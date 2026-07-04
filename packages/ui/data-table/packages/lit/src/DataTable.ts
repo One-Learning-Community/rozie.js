@@ -1157,7 +1157,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
           <button class="rdt-resize-handle" type="button" aria-label=${rozieAttr('Resize ' + this.headerLabel(header.column.id))} @pointerdown=${($event: Event) => { this.onResizeStart(header.column.id, $event); }} @touchstart=${($event: Event) => { this.onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button>
         </span>`}</th>`)}
     </tr>`)}
-  </thead>
+    
+    ${this.hasAnyFilterableColumn() ? html`<tr class="rdt-filter-row" data-rozie-s-d5dcab4c>
+      ${repeat<any>(this._headerGroups.value[this._headerGroups.value.length - 1].headers, (header, _idx) => header.id, (header, _idx) => html`<th class="rdt-filter-cell" role="presentation" key=${rozieAttr(header.id)} style=${rozieStyle(this.pinStyle(header.column.id))} data-rozie-s-d5dcab4c>
+        ${this.isSelectColumn(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : this.isExpanderColumn(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : html`<span style="display:contents" data-rozie-s-d5dcab4c>
+          ${this.columnIsFilterable(header.column.id) && !this.hasFilterSlot() ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: Event) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}${this.columnIsFilterable(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
+            ${this.filter !== undefined ? this.filter({columnId: header.column.id, uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id)}); } catch { return '{}'; } })()} @rozie-filter-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}></slot>`}
+          </span>` : nothing}</span>`}</th>`)}
+    </tr>` : nothing}</thead>
 
   <tbody class="rdt-tbody" role="rowgroup" data-rozie-s-d5dcab4c>
     

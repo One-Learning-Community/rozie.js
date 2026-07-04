@@ -1898,6 +1898,41 @@ $expose({
         </span>
       </th>
     </tr>
+    <!-- Dedicated filter row (phase 72, D-04/D-10) — IDENTICAL to the virtual-branch twin
+         above. See that comment for the full rationale (leaf-header-group iteration,
+         gating, pin alignment, grid-nav inertness). -->
+    <tr class="rdt-filter-row" r-if="hasAnyFilterableColumn()">
+      <th
+        class="rdt-filter-cell"
+        role="presentation"
+        r-for="header in $data.headerGroups[$data.headerGroups.length - 1].headers"
+        :key="header.id"
+        :style="pinStyle(header.column.id)"
+      >
+        <span style="display:contents" r-if="isSelectColumn(header.column.id)"></span>
+        <span style="display:contents" r-else-if="isExpanderColumn(header.column.id)"></span>
+        <span style="display:contents" r-else>
+          <input
+            r-if="columnIsFilterable(header.column.id) && !hasFilterSlot()"
+            class="rdt-col-filter"
+            type="text"
+            :aria-label="'Filter ' + headerLabel(header.column.id)"
+            :value="columnFilterValue(header.column.id)"
+            @input="onColumnFilterInput(header.column.id, $event)"
+            @click="stopEvent($event)"
+          />
+          <span style="display:contents" r-if="columnIsFilterable(header.column.id)">
+            <slot
+              name="filter"
+              :columnId="header.column.id"
+              :uniqueValues="getFacetedUniqueValues(header.column.id)"
+              :minMax="getFacetedMinMaxValues(header.column.id)"
+              :setFilter="setColumnFilter"
+            />
+          </span>
+        </span>
+      </th>
+    </tr>
   </thead>
 
   <tbody class="rdt-tbody" role="rowgroup">

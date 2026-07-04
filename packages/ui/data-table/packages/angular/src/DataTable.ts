@@ -410,7 +410,28 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }
         </tr>
     }
-      </thead>
+        
+        @if (hasAnyFilterableColumn()) {
+    <tr class="rdt-filter-row">
+          @for (header of headerGroups()[headerGroups().length - 1].headers; track header.id) {
+    <th class="rdt-filter-cell" role="presentation" [style]="pinStyle(header.column.id)">
+            @if (isSelectColumn(header.column.id)) {
+    <span style="display:contents"></span>
+    } @else if (isExpanderColumn(header.column.id)) {
+    <span style="display:contents"></span>
+    } @else {
+    <span style="display:contents">
+              @if (columnIsFilterable(header.column.id) && !hasFilterSlot()) {
+    <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
+    }@if (columnIsFilterable(header.column.id)) {
+    <span style="display:contents">
+                <ng-container *ngTemplateOutlet="(filterTpl ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
+              </span>
+    }</span>
+    }</th>
+    }
+        </tr>
+    }</thead>
 
       <tbody class="rdt-tbody" role="rowgroup">
         

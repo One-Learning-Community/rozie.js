@@ -3964,7 +3964,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
               <button type="button" className={"rdt-resize-handle"} aria-label={rozieAttr('Resize ' + headerLabel(header.column.id))} onPointerDown={($event) => { onResizeStart(header.column.id, $event); }} onTouchStart={($event) => { onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c=""><span className={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
             </span>}</th>)}
         </tr>)}
-      </thead>
+        
+        {!!(hasAnyFilterableColumn()) && <tr className={"rdt-filter-row"} data-rozie-s-d5dcab4c="">
+          {headerGroups[headerGroups.length - 1].headers.map((header) => <th key={header.id} className={"rdt-filter-cell"} role="presentation" style={parseInlineStyle(pinStyle(header.column.id))} data-rozie-s-d5dcab4c="">
+            {(isSelectColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : (isExpanderColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {!!(columnIsFilterable(header.column.id) && !hasFilterSlot()) && <input className={"rdt-col-filter"} type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" />}{!!(columnIsFilterable(header.column.id)) && <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {(props.renderFilter ?? props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter })}
+              </span>}</span>}</th>)}
+        </tr>}</thead>
 
       <tbody className={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         

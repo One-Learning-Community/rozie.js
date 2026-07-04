@@ -5252,7 +5252,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
               {(_props.selectAllSlot ?? _props.slots?.['selectAll'])?.({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) ?? <Show when={local.selectionMode === 'multiple'}><input type="checkbox" aria-label="Select all rows" class={"rdt-select-all"} checked={isAllRowsSelected()} onChange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" /></Show>}
             </span></Show>}</th>}</For>
         </tr>}</For>
-      </thead>
+        
+        {<Show when={hasAnyFilterableColumn()}><tr class={"rdt-filter-row"} data-rozie-s-d5dcab4c="">
+          <For each={headerGroups()[headerGroups().length - 1].headers}>{(header) => <th class={"rdt-filter-cell"} role="presentation" style={parseInlineStyle(pinStyle(header.column.id))} data-rozie-s-d5dcab4c="">
+            {<Show when={isSelectColumn(header.column.id)} fallback={<Show when={isExpanderColumn(header.column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {<Show when={columnIsFilterable(header.column.id) && !hasFilterSlot()}><input type="text" aria-label={rozieAttr('Filter ' + headerLabel(header.column.id))} class={"rdt-col-filter"} value={columnFilterValue(header.column.id)} onInput={($event) => { onColumnFilterInput(header.column.id, $event); }} onClick={($event) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" /></Show>}{<Show when={columnIsFilterable(header.column.id)}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+                {(_props.filterSlot ?? _props.slots?.['filter'])?.({ columnId: header.column.id, uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter })}
+              </span></Show>}</span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}</th>}</For>
+        </tr></Show>}</thead>
 
       <tbody class={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         
