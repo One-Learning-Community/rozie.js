@@ -519,6 +519,18 @@ export default defineConfig(async () => {
   const datePickerSrc = resolve(__dirname, '..', '..', 'packages', 'ui', 'date-picker', 'src');
   const resizableSrc = resolve(__dirname, '..', '..', 'packages', 'ui', 'resizable', 'src');
   const commandPaletteSrc = resolve(__dirname, '..', '..', 'packages', 'ui', 'command-palette', 'src');
+  // Phase 72 / D-07 — cross-family composite #3 (after command-palette→combobox):
+  // data-table's DataTable.rozie composes the popover primitive via the STABLE
+  // D-07 specifier `@rozie-ui/popover/Popover.rozie` (compile-time type
+  // threading resolves through the primitive's `exports` map). Data-table's OWN
+  // codegen.mjs remaps that specifier to a LOCAL vendored sibling before
+  // compile, so the shipped leaf never hits this — but the VR harness compiles
+  // the RAW authored source, so we reproduce that vendoring here too: alias the
+  // emitted `@rozie-ui/popover/Popover*` import to data-table's vendored copy
+  // (byte-identical to canonical per the D-04 drift guard), NOT the canonical
+  // `@rozie-ui/popover` package. The vendored home is `data-table/src`
+  // (dataTableSrc, defined above), not `packages/ui/popover/src`.
+  const dataTablePopoverSrc = dataTableSrc;
   // Phase 64 (D-08): @rozie-ui/headless-core is a SOURCE-ONLY package of shared
   // `.rzts` script-partials (smoke.rzts P0; windowing.rzts P1; listCore.rzts P2).
   // HeadlessCoreSmokeDemo (examples/demos) imports a partial via the BARE
@@ -577,6 +589,22 @@ export default defineConfig(async () => {
       {
         find: /^@rozie-ui\/combobox\/Combobox(\.\w+)?$/,
         replacement: resolve(commandPaletteSrc, 'Combobox.rozie'),
+      },
+      // Phase 72 / D-07 — cross-family composite #3: data-table's
+      // DataTable.rozie composes popover via the STABLE specifier
+      // `@rozie-ui/popover/Popover.rozie`, emitted per-target as an
+      // ext-swapped cross-package specifier (`@rozie-ui/popover/Popover`,
+      // `…/Popover.vue`, `…/Popover.svelte`). The VR harness compiles the raw
+      // authored source (data-table's own codegen.mjs vendoring remap does
+      // NOT run here), so alias the emitted specifier to data-table's
+      // VENDORED copy (byte-identical to canonical per the D-04 drift guard)
+      // — NOT the canonical `@rozie-ui/popover` package. Anchored to the
+      // `/Popover` subpath only (not a bare `@rozie-ui/popover` alias) so
+      // popover's OWN VR cells (which import it by relative path, not this
+      // bare specifier) are unaffected.
+      {
+        find: /^@rozie-ui\/popover\/Popover(\.\w+)?$/,
+        replacement: resolve(dataTablePopoverSrc, 'Popover.rozie'),
       },
     ],
   },
