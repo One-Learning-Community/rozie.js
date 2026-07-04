@@ -69,13 +69,12 @@ const editorOptionsOf = (colId) => {
 // column marked 'custom' with no slot supplied degrades to the text editor, never blank).
 const hasEditorSlot = (colId) => editorTypeOf(colId) === 'custom' && !!$slots.editor
 
-// hasFilterSlot: the consumer supplied a #filter scoped slot, so it OWNS the per-column
-// filter UI — the built-in text input is suppressed (slot REPLACES built-in, mirroring
-// #editor/#cell/#colHeader), never rendered alongside it (the double-input bug). Global,
-// not per-column: the single #filter slot dispatches by columnId internally (with an
-// r-else fallback), so its mere presence takes over filtering for every filterable column.
-const hasFilterSlot = () => !!$slots.filter
-
+// hasFilterSlot (phase 72, temporarily REMOVED): the consumer supplied a #filter scoped
+// slot, so it OWNS the per-column filter UI. This helper referenced `$slots.filter`,
+// which ROZ103-errors now that BOTH header branches (72-03) have removed their
+// `<slot name="filter">` host — the filter UI (inline input + #filter slot) relocates to
+// the dedicated filter row in 72-05, which will re-render a `<slot name="filter">` and
+// can reinstate this exact helper (`() => !!$slots.filter`) at that point.
 const columnIsFilterable = (colId) => {
   const d = defFor(colId)
   return !!(d && d.filterable)
@@ -202,4 +201,4 @@ const thStyle = (colId) => {
   return s
 }
 
-export { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, hasFilterSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle }
+export { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle }

@@ -517,4 +517,3 @@ The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filt
 | cell | columnId, column, row, value |
 | editor | columnId, column, row, value, commit, cancel |
 | detail | row |
-| filter | columnId, uniqueValues, minMax, setFilter |

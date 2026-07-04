@@ -86,13 +86,6 @@ interface RozieDetailSlotCtx {
   row: unknown;
 }
 
-interface RozieFilterSlotCtx {
-  columnId: unknown;
-  uniqueValues: unknown;
-  minMax: unknown;
-  setFilter: unknown;
-}
-
 @customElement('rozie-data-table')
 export default class DataTable extends SignalWatcher(LitElement) {
   static styles = css`
@@ -589,9 +582,6 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @state() private _hasSlotDetail = false;
   @queryAssignedElements({ slot: 'detail', flatten: true }) private _slotDetailElements!: Element[];
   @property({ attribute: false }) detail?: (scope: { row: unknown }) => unknown;
-  @state() private _hasSlotFilter = false;
-  @queryAssignedElements({ slot: 'filter', flatten: true }) private _slotFilterElements!: Element[];
-  @property({ attribute: false }) filter?: (scope: { columnId: unknown; uniqueValues: unknown; minMax: unknown; setFilter: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -686,17 +676,6 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
         update();
       }
     }
-
-    {
-      const slotEl = this.shadowRoot?.querySelector('slot[name="filter"]');
-      if (slotEl !== null && slotEl !== undefined) {
-        const update = () => { this._hasSlotFilter = this._slotFilterElements.length > 0; };
-        slotEl.addEventListener('slotchange', update);
-        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
-        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
-        update();
-      }
-    }
   }
 
   connectedCallback(): void {
@@ -709,7 +688,6 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     this._hasSlotCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'cell');
     this._hasSlotEditor = Array.from(this.children).some((el) => el.getAttribute('slot') === 'editor');
     this._hasSlotDetail = Array.from(this.children).some((el) => el.getAttribute('slot') === 'detail');
-    this._hasSlotFilter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'filter');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -1137,13 +1115,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
             <span class="rdt-header-label" data-rozie-s-d5dcab4c>
               ${this.colHeader !== undefined ? this.colHeader({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}) : html`<slot name="colHeader" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, column: header.column, label: this.headerLabel(header.column.id)}); } catch { return '{}'; } })()}>${rozieDisplay(this.headerLabel(header.column.id))}</slot>`}
             </span>
-          </span>`}${this.columnIsFilterable(header.column.id) && !this.hasFilterSlot() ? html`<input class="rdt-col-filter" type="text" aria-label=${rozieAttr('Filter ' + this.headerLabel(header.column.id))} .value=${this.columnFilterValue(header.column.id)} @input=${($event: Event) => { this.onColumnFilterInput(header.column.id, $event); }} @click=${($event: Event) => { this.stopEvent($event); }} data-rozie-s-d5dcab4c />` : nothing}${this.columnIsFilterable(header.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.filter !== undefined ? this.filter({columnId: header.column.id, uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id), setFilter: this.setColumnFilter}) : html`<slot name="filter" data-rozie-params=${(() => { try { return JSON.stringify({columnId: header.column.id, uniqueValues: this.getFacetedUniqueValues(header.column.id), minMax: this.getFacetedMinMaxValues(header.column.id)}); } catch { return '{}'; } })()} @rozie-filter-set-filter=${($event: CustomEvent) => ((this.setColumnFilter) as (...args: any[]) => any)($event.detail)}></slot>`}
-          </span>` : nothing}<span class="rdt-pin-controls" role="group" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id))} data-rozie-s-d5dcab4c>
-            <button class="rdt-pin-btn rdt-pin-left" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to left')} aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>⇤</button>
-            <button class="rdt-pin-btn rdt-pin-none" type="button" aria-label=${rozieAttr('Unpin ' + this.headerLabel(header.column.id))} aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: Event) => { this.onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>⇔</button>
-            <button class="rdt-pin-btn rdt-pin-right" type="button" aria-label=${rozieAttr('Pin ' + this.headerLabel(header.column.id) + ' to right')} aria-pressed=${this.columnPinSide(header.column.id) === 'right'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>⇥</button>
-          </span>
+          </span>`}<rozie-popover trigger="click" placement="bottom-end" strategy="fixed" .offset=${4} data-rozie-s-d5dcab4c .anchor=${(scope: { toggle: unknown }) => html`
+              <button class="rdt-col-menu-trigger" type="button" aria-label=${rozieAttr('Column options for ' + this.headerLabel(header.column.id))} @click=${scope.toggle} data-rozie-s-d5dcab4c>⋯</button>
+            `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}><div class="rdt-col-menu" role="menu" data-rozie-s-d5dcab4c>
+              <button class="rdt-col-menu-item" type="button" role="menuitem" aria-pressed=${this.columnPinSide(header.column.id) === 'left'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'left', $event); }} data-rozie-s-d5dcab4c>Pin left</button>
+              <button class="rdt-col-menu-item" type="button" role="menuitem" aria-pressed=${this.columnPinSide(header.column.id) === 'right'} @click=${($event: Event) => { this.onPinColumn(header.column.id, 'right', $event); }} data-rozie-s-d5dcab4c>Pin right</button>
+              <button class="rdt-col-menu-item" type="button" role="menuitem" aria-pressed=${!this.columnPinSide(header.column.id)} @click=${($event: Event) => { this.onPinColumn(header.column.id, false, $event); }} data-rozie-s-d5dcab4c>Unpin</button>
+              <hr class="rdt-col-menu-sep" data-rozie-s-d5dcab4c />
+              <button class="rdt-col-menu-item" type="button" role="menuitem" @click=${($event: Event) => { this.onHideColumn(header.column.id, $event); }} data-rozie-s-d5dcab4c>Hide column</button>
+            </div></rozie-popover>
           
           <button class="rdt-resize-handle" type="button" aria-label=${rozieAttr('Resize ' + this.headerLabel(header.column.id))} @pointerdown=${($event: Event) => { this.onResizeStart(header.column.id, $event); }} @touchstart=${($event: Event) => { this.onResizeStart(header.column.id, $event); }} data-rozie-s-d5dcab4c><span class="rdt-resize-grip" aria-hidden="true" data-rozie-s-d5dcab4c></span></button>
         </span>`}</th>`)}
@@ -1988,8 +1968,6 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 };
 
   hasEditorSlot = (colId: any) => this.editorTypeOf(colId) === 'custom' && !!(this._hasSlotEditor || this.editor !== undefined);
-
-  hasFilterSlot = () => !!(this._hasSlotFilter || this.filter !== undefined);
 
   columnIsFilterable = (colId: any) => {
   const d = this.defFor(colId);
