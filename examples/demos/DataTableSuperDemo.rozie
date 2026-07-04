@@ -128,6 +128,17 @@
   NOT reach it (shadow encapsulation) — a real per-target theming finding
   for Task 8. Vue (light DOM) is the validated target for this revision.
 
+  Task 8 (phase 72, plan 07 — this revision): exercises the phase-72 header
+  ⋯ menu (Pin left/right/Unpin/Hide, composed-Popover) and the dedicated
+  filter row across all six targets (tests/visual-regression/specs/
+  data-table-header-menu.spec.ts). `id` is `pinned="right"` (already-pinned
+  precedent for the menu's Unpin path) and the `#filter` slot now dispatches
+  via `r-match`/`r-case`/`r-default` (Phase-11) instead of r-if/r-else-if.
+  Adds ONE new imperative-handle button, `verb-toggleColumnVisibility`,
+  re-showing a column hidden via the ⋯ menu's "Hide column" item — the demo
+  has no dedicated column-visibility checkbox panel, so the $expose verb is
+  the only re-show affordance.
+
   Behavioral-only — NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
 -->
 
@@ -173,7 +184,7 @@
   globalFilter: '',
   columnFilters: [],
   rowSelection: {},
-  pagination: { pageIndex: 0, pageSize: 20 },
+  pagination: { pageIndex: 0, pageSize: 25 },
   // Renamed from `grouping` (Task 6): the #groupBar slot's `grouping` let-var
   // shadows an Angular `grouping` signal (DataTableGroupBarDemo.rozie's
   // proven fix). `data-slice="grouping"` readout KEY is unchanged.
@@ -190,6 +201,9 @@
   virtual: false,
   selectionMode: 'multiple',
   manualPagination: false,
+  stickyHeader: true,
+  groupable: true,
+  expandable: true,
 
   // ── Task 4: editing ────────────────────────────────────────────────────
   // Select-editor options for the category/status columns (mirrors the row
@@ -310,7 +324,6 @@ $onMount(() => {
         </select>
       </label>
       <label><input data-testid="ctl-manual" type="checkbox" r-model="$data.manualPagination" /> manual pagination</label>
-      <label><input data-testid="ctl-handle" type="checkbox" r-model="$data.showHandle" /> imperative panel</label>
       <label>theme
         <select data-testid="ctl-theme" r-model="$data.theme" @change="applyTheme($data.theme)">
           <option value="base">base</option>
@@ -319,6 +332,10 @@ $onMount(() => {
           <option value="bootstrap">bootstrap</option>
         </select>
       </label>
+      <label><input data-testid="ctl-stickyHeader" type="checkbox" r-model="$data.stickyHeader" /> sticky header</label>
+      <label><input data-testid="ctl-groupable" type="checkbox" r-model="$data.groupable" /> groupable</label>
+      <label><input data-testid="ctl-expandable" type="checkbox" r-model="$data.expandable" /> expandable</label>
+      <label><input data-testid="ctl-handle" type="checkbox" r-model="$data.showHandle" /> imperative panel</label>
     </fieldset>
 
     <!-- `virtual` is a construction-time-only prop on DataTable — the vertical
@@ -337,15 +354,15 @@ $onMount(() => {
       ref="tbl"
       :key="String($data.virtual)"
       :data="$data.rows"
-      :stickyHeader="true"
       :interactionMode="$data.gridMode ? 'grid' : 'table'"
       :virtual="$data.virtual"
       :maxHeight="'440px'"
       :estimateRowHeight="40"
       :selectionMode="$data.selectionMode"
       :manual="$data.manualPagination"
-      :groupable="true"
-      :expandable="true"
+      :stickyHeader="$data.stickyHeader"
+      :groupable="$data.groupable"
+      :expandable="$data.expandable"
       r-model:sorting="$data.sorting"
       r-model:globalFilter="$data.globalFilter"
       r-model:columnFilters="$data.columnFilters"
@@ -359,7 +376,7 @@ $onMount(() => {
       r-model:columnPinning="$data.columnPinning"
       @cell-edit-commit="onCommit"
     >
-      <Column field="id"         header="#"         :sortable="true" :groupable="false" />
+      <Column field="id"         header="#"         :sortable="true" :groupable="false" pinned="right" />
       <Column field="customer"   header="Customer"  :sortable="true" :filterable="true" :editable="true" editor="custom" />
       <Column field="category"   header="Category"  :sortable="true" :filterable="true" :editable="true" editor="custom" />
       <Column field="amount"     header="Amount"    :sortable="true" :groupable="false" :filterable="true" :editable="true" editor="custom" />
@@ -419,18 +436,20 @@ $onMount(() => {
            FilterText (everything else) drop-ins (mirrors
            DataTableFilterDropinsDemo.rozie's proven idiom). -->
       <template #filter="{ columnId, uniqueValues, minMax, setFilter }">
-        <FilterSelect
-          r-if="columnId === 'category' || columnId === 'status'"
-          :columnId="columnId" :setFilter="setFilter" :uniqueValues="uniqueValues"
-        />
-        <FilterNumberRange
-          r-else-if="columnId === 'amount'"
-          :columnId="columnId" :setFilter="setFilter" :minMax="minMax"
-        />
-        <FilterText
-          r-else
-          :columnId="columnId" :setFilter="setFilter"
-        />
+        <template r-match="columnId">
+          <FilterSelect
+            r-case="'category', 'status'"
+            :columnId="columnId" :setFilter="setFilter" :uniqueValues="uniqueValues"
+          />
+          <FilterNumberRange
+            r-case="'amount'"
+            :columnId="columnId" :setFilter="setFilter" :minMax="minMax"
+          />
+          <FilterText
+            r-default
+            :columnId="columnId" :setFilter="setFilter"
+          />
+        </template>
       </template>
 
       <!-- Task 5: the #detail scoped slot filled with the real DetailPanel drop-in
@@ -458,6 +477,12 @@ $onMount(() => {
       <button data-testid="verb-setPage" @click="$refs.tbl.setPage(2)">setPage(2)</button>
       <button data-testid="verb-resetColumnSizing" @click="$refs.tbl.resetColumnSizing()">resetColumnSizing</button>
       <button data-testid="verb-pinColumn" @click="$refs.tbl.pinColumn('customer','left')">pinColumn</button>
+      <!-- Task 8 (72-07 behavioral spec): re-show a column hidden via the header
+           ⋯ menu's "Hide column" item — the only colvis affordance this demo
+           renders is the imperative $expose verb below (there is no dedicated
+           column-visibility checkbox panel), matching the "Hide column removes
+           the column; the colvis toggle can re-show it" coverage requirement. -->
+      <button data-testid="verb-toggleColumnVisibility" @click="$refs.tbl.toggleColumnVisibility('units')">toggleColumnVisibility(units)</button>
     </fieldset>
 
     <aside data-testid="readout">
@@ -477,7 +502,7 @@ $onMount(() => {
   </main>
 </template>
 
-<style>
+<style lang="scss">
 main[data-testid="dt-super"] {
   font-family: system-ui, -apple-system, sans-serif;
   color: #1a1a1a;
@@ -495,6 +520,20 @@ aside[data-testid="readout"] code {
   font-family: ui-monospace, monospace;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+fieldset[data-testid="controls"] {
+    display: flex;
+    gap: 4px;
+    align-items: stretch;
+    flex-wrap: wrap;
+
+    label {
+        display: inline-block;
+        border: 1px solid #ccc;
+        padding: 4px;
+        white-space: nowrap;
+    }
 }
 </style>
 
