@@ -31,7 +31,9 @@
  * Phase 66 (D-1): the match itself was LIFTED into the shared core resolver
  * `resolveComponentRefs`. This function is now a pure internal redirect that
  * preserves the exported `collectComponentRefTypes` name + `Map<string,string>`
- * return so its sole consumer (emitScript.ts) is untouched. The returned Map is
+ * return so its consumers (emitScript.ts, rewriteScript.ts, and the inline-
+ * template paths rewriteListenerExpression.ts / rewriteTemplateExpression.ts)
+ * are untouched. The returned Map is
  * identical to the pre-lift output for the same input (behavior-preserving —
  * Angular leaf output must stay byte-identical, CONTEXT P1).
  */

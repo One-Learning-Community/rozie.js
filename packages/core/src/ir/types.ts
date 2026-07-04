@@ -855,14 +855,20 @@ export interface TemplateElementIR {
    * `isExternal`: absent on every element without a component-level `:key`,
    * so existing corpus IR is byte-identical (no rebless for the front-end).
    *
-   * Set in `lowerBareElement`: when present, the raw `key` binding is REMOVED
-   * from `attributes` (it is no longer a generic prop) and its expression is
-   * carried here instead. Each per-target emitter consumes this field to
-   * produce that target's native keyed-remount construct (React `key={…}`,
-   * Vue's existing vnode `key`, Lit `keyed()`, Svelte `{#key}`, Solid
-   * `<Show keyed>`, Angular structural recreation) so the child is destroyed
-   * and recreated — not just patched — when the key expression's value
-   * changes.
+   * Set in `lowerBareElement`: when present, this carries a COPY of the `key`
+   * binding's expression. The raw `key` binding is deliberately RETAINED in
+   * `attributes` (NOT stripped) — Vue's emitter has no `key`-drop filter for a
+   * bare component and relies on the raw `:key` surviving to emit its working
+   * vnode-key remount; stripping it in lowering silently deleted that (the
+   * reverted regression, commit f856a27a). Instead, each NON-Vue emitter
+   * consumes this field to produce its native keyed-remount construct
+   * (React `key={…}`, Lit `keyed()`, Svelte `{#key}`, Solid `<Show keyed>`,
+   * Angular structural recreation) AND suppresses the now-redundant raw `key`
+   * at its own emit seam (React/Solid drop it via `isConsumedAttribute`;
+   * Svelte/Angular/Lit strip it explicitly). Vue is left untouched. The result:
+   * the child is destroyed and recreated — not just patched — when the key
+   * expression's value changes. NOTE for a future 7th-target emitter: the raw
+   * `key` binding is STILL in `attributes` here — you must strip it yourself.
    */
   remountKeyExpression?: Expression;
   /**

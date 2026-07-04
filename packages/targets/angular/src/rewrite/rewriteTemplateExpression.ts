@@ -11,7 +11,9 @@
  *   - `$props.value`  (model)     → `value()`     (signal call, no `this.`)
  *   - `$props.step`   (non-model) → `step()`
  *   - `$data.hovering`            → `hovering()`
- *   - `$refs.dialogEl`            → `dialogEl()?.nativeElement`
+ *   - `$refs.dialogEl`            → `dialogEl()?.nativeElement` (DOM-element ref)
+ *   - `$refs.tbl` (composed ref)  → `tbl()` (component instance — NO `.nativeElement`,
+ *                                   so `$expose`d verbs resolve; see componentRefs.ts)
  *   - `$slots.foo`                → `fooTpl` (TemplateRef ref check is `!!fooTpl`)
  *   - `$emit('foo', x)`           → `foo.emit(x)` (no `this.` prefix in template)
  *
