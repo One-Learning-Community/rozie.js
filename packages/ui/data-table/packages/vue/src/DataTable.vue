@@ -6164,6 +6164,16 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
   width: 100%;
   font-weight: normal;
 }
+.rozie-data-table .rdt-filter-row {
+  background: var(--rdt-filter-row-bg, rgba(0, 0, 0, 0.015));
+}
+.rozie-data-table .rdt-filter-cell {
+  padding: var(--rdt-filter-cell-padding, 0.35rem 0.75rem);
+  border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table-wrap .rdt-filter-row :deep(.rdt-col-filter) {
+  font-size: var(--rdt-filter-row-input-size, 0.9em);
+}
 .rozie-data-table-wrap .rdt-pagination {
   display: flex;
   align-items: center;
@@ -6220,25 +6230,55 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
 .rozie-data-table .rdt-th-resizing .rdt-resize-grip {
   background: var(--rdt-resize-grip-active, rgba(0, 0, 0, 0.4));
 }
-.rozie-data-table .rdt-pin-controls {
-  display: inline-flex;
-  gap: var(--rdt-pin-gap, 0.1em);
-  margin-left: var(--rdt-pin-margin, 0.35em);
-}
-.rozie-data-table .rdt-pin-btn {
+.rozie-data-table .rdt-col-menu-trigger {
   font: inherit;
-  font-size: var(--rdt-pin-btn-size, 0.8em);
+  font-size: var(--rdt-col-menu-trigger-size, 0.9em);
   line-height: 1;
   cursor: pointer;
-  padding: var(--rdt-pin-btn-padding, 0.1em 0.25em);
-  border: var(--rdt-pin-btn-border, 1px solid rgba(0, 0, 0, 0.15));
-  border-radius: var(--rdt-pin-btn-radius, 3px);
-  background: var(--rdt-pin-btn-bg, transparent);
+  margin-left: var(--rdt-col-menu-trigger-margin, 0.35em);
+  padding: var(--rdt-col-menu-trigger-padding, 0.15em 0.4em);
+  border: var(--rdt-col-menu-trigger-border, 1px solid rgba(0, 0, 0, 0.15));
+  border-radius: var(--rdt-col-menu-trigger-radius, 3px);
+  background: var(--rdt-col-menu-trigger-bg, transparent);
   color: inherit;
 }
-.rozie-data-table .rdt-pin-btn[aria-pressed='true'] {
+.rozie-data-table .rdt-col-menu-trigger:hover {
+  background: var(--rdt-col-menu-trigger-hover-bg, rgba(0, 0, 0, 0.06));
+}
+.rozie-data-table .rdt-col-menu-trigger:focus-visible {
+  outline: var(--rdt-col-menu-trigger-focus-outline, 2px solid #2563eb);
+  outline-offset: 1px;
+}
+.rozie-data-table .rdt-col-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rdt-col-menu-item-gap, 0.15rem);
+  min-width: var(--rdt-col-menu-min-width, 9rem);
+}
+.rozie-data-table .rdt-col-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  padding: var(--rdt-col-menu-item-padding, 0.35em 0.6em);
+  border: none;
+  border-radius: var(--rdt-col-menu-item-radius, 3px);
+  background: none;
+  color: inherit;
+  white-space: nowrap;
+}
+.rozie-data-table .rdt-col-menu-item:hover {
+  background: var(--rdt-col-menu-item-hover-bg, rgba(0, 0, 0, 0.06));
+}
+.rozie-data-table .rdt-col-menu-item[aria-pressed='true'] {
   background: var(--rdt-pin-btn-active-bg, rgba(0, 0, 0, 0.1));
   font-weight: 700;
+}
+.rozie-data-table .rdt-col-menu-sep {
+  margin: var(--rdt-col-menu-sep-margin, 0.25rem 0);
+  border: none;
+  border-top: var(--rdt-col-menu-sep-border, 1px solid rgba(0, 0, 0, 0.1));
 }
 .rozie-data-table-wrap .rdt-colvis {
   position: relative;
