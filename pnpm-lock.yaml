@@ -2829,6 +2829,9 @@ importers:
       '@angular/forms':
         specifier: ^19
         version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      '@floating-ui/dom':
+        specifier: ^1.7.2
+        version: 1.7.6
       ng-packagr:
         specifier: ^19
         version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
@@ -2859,6 +2862,10 @@ importers:
       lit:
         specifier: ^3.2
         version: 3.3.2
+    devDependencies:
+      '@floating-ui/dom':
+        specifier: ^1.7.2
+        version: 1.7.6
 
   packages/ui/data-table/packages/react:
     dependencies:
@@ -2878,6 +2885,9 @@ importers:
         specifier: ^18.2 || ^19
         version: 19.2.6(react@19.2.6)
     devDependencies:
+      '@floating-ui/dom':
+        specifier: ^1.7.2
+        version: 1.7.6
       '@types/react':
         specifier: ^18
         version: 18.3.28
@@ -2899,6 +2909,10 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@floating-ui/dom':
+        specifier: ^1.7.2
+        version: 1.7.6
 
   packages/ui/data-table/packages/svelte:
     dependencies:
@@ -2912,6 +2926,9 @@ importers:
         specifier: ^3
         version: 3.17.1
     devDependencies:
+      '@floating-ui/dom':
+        specifier: ^1.7.2
+        version: 1.7.6
       '@sveltejs/package':
         specifier: ^2
         version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
@@ -2934,6 +2951,9 @@ importers:
         specifier: workspace:*
         version: link:../../../../runtime/vue
     devDependencies:
+      '@floating-ui/dom':
+        specifier: ^1.7.2
+        version: 1.7.6
       '@tanstack/table-core':
         specifier: ^8.21
         version: 8.21.3

@@ -51,7 +51,8 @@
   "peerDependencies": {
     "svelte": "^5",
     "@tanstack/table-core": "^8.21",
-    "@tanstack/virtual-core": "^3"
+    "@tanstack/virtual-core": "^3",
+    "@floating-ui/dom": "^1.7.2"
   },
   "peerDependenciesMeta": {
     "svelte": {
@@ -61,6 +62,9 @@
       "optional": false
     },
     "@tanstack/virtual-core": {
+      "optional": false
+    },
+    "@floating-ui/dom": {
       "optional": false
     }
   },
@@ -76,6 +80,7 @@
     "**/*.css"
   ],
   "devDependencies": {
+    "@floating-ui/dom": "^1.7.2",
     "@sveltejs/package": "^2",
     "@sveltejs/vite-plugin-svelte": "^5",
     "svelte": "^5",

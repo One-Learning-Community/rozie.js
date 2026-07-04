@@ -16,10 +16,17 @@
  * gates (Column is renderless: no $expose, no docs page). Codegen compiles each
  * sibling .rozie source into all six leaves.
  *
- * NO `copyInternal` step. This family has NO third-party vanilla engine to vendor
- * a bridge for — the @tanstack/table-core bridge is INLINE in DataTable.rozie
- * (the chartjs/rete confirmed pattern). table-core is a PEER dependency of each
- * leaf, never a colocated copy.
+ * The @tanstack/table-core bridge is INLINE in DataTable.rozie (the chartjs/rete
+ * confirmed pattern) — table-core is a PEER dependency of each leaf, never a
+ * colocated copy.
+ *
+ * VENDORED Popover (Phase 72, the command-palette→combobox precedent, the
+ * SECOND cross-family composite): the header column-menu composes the shipped
+ * <Popover strategy="fixed"> primitive by vendoring its canonical `.rozie`
+ * source (+ `internal/middleware.ts`) into this family's `src/` as a GENERATED,
+ * committed sibling — `vendorPopover()` + `copyInternal()` below. Popover is an
+ * INTERNAL implementation detail: it compiles into every leaf but is EXCLUDED
+ * from the public barrel (consumers use `@rozie-ui/popover` directly).
  *
  * REQ-1 ADAPTER-IMPORT CHECK: after compiling each leaf, this script asserts the
  * emitted code imports ONLY `@tanstack/table-core` — NEVER a per-framework
@@ -32,12 +39,16 @@
  * `import '@rozie-ui/data-table-<fw>/themes/X.css'`.
  *
  * Steps:
- *   1. read src/{DataTable,Column}.rozie
- *   2. parse() + lowerToIR() the PARENT ONCE → ir for docs tables + manifests
+ *   0. vendorPopover() — copy the canonical @rozie-ui/popover Popover.rozie
+ *      (+ internal/middleware.ts) into src/ FIRST (compile-input ordering hazard)
+ *   1. read src/{DataTable,Column,...,Popover}.rozie
+ *   2. parse() + lowerToIR() the PARENT ONCE (composed/specifier-remapped) → ir
+ *      for docs tables + manifests
  *   3. for each of the 6 targets, for each component: compile() → write leaf src/<file>
  *        (+ run the req-1 adapter-import check on the emitted code)
+ *        (Lit only: rewrite the vendored Popover's `.rozie` specifiers to extensionless siblings)
  *        (React only: also write <Component>.css / .global.css / .d.ts sidecars)
- *   4. copy src/themes/ → each leaf src/themes/
+ *   4. copy src/themes/ → each leaf src/themes/; copy src/internal/ → each leaf src/internal/
  *   5. render each leaf README from the IR + the hand-kept event/handle manifests
  *   6. vendor the repo LICENSE per leaf
  *   7. VALIDATE-NOT-OVERWRITE the docs props-table against docs/components/data-table.md
@@ -56,6 +67,7 @@ import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/data-table
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
+const POPOVER_ROOT = resolve(REPO_ROOT, 'packages/ui/popover'); // canonical primitive home (D-01)
 
 // DataTable FIRST (owns the handle-manifest + docs-table gates); Column is the
 // renderless declarative child (no $expose, no docs page — a pure addition).
@@ -64,8 +76,56 @@ const PARENT = 'DataTable';
 // Column is the renderless declarative child. The five Editor* drop-ins are
 // presentational #editor-slot fills (no $emit/$expose → no manifest entries; the
 // manifest-completeness loops key off the PARENT-only IR below, not per-component).
-// Each becomes a NAMED re-export via childExports; DataTable stays the default.
-const COMPONENTS = [PARENT, 'Column', 'EditorText', 'EditorNumber', 'EditorSelect', 'EditorCheckbox', 'EditorDate', 'FilterText', 'FilterNumberRange', 'FilterSelect', 'GroupBar', 'DetailPanel'];
+// Popover is the Phase 72 VENDORED composite — internal only, EXCLUDED from the
+// public barrel below (see childExports). Each of the rest becomes a NAMED
+// re-export via childExports; DataTable stays the default.
+const COMPONENTS = [PARENT, 'Column', 'EditorText', 'EditorNumber', 'EditorSelect', 'EditorCheckbox', 'EditorDate', 'FilterText', 'FilterNumberRange', 'FilterSelect', 'GroupBar', 'DetailPanel', 'Popover'];
+
+// D-07 (LOAD-BEARING): the authored DataTable.rozie writes a STABLE
+// package-style `<components>` specifier `@rozie-ui/popover/Popover.rozie`.
+// Under Option B (vendored) the codegen rewrites that specifier to the local
+// sibling `./Popover.rozie` BEFORE compile() so threadParamTypes resolves the
+// vendored copy on disk; the existing rewriteRozieImport then swaps
+// `.rozie`→per-target ext. The authored file is NEVER edited — only this
+// in-memory string is — so it stays byte-identical between B and a future
+// Option A (only this remap + the D-04 drift guard are B-specific, the
+// deletable plumbing). Inert until 72-03 adds the `<components>` block.
+const STABLE_POPOVER_SPECIFIER = '@rozie-ui/popover/Popover.rozie';
+const LOCAL_POPOVER_SPECIFIER = './Popover.rozie';
+
+// D-03: the GENERATED banner prepended to the vendored copy. It sits OUTSIDE the
+// `<rozie>` envelope (a leading HTML comment is tolerated — DataTable.rozie
+// itself opens with one), so the D-04 drift guard hashes only the
+// `<rozie>…</rozie>` envelope span and ignores this banner.
+const POPOVER_BANNER =
+  `<!-- GENERATED — do not edit. Vendored from @rozie-ui/popover by codegen.\n` +
+  `     Re-run \`pnpm --filter @rozie-ui/data-table codegen\` to refresh.\n` +
+  `     Drift between this copy and the canonical source FAILS CI (D-04 guard). -->\n`;
+
+/**
+ * D-03 / D-01 / D-07 — vendor the canonical Popover primitive `.rozie` (+ its
+ * `internal/middleware.ts`) into this composite's src/ as a GENERATED,
+ * committed, overwrite-on-codegen sibling.
+ *
+ * ORDERING HAZARD (the command-palette Pitfall 2 precedent): this MUST run in
+ * main() BEFORE any source is read and BEFORE the compile loop. The vendored
+ * `./Popover.rozie` is a compile INPUT — threadParamTypes' producer resolution
+ * reads it on disk for slot-type threading and degrades to `null` SILENTLY
+ * (untyped slot params, green-but-wrong codegen) if the file is missing at
+ * compile time. Contrast copyThemes which runs AFTER write because it is a
+ * leaf asset, not a compile input.
+ */
+function vendorPopover() {
+  const canonical = resolve(POPOVER_ROOT, 'src/Popover.rozie');
+  const dest = resolve(ROOT, 'src/Popover.rozie');
+  writeFileSync(dest, POPOVER_BANNER + readFileSync(canonical, 'utf8'));
+
+  const internalSrc = resolve(POPOVER_ROOT, 'src/internal');
+  cpSync(internalSrc, resolve(ROOT, 'src/internal'), {
+    recursive: true,
+    filter: (from) => !from.endsWith('.test.ts'),
+  });
+}
 
 /**
  * Per-target leaf dir + emitted file extension (`build` mode is informational).
@@ -120,6 +180,22 @@ function copyThemes(leafSrc) {
   cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
 }
 
+/**
+ * Vendor this package's OWN src/internal/ (populated by vendorPopover() with
+ * the vendored middleware.ts) → leaf src/internal/ (excluding *.test.ts), so
+ * the compiled Popover sibling's `import ... from './internal/middleware'`
+ * resolves inside the standalone bundled leaf. Mirrors command-palette's
+ * copyInternal() precedent.
+ */
+function copyInternal(leafSrc) {
+  const src = resolve(ROOT, 'src/internal');
+  if (!existsSync(src)) return;
+  cpSync(src, resolve(leafSrc, 'internal'), {
+    recursive: true,
+    filter: (from) => !from.endsWith('.test.ts'),
+  });
+}
+
 /** REQ-1: throw if the emitted code imports any per-framework @tanstack adapter. */
 function assertNoAdapterImport(target, componentName, code) {
   for (const adapter of FORBIDDEN_ADAPTERS) {
@@ -135,10 +211,22 @@ function assertNoAdapterImport(target, componentName, code) {
 }
 
 function main() {
+  // (1) D-03/D-07 ORDERING HAZARD: vendor the canonical Popover primitive into
+  // this composite's src/ FIRST — before any source is read, before parse/lower,
+  // before the compile loop. The vendored `./Popover.rozie` is a compile INPUT
+  // (the command-palette Pitfall 2 precedent).
+  vendorPopover();
+
   // Read every component source once. Keyed by component name.
   const sources = Object.fromEntries(
     COMPONENTS.map((name) => [name, readFileSync(resolve(ROOT, `src/${name}.rozie`), 'utf8')]),
   );
+
+  // D-07: pre-compile remap of the DataTable source's stable `<components>`
+  // specifier → the local vendored sibling, so threadParamTypes resolves the
+  // copy on disk. The authored file is untouched; only this in-memory string
+  // changes. Inert until 72-03 adds the `<components>` block to DataTable.rozie.
+  const composedSource = sources[PARENT].replaceAll(STABLE_POPOVER_SPECIFIER, LOCAL_POPOVER_SPECIFIER);
 
   // (2) parse + lower the PARENT ONCE for the doc tables + manifests. The
   // renderless <Column> child has no $expose and no docs page, so the
@@ -146,7 +234,9 @@ function main() {
   // Phase 54: pass the ABSOLUTE host path so inlineScriptPartials (inside lowerToIR)
   // can resolve the sibling expand/group/facet .rzts partials relative to src/. The
   // scope hash uses only the BASENAME, so absolute vs relative is byte-identical.
-  const { ast } = parse(sources[PARENT], { filename: resolve(ROOT, 'src', `${PARENT}.rozie`) });
+  // Use the composed (specifier-remapped) source so the IR's <components> resolves
+  // the local vendored sibling.
+  const { ast } = parse(composedSource, { filename: resolve(ROOT, 'src', `${PARENT}.rozie`) });
   const { ir } = lowerToIR(ast, {
     modifierRegistry: createDefaultRegistry(),
     filename: resolve(ROOT, 'src', `${PARENT}.rozie`),
@@ -178,7 +268,8 @@ function main() {
       // ./expand.rzts / ./group.rzts / ./facet.rzts). Basename-only scope hash →
       // byte-identical leaf output vs the relative-filename pre-extraction form.
       const filename = resolve(ROOT, 'src', `${componentName}.rozie`);
-      const r = compile(sources[componentName], { target, filename });
+      const componentSource = componentName === PARENT ? composedSource : sources[componentName];
+      const r = compile(componentSource, { target, filename });
       const errs = r.diagnostics.filter((d) => d.severity === 'error');
       if (errs.length) {
         throw new Error(
@@ -190,7 +281,37 @@ function main() {
       // REQ-1: assert the emitted code imports only @tanstack/table-core.
       assertNoAdapterImport(target, componentName, r.code);
 
-      writeFileSync(resolve(leafSrc, `${componentName}.${cfg.ext}`), r.code);
+      // D-07 (Option B, codegen-local plumbing — NOT an emitter edit): the Lit
+      // emitter emits a vendored-sibling composition import as a verbatim
+      // side-effect `import './Popover.rozie';` (it registers the
+      // @customElement; resolved by the rozie unplugin in the consumer-coexist
+      // flow). A pre-compiled leaf package, however, is bundled standalone by
+      // tsdown (entry src/index.ts, bundler resolution) with no unplugin and no
+      // `.rozie` on disk — only the compiled sibling `Popover.ts` — so the raw
+      // `.rozie` specifier is UNRESOLVED. Rewrite it to the extensionless
+      // sibling form (`./Popover`), exactly what rewriteRozieImport(·,'lit')
+      // yields and what the react/solid/angular leaves already import.
+      //
+      // If the parent ALSO `ref`s the composed child, the Lit emitter emits a
+      // NAMED TYPE import `import type { Popover } from './Popover.rozie';`
+      // (the element-class type for the `@query` ref field, Phase 66
+      // composed-component-ref precedent) — collapse to a DEFAULT type import
+      // off the extensionless sibling (every other target's compiled leaf
+      // exports the class as `export default class Popover`). Then strip any
+      // residual relative `.rozie` specifier. Lit-only, sibling-relative only;
+      // leaves the canonical/consumer `.rozie` contract untouched.
+      const code =
+        target === 'lit'
+          ? r.code
+              .replace(/import '\.\/([A-Za-z0-9_]+)\.rozie';/g, "import './$1';")
+              .replace(
+                /import type \{ ([A-Za-z0-9_]+) \} from '\.\/([A-Za-z0-9_]+)\.rozie'/g,
+                "import type $1 from './$2'",
+              )
+              .replace(/from '\.\/([A-Za-z0-9_]+)\.rozie'/g, "from './$1'")
+          : r.code;
+
+      writeFileSync(resolve(leafSrc, `${componentName}.${cfg.ext}`), code);
 
       // React-only sidecars, per component. The renderless Column emits no
       // synthesized handle type; the `if (r.css)` / `if (r.types)` guards already
@@ -225,7 +346,10 @@ function main() {
         ? `export { ${name} } from './${name}${bx}';\n`
         : `export { default as ${name} } from './${name}${bx}';\n`;
 
-    const childExports = COMPONENTS.filter((n) => n !== PARENT).map(reexport).join('');
+    // CRITICAL: Popover is EXCLUDED alongside PARENT — it is an internal
+    // implementation detail of the header column-menu, NOT re-exported.
+    // Consumers who want a standalone popover use `@rozie-ui/popover` directly.
+    const childExports = COMPONENTS.filter((n) => n !== PARENT && n !== 'Popover').map(reexport).join('');
     const handleType =
       (target === 'react' || target === 'solid') && ir.expose.length > 0
         ? `\n/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
@@ -241,8 +365,9 @@ function main() {
       handleType;
     writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
 
-    // (4) vendor the design-token presets.
+    // (4) vendor the design-token presets + the vendored Popover's internal middleware.
     copyThemes(leafSrc);
+    copyInternal(leafSrc);
 
     // (5) README from the single PARENT IR parse.
     const pkgName = leafPkgName(cfg.dir);
@@ -254,7 +379,7 @@ function main() {
 
     const sidecars = target === 'react' ? ' (+ .css/.global.css/.d.ts)' : '';
     const files = COMPONENTS.map((n) => `${n}.${cfg.ext}`).join(', ');
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓ (+ themes/)`);
+    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓ (+ themes/ + internal/)`);
   }
 
   // (7) ENFORCE docs props-table validation against docs/components/data-table-api.md

@@ -50,7 +50,8 @@
   "peerDependencies": {
     "solid-js": "^1.8",
     "@tanstack/table-core": "^8.21",
-    "@tanstack/virtual-core": "^3"
+    "@tanstack/virtual-core": "^3",
+    "@floating-ui/dom": "^1.7.2"
   },
   "peerDependenciesMeta": {
     "solid-js": {
@@ -61,7 +62,13 @@
     },
     "@tanstack/virtual-core": {
       "optional": false
+    },
+    "@floating-ui/dom": {
+      "optional": false
     }
+  },
+  "devDependencies": {
+    "@floating-ui/dom": "^1.7.2"
   },
   "scripts": {
     "build": "tsdown",

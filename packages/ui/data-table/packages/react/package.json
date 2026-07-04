@@ -51,7 +51,8 @@
     "react": "^18.2 || ^19",
     "react-dom": "^18.2 || ^19",
     "@tanstack/table-core": "^8.21",
-    "@tanstack/virtual-core": "^3"
+    "@tanstack/virtual-core": "^3",
+    "@floating-ui/dom": "^1.7.2"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -65,9 +66,13 @@
     },
     "@tanstack/virtual-core": {
       "optional": false
+    },
+    "@floating-ui/dom": {
+      "optional": false
     }
   },
   "devDependencies": {
+    "@floating-ui/dom": "^1.7.2",
     "@types/react": "^18",
     "@types/react-dom": "^18"
   },
