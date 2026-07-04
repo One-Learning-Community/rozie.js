@@ -36,6 +36,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const CANONICAL = resolve(HERE, '..', '..', 'popover', 'src', 'Popover.rozie');
 const VENDORED = resolve(HERE, '..', 'src', 'Popover.rozie');
 
+// WR-02 (72-REVIEW.md): vendorPopover() ALSO vendors the canonical
+// `internal/middleware.ts` (the Floating UI middleware offset/flip/shift/arrow
+// ORDER + branch logic) alongside Popover.rozie. The envelope-only guard above
+// does not cover it, so a hand-edit to the canonical middleware.ts that forgets
+// the re-vendor step would silently ship stale positioning behaviour — the
+// exact "fix once → re-vendor everywhere" failure this file exists to close.
+const CANONICAL_MW = resolve(HERE, '..', '..', 'popover', 'src', 'internal', 'middleware.ts');
+const VENDORED_MW = resolve(HERE, '..', 'src', 'internal', 'middleware.ts');
+
 // Match the `<rozie>…</rozie>` envelope span only — greedy to the LAST closing
 // tag so the full body (script/template/style) is hashed, while any banner or
 // comment OUTSIDE the envelope (e.g. the generated "do not edit" banner the
@@ -45,6 +54,9 @@ const ENVELOPE = /<rozie[\s\S]*<\/rozie>/;
 /** sha256 of the `<rozie>…</rozie>` envelope bytes of a `.rozie` file. */
 const hash = (p: string): string =>
   createHash('sha256').update(ENVELOPE.exec(readFileSync(p, 'utf8'))![0]).digest('hex');
+
+/** sha256 of the raw bytes of a plain (non-`.rozie`) vendored file. */
+const rawHash = (p: string): string => createHash('sha256').update(readFileSync(p, 'utf8')).digest('hex');
 
 describe('vendored Popover drift guard (D-04)', () => {
   it('vendored data-table/src/Popover.rozie envelope matches canonical @rozie-ui/popover', () => {
@@ -56,5 +68,16 @@ describe('vendored Popover drift guard (D-04)', () => {
         'copy (it is GENERATED): edit the canonical popover source, then re-vendor with ' +
         '`pnpm --filter @rozie-ui/data-table build` and commit the regenerated copy.',
     ).toBe(hash(CANONICAL));
+  });
+
+  it('vendored data-table/src/internal/middleware.ts matches canonical @rozie-ui/popover', () => {
+    expect(
+      rawHash(VENDORED_MW),
+      'vendored internal/middleware.ts drifted from @rozie-ui/popover — the committed ' +
+        'packages/ui/data-table/src/internal/middleware.ts no longer matches the ' +
+        'canonical packages/ui/popover/src/internal/middleware.ts. Do NOT hand-edit the vendored ' +
+        'copy (it is GENERATED): edit the canonical popover source, then re-vendor with ' +
+        '`pnpm --filter @rozie-ui/data-table build` and commit the regenerated copy.',
+    ).toBe(rawHash(CANONICAL_MW));
   });
 });
