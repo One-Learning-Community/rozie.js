@@ -48,9 +48,14 @@ export interface PdfViewerProps {
    */
   query?: unknown;
   /**
+   * Opt-in resize-observed auto-refit: `'width'` calls the equivalent of `fitWidth()` whenever the container resizes; `'page'` calls the equivalent of `fitPage()`. Unset (default) leaves today's behavior unchanged — no automatic refit; wire your own resize sensor if you need one. **Not recommended combined with a content-driven container height** (see the no-scroll container recipe): `'page'` mode measures both width and height, and a `height: auto` container can feedback-loop with the refit. `'width'` mode has no such risk — its measurement stays layout-driven either way.
+   */
+  autoFit?: unknown;
+  /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   options?: Record<string, unknown>;
+  onPagerendered?: (...args: unknown[]) => void;
   onError?: (...args: unknown[]) => void;
   onPagesrendered?: (...args: unknown[]) => void;
   onPasswordrequest?: (...args: unknown[]) => void;
@@ -76,6 +81,7 @@ export interface PdfViewerHandle {
   download: (...args: any[]) => any;
   getMetadata: (...args: any[]) => any;
   getOutline: (...args: any[]) => any;
+  getPageElement: (...args: any[]) => any;
   find: (...args: any[]) => any;
   findNext: (...args: any[]) => any;
   findPrev: (...args: any[]) => any;

@@ -182,11 +182,12 @@ el.addEventListener('load', (e) => console.log(e.detail.numPages));
 | `textLayer` | `Boolean` | `true` | | ✓ | Render PDF.js's selectable / copyable text-layer spans over each page canvas (the differentiator vs a dumb canvas image). The required `.textLayer` CSS + `--scale-factor` var ship with the component — no extra import. |
 | `password` | `unknown` | `undefined` | | ✓ | Password for an encrypted PDF. If the document is encrypted and no (or a wrong) password is set, the `passwordrequest` event fires with `{ reason }`. Changing it reloads the document. |
 | `query` | `unknown` | `undefined` | | ✓ | A reactive search query — the **controlled** alternative to the imperative `find()` handle. Setting it to a non-empty string scans every page, navigates to + coarse-highlights the first match, and emits `findresult` with the total occurrence count; clearing it (empty string / `null`) clears the highlight. Reactive so it works uniformly across all six targets (an Angular child-component `ref` cannot reach the `$expose` handle from a template event handler — the same reason `page` is a two-way model rather than a handle call). |
+| `autoFit` | `unknown` | `undefined` | | ✓ | Opt-in resize-observed auto-refit: `'width'` calls the equivalent of `fitWidth()` whenever the container resizes; `'page'` calls the equivalent of `fitPage()`. Unset (default) leaves today's behavior unchanged. Not recommended with `'page'` alongside a content-driven (`height: auto`) container — see [Gotchas](#sizing-the-container). |
 | `options` | `Object` | `{}` | | ✓ | Raw [`getDocument` `DocumentInitParameters`](https://mozilla.github.io/pdf.js/api/draft/module-pdfjsLib.html) passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc. |
 
 ### Events
 
-PDF.js's load / page / render / find lifecycle is forwarded as **seven** structured events:
+PDF.js's load / page / render / find lifecycle is forwarded as **eight** structured events:
 
 | Event | Payload | Fires when |
 | --- | --- | --- |
@@ -195,12 +196,13 @@ PDF.js's load / page / render / find lifecycle is forwarded as **seven** structu
 | `error` | the engine `Error` | A load or page-render failed (bad source, network error, corrupt PDF). Stale-load aborts are suppressed (a `src` change mid-load doesn't fire a spurious error). |
 | `pagechange` | `{ page }` | The current page changed — driven by `goToPage` / `nextPage` / `prevPage`, a `page`-prop write, or (in `render-all-pages`) the scroll spy. Also drives the two-way `page` model. |
 | `pagesrendered` | — | The visible page(s) finished rendering (canvas + optional text layer) into the container. |
+| `pagerendered` | `{ pageNumber, viewport, scale, rotation, width, height }` | **Per page**, right after that page's DOM node is in the document (canvas rendered, text layer rendered if enabled). `viewport` is pdfjs's `PageViewport` for that render; `width` / `height` are the rendered page box size in CSS px. The reactive-geometry half of the [overlay recipe](#overlaying-content-on-a-page) — pairs with the `getPageElement` handle verb. |
 | `passwordrequest` | `{ reason }` | The document is encrypted and the supplied `password` is missing or wrong. `reason` is PDF.js's `PasswordResponses` code (need vs. incorrect). |
 | `findresult` | `{ query, matches, current }` | A find ran (`find` / `findNext` / `findPrev` / `clearFind`). `query` is the active lowercased query (`''` when cleared), `matches` is the total occurrence count across all pages, and `current` is the 1-based index of the active match (`0` when none). |
 
 ### Imperative handle
 
-Beyond props, the component exposes **19** imperative methods declared once in the Rozie source via `$expose`. Grab a handle with your framework's native ref mechanism (React `useRef` / Vue template ref / Svelte `bind:this` / Angular `viewChild` / Solid callback ref / the Lit custom element itself) and call them directly:
+Beyond props, the component exposes **20** imperative methods declared once in the Rozie source via `$expose`. Grab a handle with your framework's native ref mechanism (React `useRef` / Vue template ref / Svelte `bind:this` / Angular `viewChild` / Solid callback ref / the Lit custom element itself) and call them directly:
 
 | Method | Description |
 | --- | --- |
@@ -219,13 +221,14 @@ Beyond props, the component exposes **19** imperative methods declared once in t
 | `download` | Download the original PDF bytes — `download(filename?)` (defaults to `document.pdf`). Resolves `true` on success, `false` before the document loads. |
 | `getMetadata` | Resolve the document metadata (title, author, page labels, …) — pdfjs `PDFDocumentProxy.getMetadata()`. `null` before load. |
 | `getOutline` | Resolve the document outline (bookmark / table-of-contents tree) for a navigation sidebar — pdfjs `getOutline()`. `null` when absent or before load. |
+| `getPageElement` | Return the rendered page's DOM node (`.rozie-pdf-page[data-page]`) — `getPageElement(pageNumber)` — the documented mount point for a consumer overlay (see the [DOM contract](#dom-contract) and the [overlay recipe](#overlaying-content-on-a-page)), or `null` if that page isn't currently rendered. **Not stable** across zoom/rotation/mode changes — re-acquire on every `pagerendered` firing, don't cache the node. |
 | `find` | Search the whole document for a query — `find(query)`. Scans every page's text, navigates to + highlights the first match, returns a `Promise` resolving to the match count, and emits `findresult`. The highlight is **coarse / span-level**: it highlights whole text-layer spans that *contain* the query — a query that straddles two spans won't highlight. |
 | `findNext` | Advance to the next match (wraps around), navigating its page + re-emitting `findresult` with the new `current`. No-op before a `find`. |
 | `findPrev` | Go back to the previous match (wraps around), navigating its page + re-emitting `findresult`. No-op before a `find`. |
 | `clearFind` | Clear the active query + highlights, re-render, and emit `findresult` with `{ query: '', matches: 0, current: 0 }`. |
 
 ::: tip Why navigation is `goToPage`, not `setPage`
-The handle navigates with **`goToPage(n)`** — there is deliberately **no** `setPage` verb. `page` is the two-way model prop, so React auto-generates an internal `setPage` setter; a `setPage` handle verb would collide with it (ROZ524). None of the 19 verbs collides with an emitted event name either (no bare `load` / `error` / `pagechange` / `pagesrendered` / `passwordrequest` / `progress` / `findresult` — ROZ121), and none shadows a LitElement lifecycle method. Every verb drives the component's **internal render state** (not the props), so it works whether or not the consumer two-way-binds `page` — only `page` mirrors back through the model; `scale` / `rotation` are one-way props the verbs override imperatively.
+The handle navigates with **`goToPage(n)`** — there is deliberately **no** `setPage` verb. `page` is the two-way model prop, so React auto-generates an internal `setPage` setter; a `setPage` handle verb would collide with it (ROZ524). None of the 20 verbs collides with an emitted event name either (no bare `load` / `error` / `pagechange` / `pagesrendered` / `pagerendered` / `passwordrequest` / `progress` / `findresult` — ROZ121), and none shadows a LitElement lifecycle method. Every verb drives the component's **internal render state** (not the props), so it works whether or not the consumer two-way-binds `page` — only `page` mirrors back through the model; `scale` / `rotation` are one-way props the verbs override imperatively.
 :::
 
 **React example:**
@@ -241,6 +244,50 @@ const total = viewer.current?.getPageCount();
 viewer.current?.fitWidth();
 const pdf = viewer.current?.getDocument();   // the raw pdfjs PDFDocumentProxy
 ```
+
+### DOM contract {#dom-contract}
+
+The internal DOM/CSS below is **stable and supported** — not a private implementation detail. It's small on purpose (an overlay recipe, not a slot system): a change to it is a documented, versioned change, not a silent one.
+
+| Element | Contract |
+| --- | --- |
+| `.rozie-pdf` | The root scroll host. `class` / `style` passthrough (see [Sizing / styling the container](#sizing-the-container)). |
+| `.rozie-pdf-page[data-page="N"]` | One per rendered page, 1-based `N`. `position: relative` — the documented mount point for a consumer overlay (via `getPageElement(N)` / the `pagerendered` event). **Rebuilt from scratch** (a new DOM node) on every zoom / rotation / `render-all-pages` toggle — don't cache a reference across those changes. |
+| `--scale-factor` (CSS custom property, set on each page node) | The page's current zoom scale as a plain number string (e.g. `"1.5"`). Matches `pagerendered`'s `scale` payload field. |
+| `canvas` (inside each page node) | The rasterized page. Sized in device pixels via `devicePixelRatio`; its CSS `width`/`height` match the page node's. |
+| `.textLayer` (inside each page node, when `textLayer` is on) | PDF.js's selectable-text spans, absolutely positioned (`inset: 0`) over the canvas. |
+
+This is the same contract an overlay recipe needs and no more — it does not cover pdfjs's own internal DOM (inside `.textLayer`'s children, or the canvas's pixel contents), which remains pdfjs's, not Rozie's, to guarantee.
+
+### Overlaying content on a page {#overlaying-content-on-a-page}
+
+To render your own UI positioned on top of a specific page (an annotation layer, a watermark, a highlight overlay) — pair the `pagerendered` event's geometry with the `getPageElement` handle to portal your content into the page's DOM node, using your framework's own portal mechanism (React `createPortal`, Vue `Teleport`, Solid `<Portal>`, Svelte's portal actions, Angular `ViewContainerRef`, or — since Lit is close to the DOM already — a plain `appendChild`). Because the mount point is inside the page box (`position: relative`), your overlay's `position: absolute; top/left` is in **page-local coordinates** and scrolls/scales with the page natively:
+
+```vue
+<script setup lang="ts">
+import { ref, reactive } from 'vue';
+import PdfViewer, { type PdfViewerHandle } from '@rozie-ui/pdf-vue';
+
+const viewer = ref<PdfViewerHandle>();
+// keyed by pageNumber; re-populated on every `pagerendered` firing for that page
+const pageEls = reactive<Record<number, HTMLElement | null>>({});
+
+function onPageRendered({ pageNumber }: { pageNumber: number }) {
+  pageEls[pageNumber] = viewer.value?.getPageElement(pageNumber) ?? null;
+}
+</script>
+
+<template>
+  <PdfViewer ref="viewer" src="/document.pdf" render-all-pages @pagerendered="onPageRendered" />
+  <Teleport v-for="(el, n) in pageEls" :key="n" :to="el" v-if="el">
+    <div style="position: absolute; inset: 0; pointer-events: none">
+      <!-- your annotation content for page {{ n }}, in page-local coordinates -->
+    </div>
+  </Teleport>
+</template>
+```
+
+Default the overlay wrapper to `pointer-events: none` (as above) so text selection underneath still works; opt interactive children back in individually. Because the page node is rebuilt on zoom/rotation/mode changes (see the [DOM contract](#dom-contract)), `onPageRendered` re-fires and re-acquires the node each time — don't hold onto a stale reference.
 
 ## Recipes
 
@@ -309,6 +356,16 @@ const page = ref(1);
 </template>
 ```
 
+### Auto-fit on resize
+
+Set `autoFit` to `'width'` or `'page'` to refit automatically whenever the container is resized (a resizable split-pane, a responsive layout, an orientation change) — no consumer resize wiring needed:
+
+```vue
+<PdfViewer src="/document.pdf" auto-fit="width" />
+```
+
+`'width'` fits the page width to the container (equivalent to calling `fitWidth()` on resize); `'page'` fits the whole page (equivalent to `fitPage()`). Left unset, today's behavior is unchanged — call `fitWidth()` / `fitPage()` yourself via the handle. Avoid `'page'` together with the [no-scroll container recipe](#sizing-the-container): `'page'` measures both width and height, and a `height: auto` container's height is itself a product of the last fit, which can feedback-loop.
+
 ### Selectable text
 
 The text layer is **on by default** — `textLayer` renders PDF.js's selectable / copyable text spans over each page canvas, so users can select, copy, and (with the browser's find) search the rendered text. No extra CSS import is needed; the component ships the `.textLayer` styles itself. Disable it for a pure-image render (faster, no selection):
@@ -372,9 +429,20 @@ PDF.js parses documents in a **Web Worker**, so `GlobalWorkerOptions.workerSrc` 
 
 PDF.js doesn't embed the base-14 standard fonts (Helvetica / Times / Courier / Symbol / ZapfDingbats). Without `standardFontDataUrl`, documents that rely on them render with substituted glyphs and console warnings. The prop defaults to the jsDelivr CDN dir matching the installed `pdfjs-dist`'s `.version` so the fonts "just work" online with no version-drift risk; for offline / CSP, bundle the `pdfjs-dist/standard_fonts/` directory and point `standardFontDataUrl` at it.
 
-### The container needs a height
+### Sizing / styling the container {#sizing-the-container}
 
-PDF.js renders into the component's `.rozie-pdf` host, which is `width: 100%; height: 100%; min-height: 320px; overflow: auto`. Give the **parent** an explicit height (the quick-start examples wrap the viewer in a `600px`-tall `<div>`) — especially in `render-all-pages` mode, where the scroll spy and `scrollIntoView` need a scrollable, sized container. A zero-height parent collapses to the 320px minimum.
+PDF.js renders into the component's `.rozie-pdf` host, which is `width: 100%; height: 100%; min-height: 320px; overflow: auto; background: #525659; padding: 12px 0`. Give the **parent** an explicit height (the quick-start examples wrap the viewer in a `600px`-tall `<div>`) — especially in `render-all-pages` mode, where the scroll spy and `scrollIntoView` need a scrollable, sized container. A zero-height parent collapses to the 320px minimum.
+
+To customize this or opt out of the internal scroll region entirely, pass `class` / `style` directly on `<PdfViewer>` — Rozie's attribute fallthrough (on by default) merges them onto the `.rozie-pdf` root on all six targets, and an inline `style` always wins over the component's own class-based CSS (no `:deep()` needed):
+
+```vue
+<PdfViewer
+  :src="pdfUrl"
+  style="overflow: visible; height: auto; min-height: 0"
+/>
+```
+
+Pages are laid out in normal flow (`.rozie-pdf-page` is `position: relative`, not absolute), so removing `overflow` / `height` / `min-height` this way makes the host page scroll instead of an internal region, with the container's height driven by its rendered content. Combining this with `autoFit="page"` isn't recommended — see the `autoFit` prop.
 
 ### CORS for cross-origin PDF URLs
 

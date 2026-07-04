@@ -101,6 +101,10 @@ export default class PdfViewer extends SignalWatcher(LitElement) {
    */
   @property({ type: Object }) query: unknown = undefined;
   /**
+   * Opt-in resize-observed auto-refit: `'width'` calls the equivalent of `fitWidth()` whenever the container resizes; `'page'` calls the equivalent of `fitPage()`. Unset (default) leaves today's behavior unchanged — no automatic refit; wire your own resize sensor if you need one. **Not recommended combined with a content-driven container height** (see the no-scroll container recipe): `'page'` mode measures both width and height, and a `height: auto` container can feedback-loop with the refit. `'width'` mode has no such risk — its measurement stays layout-driven either way.
+   */
+  @property({ type: Object }) autoFit: unknown = undefined;
+  /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   @property({ type: Object }) options: any = {};
@@ -128,6 +132,10 @@ private __rozieFirstUpdateDone = false;
       if (this.observer) {
         this.observer.disconnect();
         this.observer = null;
+      }
+      if (this.resizeObserver) {
+        this.resizeObserver.disconnect();
+        this.resizeObserver = null;
       }
       if (this.loadingTask) {
         this.loadingTask.destroy();
@@ -161,6 +169,18 @@ private __rozieFirstUpdateDone = false;
     this._current.value = Math.max(1, this.page);
     this._zoom.value = this.scale;
     this._rot.value = this.rotation;
+    // autoFit resize sensor — always observing (cheap when idle); the callback
+    // itself gates on the current $props.autoFit so toggling it at runtime needs
+    // no observer teardown/recreation. No-ops via applyFit's own instance/
+    // containerEl guard before a document has loaded.
+    // autoFit resize sensor — always observing (cheap when idle); the callback
+    // itself gates on the current $props.autoFit so toggling it at runtime needs
+    // no observer teardown/recreation. No-ops via applyFit's own instance/
+    // containerEl guard before a document has loaded.
+    this.resizeObserver = new ResizeObserver(() => {
+      if (this.autoFit) this.applyFit(this.autoFit === 'width' ? 'width' : 'page');
+    });
+    this.resizeObserver.observe(this.containerEl);
     // lazy-load the engine (SSR-safe + code-split), then configure the worker and
     // load the document.
     // lazy-load the engine (SSR-safe + code-split), then configure the worker and
@@ -229,6 +249,8 @@ private __rozieFirstUpdateDone = false;
   containerEl: any = null;
 
   observer: any = null;
+
+  resizeObserver: any = null;
 
   loadingTask: any = null;
 
@@ -327,6 +349,24 @@ private __rozieFirstUpdateDone = false;
     }
   }
   container.appendChild(pageDiv);
+  // reactive per-page geometry for a consumer overlay — see the DOM contract
+  // docs. Fired once the page is in the document (appendChild above), so
+  // getBoundingClientRect() etc. are valid immediately. pageDiv itself is NOT
+  // stable across zoom/rotation/mode changes (renderView() rebuilds every page
+  // from scratch on those) — re-acquire via getPageElement() each time this
+  // fires for a given pageNumber, don't cache the node.
+  this.dispatchEvent(new CustomEvent("pagerendered", {
+    detail: {
+      pageNumber: pageNum,
+      viewport,
+      scale: this._zoom.value,
+      rotation: this._rot.value,
+      width: Math.floor(viewport.width),
+      height: Math.floor(viewport.height)
+    },
+    bubbles: true,
+    composed: true
+  }));
   return pageDiv;
 };
 
@@ -548,6 +588,10 @@ private __rozieFirstUpdateDone = false;
     return this.instance ? this.instance.getOutline() : null;
   }
 
+  getPageElement(n: any) {
+    return this.containerEl ? this.containerEl.querySelector('[data-page="' + n + '"]') : null;
+  }
+
   async find(query: any) {
     const q = (query == null ? '' : String(query)).trim().toLowerCase();
     this.findQuery = q;
@@ -666,7 +710,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['src', 'page', 'scale', 'rotation', 'worker-src', 'workersrc', 'standard-font-data-url', 'standardfontdataurl', 'render-all-pages', 'renderallpages', 'text-layer', 'textlayer', 'password', 'query', 'options']);
+    const __skip = new Set<string>(['src', 'page', 'scale', 'rotation', 'worker-src', 'workersrc', 'standard-font-data-url', 'standardfontdataurl', 'render-all-pages', 'renderallpages', 'text-layer', 'textlayer', 'password', 'query', 'auto-fit', 'autofit', 'options']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

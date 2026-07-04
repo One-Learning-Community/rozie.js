@@ -114,6 +114,10 @@ export class PdfViewer {
    */
   query = input<unknown>(undefined);
   /**
+   * Opt-in resize-observed auto-refit: `'width'` calls the equivalent of `fitWidth()` whenever the container resizes; `'page'` calls the equivalent of `fitPage()`. Unset (default) leaves today's behavior unchanged — no automatic refit; wire your own resize sensor if you need one. **Not recommended combined with a content-driven container height** (see the no-scroll container recipe): `'page'` mode measures both width and height, and a `height: auto` container can feedback-loop with the refit. `'width'` mode has no such risk — its measurement stays layout-driven either way.
+   */
+  autoFit = input<unknown>(undefined);
+  /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   options = input<Record<string, any>>((() => ({}))());
@@ -122,6 +126,7 @@ export class PdfViewer {
   rot = signal(0);
   engineReady = signal(0);
   viewerEl = viewChild<ElementRef<HTMLDivElement>>('viewerEl');
+  pagerendered = output<unknown>();
   error = output<unknown>();
   pagesrendered = output<void>();
   passwordrequest = output<unknown>();
@@ -186,6 +191,19 @@ export class PdfViewer {
     this.current.set(Math.max(1, this.page()));
     this.zoom.set(this.scale());
     this.rot.set(this.rotation());
+    // autoFit resize sensor — always observing (cheap when idle); the callback
+    // itself gates on the current $props.autoFit so toggling it at runtime needs
+    // no observer teardown/recreation. No-ops via applyFit's own instance/
+    // containerEl guard before a document has loaded.
+    // autoFit resize sensor — always observing (cheap when idle); the callback
+    // itself gates on the current $props.autoFit so toggling it at runtime needs
+    // no observer teardown/recreation. No-ops via applyFit's own instance/
+    // containerEl guard before a document has loaded.
+    this.resizeObserver = new ResizeObserver(() => {
+      const __autoFit = this.autoFit();
+      if (__autoFit) this.applyFit(__autoFit === 'width' ? 'width' : 'page');
+    });
+    this.resizeObserver.observe(this.containerEl);
     // lazy-load the engine (SSR-safe + code-split), then configure the worker and
     // load the document.
     // lazy-load the engine (SSR-safe + code-split), then configure the worker and
@@ -205,6 +223,10 @@ export class PdfViewer {
         this.observer.disconnect();
         this.observer = null;
       }
+      if (this.resizeObserver) {
+        this.resizeObserver.disconnect();
+        this.resizeObserver = null;
+      }
       if (this.loadingTask) {
         this.loadingTask.destroy();
         this.loadingTask = null;
@@ -220,6 +242,7 @@ export class PdfViewer {
   instance: any = null;
   containerEl: any = null;
   observer: any = null;
+  resizeObserver: any = null;
   loadingTask: any = null;
   renderToken = 0;
   suppressScroll = false;
@@ -264,10 +287,11 @@ export class PdfViewer {
   };
   renderPage = async (pdf: any, pageNum: any, container: any) => {
     const __zoom = this.zoom();
+    const __rot = this.rot();
     const page = await pdf.getPage(pageNum);
     const viewport = page.getViewport({
       scale: __zoom,
-      rotation: this.rot()
+      rotation: __rot
     });
     const pageDiv = document.createElement('div');
     pageDiv.className = 'rozie-pdf-page';
@@ -311,6 +335,20 @@ export class PdfViewer {
       }
     }
     container.appendChild(pageDiv);
+    // reactive per-page geometry for a consumer overlay — see the DOM contract
+    // docs. Fired once the page is in the document (appendChild above), so
+    // getBoundingClientRect() etc. are valid immediately. pageDiv itself is NOT
+    // stable across zoom/rotation/mode changes (renderView() rebuilds every page
+    // from scratch on those) — re-acquire via getPageElement() each time this
+    // fires for a given pageNumber, don't cache the node.
+    this.pagerendered.emit({
+      pageNumber: pageNum,
+      viewport,
+      scale: __zoom,
+      rotation: __rot,
+      width: Math.floor(viewport.width),
+      height: Math.floor(viewport.height)
+    });
     return pageDiv;
   };
   setupScrollSpy = () => {
@@ -487,6 +525,9 @@ export class PdfViewer {
   };
   getOutline = () => {
     return this.instance ? this.instance.getOutline() : null;
+  };
+  getPageElement = (n: any) => {
+    return this.containerEl ? this.containerEl.querySelector('[data-page="' + n + '"]') : null;
   };
   find = async (query: any) => {
     const q = (query == null ? '' : String(query)).trim().toLowerCase();

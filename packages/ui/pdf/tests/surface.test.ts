@@ -27,15 +27,15 @@ const EXPECT = {
   name: 'PdfViewer',
   props: [
     'src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl',
-    'renderAllPages', 'textLayer', 'password', 'query', 'options',
+    'renderAllPages', 'textLayer', 'password', 'query', 'autoFit', 'options',
   ],
   models: ['page'],
-  emits: ['load', 'progress', 'error', 'pagechange', 'pagesrendered', 'passwordrequest', 'findresult'],
+  emits: ['load', 'progress', 'error', 'pagechange', 'pagesrendered', 'pagerendered', 'passwordrequest', 'findresult'],
   slots: [] as string[],
   expose: [
     'getDocument', 'getPageCount', 'goToPage', 'nextPage', 'prevPage',
     'setScale', 'zoomIn', 'zoomOut', 'fitWidth', 'fitPage', 'rotateCW', 'rotateCCW',
-    'download', 'getMetadata', 'getOutline',
+    'download', 'getMetadata', 'getOutline', 'getPageElement',
     'find', 'findNext', 'findPrev', 'clearFind',
   ],
 } as const;
@@ -57,7 +57,7 @@ describe('PdfViewer.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (11 props)', () => {
+  it('props surface matches (12 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -69,7 +69,7 @@ describe('PdfViewer.rozie surface gate', () => {
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches (7 emits)', () => {
+  it('emits surface matches (8 emits)', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
@@ -78,7 +78,7 @@ describe('PdfViewer.rozie surface gate', () => {
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 
-  it('expose surface matches (19 verbs)', () => {
+  it('expose surface matches (20 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

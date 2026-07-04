@@ -52,12 +52,14 @@ export class DemoComponent {
 | `textLayer` | `Boolean` | `true` |  |  |
 | `password` | `unknown` | `undefined` |  |  |
 | `query` | `unknown` | `undefined` |  |  |
+| `autoFit` | `unknown` | `undefined` |  |  |
 | `options` | `Object` | `{}` |  |  |
 
 ## Events
 
 | Event | Description |
 | --- | --- |
+| `pagerendered` | |
 | `error` | |
 | `pagesrendered` | |
 | `passwordrequest` | |
@@ -96,6 +98,7 @@ export class DemoComponent {
 | `download` | Download the original PDF bytes — `download(filename?)` (defaults to `document.pdf`). Resolves `true` on success, `false` before the document loads. |
 | `getMetadata` | Resolve the document metadata (title, author, page labels, …) — pdfjs `PDFDocumentProxy.getMetadata()`. null before load. |
 | `getOutline` | Resolve the document outline (bookmark / table-of-contents tree) for a navigation sidebar — pdfjs `getOutline()`. null when absent or before load. |
+| `getPageElement` | Return the rendered page's DOM node (`.rozie-pdf-page[data-page]`) — `getPageElement(pageNumber)` — the documented mount point for a consumer overlay, or null if that page isn't currently rendered. Paired with the `pagerendered` event for reactive per-page geometry; NOT stable across zoom/rotation/mode changes, so re-acquire it on every `pagerendered` firing rather than caching the node. |
 | `find` | Search the whole document for a query — `find(query)`. Scans every page's text, navigates to + highlights the first match, returns a `Promise` resolving to the match count, and emits `findresult`. The highlight is **coarse / span-level**: it highlights whole text-layer spans that *contain* the query — a query straddling two spans won't highlight. |
 | `findNext` | Advance to the next match (wraps around), navigating its page + re-emitting `findresult` with the new `current`. No-op before a `find`. |
 | `findPrev` | Go back to the previous match (wraps around), navigating its page + re-emitting `findresult`. No-op before a `find`. |

@@ -9,10 +9,10 @@
  * KEYS MUST stay in lockstep with `ir.expose`: codegen.mjs asserts every exposed
  * method name has an entry here and throws if one is missing.
  *
- * Collision discipline (ROZ121/ROZ524/Lit-lifecycle): none of these 19 verbs
+ * Collision discipline (ROZ121/ROZ524/Lit-lifecycle): none of these 20 verbs
  * collides with an emitted event name (NO bare `load`/`error`/`pagechange`/
- * `pagesrendered`/`passwordrequest`/`progress`/`findresult`), the React
- * `page`-model auto-setter (NO `setPage` — navigate via `goToPage(n)`; the
+ * `pagesrendered`/`pagerendered`/`passwordrequest`/`progress`/`findresult`), the
+ * React `page`-model auto-setter (NO `setPage` — navigate via `goToPage(n)`; the
  * two-way `page` binding reads it), or a Lit reserved lifecycle name. Every verb
  * drives `$data` (or reads the loaded document), so it works whether or not the
  * consumer two-way-binds `page`.
@@ -37,6 +37,8 @@ export const handleManifest = {
     'Resolve the document metadata (title, author, page labels, …) — pdfjs `PDFDocumentProxy.getMetadata()`. null before load.',
   getOutline:
     'Resolve the document outline (bookmark / table-of-contents tree) for a navigation sidebar — pdfjs `getOutline()`. null when absent or before load.',
+  getPageElement:
+    'Return the rendered page\'s DOM node (`.rozie-pdf-page[data-page]`) — `getPageElement(pageNumber)` — the documented mount point for a consumer overlay, or null if that page isn\'t currently rendered. Paired with the `pagerendered` event for reactive per-page geometry; NOT stable across zoom/rotation/mode changes, so re-acquire it on every `pagerendered` firing rather than caching the node.',
   find:
     'Search the whole document for a query — `find(query)`. Scans every page\'s text, navigates to + highlights the first match, returns a `Promise` resolving to the match count, and emits `findresult`. The highlight is **coarse / span-level**: it highlights whole text-layer spans that *contain* the query — a query straddling two spans won\'t highlight.',
   findNext:

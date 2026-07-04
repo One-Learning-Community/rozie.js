@@ -47,9 +47,14 @@ interface Props {
    */
   query?: unknown;
   /**
+   * Opt-in resize-observed auto-refit: `'width'` calls the equivalent of `fitWidth()` whenever the container resizes; `'page'` calls the equivalent of `fitPage()`. Unset (default) leaves today's behavior unchanged — no automatic refit; wire your own resize sensor if you need one. **Not recommended combined with a content-driven container height** (see the no-scroll container recipe): `'page'` mode measures both width and height, and a `height: auto` container can feedback-loop with the refit. `'width'` mode has no such risk — its measurement stays layout-driven either way.
+   */
+  autoFit?: unknown;
+  /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   options?: any;
+  onpagerendered?: (...args: unknown[]) => void;
   onerror?: (...args: unknown[]) => void;
   onpagesrendered?: (...args: unknown[]) => void;
   onpasswordrequest?: (...args: unknown[]) => void;
@@ -73,7 +78,9 @@ let {
   textLayer = true,
   password = undefined,
   query = undefined,
+  autoFit = undefined,
   options = __defaultOptions,
+  onpagerendered,
   onerror,
   onpagesrendered,
   onpasswordrequest,
@@ -121,13 +128,18 @@ function cdnBase() {
 
 // more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
 // the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
-// containerEl is the scroll host, observer is the continuous-mode scroll spy.
+// containerEl is the scroll host, observer is the continuous-mode scroll spy,
+// resizeObserver is the autoFit resize sensor (separate from `observer` — that
+// one is IntersectionObserver-typed, this one ResizeObserver-typed).
 // more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
 // the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
-// containerEl is the scroll host, observer is the continuous-mode scroll spy.
+// containerEl is the scroll host, observer is the continuous-mode scroll spy,
+// resizeObserver is the autoFit resize sensor (separate from `observer` — that
+// one is IntersectionObserver-typed, this one ResizeObserver-typed).
 let instance: any = null;
 let containerEl: any = null;
 let observer: any = null;
+let resizeObserver: any = null;
 // the PDFDocumentLoadingTask — it (NOT the PDFDocumentProxy, which has no
 // destroy() in pdfjs v6) owns teardown of the worker + document. Held so a
 // src/password change or unmount can tear the previous load down.
@@ -253,6 +265,20 @@ const renderPage = async (pdf: any, pageNum: any, container: any) => {
     }
   }
   container.appendChild(pageDiv);
+  // reactive per-page geometry for a consumer overlay — see the DOM contract
+  // docs. Fired once the page is in the document (appendChild above), so
+  // getBoundingClientRect() etc. are valid immediately. pageDiv itself is NOT
+  // stable across zoom/rotation/mode changes (renderView() rebuilds every page
+  // from scratch on those) — re-acquire via getPageElement() each time this
+  // fires for a given pageNumber, don't cache the node.
+  onpagerendered?.({
+    pageNumber: pageNum,
+    viewport,
+    scale: zoom,
+    rotation: rot,
+    width: Math.floor(viewport.width),
+    height: Math.floor(viewport.height)
+  });
   return pageDiv;
 };
 
@@ -381,18 +407,23 @@ const applyFit = async (mode: any) => {
   if (mode === 'width') zoom = cw / vp.width;else zoom = Math.min(cw / vp.width, ch / vp.height);
 };
 // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
-// 19 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
+// 20 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
 // ROZ524 — use goToPage); none equals an emit name (load/error/pagechange/
-// pagesrendered/passwordrequest/progress/findresult); none is a Lit reserved
-// lifecycle. The navigation/zoom/rotate verbs drive $data (not the props), so they
-// work whether or not the consumer binds `page`. The document-level verbs below
-// are cheap passthroughs over the held PDFDocumentProxy (`instance`) that a
+// pagesrendered/pagerendered/passwordrequest/progress/findresult); none is a Lit
+// reserved lifecycle. The navigation/zoom/rotate verbs drive $data (not the props),
+// so they work whether or not the consumer binds `page`. The document-level verbs
+// below are cheap passthroughs over the held PDFDocumentProxy (`instance`) that a
 // consumer can't reach otherwise without `getDocument()` + pdf.js knowledge:
 //   - download(filename?): save the original PDF bytes (instance.getData() ->
 //     Blob -> anchor click) — the single most-expected viewer affordance.
 //   - getMetadata(): document title/author/page-labels (tab title / info panel).
 //   - getOutline(): the bookmark/TOC tree (powers a navigation sidebar; outline
 //     dests map onto goToPage).
+//   - getPageElement(n): the rendered `.rozie-pdf-page[data-page]` DOM node for
+//     page n, or null if it isn't currently rendered — the documented mount
+//     point for a consumer overlay (see the DOM contract docs), paired with the
+//     `pagerendered` event for reactive geometry. NOT stable across zoom/
+//     rotation/mode changes — re-acquire per `pagerendered` firing, don't cache.
 // The four find verbs (find/findNext/findPrev/clearFind) drive the coarse
 // span-level highlight pass + emit `findresult`. `find/findNext/findPrev/clearFind`
 // are collision-vetted (no Lit reserved lifecycle, no `page`-model auto-setter clash).
@@ -461,6 +492,15 @@ export function getMetadata() {
 // Bookmark / table-of-contents tree — resolves null when absent or before mount.
 export function getOutline() {
   return instance ? instance.getOutline() : null;
+}
+// The rendered page's DOM node (see the DOM contract docs), or null if page n
+// isn't currently rendered (single-page mode viewing a different page, or
+// before any render). Mirrors scrollToPage's own lookup.
+// The rendered page's DOM node (see the DOM contract docs), or null if page n
+// isn't currently rendered (single-page mode viewing a different page, or
+// before any render). Mirrors scrollToPage's own lookup.
+export function getPageElement(n: any) {
+  return containerEl ? containerEl.querySelector('[data-page="' + n + '"]') : null;
 }
 
 // ─── text find/search (coarse span-level highlight) ──────────────────────────
@@ -564,6 +604,14 @@ onMount(() => {
   current = Math.max(1, page);
   zoom = scale;
   rot = rotation;
+  // autoFit resize sensor — always observing (cheap when idle); the callback
+  // itself gates on the current $props.autoFit so toggling it at runtime needs
+  // no observer teardown/recreation. No-ops via applyFit's own instance/
+  // containerEl guard before a document has loaded.
+  resizeObserver = new ResizeObserver(() => {
+    if (autoFit) applyFit(autoFit === 'width' ? 'width' : 'page');
+  });
+  resizeObserver.observe(containerEl);
   // lazy-load the engine (SSR-safe + code-split), then configure the worker and
   // load the document.
   import('pdfjs-dist').then((mod: any) => {
@@ -580,6 +628,10 @@ onMount(() => {
     if (observer) {
       observer.disconnect();
       observer = null;
+    }
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+      resizeObserver = null;
     }
     if (loadingTask) {
       loadingTask.destroy();

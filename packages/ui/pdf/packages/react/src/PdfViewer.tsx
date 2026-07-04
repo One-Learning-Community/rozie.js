@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { clsx, useControllableState } from '@rozie/runtime-react';
 import './PdfViewer.css';
 import './PdfViewer.global.css';
@@ -49,9 +49,14 @@ interface PdfViewerProps {
    */
   query?: unknown;
   /**
+   * Opt-in resize-observed auto-refit: `'width'` calls the equivalent of `fitWidth()` whenever the container resizes; `'page'` calls the equivalent of `fitPage()`. Unset (default) leaves today's behavior unchanged — no automatic refit; wire your own resize sensor if you need one. **Not recommended combined with a content-driven container height** (see the no-scroll container recipe): `'page'` mode measures both width and height, and a `height: auto` container can feedback-loop with the refit. `'width'` mode has no such risk — its measurement stays layout-driven either way.
+   */
+  autoFit?: unknown;
+  /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */
   options?: Record<string, any>;
+  onPagerendered?: (...args: any[]) => void;
   onError?: (...args: any[]) => void;
   onPagesrendered?: (...args: any[]) => void;
   onPasswordrequest?: (...args: any[]) => void;
@@ -77,6 +82,7 @@ export interface PdfViewerHandle {
   download: (...args: any[]) => any;
   getMetadata: (...args: any[]) => any;
   getOutline: (...args: any[]) => any;
+  getPageElement: (...args: any[]) => any;
   find: (...args: any[]) => any;
   findNext: (...args: any[]) => any;
   findPrev: (...args: any[]) => any;
@@ -85,7 +91,7 @@ export interface PdfViewerHandle {
 
 const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer(_props: PdfViewerProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<PdfViewerProps, 'src' | 'scale' | 'rotation' | 'workerSrc' | 'standardFontDataUrl' | 'renderAllPages' | 'textLayer' | 'password' | 'query' | 'options'> & { src: unknown; scale: number; rotation: number; workerSrc: string; standardFontDataUrl: string; renderAllPages: boolean; textLayer: boolean; password: unknown; query: unknown; options: Record<string, any> } = {
+  const props: Omit<PdfViewerProps, 'src' | 'scale' | 'rotation' | 'workerSrc' | 'standardFontDataUrl' | 'renderAllPages' | 'textLayer' | 'password' | 'query' | 'autoFit' | 'options'> & { src: unknown; scale: number; rotation: number; workerSrc: string; standardFontDataUrl: string; renderAllPages: boolean; textLayer: boolean; password: unknown; query: unknown; autoFit: unknown; options: Record<string, any> } = {
     ..._props,
     src: _props.src ?? undefined,
     scale: _props.scale ?? 1,
@@ -96,20 +102,22 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     textLayer: _props.textLayer ?? true,
     password: _props.password ?? undefined,
     query: _props.query ?? undefined,
+    autoFit: _props.autoFit ?? undefined,
     options: _props.options ?? __defaultOptions,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { src, page, scale, rotation, workerSrc, standardFontDataUrl, renderAllPages, textLayer, password, query, options, defaultValue, onPageChange, defaultPage, ...rest } = _props as PdfViewerProps & Record<string, unknown>;
-    void src; void page; void scale; void rotation; void workerSrc; void standardFontDataUrl; void renderAllPages; void textLayer; void password; void query; void options; void defaultValue; void onPageChange; void defaultPage;
+    const { src, page, scale, rotation, workerSrc, standardFontDataUrl, renderAllPages, textLayer, password, query, autoFit, options, defaultValue, onPageChange, defaultPage, ...rest } = _props as PdfViewerProps & Record<string, unknown>;
+    void src; void page; void scale; void rotation; void workerSrc; void standardFontDataUrl; void renderAllPages; void textLayer; void password; void query; void autoFit; void options; void defaultValue; void onPageChange; void defaultPage;
     return rest;
   })();
   const cancelled = useRef(false);
   const containerEl = useRef<any>(null);
+  const resizeObserver = useRef<any>(null);
   const pdfjsLib = useRef<any>(null);
+  const instance = useRef<any>(null);
   const renderToken = useRef(0);
   const observer = useRef<any>(null);
   const loadingTask = useRef<any>(null);
-  const instance = useRef<any>(null);
   const suppressScroll = useRef(false);
   const findQuery = useRef('');
   const findMatches = useRef([]);
@@ -160,7 +168,9 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
 
   // more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
   // the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
-  // containerEl is the scroll host, observer is the continuous-mode scroll spy.
+  // containerEl is the scroll host, observer is the continuous-mode scroll spy,
+  // resizeObserver is the autoFit resize sensor (separate from `observer` — that
+  // one is IntersectionObserver-typed, this one ResizeObserver-typed).
   function buildSource() {
     let cfg: any = null;
     cfg = {
@@ -243,6 +253,20 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       }
     }
     container.appendChild(pageDiv);
+    // reactive per-page geometry for a consumer overlay — see the DOM contract
+    // docs. Fired once the page is in the document (appendChild above), so
+    // getBoundingClientRect() etc. are valid immediately. pageDiv itself is NOT
+    // stable across zoom/rotation/mode changes (renderView() rebuilds every page
+    // from scratch on those) — re-acquire via getPageElement() each time this
+    // fires for a given pageNumber, don't cache the node.
+    props.onPagerendered && props.onPagerendered({
+      pageNumber: pageNum,
+      viewport,
+      scale: zoom,
+      rotation: rot,
+      width: Math.floor(viewport.width),
+      height: Math.floor(viewport.height)
+    });
     return pageDiv;
   }
   function setupScrollSpy() {
@@ -349,7 +373,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       if (token === renderToken.current) props.onError && props.onError(e);
     }
   }
-  async function applyFit(mode: any) {
+  const applyFit = useCallback(async (mode: any) => {
     if (!instance.current || !containerEl.current) return;
     const n = Math.min(Math.max(current, 1), instance.current.numPages);
     const page = await instance.current.getPage(n);
@@ -360,20 +384,25 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     const cw = containerEl.current.clientWidth - 24;
     const ch = containerEl.current.clientHeight - 24;
     if (mode === 'width') setZoom(cw / vp.width);else setZoom(Math.min(cw / vp.width, ch / vp.height));
-  }
+  }, [current, rot]);
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
-  // 19 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
+  // 20 verbs. Collision-clear: NO `setPage` (React `page`-model auto-setter,
   // ROZ524 — use goToPage); none equals an emit name (load/error/pagechange/
-  // pagesrendered/passwordrequest/progress/findresult); none is a Lit reserved
-  // lifecycle. The navigation/zoom/rotate verbs drive $data (not the props), so they
-  // work whether or not the consumer binds `page`. The document-level verbs below
-  // are cheap passthroughs over the held PDFDocumentProxy (`instance`) that a
+  // pagesrendered/pagerendered/passwordrequest/progress/findresult); none is a Lit
+  // reserved lifecycle. The navigation/zoom/rotate verbs drive $data (not the props),
+  // so they work whether or not the consumer binds `page`. The document-level verbs
+  // below are cheap passthroughs over the held PDFDocumentProxy (`instance`) that a
   // consumer can't reach otherwise without `getDocument()` + pdf.js knowledge:
   //   - download(filename?): save the original PDF bytes (instance.getData() ->
   //     Blob -> anchor click) — the single most-expected viewer affordance.
   //   - getMetadata(): document title/author/page-labels (tab title / info panel).
   //   - getOutline(): the bookmark/TOC tree (powers a navigation sidebar; outline
   //     dests map onto goToPage).
+  //   - getPageElement(n): the rendered `.rozie-pdf-page[data-page]` DOM node for
+  //     page n, or null if it isn't currently rendered — the documented mount
+  //     point for a consumer overlay (see the DOM contract docs), paired with the
+  //     `pagerendered` event for reactive geometry. NOT stable across zoom/
+  //     rotation/mode changes — re-acquire per `pagerendered` firing, don't cache.
   // The four find verbs (find/findNext/findPrev/clearFind) drive the coarse
   // span-level highlight pass + emit `findresult`. `find/findNext/findPrev/clearFind`
   // are collision-vetted (no Lit reserved lifecycle, no `page`-model auto-setter clash).
@@ -442,6 +471,15 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   // Bookmark / table-of-contents tree — resolves null when absent or before mount.
   function getOutline() {
     return instance.current ? instance.current.getOutline() : null;
+  }
+  // The rendered page's DOM node (see the DOM contract docs), or null if page n
+  // isn't currently rendered (single-page mode viewing a different page, or
+  // before any render). Mirrors scrollToPage's own lookup.
+  // The rendered page's DOM node (see the DOM contract docs), or null if page n
+  // isn't currently rendered (single-page mode viewing a different page, or
+  // before any render). Mirrors scrollToPage's own lookup.
+  function getPageElement(n: any) {
+    return containerEl.current ? containerEl.current.querySelector('[data-page="' + n + '"]') : null;
   }
 
   // ─── text find/search (coarse span-level highlight) ──────────────────────────
@@ -545,6 +583,14 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     setCurrent(Math.max(1, _pageRef.current));
     setZoom(_scaleRef.current);
     setRot(_rotationRef.current);
+    // autoFit resize sensor — always observing (cheap when idle); the callback
+    // itself gates on the current $props.autoFit so toggling it at runtime needs
+    // no observer teardown/recreation. No-ops via applyFit's own instance/
+    // containerEl guard before a document has loaded.
+    resizeObserver.current = new ResizeObserver(() => {
+      if (props.autoFit) applyFit(props.autoFit === 'width' ? 'width' : 'page');
+    });
+    resizeObserver.current.observe(containerEl.current);
     // lazy-load the engine (SSR-safe + code-split), then configure the worker and
     // load the document.
     import('pdfjs-dist').then((mod: any) => {
@@ -561,6 +607,10 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       if (observer.current) {
         observer.current.disconnect();
         observer.current = null;
+      }
+      if (resizeObserver.current) {
+        resizeObserver.current.disconnect();
+        resizeObserver.current = null;
       }
       if (loadingTask.current) {
         loadingTask.current.destroy();
@@ -636,9 +686,9 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     if (q) find(q);else clearFind();
   }, [props.query]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const _rozieExposeRef = useRef({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, find, findNext, findPrev, clearFind });
-  _rozieExposeRef.current = { getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, find, findNext, findPrev, clearFind };
-  useImperativeHandle(ref, () => ({ getDocument: (...args: Parameters<typeof getDocument>): ReturnType<typeof getDocument> => _rozieExposeRef.current.getDocument(...args), getPageCount: (...args: Parameters<typeof getPageCount>): ReturnType<typeof getPageCount> => _rozieExposeRef.current.getPageCount(...args), goToPage: (...args: Parameters<typeof goToPage>): ReturnType<typeof goToPage> => _rozieExposeRef.current.goToPage(...args), nextPage: (...args: Parameters<typeof nextPage>): ReturnType<typeof nextPage> => _rozieExposeRef.current.nextPage(...args), prevPage: (...args: Parameters<typeof prevPage>): ReturnType<typeof prevPage> => _rozieExposeRef.current.prevPage(...args), setScale: (...args: Parameters<typeof setScale>): ReturnType<typeof setScale> => _rozieExposeRef.current.setScale(...args), zoomIn: (...args: Parameters<typeof zoomIn>): ReturnType<typeof zoomIn> => _rozieExposeRef.current.zoomIn(...args), zoomOut: (...args: Parameters<typeof zoomOut>): ReturnType<typeof zoomOut> => _rozieExposeRef.current.zoomOut(...args), fitWidth: (...args: Parameters<typeof fitWidth>): ReturnType<typeof fitWidth> => _rozieExposeRef.current.fitWidth(...args), fitPage: (...args: Parameters<typeof fitPage>): ReturnType<typeof fitPage> => _rozieExposeRef.current.fitPage(...args), rotateCW: (...args: Parameters<typeof rotateCW>): ReturnType<typeof rotateCW> => _rozieExposeRef.current.rotateCW(...args), rotateCCW: (...args: Parameters<typeof rotateCCW>): ReturnType<typeof rotateCCW> => _rozieExposeRef.current.rotateCCW(...args), download: (...args: Parameters<typeof download>): ReturnType<typeof download> => _rozieExposeRef.current.download(...args), getMetadata: (...args: Parameters<typeof getMetadata>): ReturnType<typeof getMetadata> => _rozieExposeRef.current.getMetadata(...args), getOutline: (...args: Parameters<typeof getOutline>): ReturnType<typeof getOutline> => _rozieExposeRef.current.getOutline(...args), find: (...args: Parameters<typeof find>): ReturnType<typeof find> => _rozieExposeRef.current.find(...args), findNext: (...args: Parameters<typeof findNext>): ReturnType<typeof findNext> => _rozieExposeRef.current.findNext(...args), findPrev: (...args: Parameters<typeof findPrev>): ReturnType<typeof findPrev> => _rozieExposeRef.current.findPrev(...args), clearFind: (...args: Parameters<typeof clearFind>): ReturnType<typeof clearFind> => _rozieExposeRef.current.clearFind(...args) }), []);
+  const _rozieExposeRef = useRef({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, getPageElement, find, findNext, findPrev, clearFind });
+  _rozieExposeRef.current = { getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, getPageElement, find, findNext, findPrev, clearFind };
+  useImperativeHandle(ref, () => ({ getDocument: (...args: Parameters<typeof getDocument>): ReturnType<typeof getDocument> => _rozieExposeRef.current.getDocument(...args), getPageCount: (...args: Parameters<typeof getPageCount>): ReturnType<typeof getPageCount> => _rozieExposeRef.current.getPageCount(...args), goToPage: (...args: Parameters<typeof goToPage>): ReturnType<typeof goToPage> => _rozieExposeRef.current.goToPage(...args), nextPage: (...args: Parameters<typeof nextPage>): ReturnType<typeof nextPage> => _rozieExposeRef.current.nextPage(...args), prevPage: (...args: Parameters<typeof prevPage>): ReturnType<typeof prevPage> => _rozieExposeRef.current.prevPage(...args), setScale: (...args: Parameters<typeof setScale>): ReturnType<typeof setScale> => _rozieExposeRef.current.setScale(...args), zoomIn: (...args: Parameters<typeof zoomIn>): ReturnType<typeof zoomIn> => _rozieExposeRef.current.zoomIn(...args), zoomOut: (...args: Parameters<typeof zoomOut>): ReturnType<typeof zoomOut> => _rozieExposeRef.current.zoomOut(...args), fitWidth: (...args: Parameters<typeof fitWidth>): ReturnType<typeof fitWidth> => _rozieExposeRef.current.fitWidth(...args), fitPage: (...args: Parameters<typeof fitPage>): ReturnType<typeof fitPage> => _rozieExposeRef.current.fitPage(...args), rotateCW: (...args: Parameters<typeof rotateCW>): ReturnType<typeof rotateCW> => _rozieExposeRef.current.rotateCW(...args), rotateCCW: (...args: Parameters<typeof rotateCCW>): ReturnType<typeof rotateCCW> => _rozieExposeRef.current.rotateCCW(...args), download: (...args: Parameters<typeof download>): ReturnType<typeof download> => _rozieExposeRef.current.download(...args), getMetadata: (...args: Parameters<typeof getMetadata>): ReturnType<typeof getMetadata> => _rozieExposeRef.current.getMetadata(...args), getOutline: (...args: Parameters<typeof getOutline>): ReturnType<typeof getOutline> => _rozieExposeRef.current.getOutline(...args), getPageElement: (...args: Parameters<typeof getPageElement>): ReturnType<typeof getPageElement> => _rozieExposeRef.current.getPageElement(...args), find: (...args: Parameters<typeof find>): ReturnType<typeof find> => _rozieExposeRef.current.find(...args), findNext: (...args: Parameters<typeof findNext>): ReturnType<typeof findNext> => _rozieExposeRef.current.findNext(...args), findPrev: (...args: Parameters<typeof findPrev>): ReturnType<typeof findPrev> => _rozieExposeRef.current.findPrev(...args), clearFind: (...args: Parameters<typeof clearFind>): ReturnType<typeof clearFind> => _rozieExposeRef.current.clearFind(...args) }), []);
 
   return (
     <>
