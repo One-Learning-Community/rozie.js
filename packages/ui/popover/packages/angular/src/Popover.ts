@@ -246,11 +246,18 @@ export class Popover {
   arrowNode: any = null;
   stopAutoUpdate: any = null;
   lastFocusedEl: any = null;
+  deepActiveElement = () => {
+    let el = document.activeElement;
+    while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+      el = el.shadowRoot.activeElement;
+    }
+    return el;
+  };
   requestOpen = (next: any) => {
     const __trigger = this.trigger();
     if (this.open() === next) return;
     if (next && __trigger === 'click') {
-      this.lastFocusedEl = document.activeElement;
+      this.lastFocusedEl = this.deepActiveElement();
     }
     this.open.set(next), this.__rozieCvaOnChange(next);
     this.change.emit(next);

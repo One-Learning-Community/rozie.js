@@ -191,6 +191,24 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   let stopAutoUpdate: any = null;
   let lastFocusedEl: any = null;
 
+  // `document.activeElement` stops at the OUTERMOST shadow-DOM host when focus
+  // lives inside a NESTED shadow tree — e.g. a Lit consumer that composes
+  // `<rozie-popover>` inside its own shadow root (data-table's vendored copy):
+  // clicking the trigger focuses a real element several shadow boundaries deep,
+  // but `document.activeElement` only resolves as far as the outermost custom
+  // element (`<rozie-data-table>`), not the actual focused node. Walking
+  // `.shadowRoot.activeElement` recursively drills to the true focused element.
+  // On the other 5 targets (no shadow DOM) `el.shadowRoot` is always
+  // null/undefined, so the loop is a no-op and this degrades to a plain
+  // `document.activeElement` read — one implementation, safe on every target.
+  function deepActiveElement() {
+    let el = document.activeElement;
+    while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+      el = el.shadowRoot.activeElement;
+    }
+    return el;
+  }
+
   // Drive the two-way model + emit in one place. Named `requestOpen` (NOT `setOpen`)
   // to dodge the React generated `setOpen` setter for the `open` model (ROZ524).
   //
@@ -205,7 +223,7 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   function requestOpen(next: any) {
     if (open() === next) return;
     if (next && local.trigger === 'click') {
-      lastFocusedEl = document.activeElement;
+      lastFocusedEl = deepActiveElement();
     }
     setOpen(next);
     _props.onChange?.(next);
