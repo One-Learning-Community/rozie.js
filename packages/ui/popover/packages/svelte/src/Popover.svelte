@@ -345,9 +345,12 @@ onMount(() => {
 let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
   if (isOpen && !disabled) {
-    floatingNode = floatingEl;
-    arrowNode = arrowEl;
-    startTracking();
+    queueMicrotask(() => {
+      if (!open || disabled) return;
+      floatingNode = floatingEl;
+      arrowNode = arrowEl;
+      startTracking();
+    });
   } else {
     stopTracking();
   }

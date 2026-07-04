@@ -348,9 +348,12 @@ onBeforeUnmount(() => { _cleanup_0?.(); });
 
 watch(() => open.value, (isOpen: any) => {
   if (isOpen && !props.disabled) {
-    floatingNode = floatingElRef.value;
-    arrowNode = arrowElRef.value;
-    startTracking();
+    queueMicrotask(() => {
+      if (!open.value || props.disabled) return;
+      floatingNode = floatingElRef.value;
+      arrowNode = arrowElRef.value;
+      startTracking();
+    });
   } else {
     stopTracking();
   }

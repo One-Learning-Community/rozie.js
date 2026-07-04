@@ -201,9 +201,12 @@ export class Popover {
 
     effect(() => { const __watchVal = (() => this.open())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
       if (isOpen && !(this.disabled() || this.__rozieCvaDisabled())) {
-        this.floatingNode = this.floatingEl()?.nativeElement;
-        this.arrowNode = this.arrowEl()?.nativeElement;
-        this.startTracking();
+        queueMicrotask(() => {
+          if (!this.open() || (this.disabled() || this.__rozieCvaDisabled())) return;
+          this.floatingNode = this.floatingEl()?.nativeElement;
+          this.arrowNode = this.arrowEl()?.nativeElement;
+          this.startTracking();
+        });
       } else {
         this.stopTracking();
       }

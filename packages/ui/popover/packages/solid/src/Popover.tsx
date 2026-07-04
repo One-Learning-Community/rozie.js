@@ -142,9 +142,12 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   });
   createEffect(on(() => (() => open())(), (v) => untrack(() => ((isOpen: any) => {
     if (isOpen && !local.disabled) {
-      floatingNode = floatingElRef;
-      arrowNode = arrowElRef;
-      startTracking();
+      queueMicrotask(() => {
+        if (!open() || local.disabled) return;
+        floatingNode = floatingElRef;
+        arrowNode = arrowElRef;
+        startTracking();
+      });
     } else {
       stopTracking();
     }

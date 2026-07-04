@@ -277,11 +277,38 @@ $onMount(() => {
 })
 
 // ─── open/close drives autoUpdate (lazy $watch — never fires on initial value) ──
+//
+// Phase 72-07 finding (canonical-Popover scope, routed here per the plan's own
+// contingency): reading `$refs.floatingEl` SYNCHRONOUSLY inside this $watch
+// callback gets a STALE (pre-toggle) value on Vue/Angular/Lit — Vue's `watch()`
+// defaults to `flush:'pre'` (runs BEFORE the newly-toggled `r-if` patches the
+// DOM), and Angular's signal `effect()` / Lit's `$watch` compilation have an
+// analogous ordering gap relative to when `floatingEl`'s viewChild/ref actually
+// reflects the just-rendered element. The practical effect: `floatingNode`
+// stayed `undefined`, `startTracking()`'s own `if (!anchorNode || !floatingNode)
+// return` guard silently no-opped, and the floating panel never got its
+// floating-ui-computed `left`/`top`/`position` — it rendered at the stylesheet's
+// default `position:absolute;left:0;top:0` relative to whatever positioned
+// ancestor happened to be nearest (the viewport's initial containing block in
+// a standalone demo; a data-table `<th>` in the pinned/sticky-header case),
+// nowhere near the actual anchor. React/Svelte/Solid were unaffected — their
+// own effect/reactive-statement timing already runs after the DOM commit.
+//
+// Fix: defer the ref read + startTracking() one microtask. A microtask
+// boundary is always AFTER the current synchronous DOM-patch pass completes
+// on every target (it's a JS-platform guarantee, not framework-specific), so
+// `$refs.floatingEl` is guaranteed fresh by the time this runs — on every
+// target, including the 3 that were already correct (their own post-render
+// timing means the ref is already fresh even before the extra microtask
+// delay, so the deferred read observes the same value, not a stale one).
 $watch(() => $props.open, (isOpen) => {
   if (isOpen && !$props.disabled) {
-    floatingNode = $refs.floatingEl
-    arrowNode = $refs.arrowEl
-    startTracking()
+    queueMicrotask(() => {
+      if (!$props.open || $props.disabled) return
+      floatingNode = $refs.floatingEl
+      arrowNode = $refs.arrowEl
+      startTracking()
+    })
   } else {
     stopTracking()
   }
