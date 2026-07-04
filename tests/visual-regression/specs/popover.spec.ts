@@ -47,13 +47,16 @@ for (const target of TARGETS) {
     const value = page.getByTestId('readout-value');
     const change = page.getByTestId('readout-change');
     const anchor = page.getByTestId('popover-anchor');
-    // The open/closed SIGNAL is the floating panel itself (role="dialog"), which
-    // is r-if="open"-gated inside the popover's shadow/template. NOT the
-    // `popover-content` testid: on Lit that slotted text is a LIGHT-DOM child of
-    // <rozie-popover> and so stays in the DOM tree even when closed (it is merely
-    // unslotted/not rendered), unlike the r-if-gated panel — a shadow-DOM
-    // slotting subtlety, not a state bug. role= pierces Lit's shadow.
-    const panel = page.locator('[role="dialog"]');
+    // The open/closed SIGNAL is the floating panel itself
+    // (`.rozie-popover-floating`), which is r-if="open"-gated inside the popover's
+    // shadow/template. NOT the `popover-content` testid: on Lit that slotted text
+    // is a LIGHT-DOM child of <rozie-popover> and so stays in the DOM tree even
+    // when closed (it is merely unslotted/not rendered), unlike the r-if-gated
+    // panel — a shadow-DOM slotting subtlety, not a state bug. The class locator
+    // pierces Lit's open shadow (Playwright css engine) and is role-INDEPENDENT: a
+    // default click popover is non-modal and role-neutral (no role="dialog" unless
+    // `modal` is set), so we key on the stable panel class, not the role.
+    const panel = page.locator('.rozie-popover-floating');
     const content = page.getByTestId('popover-content');
     // An always-present element OUTSIDE the anchor + floating panel for the
     // click-outside dismissal (the demo heading).

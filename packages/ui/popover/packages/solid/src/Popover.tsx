@@ -97,6 +97,10 @@ interface PopoverProps {
    */
   disabled?: boolean;
   /**
+   * Opt in to modal dialog semantics for a `click` popover. **Off by default:** a click popover is a non-modal, click-outside-dismissable layer, so its panel is rendered role-neutral (the slot content owns its own ARIA role — e.g. a `role="menu"`) and carries NO `aria-modal`. Set `modal` for a genuinely modal dialog popover: the panel then gets `role="dialog"` + `aria-modal="true"`. **Note:** Popover ships no focus trap (it stays a minimal headless primitive); if you set `modal`, provide your own focus containment so the `aria-modal` claim holds. Ignored for `hover`/`focus` triggers (always tooltip-flavored).
+   */
+  modal?: boolean;
+  /**
    * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
    */
   strategy?: string;
@@ -116,8 +120,8 @@ export interface PopoverHandle {
 }
 
 export default function Popover(_props: PopoverProps): JSX.Element {
-  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, strategy: 'absolute' }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'strategy', 'children', 'ref']);
+  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute' }, _props);
+  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'children', 'ref']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ show, hide, toggle, reposition }); });
 
@@ -347,8 +351,14 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   function isTooltip() {
     return local.trigger === 'hover' || local.trigger === 'focus';
   }
+  // Role: hover/focus → 'tooltip'; a click popover is 'dialog' ONLY when the consumer
+  // opts into `modal` (which is what also emits aria-modal). A default (non-modal)
+  // click popover returns `null` — a role-NEUTRAL positioned container, so the slot
+  // content owns its own semantics (e.g. the data-table ⋯ menu declares role="menu").
+  // Emitting role="dialog" + aria-modal="true" on a click-outside-dismissable panel
+  // with no focus trap wrongly tells assistive tech that sibling content is inert (IN-03).
   function floatingRole() {
-    return isTooltip() ? 'tooltip' : 'dialog';
+    return isTooltip() ? 'tooltip' : local.modal ? 'dialog' : null;
   }
 
   // ─── imperative handle ($expose) ────────────────────────────────────────────────

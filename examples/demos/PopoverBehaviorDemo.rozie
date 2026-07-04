@@ -4,7 +4,8 @@
   r-model:open (live open + @change readouts), the anchor-click open gesture,
   Escape + click-outside dismissal, and a `set-open` direct-model-write button
   (programmatic OPEN). The floating panel is r-if="open" so the spec asserts
-  presence/absence via role="dialog". See popover.spec.ts. Behavioral-only.
+  presence/absence via the `.rozie-popover-floating` panel class (a default click
+  popover is non-modal + role-neutral). See popover.spec.ts. Behavioral-only.
 
   The direct-model-write is a programmatic OPEN from an external button, which
   proves the Svelte click-outside race is fixed: the Svelte listeners emitter now

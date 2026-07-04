@@ -113,10 +113,12 @@ for (const example of EXAMPLES) {
           timeout: 15_000,
         });
       } else if (example === 'PopoverScreenshot') {
-        // The demo seeds open=true; the floating panel is r-if="open" with
-        // role="dialog" (click trigger). Its visibility proves the panel mounted
-        // AND Floating UI applied left/top before the clip. role= pierces Lit's shadow.
-        await expect(page.locator('[role="dialog"]')).toBeVisible({
+        // The demo seeds open=true; the floating panel is r-if="open"
+        // (`.rozie-popover-floating`). Its visibility proves the panel mounted AND
+        // Floating UI applied left/top before the clip. The class locator pierces
+        // Lit's open shadow and is role-INDEPENDENT: a default click popover is now
+        // non-modal + role-neutral (no role="dialog" unless `modal` is set).
+        await expect(page.locator('.rozie-popover-floating')).toBeVisible({
           timeout: 15_000,
         });
       } else if (example === 'CommandPaletteScreenshot') {

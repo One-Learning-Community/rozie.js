@@ -105,6 +105,10 @@ export default class Popover extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true }) disabled: boolean = false;
   /**
+   * Opt in to modal dialog semantics for a `click` popover. **Off by default:** a click popover is a non-modal, click-outside-dismissable layer, so its panel is rendered role-neutral (the slot content owns its own ARIA role — e.g. a `role="menu"`) and carries NO `aria-modal`. Set `modal` for a genuinely modal dialog popover: the panel then gets `role="dialog"` + `aria-modal="true"`. **Note:** Popover ships no focus trap (it stays a minimal headless primitive); if you set `modal`, provide your own focus containment so the `aria-modal` claim holds. Ignored for `hover`/`focus` triggers (always tooltip-flavored).
+   */
+  @property({ type: Boolean, reflect: true }) modal: boolean = false;
+  /**
    * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
    */
   @property({ type: String, reflect: true }) strategy: string = 'absolute';
@@ -382,7 +386,7 @@ private __rozieFirstUpdateDone = false;
 
   isTooltip = () => this.trigger === 'hover' || this.trigger === 'focus';
 
-  floatingRole = () => this.isTooltip() ? 'tooltip' : 'dialog';
+  floatingRole = () => this.isTooltip() ? 'tooltip' : this.modal ? 'dialog' : null;
 
   show() {
     if (!this.disabled) this.requestOpen(true);
@@ -416,7 +420,7 @@ private __rozieFirstUpdateDone = false;
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'strategy']);
+    const __skip = new Set<string>(['open', 'placement', 'trigger', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'arrow', 'disabled', 'modal', 'strategy']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

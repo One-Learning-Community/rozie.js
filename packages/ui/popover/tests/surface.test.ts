@@ -25,7 +25,7 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'Popover',
-  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled'],
+  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal'],
   models: ['open'],
   emits: ['change'],
   slots: ['', 'anchor'] as string[],
@@ -49,7 +49,7 @@ describe('Popover.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (9 props)', () => {
+  it('props surface matches (10 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -98,5 +98,26 @@ describe('Popover.rozie surface gate', () => {
     const errs = r.diagnostics.filter((d) => d.severity === 'error');
     expect(errs).toEqual([]);
     expect(r.code.length).toBeGreaterThan(0);
+  });
+
+  // IN-03 contract lock: the floating panel is a `dialog` (and thus emits
+  // `aria-modal`) ONLY when the consumer opts into `modal`. A default click
+  // popover is a non-modal, click-outside-dismissable, focus-trap-less layer, so
+  // it must NOT advertise `aria-modal="true"` (which tells AT that siblings are
+  // inert). We assert the modal-GATE survives into every target's emit: the role
+  // helper resolves `'dialog'` only under the `modal` prop, and the panel's
+  // aria-modal derives from that role — so neither can fire without `modal`.
+  it.each(TARGETS)('gates role="dialog" + aria-modal behind the modal prop (%s)', (target) => {
+    const { code } = compile(source, { target, filename: FILENAME });
+    // role='dialog' is reachable ONLY through the modal prop (e.g. `props.modal ?
+    // 'dialog'`, `this.modal ? 'dialog'`, or the Angular signal `this.modal() ?
+    // 'dialog'`), never unconditionally from trigger.
+    expect(code).toMatch(/modal(?:\(\))? \? 'dialog'/);
+    // aria-modal derives from the (modal-gated) role, not from trigger directly.
+    expect(code).toMatch(/=== 'dialog'/);
+    // The old buggy form was `isTooltip() ? 'tooltip' : 'dialog'` — a bare
+    // unconditional `: 'dialog'` fallback must never reappear (role strings use
+    // single quotes; the static aria-haspopup="dialog" uses double quotes).
+    expect(code).not.toMatch(/: 'dialog'/);
   });
 });

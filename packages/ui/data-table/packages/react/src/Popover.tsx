@@ -69,6 +69,10 @@ interface PopoverProps {
    */
   disabled?: boolean;
   /**
+   * Opt in to modal dialog semantics for a `click` popover. **Off by default:** a click popover is a non-modal, click-outside-dismissable layer, so its panel is rendered role-neutral (the slot content owns its own ARIA role — e.g. a `role="menu"`) and carries NO `aria-modal`. Set `modal` for a genuinely modal dialog popover: the panel then gets `role="dialog"` + `aria-modal="true"`. **Note:** Popover ships no focus trap (it stays a minimal headless primitive); if you set `modal`, provide your own focus containment so the `aria-modal` claim holds. Ignored for `hover`/`focus` triggers (always tooltip-flavored).
+   */
+  modal?: boolean;
+  /**
    * Floating UI positioning strategy — 'absolute' (default) or 'fixed'. Use 'fixed' to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). Reconciled at runtime.
    */
   strategy?: string;
@@ -86,7 +90,7 @@ export interface PopoverHandle {
 }
 
 const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props: PopoverProps, ref): JSX.Element {
-  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'strategy'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; strategy: string } = {
+  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string } = {
     ..._props,
     placement: _props.placement ?? 'bottom',
     trigger: _props.trigger ?? 'click',
@@ -95,11 +99,12 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     disableShift: _props.disableShift ?? false,
     arrow: _props.arrow ?? false,
     disabled: _props.disabled ?? false,
+    modal: _props.modal ?? false,
     strategy: _props.strategy ?? 'absolute',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, strategy, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as PopoverProps & Record<string, unknown>;
-    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void strategy; void defaultValue; void onOpenChange; void defaultOpen;
+    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as PopoverProps & Record<string, unknown>;
+    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void defaultValue; void onOpenChange; void defaultOpen;
     return rest;
   })();
   const anchorNode = useRef<any>(null);
@@ -236,7 +241,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     return props.trigger === 'hover' || props.trigger === 'focus';
   }
   function floatingRole() {
-    return isTooltip() ? 'tooltip' : 'dialog';
+    return isTooltip() ? 'tooltip' : props.modal ? 'dialog' : null;
   }
   // ─── imperative handle ($expose) ────────────────────────────────────────────────
   // Verbs: show/hide/toggle/reposition. NOT `update` (reserved Lit lifecycle) → the

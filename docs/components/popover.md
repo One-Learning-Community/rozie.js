@@ -64,6 +64,7 @@ Two-way bind `open`, project a trigger into the `anchor` slot and the content in
 | `disableShift` | `Boolean` | `false` | yes | Disable the `shift` middleware (keep the content strictly aligned to the anchor). |
 | `arrow` | `Boolean` | `false` | yes | Opt in to a positioned arrow element + the `arrow` middleware. |
 | `disabled` | `Boolean` | `false` | yes | Disable the control entirely: the trigger no longer opens, and open content is suppressed. |
+| `modal` | `Boolean` | `false` | yes | Opt in to modal dialog semantics for a `click` popover. Off by default: a click popover is a non-modal, click-outside-dismissable layer, rendered role-neutral (the slot content owns its ARIA role) with no `aria-modal`. Set `modal` for a true modal dialog (`role="dialog"` + `aria-modal="true"`) — Popover ships no focus trap, so supply your own focus containment. Ignored for `hover`/`focus` (always tooltip). |
 | `strategy` | `String` | `"absolute"` | yes | Floating UI positioning strategy — `'absolute'` (default) or `'fixed'`. Use `'fixed'` to escape a scrollable/overflow-clipping ancestor (e.g. a sticky table header). |
 
 ### Events
