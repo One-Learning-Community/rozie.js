@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { rozieAttr, rozieDisplay } from '@rozie/runtime-react';
+import { clsx, rozieAttr, rozieDisplay } from '@rozie/runtime-react';
+import './GroupBar.css';
 
 interface GroupBarProps {
   /**
@@ -31,6 +32,7 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
     clearGrouping: _props.clearGrouping ?? null,
   };
   const [draggingId, setDraggingId] = useState('');
+  const [isOver, setIsOver] = useState(false);
 
   const { applyGrouping: _rozieProp_applyGrouping } = props;
   const onDragStart = useCallback((e: any, id: any) => {
@@ -39,8 +41,14 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
   }, []);
   const onDragOver = useCallback((e: any) => {
     if (e) e.preventDefault();
+    setIsOver(true);
+  }, []);
+  const onDragLeave = useCallback((e: any) => {
+    if (e && e.currentTarget && e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+    setIsOver(false);
   }, []);
   const onDrop = useCallback((e: any) => {
+    setIsOver(false);
     const id = e && e.dataTransfer && e.dataTransfer.getData('text/plain') || draggingId;
     setDraggingId('');
     if (!id) return;
@@ -65,8 +73,9 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
       {props.groupableColumns.map((col) => <span key={col.id} className={"rdt-group-token"} part="group-token" draggable="true" onDragStart={($event) => { onDragStart($event, col.id); }} data-rozie-s-546c469a="">{rozieDisplay(col.label)}</span>)}
 
       
-      <span className={"rdt-group-drop-zone"} data-group-drop-zone="" onDragOver={($event) => { onDragOver($event); }} onDrop={($event) => { onDrop($event); }} data-rozie-s-546c469a="">
-        {props.grouping.map((gk) => <span key={gk} className={"rdt-group-token"} part="group-token" data-group-token="" data-rozie-s-546c469a="">
+      <span className={clsx("rdt-group-drop-zone", { "is-over": isOver })} data-group-drop-zone="" onDragOver={($event) => { onDragOver($event); }} onDragLeave={($event) => { onDragLeave($event); }} onDrop={($event) => { onDrop($event); }} data-rozie-s-546c469a="">
+        
+        {!!(!props.grouping.length) && <span className={"rdt-group-drop-hint"} data-rozie-s-546c469a="">Drag columns here to group</span>}{props.grouping.map((gk) => <span key={gk} className={"rdt-group-token"} part="group-token" data-group-token="" data-rozie-s-546c469a="">
           {rozieDisplay(gk)}
           <button type="button" className={"rdt-group-token-remove"} aria-label={rozieAttr(gk)} onClick={($event) => { removeKey(gk); }} data-rozie-s-546c469a="">×</button>
         </span>)}

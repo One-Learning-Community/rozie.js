@@ -1,0 +1,23 @@
+.rdt-group-drop-zone[data-rozie-s-546c469a] {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rdt-group-bar-gap, 0.375rem);
+  min-width: var(--rdt-group-drop-zone-min, 8rem);
+  min-height: 1.75rem;
+  padding: var(--rdt-group-drop-zone-pad, 0.1875rem 0.5rem);
+  border: 1px dashed var(--rdt-group-drop-zone-border, rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-group-drop-zone-radius, 0.375rem);
+  background: var(--rdt-group-drop-zone-bg, transparent);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.rdt-group-drop-zone.is-over[data-rozie-s-546c469a] {
+  border-color: var(--rdt-group-drop-zone-border-over, rgba(37, 99, 235, 0.7));
+  background: var(--rdt-group-drop-zone-bg-over, rgba(37, 99, 235, 0.08));
+}
+.rdt-group-drop-hint[data-rozie-s-546c469a] {
+  opacity: 0.55;
+  font-size: 0.8125em;
+  user-select: none;
+  pointer-events: none;
+}

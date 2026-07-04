@@ -1,4 +1,5 @@
 import { Component, ViewEncapsulation, input, signal } from '@angular/core';
+import { NgClass } from '@angular/common';
 
 function __rozieDisplay(v: unknown): string {
   if (v == null) return '';
@@ -23,6 +24,7 @@ function __rozieAttr(v: unknown): string | null {
 @Component({
   selector: 'rozie-group-bar',
   standalone: true,
+  imports: [NgClass],
   template: `
 
     <div class="rdt-group-bar">
@@ -32,8 +34,11 @@ function __rozieAttr(v: unknown): string | null {
     }
 
       
-      <span class="rdt-group-drop-zone" data-group-drop-zone="" (dragover)="onDragOver($event)" (drop)="onDrop($event)">
-        @for (gk of grouping(); track gk) {
+      <span class="rdt-group-drop-zone" [ngClass]="{ 'is-over': isOver() }" data-group-drop-zone="" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+        
+        @if (!grouping().length) {
+    <span class="rdt-group-drop-hint">Drag columns here to group</span>
+    }@for (gk of grouping(); track gk) {
     <span class="rdt-group-token" part="group-token" data-group-token="">
           {{ rozieDisplay(gk) }}
           <button type="button" class="rdt-group-token-remove" [attr.aria-label]="rozieAttr(gk)" (click)="removeKey(gk)">×</button>
@@ -47,6 +52,31 @@ function __rozieAttr(v: unknown): string | null {
     }</div>
 
   `,
+  styles: [`
+    .rdt-group-drop-zone {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--rdt-group-bar-gap, 0.375rem);
+      min-width: var(--rdt-group-drop-zone-min, 8rem);
+      min-height: 1.75rem;
+      padding: var(--rdt-group-drop-zone-pad, 0.1875rem 0.5rem);
+      border: 1px dashed var(--rdt-group-drop-zone-border, rgba(0, 0, 0, 0.2));
+      border-radius: var(--rdt-group-drop-zone-radius, 0.375rem);
+      background: var(--rdt-group-drop-zone-bg, transparent);
+      transition: border-color 0.12s ease, background 0.12s ease;
+    }
+    .rdt-group-drop-zone.is-over {
+      border-color: var(--rdt-group-drop-zone-border-over, rgba(37, 99, 235, 0.7));
+      background: var(--rdt-group-drop-zone-bg-over, rgba(37, 99, 235, 0.08));
+    }
+    .rdt-group-drop-hint {
+      opacity: 0.55;
+      font-size: 0.8125em;
+      user-select: none;
+      pointer-events: none;
+    }
+  `],
 })
 export class GroupBar {
   /**
@@ -66,6 +96,7 @@ export class GroupBar {
    */
   clearGrouping = input<((...args: unknown[]) => unknown) | null>(null);
   draggingId = signal('');
+  isOver = signal(false);
 
   onDragStart = (e: any, id: any) => {
     this.draggingId.set(id);
@@ -73,10 +104,16 @@ export class GroupBar {
   };
   onDragOver = (e: any) => {
     if (e) e.preventDefault();
+    this.isOver.set(true);
+  };
+  onDragLeave = (e: any) => {
+    if (e && e.currentTarget && e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+    this.isOver.set(false);
   };
   onDrop = (e: any) => {
     const __grouping = this.grouping();
     const __applyGrouping = this.applyGrouping();
+    this.isOver.set(false);
     const id = e && e.dataTransfer && e.dataTransfer.getData('text/plain') || this.draggingId();
     this.draggingId.set('');
     if (!id) return;

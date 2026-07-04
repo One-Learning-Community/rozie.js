@@ -21,10 +21,15 @@
   to remove it; "Clear" resets. Native DnD requires the drop zone to preventDefault on
   dragover or @drop never fires — onDragOver handles that uniformly across all 6 targets.
 
-  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. Styling: ZERO
-  CSS of its own — `.rdt-group-bar-host` / `.rdt-group-token` are descendant selectors
-  defined in DataTable.rozie's <style>; a slotted <GroupBar> renders inside that subtree
-  so the DOM nesting reaches them. NO <style> block here.
+  PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. Styling split:
+  the SHARED `.rdt-group-token` pill + `.rdt-group-bar-host` are descendant selectors
+  defined in DataTable.rozie's <style> (a slotted <GroupBar> renders inside that subtree
+  so the DOM nesting reaches them, and Lit crosses the shadow via ::part(group-token)).
+  The drop-zone chrome (`.rdt-group-drop-zone`, its empty-state hint, the drag-over
+  highlight) is LOCAL to this drop-in — it exists nowhere else, so it lives in the
+  <style> block below rather than paying the cross-shadow :deep()/::part() tax. Its
+  `--rdt-group-drop-zone-*` tokens still inherit through the Lit shadow, so consumer
+  retheming works the same as the shared pills.
 -->
 <rozie name="GroupBar" inherit-attrs="false" inherit-listeners="false">
 
@@ -74,6 +79,10 @@
   // Ephemeral drag bookkeeping ONLY — which column id is mid-drag. NEVER a copy of
   // the grouping order (that lives in $props.grouping).
   draggingId: '',
+  // Ephemeral drop-target highlight — true while a chip is dragged over the zone.
+  // Presentational only; drives the .is-over class (light DOM) + `group-drop-zone-over`
+  // ::part token (Lit shadow). Reset on drop / real leave.
+  isOver: false,
 }
 </data>
 
@@ -88,12 +97,22 @@ const onDragStart = (e, id) => {
 }
 
 // MUST preventDefault — native HTML5 DnD never fires @drop on a zone that does not
-// cancel the dragover default.
+// cancel the dragover default. Also raises the drop-target highlight.
 const onDragOver = (e) => {
   if (e) e.preventDefault()
+  $data.isOver = true
+}
+
+// Clear the highlight only on a REAL leave: dragleave ALSO fires when the pointer
+// crosses onto a child token, so ignore leaves whose relatedTarget is still inside
+// the zone (prevents flicker as you hover over existing grouping tokens).
+const onDragLeave = (e) => {
+  if (e && e.currentTarget && e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return
+  $data.isOver = false
 }
 
 const onDrop = (e) => {
+  $data.isOver = false
   const id = (e && e.dataTransfer && e.dataTransfer.getData('text/plain')) || $data.draggingId
   $data.draggingId = ''
   if (!id) return
@@ -128,10 +147,14 @@ const clearAll = () => {
   <!-- (b) drop zone listing the ACTIVE grouping as removable tokens -->
   <span
     class="rdt-group-drop-zone"
+    :class="{ 'is-over': $data.isOver }"
     data-group-drop-zone
     @dragover="onDragOver($event)"
+    @dragleave="onDragLeave($event)"
     @drop="onDrop($event)"
   >
+    <!-- empty-state affordance: only shown when nothing is grouped yet -->
+    <span class="rdt-group-drop-hint" r-if="!$props.grouping.length">Drag columns here to group</span>
     <span class="rdt-group-token" part="group-token" data-group-token r-for="gk in $props.grouping" :key="gk">
       {{ gk }}
       <button type="button" class="rdt-group-token-remove" :aria-label="gk" @click="removeKey(gk)">×</button>
@@ -142,5 +165,37 @@ const clearAll = () => {
   <button type="button" class="rdt-group-clear" r-if="$props.grouping.length" @click="clearAll()">Clear</button>
 </div>
 </template>
+
+<style>
+/* Drop-zone chrome is LOCAL to this drop-in (unlike the shared `.rdt-group-token` pill,
+   which DataTable owns). Keeping it here means the selectors sit in our OWN subtree — no
+   cross-shadow `:deep()`/`::part()` needed. Token-driven so consumers can retheme; the
+   `--rdt-*` custom props inherit through the Lit shadow boundary just fine. */
+.rdt-group-drop-zone {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rdt-group-bar-gap, 0.375rem);
+  min-width: var(--rdt-group-drop-zone-min, 8rem);
+  min-height: 1.75rem;
+  padding: var(--rdt-group-drop-zone-pad, 0.1875rem 0.5rem);
+  border: 1px dashed var(--rdt-group-drop-zone-border, rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-group-drop-zone-radius, 0.375rem);
+  background: var(--rdt-group-drop-zone-bg, transparent);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+/* Drag-over highlight — driven by the ephemeral $data.isOver flag. */
+.rdt-group-drop-zone.is-over {
+  border-color: var(--rdt-group-drop-zone-border-over, rgba(37, 99, 235, 0.7));
+  background: var(--rdt-group-drop-zone-bg-over, rgba(37, 99, 235, 0.08));
+}
+/* Empty-state hint — pointer-events off so it never eats the drag/drop events. */
+.rdt-group-drop-hint {
+  opacity: 0.55;
+  font-size: 0.8125em;
+  user-select: none;
+  pointer-events: none;
+}
+</style>
 
 </rozie>

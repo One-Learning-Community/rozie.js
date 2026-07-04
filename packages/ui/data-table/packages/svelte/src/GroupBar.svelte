@@ -31,6 +31,7 @@ let {
 }: Props = $props();
 
 let draggingId = $state('');
+let isOver = $state(false);
 
 // Untyped handler params neutralize to `any` so the native drag-event shapes
 // (dataTransfer / preventDefault) typecheck across all six strict leaves — the
@@ -42,13 +43,26 @@ const onDragStart = (e: any, id: any) => {
 };
 
 // MUST preventDefault — native HTML5 DnD never fires @drop on a zone that does not
-// cancel the dragover default.
+// cancel the dragover default. Also raises the drop-target highlight.
 // MUST preventDefault — native HTML5 DnD never fires @drop on a zone that does not
-// cancel the dragover default.
+// cancel the dragover default. Also raises the drop-target highlight.
 const onDragOver = (e: any) => {
   if (e) e.preventDefault();
+  isOver = true;
+};
+
+// Clear the highlight only on a REAL leave: dragleave ALSO fires when the pointer
+// crosses onto a child token, so ignore leaves whose relatedTarget is still inside
+// the zone (prevents flicker as you hover over existing grouping tokens).
+// Clear the highlight only on a REAL leave: dragleave ALSO fires when the pointer
+// crosses onto a child token, so ignore leaves whose relatedTarget is still inside
+// the zone (prevents flicker as you hover over existing grouping tokens).
+const onDragLeave = (e: any) => {
+  if (e && e.currentTarget && e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+  isOver = false;
 };
 const onDrop = (e: any) => {
+  isOver = false;
   const id = e && e.dataTransfer && e.dataTransfer.getData('text/plain') || draggingId;
   draggingId = '';
   if (!id) return;
@@ -66,4 +80,32 @@ const clearAll = () => {
 };
 </script>
 
-<div class="rdt-group-bar" data-rozie-s-546c469a>{#each groupableColumns as col (col.id)}<span class="rdt-group-token" part="group-token" draggable="true" ondragstart={($event) => { onDragStart($event, col.id); }} data-rozie-s-546c469a>{rozieDisplay(col.label)}</span>{/each}<span class="rdt-group-drop-zone" data-group-drop-zone="" ondragover={($event) => { onDragOver($event); }} ondrop={($event) => { onDrop($event); }} data-rozie-s-546c469a>{#each grouping as gk (gk)}<span class="rdt-group-token" part="group-token" data-group-token="" data-rozie-s-546c469a>{rozieDisplay(gk)}<button type="button" class="rdt-group-token-remove" aria-label={rozieAttr(gk)} onclick={($event) => { removeKey(gk); }} data-rozie-s-546c469a>×</button></span>{/each}</span>{#if grouping.length}<button type="button" class="rdt-group-clear" onclick={($event) => { clearAll(); }} data-rozie-s-546c469a>Clear</button>{/if}</div>
+<div class="rdt-group-bar" data-rozie-s-546c469a>{#each groupableColumns as col (col.id)}<span class="rdt-group-token" part="group-token" draggable="true" ondragstart={($event) => { onDragStart($event, col.id); }} data-rozie-s-546c469a>{rozieDisplay(col.label)}</span>{/each}<span class={["rdt-group-drop-zone", { 'is-over': isOver }]} data-group-drop-zone="" ondragover={($event) => { onDragOver($event); }} ondragleave={($event) => { onDragLeave($event); }} ondrop={($event) => { onDrop($event); }} data-rozie-s-546c469a>{#if !grouping.length}<span class="rdt-group-drop-hint" data-rozie-s-546c469a>Drag columns here to group</span>{/if}{#each grouping as gk (gk)}<span class="rdt-group-token" part="group-token" data-group-token="" data-rozie-s-546c469a>{rozieDisplay(gk)}<button type="button" class="rdt-group-token-remove" aria-label={rozieAttr(gk)} onclick={($event) => { removeKey(gk); }} data-rozie-s-546c469a>×</button></span>{/each}</span>{#if grouping.length}<button type="button" class="rdt-group-clear" onclick={($event) => { clearAll(); }} data-rozie-s-546c469a>Clear</button>{/if}</div>
+
+<style>
+:global {
+  .rdt-group-drop-zone[data-rozie-s-546c469a] {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--rdt-group-bar-gap, 0.375rem);
+    min-width: var(--rdt-group-drop-zone-min, 8rem);
+    min-height: 1.75rem;
+    padding: var(--rdt-group-drop-zone-pad, 0.1875rem 0.5rem);
+    border: 1px dashed var(--rdt-group-drop-zone-border, rgba(0, 0, 0, 0.2));
+    border-radius: var(--rdt-group-drop-zone-radius, 0.375rem);
+    background: var(--rdt-group-drop-zone-bg, transparent);
+    transition: border-color 0.12s ease, background 0.12s ease;
+  }
+  .rdt-group-drop-zone.is-over[data-rozie-s-546c469a] {
+    border-color: var(--rdt-group-drop-zone-border-over, rgba(37, 99, 235, 0.7));
+    background: var(--rdt-group-drop-zone-bg-over, rgba(37, 99, 235, 0.08));
+  }
+  .rdt-group-drop-hint[data-rozie-s-546c469a] {
+    opacity: 0.55;
+    font-size: 0.8125em;
+    user-select: none;
+    pointer-events: none;
+  }
+}
+</style>
