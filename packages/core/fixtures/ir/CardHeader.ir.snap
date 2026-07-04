@@ -14,7 +14,8 @@
       "required": false,
       "sourceLoc": {
         "start": 35,
-        "end": 58
+        "end": 58,
+        "filename": "CardHeader.rozie"
       }
     }
   ],

@@ -159,7 +159,8 @@
       "isModel": false,
       "sourceLoc": {
         "start": 523,
-        "end": 573
+        "end": 573,
+        "filename": "SearchInput.rozie"
       }
     },
     "minLength": {
@@ -321,7 +322,8 @@
       "isModel": false,
       "sourceLoc": {
         "start": 577,
-        "end": 619
+        "end": 619,
+        "filename": "SearchInput.rozie"
       }
     },
     "autofocus": {
@@ -483,7 +485,8 @@
       "isModel": false,
       "sourceLoc": {
         "start": 623,
-        "end": 669
+        "end": 669,
+        "filename": "SearchInput.rozie"
       }
     }
   },
@@ -542,7 +545,8 @@
       },
       "sourceLoc": {
         "start": 694,
-        "end": 703
+        "end": 703,
+        "filename": "SearchInput.rozie"
       }
     }
   },
@@ -715,7 +719,8 @@
       },
       "sourceLoc": {
         "start": 731,
-        "end": 796
+        "end": 796,
+        "filename": "SearchInput.rozie"
       }
     }
   },
@@ -1021,7 +1026,8 @@
       },
       "sourceLoc": {
         "start": 931,
-        "end": 1243
+        "end": 1243,
+        "filename": "SearchInput.rozie"
       }
     }
   ]

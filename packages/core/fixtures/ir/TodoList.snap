@@ -49,7 +49,8 @@
       "required": false,
       "sourceLoc": {
         "start": 539,
-        "end": 593
+        "end": 593,
+        "filename": "TodoList.rozie"
       }
     },
     {
@@ -82,7 +83,8 @@
       "required": false,
       "sourceLoc": {
         "start": 597,
-        "end": 637
+        "end": 637,
+        "filename": "TodoList.rozie"
       }
     }
   ],
@@ -111,7 +113,8 @@
       },
       "sourceLoc": {
         "start": 662,
-        "end": 671
+        "end": 671,
+        "filename": "TodoList.rozie"
       }
     }
   ],
@@ -354,7 +357,8 @@
       ],
       "sourceLoc": {
         "start": 699,
-        "end": 768
+        "end": 768,
+        "filename": "TodoList.rozie"
       }
     }
   ],

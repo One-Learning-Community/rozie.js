@@ -32,7 +32,8 @@
       "required": false,
       "sourceLoc": {
         "start": 624,
-        "end": 691
+        "end": 691,
+        "filename": "Dropdown.rozie"
       }
     },
     {
@@ -65,7 +66,8 @@
       "required": false,
       "sourceLoc": {
         "start": 695,
-        "end": 748
+        "end": 748,
+        "filename": "Dropdown.rozie"
       }
     },
     {
@@ -98,7 +100,8 @@
       "required": false,
       "sourceLoc": {
         "start": 752,
-        "end": 805
+        "end": 805,
+        "filename": "Dropdown.rozie"
       }
     }
   ],
@@ -270,7 +273,8 @@
       "name": "toggle",
       "sourceLoc": {
         "start": 2454,
-        "end": 2460
+        "end": 2460,
+        "filename": "Dropdown.rozie"
       }
     },
     {
@@ -278,7 +282,8 @@
       "name": "close",
       "sourceLoc": {
         "start": 2462,
-        "end": 2467
+        "end": 2467,
+        "filename": "Dropdown.rozie"
       }
     }
   ],
@@ -449,7 +454,8 @@
       ],
       "sourceLoc": {
         "start": 1552,
-        "end": 1668
+        "end": 1668,
+        "filename": "Dropdown.rozie"
       }
     },
     {
@@ -478,7 +484,8 @@
       "setupDeps": [],
       "sourceLoc": {
         "start": 1670,
-        "end": 1850
+        "end": 1850,
+        "filename": "Dropdown.rozie"
       }
     }
   ],
@@ -672,7 +679,8 @@
       "immediate": false,
       "sourceLoc": {
         "start": 1377,
-        "end": 1445
+        "end": 1445,
+        "filename": "Dropdown.rozie"
       }
     }
   ],

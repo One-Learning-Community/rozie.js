@@ -209,7 +209,8 @@
       "isModel": true,
       "sourceLoc": {
         "start": 411,
-        "end": 460
+        "end": 460,
+        "filename": "Counter.rozie"
       }
     },
     "step": {
@@ -371,7 +372,8 @@
       "isModel": false,
       "sourceLoc": {
         "start": 464,
-        "end": 499
+        "end": 499,
+        "filename": "Counter.rozie"
       }
     },
     "min": {
@@ -549,7 +551,8 @@
       "isModel": false,
       "sourceLoc": {
         "start": 503,
-        "end": 546
+        "end": 546,
+        "filename": "Counter.rozie"
       }
     },
     "max": {
@@ -712,7 +715,8 @@
       "isModel": false,
       "sourceLoc": {
         "start": 550,
-        "end": 592
+        "end": 592,
+        "filename": "Counter.rozie"
       }
     }
   },
@@ -771,7 +775,8 @@
       },
       "sourceLoc": {
         "start": 617,
-        "end": 632
+        "end": 632,
+        "filename": "Counter.rozie"
       }
     }
   },
@@ -964,7 +969,8 @@
       },
       "sourceLoc": {
         "start": 693,
-        "end": 765
+        "end": 765,
+        "filename": "Counter.rozie"
       }
     },
     "canDecrement": {
@@ -1153,7 +1159,8 @@
       },
       "sourceLoc": {
         "start": 772,
-        "end": 844
+        "end": 844,
+        "filename": "Counter.rozie"
       }
     }
   },

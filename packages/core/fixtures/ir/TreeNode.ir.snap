@@ -14,7 +14,8 @@
       "required": false,
       "sourceLoc": {
         "start": 91,
-        "end": 114
+        "end": 114,
+        "filename": "TreeNode.rozie"
       }
     },
     {
@@ -64,7 +65,8 @@
       "required": false,
       "sourceLoc": {
         "start": 116,
-        "end": 160
+        "end": 160,
+        "filename": "TreeNode.rozie"
       }
     }
   ],

@@ -209,7 +209,8 @@
       "isModel": true,
       "sourceLoc": {
         "start": 787,
-        "end": 849
+        "end": 849,
+        "filename": "Modal.rozie"
       }
     },
     "closeOnEscape": {
@@ -371,7 +372,8 @@
       "isModel": false,
       "sourceLoc": {
         "start": 853,
-        "end": 901
+        "end": 901,
+        "filename": "Modal.rozie"
       }
     },
     "closeOnBackdrop": {
@@ -533,7 +535,8 @@
       "isModel": false,
       "sourceLoc": {
         "start": 905,
-        "end": 953
+        "end": 953,
+        "filename": "Modal.rozie"
       }
     },
     "lockBodyScroll": {
@@ -695,7 +698,8 @@
       "isModel": false,
       "sourceLoc": {
         "start": 957,
-        "end": 1005
+        "end": 1005,
+        "filename": "Modal.rozie"
       }
     },
     "title": {
@@ -857,7 +861,8 @@
       "isModel": false,
       "sourceLoc": {
         "start": 1009,
-        "end": 1055
+        "end": 1055,
+        "filename": "Modal.rozie"
       }
     }
   },
@@ -965,7 +970,8 @@
       },
       "sourceLoc": {
         "start": 1974,
-        "end": 1994
+        "end": 1994,
+        "filename": "Modal.rozie"
       }
     },
     {
@@ -992,7 +998,8 @@
       },
       "sourceLoc": {
         "start": 1995,
-        "end": 2019
+        "end": 2019,
+        "filename": "Modal.rozie"
       }
     },
     {
@@ -1139,7 +1146,8 @@
       },
       "sourceLoc": {
         "start": 2086,
-        "end": 2131
+        "end": 2131,
+        "filename": "Modal.rozie"
       }
     }
   ]
