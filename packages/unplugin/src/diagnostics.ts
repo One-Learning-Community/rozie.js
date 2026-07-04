@@ -15,6 +15,7 @@
 
 import { renderDiagnostic } from '../../core/src/diagnostics/frame.js';
 import { offsetToLineCol } from '../../core/src/diagnostics/offsetToLineCol.js';
+import { createSourceResolver } from '../../core/src/diagnostics/sourceResolver.js';
 import type { Diagnostic } from '../../core/src/diagnostics/Diagnostic.js';
 import type { SourceLoc } from '../../core/src/ast/types.js';
 
@@ -45,8 +46,12 @@ export function formatViteError(
     fallback.frame = '';
     return fallback;
   }
-  const { line, column } = offsetToLineCol(source, first.loc.start);
-  const frame = renderDiagnostic(first, source);
+  // Part 2 (partial-origin attribution): resolve the correct source text for
+  // `first.filename` (a spliced .rzts/.rzjs partial's absolute path, or the
+  // host `id` itself) before computing the header line/column and code frame.
+  const resolveSource = createSourceResolver(id, source);
+  const { line, column } = offsetToLineCol(resolveSource(first.filename), first.loc.start);
+  const frame = renderDiagnostic(first, source, { resolveSource });
   const tail = errors.length > 1 ? `\n(plus ${errors.length - 1} more error${errors.length - 1 === 1 ? '' : 's'} — fix and recompile)` : '';
   const message = `[${first.code}] ${first.message}${tail}`;
   const err = new Error(message) as ViteShapedError;
@@ -61,12 +66,20 @@ export function formatViteError(
  * Convert a `SourceLoc` byte range to Vite's `{ id, line, column }` shape.
  * Used for `this.warn(...)` calls where we want the dev overlay to point
  * at the warning's source location.
+ *
+ * `filename` (the owning diagnostic's resolved filename, if known) and
+ * `resolveSource` (Part 2 — per-diagnostic source-text resolver) are both
+ * optional and back-compatible: when either is absent, this computes
+ * line/column against `source` unchanged, exactly as before.
  */
 export function formatLoc(
   loc: SourceLoc,
   id: string,
   source: string,
+  filename?: string,
+  resolveSource?: (filename?: string) => string,
 ): { id: string; line: number; column: number } {
-  const { line, column } = offsetToLineCol(source, loc.start);
+  const src = resolveSource ? resolveSource(filename) : source;
+  const { line, column } = offsetToLineCol(src, loc.start);
   return { id, line, column };
 }

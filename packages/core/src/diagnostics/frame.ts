@@ -22,6 +22,14 @@ export interface RenderDiagnosticOpts {
   linesAbove?: number;
   /** Source-context lines AFTER the offending line (default: 2). */
   linesBelow?: number;
+  /**
+   * Resolves the correct source text for a diagnostic's `filename` (Part 2 —
+   * partial-origin diagnostics render against the partial's own text, not
+   * the host `.rozie` source). Absent → falls back to the `source` argument
+   * unchanged (back-compat for callers that don't yet thread a resolver).
+   * See `createSourceResolver`.
+   */
+  resolveSource?: (filename?: string) => string;
 }
 
 /**
@@ -42,9 +50,10 @@ export function renderDiagnostic(
   source: string,
   opts: RenderDiagnosticOpts = {},
 ): string {
-  const { highlightCode = false, linesAbove = 2, linesBelow = 2 } = opts;
-  const startLC = offsetToLineCol(source, diagnostic.loc.start);
-  const endLC = offsetToLineCol(source, diagnostic.loc.end);
+  const { highlightCode = false, linesAbove = 2, linesBelow = 2, resolveSource } = opts;
+  const src = resolveSource ? resolveSource(diagnostic.filename) : source;
+  const startLC = offsetToLineCol(src, diagnostic.loc.start);
+  const endLC = offsetToLineCol(src, diagnostic.loc.end);
 
   const filenameLabel = diagnostic.filename ?? '<input>';
   const header = `[${diagnostic.severity}] ${diagnostic.code} ${filenameLabel}:${startLC.line}:${startLC.column}`;
@@ -52,7 +61,7 @@ export function renderDiagnostic(
   let frame: string;
   try {
     frame = codeFrameColumns(
-      source,
+      src,
       {
         // @babel/code-frame columns are 1-INDEXED; offsetToLineCol returns 0-indexed columns.
         start: { line: startLC.line, column: startLC.column + 1 },

@@ -82,6 +82,7 @@ import { emitSolid, type EmitSolidResult } from '../../targets/solid/src/emitSol
 import { emitLit, type EmitLitResult } from '../../targets/lit/src/emitLit.js';
 import type { Diagnostic } from '../../core/src/diagnostics/Diagnostic.js';
 import { stampMissingFilename } from '../../core/src/diagnostics/stampFilename.js';
+import { createSourceResolver } from '../../core/src/diagnostics/sourceResolver.js';
 import type { TargetValue } from './options.js';
 import { formatViteError, formatLoc } from './diagnostics.js';
 
@@ -1787,10 +1788,16 @@ function surfaceWarnings(
   // Phase 2+ (semantic/IR/validator) diagnostics reach here with no filename
   // of their own — backfill the host file being compiled so every 6-target
   // pipeline surfaces an attributable warning (mirrors compile()'s stamping).
+  // stampMissingFilename prefers a loc-carried partial filename (Part 1) over
+  // this host fallback.
   stampMissingFilename(warnings, filePath);
+  // Part 2: resolve the correct source text per-warning before computing
+  // line/column — a partial-origin warning resolves against the partial's
+  // own text, never the host source.
+  const resolveSource = createSourceResolver(filePath, source);
   for (const w of warnings) {
     if (typeof this?.warn === 'function') {
-      const loc = formatLoc(w.loc, filePath, source);
+      const loc = formatLoc(w.loc, filePath, source, w.filename, resolveSource);
       this.warn({
         message: `[${w.code}] ${w.message}`,
         ...loc,

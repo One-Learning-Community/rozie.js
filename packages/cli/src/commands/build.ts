@@ -23,6 +23,7 @@
 // at bundle time for the published artifact.
 import { compile } from '../../../core/src/compile.js';
 import { renderDiagnostic } from '../../../core/src/diagnostics/frame.js';
+import { createSourceResolver } from '../../../core/src/diagnostics/sourceResolver.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 // Phase 22 Plan 22-05 — CLI sidecar fallback (REQ-5). The `.d.rozie.ts`
 // per-module declaration is rendered by the SAME `renderSidecar` the unplugin
@@ -298,11 +299,11 @@ export async function runBuildMatrix(
       const warnings = result.diagnostics.filter((d) => d.severity === 'warning');
 
       if (errors.length > 0) {
-        stderrWrite(renderAll(result.diagnostics, source));
+        stderrWrite(renderAll(result.diagnostics, source, input));
         return true; // failed
       }
       if (warnings.length > 0) {
-        stderrWrite(renderAll(warnings, source));
+        stderrWrite(renderAll(warnings, source, input));
       }
 
       if (outDir === null) {
@@ -433,6 +434,10 @@ export async function runBuildMany(
   return runBuildMatrix(inputs, ext, ctx);
 }
 
-function renderAll(diagnostics: Diagnostic[], source: string): string {
-  return diagnostics.map((d) => `${renderDiagnostic(d, source)}\n`).join('');
+function renderAll(diagnostics: Diagnostic[], source: string, hostFilename?: string): string {
+  // Part 2 (partial-origin attribution): resolve the correct source text per
+  // diagnostic before computing line/column and code frames — a partial-
+  // origin diagnostic renders against the partial's own text.
+  const resolveSource = createSourceResolver(hostFilename, source);
+  return diagnostics.map((d) => `${renderDiagnostic(d, source, { resolveSource })}\n`).join('');
 }
