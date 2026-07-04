@@ -2207,6 +2207,20 @@ $expose({
   background: var(--rdt-group-token-bg, rgba(0, 0, 0, 0.06));
   font-size: var(--rdt-group-token-size, 0.8125em);
 }
+/* Lit cross-shadow: a slotted GroupBar drop-in renders inside DataTable's shadow tree
+   (this.groupBar(params) render-function path), but its tokens live in the drop-in's OWN
+   shadow root, which :deep() can't pierce. The drop-in exposes them as part="group-token";
+   ::part() reaches across. Mirrors the :deep(.rdt-group-token) box above. Inert on the
+   other five targets (no shadow boundary → no exposed parts). See the ::part(col-filter)
+   rule below for the same pattern on the filter drop-ins. */
+::part(group-token) {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--rdt-group-token-pad, 0.125rem 0.5rem);
+  border-radius: var(--rdt-group-token-radius, 999px);
+  background: var(--rdt-group-token-bg, rgba(0, 0, 0, 0.06));
+  font-size: var(--rdt-group-token-size, 0.8125em);
+}
 /* Group-header rows + grouped-cell chrome (phase 50 req-4/5) — group rows ride the D-04 seam. */
 .rozie-data-table .rdt-group-header {
   background: var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025));
@@ -2243,6 +2257,26 @@ $expose({
   color: inherit;
 }
 .rozie-data-table-wrap :deep(.rdt-col-filter) {
+  display: block;
+  margin-top: var(--rdt-col-filter-gap, 0.25rem);
+  width: 100%;
+  font-weight: normal;
+}
+/* Lit cross-shadow: a slotted Filter drop-in (rozie-filter-text/-select/-number-range)
+   renders inside DataTable's shadow tree via the this.filter(params) render-function path,
+   but the input it renders lives in the DROP-IN's OWN shadow root — which :deep() cannot
+   pierce (shadow boundaries are opaque to outside CSS; see docs/guide/features.md). The
+   drop-in exposes that control as part="col-filter"; ::part() is the standards-track pierce
+   for exactly this. Mirrors the :deep(.rdt-col-filter) box above. Inert on the other five
+   targets (no shadow boundary → no exposed parts to match). */
+::part(col-filter) {
+  font: inherit;
+  box-sizing: border-box;
+  padding: var(--rdt-filter-padding, 0.25rem 0.5rem);
+  border: var(--rdt-filter-border, 1px solid rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-filter-radius, 4px);
+  background: var(--rdt-filter-bg, transparent);
+  color: inherit;
   display: block;
   margin-top: var(--rdt-col-filter-gap, 0.25rem);
   width: 100%;

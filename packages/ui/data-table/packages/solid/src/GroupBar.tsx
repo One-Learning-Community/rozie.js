@@ -62,11 +62,11 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
     <>
     <div class={"rdt-group-bar"} data-rozie-s-546c469a="">
       
-      <For each={local.groupableColumns}>{(col) => <span draggable="true" class={"rdt-group-token"} onDragStart={($event) => { onDragStart($event, col.id); }} data-rozie-s-546c469a="">{rozieDisplay(col.label)}</span>}</For>
+      <For each={local.groupableColumns}>{(col) => <span part="group-token" draggable="true" class={"rdt-group-token"} onDragStart={($event) => { onDragStart($event, col.id); }} data-rozie-s-546c469a="">{rozieDisplay(col.label)}</span>}</For>
 
       
       <span data-group-drop-zone="" class={"rdt-group-drop-zone"} onDragOver={($event) => { onDragOver($event); }} onDrop={($event) => { onDrop($event); }} data-rozie-s-546c469a="">
-        <For each={local.grouping}>{(gk) => <span class={"rdt-group-token"} data-group-token="" data-rozie-s-546c469a="">
+        <For each={local.grouping}>{(gk) => <span class={"rdt-group-token"} part="group-token" data-group-token="" data-rozie-s-546c469a="">
           {rozieDisplay(gk)}
           <button type="button" aria-label={rozieAttr(gk)} class={"rdt-group-token-remove"} onClick={($event) => { removeKey(gk); }} data-rozie-s-546c469a="">×</button>
         </span>}</For>

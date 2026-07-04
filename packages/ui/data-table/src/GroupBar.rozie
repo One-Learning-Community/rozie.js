@@ -118,6 +118,7 @@ const clearAll = () => {
   <!-- (a) draggable column chips -->
   <span
     class="rdt-group-token"
+    part="group-token"
     r-for="col in $props.groupableColumns"
     :key="col.id"
     draggable="true"
@@ -131,7 +132,7 @@ const clearAll = () => {
     @dragover="onDragOver($event)"
     @drop="onDrop($event)"
   >
-    <span class="rdt-group-token" data-group-token r-for="gk in $props.grouping" :key="gk">
+    <span class="rdt-group-token" part="group-token" data-group-token r-for="gk in $props.grouping" :key="gk">
       {{ gk }}
       <button type="button" class="rdt-group-token-remove" :aria-label="gk" @click="removeKey(gk)">×</button>
     </span>

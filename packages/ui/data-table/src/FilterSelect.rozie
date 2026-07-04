@@ -90,6 +90,7 @@ const onChange = (e) => {
 <template>
 <select
   class="rdt-col-filter"
+  part="col-filter"
   :aria-label="$props.columnId"
   :value="selectValue()"
   @change="onChange($event)"

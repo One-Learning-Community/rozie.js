@@ -54,8 +54,8 @@ export default class FilterNumberRange extends SignalWatcher(LitElement) {
   render() {
     return html`
 <span style="display:contents" data-rozie-s-97b2c090>
-  <input class="rdt-col-filter" type="number" aria-label=${rozieAttr(this.columnId + ' min')} placeholder=${rozieAttr(this.minPlaceholder())} .value=${this._minDraft.value} @input=${($event: Event) => { this.onMinInput($event); }} @change=${($event: Event) => { this.applyRange(); }} data-rozie-s-97b2c090 />
-  <input class="rdt-col-filter" type="number" aria-label=${rozieAttr(this.columnId + ' max')} placeholder=${rozieAttr(this.maxPlaceholder())} .value=${this._maxDraft.value} @input=${($event: Event) => { this.onMaxInput($event); }} @change=${($event: Event) => { this.applyRange(); }} data-rozie-s-97b2c090 />
+  <input class="rdt-col-filter" part="col-filter" type="number" aria-label=${rozieAttr(this.columnId + ' min')} placeholder=${rozieAttr(this.minPlaceholder())} .value=${this._minDraft.value} @input=${($event: Event) => { this.onMinInput($event); }} @change=${($event: Event) => { this.applyRange(); }} data-rozie-s-97b2c090 />
+  <input class="rdt-col-filter" part="col-filter" type="number" aria-label=${rozieAttr(this.columnId + ' max')} placeholder=${rozieAttr(this.maxPlaceholder())} .value=${this._maxDraft.value} @input=${($event: Event) => { this.onMaxInput($event); }} @change=${($event: Event) => { this.applyRange(); }} data-rozie-s-97b2c090 />
 </span>
 `;
   }

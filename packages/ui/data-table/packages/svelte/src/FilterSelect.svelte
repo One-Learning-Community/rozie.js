@@ -54,4 +54,4 @@ const onChange = (e: any) => {
 };
 </script>
 
-<select class="rdt-col-filter" aria-label={columnId} value={rozieAttr(selectValue())} onchange={($event) => { onChange($event); }} data-rozie-s-d75b42b2><option value="" data-rozie-s-d75b42b2>All</option>{#each uniqueValues as opt (opt)}<option value={rozieAttr(opt)} data-rozie-s-d75b42b2>{rozieDisplay(opt)}</option>{/each}</select>
+<select class="rdt-col-filter" part="col-filter" aria-label={columnId} value={rozieAttr(selectValue())} onchange={($event) => { onChange($event); }} data-rozie-s-d75b42b2><option value="" data-rozie-s-d75b42b2>All</option>{#each uniqueValues as opt (opt)}<option value={rozieAttr(opt)} data-rozie-s-d75b42b2>{rozieDisplay(opt)}</option>{/each}</select>

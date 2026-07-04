@@ -25,7 +25,7 @@ function __rozieAttr(v: unknown): string | null {
   standalone: true,
   template: `
 
-    <select class="rdt-col-filter" [attr.aria-label]="columnId()" [value]="selectValue()" (change)="onChange($event)">
+    <select class="rdt-col-filter" part="col-filter" [attr.aria-label]="columnId()" [value]="selectValue()" (change)="onChange($event)">
       <option value="">All</option>
       @for (opt of uniqueValues(); track opt) {
     <option [attr.value]="rozieAttr(opt)">{{ rozieDisplay(opt) }}</option>

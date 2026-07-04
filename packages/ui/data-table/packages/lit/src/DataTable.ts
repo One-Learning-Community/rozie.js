@@ -191,6 +191,14 @@ export default class DataTable extends SignalWatcher(LitElement) {
   background: var(--rdt-group-token-bg, rgba(0, 0, 0, 0.06));
   font-size: var(--rdt-group-token-size, 0.8125em);
 }
+::part(group-token) {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--rdt-group-token-pad, 0.125rem 0.5rem);
+  border-radius: var(--rdt-group-token-radius, 999px);
+  background: var(--rdt-group-token-bg, rgba(0, 0, 0, 0.06));
+  font-size: var(--rdt-group-token-size, 0.8125em);
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-header[data-rozie-s-d5dcab4c] {
   background: var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025));
   font-weight: var(--rdt-group-header-weight, 600);
@@ -225,6 +233,19 @@ export default class DataTable extends SignalWatcher(LitElement) {
   color: inherit;
 }
 .rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-col-filter {
+  display: block;
+  margin-top: var(--rdt-col-filter-gap, 0.25rem);
+  width: 100%;
+  font-weight: normal;
+}
+::part(col-filter) {
+  font: inherit;
+  box-sizing: border-box;
+  padding: var(--rdt-filter-padding, 0.25rem 0.5rem);
+  border: var(--rdt-filter-border, 1px solid rgba(0, 0, 0, 0.2));
+  border-radius: var(--rdt-filter-radius, 4px);
+  background: var(--rdt-filter-bg, transparent);
+  color: inherit;
   display: block;
   margin-top: var(--rdt-col-filter-gap, 0.25rem);
   width: 100%;

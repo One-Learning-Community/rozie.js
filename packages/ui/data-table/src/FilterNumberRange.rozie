@@ -117,6 +117,7 @@ const applyRange = () => {
 <span style="display:contents">
   <input
     class="rdt-col-filter"
+    part="col-filter"
     type="number"
     :aria-label="$props.columnId + ' min'"
     :placeholder="minPlaceholder()"
@@ -126,6 +127,7 @@ const applyRange = () => {
   />
   <input
     class="rdt-col-filter"
+    part="col-filter"
     type="number"
     :aria-label="$props.columnId + ' max'"
     :placeholder="maxPlaceholder()"

@@ -28,13 +28,13 @@ function __rozieAttr(v: unknown): string | null {
     <div class="rdt-group-bar">
       
       @for (col of groupableColumns(); track col.id) {
-    <span class="rdt-group-token" draggable="true" (dragstart)="onDragStart($event, col.id)">{{ rozieDisplay(col.label) }}</span>
+    <span class="rdt-group-token" part="group-token" draggable="true" (dragstart)="onDragStart($event, col.id)">{{ rozieDisplay(col.label) }}</span>
     }
 
       
       <span class="rdt-group-drop-zone" data-group-drop-zone="" (dragover)="onDragOver($event)" (drop)="onDrop($event)">
         @for (gk of grouping(); track gk) {
-    <span class="rdt-group-token" data-group-token="">
+    <span class="rdt-group-token" part="group-token" data-group-token="">
           {{ rozieDisplay(gk) }}
           <button type="button" class="rdt-group-token-remove" [attr.aria-label]="rozieAttr(gk)" (click)="removeKey(gk)">×</button>
         </span>

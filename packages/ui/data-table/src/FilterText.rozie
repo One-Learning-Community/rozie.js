@@ -115,6 +115,7 @@ const onBlur = () => {
 <template>
 <input
   class="rdt-col-filter"
+  part="col-filter"
   type="text"
   :aria-label="$props.columnId"
   :value="$data.draft"

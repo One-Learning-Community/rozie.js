@@ -1,6 +1,6 @@
 <template>
 
-<input class="rdt-col-filter" type="text" :aria-label="props.columnId" :value="draft" @input="onInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
+<input class="rdt-col-filter" part="col-filter" type="text" :aria-label="props.columnId" :value="draft" @input="onInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
 
 </template>
 

@@ -43,11 +43,11 @@ export default class GroupBar extends SignalWatcher(LitElement) {
     return html`
 <div class="rdt-group-bar" data-rozie-s-546c469a>
   
-  ${repeat<any>(this.groupableColumns, (col, _idx) => col.id, (col, _idx) => html`<span class="rdt-group-token" key=${rozieAttr(col.id)} draggable="true" @dragstart=${($event: Event) => { this.onDragStart($event, col.id); }} data-rozie-s-546c469a>${rozieDisplay(col.label)}</span>`)}
+  ${repeat<any>(this.groupableColumns, (col, _idx) => col.id, (col, _idx) => html`<span class="rdt-group-token" part="group-token" key=${rozieAttr(col.id)} draggable="true" @dragstart=${($event: Event) => { this.onDragStart($event, col.id); }} data-rozie-s-546c469a>${rozieDisplay(col.label)}</span>`)}
 
   
   <span class="rdt-group-drop-zone" data-group-drop-zone="" @dragover=${($event: Event) => { this.onDragOver($event); }} @drop=${($event: Event) => { this.onDrop($event); }} data-rozie-s-546c469a>
-    ${repeat<any>(this.grouping, (gk, _idx) => gk, (gk, _idx) => html`<span class="rdt-group-token" data-group-token="" key=${rozieAttr(gk)} data-rozie-s-546c469a>
+    ${repeat<any>(this.grouping, (gk, _idx) => gk, (gk, _idx) => html`<span class="rdt-group-token" part="group-token" data-group-token="" key=${rozieAttr(gk)} data-rozie-s-546c469a>
       ${rozieDisplay(gk)}
       <button class="rdt-group-token-remove" type="button" aria-label=${rozieAttr(gk)} @click=${($event: Event) => { this.removeKey(gk); }} data-rozie-s-546c469a>×</button>
     </span>`)}

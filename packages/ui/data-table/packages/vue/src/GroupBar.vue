@@ -2,11 +2,11 @@
 
 <div class="rdt-group-bar">
   
-  <span v-for="col in props.groupableColumns" :key="col.id" class="rdt-group-token" draggable="true" @dragstart="onDragStart($event, col.id)">{{ col.label }}</span>
+  <span v-for="col in props.groupableColumns" :key="col.id" class="rdt-group-token" part="group-token" draggable="true" @dragstart="onDragStart($event, col.id)">{{ col.label }}</span>
 
   
   <span class="rdt-group-drop-zone" data-group-drop-zone="" @dragover="onDragOver($event)" @drop="onDrop($event)">
-    <span v-for="gk in props.grouping" :key="gk" class="rdt-group-token" data-group-token="">
+    <span v-for="gk in props.grouping" :key="gk" class="rdt-group-token" part="group-token" data-group-token="">
       {{ gk }}
       <button type="button" class="rdt-group-token-remove" :aria-label="gk" @click="removeKey(gk)">×</button>
     </span>

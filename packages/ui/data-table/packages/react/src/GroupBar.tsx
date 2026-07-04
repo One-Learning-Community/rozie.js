@@ -62,11 +62,11 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
     <>
     <div className={"rdt-group-bar"} data-rozie-s-546c469a="">
       
-      {props.groupableColumns.map((col) => <span key={col.id} className={"rdt-group-token"} draggable="true" onDragStart={($event) => { onDragStart($event, col.id); }} data-rozie-s-546c469a="">{rozieDisplay(col.label)}</span>)}
+      {props.groupableColumns.map((col) => <span key={col.id} className={"rdt-group-token"} part="group-token" draggable="true" onDragStart={($event) => { onDragStart($event, col.id); }} data-rozie-s-546c469a="">{rozieDisplay(col.label)}</span>)}
 
       
       <span className={"rdt-group-drop-zone"} data-group-drop-zone="" onDragOver={($event) => { onDragOver($event); }} onDrop={($event) => { onDrop($event); }} data-rozie-s-546c469a="">
-        {props.grouping.map((gk) => <span key={gk} className={"rdt-group-token"} data-group-token="" data-rozie-s-546c469a="">
+        {props.grouping.map((gk) => <span key={gk} className={"rdt-group-token"} part="group-token" data-group-token="" data-rozie-s-546c469a="">
           {rozieDisplay(gk)}
           <button type="button" className={"rdt-group-token-remove"} aria-label={rozieAttr(gk)} onClick={($event) => { removeKey(gk); }} data-rozie-s-546c469a="">×</button>
         </span>)}

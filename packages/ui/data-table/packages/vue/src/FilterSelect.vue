@@ -1,6 +1,6 @@
 <template>
 
-<select class="rdt-col-filter" :aria-label="props.columnId" :value="selectValue()" @change="onChange($event)">
+<select class="rdt-col-filter" part="col-filter" :aria-label="props.columnId" :value="selectValue()" @change="onChange($event)">
   <option value="">All</option>
   <option v-for="opt in props.uniqueValues" :key="opt" :value="opt">{{ opt }}</option>
 </select>

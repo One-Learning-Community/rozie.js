@@ -48,7 +48,7 @@ export default class FilterText extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<input class="rdt-col-filter" type="text" aria-label=${this.columnId} .value=${this._draft.value} @input=${($event: Event) => { this.onInput($event); }} @keydown=${($event: Event) => { this.onKeydown($event); }} @blur=${($event: Event) => { this.onBlur(); }} data-rozie-s-18cbb44e />
+<input class="rdt-col-filter" part="col-filter" type="text" aria-label=${this.columnId} .value=${this._draft.value} @input=${($event: Event) => { this.onInput($event); }} @keydown=${($event: Event) => { this.onKeydown($event); }} @blur=${($event: Event) => { this.onBlur(); }} data-rozie-s-18cbb44e />
 `;
   }
 

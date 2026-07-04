@@ -62,4 +62,4 @@ const onBlur = () => {
 };
 </script>
 
-<input class="rdt-col-filter" type="text" aria-label={columnId} value={draft} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-18cbb44e />
+<input class="rdt-col-filter" part="col-filter" type="text" aria-label={columnId} value={draft} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-18cbb44e />

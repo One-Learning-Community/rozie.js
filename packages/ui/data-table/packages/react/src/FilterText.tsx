@@ -54,7 +54,7 @@ export default function FilterText(_props: FilterTextProps): JSX.Element {
 
   return (
     <>
-    <input className={"rdt-col-filter"} type="text" aria-label={props.columnId} value={draft} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-18cbb44e="" />
+    <input className={"rdt-col-filter"} part="col-filter" type="text" aria-label={props.columnId} value={draft} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-18cbb44e="" />
     </>
   );
 }

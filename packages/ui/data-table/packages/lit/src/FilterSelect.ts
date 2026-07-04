@@ -44,7 +44,7 @@ export default class FilterSelect extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<select class="rdt-col-filter" aria-label=${this.columnId} .value=${this.selectValue()} @change=${($event: Event) => { this.onChange($event); }} data-rozie-s-d75b42b2>
+<select class="rdt-col-filter" part="col-filter" aria-label=${this.columnId} .value=${this.selectValue()} @change=${($event: Event) => { this.onChange($event); }} data-rozie-s-d75b42b2>
   <option value="" data-rozie-s-d75b42b2>All</option>
   ${repeat<any>(this.uniqueValues, (opt, _idx) => opt, (opt, _idx) => html`<option key=${rozieAttr(opt)} value=${rozieAttr(opt)} data-rozie-s-d75b42b2>${rozieDisplay(opt)}</option>`)}
 </select>
