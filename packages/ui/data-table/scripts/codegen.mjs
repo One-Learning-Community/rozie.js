@@ -99,7 +99,7 @@ const LOCAL_POPOVER_SPECIFIER = './Popover.rozie';
 // `<rozie>…</rozie>` envelope span and ignores this banner.
 const POPOVER_BANNER =
   `<!-- GENERATED — do not edit. Vendored from @rozie-ui/popover by codegen.\n` +
-  `     Re-run \`pnpm --filter @rozie-ui/data-table codegen\` to refresh.\n` +
+  `     Re-run \`pnpm --filter @rozie-ui/data-table build\` to refresh.\n` +
   `     Drift between this copy and the canonical source FAILS CI (D-04 guard). -->\n`;
 
 /**
