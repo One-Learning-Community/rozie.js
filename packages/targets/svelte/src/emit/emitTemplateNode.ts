@@ -476,13 +476,55 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx, isComponent: boolean):
  * tag below; no template AST rewrite needed.
  */
 function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
+  const markup = emitElementInner(origNode, ctx);
+
+  // Keyed-remount codegen Task 4 — a component-level `:key="expr"` (NOT
+  // under r-for; that path owns `key` via `TemplateLoopIR.keyExpression`
+  // and never sets this field — see Task 1's Global Constraints) lowers to
+  // `remountKeyExpression`. Svelte's native remount primitive is the
+  // `{#key <expr>}...{/key}` block (Svelte 5): it destroys and recreates its
+  // content whenever `<expr>` changes across renders — exactly the semantics
+  // a component-level `:key` is meant to express. We wrap the ENTIRE emitted
+  // component invocation (not just its children — the invocation is
+  // typically self-closing/void of its own children) so the whole custom
+  // element is torn down and rebuilt on key change. The inert `key` prop
+  // that used to be forwarded onto the component is stripped inside
+  // `emitElementInner` (guarded on this SAME field), so it's never ALSO
+  // emitted alongside this wrap.
+  if (origNode.remountKeyExpression) {
+    const keyExpr = rewriteTemplateExpression(
+      origNode.remountKeyExpression,
+      ctx.ir,
+      ctxRenames(ctx),
+    );
+    return `{#key ${keyExpr}}${markup}{/key}`;
+  }
+  return markup;
+}
+
+function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
   // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
   // BEFORE any listener emission runs; it's routed into the `keynav`
   // action's `onCommit` option by emitKeynav.ts, never as an
   // `onkeynav-commit=` template attribute (see `stripKeynavCommitEvent`'s
   // doc comment). No-op (returns the SAME node) for every element that
   // isn't a keynav root.
-  const node = stripKeynavCommitEvent(origNode);
+  let node = stripKeynavCommitEvent(origNode);
+
+  // Keyed-remount codegen Task 4 — when this element carries a
+  // `remountKeyExpression` (a component-level `:key`, not an r-for loop
+  // key), the raw `key` binding is retained upstream in the IR (Task 1 —
+  // Vue still needs it) but MUST NOT be forwarded here as an inert
+  // `key={...}` prop now that `emitElement` wraps the whole invocation in a
+  // `{#key}` block. Strip it before attrs/props are computed below.
+  if (node.remountKeyExpression) {
+    node = {
+      ...node,
+      attributes: node.attributes.filter(
+        (a) => !(a.kind === 'binding' && a.name === 'key'),
+      ),
+    };
+  }
   // 260519 linechart-watch-recreate step 5 — resolve the host's static `type`
   // attribute when it is an `<input>`, so emitAttributes can route an
   // `r-model` on a `<input type="checkbox">` to `bind:checked` instead of

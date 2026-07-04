@@ -100,3 +100,63 @@ describe('emitSvelte — Phase 06.2 P2 composition + recursion', () => {
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'Modal-with-Counter.svelte.snap'));
   });
 });
+
+// Keyed-remount codegen, Task 4 — Svelte `:key` on a composed component now
+// lowers to `TemplateElementIR.remountKeyExpression` (Task 1, DONE) but
+// Svelte currently FORWARDS the raw `key` binding as an inert reactive prop
+// (`get key(){ ... }`) — the child component declares no `key` prop, so the
+// binding does nothing and the component never remounts on change
+// (data-table-super-crosstarget-findings.md §3.1). Fix: wrap the component
+// invocation in `{#key <expr>}...{/key}` (Svelte 5's native destroy+recreate
+// block) and stop forwarding `key` as a prop.
+describe('emitSvelte — component :key wraps {#key expr}...{/key} (keyed-remount codegen Task 4)', () => {
+  it('component :key wraps the invocation in {#key String(v)}...{/key} and drops the inert key prop', () => {
+    const src = `<rozie name="KeyedHost">
+<components>{ MyComp: "./MyComp.rozie" }</components>
+<data>{ v: 0 }</data>
+<template>
+  <div>
+    <MyComp :key="String($data.v)" />
+  </div>
+</template>
+</rozie>`;
+    const code = compileSvelte(src, 'KeyedHost.rozie');
+    // THE fix — a real {#key expr}...{/key} block wrapping the component call.
+    expect(code).toMatch(/\{#key String\(v\)\}<MyComp[^]*?\{\/key\}/);
+    // The inert `key` prop/binding must NOT be forwarded onto the component anymore.
+    expect(code).not.toMatch(/get key\(\)/);
+    expect(code).not.toMatch(/<MyComp[^/]*\bkey=/);
+  });
+
+  it('control: component WITHOUT :key emits no {#key} wrap and no key prop', () => {
+    const src = `<rozie name="KeyedHostNoKey">
+<components>{ MyComp: "./MyComp.rozie" }</components>
+<template>
+  <div>
+    <MyComp />
+  </div>
+</template>
+</rozie>`;
+    const code = compileSvelte(src, 'KeyedHostNoKey.rozie');
+    expect(code).not.toMatch(/\{#key /);
+    expect(code).not.toMatch(/get key\(\)/);
+  });
+
+  it('control: r-for loop key on a component is emitted exactly as before (unaffected by remountKeyExpression)', () => {
+    const src = `<rozie name="KeyedHostLoop">
+<components>{ MyComp: "./MyComp.rozie" }</components>
+<data>{ xs: [] }</data>
+<template>
+  <div>
+    <MyComp r-for="x in $data.xs" :key="x.id" />
+  </div>
+</template>
+</rozie>`;
+    const code = compileSvelte(src, 'KeyedHostLoop.rozie');
+    // Loop key still emitted via the `{#each ... (key)}` directive, unchanged.
+    expect(code).toMatch(/\{#each xs as x \(x\.id\)\}/);
+    // No {#key} wrap and no inert `key` prop introduced by this task.
+    expect(code).not.toMatch(/\{#key /);
+    expect(code).not.toMatch(/get key\(\)/);
+  });
+});
