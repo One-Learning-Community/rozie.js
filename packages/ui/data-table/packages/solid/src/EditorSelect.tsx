@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
-import { For, mergeProps, splitProps } from 'solid-js';
+import { mergeProps, splitProps } from 'solid-js';
+import { Key } from '@solid-primitives/keyed';
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
 
 interface EditorSelectProps {
@@ -61,7 +62,7 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
   return (
     <>
     <select data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={selectValue()} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-117f1a16="">
-      <For each={local.options}>{(opt) => <option value={rozieAttr(opt.value)} data-rozie-s-117f1a16="">{rozieDisplay(opt.label)}</option>}</For>
+      <Key each={local.options as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-117f1a16="">{rozieDisplay(opt().label)}</option>}</Key>
     </select>
     </>
   );

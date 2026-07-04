@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
-import { For, mergeProps, splitProps } from 'solid-js';
+import { mergeProps, splitProps } from 'solid-js';
+import { Key } from '@solid-primitives/keyed';
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
 
 interface FilterSelectProps {
@@ -52,7 +53,7 @@ export default function FilterSelect(_props: FilterSelectProps): JSX.Element {
     <>
     <select part="col-filter" aria-label={local.columnId} class={"rdt-col-filter"} value={selectValue()} onChange={($event) => { onChange($event); }} data-rozie-s-d75b42b2="">
       <option value="" data-rozie-s-d75b42b2="">All</option>
-      <For each={local.uniqueValues}>{(opt) => <option value={rozieAttr(opt)} data-rozie-s-d75b42b2="">{rozieDisplay(opt)}</option>}</For>
+      <Key each={local.uniqueValues as readonly any[]} by={(opt) => opt}>{(opt) => <option value={rozieAttr(opt())} data-rozie-s-d75b42b2="">{rozieDisplay(opt())}</option>}</Key>
     </select>
     </>
   );

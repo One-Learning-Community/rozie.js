@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, Show, children, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
+import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 import EmblaCarousel from 'embla-carousel';
 import Autoplay from 'embla-carousel-autoplay';
@@ -466,7 +467,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
 
       
       {<Show when={local.dots}><div class={"rozie-embla__dots"} data-rozie-s-4143c216="">
-        <For each={snaps()}>{(di) => <button type="button" aria-label={rozieAttr('Go to slide ' + (di + 1))} class={"rozie-embla__dot" + " " + rozieClass({ 'is-selected': di === selected() })} onClick={($event) => { navTo(di); }} data-rozie-s-4143c216="" />}</For>
+        <Key each={snaps() as readonly any[]} by={(di) => di}>{(di) => <button type="button" aria-label={rozieAttr('Go to slide ' + (di() + 1))} class={"rozie-embla__dot" + " " + rozieClass({ 'is-selected': di() === selected() })} onClick={($event) => { navTo(di()); }} data-rozie-s-4143c216="" />}</Key>
       </div></Show>}{<Show when={local.thumbnails}><div class={"rozie-embla__thumbs"} data-rozie-s-4143c216="">
         <div class={"rozie-embla__thumbs-viewport"} ref={(el) => { thumbsViewportElRef = el as HTMLElement; }} data-rozie-s-4143c216="">
           <div class={"rozie-embla__thumbs-container"} data-rozie-s-4143c216="">

@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
-import { For, mergeProps, onMount, splitProps } from 'solid-js';
+import { mergeProps, onMount, splitProps } from 'solid-js';
+import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieClass } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Otp-8267d52a', `.rozie-otp[data-rozie-s-8267d52a] {
@@ -264,7 +265,7 @@ export default function Otp(_props: OtpProps): JSX.Element {
   return (
     <>
     <div ref={(el) => { rootRef = el as HTMLElement; }} role="group" aria-label={rozieAttr(local.ariaLabel)} {...attrs} class={"rozie-otp" + " " + rozieClass({ 'rozie-otp--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-8267d52a="">
-      <For each={cells()}>{(cell) => <input autocapitalize="off" aria-label={rozieAttr(cellAriaLabel(cell.i))} data-filled={rozieAttr(cell.ch ? 'true' : null)} class={"rozie-otp-cell"} type={rozieAttr(cellType())} inputMode={rozieAttr(cellInputMode())} maxLength={1} autocomplete={rozieAttr(cellAutocomplete(cell.i))} value={cell.ch} placeholder={local.placeholder} disabled={!!local.disabled} onInput={($event) => { onInput(cell.i, $event); }} onKeyDown={($event) => { onKeydown(cell.i, $event); }} onPaste={($event) => { onPaste(cell.i, $event); }} onFocus={($event) => { onFocus($event); }} data-rozie-s-8267d52a="" />}</For>
+      <Key each={cells() as readonly any[]} by={(cell) => cell.i}>{(cell) => <input autocapitalize="off" aria-label={rozieAttr(cellAriaLabel(cell().i))} data-filled={rozieAttr(cell().ch ? 'true' : null)} class={"rozie-otp-cell"} type={rozieAttr(cellType())} inputMode={rozieAttr(cellInputMode())} maxLength={1} autocomplete={rozieAttr(cellAutocomplete(cell().i))} value={cell().ch} placeholder={local.placeholder} disabled={!!local.disabled} onInput={($event) => { onInput(cell().i, $event); }} onKeyDown={($event) => { onKeydown(cell().i, $event); }} onPaste={($event) => { onPaste(cell().i, $event); }} onFocus={($event) => { onFocus($event); }} data-rozie-s-8267d52a="" />}</Key>
     </div>
     </>
   );

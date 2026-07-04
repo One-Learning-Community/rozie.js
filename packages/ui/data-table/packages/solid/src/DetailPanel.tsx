@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
-import { For, mergeProps, splitProps } from 'solid-js';
+import { mergeProps, splitProps } from 'solid-js';
+import { Key } from '@solid-primitives/keyed';
 import { rozieDisplay } from '@rozie/runtime-solid';
 
 interface DetailPanelProps {
@@ -29,10 +30,10 @@ export default function DetailPanel(_props: DetailPanelProps): JSX.Element {
     <>
     <dl class={"rdt-detail-panel"} data-rozie-s-8f65bdaa="">
       
-      <For each={entries()}>{(pair) => <div class={"rdt-detail-entry"} data-rozie-s-8f65bdaa="">
-        <dt class={"rdt-detail-key"} data-rozie-s-8f65bdaa="">{rozieDisplay(pair.key)}</dt>
-        <dd class={"rdt-detail-value"} data-rozie-s-8f65bdaa="">{rozieDisplay(pair.value)}</dd>
-      </div>}</For>
+      <Key each={entries() as readonly any[]} by={(pair) => pair.key}>{(pair) => <div class={"rdt-detail-entry"} data-rozie-s-8f65bdaa="">
+        <dt class={"rdt-detail-key"} data-rozie-s-8f65bdaa="">{rozieDisplay(pair().key)}</dt>
+        <dd class={"rdt-detail-value"} data-rozie-s-8f65bdaa="">{rozieDisplay(pair().value)}</dd>
+      </div>}</Key>
     </dl>
     </>
   );

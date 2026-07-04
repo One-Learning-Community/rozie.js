@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
-import { For, Show, createSignal, mergeProps, splitProps } from 'solid-js';
+import { Show, createSignal, mergeProps, splitProps } from 'solid-js';
+import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('GroupBar-546c469a', `.rdt-group-drop-zone[data-rozie-s-546c469a] {
@@ -188,15 +189,15 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
     <>
     <div class={"rdt-group-bar"} data-rozie-s-546c469a="">
       
-      <For each={local.groupableColumns}>{(col) => <span part="group-token" draggable="true" class={"rdt-group-token"} onDragStart={($event) => { onChipDragStart($event, col.id); }} onDragEnd={($event) => { onDragEnd(); }} data-rozie-s-546c469a="">{rozieDisplay(col.label)}</span>}</For>
+      <Key each={local.groupableColumns as readonly any[]} by={(col) => col.id}>{(col) => <span part="group-token" draggable="true" class={"rdt-group-token"} onDragStart={($event) => { onChipDragStart($event, col().id); }} onDragEnd={($event) => { onDragEnd(); }} data-rozie-s-546c469a="">{rozieDisplay(col().label)}</span>}</Key>
 
       
       <span data-group-drop-zone="" class={"rdt-group-drop-zone" + " " + rozieClass({ 'is-over': isOver() })} onDragOver={($event) => { onDragOver($event); }} onDragLeave={($event) => { onDragLeave($event); }} onDrop={($event) => { onDrop($event); }} data-rozie-s-546c469a="">
         
-        {<Show when={!local.grouping.length}><span class={"rdt-group-drop-hint"} data-rozie-s-546c469a="">Drag columns here to group</span></Show>}<For each={local.grouping}>{(gk) => <span part="group-token" data-group-token="" draggable="true" class={"rdt-group-token" + " " + rozieClass({ 'is-drop-target': dragKind() === 'token' && dropKey() === gk && draggingId() !== gk })} onDragStart={($event) => { onTokenDragStart($event, gk); }} onDragOver={($event) => { onTokenDragOver($event, gk); }} onDragEnd={($event) => { onDragEnd(); }} data-rozie-s-546c469a="">
-          {rozieDisplay(labelFor(gk))}
-          <button type="button" aria-label={rozieAttr('Remove ' + labelFor(gk) + ' grouping')} class={"rdt-group-token-remove"} onClick={($event) => { removeKey(gk); }} data-rozie-s-546c469a="">×</button>
-        </span>}</For>
+        {<Show when={!local.grouping.length}><span class={"rdt-group-drop-hint"} data-rozie-s-546c469a="">Drag columns here to group</span></Show>}<Key each={local.grouping as readonly any[]} by={(gk) => gk}>{(gk) => <span part="group-token" data-group-token="" draggable="true" class={"rdt-group-token" + " " + rozieClass({ 'is-drop-target': dragKind() === 'token' && dropKey() === gk() && draggingId() !== gk() })} onDragStart={($event) => { onTokenDragStart($event, gk()); }} onDragOver={($event) => { onTokenDragOver($event, gk()); }} onDragEnd={($event) => { onDragEnd(); }} data-rozie-s-546c469a="">
+          {rozieDisplay(labelFor(gk()))}
+          <button type="button" aria-label={rozieAttr('Remove ' + labelFor(gk()) + ' grouping')} class={"rdt-group-token-remove"} onClick={($event) => { removeKey(gk()); }} data-rozie-s-546c469a="">×</button>
+        </span>}</Key>
       </span>
 
       

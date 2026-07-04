@@ -13,6 +13,7 @@
     "@rozie/target-solid": "workspace:*"
   },
   "devDependencies": {
+    "@solid-primitives/keyed": "^1.5.3",
     "@typescript-eslint/parser": "^8.59.2",
     "eslint": "^9",
     "eslint-plugin-solid": "^0.14.5",

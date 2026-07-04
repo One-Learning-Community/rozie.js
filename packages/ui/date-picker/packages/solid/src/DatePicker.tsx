@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, Show, createSignal, mergeProps, onMount, splitProps } from 'solid-js';
+import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
@@ -1038,9 +1039,9 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
         </div>
 
         <For each={g.weeks}>{(week, wk) => <div class={"rozie-datepicker-week"} role="row" data-rozie-s-6800c7a2="">
-          <For each={week}>{(day) => <span class={"rozie-datepicker-cell"} role="gridcell" aria-selected={!!(day.selected || day.rangeStart || day.rangeEnd)} data-rozie-s-6800c7a2="">
-            <button type="button" data-day={rozieAttr(day.iso)} aria-disabled={!!day.disabled} aria-label={rozieAttr(day.iso)} aria-current={rozieAttr(day.today ? 'date' : null)} class={"rozie-datepicker-day" + " " + rozieClass({ 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview })} tabIndex={rozieAttr(dayTabIndex(day))} disabled={!!day.disabled} onClick={($event) => { onDaySelect(day.iso); }} onMouseEnter={($event) => { onDayHover(day.iso); }} onFocus={($event) => { onDayHover(day.iso); }} onKeyDown={($event) => { onDayKeydown(day.iso, $event); }} data-rozie-s-6800c7a2="">{rozieDisplay(day.day)}</button>
-          </span>}</For>
+          <Key each={week as readonly any[]} by={(day) => day.iso}>{(day) => <span class={"rozie-datepicker-cell"} role="gridcell" aria-selected={!!(day().selected || day().rangeStart || day().rangeEnd)} data-rozie-s-6800c7a2="">
+            <button type="button" data-day={rozieAttr(day().iso)} aria-disabled={!!day().disabled} aria-label={rozieAttr(day().iso)} aria-current={rozieAttr(day().today ? 'date' : null)} class={"rozie-datepicker-day" + " " + rozieClass({ 'is-selected': day().selected, 'is-today': day().today, 'is-outside': !day().inMonth, 'is-in-range': day().inRange, 'is-range-start': day().rangeStart, 'is-range-end': day().rangeEnd, 'is-in-preview': day().inPreview })} tabIndex={rozieAttr(dayTabIndex(day()))} disabled={!!day().disabled} onClick={($event) => { onDaySelect(day().iso); }} onMouseEnter={($event) => { onDayHover(day().iso); }} onFocus={($event) => { onDayHover(day().iso); }} onKeyDown={($event) => { onDayKeydown(day().iso, $event); }} data-rozie-s-6800c7a2="">{rozieDisplay(day().day)}</button>
+          </span>}</Key>
         </div>}</For>
       </div>}</For>
 
@@ -1050,14 +1051,14 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
           <button type="button" aria-disabled={!!local.disabled} aria-label="Change year" class={"rozie-datepicker-drill-label"} disabled={!!local.disabled} onClick={enterYearsView} data-rozie-s-6800c7a2="">{rozieDisplay(monthList().year)}</button>
         </div>
         <div class={"rozie-datepicker-drill-grid"} role="grid" aria-label="Choose month" data-rozie-s-6800c7a2="">
-          <For each={monthList().months}>{(cell) => <button type="button" role="gridcell" data-month={rozieAttr(cell.iso)} aria-disabled={!!cell.disabled} aria-selected={!!cell.selected} class={"rozie-datepicker-month" + " " + rozieClass({ 'is-selected': cell.selected, 'is-current': cell.current })} tabIndex={rozieAttr(monthTabIndex(cell))} disabled={!!cell.disabled} onClick={($event) => { selectMonth(cell.iso); }} onKeyDown={($event) => { onMonthKeydown(cell.iso, $event); }} data-rozie-s-6800c7a2="">{rozieDisplay(cell.label)}</button>}</For>
+          <Key each={monthList().months as readonly any[]} by={(cell) => cell.iso}>{(cell) => <button type="button" role="gridcell" data-month={rozieAttr(cell().iso)} aria-disabled={!!cell().disabled} aria-selected={!!cell().selected} class={"rozie-datepicker-month" + " " + rozieClass({ 'is-selected': cell().selected, 'is-current': cell().current })} tabIndex={rozieAttr(monthTabIndex(cell()))} disabled={!!cell().disabled} onClick={($event) => { selectMonth(cell().iso); }} onKeyDown={($event) => { onMonthKeydown(cell().iso, $event); }} data-rozie-s-6800c7a2="">{rozieDisplay(cell().label)}</button>}</Key>
         </div>
       </div></Show>}{<Show when={showsYearsView()}><div class={"rozie-datepicker-years"} data-rozie-s-6800c7a2="">
         <div class={"rozie-datepicker-drill-header"} data-rozie-s-6800c7a2="">
           <span class={"rozie-datepicker-drill-label"} aria-live="polite" data-rozie-s-6800c7a2="">{rozieDisplay(yearRangeLabel())}</span>
         </div>
         <div class={"rozie-datepicker-drill-grid"} role="grid" aria-label="Choose year" data-rozie-s-6800c7a2="">
-          <For each={yearGrid().years}>{(cell) => <button type="button" role="gridcell" data-year={rozieAttr(cell.iso)} aria-disabled={!!cell.disabled} aria-selected={!!cell.selected} class={"rozie-datepicker-year" + " " + rozieClass({ 'is-selected': cell.selected, 'is-current': cell.current })} tabIndex={rozieAttr(yearTabIndex(cell))} disabled={!!cell.disabled} onClick={($event) => { selectYear(cell.iso); }} onKeyDown={($event) => { onYearKeydown(cell.iso, $event); }} data-rozie-s-6800c7a2="">{rozieDisplay(cell.year)}</button>}</For>
+          <Key each={yearGrid().years as readonly any[]} by={(cell) => cell.iso}>{(cell) => <button type="button" role="gridcell" data-year={rozieAttr(cell().iso)} aria-disabled={!!cell().disabled} aria-selected={!!cell().selected} class={"rozie-datepicker-year" + " " + rozieClass({ 'is-selected': cell().selected, 'is-current': cell().current })} tabIndex={rozieAttr(yearTabIndex(cell()))} disabled={!!cell().disabled} onClick={($event) => { selectYear(cell().iso); }} onKeyDown={($event) => { onYearKeydown(cell().iso, $event); }} data-rozie-s-6800c7a2="">{rozieDisplay(cell().year)}</button>}</Key>
         </div>
       </div></Show>}{(_props.footerSlot ?? _props.slots?.['footer'])?.({ today: selectToday, clear, todayIso: todayIso() }) ?? <Show when={showsFooter()}><div class={"rozie-datepicker-footer"} data-rozie-s-6800c7a2="">
           <button type="button" aria-disabled={!!local.disabled} class={"rozie-datepicker-footer-btn rozie-datepicker-today"} disabled={!!local.disabled} onClick={selectToday} data-rozie-s-6800c7a2="">Today</button>
@@ -1066,7 +1067,7 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
 
       
       {(_props.presetsSlot ?? _props.slots?.['presets'])?.({ presets: resolvedPresets(), apply: applyPreset }) ?? <Show when={hasPresets()}><div class={"rozie-datepicker-presets"} role="group" aria-label="Date range presets" data-rozie-s-6800c7a2="">
-          <For each={resolvedPresets()}>{(p) => <button type="button" aria-pressed={!!isPresetActive(p.range)} class={"rozie-datepicker-preset" + " " + rozieClass({ 'is-active': isPresetActive(p.range) })} disabled={!!local.disabled} onClick={($event) => { applyPreset(p.range); }} data-rozie-s-6800c7a2="">{rozieDisplay(p.label)}</button>}</For>
+          <Key each={resolvedPresets() as readonly any[]} by={(p) => p.label}>{(p) => <button type="button" aria-pressed={!!isPresetActive(p().range)} class={"rozie-datepicker-preset" + " " + rozieClass({ 'is-active': isPresetActive(p().range) })} disabled={!!local.disabled} onClick={($event) => { applyPreset(p().range); }} data-rozie-s-6800c7a2="">{rozieDisplay(p().label)}</button>}</Key>
         </div></Show>}
     </div>
     </>

@@ -19,7 +19,7 @@
     "./themes/*": "./src/themes/*"
   },
   "files": ["dist","src"],
-  "dependencies": { "@rozie/runtime-solid": "workspace:*" },
+  "dependencies": { "@rozie/runtime-solid": "workspace:*", "@solid-primitives/keyed": "^1.5.3" },
   "peerDependencies": { "solid-js": "^1.8" },
   "peerDependenciesMeta": { "solid-js": { "optional": false } },
   "scripts": { "build": "tsdown", "typecheck": "tsc --noEmit" },

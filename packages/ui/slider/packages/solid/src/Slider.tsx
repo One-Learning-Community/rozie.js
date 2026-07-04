@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
-import { For, Show, createMemo, mergeProps, onMount, splitProps } from 'solid-js';
+import { Show, createMemo, mergeProps, onMount, splitProps } from 'solid-js';
+import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 
 __rozieInjectStyle('Slider-4e6f0be6', `.rozie-slider[data-rozie-s-4e6f0be6] {
@@ -438,9 +439,9 @@ export default function Slider(_props: SliderProps): JSX.Element {
       
       {<Show when={normalizedMarks().length > 0}><div class={"rozie-slider-marks"} aria-hidden="true" data-rozie-s-4e6f0be6="">
         
-        <For each={normalizedMarks()}>{(tick) => <div class={"rozie-slider-mark"} style={{ left: pct(tick.value) + '%' }} data-rozie-s-4e6f0be6="">
-          {(_props.markSlot ?? _props.slots?.['mark'])?.({ value: tick.value, label: tick.label, position: pct(tick.value) }) ?? <span class={"rozie-slider-mark-label"} data-rozie-s-4e6f0be6="">{rozieDisplay(tick.label)}</span>}
-        </div>}</For>
+        <Key each={normalizedMarks() as readonly any[]} by={(tick) => tick.value}>{(tick) => <div class={"rozie-slider-mark"} style={{ left: pct(tick().value) + '%' }} data-rozie-s-4e6f0be6="">
+          {(_props.markSlot ?? _props.slots?.['mark'])?.({ value: tick().value, label: tick().label, position: pct(tick().value) }) ?? <span class={"rozie-slider-mark-label"} data-rozie-s-4e6f0be6="">{rozieDisplay(tick().label)}</span>}
+        </div>}</Key>
       </div></Show>}{<Show when={local.showValue && !local.range}><div class={"rozie-slider-bubbles"} aria-hidden="true" data-rozie-s-4e6f0be6="">
         <div class={"rozie-slider-bubble"} style={{ left: 'var(--rozie-slider-fill-end)' }} data-rozie-s-4e6f0be6="">
           {(_props.bubbleSlot ?? _props.slots?.['bubble'])?.({ value: singleValue() }) ?? <span class={"rozie-slider-bubble-text"} data-rozie-s-4e6f0be6="">{rozieDisplay(display(singleValue()))}</span>}
