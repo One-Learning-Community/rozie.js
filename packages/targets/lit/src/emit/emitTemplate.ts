@@ -206,6 +206,17 @@ export interface EmitTemplateOpts {
      */
     keyedUsed: boolean;
     /**
+     * Keyed-remount codegen Task 3 — set true ONLY when at least one
+     * `r-external`-marked element was emitted (the `_rozieReconcileSeq`
+     * counter is r-external's own invalidation channel; a component-level
+     * `:key` remount (`remountKeyExpression`, below) reuses the `keyed()`
+     * import via `keyedUsed` but keys off its OWN expression, never the
+     * seq counter, so it must NOT trigger this field declaration).
+     * emitLit reads this off `EmitTemplateResult` to conditionally declare
+     * the `_rozieReconcileSeq = 0;` class field.
+     */
+    reconcileSeqUsed: boolean;
+    /**
      * Phase 24 (req 2) — set true when at least one `r-html` directive was
      * lowered to the unsafeHTML element-content directive. emitLit reads this
      * off `EmitTemplateResult` and conditionally adds the unsafe-html
@@ -286,6 +297,14 @@ export interface EmitTemplateResult {
    * third-party listeners attached to it) untouched.
    */
   keyedUsed: boolean;
+  /**
+   * Keyed-remount codegen Task 3 — true ONLY when at least one
+   * `r-external`-marked element was emitted. emitLit conditionally declares
+   * the `_rozieReconcileSeq = 0;` class field based on THIS flag (not
+   * `keyedUsed` — a component-level `:key` remount also sets `keyedUsed`
+   * for the shared `keyed` import but never touches the seq counter).
+   */
+  reconcileSeqUsed: boolean;
   /**
    * Phase 24 (req 2) — true when at least one `r-html` directive was lowered
    * to the unsafeHTML element-content directive. emitLit conditionally wires
@@ -1314,6 +1333,17 @@ function emitElementOpenTag(
       // Phase 24 (req 2) — strip r-html from the open tag; emitElement emits
       // it as `${unsafeHTML(<expr>)}` element content (Pitfall 2).
       if (attributeIsRHtml(attr)) continue;
+      // Keyed-remount codegen Task 3 — a component-level `:key` that lowered
+      // to `remountKeyExpression` (Task 1) is consumed by `emitElement`'s
+      // `keyed()` wrap (below), NOT emitted as a property binding here. Core
+      // deliberately RETAINS the raw `key` binding in `.attributes` (Vue
+      // relies on it as its own working vnode-key remount — see Task 1's
+      // Global Constraints), so Lit must strip it at its own seam to avoid
+      // ALSO emitting a dead `.key=${…}` property binding alongside the
+      // `keyed()` wrap. Guarded on `remountKeyExpression` being set so an
+      // r-for LOOP key (which never sets `remountKeyExpression`) is
+      // untouched here.
+      if (attr.name === 'key' && node.remountKeyExpression) continue;
     }
     const emitted = emitAttribute(attr, ir, node.tagName, node.tagKind, opts);
     if (emitted) parts.push(emitted);
@@ -1536,6 +1566,42 @@ function emitElement(
   hostListenerWiring: string[],
   opts: EmitTemplateOpts,
 ): string {
+  const markup = emitElementInner(origNode, ir, hostListenerWiring, opts);
+
+  // Keyed-remount codegen Task 3 — a component-level `:key="expr"` (NOT
+  // under r-for; that path owns `key` via `TemplateLoopIR.keyExpression`
+  // and never sets this field — see Task 1's Global Constraints) lowers to
+  // `remountKeyExpression`. Lit has no native "destroy+recreate this
+  // element when a property changes" primitive, so we reuse the
+  // `r-external` `keyed()` precedent (see the `isExternal` branch inside
+  // `emitElementInner`): wrap the ENTIRE component invocation — not just
+  // its children, unlike `r-external`'s wrap, because a composed component
+  // is typically self-closing and the WHOLE custom element must be
+  // disposed + recreated, not merely its content — in
+  // `${keyed(<expr>, html\`<invocation>\`)}`. lit-html then disposes and
+  // rebuilds the inner template (and the custom element inside it)
+  // whenever the key value changes across renders. Applying the wrap here
+  // (around the fully-assembled markup returned by every internal return
+  // path of `emitElementInner` — selfClose, r-html, slot-fillers, isExternal
+  // children-wrap, and the plain children case) means every element shape
+  // gets keyed-remount support uniformly, with no per-branch duplication.
+  // The inert `.key=` property binding is stripped at `emitElementOpenTag`'s
+  // attribute-emit seam (guarded on this SAME field) so it is never ALSO
+  // emitted alongside this wrap.
+  if (origNode.remountKeyExpression) {
+    if (opts._state) opts._state.keyedUsed = true;
+    const keyExpr = rewriteTemplateExpression(origNode.remountKeyExpression, ir);
+    return `\${keyed(${keyExpr}, html\`${markup}\`)}`;
+  }
+  return markup;
+}
+
+function emitElementInner(
+  origNode: TemplateElementIR,
+  ir: IRComponent,
+  hostListenerWiring: string[],
+  opts: EmitTemplateOpts,
+): string {
   // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
   // BEFORE any listener emission runs; it's routed into `KeynavController`'s
   // `onCommit` option by `emitKeynav.ts`'s `buildKeynavFieldDecls`, never as
@@ -1670,7 +1736,10 @@ function emitElement(
   // marked element itself (and any third-party listeners attached to it —
   // SortableJS et al.). The seq is bumped by the helper; `keyed` reacts.
   if (node.isExternal === true) {
-    if (opts._state) opts._state.keyedUsed = true;
+    if (opts._state) {
+      opts._state.keyedUsed = true;
+      opts._state.reconcileSeqUsed = true;
+    }
     return `${open}\${keyed(this._rozieReconcileSeq ?? 0, html\`${children}\`)}</${tagName}>`;
   }
   return `${open}${children}</${tagName}>`;
@@ -2028,6 +2097,7 @@ export function emitTemplate(
     rozieListenersUsed: false,
     refUsed: false,
     keyedUsed: false,
+    reconcileSeqUsed: false,
     unsafeHtmlUsed: false,
     debouncedFieldDecls: [] as string[],
     debounceCleanupWiring: [] as string[],
@@ -2067,6 +2137,7 @@ export function emitTemplate(
       rozieListenersUsed: state.rozieListenersUsed,
       refUsed: state.refUsed,
       keyedUsed: state.keyedUsed,
+      reconcileSeqUsed: state.reconcileSeqUsed,
       unsafeHtmlUsed: state.unsafeHtmlUsed,
       debouncedFieldDecls: state.debouncedFieldDecls,
       hoistedLiteralFieldDecls: state.hoistedLiteralFieldDecls,
@@ -2093,6 +2164,7 @@ export function emitTemplate(
     rozieListenersUsed: state.rozieListenersUsed,
     refUsed: state.refUsed,
     keyedUsed: state.keyedUsed,
+    reconcileSeqUsed: state.reconcileSeqUsed,
     unsafeHtmlUsed: state.unsafeHtmlUsed,
     debouncedFieldDecls: state.debouncedFieldDecls,
     hoistedLiteralFieldDecls: state.hoistedLiteralFieldDecls,

@@ -383,7 +383,14 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // component instance satisfies the runtime `ReconcilableHost` interface
     // (TS forbids a `private` member from satisfying an interface member);
     // surfaced by the @rozie-ui/sortable-list-lit strict typecheck gate.
-    reconcileSeqField: templateResult.keyedUsed
+    //
+    // Keyed-remount codegen Task 3 — gated on `reconcileSeqUsed` (NOT the
+    // broader `keyedUsed`, which a component-level `:key` remount ALSO sets
+    // to get the shared `keyed` import). A component `:key` remount keys off
+    // its own `remountKeyExpression`, never this seq counter, so a template
+    // using ONLY a component `:key` (no `r-external`) must not declare this
+    // unused field.
+    reconcileSeqField: templateResult.reconcileSeqUsed
       ? '  _rozieReconcileSeq = 0;'
       : '',
     listenerWiringBody: listenerWiring,
