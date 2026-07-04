@@ -54,7 +54,7 @@ import {
   emitListenerSpreadAsMergePartial,
 } from './emitTemplateAttribute.js';
 import { emitConditional } from './emitConditional.js';
-import { emitTemplateEvent } from './emitTemplateEvent.js';
+import { emitTemplateEvent, eventNameToJsxProp } from './emitTemplateEvent.js';
 import { emitRModel } from './emitRModel.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 // Phase 07.2 — consumer-side slot-fill emission for component-tag elements.
@@ -258,7 +258,10 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
   // `onCommit` option by emitTemplate.ts, never as a JSX `onKeynavCommit=`
   // prop (see emitKeynav.ts's `stripKeynavCommitEvent` doc comment). No-op
   // (returns the SAME node) for every element that isn't a keynav root.
-  const node = stripKeynavCommitEvent(origNode);
+  // `let` — the r-model/same-event-listener collision merge (bug §3.3) below
+  // reassigns `node` to a copy with the colliding listener(s) stripped from
+  // `events`, so `emitElementListeners` doesn't also emit them.
+  let node = stripKeynavCommitEvent(origNode);
 
   // Capture and clear pendingKey for this element ONLY.
   const pendingKey = ctx.pendingKey ?? null;
@@ -343,13 +346,69 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
 
   // r-model special-case: lower to value+onChange (or checked+onChange)
   const rModelAttr = findAttribute(workingAttrs, 'r-model');
+  // Finding §3.3 (data-table-super-crosstarget-findings.md) — when an
+  // element carries BOTH `r-model` AND an explicit `@event` listener for the
+  // SAME React synthetic event r-model lowers to (e.g. `@change` on a
+  // `<select r-model="...">`), emitting both independently produces TWO
+  // same-named JSX attributes (`onChange={...} onChange={...}`). JS
+  // object-literal semantics silently keep only the LAST one, so the
+  // r-model two-way write is dropped. `mergedModelEventJsx`, when set, is
+  // the single pre-merged handler (model write first, then the explicit
+  // handler(s), in source order) that replaces BOTH the model's own
+  // on-event attribute and the colliding `@event` listener(s).
+  let mergedModelEventJsx: string | null = null;
   if (rModelAttr) {
     const rModelResult = emitRModel(node, ctx.ir);
     for (const d of rModelResult.diagnostics) ctx.diagnostics.push(d);
     if (rModelResult.replacementAttributes.length > 0) {
       // Replace the r-model attribute with the emitted pair.
       workingAttrs = workingAttrs.filter((a) => a !== rModelAttr);
-      workingAttrs = [...workingAttrs, ...rModelResult.replacementAttributes];
+
+      const modelEventAttr = rModelResult.replacementAttributes.find(
+        (a) => a.kind === 'binding' && a.name.startsWith(':on'),
+      );
+      const collidingEvents =
+        modelEventAttr && modelEventAttr.kind === 'binding'
+          ? node.events.filter(
+              (ev) => eventNameToJsxProp(ev.event) === modelEventAttr.name.slice(1),
+            )
+          : [];
+
+      if (modelEventAttr && modelEventAttr.kind === 'binding' && collidingEvents.length > 0) {
+        const modelJsxName = modelEventAttr.name.slice(1); // ':onChange' -> 'onChange'
+        const modelHandlerCode = rewriteTemplateExpression(modelEventAttr.expression, ctx.ir);
+        // Model write runs FIRST, then each colliding explicit handler, in
+        // source order — matching the other 5 targets' "both fire" semantics.
+        const callParts: string[] = [`(${modelHandlerCode})($event);`];
+        for (const ev of collidingEvents) {
+          const result = emitTemplateEvent(ev, {
+            ir: ctx.ir,
+            registry: ctx.registry,
+            collectors: ctx.collectors,
+            injectionCounter: ctx.injectionCounter,
+          });
+          if (result.scriptInjection !== null) {
+            ctx.scriptInjections.push(result.scriptInjection);
+          }
+          for (const d of result.diagnostics) ctx.diagnostics.push(d);
+          const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{([\s\S]*)\}$/);
+          const body = match ? match[2]! : result.jsxAttr;
+          callParts.push(
+            /^[A-Za-z_$][\w$]*$/.test(body) ? `${body}($event);` : `(${body})($event);`,
+          );
+        }
+        mergedModelEventJsx = `${modelJsxName}={($event) => { ${callParts.join(' ')} }}`;
+        // Drop the model's own on-event attribute (folded into
+        // mergedModelEventJsx above) and strip the now-consumed listener(s)
+        // from `node.events` so emitElementListeners doesn't re-emit them.
+        workingAttrs = [
+          ...workingAttrs,
+          ...rModelResult.replacementAttributes.filter((a) => a !== modelEventAttr),
+        ];
+        node = { ...node, events: node.events.filter((ev) => !collidingEvents.includes(ev)) };
+      } else {
+        workingAttrs = [...workingAttrs, ...rModelResult.replacementAttributes];
+      }
     }
   }
 
@@ -370,6 +429,7 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
     ...listenerResult.extraSpreads,
     ...keynavAttrs,
   ];
+  if (mergedModelEventJsx) headParts.push(mergedModelEventJsx);
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
   if (scopeAttrJsx) headParts.push(scopeAttrJsx);
   if (pendingKey !== null) headParts.unshift(`key={${pendingKey}}`);

@@ -185,7 +185,7 @@ const EVENT_NAME_TO_JSX_PROP: Readonly<Record<string, string>> = {
  * underscore split. This preserves backward compatibility with custom event
  * names while fixing native events whose lowercase form would mis-camelCase.
  */
-function eventNameToJsxProp(eventName: string): string {
+export function eventNameToJsxProp(eventName: string): string {
   const lower = eventName.toLowerCase();
   const mapped = EVENT_NAME_TO_JSX_PROP[lower];
   if (mapped) return mapped;
