@@ -102,3 +102,58 @@ describe('emitReact — Phase 06.2 P2 composition + recursion', () => {
     await expect(code).toMatchFileSnapshot(resolve(FIXTURES, 'Modal-with-Counter.tsx.snap'));
   });
 });
+
+// Keyed-remount codegen, Task 2 — React `:key` on a composed component now
+// lowers to `TemplateElementIR.remountKeyExpression` (Task 1, DONE) but React
+// currently DROPS the raw `key`/`:key` binding via `isConsumedAttribute`
+// (emitTemplateAttribute.ts:83-90) and emits NO key at all — meaning React
+// silently never remounts on `:key` change (data-table-super-crosstarget-
+// findings.md §3.1). Fix: emit `key={<expr>}` on the component call so
+// React's native "key change → remount" behavior fires.
+describe('emitReact — component :key emits key={expr} (keyed-remount codegen Task 2)', () => {
+  it('component :key emits key={String(v)} on the component call', () => {
+    const src = `<rozie name="KeyedHost">
+<components>{ MyComp: "./MyComp.rozie" }</components>
+<data>{ v: 0 }</data>
+<template>
+  <div>
+    <MyComp :key="String($data.v)" />
+  </div>
+</template>
+</rozie>`;
+    const code = compileReact(src, 'KeyedHost.rozie');
+    // THE fix — a real key={...} JSX attribute on the component invocation.
+    expect(code).toMatch(/<MyComp[^/]*\bkey=\{String\(v\)\}/);
+  });
+
+  it('control: component WITHOUT :key emits no key attribute', () => {
+    const src = `<rozie name="KeyedHostNoKey">
+<components>{ MyComp: "./MyComp.rozie" }</components>
+<template>
+  <div>
+    <MyComp />
+  </div>
+</template>
+</rozie>`;
+    const code = compileReact(src, 'KeyedHostNoKey.rozie');
+    expect(code).not.toMatch(/\bkey=\{/);
+  });
+
+  it('control: r-for loop key on a component is emitted exactly as before (unaffected by remountKeyExpression)', () => {
+    const src = `<rozie name="KeyedHostLoop">
+<components>{ MyComp: "./MyComp.rozie" }</components>
+<data>{ xs: [] }</data>
+<template>
+  <div>
+    <MyComp r-for="x in $data.xs" :key="x.id" />
+  </div>
+</template>
+</rozie>`;
+    const code = compileReact(src, 'KeyedHostLoop.rozie');
+    // Loop key still emitted via the pendingKey channel.
+    expect(code).toMatch(/<MyComp[^/]*\bkey=\{x\.id\}/);
+    // Exactly one key= on the component call (no duplicate from remount path).
+    const matches = code.match(/\bkey=\{/g) ?? [];
+    expect(matches.length).toBe(1);
+  });
+});

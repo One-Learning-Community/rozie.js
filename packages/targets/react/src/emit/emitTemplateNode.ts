@@ -270,6 +270,20 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
   // Build a working set of attributes — start with element's own.
   let workingAttrs: AttributeBinding[] = [...node.attributes];
 
+  // Keyed-remount codegen Task 2 — a component-level `:key="expr"` (NOT
+  // under r-for; that path owns `key` via `pendingKey` above) lowers to
+  // `remountKeyExpression` (Task 1). React natively destroys+recreates a
+  // component when its `key` prop changes, so emitting `key={<expr>}` here
+  // IS the remount — no runtime helper needed. The raw `key`/`:key` binding
+  // is already dropped by `isConsumedAttribute` (emitTemplateAttribute.ts),
+  // so this is the ONLY place `key=` is emitted for this element; guarded on
+  // `pendingKey === null` so the (mutually-exclusive, per the IR contract)
+  // r-for loop-key path is never double-emitted.
+  const remountKeyJsx =
+    pendingKey === null && node.remountKeyExpression
+      ? `key={${rewriteTemplateExpression(node.remountKeyExpression, ctx.ir)}}`
+      : null;
+
   const scopeAttrJsx = scopeAttrForElement(node, ctx);
   // Phase 71 (r-keynav) — root `ref={...}`/`aria-activedescendant` and item
   // `id`/`data-rozie-keynav-item`/`data-rozie-keynav-active`/`tabIndex`
@@ -319,6 +333,7 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
       ...keynavAttrs,
     ].filter(Boolean);
     if (scopeAttrJsx) headParts.push(scopeAttrJsx);
+    if (remountKeyJsx) headParts.push(remountKeyJsx);
     if (pendingKey !== null) headParts.unshift(`key={${pendingKey}}`);
     const head = headParts.length > 0 ? ' ' + headParts.join(' ') : '';
     return `<${node.tagName}${head} />`;
@@ -439,6 +454,7 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
   if (mergedModelEventJsx) headParts.push(mergedModelEventJsx);
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
   if (scopeAttrJsx) headParts.push(scopeAttrJsx);
+  if (remountKeyJsx) headParts.push(remountKeyJsx);
   if (pendingKey !== null) headParts.unshift(`key={${pendingKey}}`);
 
   // Phase 07.2 consumer-side slot-fill emit (R3 + R4 + R5).
