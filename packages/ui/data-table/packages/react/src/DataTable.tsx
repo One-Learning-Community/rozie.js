@@ -1245,7 +1245,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return colId === EXPANDER_COL_ID;
   }
   function rowCanExpand(row: any) {
-    return !!(tick() >= 0 && row && row.getCanExpand && row.getCanExpand());
+    return !!(tick() >= 0 && row && row.getCanExpand && row.getCanExpand() && !(row.getIsGrouped && row.getIsGrouped()));
   }
   function rowIsExpanded(row: any) {
     return !!(tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());

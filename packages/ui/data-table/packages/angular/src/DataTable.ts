@@ -2022,7 +2022,7 @@ export class DataTable {
   };
   isSelectColumn = (colId: any) => colId === this.SELECT_COL_ID;
   isExpanderColumn = (colId: any) => colId === this.EXPANDER_COL_ID;
-  rowCanExpand = (row: any) => !!(this.tick() >= 0 && row && row.getCanExpand && row.getCanExpand());
+  rowCanExpand = (row: any) => !!(this.tick() >= 0 && row && row.getCanExpand && row.getCanExpand() && !(row.getIsGrouped && row.getIsGrouped()));
   rowIsExpanded = (row: any) => !!(this.tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());
   rowShowsDetail = (row: any) => this.getSubRows() == null && !this.rowIsGrouped(row) && this.rowIsExpanded(row);
   onToggleExpand = (row: any, evt: any) => {

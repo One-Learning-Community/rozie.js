@@ -2072,8 +2072,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   function isExpanderColumn(colId: any) {
     return colId === EXPANDER_COL_ID;
   }
+  // rowCanExpand gates ONLY the leading expander-column detail chevron. Group-header rows
+  // are excluded (`!getIsGrouped`): with `expandable` + grouping, getRowCanExpand returns
+  // `() => true` for EVERY flattened row, so without this a group header rendered TWO
+  // chevrons — the group-toggle in its grouped cell AND a redundant detail chevron in the
+  // leading column (both fire onToggleExpand on the shared expanded state). A group row's
+  // expand affordance is the group-toggle; the leading-column chevron is detail-only.
   function rowCanExpand(row: any) {
-    return !!(tick() >= 0 && row && row.getCanExpand && row.getCanExpand());
+    return !!(tick() >= 0 && row && row.getCanExpand && row.getCanExpand() && !(row.getIsGrouped && row.getIsGrouped()));
   }
   function rowIsExpanded(row: any) {
     return !!(tick() >= 0 && row && row.getIsExpanded && row.getIsExpanded());
