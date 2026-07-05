@@ -386,7 +386,7 @@ private __rozieFirstUpdateDone = false;
 
   isTooltip = () => this.trigger === 'hover' || this.trigger === 'focus';
 
-  floatingRole = () => this.isTooltip() ? 'tooltip' : this.modal ? 'dialog' : null;
+  floatingRole = () => this.isTooltip() ? 'tooltip' : this.modal ? 'dialog' : undefined;
 
   show() {
     if (!this.disabled) this.requestOpen(true);

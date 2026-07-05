@@ -364,7 +364,7 @@ export class Popover {
     this.requestOpen(false);
   };
   isTooltip = () => this.trigger() === 'hover' || this.trigger() === 'focus';
-  floatingRole = () => this.isTooltip() ? 'tooltip' : this.modal() ? 'dialog' : null;
+  floatingRole = () => this.isTooltip() ? 'tooltip' : this.modal() ? 'dialog' : undefined;
   show = () => {
     if (!(this.disabled() || this.__rozieCvaDisabled())) this.requestOpen(true);
   };

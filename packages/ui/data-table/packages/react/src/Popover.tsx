@@ -241,7 +241,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     return props.trigger === 'hover' || props.trigger === 'focus';
   }
   function floatingRole() {
-    return isTooltip() ? 'tooltip' : props.modal ? 'dialog' : null;
+    return isTooltip() ? 'tooltip' : props.modal ? 'dialog' : undefined;
   }
   // ─── imperative handle ($expose) ────────────────────────────────────────────────
   // Verbs: show/hide/toggle/reposition. NOT `update` (reserved Lit lifecycle) → the

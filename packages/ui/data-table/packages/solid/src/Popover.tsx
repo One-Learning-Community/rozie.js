@@ -353,12 +353,16 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   }
   // Role: hover/focus → 'tooltip'; a click popover is 'dialog' ONLY when the consumer
   // opts into `modal` (which is what also emits aria-modal). A default (non-modal)
-  // click popover returns `null` — a role-NEUTRAL positioned container, so the slot
+  // click popover returns `undefined` — a role-NEUTRAL positioned container, so the slot
   // content owns its own semantics (e.g. the data-table ⋯ menu declares role="menu").
   // Emitting role="dialog" + aria-modal="true" on a click-outside-dismissable panel
   // with no focus trap wrongly tells assistive tech that sibling content is inert (IN-03).
+  // `undefined` (not `null`) for the neutral case: the Vue `:role` binding target is
+  // `string | undefined`, and under strict vue-tsc `null` is not assignable to it —
+  // `undefined` drops the attribute identically (Vue/Solid nullish-attr drop treats both
+  // alike) while keeping the emitted leaf's inferred type a clean `'tooltip' | 'dialog' | undefined`.
   function floatingRole() {
-    return isTooltip() ? 'tooltip' : local.modal ? 'dialog' : null;
+    return isTooltip() ? 'tooltip' : local.modal ? 'dialog' : undefined;
   }
 
   // ─── imperative handle ($expose) ────────────────────────────────────────────────

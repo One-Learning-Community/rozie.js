@@ -24,10 +24,21 @@
  * unassignable (TS2322). Non-string inputs (numbers/booleans/objects) are
  * stringified at runtime, so their wrapped type is `string`.
  *
+ * A NULLISH member of a MIXED union (e.g. `'tooltip' | 'dialog' | undefined` from
+ * a role helper whose neutral case omits the attribute) maps to `never`, NOT
+ * `string`: at runtime a nullish `v` is dropped, so the wrapped result for that
+ * member is the outer `| undefined`. Distributing it to `string` (the old
+ * else-branch) would widen the WHOLE union to `string` and defeat the literal
+ * preservation above — the exact regression that broke `Popover`'s `role`.
+ *
  * @public — runtime API consumed by emitted .tsx files.
  */
 import { rozieDisplay } from './rozieDisplay.js';
 
-export function rozieAttr<T>(v: T): (T extends string ? T : string) | undefined {
-  return (v == null ? undefined : rozieDisplay(v)) as (T extends string ? T : string) | undefined;
+export function rozieAttr<T>(
+  v: T,
+): (T extends string ? T : T extends null | undefined ? never : string) | undefined {
+  return (v == null ? undefined : rozieDisplay(v)) as
+    | (T extends string ? T : T extends null | undefined ? never : string)
+    | undefined;
 }

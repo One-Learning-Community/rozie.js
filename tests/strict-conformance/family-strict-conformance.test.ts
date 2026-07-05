@@ -224,7 +224,10 @@ const FAMILIES: FamilySpec[] = [
         TS7023: 1,
         TS7022: 1,
         TS7053: 4,
-        TS2322: 2,
+        // TS2322 (2) cleared 2026-07-05: the rozieAttr nullish-union type fix
+        // (a nullish member of a mixed string-literal union now maps to `never`,
+        // not `string`) narrows the two role/aria attr bindings that previously
+        // widened to `string` and tripped Solid's strict AriaRole union.
         TS7006: 2,
       },
       'DetailPanel.tsx': {
