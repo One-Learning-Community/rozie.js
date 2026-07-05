@@ -83,14 +83,16 @@ const rowShowsDetail = (row) => ($props.getSubRows == null && !rowIsGrouped(row)
 const onToggleExpand = (row, evt) => {
   if (!row || !row.toggleExpanded) return
   // Capture the owning row element BEFORE the toggle so DOM focus can be restored after the
-  // expanded-state re-render. On Solid the expander <td>/<button> is RECREATED on that
-  // re-render (the reference-keyed cell <For> receives fresh table-core cell instances each
-  // pull — the <tr> persists but its cells are rebuilt), which drops DOM focus to <body> and
-  // breaks keyboard activation (Enter/Space on the focused expander leaves nothing focused).
-  // Re-focusing the (possibly-recreated) expander in the SAME row keeps the control focused —
-  // the focusActiveCell imperative-refocus precedent. The rAF defers past the synchronous
-  // reactive flush so the fresh node exists. Harmless on the targets that keep the node
-  // (Vue/React/Svelte/Angular/Lit re-focus the same element → no-op).
+  // expanded-state re-render. This guards a focus-drop that USED to happen on Solid: when the
+  // cell loop reconciled by reference (bare <For>), table-core's fresh cell instances each
+  // pull rebuilt the expander <td>/<button> (the <tr> persisted but its cells were rebuilt),
+  // dropping DOM focus to <body> and breaking keyboard activation (Enter/Space on the focused
+  // expander left nothing focused). Since the emitter now emits `<Key>` for the
+  // `:key="cellCtx.id"` cell loop, Solid keeps the cell node on a stable key too — so the
+  // expander is no longer recreated and this re-focus is now a defensive no-op on ALL six
+  // targets (re-focusing the SAME kept element — the focusActiveCell imperative-refocus
+  // precedent). Kept for safety; it costs nothing when the node is unchanged. The rAF defers
+  // past the synchronous reactive flush so any (re)created node exists first.
   const ownerRow = evt && evt.currentTarget && evt.currentTarget.closest ? evt.currentTarget.closest('tr') : null
   row.toggleExpanded()
   if (ownerRow && typeof requestAnimationFrame === 'function') {

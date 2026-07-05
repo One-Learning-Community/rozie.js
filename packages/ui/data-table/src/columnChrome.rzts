@@ -31,9 +31,10 @@ const defFor = (colId) => {
 // Per-row visible cells for the body loop. table-core memoizes row objects by id,
 // so a re-pull after a column change (visibility/reorder/pin, or the late <Column>
 // registry on first mount) returns the SAME row references with a different cell
-// set. Solid's reference-keyed <For> keeps the existing <tr> and will NOT re-run a
-// child loop whose `each` reads no signal — so a bare `row.getVisibleCells()` goes
-// stale (header reorders, cells don't). Reading `$data.rowModelVer` (bumped by every
+// set. On Solid the row loop keeps the existing <tr> across that pull (`:key="row.id"`
+// is stable, so the emitter's `<Key>` reconciler holds the node), and Solid will NOT
+// re-run a child loop whose `each` reads no signal — so a bare `row.getVisibleCells()`
+// goes stale (header reorders, cells don't). Reading `$data.rowModelVer` (bumped by every
 // refreshRowModel) inside the `each` puts the inner loop in the reactive scope, so it
 // re-derives the cells on every row-model change. No-op on the coarse-render targets.
 const visibleCellsFor = (row) => ($data.rowModelVer >= 0 ? row.getVisibleCells() : [])
