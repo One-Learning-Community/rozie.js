@@ -512,6 +512,7 @@
 @shikijs/types
 @shikijs/vscode-textmate
 @sindresorhus/merge-streams
+@solid-primitives/keyed
 @standard-schema/spec
 @sveltejs/acorn-typescript
 @sveltejs/package

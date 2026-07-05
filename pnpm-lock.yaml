@@ -7033,6 +7033,9 @@ importers:
       '@rozie/unplugin':
         specifier: workspace:*
         version: link:../../packages/unplugin
+      '@solid-primitives/keyed':
+        specifier: ^1.5.3
+        version: 1.5.3(solid-js@1.9.12)
       '@tiptap/core':
         specifier: ^3.23.5
         version: 3.23.5(@tiptap/pm@3.23.5)
