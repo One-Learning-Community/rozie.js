@@ -283,7 +283,7 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   // rather than the SolidImportCollector — mirrors `portalImport`.
   const keyedImport = templateResult.needsKeyedImport
     ? "import { Key } from '@solid-primitives/keyed';\n"
-    : undefined;
+    : '';
 
   const shellParts = {
     componentName: ir.name,
