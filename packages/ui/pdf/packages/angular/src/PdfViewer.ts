@@ -157,7 +157,10 @@ export class PdfViewer {
       if (this.pdfjsLib && v) this.pdfjsLib.GlobalWorkerOptions.workerSrc = v;
     })(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.page())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => {
-      if (typeof v === 'number' && v >= 1 && v !== this.current()) this.current.set(v);
+      if (typeof v === 'number' && v >= 1 && v !== this.current()) {
+        this.current.set(v);
+        if (this.renderAllPages()) this.scrollToPage(v);
+      }
     })(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.scale())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
       if (typeof v === 'number' && v > 0) this.zoom.set(v);
@@ -170,9 +173,7 @@ export class PdfViewer {
       this.pagechange.emit({
         page: v
       });
-      if (this.renderAllPages()) {
-        if (!this.suppressScroll) this.scrollToPage(v);
-      } else this.renderView();
+      if (!this.renderAllPages()) this.renderView();
     })(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.zoom())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => this.renderView())(); }); });
     effect(() => { const __watchVal = (() => this.rot())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => this.renderView())(); }); });
@@ -245,7 +246,6 @@ export class PdfViewer {
   resizeObserver: any = null;
   loadingTask: any = null;
   renderToken = 0;
-  suppressScroll = false;
   findQuery = '';
   findMatches = [];
   findIndex = -1;
@@ -368,11 +368,7 @@ export class PdfViewer {
       }
       if (best) {
         const n = Number(best.getAttribute('data-page'));
-        if (n && n !== this.current()) {
-          this.suppressScroll = true;
-          this.current.set(n);
-          this.suppressScroll = false;
-        }
+        if (n && n !== this.current()) this.current.set(n);
       }
     }, {
       root: this.containerEl,
@@ -476,7 +472,13 @@ export class PdfViewer {
   };
   goToPage = (n: any) => {
     if (!this.instance) return;
-    this.current.set(Math.min(Math.max(n, 1), this.instance.numPages));
+    const clamped = Math.min(Math.max(n, 1), this.instance.numPages);
+    this.current.set(clamped);
+    // programmatic navigation origin — scroll the target into view in continuous
+    // mode (single-page mode re-renders that page via the $data.current $watch).
+    // Called unconditionally (not gated on a change) so an explicit re-navigation
+    // to the page the user has scrolled partly out of view re-centers it.
+    if (this.renderAllPages()) this.scrollToPage(clamped);
   };
   nextPage = () => {
     this.goToPage(this.current() + 1);

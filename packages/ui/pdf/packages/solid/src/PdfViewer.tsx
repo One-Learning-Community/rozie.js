@@ -201,7 +201,10 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
     if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
   })(v)), { defer: true }));
   createEffect(on(() => (() => page())(), (v) => untrack(() => ((v: any) => {
-    if (typeof v === 'number' && v >= 1 && v !== current()) setCurrent(v);
+    if (typeof v === 'number' && v >= 1 && v !== current()) {
+      setCurrent(v);
+      if (local.renderAllPages) scrollToPage(v);
+    }
   })(v)), { defer: true }));
   createEffect(on(() => (() => local.scale)(), (v) => untrack(() => ((v: any) => {
     if (typeof v === 'number' && v > 0) setZoom(v);
@@ -214,9 +217,7 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
     _props.onPagechange?.({
       page: v
     });
-    if (local.renderAllPages) {
-      if (!suppressScroll) scrollToPage(v);
-    } else renderView();
+    if (!local.renderAllPages) renderView();
   })(v)), { defer: true }));
   createEffect(on(() => (() => zoom())(), (v) => untrack(() => (() => renderView())()), { defer: true }));
   createEffect(on(() => (() => rot())(), (v) => untrack(() => (() => renderView())()), { defer: true }));
@@ -265,8 +266,6 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   // monotonic token cancels stale async loads/renders (src can change mid-render,
   // pages render async — the SortableList rebuild-cancel discipline).
   let renderToken = 0;
-  // guards the scroll-spy → $data.current → scroll-to feedback loop.
-  let suppressScroll = false;
   // find/search state. findQuery is the active lowercased query (''=inactive);
   // findMatches is a flat per-OCCURRENCE list [{ page }] (drives the count + the
   // next/prev cycle); findIndex is the current match (-1=none). TOP-LEVEL lets (not
@@ -384,6 +383,16 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   }
 
   // continuous-mode scroll spy — reflect the most-visible page into $data.current.
+  // It ONLY writes $data.current (which echoes to $model.page + the `pagechange`
+  // event via the $data.current $watch); it deliberately does NOT scroll. The
+  // scroll-into-view lives at the navigation origins (goToPage + the `page`-prop
+  // $watch) so an observer-driven page change never snaps the view back under the
+  // user's own scroll. This is the origin-distinguishing fix for the render-all-
+  // pages scroll fight: a suppress flag set here and read by the ASYNC $data.current
+  // effect is defeated by flush timing (the flag is already reset by the time the
+  // deferred effect runs — true on Vue's flush:'pre' and every other target's
+  // deferred-effect model), so origin is encoded by WHERE scrollToPage is called,
+  // not by a boolean held across a flush.
   function setupScrollSpy() {
     if (observer) {
       observer.disconnect();
@@ -401,11 +410,7 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
       }
       if (best) {
         const n = Number(best.getAttribute('data-page'));
-        if (n && n !== current()) {
-          suppressScroll = true;
-          setCurrent(n);
-          suppressScroll = false;
-        }
+        if (n && n !== current()) setCurrent(n);
       }
     }, {
       root: containerEl,
@@ -533,7 +538,13 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   }
   function goToPage(n: any) {
     if (!instance) return;
-    setCurrent(Math.min(Math.max(n, 1), instance.numPages));
+    const clamped = Math.min(Math.max(n, 1), instance.numPages);
+    setCurrent(clamped);
+    // programmatic navigation origin — scroll the target into view in continuous
+    // mode (single-page mode re-renders that page via the $data.current $watch).
+    // Called unconditionally (not gated on a change) so an explicit re-navigation
+    // to the page the user has scrolled partly out of view re-centers it.
+    if (local.renderAllPages) scrollToPage(clamped);
   }
   function nextPage() {
     goToPage(current() + 1);

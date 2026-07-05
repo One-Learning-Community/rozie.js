@@ -152,9 +152,6 @@ let loadingTask: any = null;
 // monotonic token cancels stale async loads/renders (src can change mid-render,
 // pages render async — the SortableList rebuild-cancel discipline).
 let renderToken = 0;
-// guards the scroll-spy → $data.current → scroll-to feedback loop.
-// guards the scroll-spy → $data.current → scroll-to feedback loop.
-let suppressScroll = false;
 // find/search state. findQuery is the active lowercased query (''=inactive);
 // findMatches is a flat per-OCCURRENCE list [{ page }] (drives the count + the
 // next/prev cycle); findIndex is the current match (-1=none). TOP-LEVEL lets (not
@@ -283,7 +280,27 @@ const renderPage = async (pdf: any, pageNum: any, container: any) => {
 };
 
 // continuous-mode scroll spy — reflect the most-visible page into $data.current.
+// It ONLY writes $data.current (which echoes to $model.page + the `pagechange`
+// event via the $data.current $watch); it deliberately does NOT scroll. The
+// scroll-into-view lives at the navigation origins (goToPage + the `page`-prop
+// $watch) so an observer-driven page change never snaps the view back under the
+// user's own scroll. This is the origin-distinguishing fix for the render-all-
+// pages scroll fight: a suppress flag set here and read by the ASYNC $data.current
+// effect is defeated by flush timing (the flag is already reset by the time the
+// deferred effect runs — true on Vue's flush:'pre' and every other target's
+// deferred-effect model), so origin is encoded by WHERE scrollToPage is called,
+// not by a boolean held across a flush.
 // continuous-mode scroll spy — reflect the most-visible page into $data.current.
+// It ONLY writes $data.current (which echoes to $model.page + the `pagechange`
+// event via the $data.current $watch); it deliberately does NOT scroll. The
+// scroll-into-view lives at the navigation origins (goToPage + the `page`-prop
+// $watch) so an observer-driven page change never snaps the view back under the
+// user's own scroll. This is the origin-distinguishing fix for the render-all-
+// pages scroll fight: a suppress flag set here and read by the ASYNC $data.current
+// effect is defeated by flush timing (the flag is already reset by the time the
+// deferred effect runs — true on Vue's flush:'pre' and every other target's
+// deferred-effect model), so origin is encoded by WHERE scrollToPage is called,
+// not by a boolean held across a flush.
 const setupScrollSpy = () => {
   if (observer) {
     observer.disconnect();
@@ -301,11 +318,7 @@ const setupScrollSpy = () => {
     }
     if (best) {
       const n = Number(best.getAttribute('data-page'));
-      if (n && n !== current) {
-        suppressScroll = true;
-        current = n;
-        suppressScroll = false;
-      }
+      if (n && n !== current) current = n;
     }
   }, {
     root: containerEl,
@@ -435,7 +448,13 @@ export function getPageCount() {
 }
 export function goToPage(n: any) {
   if (!instance) return;
-  current = Math.min(Math.max(n, 1), instance.numPages);
+  const clamped = Math.min(Math.max(n, 1), instance.numPages);
+  current = clamped;
+  // programmatic navigation origin — scroll the target into view in continuous
+  // mode (single-page mode re-renders that page via the $data.current $watch).
+  // Called unconditionally (not gated on a change) so an explicit re-navigation
+  // to the page the user has scrolled partly out of view re-centers it.
+  if (renderAllPages) scrollToPage(clamped);
 }
 export function nextPage() {
   goToPage(current + 1);
@@ -653,7 +672,10 @@ $effect(() => { const __watchVal = (() => workerSrc)(); untrack(() => { if (__ro
 })(__watchVal); }); });
 let __rozieWatchInitial_4 = true;
 $effect(() => { const __watchVal = (() => page)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => {
-  if (typeof v === 'number' && v >= 1 && v !== current) current = v;
+  if (typeof v === 'number' && v >= 1 && v !== current) {
+    current = v;
+    if (renderAllPages) scrollToPage(v);
+  }
 })(__watchVal); }); });
 let __rozieWatchInitial_5 = true;
 $effect(() => { const __watchVal = (() => scale)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => {
@@ -669,9 +691,7 @@ $effect(() => { const __watchVal = (() => current)(); untrack(() => { if (__rozi
   onpagechange?.({
     page: v
   });
-  if (renderAllPages) {
-    if (!suppressScroll) scrollToPage(v);
-  } else renderView();
+  if (!renderAllPages) renderView();
 })(__watchVal); }); });
 let __rozieWatchInitial_8 = true;
 $effect(() => { (() => zoom)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => renderView())(); }); });

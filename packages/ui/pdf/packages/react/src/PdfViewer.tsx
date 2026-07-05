@@ -118,7 +118,6 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   const renderToken = useRef(0);
   const observer = useRef<any>(null);
   const loadingTask = useRef<any>(null);
-  const suppressScroll = useRef(false);
   const findQuery = useRef('');
   const findMatches = useRef([]);
   const findIndex = useRef(-1);
@@ -286,11 +285,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       }
       if (best) {
         const n = Number(best.getAttribute('data-page'));
-        if (n && n !== current) {
-          suppressScroll.current = true;
-          setCurrent(n);
-          suppressScroll.current = false;
-        }
+        if (n && n !== current) setCurrent(n);
       }
     }, {
       root: containerEl.current,
@@ -414,7 +409,13 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   }
   function goToPage(n: any) {
     if (!instance.current) return;
-    setCurrent(Math.min(Math.max(n, 1), instance.current.numPages));
+    const clamped = Math.min(Math.max(n, 1), instance.current.numPages);
+    setCurrent(clamped);
+    // programmatic navigation origin — scroll the target into view in continuous
+    // mode (single-page mode re-renders that page via the $data.current $watch).
+    // Called unconditionally (not gated on a change) so an explicit re-navigation
+    // to the page the user has scrolled partly out of view re-centers it.
+    if (props.renderAllPages) scrollToPage(clamped);
   }
   function nextPage() {
     goToPage(current + 1);
@@ -639,7 +640,10 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   useEffect(() => {
     if (_watch4First.current) { _watch4First.current = false; return; }
     const v = page;
-    if (typeof v === 'number' && v >= 1 && v !== current) setCurrent(v);
+    if (typeof v === 'number' && v >= 1 && v !== current) {
+      setCurrent(v);
+      if (props.renderAllPages) scrollToPage(v);
+    }
   }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch5First.current) { _watch5First.current = false; return; }
@@ -658,9 +662,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     props.onPagechange && props.onPagechange({
       page: v
     });
-    if (props.renderAllPages) {
-      if (!suppressScroll.current) scrollToPage(v);
-    } else renderView();
+    if (!props.renderAllPages) renderView();
   }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch8First.current) { _watch8First.current = false; return; }

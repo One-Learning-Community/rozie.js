@@ -234,8 +234,6 @@ let loadingTask = null
 // monotonic token cancels stale async loads/renders (src can change mid-render,
 // pages render async — the SortableList rebuild-cancel discipline).
 let renderToken = 0
-// guards the scroll-spy → $data.current → scroll-to feedback loop.
-let suppressScroll = false
 // find/search state. findQuery is the active lowercased query (''=inactive);
 // findMatches is a flat per-OCCURRENCE list [{ page }] (drives the count + the
 // next/prev cycle); findIndex is the current match (-1=none). TOP-LEVEL lets (not
@@ -349,6 +347,16 @@ const renderPage = async (pdf, pageNum, container) => {
 }
 
 // continuous-mode scroll spy — reflect the most-visible page into $data.current.
+// It ONLY writes $data.current (which echoes to $model.page + the `pagechange`
+// event via the $data.current $watch); it deliberately does NOT scroll. The
+// scroll-into-view lives at the navigation origins (goToPage + the `page`-prop
+// $watch) so an observer-driven page change never snaps the view back under the
+// user's own scroll. This is the origin-distinguishing fix for the render-all-
+// pages scroll fight: a suppress flag set here and read by the ASYNC $data.current
+// effect is defeated by flush timing (the flag is already reset by the time the
+// deferred effect runs — true on Vue's flush:'pre' and every other target's
+// deferred-effect model), so origin is encoded by WHERE scrollToPage is called,
+// not by a boolean held across a flush.
 const setupScrollSpy = () => {
   if (observer) { observer.disconnect(); observer = null }
   if (!containerEl) return
@@ -361,11 +369,7 @@ const setupScrollSpy = () => {
       }
       if (best) {
         const n = Number(best.getAttribute('data-page'))
-        if (n && n !== $data.current) {
-          suppressScroll = true
-          $data.current = n
-          suppressScroll = false
-        }
+        if (n && n !== $data.current) $data.current = n
       }
     },
     { root: containerEl, threshold: [0.25, 0.5, 0.75] },
@@ -485,19 +489,30 @@ $watch(() => $props.src, () => load())
 $watch(() => $props.password, () => load())
 $watch(() => $props.workerSrc, (v) => { if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v })
 
-// prop → internal state (guarded so consumer writes don't fight the verbs).
+// prop → internal state (guarded so consumer writes don't fight the verbs). A
+// consumer `:page` write is a programmatic navigation origin, so it scrolls the
+// target into view in continuous mode (mirrors goToPage). The scroll-spy echo
+// back through $model.page arrives with v === $data.current and is skipped by the
+// guard, so this never fires for observer-driven changes.
 $watch(() => $props.page, (v) => {
-  if (typeof v === 'number' && v >= 1 && v !== $data.current) $data.current = v
+  if (typeof v === 'number' && v >= 1 && v !== $data.current) {
+    $data.current = v
+    if ($props.renderAllPages) scrollToPage(v)
+  }
 })
 $watch(() => $props.scale, (v) => { if (typeof v === 'number' && v > 0) $data.zoom = v })
 $watch(() => $props.rotation, (v) => { if (typeof v === 'number') $data.rot = ((v % 360) + 360) % 360 })
 
-// internal state → render + two-way page echo.
+// internal state → render + two-way page echo. Echoes to $model.page and emits
+// `pagechange` for BOTH origins (observer scroll spy AND programmatic nav), but
+// does NOT scroll — the continuous-mode scroll-into-view is triggered at the
+// navigation origins only (goToPage + the `page`-prop $watch), so a spy-driven
+// page change never snaps the view back. In single-page mode the current page IS
+// what renders, so a change re-renders.
 $watch(() => $data.current, (v) => {
   $model.page = v
   $emit('pagechange', { page: v })
-  if ($props.renderAllPages) { if (!suppressScroll) scrollToPage(v) }
-  else renderView()
+  if (!$props.renderAllPages) renderView()
 })
 $watch(() => $data.zoom, () => renderView())
 $watch(() => $data.rot, () => renderView())
@@ -541,7 +556,13 @@ function getDocument() { return instance }
 function getPageCount() { return instance ? instance.numPages : 0 }
 function goToPage(n) {
   if (!instance) return
-  $data.current = Math.min(Math.max(n, 1), instance.numPages)
+  const clamped = Math.min(Math.max(n, 1), instance.numPages)
+  $data.current = clamped
+  // programmatic navigation origin — scroll the target into view in continuous
+  // mode (single-page mode re-renders that page via the $data.current $watch).
+  // Called unconditionally (not gated on a change) so an explicit re-navigation
+  // to the page the user has scrolled partly out of view re-centers it.
+  if ($props.renderAllPages) scrollToPage(clamped)
 }
 function nextPage() { goToPage($data.current + 1) }
 function prevPage() { goToPage($data.current - 1) }

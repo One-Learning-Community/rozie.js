@@ -146,7 +146,10 @@ private __rozieFirstUpdateDone = false;
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._engineReady.value)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => this.load())(); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.page)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => {
-      if (typeof v === 'number' && v >= 1 && v !== this._current.value) this._current.value = v;
+      if (typeof v === 'number' && v >= 1 && v !== this._current.value) {
+        this._current.value = v;
+        if (this.renderAllPages) this.scrollToPage(v);
+      }
     })(__watchVal); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._current.value)(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((v: any) => {
       this._pageControllable.write(v);
@@ -157,9 +160,7 @@ private __rozieFirstUpdateDone = false;
         bubbles: true,
         composed: true
       }));
-      if (this.renderAllPages) {
-        if (!this.suppressScroll) this.scrollToPage(v);
-      } else this.renderView();
+      if (!this.renderAllPages) this.renderView();
     })(__watchVal); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._zoom.value)(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => this.renderView())(); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._rot.value)(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => this.renderView())(); }); }));
@@ -255,8 +256,6 @@ private __rozieFirstUpdateDone = false;
   loadingTask: any = null;
 
   renderToken = 0;
-
-  suppressScroll = false;
 
   findQuery = '';
 
@@ -387,11 +386,7 @@ private __rozieFirstUpdateDone = false;
     }
     if (best) {
       const n = Number(best.getAttribute('data-page'));
-      if (n && n !== this._current.value) {
-        this.suppressScroll = true;
-        this._current.value = n;
-        this.suppressScroll = false;
-      }
+      if (n && n !== this._current.value) this._current.value = n;
     }
   }, {
     root: this.containerEl,
@@ -525,7 +520,13 @@ private __rozieFirstUpdateDone = false;
 
   goToPage(n: any) {
     if (!this.instance) return;
-    this._current.value = Math.min(Math.max(n, 1), this.instance.numPages);
+    const clamped = Math.min(Math.max(n, 1), this.instance.numPages);
+    this._current.value = clamped;
+    // programmatic navigation origin — scroll the target into view in continuous
+    // mode (single-page mode re-renders that page via the $data.current $watch).
+    // Called unconditionally (not gated on a change) so an explicit re-navigation
+    // to the page the user has scrolled partly out of view re-centers it.
+    if (this.renderAllPages) this.scrollToPage(clamped);
   }
 
   nextPage() {

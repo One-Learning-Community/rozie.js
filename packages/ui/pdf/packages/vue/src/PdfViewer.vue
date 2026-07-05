@@ -136,9 +136,6 @@ let loadingTask: any = null;
 // monotonic token cancels stale async loads/renders (src can change mid-render,
 // pages render async — the SortableList rebuild-cancel discipline).
 let renderToken = 0;
-// guards the scroll-spy → $data.current → scroll-to feedback loop.
-// guards the scroll-spy → $data.current → scroll-to feedback loop.
-let suppressScroll = false;
 // find/search state. findQuery is the active lowercased query (''=inactive);
 // findMatches is a flat per-OCCURRENCE list [{ page }] (drives the count + the
 // next/prev cycle); findIndex is the current match (-1=none). TOP-LEVEL lets (not
@@ -267,7 +264,27 @@ const renderPage = async (pdf: any, pageNum: any, container: any) => {
 };
 
 // continuous-mode scroll spy — reflect the most-visible page into $data.current.
+// It ONLY writes $data.current (which echoes to $model.page + the `pagechange`
+// event via the $data.current $watch); it deliberately does NOT scroll. The
+// scroll-into-view lives at the navigation origins (goToPage + the `page`-prop
+// $watch) so an observer-driven page change never snaps the view back under the
+// user's own scroll. This is the origin-distinguishing fix for the render-all-
+// pages scroll fight: a suppress flag set here and read by the ASYNC $data.current
+// effect is defeated by flush timing (the flag is already reset by the time the
+// deferred effect runs — true on Vue's flush:'pre' and every other target's
+// deferred-effect model), so origin is encoded by WHERE scrollToPage is called,
+// not by a boolean held across a flush.
 // continuous-mode scroll spy — reflect the most-visible page into $data.current.
+// It ONLY writes $data.current (which echoes to $model.page + the `pagechange`
+// event via the $data.current $watch); it deliberately does NOT scroll. The
+// scroll-into-view lives at the navigation origins (goToPage + the `page`-prop
+// $watch) so an observer-driven page change never snaps the view back under the
+// user's own scroll. This is the origin-distinguishing fix for the render-all-
+// pages scroll fight: a suppress flag set here and read by the ASYNC $data.current
+// effect is defeated by flush timing (the flag is already reset by the time the
+// deferred effect runs — true on Vue's flush:'pre' and every other target's
+// deferred-effect model), so origin is encoded by WHERE scrollToPage is called,
+// not by a boolean held across a flush.
 const setupScrollSpy = () => {
   if (observer) {
     observer.disconnect();
@@ -285,11 +302,7 @@ const setupScrollSpy = () => {
     }
     if (best) {
       const n = Number(best.getAttribute('data-page'));
-      if (n && n !== current.value) {
-        suppressScroll = true;
-        current.value = n;
-        suppressScroll = false;
-      }
+      if (n && n !== current.value) current.value = n;
     }
   }, {
     root: containerEl,
@@ -419,7 +432,13 @@ function getPageCount() {
 }
 function goToPage(n: any) {
   if (!instance) return;
-  current.value = Math.min(Math.max(n, 1), instance.numPages);
+  const clamped = Math.min(Math.max(n, 1), instance.numPages);
+  current.value = clamped;
+  // programmatic navigation origin — scroll the target into view in continuous
+  // mode (single-page mode re-renders that page via the $data.current $watch).
+  // Called unconditionally (not gated on a change) so an explicit re-navigation
+  // to the page the user has scrolled partly out of view re-centers it.
+  if (props.renderAllPages) scrollToPage(clamped);
 }
 function nextPage() {
   goToPage(current.value + 1);
@@ -634,7 +653,10 @@ watch(() => props.workerSrc, (v: any) => {
   if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
 });
 watch(() => page.value, (v: any) => {
-  if (typeof v === 'number' && v >= 1 && v !== current.value) current.value = v;
+  if (typeof v === 'number' && v >= 1 && v !== current.value) {
+    current.value = v;
+    if (props.renderAllPages) scrollToPage(v);
+  }
 });
 watch(() => props.scale, (v: any) => {
   if (typeof v === 'number' && v > 0) zoom.value = v;
@@ -647,9 +669,7 @@ watch(() => current.value, (v: any) => {
   emit('pagechange', {
     page: v
   });
-  if (props.renderAllPages) {
-    if (!suppressScroll) scrollToPage(v);
-  } else renderView();
+  if (!props.renderAllPages) renderView();
 });
 watch(() => zoom.value, () => renderView());
 watch(() => rot.value, () => renderView());
