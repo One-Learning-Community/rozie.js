@@ -103,7 +103,7 @@ When a family becomes release-verified, widen the workflow — and mirror the sa
 2. Add the new leaf names to the **CI advisory precheck step's** `--filter` list (the `--skip-npm` step).
 3. Add them to your local invocation: `pnpm release:precheck --gate --filter @rozie-ui/<family>-<leaf> ...`.
 4. **Build order:** toolchain / runtimes before leaves.
-5. **Do NOT** widen `--filter` lists to families that are not release-verified — see the warning header in `release.yml`. `data-table` and the non-captcha non-vue leaves are deliberately out of scope until verified.
+5. **Do NOT** widen `--filter` lists to families that are not release-verified — see the warning header in `release.yml`. In scope today: all six leaves of captcha, sortable-list, flatpickr, and pdf, plus the `-vue` leaves of cropper + fullcalendar. Still out of scope: the non-vue leaves of cropper + fullcalendar, and all of `data-table` — deliberately excluded until verified.
 
 ---
 
