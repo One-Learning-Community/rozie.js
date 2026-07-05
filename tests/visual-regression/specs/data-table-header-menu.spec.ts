@@ -86,17 +86,18 @@ for (const target of TARGETS) {
       // every column on any such change (not just the pinned one). On five of
       // the six targets the menu (and its Popover instance) survives that
       // re-render in place (DataTable.rozie's own `:key="header.id"` binding
-      // is honored — the click below would just TOGGLE IT CLOSED). On Solid
-      // specifically, the header `<For>` loop has no Solid-side equivalent of
-      // `:key` (Solid's `<For>` reconciles by REFERENCE identity, not a
-      // derived key), so it tears down and recreates the entire `<th>`
-      // subtree — including the just-opened Popover instance — on every such
-      // state change (documented finding, see deferred-items.md; a
-      // pre-existing Solid-target `r-for`/`:key` limitation, out of scope for
-      // this plan). `ensureMenuOpen()` checks which case applies and reopens
-      // only if needed, so the same sequence verifies the required behavior
-      // (pin left → pins; pin right → re-pins; unpin → unpins) uniformly on
-      // all six targets regardless of which case applies.
+      // is honored — the click below would just TOGGLE IT CLOSED). Solid
+      // HISTORICALLY tore down and recreated the entire `<th>` subtree —
+      // including the just-opened Popover instance — because its `<For>`
+      // reconciled by REFERENCE identity and ignored `:key`. That root cause
+      // is now FIXED at codegen: the Solid emitter emits `@solid-primitives/keyed`'s
+      // `<Key>` for a keyed `r-for` (commit b3c29136), so Solid should survive
+      // the re-render in place like the other five. `ensureMenuOpen()` checks
+      // which case applies and reopens only if needed, so the same sequence
+      // verifies the required behavior (pin left → pins; pin right → re-pins;
+      // unpin → unpins) uniformly on all six targets — and stays robust
+      // whether or not the (now VR-pending) Solid stays-open behavior holds
+      // end-to-end.
       const ensureMenuOpen = async () => {
         const m = page.locator('[role="menu"].rdt-col-menu:visible');
         if (await m.count()) return m;
@@ -130,11 +131,13 @@ for (const target of TARGETS) {
 
     // The menu staying open ACROSS a pin action (no reopen needed — 72-03's
     // design, verified on Lit in 72-06b) is a genuine, additional guarantee on
-    // five of the six targets. Excludes Solid: the header `<For>` reconciles
-    // by reference (not `:key`), so ANY table-state change (including a pin)
-    // recreates the `<th>`/Popover subtree there — a documented, pre-existing
-    // Solid-target limitation (see deferred-items.md), not a regression this
-    // plan introduced.
+    // five of the six targets. Solid was historically excluded because its
+    // `<For>` reconciled by reference (not `:key`), recreating the
+    // `<th>`/Popover subtree on any table-state change; that root cause is now
+    // FIXED (Solid emits `<Key>`, commit b3c29136). This exclusion is retained
+    // ONLY pending a VR run confirming Solid stays open end-to-end.
+    // TODO(solid-key-vr): once the Solid VR cell is green here, drop the
+    // `target !== 'solid'` guard so this guarantee is asserted on all six.
     if (target !== 'solid') {
       runner(`the ⋯ menu stays open across a Pin action (does not self-close) [${target}]`, async ({ page }) => {
         await page.goto(`/?example=DataTableSuper&target=${target}`);
@@ -311,11 +314,12 @@ for (const target of TARGETS) {
       // a real click on a menu item must land on that item, not on whatever
       // would-be-visible content sits underneath a clipped/mispositioned menu.
       // Assert via the underlying th's sticky style (not the menuitem's own
-      // aria-pressed) — on Solid, a pin action's table-state change recreates
-      // the `<th>`/Popover subtree (documented finding, see deferred-items.md),
-      // so the menu may already be gone by the time this assertion runs; the
-      // th's resulting sticky style is the robust, cross-target proof the
-      // click actually landed and fired the pin.
+      // aria-pressed): the th's sticky style is the robust, cross-target proof
+      // the click actually landed and fired the pin, regardless of whether the
+      // menu survives the pin in place. (Pre-`<Key>` fix, Solid recreated the
+      // `<th>`/Popover subtree on a pin, so the menu could vanish mid-assertion;
+      // Solid now emits `<Key>` (commit b3c29136), but this th-sticky proof
+      // holds either way.)
       const th = page.locator('thead th[data-col="units"]').first();
       await menu.getByRole('menuitem', { name: 'Pin left' }).click();
       await expect.poll(async () => th.evaluate((el) => (el as HTMLElement).style.position)).toBe('sticky');
