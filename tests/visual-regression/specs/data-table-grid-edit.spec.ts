@@ -285,8 +285,11 @@ async function enterEditAt(page: Page, row: number, col: number): Promise<void> 
   await expect.poll(async () => (await openEditor(page))?.col, { timeout: 3_000 }).toBe(String(col));
 }
 
-// Columns: name(0,text) qty(1,number) note(2,#editor drop-in) status(3,select)
-// active(4,checkbox) verified(5,checkbox — always-rejecting validator, D-01 vehicle).
+// Columns (reordered 2026-07-05 — see the demo's header comment): name(0,text) qty(1,number)
+// note(2,#editor drop-in) active(3,checkbox) verified(4,checkbox — always-rejecting
+// validator, D-01 vehicle) status(5,select — kept LAST: a checkbox no longer opens an
+// editor at all, so B5's Tab-off-the-last-editable-cell vehicle needs an editor-opening
+// column here).
 
 async function gotoGrid(page: Page, target: Target) {
   await page.goto(`/?example=DataTableGridEdit&target=${target}`);
@@ -380,11 +383,14 @@ for (const target of TARGETS) {
   // ════════════════════════════════════════════════════════════════════════════════
   // B5 — Tab on the LAST editable cell of the LAST row keeps focus INSIDE the grid.
   //   Pre-fix: nextEditableCell returns null at grid end → the editor commits + closes
-  //   but no focus is re-seated → focus drops to <body>.
+  //   but no focus is re-seated → focus drops to <body>. Vehicle updated 2026-07-05:
+  //   `status` (select, col 5) is now the LAST editable column — a checkbox column no
+  //   longer opens ANY editor (the boolean in-place toggle), so it can no longer serve as
+  //   this test's "Tab off an OPEN editor at grid end" vehicle.
   // ════════════════════════════════════════════════════════════════════════════════
   runnerFor(target)(`data-table-grid-edit [${target}]: B5 Tab on the last editable cell keeps focus inside the grid`, async ({ page }) => {
     const mount = await gotoGrid(page, target);
-    await enterEditAt(page, 3, 4); // last row, last editable col (checkbox)
+    await enterEditAt(page, 3, 5); // last row, last editable col (select)
     await mount.locator('[data-editing-cell]').press('Tab');
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
     // Focus stayed inside the grid (the active element resolves to a gridcell, not <body>).
@@ -392,24 +398,23 @@ for (const target of TARGETS) {
   });
 
   // ════════════════════════════════════════════════════════════════════════════════
-  // B24 — type-to-edit / printable key on a checkbox/select cell does NOT seed a
-  //   forced-checked / garbage draft. Pre-fix: beginEdit seeds the printable char into
-  //   draftValue → checkbox checked = !!'x' = true (forced); select value = 'x' (garbage).
+  // B24 — type-to-edit / printable key on a select cell does NOT seed a garbage draft.
+  //   Pre-fix: beginEdit seeded the printable char into draftValue → select value = 'z'
+  //   (garbage). The CHECKBOX half of this historical assertion (a printable key must not
+  //   force-check it) is SUPERSEDED 2026-07-05 by the boolean in-place toggle's "printable
+  //   key on a checkbox cell opens no editor (type-to-edit disabled)" test below — a
+  //   checkbox cell no longer opens ANY editor via a printable key, so there is no draft to
+  //   inspect here anymore.
   // ════════════════════════════════════════════════════════════════════════════════
-  runnerFor(target)(`data-table-grid-edit [${target}]: B24 printable key on checkbox/select does not seed a forced/garbage draft`, async ({ page }) => {
+  runnerFor(target)(`data-table-grid-edit [${target}]: B24 printable key on select does not seed a garbage draft`, async ({ page }) => {
     const mount = await gotoGrid(page, target);
-    // Checkbox (col 4) — row 0 active=false. A printable key must NOT force-check it.
-    await focusBodyCellStable(page, 0, 4);
-    await page.keyboard.press('x');
-    await expect.poll(async () => (await openEditor(page))?.type, { timeout: 10_000 }).toBe('checkbox');
-    expect((await openEditor(page))?.checked).toBe(false); // reflects the real value, not a seeded true.
-    await mount.locator('[data-editing-cell]').press('Escape');
-    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
-    // Select (col 3) — row 0 status='active'. A printable key must NOT seed a garbage option.
-    await focusBodyCellStable(page, 0, 3);
+    // Select (col 5) — row 0 status='active'. A printable key must NOT seed a garbage option.
+    await focusBodyCellStable(page, 0, 5);
     await page.keyboard.press('z');
     await expect.poll(async () => (await openEditor(page))?.tag, { timeout: 10_000 }).toBe('select');
     expect((await openEditor(page))?.value).toBe('active'); // the real option, not 'z'.
+    await mount.locator('[data-editing-cell]').press('Escape');
+    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
   });
 
   // ════════════════════════════════════════════════════════════════════════════════
@@ -454,15 +459,15 @@ for (const target of TARGETS) {
   // ════════════════════════════════════════════════════════════════════════════════
   // Boolean in-place toggle (design doc 2026-07-05, Change 1) — a built-in
   // editor:'checkbox' cell flips + commits INSTANTLY on Space/Enter/F2: no editor opens,
-  // EXACTLY ONE cell-edit-commit per keystroke, and the active cell keeps focus (col 4,
+  // EXACTLY ONE cell-edit-commit per keystroke, and the active cell keeps focus (col 3,
   // `active`, row 0 starts false). A printable key on a checkbox cell is a no-op
-  // (type-to-edit disabled). A rejecting column validator (col 5, `verified` —
+  // (type-to-edit disabled). A rejecting column validator (col 4, `verified` —
   // `rejectToggle` always returns a string) blocks the toggle entirely (D-01): no model
   // write, no commit-count bump — proven by the model + commit-count staying UNCHANGED.
   // ════════════════════════════════════════════════════════════════════════════════
   runnerFor(target)(`data-table-grid-edit [${target}]: boolean toggle — Space flips+commits instantly, no editor, focus held`, async ({ page }) => {
     await gotoGrid(page, target);
-    await focusBodyCellStable(page, 0, 4); // active column, row 0 (active=false)
+    await focusBodyCellStable(page, 0, 3); // active column, row 0 (active=false)
     const before = await commitCount(page);
     const beforeValue = (await modelRows(page))[0]?.active;
     await page.keyboard.press(' ');
@@ -471,13 +476,13 @@ for (const target of TARGETS) {
     expect(await openEditor(page)).toBeNull(); // no editor opened
     const coords = await activeCellCoords(page);
     expect(coords?.row).toBe('0');
-    expect(coords?.col).toBe('4');
+    expect(coords?.col).toBe('3');
     expect(coords?.tag).not.toBe('input'); // deepest active tag is the CELL, not an editor
   });
 
   runnerFor(target)(`data-table-grid-edit [${target}]: boolean toggle — Enter flips+commits instantly, no editor, focus held`, async ({ page }) => {
     await gotoGrid(page, target);
-    await focusBodyCellStable(page, 0, 4);
+    await focusBodyCellStable(page, 0, 3);
     const before = await commitCount(page);
     const beforeValue = (await modelRows(page))[0]?.active;
     await page.keyboard.press('Enter');
@@ -486,13 +491,13 @@ for (const target of TARGETS) {
     expect(await openEditor(page)).toBeNull();
     const coords = await activeCellCoords(page);
     expect(coords?.row).toBe('0');
-    expect(coords?.col).toBe('4');
+    expect(coords?.col).toBe('3');
     expect(coords?.tag).not.toBe('input');
   });
 
   runnerFor(target)(`data-table-grid-edit [${target}]: boolean toggle — F2 flips+commits instantly, no editor, focus held`, async ({ page }) => {
     await gotoGrid(page, target);
-    await focusBodyCellStable(page, 0, 4);
+    await focusBodyCellStable(page, 0, 3);
     const before = await commitCount(page);
     const beforeValue = (await modelRows(page))[0]?.active;
     await page.keyboard.press('F2');
@@ -501,13 +506,13 @@ for (const target of TARGETS) {
     expect(await openEditor(page)).toBeNull();
     const coords = await activeCellCoords(page);
     expect(coords?.row).toBe('0');
-    expect(coords?.col).toBe('4');
+    expect(coords?.col).toBe('3');
     expect(coords?.tag).not.toBe('input');
   });
 
   runnerFor(target)(`data-table-grid-edit [${target}]: boolean toggle — a printable key on a checkbox cell opens no editor (type-to-edit disabled)`, async ({ page }) => {
     await gotoGrid(page, target);
-    await focusBodyCellStable(page, 0, 4);
+    await focusBodyCellStable(page, 0, 3);
     const before = await commitCount(page);
     await page.keyboard.press('x');
     // Give any (incorrect) editor-open / commit a moment, then assert neither happened.
@@ -518,7 +523,7 @@ for (const target of TARGETS) {
 
   runnerFor(target)(`data-table-grid-edit [${target}]: boolean toggle — a rejecting validator blocks the toggle (no write, no commit)`, async ({ page }) => {
     await gotoGrid(page, target);
-    await focusBodyCellStable(page, 0, 5); // verified column — rejectToggle always rejects
+    await focusBodyCellStable(page, 0, 4); // verified column — rejectToggle always rejects
     const before = await commitCount(page);
     const beforeValue = (await modelRows(page))[0]?.verified;
     await page.keyboard.press(' ');

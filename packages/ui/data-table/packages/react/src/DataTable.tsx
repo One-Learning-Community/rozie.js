@@ -1257,14 +1257,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const onToggleExpand = useCallback((row: any, evt: any) => {
     if (!row || !row.toggleExpanded) return;
     // Capture the owning row element BEFORE the toggle so DOM focus can be restored after the
-    // expanded-state re-render. On Solid the expander <td>/<button> is RECREATED on that
-    // re-render (the reference-keyed cell <For> receives fresh table-core cell instances each
-    // pull — the <tr> persists but its cells are rebuilt), which drops DOM focus to <body> and
-    // breaks keyboard activation (Enter/Space on the focused expander leaves nothing focused).
-    // Re-focusing the (possibly-recreated) expander in the SAME row keeps the control focused —
-    // the focusActiveCell imperative-refocus precedent. The rAF defers past the synchronous
-    // reactive flush so the fresh node exists. Harmless on the targets that keep the node
-    // (Vue/React/Svelte/Angular/Lit re-focus the same element → no-op).
+    // expanded-state re-render. This guards a focus-drop that USED to happen on Solid: when the
+    // cell loop reconciled by reference (bare <For>), table-core's fresh cell instances each
+    // pull rebuilt the expander <td>/<button> (the <tr> persisted but its cells were rebuilt),
+    // dropping DOM focus to <body> and breaking keyboard activation (Enter/Space on the focused
+    // expander left nothing focused). Since the emitter now emits `<Key>` for the
+    // `:key="cellCtx.id"` cell loop, Solid keeps the cell node on a stable key too — so the
+    // expander is no longer recreated and this re-focus is now a defensive no-op on ALL six
+    // targets (re-focusing the SAME kept element — the focusActiveCell imperative-refocus
+    // precedent). Kept for safety; it costs nothing when the node is unchanged. The rAF defers
+    // past the synchronous reactive flush so any (re)created node exists first.
     const ownerRow = evt && evt.currentTarget && evt.currentTarget.closest ? evt.currentTarget.closest('tr') : null;
     row.toggleExpanded();
     if (ownerRow && typeof requestAnimationFrame === 'function') {
@@ -1892,6 +1894,18 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       beginRowEdit((rows || [])[activeRow]);
       return;
     }
+    // ── Boolean in-place toggle (design doc 2026-07-05, Change 1) — a built-in
+    // editor:'checkbox' cell toggles + commits INSTANTLY on Space/Enter/F2, no editor opens
+    // (the spreadsheet-standard shape for a two-state value). Tested BEFORE the generic
+    // Enter/F2 edit-entry branch below (a checkbox cell must never fall into the open-an-
+    // editor ceremony) and gated the SAME way (isActiveCellEditable) plus editorTypeOf ===
+    // 'checkbox'. Full-row edit mode is unaffected — the editingRowIndex early return at the
+    // top of onGridKeyDown already excludes it.
+    else if ((key === 'Enter' || key === 'F2' || key === ' ') && isActiveCellEditable() && editorTypeOf(activeCellColumnId()) === 'checkbox') {
+      e.preventDefault();
+      toggleActiveBooleanCell();
+      return;
+    }
     // ── Edit-entry (phase 51 req-1/3, D-05) — BEFORE the reserved enterControl branch.
     // Gated by isActiveCellEditable(): a non-editable active cell falls through to
     // enterControl (the Phase-49 behavior is unchanged). F2/Enter seed the EXISTING value
@@ -1900,11 +1914,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       e.preventDefault();
       beginEdit(activeRow, activeColIndex, null);
       return;
-    } else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    } else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && editorTypeOf(activeCellColumnId()) !== 'checkbox') {
       // B24: a printable key only SEEDS a draft on a free-text editor (text/number). A
       // checkbox/select/date editor must NOT take the typed char as its value (it would
       // force-check the checkbox, seed a garbage select option, or corrupt the date) — open
       // those with the EXISTING value (seed=null), identical to the F2/Enter in-place entry.
+      // Checkbox is excluded entirely (type-to-edit disabled — the branch above already
+      // handles Space/Enter/F2; any OTHER printable key on a checkbox cell is a no-op).
       e.preventDefault();
       const editType = editorTypeOf(activeCellColumnId());
       const seed = editType === 'text' || editType === 'number' ? key : null;
@@ -1960,7 +1976,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         colIndex: nextCol
       });
     }
-  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cutRange, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, onToggleExpand, pasteRange, recoverGridFocus, rowIsGrouped, rows, toAbsRow]);
+  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cutRange, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, onToggleExpand, pasteRange, recoverGridFocus, rowIsGrouped, rows, toAbsRow, toggleActiveBooleanCell]);
   const syncActiveFromEvent = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -2994,6 +3010,45 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       col: focusCol
     };
     return true;
+  }
+  function toggleActiveBooleanCell() {
+    const colId = columnIdAt(activeRow, activeColIndex);
+    if (colId == null || !columnEditable(colId)) return;
+    const rowList = rows || [];
+    const row = rowList[activeRow];
+    if (!row) return;
+    const rowOriginal = row.original;
+    const rowId = row.id;
+    const oldValue = cellValueAt(activeRow, activeColIndex);
+    const newValue = !oldValue;
+    // D-01: same discipline as commitEdit — a rejecting validator blocks the toggle. There is
+    // no editor to keep open here, so the toggle simply does not apply (no model write).
+    const err = runValidator(colId, newValue, rowOriginal);
+    if (err !== true) {
+      setInvalid(err);
+      return;
+    }
+    setInvalid('');
+    const def = defFor(colId);
+    const field = def && def.accessorKey != null ? def.accessorKey : colId;
+    const srcIndex = sourceIndexOfRow(activeRow);
+    writeData(replaceRowValue(currentData(), srcIndex, field, newValue));
+    // Exactly one emit per toggle, from this single call site (writeData does NOT emit) —
+    // mirrors commitEdit's D-07 single-emit discipline.
+    props.onCellEditCommit && props.onCellEditCommit({
+      rowId,
+      columnId: colId,
+      oldValue,
+      newValue
+    });
+    // Follow the toggled row's focus through a boolean sort/filter relocation AND a
+    // fine-grained keyed-row replace (Solid) — the SAME recovery commitEdit relies on; even
+    // with no editor to unmount, writeData's re-render can still drop focus.
+    pendingEditFollow.current = {
+      rowOriginal,
+      rowId,
+      col: activeColIndex
+    };
   }
   function cancelEdit() {
     if (editingRow < 0) return;

@@ -1731,17 +1731,19 @@ const defFor = (colId: any) => {
 // Per-row visible cells for the body loop. table-core memoizes row objects by id,
 // so a re-pull after a column change (visibility/reorder/pin, or the late <Column>
 // registry on first mount) returns the SAME row references with a different cell
-// set. Solid's reference-keyed <For> keeps the existing <tr> and will NOT re-run a
-// child loop whose `each` reads no signal — so a bare `row.getVisibleCells()` goes
-// stale (header reorders, cells don't). Reading `$data.rowModelVer` (bumped by every
+// set. On Solid the row loop keeps the existing <tr> across that pull (`:key="row.id"`
+// is stable, so the emitter's `<Key>` reconciler holds the node), and Solid will NOT
+// re-run a child loop whose `each` reads no signal — so a bare `row.getVisibleCells()`
+// goes stale (header reorders, cells don't). Reading `$data.rowModelVer` (bumped by every
 // refreshRowModel) inside the `each` puts the inner loop in the reactive scope, so it
 // re-derives the cells on every row-model change. No-op on the coarse-render targets.
 // Per-row visible cells for the body loop. table-core memoizes row objects by id,
 // so a re-pull after a column change (visibility/reorder/pin, or the late <Column>
 // registry on first mount) returns the SAME row references with a different cell
-// set. Solid's reference-keyed <For> keeps the existing <tr> and will NOT re-run a
-// child loop whose `each` reads no signal — so a bare `row.getVisibleCells()` goes
-// stale (header reorders, cells don't). Reading `$data.rowModelVer` (bumped by every
+// set. On Solid the row loop keeps the existing <tr> across that pull (`:key="row.id"`
+// is stable, so the emitter's `<Key>` reconciler holds the node), and Solid will NOT
+// re-run a child loop whose `each` reads no signal — so a bare `row.getVisibleCells()`
+// goes stale (header reorders, cells don't). Reading `$data.rowModelVer` (bumped by every
 // refreshRowModel) inside the `each` puts the inner loop in the reactive scope, so it
 // re-derives the cells on every row-model change. No-op on the coarse-render targets.
 const visibleCellsFor = (row: any) => rowModelVer.value >= 0 ? row.getVisibleCells() : [];
@@ -2116,14 +2118,16 @@ const rowShowsDetail = (row: any) => props.getSubRows == null && !rowIsGrouped(r
 const onToggleExpand = (row: any, evt: any) => {
   if (!row || !row.toggleExpanded) return;
   // Capture the owning row element BEFORE the toggle so DOM focus can be restored after the
-  // expanded-state re-render. On Solid the expander <td>/<button> is RECREATED on that
-  // re-render (the reference-keyed cell <For> receives fresh table-core cell instances each
-  // pull — the <tr> persists but its cells are rebuilt), which drops DOM focus to <body> and
-  // breaks keyboard activation (Enter/Space on the focused expander leaves nothing focused).
-  // Re-focusing the (possibly-recreated) expander in the SAME row keeps the control focused —
-  // the focusActiveCell imperative-refocus precedent. The rAF defers past the synchronous
-  // reactive flush so the fresh node exists. Harmless on the targets that keep the node
-  // (Vue/React/Svelte/Angular/Lit re-focus the same element → no-op).
+  // expanded-state re-render. This guards a focus-drop that USED to happen on Solid: when the
+  // cell loop reconciled by reference (bare <For>), table-core's fresh cell instances each
+  // pull rebuilt the expander <td>/<button> (the <tr> persisted but its cells were rebuilt),
+  // dropping DOM focus to <body> and breaking keyboard activation (Enter/Space on the focused
+  // expander left nothing focused). Since the emitter now emits `<Key>` for the
+  // `:key="cellCtx.id"` cell loop, Solid keeps the cell node on a stable key too — so the
+  // expander is no longer recreated and this re-focus is now a defensive no-op on ALL six
+  // targets (re-focusing the SAME kept element — the focusActiveCell imperative-refocus
+  // precedent). Kept for safety; it costs nothing when the node is unchanged. The rAF defers
+  // past the synchronous reactive flush so any (re)created node exists first.
   const ownerRow = evt && evt.currentTarget && evt.currentTarget.closest ? evt.currentTarget.closest('tr') : null;
   row.toggleExpanded();
   if (ownerRow && typeof requestAnimationFrame === 'function') {
@@ -3160,6 +3164,18 @@ const onGridKeyDown = (e: any) => {
     beginRowEdit((rows.value || [])[activeRow.value]);
     return;
   }
+  // ── Boolean in-place toggle (design doc 2026-07-05, Change 1) — a built-in
+  // editor:'checkbox' cell toggles + commits INSTANTLY on Space/Enter/F2, no editor opens
+  // (the spreadsheet-standard shape for a two-state value). Tested BEFORE the generic
+  // Enter/F2 edit-entry branch below (a checkbox cell must never fall into the open-an-
+  // editor ceremony) and gated the SAME way (isActiveCellEditable) plus editorTypeOf ===
+  // 'checkbox'. Full-row edit mode is unaffected — the editingRowIndex early return at the
+  // top of onGridKeyDown already excludes it.
+  else if ((key === 'Enter' || key === 'F2' || key === ' ') && isActiveCellEditable() && editorTypeOf(activeCellColumnId()) === 'checkbox') {
+    e.preventDefault();
+    toggleActiveBooleanCell();
+    return;
+  }
   // ── Edit-entry (phase 51 req-1/3, D-05) — BEFORE the reserved enterControl branch.
   // Gated by isActiveCellEditable(): a non-editable active cell falls through to
   // enterControl (the Phase-49 behavior is unchanged). F2/Enter seed the EXISTING value
@@ -3168,11 +3184,13 @@ const onGridKeyDown = (e: any) => {
     e.preventDefault();
     beginEdit(activeRow.value, activeColIndex.value, null);
     return;
-  } else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+  } else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && editorTypeOf(activeCellColumnId()) !== 'checkbox') {
     // B24: a printable key only SEEDS a draft on a free-text editor (text/number). A
     // checkbox/select/date editor must NOT take the typed char as its value (it would
     // force-check the checkbox, seed a garbage select option, or corrupt the date) — open
     // those with the EXISTING value (seed=null), identical to the F2/Enter in-place entry.
+    // Checkbox is excluded entirely (type-to-edit disabled — the branch above already
+    // handles Space/Enter/F2; any OTHER printable key on a checkbox cell is a no-op).
     e.preventDefault();
     const editType = editorTypeOf(activeCellColumnId());
     const seed = editType === 'text' || editType === 'number' ? key : null;
@@ -4863,6 +4881,60 @@ const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
     col: focusCol
   };
   return true;
+};
+
+// toggleActiveBooleanCell (design doc 2026-07-05, Change 1): the spreadsheet-standard
+// single-keystroke boolean toggle. Flips the ACTIVE cell's value and commits it through the
+// EXACT SAME write funnel commitEdit uses (replaceRowValue → writeData → single $emit) but
+// WITHOUT opening an editor — there is no editingRow/editingCol involvement at all, so this
+// operates entirely off $data.activeRow/activeColIndex. Gated in onGridKeyDown to
+// editor:'checkbox' columns only (Space/Enter/F2), full-row edit mode is unaffected (the
+// editingRowIndex early return in onGridKeyDown already excludes it).
+// toggleActiveBooleanCell (design doc 2026-07-05, Change 1): the spreadsheet-standard
+// single-keystroke boolean toggle. Flips the ACTIVE cell's value and commits it through the
+// EXACT SAME write funnel commitEdit uses (replaceRowValue → writeData → single $emit) but
+// WITHOUT opening an editor — there is no editingRow/editingCol involvement at all, so this
+// operates entirely off $data.activeRow/activeColIndex. Gated in onGridKeyDown to
+// editor:'checkbox' columns only (Space/Enter/F2), full-row edit mode is unaffected (the
+// editingRowIndex early return in onGridKeyDown already excludes it).
+const toggleActiveBooleanCell = () => {
+  const colId = columnIdAt(activeRow.value, activeColIndex.value);
+  if (colId == null || !columnEditable(colId)) return;
+  const rowList = rows.value || [];
+  const row = rowList[activeRow.value];
+  if (!row) return;
+  const rowOriginal = row.original;
+  const rowId = row.id;
+  const oldValue = cellValueAt(activeRow.value, activeColIndex.value);
+  const newValue = !oldValue;
+  // D-01: same discipline as commitEdit — a rejecting validator blocks the toggle. There is
+  // no editor to keep open here, so the toggle simply does not apply (no model write).
+  const err = runValidator(colId, newValue, rowOriginal);
+  if (err !== true) {
+    setInvalid(err);
+    return;
+  }
+  setInvalid('');
+  const def = defFor(colId);
+  const field = def && def.accessorKey != null ? def.accessorKey : colId;
+  const srcIndex = sourceIndexOfRow(activeRow.value);
+  writeData(replaceRowValue(currentData(), srcIndex, field, newValue));
+  // Exactly one emit per toggle, from this single call site (writeData does NOT emit) —
+  // mirrors commitEdit's D-07 single-emit discipline.
+  emit('cell-edit-commit', {
+    rowId,
+    columnId: colId,
+    oldValue,
+    newValue
+  });
+  // Follow the toggled row's focus through a boolean sort/filter relocation AND a
+  // fine-grained keyed-row replace (Solid) — the SAME recovery commitEdit relies on; even
+  // with no editor to unmount, writeData's re-render can still drop focus.
+  pendingEditFollow = {
+    rowOriginal,
+    rowId,
+    col: activeColIndex.value
+  };
 };
 
 // cancelEdit: discard the draft (D-05 — revert to the pre-edit value, no model write) and

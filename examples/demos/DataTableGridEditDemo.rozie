@@ -6,17 +6,21 @@
   checkbox/select draft-seed guard, B26 drop-in vs built-in click-away parity) across all
   six targets via data-table-grid-edit.spec.ts.
 
-  A SINGLE DataTable in interactionMode='grid' with six editable columns:
+  A SINGLE DataTable in interactionMode='grid' with six editable columns. NOTE (2026-07-05):
+  the two checkbox columns sit BEFORE `status` — a built-in editor:'checkbox' cell no longer
+  opens ANY editor (Space/Enter/F2 toggle it instantly per the boolean in-place toggle design),
+  so B5's "Tab off the LAST editable cell" vehicle must stay an editor-opening column; `status`
+  (select) is kept LAST for that reason.
     0 name     — built-in text editor
     1 qty      — built-in number editor  (B3 numeric/empty coercion)
     2 note     — CUSTOM #editor drop-in (EditorText, owns its OWN onBlur commit) (B26)
-    3 status   — built-in select editor  (B24 no garbage draft)
-    4 active   — built-in checkbox editor (B24 no forced-checked seed) — PASS vehicle for
-                 the 2026-07-05 boolean in-place toggle (Space/Enter/F2 flip+commit, no
-                 editor, single emit, focus held; a stray printable key is a no-op)
-    5 verified — built-in checkbox editor with an ALWAYS-REJECTING validator (`rejectToggle`)
-                 — the boolean-toggle D-01 reject vehicle (no model write, no commit bump;
-                 LAST editable col → B5)
+    3 active   — built-in checkbox editor — PASS vehicle for the 2026-07-05 boolean in-place
+                 toggle (Space/Enter/F2 flip+commit, no editor, single emit, focus held; a
+                 stray printable key is a no-op — type-to-edit is disabled for checkbox, so
+                 B24's OLD checkbox-seeds-a-draft assertion no longer applies here)
+    4 verified — built-in checkbox editor with an ALWAYS-REJECTING validator (`rejectToggle`)
+                 — the boolean-toggle D-01 reject vehicle (no model write, no commit bump)
+    5 status   — built-in select editor  (B24 no garbage draft; LAST editable col → B5)
 
   `r-model:data` binds the dataset so the spec asserts the COMMITTED model values + types
   through the `model-readout` JSON dump. activecell-readout / getactivecell-readout mirror
@@ -137,6 +141,10 @@ const rejectToggle = (value: unknown, row: unknown): string => 'nope'
       <!-- The #editor-slot column (B26): a real drop-in editor that owns its own onBlur
            commit. editor='custom' routes it through the #editor scoped slot. -->
       <Column field="note"   header="Note"   :editable="true" editor="custom" />
+      <Column field="active" header="Active" :editable="true" editor="checkbox" />
+      <Column field="verified" header="Verified" :editable="true" editor="checkbox" :validate="rejectToggle" />
+      <!-- Kept LAST (2026-07-05): a checkbox column no longer opens an editor at all, so
+           B5's "Tab off the last editable cell" vehicle needs an editor-opening column here. -->
       <Column
         field="status"
         header="Status"
@@ -144,8 +152,6 @@ const rejectToggle = (value: unknown, row: unknown): string => 'nope'
         editor="select"
         :editorOptions="$data.statusOptions"
       />
-      <Column field="active" header="Active" :editable="true" editor="checkbox" />
-      <Column field="verified" header="Verified" :editable="true" editor="checkbox" :validate="rejectToggle" />
 
       <!-- Read-only display slot. -->
       <template #cell="{ columnId, value }">
