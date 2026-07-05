@@ -1,14 +1,15 @@
 <!--
   DataTableEditorDropinsDemo.rozie — runtime behavioral cell for the @rozie-ui/data-table
-  #editor slot DROP-INS (EditorText / EditorSelect).
+  #editor slot DROP-INS (EditorText / EditorSelect / EditorDate).
 
   Mirrors DataTableEditDemo.rozie's structure (grid interactionMode, r-model:data write-back,
   @cell-edit-commit readout + counter, the #editor scoped slot dispatched by columnId) but
-  routes BOTH editable columns through the #editor slot via editor='custom' and SWAPS the
-  hand-rolled stepped control for the real EditorText / EditorSelect drop-ins imported
-  cross-tree from packages/ui/data-table/src. Each receives the verified #editor slot scope
-  ({ columnId, column, row, value, commit, cancel }); EditorText commits a typed draft on
-  Enter/blur, EditorSelect commits the picked option on change.
+  routes all three editable columns through the #editor slot via editor='custom' and SWAPS the
+  hand-rolled stepped control for the real EditorText / EditorSelect / EditorDate drop-ins
+  imported cross-tree from packages/ui/data-table/src. Each receives the verified #editor slot
+  scope ({ columnId, column, row, value, commit, cancel }); EditorText commits a typed draft on
+  Enter/blur, EditorSelect and EditorDate now DEFER commit to Enter/blur (pick/nudge updates the
+  draft only — matching EditorText).
 
   Loop-var / slot discipline: NO loop var or slot named `cell`; the #cell display slot binds
   `value`. NO <data> field collides with a slot let-var (row/value/columnId). VR-deterministic.
@@ -22,6 +23,7 @@
   Column: '../../packages/ui/data-table/src/Column.rozie',
   EditorText: '../../packages/ui/data-table/src/EditorText.rozie',
   EditorSelect: '../../packages/ui/data-table/src/EditorSelect.rozie',
+  EditorDate: '../../packages/ui/data-table/src/EditorDate.rozie',
 }
 </components>
 
@@ -30,10 +32,10 @@
   // A static dataset with an editable text field (name) + a categorical field (status).
   // VR-deterministic. Row 0 = Alpha / active.
   rows: [
-    { id: 1, name: 'Alpha', status: 'active' },
-    { id: 2, name: 'Beta',  status: 'archived' },
-    { id: 3, name: 'Gamma', status: 'active' },
-    { id: 4, name: 'Delta', status: 'pending' },
+    { id: 1, name: 'Alpha', status: 'active',   orderedAt: '2026-01-01' },
+    { id: 2, name: 'Beta',  status: 'archived', orderedAt: '2026-02-01' },
+    { id: 3, name: 'Gamma', status: 'active',   orderedAt: '2026-03-01' },
+    { id: 4, name: 'Delta', status: 'pending',  orderedAt: '2026-04-01' },
   ],
   // Select-editor options for the `status` column.
   statusOptions: [
@@ -74,9 +76,10 @@ const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue:
       r-model:data="$data.rows"
       @cell-edit-commit="onCellEditCommit($event)"
     >
-      <!-- editor='custom' routes BOTH columns through the #editor scoped slot. -->
-      <Column field="name"   header="Name"   :editable="true" editor="custom" />
-      <Column field="status" header="Status" :editable="true" editor="custom" />
+      <!-- editor='custom' routes all three columns through the #editor scoped slot. -->
+      <Column field="name"      header="Name"    :editable="true" editor="custom" />
+      <Column field="status"    header="Status"  :editable="true" editor="custom" />
+      <Column field="orderedAt" header="Ordered" :editable="true" editor="custom" />
 
       <!-- The default #cell display slot (read-only display path). -->
       <template #cell="{ value }">
@@ -105,6 +108,15 @@ const onCellEditCommit = (payload: { rowId: unknown; columnId: string; oldValue:
           :commit="commit"
           :cancel="cancel"
           :options="$data.statusOptions"
+        />
+        <EditorDate
+          r-else-if="columnId === 'orderedAt'"
+          :columnId="columnId"
+          :column="column"
+          :row="row"
+          :value="value"
+          :commit="commit"
+          :cancel="cancel"
         />
       </template>
     </DataTable>

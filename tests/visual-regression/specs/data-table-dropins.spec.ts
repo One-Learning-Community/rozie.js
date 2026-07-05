@@ -33,8 +33,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   DETAIL (DataTableDetailPanel): expanding a row mounts the DetailPanel drop-in's
  *     key/value definition list (dl.rdt-detail-panel > dt/dd); collapsing removes it.
  *   EDITOR (DataTableEditorDropins): F2 on an editor='custom' cell routes to the #editor
- *     slot → EditorText (name) / EditorSelect (status); committing updates the cell + the
- *     commit readout.
+ *     slot → EditorText (name) / EditorSelect (status) / EditorDate (orderedAt). EditorText
+ *     already defers commit to Enter/blur; EditorSelect and EditorDate now ALSO defer
+ *     (pick/nudge updates the draft only — Enter/blur commits the final value), matching
+ *     EditorText and the built-in editors (2026-07-05 grid-edit keyboard-UX design, Changes
+ *     2 + 3). Committing updates the cell + the commit readout.
  */
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
@@ -290,10 +293,13 @@ for (const target of TARGETS) {
 
 // ═══════════════════════════════════════════════════════════════════════════════════
 // EDITOR — DataTableEditorDropins: #editor slot dispatch → EditorText (name) / EditorSelect
-//   (status). F2 on an editor='custom' cell routes to the slot; committing updates the cell.
+//   (status) / EditorDate (orderedAt). F2 on an editor='custom' cell routes to the slot;
+//   committing updates the cell + the readout. EditorSelect and EditorDate now DEFER commit
+//   to Enter/blur (pick/nudge updates the draft only, per the 2026-07-05 grid-edit keyboard-UX
+//   design Changes 2 + 3) — matching EditorText.
 // ═══════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
-  runnerFor(target)(`data-table-dropins editor [${target}]: F2 → EditorText type+Enter commits name; EditorSelect pick commits status; cell + readout update`, async ({
+  runnerFor(target)(`data-table-dropins editor [${target}]: F2 → EditorText type+Enter commits name; EditorSelect pick defers to Enter; EditorDate nudge defers to Enter; cell + readout update`, async ({
     page,
   }) => {
     await page.goto(`/?example=DataTableEditorDropins&target=${target}`);
@@ -307,7 +313,8 @@ for (const target of TARGETS) {
     const commitCount = mount.getByTestId('commit-count');
     const cellDisplays = mount.getByTestId('cell-display');
 
-    // Columns: name(0, editor=custom → EditorText), status(1, editor=custom → EditorSelect).
+    // Columns: name(0, editor=custom → EditorText), status(1, editor=custom → EditorSelect),
+    // orderedAt(2, editor=custom → EditorDate).
     // ── EditorText (name): F2 on cell (0,0) routes to the #editor slot → EditorText mounts.
     await openCustomEditor(page, 'input.rdt-cell-editor[data-editing-cell]', 0, 0);
     const nameEditor = mount.locator('input.rdt-cell-editor[data-editing-cell]');
@@ -321,13 +328,39 @@ for (const target of TARGETS) {
     await expect.poll(async () => cellDisplays.nth(0).textContent(), { timeout: 10_000 }).toBe('Zeta');
 
     // ── EditorSelect (status): F2 on cell (0,1) routes to the #editor slot → EditorSelect
-    //    mounts; picking a new option commits immediately (immediate-commit-on-change).
-    const beforeStatus = Number(await commitCount.textContent());
+    //    mounts. DEFER assertion (Change 3): picking an option updates the draft ONLY — no
+    //    commit yet. Enter then commits the final selection.
+    const beforeSel = Number(await commitCount.textContent());
     await openCustomEditor(page, 'select.rdt-cell-editor[data-editing-cell]', 0, 1);
     const statusEditor = mount.locator('select.rdt-cell-editor[data-editing-cell]');
     await statusEditor.selectOption('archived');
+    // NO commit yet — the pick only updates the draft (settle, then assert no change).
+    await page.waitForTimeout(300);
+    expect(Number(await commitCount.textContent())).toBe(beforeSel);
+    expect(await commitReadout.textContent()).not.toBe('status=archived');
+    // Enter commits the draft.
+    await statusEditor.press('Enter');
     await expect.poll(async () => commitReadout.textContent(), { timeout: 10_000 }).toBe('status=archived');
-    await expect.poll(async () => Number(await commitCount.textContent()), { timeout: 10_000 }).toBeGreaterThan(beforeStatus);
+    // Enter's commit closes+unmounts the select, whose blur may fire a second identical
+    // commit on some targets (the EditorText leg above already documents this Enter+blur
+    // double-fire) — assert a delta, not exactly beforeSel+1.
+    await expect.poll(async () => Number(await commitCount.textContent()), { timeout: 10_000 }).toBeGreaterThan(beforeSel);
     await expect.poll(async () => cellDisplays.nth(1).textContent(), { timeout: 10_000 }).toBe('archived');
+
+    // ── EditorDate (orderedAt): F2 on cell (0,2) routes to the #editor slot → EditorDate
+    //    mounts. DEFER assertion (Change 2): filling/nudging the date updates the draft ONLY —
+    //    no commit yet. Enter then commits the final ISO value.
+    const beforeDate = Number(await commitCount.textContent());
+    await openCustomEditor(page, 'input[type="date"].rdt-cell-editor[data-editing-cell]', 0, 2);
+    const dateEditor = mount.locator('input[type="date"].rdt-cell-editor[data-editing-cell]');
+    await dateEditor.fill('2026-06-15');
+    // NO commit yet — fill dispatches input+change, both draft-only now.
+    await page.waitForTimeout(300);
+    expect(Number(await commitCount.textContent())).toBe(beforeDate);
+    // Enter commits the draft.
+    await dateEditor.press('Enter');
+    await expect.poll(async () => commitReadout.textContent(), { timeout: 10_000 }).toBe('orderedAt=2026-06-15');
+    await expect.poll(async () => Number(await commitCount.textContent()), { timeout: 10_000 }).toBeGreaterThan(beforeDate);
+    await expect.poll(async () => cellDisplays.nth(2).textContent(), { timeout: 10_000 }).toBe('2026-06-15');
   });
 }
