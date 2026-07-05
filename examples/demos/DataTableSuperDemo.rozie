@@ -27,8 +27,9 @@
   DataTableEditorDropinsDemo.rozie's proven `#editor` slot idiom). Six
   columns become editable (`:editable="true" editor="custom"`):
   customer→EditorText (the `r-else` fallthrough), category/status→
-  EditorSelect (with :options), amount→EditorNumber, active→EditorCheckbox,
-  orderedAt→EditorDate. The `#editor` slot dispatches by `columnId` via an
+  EditorSelect (with :options), amount→EditorNumber, active→its checkbox
+  drop-in (superseded 2026-07-05, see below), orderedAt→EditorDate. The
+  `#editor` slot dispatches by `columnId` via an
   `r-if`/`r-else-if`/…/`r-else` chain (proven to compile ×6 in
   DataTableEditorDropinsDemo.rozie — no fallback needed). A
   `@cell-edit-commit` listener (the literal event name DataTable's
@@ -139,6 +140,17 @@
   has no dedicated column-visibility checkbox panel, so the $expose verb is
   the only re-show affordance.
 
+  2026-07-05 (grid-edit keyboard UX, Change 4): the `active` column now uses
+  the BUILT-IN `editor="checkbox"` (was `editor="custom"` → the checkbox
+  drop-in) so it exercises the new framework in-place boolean toggle
+  (Space/Enter/F2 flip+commit instantly, no editor opens) — see
+  docs/superpowers/specs/2026-07-05-datatable-grid-edit-keyboard-ux-design.md.
+  The checkbox drop-in's `#editor`-slot branch and components-registry entry
+  are removed from this demo (the drop-in itself is unaffected — still used/
+  tested elsewhere: full-row edit routes its `commit(v)` to the row draft,
+  not a per-cell commit, so its immediate-`@change` stays a valid drop-in
+  choice there).
+
   Behavioral-only — NOT in matrix.spec.ts EXAMPLES (no pixel baseline).
 -->
 
@@ -151,7 +163,6 @@
   EditorText: '../../packages/ui/data-table/src/EditorText.rozie',
   EditorNumber: '../../packages/ui/data-table/src/EditorNumber.rozie',
   EditorSelect: '../../packages/ui/data-table/src/EditorSelect.rozie',
-  EditorCheckbox: '../../packages/ui/data-table/src/EditorCheckbox.rozie',
   EditorDate: '../../packages/ui/data-table/src/EditorDate.rozie',
   GroupBar: '../../packages/ui/data-table/src/GroupBar.rozie',
   FilterText: '../../packages/ui/data-table/src/FilterText.rozie',
@@ -382,7 +393,7 @@ $onMount(() => {
       <Column field="amount"     header="Amount"    :sortable="true" :groupable="false" :filterable="true" :editable="true" editor="custom" />
       <Column field="units"      header="Units"     :sortable="true" :groupable="false" />
       <Column field="status"     header="Status"    :sortable="true" :filterable="true" :editable="true" editor="custom" />
-      <Column field="active"     header="Active"    :sortable="true" :groupable="false" :editable="true" editor="custom" />
+      <Column field="active"     header="Active"    :sortable="true" :groupable="false" :editable="true" editor="checkbox" />
       <Column field="orderedAt"  header="Ordered"   :sortable="true" :groupable="false" :editable="true" editor="custom" />
 
       <!-- The #editor scoped slot (Task 4), dispatched by columnId to the five
@@ -402,10 +413,6 @@ $onMount(() => {
         />
         <EditorNumber
           r-else-if="columnId === 'amount'"
-          :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel"
-        />
-        <EditorCheckbox
-          r-else-if="columnId === 'active'"
           :columnId="columnId" :column="column" :row="row" :value="value" :commit="commit" :cancel="cancel"
         />
         <EditorDate

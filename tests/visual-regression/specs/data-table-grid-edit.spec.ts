@@ -173,7 +173,7 @@ async function readoutText(page: Page, testid: string): Promise<string> {
 /** The committed model (JSON.parsed from the model-readout dump). */
 async function modelRows(
   page: Page,
-): Promise<Array<{ id: number; name: string; qty: unknown; note: string; status: string; active: boolean }>> {
+): Promise<Array<{ id: number; name: string; qty: unknown; note: string; status: string; active: boolean; verified: boolean }>> {
   const raw = await readoutText(page, 'model-readout');
   try {
     return JSON.parse(raw);
@@ -285,7 +285,8 @@ async function enterEditAt(page: Page, row: number, col: number): Promise<void> 
   await expect.poll(async () => (await openEditor(page))?.col, { timeout: 3_000 }).toBe(String(col));
 }
 
-// Columns: name(0,text) qty(1,number) note(2,#editor drop-in) status(3,select) active(4,checkbox).
+// Columns: name(0,text) qty(1,number) note(2,#editor drop-in) status(3,select)
+// active(4,checkbox) verified(5,checkbox — always-rejecting validator, D-01 vehicle).
 
 async function gotoGrid(page: Page, target: Target) {
   await page.goto(`/?example=DataTableGridEdit&target=${target}`);
@@ -448,5 +449,85 @@ for (const target of TARGETS) {
     await clickBodyCell(page, 2, 0);
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
     await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(before + 1);
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // Boolean in-place toggle (design doc 2026-07-05, Change 1) — a built-in
+  // editor:'checkbox' cell flips + commits INSTANTLY on Space/Enter/F2: no editor opens,
+  // EXACTLY ONE cell-edit-commit per keystroke, and the active cell keeps focus (col 4,
+  // `active`, row 0 starts false). A printable key on a checkbox cell is a no-op
+  // (type-to-edit disabled). A rejecting column validator (col 5, `verified` —
+  // `rejectToggle` always returns a string) blocks the toggle entirely (D-01): no model
+  // write, no commit-count bump — proven by the model + commit-count staying UNCHANGED.
+  // ════════════════════════════════════════════════════════════════════════════════
+  runnerFor(target)(`data-table-grid-edit [${target}]: boolean toggle — Space flips+commits instantly, no editor, focus held`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await focusBodyCellStable(page, 0, 4); // active column, row 0 (active=false)
+    const before = await commitCount(page);
+    const beforeValue = (await modelRows(page))[0]?.active;
+    await page.keyboard.press(' ');
+    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(before + 1);
+    await expect.poll(async () => (await modelRows(page))[0]?.active, { timeout: 10_000 }).toBe(!beforeValue);
+    expect(await openEditor(page)).toBeNull(); // no editor opened
+    const coords = await activeCellCoords(page);
+    expect(coords?.row).toBe('0');
+    expect(coords?.col).toBe('4');
+    expect(coords?.tag).not.toBe('input'); // deepest active tag is the CELL, not an editor
+  });
+
+  runnerFor(target)(`data-table-grid-edit [${target}]: boolean toggle — Enter flips+commits instantly, no editor, focus held`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await focusBodyCellStable(page, 0, 4);
+    const before = await commitCount(page);
+    const beforeValue = (await modelRows(page))[0]?.active;
+    await page.keyboard.press('Enter');
+    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(before + 1);
+    await expect.poll(async () => (await modelRows(page))[0]?.active, { timeout: 10_000 }).toBe(!beforeValue);
+    expect(await openEditor(page)).toBeNull();
+    const coords = await activeCellCoords(page);
+    expect(coords?.row).toBe('0');
+    expect(coords?.col).toBe('4');
+    expect(coords?.tag).not.toBe('input');
+  });
+
+  runnerFor(target)(`data-table-grid-edit [${target}]: boolean toggle — F2 flips+commits instantly, no editor, focus held`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await focusBodyCellStable(page, 0, 4);
+    const before = await commitCount(page);
+    const beforeValue = (await modelRows(page))[0]?.active;
+    await page.keyboard.press('F2');
+    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(before + 1);
+    await expect.poll(async () => (await modelRows(page))[0]?.active, { timeout: 10_000 }).toBe(!beforeValue);
+    expect(await openEditor(page)).toBeNull();
+    const coords = await activeCellCoords(page);
+    expect(coords?.row).toBe('0');
+    expect(coords?.col).toBe('4');
+    expect(coords?.tag).not.toBe('input');
+  });
+
+  runnerFor(target)(`data-table-grid-edit [${target}]: boolean toggle — a printable key on a checkbox cell opens no editor (type-to-edit disabled)`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await focusBodyCellStable(page, 0, 4);
+    const before = await commitCount(page);
+    await page.keyboard.press('x');
+    // Give any (incorrect) editor-open / commit a moment, then assert neither happened.
+    await page.waitForTimeout(300);
+    expect(await openEditor(page)).toBeNull();
+    expect(await commitCount(page)).toBe(before);
+  });
+
+  runnerFor(target)(`data-table-grid-edit [${target}]: boolean toggle — a rejecting validator blocks the toggle (no write, no commit)`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await focusBodyCellStable(page, 0, 5); // verified column — rejectToggle always rejects
+    const before = await commitCount(page);
+    const beforeValue = (await modelRows(page))[0]?.verified;
+    await page.keyboard.press(' ');
+    // Give the (would-be) write a moment, then assert NOTHING changed — the unchanged
+    // model + unchanged commit-count IS the proof of "no write" (D-01: there is no editor
+    // to keep open on a reject, so the toggle simply does not apply).
+    await page.waitForTimeout(300);
+    expect(await commitCount(page)).toBe(before);
+    expect((await modelRows(page))[0]?.verified).toBe(beforeValue);
+    expect(await openEditor(page)).toBeNull();
   });
 }

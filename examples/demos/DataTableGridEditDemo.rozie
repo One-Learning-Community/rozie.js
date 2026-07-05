@@ -6,12 +6,17 @@
   checkbox/select draft-seed guard, B26 drop-in vs built-in click-away parity) across all
   six targets via data-table-grid-edit.spec.ts.
 
-  A SINGLE DataTable in interactionMode='grid' with five editable columns:
-    0 name   — built-in text editor
-    1 qty    — built-in number editor  (B3 numeric/empty coercion)
-    2 note   — CUSTOM #editor drop-in (EditorText, owns its OWN onBlur commit) (B26)
-    3 status — built-in select editor  (B24 no garbage draft)
-    4 active — built-in checkbox editor (B24 no forced-checked seed; LAST editable col → B5)
+  A SINGLE DataTable in interactionMode='grid' with six editable columns:
+    0 name     — built-in text editor
+    1 qty      — built-in number editor  (B3 numeric/empty coercion)
+    2 note     — CUSTOM #editor drop-in (EditorText, owns its OWN onBlur commit) (B26)
+    3 status   — built-in select editor  (B24 no garbage draft)
+    4 active   — built-in checkbox editor (B24 no forced-checked seed) — PASS vehicle for
+                 the 2026-07-05 boolean in-place toggle (Space/Enter/F2 flip+commit, no
+                 editor, single emit, focus held; a stray printable key is a no-op)
+    5 verified — built-in checkbox editor with an ALWAYS-REJECTING validator (`rejectToggle`)
+                 — the boolean-toggle D-01 reject vehicle (no model write, no commit bump;
+                 LAST editable col → B5)
 
   `r-model:data` binds the dataset so the spec asserts the COMMITTED model values + types
   through the `model-readout` JSON dump. activecell-readout / getactivecell-readout mirror
@@ -35,11 +40,12 @@
 <data>
 {
   // Static dataset — one field per editor type + the #editor-slot field (`note`).
+  // `verified` is the dedicated always-rejecting-validator boolean toggle column (D-01).
   rows: [
-    { id: 1, name: 'Alpha', qty: 3, note: 'a-note', status: 'active',   active: false },
-    { id: 2, name: 'Beta',  qty: 7, note: 'b-note', status: 'archived', active: true  },
-    { id: 3, name: 'Gamma', qty: 1, note: 'c-note', status: 'active',   active: false },
-    { id: 4, name: 'Delta', qty: 5, note: 'd-note', status: 'pending',  active: true  },
+    { id: 1, name: 'Alpha', qty: 3, note: 'a-note', status: 'active',   active: false, verified: false },
+    { id: 2, name: 'Beta',  qty: 7, note: 'b-note', status: 'archived', active: true,  verified: false },
+    { id: 3, name: 'Gamma', qty: 1, note: 'c-note', status: 'active',   active: false, verified: false },
+    { id: 4, name: 'Delta', qty: 5, note: 'd-note', status: 'pending',  active: true,  verified: false },
   ],
   statusOptions: [
     { value: 'active',   label: 'Active' },
@@ -88,6 +94,11 @@ const editNoteCell = (): void => {
   const api = $refs.dt
   if (api && api.editCell) api.editCell(0, 2)
 }
+
+// The `verified` column's validator (D-01 reject vehicle, boolean-toggle spec): ALWAYS
+// rejects, regardless of the proposed value or row — proves toggleActiveBooleanCell blocks
+// the write and never emits cell-edit-commit when the validator rejects.
+const rejectToggle = (value: unknown, row: unknown): string => 'nope'
 </script>
 
 <template>
@@ -134,6 +145,7 @@ const editNoteCell = (): void => {
         :editorOptions="$data.statusOptions"
       />
       <Column field="active" header="Active" :editable="true" editor="checkbox" />
+      <Column field="verified" header="Verified" :editable="true" editor="checkbox" :validate="rejectToggle" />
 
       <!-- Read-only display slot. -->
       <template #cell="{ columnId, value }">
