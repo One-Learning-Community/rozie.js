@@ -348,6 +348,44 @@ const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
   return true
 }
 
+// toggleActiveBooleanCell (design doc 2026-07-05, Change 1): the spreadsheet-standard
+// single-keystroke boolean toggle. Flips the ACTIVE cell's value and commits it through the
+// EXACT SAME write funnel commitEdit uses (replaceRowValue → writeData → single $emit) but
+// WITHOUT opening an editor — there is no editingRow/editingCol involvement at all, so this
+// operates entirely off $data.activeRow/activeColIndex. Gated in onGridKeyDown to
+// editor:'checkbox' columns only (Space/Enter/F2), full-row edit mode is unaffected (the
+// editingRowIndex early return in onGridKeyDown already excludes it).
+const toggleActiveBooleanCell = () => {
+  const colId = columnIdAt($data.activeRow, $data.activeColIndex)
+  if (colId == null || !columnEditable(colId)) return
+  const rowList = $data.rows || []
+  const row = rowList[$data.activeRow]
+  if (!row) return
+  const rowOriginal = row.original
+  const rowId = row.id
+  const oldValue = cellValueAt($data.activeRow, $data.activeColIndex)
+  const newValue = !oldValue
+  // D-01: same discipline as commitEdit — a rejecting validator blocks the toggle. There is
+  // no editor to keep open here, so the toggle simply does not apply (no model write).
+  const err = runValidator(colId, newValue, rowOriginal)
+  if (err !== true) {
+    setInvalid(err)
+    return
+  }
+  setInvalid('')
+  const def = defFor(colId)
+  const field = def && def.accessorKey != null ? def.accessorKey : colId
+  const srcIndex = sourceIndexOfRow($data.activeRow)
+  writeData(replaceRowValue(currentData(), srcIndex, field, newValue))
+  // Exactly one emit per toggle, from this single call site (writeData does NOT emit) —
+  // mirrors commitEdit's D-07 single-emit discipline.
+  $emit('cell-edit-commit', { rowId, columnId: colId, oldValue, newValue })
+  // Follow the toggled row's focus through a boolean sort/filter relocation AND a
+  // fine-grained keyed-row replace (Solid) — the SAME recovery commitEdit relies on; even
+  // with no editor to unmount, writeData's re-render can still drop focus.
+  pendingEditFollow = { rowOriginal, rowId, col: $data.activeColIndex }
+}
+
 // cancelEdit: discard the draft (D-05 — revert to the pre-edit value, no model write) and
 // return focus to the owning cell.
 const cancelEdit = () => {
@@ -364,4 +402,4 @@ const cancelEdit = () => {
   focusCellWhenReady(focusRow, focusCol)
 }
 
-export { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, coerceCellValue, commitEdit, cancelEdit }
+export { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit }

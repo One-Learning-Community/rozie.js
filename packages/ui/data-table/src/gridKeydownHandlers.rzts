@@ -107,6 +107,16 @@ const onGridKeyDown = (e) => {
   else if (key === 'F2' && e.shiftKey && isActiveCellEditable()) {
     e.preventDefault(); beginRowEdit(($data.rows || [])[$data.activeRow]); return
   }
+  // ── Boolean in-place toggle (design doc 2026-07-05, Change 1) — a built-in
+  // editor:'checkbox' cell toggles + commits INSTANTLY on Space/Enter/F2, no editor opens
+  // (the spreadsheet-standard shape for a two-state value). Tested BEFORE the generic
+  // Enter/F2 edit-entry branch below (a checkbox cell must never fall into the open-an-
+  // editor ceremony) and gated the SAME way (isActiveCellEditable) plus editorTypeOf ===
+  // 'checkbox'. Full-row edit mode is unaffected — the editingRowIndex early return at the
+  // top of onGridKeyDown already excludes it.
+  else if ((key === 'Enter' || key === 'F2' || key === ' ') && isActiveCellEditable() && editorTypeOf(activeCellColumnId()) === 'checkbox') {
+    e.preventDefault(); toggleActiveBooleanCell(); return
+  }
   // ── Edit-entry (phase 51 req-1/3, D-05) — BEFORE the reserved enterControl branch.
   // Gated by isActiveCellEditable(): a non-editable active cell falls through to
   // enterControl (the Phase-49 behavior is unchanged). F2/Enter seed the EXISTING value
@@ -114,11 +124,13 @@ const onGridKeyDown = (e) => {
   else if ((key === 'Enter' || key === 'F2') && isActiveCellEditable()) {
     e.preventDefault(); beginEdit($data.activeRow, $data.activeColIndex, null); return
   }
-  else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+  else if (isActiveCellEditable() && key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && editorTypeOf(activeCellColumnId()) !== 'checkbox') {
     // B24: a printable key only SEEDS a draft on a free-text editor (text/number). A
     // checkbox/select/date editor must NOT take the typed char as its value (it would
     // force-check the checkbox, seed a garbage select option, or corrupt the date) — open
     // those with the EXISTING value (seed=null), identical to the F2/Enter in-place entry.
+    // Checkbox is excluded entirely (type-to-edit disabled — the branch above already
+    // handles Space/Enter/F2; any OTHER printable key on a checkbox cell is a no-op).
     e.preventDefault()
     const editType = editorTypeOf(activeCellColumnId())
     const seed = (editType === 'text' || editType === 'number') ? key : null
