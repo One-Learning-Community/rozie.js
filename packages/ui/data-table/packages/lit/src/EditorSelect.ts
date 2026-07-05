@@ -1,6 +1,6 @@
 import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { SignalWatcher } from '@lit-labs/preact-signals';
+import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
@@ -19,11 +19,11 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
    */
   @property({ type: Object }) row: unknown = null;
   /**
-   * The current cell value the `<select>` binds to (String-coerced).
+   * The current cell value the local draft seeds from (setup-once); String-coerced for the `<select>` binding.
    */
   @property({ type: Object }) value: unknown = null;
   /**
-   * `(value) => void` — commit the cell. This editor immediately commits the selected value on `@change`. Null-guarded at call sites.
+   * `(value) => void` — commit the cell with the selected value (Enter / blur). Null-guarded at call sites.
    */
   @property({ type: Function }) commit: ((...args: unknown[]) => unknown) | null = null;
   /**
@@ -34,11 +34,20 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
    * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
    */
   @property({ type: Array }) options: any[] = [];
+  private _draft = signal('');
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
   // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
   private _rozieTornDown = false;
+
+  firstUpdated(): void {
+    // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
+    // to '' so the <select> binds to a string.
+    this._draft.value = this.value != null ? String(this.value) : '';
+
+    // Picking/arrow-cycling an option updates the draft only — no commit.
+  }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
@@ -52,22 +61,35 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<select class="rdt-cell-editor" data-editing-cell="" aria-label=${this.columnId} .value=${this.selectValue()} @change=${($event: Event) => { this.onChange($event); }} @keydown=${($event: Event) => { this.onKeydown($event); }} data-rozie-s-117f1a16>
+<select class="rdt-cell-editor" data-editing-cell="" aria-label=${this.columnId} .value=${this._draft.value} @change=${($event: Event) => { this.onChange($event); }} @keydown=${($event: Event) => { this.onKeydown($event); }} @blur=${($event: Event) => { this.onBlur(); }} data-rozie-s-117f1a16>
   ${repeat<any>(this.options, (opt, _idx) => opt.value, (opt, _idx) => html`<option key=${rozieAttr(opt.value)} value=${rozieAttr(opt.value)} data-rozie-s-117f1a16>${rozieDisplay(opt.label)}</option>`)}
 </select>
 `;
   }
 
-  selectValue = () => this.value != null ? String(this.value) : '';
-
   onChange = (e: any) => {
-  this.commit && this.commit(e && e.target ? e.target.value : '');
+  this._draft.value = e && e.target ? e.target.value : '';
+};
+
+  doCommit = () => {
+  this.commit && this.commit(this._draft.value);
+};
+
+  doCancel = () => {
+  this.cancel && this.cancel();
 };
 
   onKeydown = (e: any) => {
-  if (e && e.key === 'Escape') {
+  if (e && e.key === 'Enter') {
     e.preventDefault();
-    this.cancel && this.cancel();
+    this.doCommit();
+  } else if (e && e.key === 'Escape') {
+    e.preventDefault();
+    this.doCancel();
   }
+};
+
+  onBlur = () => {
+  this.doCommit();
 };
 }

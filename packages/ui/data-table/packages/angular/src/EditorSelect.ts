@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, input } from '@angular/core';
+import { Component, ViewEncapsulation, input, signal } from '@angular/core';
 
 function __rozieDisplay(v: unknown): string {
   if (v == null) return '';
@@ -25,7 +25,7 @@ function __rozieAttr(v: unknown): string | null {
   standalone: true,
   template: `
 
-    <select class="rdt-cell-editor" data-editing-cell="" [attr.aria-label]="columnId()" [value]="selectValue()" (change)="onChange($event)" (keydown)="onKeydown($event)">
+    <select class="rdt-cell-editor" data-editing-cell="" [attr.aria-label]="columnId()" [value]="draft()" (change)="onChange($event)" (keydown)="onKeydown($event)" (blur)="onBlur()">
       @for (opt of options(); track opt.value) {
     <option [attr.value]="rozieAttr(opt.value)">{{ rozieDisplay(opt.label) }}</option>
     }
@@ -47,11 +47,11 @@ export class EditorSelect {
    */
   row = input<(unknown) | null>(null);
   /**
-   * The current cell value the `<select>` binds to (String-coerced).
+   * The current cell value the local draft seeds from (setup-once); String-coerced for the `<select>` binding.
    */
   value = input<(unknown) | null>(null);
   /**
-   * `(value) => void` — commit the cell. This editor immediately commits the selected value on `@change`. Null-guarded at call sites.
+   * `(value) => void` — commit the cell with the selected value (Enter / blur). Null-guarded at call sites.
    */
   commit = input<((...args: unknown[]) => unknown) | null>(null);
   /**
@@ -62,18 +62,38 @@ export class EditorSelect {
    * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
    */
   options = input<any[]>((() => [])());
+  draft = signal('');
 
-  selectValue = () => this.value() != null ? String(this.value()) : '';
+  constructor() {
+    // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
+    // to '' so the <select> binds to a string.
+    this.draft.set(this.value() != null ? String(this.value()) : '');
+
+    // Picking/arrow-cycling an option updates the draft only — no commit.
+  }
+
   onChange = (e: any) => {
+    this.draft.set(e && e.target ? e.target.value : '');
+  };
+  doCommit = () => {
     const __commit = this.commit();
-    __commit && __commit(e && e.target ? e.target.value : '');
+    __commit && __commit(this.draft());
+  };
+  doCancel = () => {
+    const __cancel = this.cancel();
+    __cancel && __cancel();
   };
   onKeydown = (e: any) => {
-    const __cancel = this.cancel();
-    if (e && e.key === 'Escape') {
+    if (e && e.key === 'Enter') {
       e.preventDefault();
-      __cancel && __cancel();
+      this.doCommit();
+    } else if (e && e.key === 'Escape') {
+      e.preventDefault();
+      this.doCancel();
     }
+  };
+  onBlur = () => {
+    this.doCommit();
   };
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }

@@ -2,12 +2,13 @@
   EditorSelect.rozie — presentational #editor slot DROP-IN for @rozie-ui/data-table.
 
   A ready-made <select> cell-editor matching the headless built-in select editor
-  (class="rdt-cell-editor" + bare data-editing-cell). Immediate-commit-on-change:
-  no local draft — @change commits the selected value right away; Escape cancels.
+  (class="rdt-cell-editor" + bare data-editing-cell). Draft-based deferred commit
+  (mirrors EditorDate/EditorText): picking/arrow-cycling an option updates a local
+  draft only; Enter / blur commit the draft; Escape cancels.
 
   Consumers pass an `options` array of `[{ value, label }]` (the same shape as a
   <Column editor="select" :editorOptions="…">). The <select> value binds to the
-  incoming $props.value directly.
+  local draft (seeded from $props.value, setup-once).
 
   PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. See
   EditorText.rozie for slot-wiring + styling rationale. NO <style> block.
@@ -45,7 +46,7 @@
     default: null,
     docs: {
       description:
-        'The current cell value the `<select>` binds to (String-coerced).',
+        'The current cell value the local draft seeds from (setup-once); String-coerced for the `<select>` binding.',
     },
   },
   commit:   {
@@ -53,7 +54,7 @@
     default: null,
     docs: {
       description:
-        '`(value) => void` — commit the cell. This editor immediately commits the selected value on `@change`. Null-guarded at call sites.',
+        '`(value) => void` — commit the cell with the selected value (Enter / blur). Null-guarded at call sites.',
     },
   },
   cancel:   {
@@ -76,25 +77,43 @@
 }
 </props>
 
-<script lang="ts">
-// The <select> value binding coerced to a string. $props.value is typed `unknown`
-// (opaque slot-scope), which the strict bundled-leaf tsc rejects against the
-// native select `value` type (string | number | string[]) on React/Solid — the
-// .rozie-native fix is a plain function returning a string (uniform ×6, NOT a
-// $computed which can't be aliased; the listbox value-vs-accessor lesson).
-const selectValue = () => ($props.value != null ? String($props.value) : '')
+<data>
+{
+  // Local draft — the currently selected value, seeded from $props.value.
+  draft: '',
+}
+</data>
 
-// Immediate-commit-on-change: read the selected value the global-filter way and
-// commit it directly (no draft needed for a single-gesture select).
+<script lang="ts">
+// Seed the draft once from the incoming value (setup-once). Normalize null/undefined
+// to '' so the <select> binds to a string.
+$data.draft = $props.value != null ? String($props.value) : ''
+
+// Picking/arrow-cycling an option updates the draft only — no commit.
 const onChange = (e) => {
-  $props.commit && $props.commit(e && e.target ? e.target.value : '')
+  $data.draft = e && e.target ? e.target.value : ''
+}
+
+// commit/cancel are Function props (default null) — guard before calling.
+const doCommit = () => {
+  $props.commit && $props.commit($data.draft)
+}
+const doCancel = () => {
+  $props.cancel && $props.cancel()
 }
 
 const onKeydown = (e) => {
-  if (e && e.key === 'Escape') {
+  if (e && e.key === 'Enter') {
     e.preventDefault()
-    $props.cancel && $props.cancel()
+    doCommit()
+  } else if (e && e.key === 'Escape') {
+    e.preventDefault()
+    doCancel()
   }
+}
+
+const onBlur = () => {
+  doCommit()
 }
 </script>
 
@@ -103,9 +122,10 @@ const onKeydown = (e) => {
   class="rdt-cell-editor"
   data-editing-cell
   :aria-label="$props.columnId"
-  :value="selectValue()"
+  :value="$data.draft"
   @change="onChange($event)"
   @keydown="onKeydown($event)"
+  @blur="onBlur()"
 >
   <option r-for="opt in $props.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
 </select>

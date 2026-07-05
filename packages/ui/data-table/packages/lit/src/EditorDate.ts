@@ -21,7 +21,7 @@ export default class EditorDate extends SignalWatcher(LitElement) {
    */
   @property({ type: Object }) value: unknown = null;
   /**
-   * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur / change). Null-guarded at call sites.
+   * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur). Null-guarded at call sites.
    */
   @property({ type: Function }) commit: ((...args: unknown[]) => unknown) | null = null;
   /**
@@ -72,7 +72,6 @@ export default class EditorDate extends SignalWatcher(LitElement) {
 
   onChange = (e: any) => {
   this._draft.value = e && e.target ? e.target.value : '';
-  this.doCommit();
 };
 
   onKeydown = (e: any) => {

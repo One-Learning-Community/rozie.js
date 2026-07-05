@@ -14,11 +14,11 @@ export interface EditorSelectProps {
    */
   row?: (unknown) | null;
   /**
-   * The current cell value the `<select>` binds to (String-coerced).
+   * The current cell value the local draft seeds from (setup-once); String-coerced for the `<select>` binding.
    */
   value?: (unknown) | null;
   /**
-   * `(value) => void` — commit the cell. This editor immediately commits the selected value on `@change`. Null-guarded at call sites.
+   * `(value) => void` — commit the cell with the selected value (Enter / blur). Null-guarded at call sites.
    */
   commit?: ((...args: unknown[]) => unknown) | null;
   /**

@@ -26,7 +26,7 @@ const props = withDefaults(
      */
     value?: Record<string, any> | null;
     /**
-     * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur / change). Null-guarded at call sites.
+     * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur). Null-guarded at call sites.
      */
     commit?: ((...args: any[]) => any) | null;
     /**
@@ -54,7 +54,6 @@ const doCancel = () => {
 };
 const onChange = (e: any) => {
   draft.value = e && e.target ? e.target.value : '';
-  doCommit();
 };
 const onKeydown = (e: any) => {
   if (e && e.key === 'Enter') {

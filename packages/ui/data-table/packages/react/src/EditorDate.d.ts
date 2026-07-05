@@ -18,7 +18,7 @@ export interface EditorDateProps {
    */
   value?: (unknown) | null;
   /**
-   * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur / change). Null-guarded at call sites.
+   * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur). Null-guarded at call sites.
    */
   commit?: ((...args: unknown[]) => unknown) | null;
   /**

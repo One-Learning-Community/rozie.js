@@ -15,11 +15,11 @@ interface Props {
    */
   row?: (unknown) | null;
   /**
-   * The current cell value the `<select>` binds to (String-coerced).
+   * The current cell value the local draft seeds from (setup-once); String-coerced for the `<select>` binding.
    */
   value?: (unknown) | null;
   /**
-   * `(value) => void` — commit the cell. This editor immediately commits the selected value on `@change`. Null-guarded at call sites.
+   * `(value) => void` — commit the cell with the selected value (Enter / blur). Null-guarded at call sites.
    */
   commit?: ((...args: any[]) => any) | null;
   /**
@@ -44,26 +44,38 @@ let {
   options = __defaultOptions
 }: Props = $props();
 
-// The <select> value binding coerced to a string. $props.value is typed `unknown`
-// (opaque slot-scope), which the strict bundled-leaf tsc rejects against the
-// native select `value` type (string | number | string[]) on React/Solid — the
-// .rozie-native fix is a plain function returning a string (uniform ×6, NOT a
-// $computed which can't be aliased; the listbox value-vs-accessor lesson).
-const selectValue = () => value != null ? String(value) : '';
+let draft = $state('');
 
-// Immediate-commit-on-change: read the selected value the global-filter way and
-// commit it directly (no draft needed for a single-gesture select).
-// Immediate-commit-on-change: read the selected value the global-filter way and
-// commit it directly (no draft needed for a single-gesture select).
+// Seed the draft once from the incoming value (setup-once). Normalize null/undefined
+// to '' so the <select> binds to a string.
+draft = value != null ? String(value) : '';
+
+// Picking/arrow-cycling an option updates the draft only — no commit.
+// Picking/arrow-cycling an option updates the draft only — no commit.
 const onChange = (e: any) => {
-  commit && commit(e && e.target ? e.target.value : '');
+  draft = e && e.target ? e.target.value : '';
+};
+
+// commit/cancel are Function props (default null) — guard before calling.
+// commit/cancel are Function props (default null) — guard before calling.
+const doCommit = () => {
+  commit && commit(draft);
+};
+const doCancel = () => {
+  cancel && cancel();
 };
 const onKeydown = (e: any) => {
-  if (e && e.key === 'Escape') {
+  if (e && e.key === 'Enter') {
     e.preventDefault();
-    cancel && cancel();
+    doCommit();
+  } else if (e && e.key === 'Escape') {
+    e.preventDefault();
+    doCancel();
   }
+};
+const onBlur = () => {
+  doCommit();
 };
 </script>
 
-<select class="rdt-cell-editor" data-editing-cell="" aria-label={columnId} value={rozieAttr(selectValue())} onchange={($event) => { onChange($event); }} onkeydown={($event) => { onKeydown($event); }} data-rozie-s-117f1a16>{#each options as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-117f1a16>{rozieDisplay(opt.label)}</option>{/each}</select>
+<select class="rdt-cell-editor" data-editing-cell="" aria-label={columnId} value={draft} onchange={($event) => { onChange($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-117f1a16>{#each options as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-117f1a16>{rozieDisplay(opt.label)}</option>{/each}</select>

@@ -19,7 +19,7 @@ interface EditorDateProps {
    */
   value?: (unknown) | null;
   /**
-   * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur / change). Null-guarded at call sites.
+   * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur). Null-guarded at call sites.
    */
   commit?: ((...args: unknown[]) => unknown) | null;
   /**
@@ -49,7 +49,6 @@ export default function EditorDate(_props: EditorDateProps): JSX.Element {
   }
   function onChange(e: any) {
     setDraft(e && e.target ? e.target.value : '');
-    doCommit();
   }
   function onKeydown(e: any) {
     if (e && e.key === 'Enter') {

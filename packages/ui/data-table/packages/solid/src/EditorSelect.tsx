@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { mergeProps, splitProps } from 'solid-js';
+import { createSignal, mergeProps, splitProps } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
 
@@ -17,11 +17,11 @@ interface EditorSelectProps {
    */
   row?: (unknown) | null;
   /**
-   * The current cell value the `<select>` binds to (String-coerced).
+   * The current cell value the local draft seeds from (setup-once); String-coerced for the `<select>` binding.
    */
   value?: (unknown) | null;
   /**
-   * `(value) => void` — commit the cell. This editor immediately commits the selected value on `@change`. Null-guarded at call sites.
+   * `(value) => void` — commit the cell with the selected value (Enter / blur). Null-guarded at call sites.
    */
   commit?: ((...args: unknown[]) => unknown) | null;
   /**
@@ -38,30 +38,40 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
   const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null, options: (() => [])() }, _props);
   const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'options']);
 
-  // The <select> value binding coerced to a string. $props.value is typed `unknown`
-  // (opaque slot-scope), which the strict bundled-leaf tsc rejects against the
-  // native select `value` type (string | number | string[]) on React/Solid — the
-  // .rozie-native fix is a plain function returning a string (uniform ×6, NOT a
-  // $computed which can't be aliased; the listbox value-vs-accessor lesson).
-  function selectValue() {
-    return local.value != null ? String(local.value) : '';
+  const [draft, setDraft] = createSignal('');
+
+  // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
+  // to '' so the <select> binds to a string.
+  setDraft(local.value != null ? String(local.value) : '');
+
+  // Picking/arrow-cycling an option updates the draft only — no commit.
+  function onChange(e: any) {
+    setDraft(e && e.target ? e.target.value : '');
   }
 
-  // Immediate-commit-on-change: read the selected value the global-filter way and
-  // commit it directly (no draft needed for a single-gesture select).
-  function onChange(e: any) {
-    local.commit && local.commit(e && e.target ? e.target.value : '');
+  // commit/cancel are Function props (default null) — guard before calling.
+  function doCommit() {
+    local.commit && local.commit(draft());
+  }
+  function doCancel() {
+    local.cancel && local.cancel();
   }
   function onKeydown(e: any) {
-    if (e && e.key === 'Escape') {
+    if (e && e.key === 'Enter') {
       e.preventDefault();
-      local.cancel && local.cancel();
+      doCommit();
+    } else if (e && e.key === 'Escape') {
+      e.preventDefault();
+      doCancel();
     }
+  }
+  function onBlur() {
+    doCommit();
   }
 
   return (
     <>
-    <select data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={selectValue()} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-117f1a16="">
+    <select data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={draft()} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-117f1a16="">
       <Key each={local.options as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-117f1a16="">{rozieDisplay(opt().label)}</option>}</Key>
     </select>
     </>

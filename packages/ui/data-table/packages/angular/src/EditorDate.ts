@@ -27,7 +27,7 @@ export class EditorDate {
    */
   value = input<(unknown) | null>(null);
   /**
-   * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur / change). Null-guarded at call sites.
+   * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur). Null-guarded at call sites.
    */
   commit = input<((...args: unknown[]) => unknown) | null>(null);
   /**
@@ -56,7 +56,6 @@ export class EditorDate {
   };
   onChange = (e: any) => {
     this.draft.set(e && e.target ? e.target.value : '');
-    this.doCommit();
   };
   onKeydown = (e: any) => {
     if (e && e.key === 'Enter') {

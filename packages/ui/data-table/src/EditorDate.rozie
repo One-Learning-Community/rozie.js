@@ -7,7 +7,8 @@
   is already an ISO `YYYY-MM-DD` string, so the draft IS the ISO string committed.
 
   Behavior: local draft seeded from $props.value (setup-once); @change/@input
-  update the draft; Enter / blur / change commit the ISO string; Escape cancels.
+  update the draft only (deferred commit); Enter / blur commit the ISO string;
+  Escape cancels.
 
   PRESENTATIONAL ONLY: NO $emit / NO $expose / NO $inject / NO engine. See
   EditorText.rozie for slot-wiring + styling rationale. NO <style> block.
@@ -53,7 +54,7 @@
     default: null,
     docs: {
       description:
-        '`(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur / change). Null-guarded at call sites.',
+        '`(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur). Null-guarded at call sites.',
     },
   },
   cancel:   {
@@ -93,7 +94,6 @@ const doCancel = () => {
 
 const onChange = (e) => {
   $data.draft = e && e.target ? e.target.value : ''
-  doCommit()
 }
 
 const onKeydown = (e) => {

@@ -15,11 +15,11 @@ interface EditorSelectProps {
    */
   row?: (unknown) | null;
   /**
-   * The current cell value the `<select>` binds to (String-coerced).
+   * The current cell value the local draft seeds from (setup-once); String-coerced for the `<select>` binding.
    */
   value?: (unknown) | null;
   /**
-   * `(value) => void` — commit the cell. This editor immediately commits the selected value on `@change`. Null-guarded at call sites.
+   * `(value) => void` — commit the cell with the selected value (Enter / blur). Null-guarded at call sites.
    */
   commit?: ((...args: any[]) => any) | null;
   /**
@@ -44,25 +44,33 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
     cancel: _props.cancel ?? null,
     options: _props.options ?? __defaultOptions,
   };
+  const [draft, setDraft] = useState(() => props.value != null ? String(props.value) : '');
 
-  function selectValue() {
-    return props.value != null ? String(props.value) : '';
+  const onChange = useCallback((e: any) => {
+    setDraft(e && e.target ? e.target.value : '');
+  }, []);
+  function doCommit() {
+    props.commit && props.commit(draft);
   }
-  const { commit: _rozieProp_commit } = props;
-    const onChange = useCallback((e: any) => {
-    _rozieProp_commit && _rozieProp_commit(e && e.target ? e.target.value : '');
-  }, [_rozieProp_commit]);
-  const { cancel: _rozieProp_cancel } = props;
-    const onKeydown = useCallback((e: any) => {
-    if (e && e.key === 'Escape') {
+  function doCancel() {
+    props.cancel && props.cancel();
+  }
+  const onKeydown = useCallback((e: any) => {
+    if (e && e.key === 'Enter') {
       e.preventDefault();
-      _rozieProp_cancel && _rozieProp_cancel();
+      doCommit();
+    } else if (e && e.key === 'Escape') {
+      e.preventDefault();
+      doCancel();
     }
-  }, [_rozieProp_cancel]);
+  }, [doCancel, doCommit]);
+  const onBlur = useCallback(() => {
+    doCommit();
+  }, [doCommit]);
 
   return (
     <>
-    <select className={"rdt-cell-editor"} data-editing-cell="" aria-label={props.columnId} value={selectValue()} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-117f1a16="">
+    <select className={"rdt-cell-editor"} data-editing-cell="" aria-label={props.columnId} value={draft} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-117f1a16="">
       {props.options.map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-117f1a16="">{rozieDisplay(opt.label)}</option>)}
     </select>
     </>
