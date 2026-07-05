@@ -161,7 +161,9 @@ const onGridKeyDown = (e) => {
     const grpRow = $data.activeRow
     const grpCol = $data.activeColIndex
     onToggleExpand(($data.rows || [])[$data.activeRow], e)
-    recoverGridFocus(String(grpRow), grpCol, null)
+    // guardMoved=true: the group header row is UNCHANGED by its own collapse, so a stale late
+    // rAF poll must not steal focus back after the user has already ArrowDown'd to another row.
+    recoverGridFocus(String(grpRow), grpCol, null, true)
     return
   }
   else if (key === 'Enter' || key === 'F2') { e.preventDefault(); enterControl(); return }
@@ -279,10 +281,27 @@ const onGridFocusOut = (e) => {
 // resolves the [data-row][data-col-index] cell off gridRoot once it has rendered (the fast
 // targets land on attempt 1; React/Solid retry across the async commit). Mirrors
 // focusCellWhenReady (B23) — DOM-only (reads gridRoot), so it is React-stale-safe.
-const recoverGridFocus = (rowKey, col, level) => {
+// guardMoved (default false): when true, the poll does NOT stomp focus that a later nav has
+// already moved to a DIFFERENT, STILL-VALID row — used only by the group-collapse re-seat (the
+// target group-header row is unchanged, so a stale late rAF must not steal focus back after the
+// user ArrowDown'd away → the non-deterministic treegrid collapsed-nav focus-theft). It is left
+// OFF for the B25 shrink-recovery site, whose target is a CLAMPED index of a now-REMOVED cell:
+// there focus legitimately sits on the doomed old cell (a different row) mid-async-render on
+// React and MUST be recovered onto the clamped survivor, not preserved. Compare data-row (NOT
+// node identity) so a stale SAME-row cell on Solid's node-replacing re-render still resolves as
+// the target — a genuinely dropped focus is always recovered on both sites.
+const recoverGridFocus = (rowKey, col, level, guardMoved = false) => {
   if (!gridRoot) return
   let attempts = 0
   const tryFocus = () => {
+    if (guardMoved) {
+      const ae = gridRoot && gridRoot.getRootNode ? gridRoot.getRootNode().activeElement : null
+      const aeCell = ae && ae.closest ? ae.closest('[data-grid-cell]') : null
+      if (aeCell && gridRoot.contains(aeCell)) {
+        const aeRow = aeCell.getAttribute('data-row')
+        if (aeRow != null && aeRow !== rowKey) return
+      }
+    }
     const el = resolveCellEl(rowKey, col, level)
     if (el) { el.focus(); return }
     attempts = attempts + 1

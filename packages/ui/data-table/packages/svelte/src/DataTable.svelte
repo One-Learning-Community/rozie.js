@@ -3065,7 +3065,9 @@ const onGridKeyDown = (e: any) => {
     const grpRow = activeRow;
     const grpCol = activeColIndex;
     onToggleExpand((rows || [])[activeRow], e);
-    recoverGridFocus(String(grpRow), grpCol, null);
+    // guardMoved=true: the group header row is UNCHANGED by its own collapse, so a stale late
+    // rAF poll must not steal focus back after the user has already ArrowDown'd to another row.
+    recoverGridFocus(String(grpRow), grpCol, null, true);
     return;
   } else if (key === 'Enter' || key === 'F2') {
     e.preventDefault();
@@ -3212,15 +3214,41 @@ const onGridFocusOut = (e: any) => {
 // resolves the [data-row][data-col-index] cell off gridRoot once it has rendered (the fast
 // targets land on attempt 1; React/Solid retry across the async commit). Mirrors
 // focusCellWhenReady (B23) — DOM-only (reads gridRoot), so it is React-stale-safe.
+// guardMoved (default false): when true, the poll does NOT stomp focus that a later nav has
+// already moved to a DIFFERENT, STILL-VALID row — used only by the group-collapse re-seat (the
+// target group-header row is unchanged, so a stale late rAF must not steal focus back after the
+// user ArrowDown'd away → the non-deterministic treegrid collapsed-nav focus-theft). It is left
+// OFF for the B25 shrink-recovery site, whose target is a CLAMPED index of a now-REMOVED cell:
+// there focus legitimately sits on the doomed old cell (a different row) mid-async-render on
+// React and MUST be recovered onto the clamped survivor, not preserved. Compare data-row (NOT
+// node identity) so a stale SAME-row cell on Solid's node-replacing re-render still resolves as
+// the target — a genuinely dropped focus is always recovered on both sites.
 // B25: re-focus a resolved valid cell AFTER a programmatic shrink re-renders. The clamp
 // runs synchronously BEFORE the framework commits the new tbody, so a deferred rAF-poll
 // resolves the [data-row][data-col-index] cell off gridRoot once it has rendered (the fast
 // targets land on attempt 1; React/Solid retry across the async commit). Mirrors
 // focusCellWhenReady (B23) — DOM-only (reads gridRoot), so it is React-stale-safe.
-const recoverGridFocus = (rowKey: any, col: any, level: any) => {
+// guardMoved (default false): when true, the poll does NOT stomp focus that a later nav has
+// already moved to a DIFFERENT, STILL-VALID row — used only by the group-collapse re-seat (the
+// target group-header row is unchanged, so a stale late rAF must not steal focus back after the
+// user ArrowDown'd away → the non-deterministic treegrid collapsed-nav focus-theft). It is left
+// OFF for the B25 shrink-recovery site, whose target is a CLAMPED index of a now-REMOVED cell:
+// there focus legitimately sits on the doomed old cell (a different row) mid-async-render on
+// React and MUST be recovered onto the clamped survivor, not preserved. Compare data-row (NOT
+// node identity) so a stale SAME-row cell on Solid's node-replacing re-render still resolves as
+// the target — a genuinely dropped focus is always recovered on both sites.
+const recoverGridFocus = (rowKey: any, col: any, level: any, guardMoved = false) => {
   if (!gridRoot) return;
   let attempts = 0;
   const tryFocus = () => {
+    if (guardMoved) {
+      const ae = gridRoot && gridRoot.getRootNode ? gridRoot.getRootNode().activeElement : null;
+      const aeCell = ae && ae.closest ? ae.closest('[data-grid-cell]') : null;
+      if (aeCell && gridRoot.contains(aeCell)) {
+        const aeRow = aeCell.getAttribute('data-row');
+        if (aeRow != null && aeRow !== rowKey) return;
+      }
+    }
     const el = resolveCellEl(rowKey, col, level);
     if (el) {
       el.focus();
@@ -4479,6 +4507,21 @@ const focusEditorWhenReady = (selectAll = true) => {
   let attempts = 0;
   const tryFocus = () => {
     const el = gridRoot ? gridRoot.querySelector('[data-editing-cell]') : null;
+    // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
+    // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
+    // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it
+    // back to the first editor and break row-mode Tab containment (the non-deterministic B21
+    // focus-theft). Compare the OWNING cell's data-col-index (NOT node identity) so a stale
+    // SAME-column editor node on Solid's node-replacing re-render still resolves as the target —
+    // a genuinely dropped focus is still recovered.
+    const ae = gridRoot && gridRoot.getRootNode ? gridRoot.getRootNode().activeElement : null;
+    if (ae && el && ae !== el && ae.closest && gridRoot.contains(ae) && ae.hasAttribute && ae.hasAttribute('data-editing-cell')) {
+      const aeCell = ae.closest('[data-grid-cell]');
+      const elCell = el.closest ? el.closest('[data-grid-cell]') : null;
+      const aeCol = aeCell ? aeCell.getAttribute('data-col-index') : null;
+      const elCol = elCell ? elCell.getAttribute('data-col-index') : null;
+      if (aeCol != null && aeCol !== elCol) return;
+    }
     if (el) {
       el.focus();
       if (selectAll && el.select) {

@@ -2938,7 +2938,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     const grpRow = this._activeRow.value;
     const grpCol = this._activeColIndex.value;
     this.onToggleExpand((this._rows.value || [])[this._activeRow.value], e);
-    this.recoverGridFocus(String(grpRow), grpCol, null);
+    // guardMoved=true: the group header row is UNCHANGED by its own collapse, so a stale late
+    // rAF poll must not steal focus back after the user has already ArrowDown'd to another row.
+    this.recoverGridFocus(String(grpRow), grpCol, null, true);
     return;
   } else if (key === 'Enter' || key === 'F2') {
     e.preventDefault();
@@ -3036,10 +3038,18 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (!cellEl || !next || !cellEl.contains(next)) this._activeInControl.value = false;
 };
 
-  recoverGridFocus = (rowKey: any, col: any, level: any) => {
+  recoverGridFocus = (rowKey: any, col: any, level: any, guardMoved = false) => {
   if (!this.gridRoot) return;
   let attempts = 0;
   const tryFocus = () => {
+    if (guardMoved) {
+      const ae = this.gridRoot && this.gridRoot.getRootNode ? this.gridRoot.getRootNode().activeElement : null;
+      const aeCell = ae && ae.closest ? ae.closest('[data-grid-cell]') : null;
+      if (aeCell && this.gridRoot.contains(aeCell)) {
+        const aeRow = aeCell.getAttribute('data-row');
+        if (aeRow != null && aeRow !== rowKey) return;
+      }
+    }
     const el = this.resolveCellEl(rowKey, col, level);
     if (el) {
       el.focus();
@@ -3877,6 +3887,21 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   let attempts = 0;
   const tryFocus = () => {
     const el = this.gridRoot ? this.gridRoot.querySelector('[data-editing-cell]') : null;
+    // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
+    // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
+    // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it
+    // back to the first editor and break row-mode Tab containment (the non-deterministic B21
+    // focus-theft). Compare the OWNING cell's data-col-index (NOT node identity) so a stale
+    // SAME-column editor node on Solid's node-replacing re-render still resolves as the target —
+    // a genuinely dropped focus is still recovered.
+    const ae = this.gridRoot && this.gridRoot.getRootNode ? this.gridRoot.getRootNode().activeElement : null;
+    if (ae && el && ae !== el && ae.closest && this.gridRoot.contains(ae) && ae.hasAttribute && ae.hasAttribute('data-editing-cell')) {
+      const aeCell = ae.closest('[data-grid-cell]');
+      const elCell = el.closest ? el.closest('[data-grid-cell]') : null;
+      const aeCol = aeCell ? aeCell.getAttribute('data-col-index') : null;
+      const elCol = elCell ? elCell.getAttribute('data-col-index') : null;
+      if (aeCol != null && aeCol !== elCol) return;
+    }
     if (el) {
       el.focus();
       if (selectAll && el.select) {
