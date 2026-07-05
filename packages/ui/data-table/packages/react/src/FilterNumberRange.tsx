@@ -61,8 +61,9 @@ export default function FilterNumberRange(_props: FilterNumberRangeProps): JSX.E
 
   return (
     <>
-    <span style={{ display: "contents" }} data-rozie-s-97b2c090="">
+    <span style={{ display: "flex", alignItems: "center" }} data-rozie-s-97b2c090="">
       <input className={"rdt-col-filter"} part="col-filter" type="number" aria-label={rozieAttr(props.columnId + ' min')} placeholder={rozieAttr(minPlaceholder())} value={minDraft} onInput={($event) => { onMinInput($event); }} onChange={($event) => { applyRange(); }} data-rozie-s-97b2c090="" />
+      <span data-rozie-s-97b2c090=""> - </span>
       <input className={"rdt-col-filter"} part="col-filter" type="number" aria-label={rozieAttr(props.columnId + ' max')} placeholder={rozieAttr(maxPlaceholder())} value={maxDraft} onInput={($event) => { onMaxInput($event); }} onChange={($event) => { applyRange(); }} data-rozie-s-97b2c090="" />
     </span>
     </>

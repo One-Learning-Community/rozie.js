@@ -1,7 +1,8 @@
 <template>
 
-<span style="display:contents">
+<span style="display:flex; align-items: center">
   <input class="rdt-col-filter" part="col-filter" type="number" :aria-label="props.columnId + ' min'" :placeholder="minPlaceholder()" :value="minDraft" @input="onMinInput($event)" @change="applyRange()" />
+  <span> - </span>
   <input class="rdt-col-filter" part="col-filter" type="number" :aria-label="props.columnId + ' max'" :placeholder="maxPlaceholder()" :value="maxDraft" @input="onMaxInput($event)" @change="applyRange()" />
 </span>
 

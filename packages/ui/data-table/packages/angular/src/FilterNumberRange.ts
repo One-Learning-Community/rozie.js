@@ -25,8 +25,9 @@ function __rozieAttr(v: unknown): string | null {
   standalone: true,
   template: `
 
-    <span style="display:contents">
+    <span style="display:flex; align-items: center">
       <input class="rdt-col-filter" part="col-filter" type="number" [attr.aria-label]="rozieAttr(columnId() + ' min')" [attr.placeholder]="rozieAttr(minPlaceholder())" [value]="minDraft()" (input)="onMinInput($event)" (change)="applyRange()" />
+      <span> - </span>
       <input class="rdt-col-filter" part="col-filter" type="number" [attr.aria-label]="rozieAttr(columnId() + ' max')" [attr.placeholder]="rozieAttr(maxPlaceholder())" [value]="maxDraft()" (input)="onMaxInput($event)" (change)="applyRange()" />
     </span>
 
