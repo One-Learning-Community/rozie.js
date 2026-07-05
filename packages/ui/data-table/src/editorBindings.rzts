@@ -187,6 +187,8 @@ const editCell = (rowIndex, colIndex) => {
   const maxCol = visibleColCount() - 1
   const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow)
   const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, (maxCol < 0 ? 0 : maxCol))
+  // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
+  committedThisSession = false
   $data.activeIsHeader = false
   $data.activeRow = r
   $data.activeColIndex = c

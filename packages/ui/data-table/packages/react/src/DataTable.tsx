@@ -264,6 +264,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const fillDragging = useRef(false);
   const lastData = useRef<any>(null);
   const lastDataLen = useRef(-1);
+  const committedThisSession = useRef(false);
   const editTransition = useRef(false);
   const [data, setData] = useControllableState({
     value: props.data,
@@ -2914,6 +2915,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function beginEdit(rowIndex: any, colIndex: any, seed: any) {
     const colId = columnIdAt(rowIndex, colIndex);
     if (colId == null || !columnEditable(colId)) return;
+    // A new edit session starts — reset the sync idempotency latch so THIS session's eventual
+    // commit is not silently no-op'd by a PRIOR session's already-set latch.
+    committedThisSession.current = false;
     setInvalid('');
     // Single-cell and full-row edit are mutually exclusive (D-06): entering a single-cell
     // editor clears any row-edit state so isEditing never resolves both modes for one cell.
@@ -2979,6 +2983,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   function commitEdit(overrideValue = undefined, skipFocusReturn = false) {
     if (editingRow < 0) return false;
+    // Sync idempotency latch (drop-in double cell-edit-commit fix): a second commitEdit call
+    // within the SAME edit session — the deferred drop-in's unmount-blur re-entry, which on
+    // React fires while $data.editingRow is still async-stale ≥ 0 — no-ops here instead of
+    // re-validating/re-writing/re-emitting. Reset by beginEdit/beginRowEdit/editCell.
+    if (committedThisSession.current) return false;
     const colId = editingColumnId();
     if (colId == null) {
       endEdit();
@@ -3008,6 +3017,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // Guard the teardown blur: writeData/endEdit re-render unmounts the editor → its blur
     // must NOT re-enter commitEdit (double cell-edit-commit). Cleared after the focus return.
     editTransition.current = true;
+    // Sync idempotency latch: flip BEFORE writeData/endEdit so the async unmount-blur re-entry
+    // (which fires AFTER this call returns, once editTransition is already back to false) finds
+    // it set at the top-of-function guard above and no-ops.
+    committedThisSession.current = true;
     writeData(next);
     // Exactly one emit per commit, from this single call site (writeData does NOT emit).
     props.onCellEditCommit && props.onCellEditCommit({
@@ -3057,6 +3070,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const def = defFor(colId);
     const field = def && def.accessorKey != null ? def.accessorKey : colId;
     const srcIndex = sourceIndexOfRow(activeRow);
+    // Sync idempotency latch: this toggle is a commit-equivalent (mirrors commitEdit's D-07
+    // single-emit discipline) — flip it too so a stray re-entry after this toggle no-ops.
+    committedThisSession.current = true;
     writeData(replaceRowValue(currentData(), srcIndex, field, newValue));
     // Exactly one emit per toggle, from this single call site (writeData does NOT emit) —
     // mirrors commitEdit's D-07 single-emit discipline.
@@ -3137,6 +3153,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (rowIndex < 0) return;
     const editable = editableColumnsForRow(rowIndex);
     if (editable.length === 0) return;
+    // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
+    committedThisSession.current = false;
     // Clear any single-cell editor first (mutual exclusivity).
     setEditingRow(-1);
     setEditingCol(-1);
@@ -3498,6 +3516,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const maxCol = visibleColCount() - 1;
     const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
     const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+    // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
+    committedThisSession.current = false;
     setActiveIsHeader(false);
     setActiveRow(r);
     setActiveColIndex(c);

@@ -4574,6 +4574,9 @@ const cellValueAt = (rowIndex: any, colIndex: any) => {
 const beginEdit = (rowIndex: any, colIndex: any, seed: any) => {
   const colId = columnIdAt(rowIndex, colIndex);
   if (colId == null || !columnEditable(colId)) return;
+  // A new edit session starts — reset the sync idempotency latch so THIS session's eventual
+  // commit is not silently no-op'd by a PRIOR session's already-set latch.
+  committedThisSession = false;
   setInvalid('');
   // Single-cell and full-row edit are mutually exclusive (D-06): entering a single-cell
   // editor clears any row-edit state so isEditing never resolves both modes for one cell.
@@ -4711,6 +4714,11 @@ const coerceCellValue = (colId: any, raw: any) => {
 // immediate re-read of editingRow still shows the OLD value (the ROZ138 stale-read class).
 const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
   if (editingRow < 0) return false;
+  // Sync idempotency latch (drop-in double cell-edit-commit fix): a second commitEdit call
+  // within the SAME edit session — the deferred drop-in's unmount-blur re-entry, which on
+  // React fires while $data.editingRow is still async-stale ≥ 0 — no-ops here instead of
+  // re-validating/re-writing/re-emitting. Reset by beginEdit/beginRowEdit/editCell.
+  if (committedThisSession) return false;
   const colId = editingColumnId();
   if (colId == null) {
     endEdit();
@@ -4740,6 +4748,10 @@ const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
   // Guard the teardown blur: writeData/endEdit re-render unmounts the editor → its blur
   // must NOT re-enter commitEdit (double cell-edit-commit). Cleared after the focus return.
   editTransition = true;
+  // Sync idempotency latch: flip BEFORE writeData/endEdit so the async unmount-blur re-entry
+  // (which fires AFTER this call returns, once editTransition is already back to false) finds
+  // it set at the top-of-function guard above and no-ops.
+  committedThisSession = true;
   writeData(next);
   // Exactly one emit per commit, from this single call site (writeData does NOT emit).
   oncelleditcommit?.({
@@ -4804,6 +4816,9 @@ const toggleActiveBooleanCell = () => {
   const def = defFor(colId);
   const field = def && def.accessorKey != null ? def.accessorKey : colId;
   const srcIndex = sourceIndexOfRow(activeRow);
+  // Sync idempotency latch: this toggle is a commit-equivalent (mirrors commitEdit's D-07
+  // single-emit discipline) — flip it too so a stray re-entry after this toggle no-ops.
+  committedThisSession = true;
   writeData(replaceRowValue(currentData(), srcIndex, field, newValue));
   // Exactly one emit per toggle, from this single call site (writeData does NOT emit) —
   // mirrors commitEdit's D-07 single-emit discipline.
@@ -4932,6 +4947,8 @@ const beginRowEdit = (row: any) => {
   if (rowIndex < 0) return;
   const editable = editableColumnsForRow(rowIndex);
   if (editable.length === 0) return;
+  // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
+  committedThisSession = false;
   // Clear any single-cell editor first (mutual exclusivity).
   editingRow = -1;
   editingCol = -1;
@@ -5170,6 +5187,30 @@ let editTransition = false;
 // committed row's NEW display index (React-stale-safe) and re-seat focus there. Shape:
 // { rowOriginal, rowId, col } or null. A top-level `let` (React hoists to useRef → persists).
 let pendingEditFollow: any = null;
+
+// Sync idempotency latch for a cell commit (drop-in double cell-edit-commit fix, 260705):
+// commitEdit's `$data.editingRow < 0` re-entry guard is ASYNC-STALE on React — a deferred
+// drop-in editor's unmount-blur (onBlur → $props.commit → commitEdit) fires AFTER commitEdit
+// has already returned (editTransition is a SYNC latch, cleared before the async blur), while
+// `$data.editingRow` in that stale closure still reads the OLD (pre-endEdit) value, so the
+// second commit slips through and re-emits `cell-edit-commit`. A top-level `let` is written/read
+// synchronously by plain assignment (unaffected by React's setState batching — that's the point)
+// so it stays correct across the async window editTransition/editingRow cannot cover. Set true on
+// a SUCCESSFUL commitEdit/toggleActiveBooleanCell; reset to false wherever a NEW edit session
+// begins (beginEdit/beginRowEdit/editCell) so the next legitimate commit fires exactly once.
+// A top-level `let` (React hoists to useRef → persists).
+// Sync idempotency latch for a cell commit (drop-in double cell-edit-commit fix, 260705):
+// commitEdit's `$data.editingRow < 0` re-entry guard is ASYNC-STALE on React — a deferred
+// drop-in editor's unmount-blur (onBlur → $props.commit → commitEdit) fires AFTER commitEdit
+// has already returned (editTransition is a SYNC latch, cleared before the async blur), while
+// `$data.editingRow` in that stale closure still reads the OLD (pre-endEdit) value, so the
+// second commit slips through and re-emits `cell-edit-commit`. A top-level `let` is written/read
+// synchronously by plain assignment (unaffected by React's setState batching — that's the point)
+// so it stays correct across the async window editTransition/editingRow cannot cover. Set true on
+// a SUCCESSFUL commitEdit/toggleActiveBooleanCell; reset to false wherever a NEW edit session
+// begins (beginEdit/beginRowEdit/editCell) so the next legitimate commit fires exactly once.
+// A top-level `let` (React hoists to useRef → persists).
+let committedThisSession = false;
 
 // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
 // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
@@ -5423,6 +5464,8 @@ export const editCell = (rowIndex: any, colIndex: any) => {
   const maxCol = visibleColCount() - 1;
   const r = clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
   const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+  // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
+  committedThisSession = false;
   activeIsHeader = false;
   activeRow = r;
   activeColIndex = c;

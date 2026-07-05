@@ -3939,6 +3939,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   beginEdit = (rowIndex: any, colIndex: any, seed: any) => {
   const colId = this.columnIdAt(rowIndex, colIndex);
   if (colId == null || !this.columnEditable(colId)) return;
+  // A new edit session starts — reset the sync idempotency latch so THIS session's eventual
+  // commit is not silently no-op'd by a PRIOR session's already-set latch.
+  this.committedThisSession = false;
   this.setInvalid('');
   // Single-cell and full-row edit are mutually exclusive (D-06): entering a single-cell
   // editor clears any row-edit state so isEditing never resolves both modes for one cell.
@@ -4010,6 +4013,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
   if (this._editingRow.value < 0) return false;
+  // Sync idempotency latch (drop-in double cell-edit-commit fix): a second commitEdit call
+  // within the SAME edit session — the deferred drop-in's unmount-blur re-entry, which on
+  // React fires while $data.editingRow is still async-stale ≥ 0 — no-ops here instead of
+  // re-validating/re-writing/re-emitting. Reset by beginEdit/beginRowEdit/editCell.
+  if (this.committedThisSession) return false;
   const colId = this.editingColumnId();
   if (colId == null) {
     this.endEdit();
@@ -4039,6 +4047,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // Guard the teardown blur: writeData/endEdit re-render unmounts the editor → its blur
   // must NOT re-enter commitEdit (double cell-edit-commit). Cleared after the focus return.
   this.editTransition = true;
+  // Sync idempotency latch: flip BEFORE writeData/endEdit so the async unmount-blur re-entry
+  // (which fires AFTER this call returns, once editTransition is already back to false) finds
+  // it set at the top-of-function guard above and no-ops.
+  this.committedThisSession = true;
   this.writeData(next);
   // Exactly one emit per commit, from this single call site (writeData does NOT emit).
   this.dispatchEvent(new CustomEvent("cell-edit-commit", {
@@ -4093,6 +4105,9 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   const def = this.defFor(colId);
   const field = def && def.accessorKey != null ? def.accessorKey : colId;
   const srcIndex = this.sourceIndexOfRow(this._activeRow.value);
+  // Sync idempotency latch: this toggle is a commit-equivalent (mirrors commitEdit's D-07
+  // single-emit discipline) — flip it too so a stray re-entry after this toggle no-ops.
+  this.committedThisSession = true;
   this.writeData(this.replaceRowValue(this.currentData(), srcIndex, field, newValue));
   // Exactly one emit per toggle, from this single call site (writeData does NOT emit) —
   // mirrors commitEdit's D-07 single-emit discipline.
@@ -4181,6 +4196,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (rowIndex < 0) return;
   const editable = this.editableColumnsForRow(rowIndex);
   if (editable.length === 0) return;
+  // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
+  this.committedThisSession = false;
   // Clear any single-cell editor first (mutual exclusivity).
   this._editingRow.value = -1;
   this._editingCol.value = -1;
@@ -4372,6 +4389,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   pendingEditFollow: any = null;
 
+  committedThisSession = false;
+
   inRowEdit = () => this._editingRowIndex.value != null;
 
   editorValueFor = (colId: any) => this.inRowEdit() ? this._rowDraft.value ? this._rowDraft.value[colId] : null : this._draftValue.value;
@@ -4557,6 +4576,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   const maxCol = this.visibleColCount() - 1;
   const r = this.clamp(Math.trunc(Number(rowIndex)) || 0, 0, maxRow);
   const c = this.clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
+  // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
+  this.committedThisSession = false;
   this._activeIsHeader.value = false;
   this._activeRow.value = r;
   this._activeColIndex.value = c;

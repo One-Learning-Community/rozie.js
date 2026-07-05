@@ -1186,6 +1186,19 @@ let editTransition = false
 // { rowOriginal, rowId, col } or null. A top-level `let` (React hoists to useRef → persists).
 let pendingEditFollow = null
 
+// Sync idempotency latch for a cell commit (drop-in double cell-edit-commit fix, 260705):
+// commitEdit's `$data.editingRow < 0` re-entry guard is ASYNC-STALE on React — a deferred
+// drop-in editor's unmount-blur (onBlur → $props.commit → commitEdit) fires AFTER commitEdit
+// has already returned (editTransition is a SYNC latch, cleared before the async blur), while
+// `$data.editingRow` in that stale closure still reads the OLD (pre-endEdit) value, so the
+// second commit slips through and re-emits `cell-edit-commit`. A top-level `let` is written/read
+// synchronously by plain assignment (unaffected by React's setState batching — that's the point)
+// so it stays correct across the async window editTransition/editingRow cannot cover. Set true on
+// a SUCCESSFUL commitEdit/toggleActiveBooleanCell; reset to false wherever a NEW edit session
+// begins (beginEdit/beginRowEdit/editCell) so the next legitimate commit fires exactly once.
+// A top-level `let` (React hoists to useRef → persists).
+let committedThisSession = false
+
 // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
 // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
 // (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in

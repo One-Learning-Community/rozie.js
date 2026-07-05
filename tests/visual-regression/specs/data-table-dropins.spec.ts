@@ -321,10 +321,11 @@ for (const target of TARGETS) {
     await nameEditor.fill('Zeta');
     await nameEditor.press('Enter');
     // The commit drives the model write-back: the readout carries the new value and the
-    // rendered cell updates. (EditorText commits on Enter AND blur, so some targets fire
-    // more than one identical commit — assert the value + a non-zero count, not exactly 1.)
+    // rendered cell updates. Enter commits ONCE — the editor's teardown blur that follows
+    // must NOT re-commit (double cell-edit-commit fix, quick 260705); assert EXACTLY 1 on
+    // all six targets. RED until the commitEdit sync idempotency latch lands.
     await expect.poll(async () => commitReadout.textContent(), { timeout: 10_000 }).toBe('name=Zeta');
-    await expect.poll(async () => Number(await commitCount.textContent()), { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
+    await expect.poll(async () => Number(await commitCount.textContent()), { timeout: 10_000 }).toBe(1);
     await expect.poll(async () => cellDisplays.nth(0).textContent(), { timeout: 10_000 }).toBe('Zeta');
 
     // ── EditorSelect (status): F2 on cell (0,1) routes to the #editor slot → EditorSelect
@@ -341,10 +342,10 @@ for (const target of TARGETS) {
     // Enter commits the draft.
     await statusEditor.press('Enter');
     await expect.poll(async () => commitReadout.textContent(), { timeout: 10_000 }).toBe('status=archived');
-    // Enter's commit closes+unmounts the select, whose blur may fire a second identical
-    // commit on some targets (the EditorText leg above already documents this Enter+blur
-    // double-fire) — assert a delta, not exactly beforeSel+1.
-    await expect.poll(async () => Number(await commitCount.textContent()), { timeout: 10_000 }).toBeGreaterThan(beforeSel);
+    // Enter's commit closes+unmounts the select; the teardown blur must NOT re-commit
+    // (double cell-edit-commit fix, quick 260705) — assert EXACTLY beforeSel+1 on all six
+    // targets. RED until the commitEdit sync idempotency latch lands.
+    await expect.poll(async () => Number(await commitCount.textContent()), { timeout: 10_000 }).toBe(beforeSel + 1);
     await expect.poll(async () => cellDisplays.nth(1).textContent(), { timeout: 10_000 }).toBe('archived');
 
     // ── EditorDate (orderedAt): F2 on cell (0,2) routes to the #editor slot → EditorDate
@@ -360,7 +361,10 @@ for (const target of TARGETS) {
     // Enter commits the draft.
     await dateEditor.press('Enter');
     await expect.poll(async () => commitReadout.textContent(), { timeout: 10_000 }).toBe('orderedAt=2026-06-15');
-    await expect.poll(async () => Number(await commitCount.textContent()), { timeout: 10_000 }).toBeGreaterThan(beforeDate);
+    // Enter's commit closes+unmounts the date input; the teardown blur must NOT re-commit
+    // (double cell-edit-commit fix, quick 260705) — assert EXACTLY beforeDate+1 on all six
+    // targets. RED until the commitEdit sync idempotency latch lands.
+    await expect.poll(async () => Number(await commitCount.textContent()), { timeout: 10_000 }).toBe(beforeDate + 1);
     await expect.poll(async () => cellDisplays.nth(2).textContent(), { timeout: 10_000 }).toBe('2026-06-15');
   });
 }

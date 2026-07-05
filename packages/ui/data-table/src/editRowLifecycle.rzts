@@ -59,6 +59,8 @@ const beginRowEdit = (row) => {
   if (rowIndex < 0) return
   const editable = editableColumnsForRow(rowIndex)
   if (editable.length === 0) return
+  // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
+  committedThisSession = false
   // Clear any single-cell editor first (mutual exclusivity).
   $data.editingRow = -1
   $data.editingCol = -1
