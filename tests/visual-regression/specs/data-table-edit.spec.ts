@@ -866,12 +866,22 @@ for (const target of TARGETS) {
     await mount.locator('[data-editing-cell]').press('Escape');
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
 
-    // ── req-1: the checkbox editor enters a checkbox seeded from the boolean value. ────
-    await enterEditAt(page, 0, 3); // col 3 (active, checkbox)
-    await expect.poll(async () => (await openEditor(page))?.type, { timeout: 10_000 }).toBe('checkbox');
-    expect((await openEditor(page))?.checked).toBe(true); // row 0 active=true seed.
-    await mount.locator('[data-editing-cell]').press('Escape');
-    await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
+    // ── Boolean in-place toggle (design doc 2026-07-05, Change 1): col 3 (active, checkbox)
+    //    FLIPS + commits INSTANTLY on Space — NO editor opens, exactly one cell-edit-commit,
+    //    and focus stays on the cell. Row 0 active=true → false. This SUPERSEDES the pre-toggle
+    //    "checkbox editor opens" vehicle: a built-in editor:'checkbox' cell no longer opens an
+    //    editor (matches the canonical data-table-grid-edit boolean-toggle tests). ───────────
+    await focusBodyCellStable(page, 0, 3); // col 3 (active, checkbox)
+    const beforeToggle = await commitCount(page);
+    await page.keyboard.press(' ');
+    await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(beforeToggle + 1);
+    expect(await commitReadout(page)).toBe('active=false'); // true → false, exactly one commit
+    expect(await openEditor(page)).toBeNull(); // no editor opened
+    {
+      const coords = await activeCellCoords(page); // focus held on the cell, not an input
+      expect(coords?.col).toBe('3');
+      expect(coords?.tag).not.toBe('input');
+    }
 
     // ── req-2: the custom #editor stepped slot replaces the built-in editor on `score`,
     //    receives commit (the React render-prop edge), and a step commits one edit. ─────
