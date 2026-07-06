@@ -75,8 +75,14 @@ export function renderSignalRef(dep: SignalRef, ir: IRComponent): string {
  */
 export function renderDepArray(deps: SignalRef[], ir: IRComponent): string {
   const expressions = deps.map((d) => renderSignalRef(d, ir));
+  // Spike-012 R3-1 — the `$event` sigil is the synthesized event-handler param,
+  // not a reactive value. A debounce/throttle wrap whose handler reads `$event`
+  // (`@input.debounce(300)="$data.q = $event.target.value"`) collected it as a
+  // `closure` dep → a free `$event` in the emitted deps[] literal (`[$event]`).
+  // Drop it — the event param is never a valid React dependency.
+  const filtered = expressions.filter((e) => e !== '$event');
   // Dedupe + alphabetize.
-  const unique = [...new Set(expressions)].sort();
+  const unique = [...new Set(filtered)].sort();
   if (unique.length === 0) return '[]';
   return `[${unique.join(', ')}]`;
 }

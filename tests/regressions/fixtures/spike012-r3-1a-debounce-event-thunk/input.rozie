@@ -1,0 +1,18 @@
+<rozie name="DebounceEventThunk">
+<data>
+{
+  q: '',
+}
+</data>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<div class="r">
+  <input @input.debounce(300)="$data.q = $event.target.value" />
+</div>
+</template>
+
+</rozie>

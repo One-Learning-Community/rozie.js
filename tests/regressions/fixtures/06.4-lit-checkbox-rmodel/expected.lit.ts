@@ -36,7 +36,7 @@ export default class CheckboxRModel extends SignalWatcher(LitElement) {
     return html`
 <label class="toggle" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-5898a126>
   
-  <input type="checkbox" .checked=${this.checked} @change=${($event) => this.checked = ($event.target as HTMLInputElement).checked} data-rozie-s-5898a126 />
+  <input type="checkbox" .checked=${this.checked} @change=${($event: Event) => this.checked = ($event.target as HTMLInputElement).checked} data-rozie-s-5898a126 />
   <span data-rozie-s-5898a126>Enabled</span>
 </label>
 `;

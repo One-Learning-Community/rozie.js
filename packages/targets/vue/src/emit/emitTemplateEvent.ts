@@ -125,6 +125,27 @@ function makeWrapName(
   return N === 0 ? `${prefix}${cap}` : `${prefix}${cap}_${N}`;
 }
 
+/**
+ * Spike-012 R3-1 — classify a handler expression to decide how the debounce/
+ * throttle script-level wrap references it. `identifier` (bare ref) and
+ * `callable` (MemberExpression / arrow / function) are already FUNCTION values
+ * and pass bare; `statement` (a CallExpression / assignment / etc.) must be
+ * wrapped in a thunk so a function — not its eagerly-evaluated result — is
+ * debounced. Mirrors the same helper in the React/Solid/Angular targets.
+ */
+function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'statement' {
+  if (t.isIdentifier(node)) return 'identifier';
+  if (
+    t.isArrowFunctionExpression(node) ||
+    t.isFunctionExpression(node) ||
+    t.isMemberExpression(node) ||
+    t.isOptionalMemberExpression(node)
+  ) {
+    return 'callable';
+  }
+  return 'statement';
+}
+
 export function emitTemplateEvent(
   listener: Listener,
   ctx: EmitEventCtx,
@@ -208,9 +229,20 @@ export function emitTemplateEvent(
     if (descriptor.helperName === 'debounce' || descriptor.helperName === 'throttle') {
       // Pattern 5: script-level handler wrap.
       const originalHandlerCode = renderHandler(listener.handler, ctx.ir);
+      // Spike-012 R3-1 — the wrap is lifted to SCRIPT scope, where the template's
+      // `$event` magic is NOT in scope. A statement-kind handler
+      // (`@input.debounce(300)="$data.q = $event.target.value"`) must be wrapped in
+      // a thunk so it becomes a FUNCTION with its own `$event` param — otherwise
+      // `debounce(q = $event.target.value, 300)` evaluates the assignment eagerly
+      // with a free `$event`. An identifier / callable handler is already a
+      // function reference — passed bare (byte-identical to the bare-method form).
+      const helperCallback =
+        classifyHandler(listener.handler) === 'statement'
+          ? `($event) => { ${originalHandlerCode}; }`
+          : originalHandlerCode;
       const wrapName = makeWrapName(descriptor.helperName, listener.handler, counter);
       const argList = descriptor.args.map(renderModifierArg).join(', ');
-      const decl = `const ${wrapName} = ${descriptor.helperName}(${originalHandlerCode}${argList ? ', ' + argList : ''});`;
+      const decl = `const ${wrapName} = ${descriptor.helperName}(${helperCallback}${argList ? ', ' + argList : ''});`;
 
       scriptInjection = {
         wrapName,

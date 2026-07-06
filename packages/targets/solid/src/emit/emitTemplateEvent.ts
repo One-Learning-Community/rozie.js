@@ -368,15 +368,16 @@ export function emitTemplateEvent(
       const originalHandlerCode = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
       // Spike-012 NEW-2 — a statement-kind handler (`@input.debounce(300)="bump()"`)
       // must be wrapped in a thunk so the FUNCTION is debounced, not its invoked
-      // `void` result (TS2345). The param is left UN-annotated here (unlike the
-      // direct-JSX paths, which need NEW-3's specific event type): the helper's
-      // generic bound `<T extends (...args: unknown[]) => unknown>` supplies the
-      // contextual type (`$event: unknown`) — so there is no TS7006, and any
-      // concrete annotation (`Event`, `MouseEvent`) would FAIL the `unknown[]`
-      // arg-contravariance bound (TS2345).
+      // `void` result (TS2345).
+      // Spike-012 R3-1 — the param is typed `any` (matching Angular's debounce
+      // IIFE): the helper's generic bound `<T extends (...args: unknown[]) =>
+      // unknown>` strips the param type at its boundary regardless, so a concrete
+      // DOM-event annotation would only FAIL the `unknown[]` arg-contravariance
+      // bound (TS2345) while buying nothing — and a handler that reads
+      // `$event.target.value` needs the param permissive, not narrowed.
       const helperCallback =
         classifyHandler(listener.handler) === 'statement'
-          ? `($event) => { ${originalHandlerCode}; }`
+          ? `($event: any) => { ${originalHandlerCode}; }`
           : originalHandlerCode;
       const wrapName = makeWrapName(solidHelper, listener.handler, ctx.injectionCounter);
       const argList = desc.args.map(renderModifierArg).join(', ');

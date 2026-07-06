@@ -300,10 +300,22 @@ export function emitTemplateEvent(
       const argList = descriptor.args.map(renderModifierArg);
       const ms = argList[0] ?? '0';
       const origHandlerCode = rewriteTemplateExpression(listener.handler, ctx.ir);
+      // Spike-012 R3-1 — the IIFE runs at script scope, where the template's
+      // `$event` magic is not in scope. A statement-kind handler
+      // (`@input.debounce(300)="$data.q = $event.target.value"`) must be wrapped
+      // in a parenthesized thunk so the IIFE debounces the FUNCTION — otherwise
+      // `(q = $event.target.value as …)(...args)` evaluates the assignment eagerly
+      // with a free `$event`. The arrow is parenthesized before the `as` cast to
+      // avoid a cast/arrow parse ambiguity. Identifier / callable handlers are
+      // already function references — passed as-is (byte-identical bare form).
+      const wrappedHandlerCode =
+        classifyHandler(listener.handler) === 'statement'
+          ? `(($event) => { ${origHandlerCode}; })`
+          : origHandlerCode;
       const decl =
         descriptor.helperName === 'debounce'
-          ? buildDebounceIIFE(wrapName, origHandlerCode, ms)
-          : buildThrottleIIFE(wrapName, origHandlerCode, ms);
+          ? buildDebounceIIFE(wrapName, wrappedHandlerCode, ms)
+          : buildThrottleIIFE(wrapName, wrappedHandlerCode, ms);
       scriptInjection = {
         name: wrapName,
         decl,

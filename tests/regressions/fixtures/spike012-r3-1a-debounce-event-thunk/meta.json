@@ -1,0 +1,12 @@
+{
+  "id": "REG-SPIKE012-R3-1A",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a `.debounce(N)` statement handler that reads $event (`@input.debounce(300)=\"$data.q = $event.target.value\"`) is wrapped in a thunk so the script-lifted wrap is a FUNCTION with its own $event param — vue `debounce(($event) => {…})`, svelte a parenthesized IIFE thunk (Spike-012 R3-1 structural); pre-fix vue/svelte lifted the raw assignment to script scope where $event is undefined (free $event). React drops $event from the debounce deps[] (was a free `[$event]`).",
+  "targets": [
+    "vue",
+    "svelte"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012)"
+}

@@ -11,8 +11,8 @@ export default function DebounceInlineCall(props: DebounceInlineCallProps): JSX.
     setN(prev => prev + 1);
   }
 
-  const _rozieDebouncedHandler0 = useDebouncedCallback(($event) => { bump(); }, [bump], 300);
-  const _rozieThrottledHandler1_1 = useThrottledCallback(($event) => { bump(); }, [bump], 200);
+  const _rozieDebouncedHandler0 = useDebouncedCallback(($event: any) => { bump(); }, [bump], 300);
+  const _rozieThrottledHandler1_1 = useThrottledCallback(($event: any) => { bump(); }, [bump], 200);
 
   return (
     <>

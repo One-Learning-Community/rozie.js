@@ -399,12 +399,15 @@ export function emitTemplateEvent(
       // Spike-012 NEW-2 — a statement-kind handler (`@input.debounce(300)="bump()"`)
       // is a CallExpression: passing it verbatim would INVOKE it and hand the
       // helper its `void` result (TS2345). Wrap it in a thunk so the FUNCTION is
-      // debounced, exactly as the plain-event path below wraps a statement in
-      // `($event) => { … }`. Identifier / callable handlers are already function
-      // references — left untouched (byte-identity for the bare-method form).
+      // debounced. Identifier / callable handlers are already function references
+      // — left untouched (byte-identity for the bare-method form).
+      // Spike-012 R3-1 — the thunk param is typed `any`: `useDebouncedCallback`'s
+      // generic bound infers the param as `never` when un-annotated, so a handler
+      // reading `$event.target.value` would be TS2339 on `never`. `any` keeps the
+      // event-reading form permissive (the helper erases the type at its boundary).
       const helperCallback =
         classifyHandler(listener.handler) === 'statement'
-          ? `($event) => { ${originalHandlerCode}; }`
+          ? `($event: any) => { ${originalHandlerCode}; }`
           : originalHandlerCode;
       const wrapName = makeWrapName(desc.helperName, listener.handler, ctx.injectionCounter);
       const argList = desc.args.map(renderModifierArg).join(', ');
