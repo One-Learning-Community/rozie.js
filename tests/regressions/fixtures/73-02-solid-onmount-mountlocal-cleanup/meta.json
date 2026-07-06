@@ -1,0 +1,9 @@
+{
+  "id": "REG-73.02-001",
+  "source": "project_emitter_hardening_backlog item #2 (project_solid_polymorphic_model_typeof_narrow_gap sibling)",
+  "sourceKind": "deviation-log",
+  "phase": "73-02",
+  "desc": "$onMount setup-local `const timer` referenced by the returned teardown must stay in scope for the teardown on every target (Solid-only TS2304 before the fix)",
+  "targets": ["lit", "react", "solid", "svelte", "vue", "angular"],
+  "discoveredBy": "project_emitter_hardening_backlog Tier 1 item #2"
+}

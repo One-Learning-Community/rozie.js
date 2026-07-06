@@ -1,0 +1,41 @@
+<rozie name="OnMountMountLocalCleanup">
+
+<props>
+{
+  // A harmless declared prop — sidesteps an unrelated pre-existing Solid
+  // `splitProps(_props, [])` empty-keys-array tsc quirk (TS2345) on
+  // truly-zero-prop components, which is out of scope for this fixture
+  // (see deferred-items.md). Not exercised by the $onMount/cleanup logic.
+  label: { type: String, default: '' },
+}
+</props>
+
+<data>
+{
+  ticks: 0,
+}
+</data>
+
+<script>
+// Emitter-hardening backlog item #2 (project_solid_polymorphic_model_typeof_narrow_gap's
+// sibling): a $onMount setup block that declares a mount-local `const timer = ...` and
+// returns a teardown REFERENCING that local must keep `timer` in scope for the teardown
+// on every target. Before the Solid fix, Solid's emitter re-parented the setup body into
+// its own IIFE scope, so the sibling `onCleanup(() => clearInterval(timer))` call could
+// not see `timer` — a TS2304 typecheck failure Solid-only (the other five targets keep
+// setup and teardown in the SAME lexical scope by construction).
+$onMount(() => {
+  const timer = setInterval(() => { $data.ticks += 1 }, 1000)
+  return () => clearInterval(timer)
+})
+</script>
+
+<template>
+<div class="ticks">{{ $data.ticks }}</div>
+</template>
+
+<style>
+.ticks { font-variant-numeric: tabular-nums; }
+</style>
+
+</rozie>
