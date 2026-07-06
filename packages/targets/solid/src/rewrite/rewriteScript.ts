@@ -216,6 +216,29 @@ function hoistPolymorphicModelGuards(cloned: File, polymorphicModelProps: Set<st
       });
       if (occurrences < 2) return;
 
+      // CR-01 fix (project_solid_polymorphic_model_typeof_narrow_gap review
+      // finding, 73-10 gap-closure): determine which shape (if any) applies
+      // FIRST — no mutation yet. The two shapes below are the ONLY ones this
+      // hoist is safe for; every other nesting (guard one level inside an
+      // `if`/`for`/`try`/`switch`, etc.) must be a TRUE no-op, matching the
+      // falsify-to-no-op contract this function's docstring already
+      // promises. Computing this before any replacement prevents the bug
+      // where the tree was mutated to reference an undeclared local (`v`)
+      // even when neither shape matched.
+      const parentPath = path.parentPath;
+      const isConciseArrowBody =
+        parentPath.isArrowFunctionExpression() && parentPath.node.body === path.node;
+
+      const fnPath = path.getFunctionParent();
+      const stmtPath = path.getStatementParent();
+      const isDirectBlockChild =
+        !!fnPath &&
+        !!stmtPath &&
+        t.isBlockStatement(fnPath.node.body) &&
+        stmtPath.parentPath?.node === fnPath.node.body;
+
+      if (!isConciseArrowBody && !isDirectBlockChild) return; // true no-op, nothing touched
+
       // Pick a local name, defaulting to `v` (mirrors the hand-authored
       // pattern) — fall back to a generated uid on the rare collision.
       const localName = path.scope.hasBinding('v')
@@ -224,6 +247,8 @@ function hoistPolymorphicModelGuards(cloned: File, polymorphicModelProps: Set<st
 
       // Replace every `$props.<propName>` read inside the conditional
       // (including the guard itself) with a bare reference to the local.
+      // Safe now — a matching shape is guaranteed, so the declaration below
+      // always lands in scope for this replacement.
       path.traverse({
         MemberExpression(inner: NodePath<t.MemberExpression>) {
           if (
@@ -244,26 +269,14 @@ function hoistPolymorphicModelGuards(cloned: File, polymorphicModelProps: Set<st
       ]);
 
       // Shape 1: the conditional IS the arrow function's own concise body.
-      const parentPath = path.parentPath;
-      if (parentPath.isArrowFunctionExpression() && parentPath.node.body === path.node) {
+      if (isConciseArrowBody) {
         parentPath.node.body = t.blockStatement([varDecl, t.returnStatement(path.node)]);
         return;
       }
 
       // Shape 2: the conditional sits inside a statement that is a direct
       // child of its nearest enclosing function's own block body.
-      const fnPath = path.getFunctionParent();
-      const stmtPath = path.getStatementParent();
-      if (
-        fnPath &&
-        stmtPath &&
-        t.isBlockStatement(fnPath.node.body) &&
-        stmtPath.parentPath?.node === fnPath.node.body
-      ) {
-        stmtPath.insertBefore(varDecl);
-      }
-      // Otherwise: leave as-is. Falsify-to-no-op rather than risk hoisting
-      // into the wrong scope.
+      stmtPath!.insertBefore(varDecl);
     },
   });
 }
