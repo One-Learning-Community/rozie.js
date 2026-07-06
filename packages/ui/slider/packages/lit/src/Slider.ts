@@ -298,9 +298,9 @@ export default class Slider extends SignalWatcher(LitElement) {
   
   ${this.normalizedMarks().length > 0 ? html`<div class="rozie-slider-marks" aria-hidden="true" data-rozie-s-4e6f0be6>
     
-    ${repeat<any>(this.normalizedMarks(), (tick, _idx) => tick.value, (tick, _idx) => html`<div class="rozie-slider-mark" key=${rozieAttr(tick.value)} style=${styleMap({ left: this.pct(tick.value) + '%' })} data-rozie-s-4e6f0be6>
-      ${this.mark !== undefined ? this.mark({value: tick.value, label: tick.label, position: this.pct(tick.value)}) : html`<slot name="mark" data-rozie-params=${(() => { try { return JSON.stringify({value: tick.value, label: tick.label, position: this.pct(tick.value)}); } catch { return '{}'; } })()}>
-        <span class="rozie-slider-mark-label" data-rozie-s-4e6f0be6>${rozieDisplay(tick.label)}</span>
+    ${repeat<any>(this.normalizedMarks(), (mark, _idx) => mark.value, (mark, _idx) => html`<div class="rozie-slider-mark" key=${rozieAttr(mark.value)} style=${styleMap({ left: this.pct(mark.value) + '%' })} data-rozie-s-4e6f0be6>
+      ${this.mark !== undefined ? this.mark({value: mark.value, label: mark.label, position: this.pct(mark.value)}) : html`<slot name="mark" data-rozie-params=${(() => { try { return JSON.stringify({value: mark.value, label: mark.label, position: this.pct(mark.value)}); } catch { return '{}'; } })()}>
+        <span class="rozie-slider-mark-label" data-rozie-s-4e6f0be6>${rozieDisplay(mark.label)}</span>
       </slot>`}
     </div>`)}
   </div>` : nothing}${this.showValue && !this.range ? html`<div class="rozie-slider-bubbles" aria-hidden="true" data-rozie-s-4e6f0be6>

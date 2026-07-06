@@ -6,8 +6,8 @@
     <button v-if="props.arrows" type="button" class="rozie-embla__arrow rozie-embla__arrow--prev" :disabled="!canPrev" aria-label="Previous slide" @click="navPrev()">‹</button><div class="rozie-embla__viewport" ref="viewportElRef">
       <div class="rozie-embla__container">
         
-        <div v-for="(item, i) in props.slides" :key="keyFor(item, i)" class="rozie-embla__slide">
-          <slot name="slide" :slide="item" :index="i">{{ item }}</slot>
+        <div v-for="(slide, i) in props.slides" :key="keyFor(slide, i)" class="rozie-embla__slide">
+          <slot name="slide" :slide="slide" :index="i">{{ slide }}</slot>
         </div>
         
         <slot></slot>

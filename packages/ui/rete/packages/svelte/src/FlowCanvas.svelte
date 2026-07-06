@@ -149,7 +149,7 @@ let {
   oncontextmenu
 }: Props = $props();
 
-const node = $derived(__nodeProp ?? snippets?.node);
+const node$$slot = $derived(__nodeProp ?? snippets?.node);
 const toolbar = $derived(__toolbarProp ?? snippets?.toolbar);
 const children = $derived(__childrenProp ?? snippets?.children);
 
@@ -1767,12 +1767,12 @@ interface ReactivePortalHandle {
 const portalInstances = new Set<Record<string, unknown>>();
 const portals = {
   node: (container: HTMLElement, scope: { node: unknown; selected: unknown; emit: unknown }): ReactivePortalHandle => {
-    if (!node) return { update() {}, dispose() {} };
+    if (!node$$slot) return { update() {}, dispose() {} };
     // Spike 004: portal-scope attribute injection.
     container.setAttribute('data-rozie-portal-node', 'cd396d6a');
     const inst = mount(PortalHostReactive, {
       target: container,
-      props: { snippet: node, initialScope: scope },
+      props: { snippet: node$$slot, initialScope: scope },
     });
     portalInstances.add(inst as Record<string, unknown>);
     return {
@@ -2110,25 +2110,26 @@ onMount(() => {
   // Fills the engine-created nodeView element with: input sockets, the body
   // (consumer `node` portal fragment OR default chrome), and output sockets.
   // Re-render (area.update('node', id)) reuses the same element → update in place.
-  // NOTE: the engine-node parameter is `reteNode`, NOT `node` — on Svelte the
-  // `$slots.node` slot lowers to a top-level `const node`, and a parameter named
-  // `node` here would SHADOW it, so `if ($slots.node)` would read the (always-
-  // truthy) engine node and wrongly take the portal branch even when the slot is
-  // unfilled (dropping the default-chrome title). The cross-target slot-name ==
-  // local-binding shadow trap.
-  const renderNode = (element: any, reteNode: any) => {
+  // The engine-node parameter is named `node` (matching the `node` portal slot) —
+  // a script-side `$slots.node` read inside a helper whose OWN parameter also
+  // shadows `node` is now AUTO-FIXED by the Svelte emitter (Phase 73 item #1):
+  // `findRForSlotNameCollisions` detects the script/param-scope shadow and renames
+  // the lowered slot-merge binding to `node$$slot` everywhere it's referenced
+  // (including this function's own `$slots.node` read below), so `if ($slots.node)`
+  // resolves to the true slot-presence check, never this local parameter.
+  const renderNode = (element: any, node: any) => {
     // a (re)render means node DOM exists / changed → refresh the minimap (its node
     // rects measure these elements; coalesced, so calling it on every render is cheap,
     // and it covers Lit's measure-after-first-paint).
     if (scheduleMinimapRedraw) scheduleMinimapRedraw();
-    const id = reteNode.id;
+    const id = node.id;
     const meta = nodeMeta.get(id) || {
       id,
       type: undefined,
       data: {}
     };
     const existing = nodeEntries.get(id);
-    const selected = reteNode.selected === true;
+    const selected = node.selected === true;
     // default-chrome fallback label (only when a node's type has no #body template).
     const chromeLabel = meta.data && meta.data.label != null ? String(meta.data.label) : meta.type != null ? String(meta.type) : '';
     if (existing && existing.element === element) {
@@ -2161,12 +2162,12 @@ onMount(() => {
     // bottom port gets the 3-ROW structure (topRow / midRow[left|body|right] / bottomRow).
     const socketDisposers = [];
     const portEntries = [];
-    for (const key of Object.keys(reteNode.inputs) as any) portEntries.push({
+    for (const key of Object.keys(node.inputs) as any) portEntries.push({
       side: 'input',
       key,
       position: resolvePortPosition(meta.type, 'input', key)
     });
-    for (const key of Object.keys(reteNode.outputs) as any) portEntries.push({
+    for (const key of Object.keys(node.outputs) as any) portEntries.push({
       side: 'output',
       key,
       position: resolvePortPosition(meta.type, 'output', key)
@@ -2183,7 +2184,7 @@ onMount(() => {
       box.appendChild(outputsCol);
       element.appendChild(box);
       for (const p of portEntries as any) {
-        renderSocketInto(p.position === 'right' ? outputsCol : inputsCol, reteNode, p.side, p.key, p.position, socketDisposers);
+        renderSocketInto(p.position === 'right' ? outputsCol : inputsCol, node, p.side, p.key, p.position, socketDisposers);
       }
     } else {
       // VERTICAL-capable 3-row layout (only when a top/bottom port exists).
@@ -2207,7 +2208,7 @@ onMount(() => {
       element.appendChild(box);
       for (const p of portEntries as any) {
         const zone = p.position === 'top' ? topRow : p.position === 'bottom' ? bottomRow : p.position === 'right' ? rightCol : leftCol;
-        renderSocketInto(zone, reteNode, p.side, p.key, p.position, socketDisposers);
+        renderSocketInto(zone, node, p.side, p.key, p.position, socketDisposers);
       }
     }
 
@@ -2253,7 +2254,7 @@ onMount(() => {
       entry.bodyMoved = true;
       return;
     }
-    if (node) {
+    if (node$$slot) {
       // reactive multi-instance portal — one handle per node, re-rendered in
       // place on meta change (the MapLibre marker discipline). Low-level escape
       // hatch: the consumer switches on node.type inside the single `#node` slot.
@@ -2278,8 +2279,8 @@ onMount(() => {
   // placement (left|right|top|bottom). For left/right the DOM is byte-identical to pre-F2
   // (the classic horizontal port row); top/bottom get a vertical port (socket above its
   // label) + a `--<position>` socket class so the socket straddles the matching edge.
-  const renderSocketInto = (zone: any, reteNode: any, side: any, key: any, position: any, socketDisposers: any) => {
-    const port = (side === 'input' ? reteNode.inputs : reteNode.outputs)[key];
+  const renderSocketInto = (zone: any, node: any, side: any, key: any, position: any, socketDisposers: any) => {
+    const port = (side === 'input' ? node.inputs : node.outputs)[key];
     if (!port) return;
     const vertical = position === 'top' || position === 'bottom';
     const row = document.createElement('div');
@@ -2310,7 +2311,7 @@ onMount(() => {
         type: 'socket',
         side,
         key,
-        nodeId: reteNode.id,
+        nodeId: node.id,
         element: socketEl,
         payload: {
           socket: port.socket
@@ -2329,7 +2330,7 @@ onMount(() => {
         type: 'socket',
         side,
         key,
-        nodeId: reteNode.id,
+        nodeId: node.id,
         element: socketEl,
         payload: {
           socket: port.socket

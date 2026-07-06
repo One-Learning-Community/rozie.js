@@ -439,8 +439,8 @@ export default function Slider(_props: SliderProps): JSX.Element {
       
       {<Show when={normalizedMarks().length > 0}><div class={"rozie-slider-marks"} aria-hidden="true" data-rozie-s-4e6f0be6="">
         
-        <Key each={normalizedMarks() as readonly any[]} by={(tick) => tick.value}>{(tick) => <div class={"rozie-slider-mark"} style={{ left: pct(tick().value) + '%' }} data-rozie-s-4e6f0be6="">
-          {(_props.markSlot ?? _props.slots?.['mark'])?.({ value: tick().value, label: tick().label, position: pct(tick().value) }) ?? <span class={"rozie-slider-mark-label"} data-rozie-s-4e6f0be6="">{rozieDisplay(tick().label)}</span>}
+        <Key each={normalizedMarks() as readonly any[]} by={(mark) => mark.value}>{(mark) => <div class={"rozie-slider-mark"} style={{ left: pct(mark().value) + '%' }} data-rozie-s-4e6f0be6="">
+          {(_props.markSlot ?? _props.slots?.['mark'])?.({ value: mark().value, label: mark().label, position: pct(mark().value) }) ?? <span class={"rozie-slider-mark-label"} data-rozie-s-4e6f0be6="">{rozieDisplay(mark().label)}</span>}
         </div>}</Key>
       </div></Show>}{<Show when={local.showValue && !local.range}><div class={"rozie-slider-bubbles"} aria-hidden="true" data-rozie-s-4e6f0be6="">
         <div class={"rozie-slider-bubble"} style={{ left: 'var(--rozie-slider-fill-end)' }} data-rozie-s-4e6f0be6="">

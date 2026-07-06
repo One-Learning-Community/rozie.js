@@ -249,8 +249,8 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
       
       {!!(normalizedMarks().length > 0) && <div className={"rozie-slider-marks"} aria-hidden="true" data-rozie-s-4e6f0be6="">
         
-        {normalizedMarks().map((tick) => <div key={tick.value} className={"rozie-slider-mark"} style={{ left: pct(tick.value) + '%' }} data-rozie-s-4e6f0be6="">
-          {(props.renderMark ?? props.slots?.['mark']) ? ((props.renderMark ?? props.slots?.['mark']) as Function)({ value: tick.value, label: tick.label, position: pct(tick.value) }) : <span className={"rozie-slider-mark-label"} data-rozie-s-4e6f0be6="">{rozieDisplay(tick.label)}</span>}
+        {normalizedMarks().map((mark) => <div key={mark.value} className={"rozie-slider-mark"} style={{ left: pct(mark.value) + '%' }} data-rozie-s-4e6f0be6="">
+          {(props.renderMark ?? props.slots?.['mark']) ? ((props.renderMark ?? props.slots?.['mark']) as Function)({ value: mark.value, label: mark.label, position: pct(mark.value) }) : <span className={"rozie-slider-mark-label"} data-rozie-s-4e6f0be6="">{rozieDisplay(mark.label)}</span>}
         </div>)}
       </div>}{!!(props.showValue && !props.range) && <div className={"rozie-slider-bubbles"} aria-hidden="true" data-rozie-s-4e6f0be6="">
         <div className={"rozie-slider-bubble"} style={{ left: 'var(--rozie-slider-fill-end)' }} data-rozie-s-4e6f0be6="">

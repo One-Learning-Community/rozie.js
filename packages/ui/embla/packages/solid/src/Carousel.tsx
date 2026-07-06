@@ -456,8 +456,8 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
         {<Show when={local.arrows}><button type="button" aria-label="Previous slide" class={"rozie-embla__arrow rozie-embla__arrow--prev"} disabled={!canPrev()} onClick={($event) => { navPrev(); }} data-rozie-s-4143c216="">‹</button></Show>}<div class={"rozie-embla__viewport"} ref={(el) => { viewportElRef = el as HTMLElement; }} data-rozie-s-4143c216="">
           <div class={"rozie-embla__container"} data-rozie-s-4143c216="">
             
-            <For each={local.slides}>{(item, i) => <div class={"rozie-embla__slide"} data-rozie-s-4143c216="">
-              {(_props.slideSlot ?? _props.slots?.['slide'])?.({ slide: item, index: i() }) ?? rozieDisplay(item)}
+            <For each={local.slides}>{(slide, i) => <div class={"rozie-embla__slide"} data-rozie-s-4143c216="">
+              {(_props.slideSlot ?? _props.slots?.['slide'])?.({ slide, index: i() }) ?? rozieDisplay(slide)}
             </div>}</For>
             
             {resolved()}

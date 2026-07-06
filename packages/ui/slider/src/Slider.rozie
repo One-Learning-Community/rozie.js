@@ -387,18 +387,19 @@ $expose({ focus, increment, decrement })
        scoped slot ({ value, label, position }) overrides the default label.
        Mirrors the listbox #option scoped-slot shape. -->
   <div r-if="normalizedMarks().length > 0" class="rozie-slider-marks" aria-hidden="true">
-    <!-- Loop var is `tick`, NOT `mark`: a loop var named `mark` shadows the
-         `#mark` slot snippet on Svelte (`{#each … as mark}` collides with the
-         `mark` snippet binding → `{@render mark()}` renders a non-function →
-         Svelte-only mount throw). Same class of bug as embla's slide→item. -->
+    <!-- Loop var `mark` == the `#mark` slot name is now AUTO-FIXED by the Svelte
+         emitter (Phase 73 item #1): `findRForSlotNameCollisions` detects the
+         r-for-loop-var/slot-name shadow and renames the lowered snippet binding
+         to `mark$$slot` (author's loop var + slot-arg values untouched), so the
+         natural name is safe to author directly — no more hand-workaround. -->
     <div
-      r-for="tick in normalizedMarks()"
-      :key="tick.value"
+      r-for="mark in normalizedMarks()"
+      :key="mark.value"
       class="rozie-slider-mark"
-      :style="{ left: pct(tick.value) + '%' }"
+      :style="{ left: pct(mark.value) + '%' }"
     >
-      <slot name="mark" :value="tick.value" :label="tick.label" :position="pct(tick.value)">
-        <span class="rozie-slider-mark-label">{{ tick.label }}</span>
+      <slot name="mark" :value="mark.value" :label="mark.label" :position="pct(mark.value)">
+        <span class="rozie-slider-mark-label">{{ mark.label }}</span>
       </slot>
     </div>
   </div>

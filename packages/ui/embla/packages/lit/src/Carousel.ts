@@ -383,8 +383,8 @@ private __rozieFirstUpdateDone = false;
     ${this.arrows ? html`<button class="rozie-embla__arrow rozie-embla__arrow--prev" type="button" ?disabled=${!this._canPrev.value} aria-label="Previous slide" @click=${($event: Event) => { this.navPrev(); }} data-rozie-s-4143c216>‹</button>` : nothing}<div class="rozie-embla__viewport" data-rozie-ref="viewportEl" data-rozie-s-4143c216>
       <div class="rozie-embla__container" data-rozie-s-4143c216>
         
-        ${repeat<any>(this.slides, (item, i) => this.keyFor(item, i), (item, i) => html`<div class="rozie-embla__slide" key=${rozieAttr(this.keyFor(item, i))} data-rozie-s-4143c216>
-          ${this.slide !== undefined ? this.slide({slide: item, index: i}) : html`<slot name="slide" data-rozie-params=${(() => { try { return JSON.stringify({slide: item, index: i}); } catch { return '{}'; } })()}>${rozieDisplay(item)}</slot>`}
+        ${repeat<any>(this.slides, (slide, i) => this.keyFor(slide, i), (slide, i) => html`<div class="rozie-embla__slide" key=${rozieAttr(this.keyFor(slide, i))} data-rozie-s-4143c216>
+          ${this.slide !== undefined ? this.slide({slide: slide, index: i}) : html`<slot name="slide" data-rozie-params=${(() => { try { return JSON.stringify({slide: slide, index: i}); } catch { return '{}'; } })()}>${rozieDisplay(slide)}</slot>`}
         </div>`)}
         
         <slot></slot>

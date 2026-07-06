@@ -269,64 +269,64 @@ function rozieToken(key: string): InjectionToken<unknown> {
         @for (wr of windowedRows(); track wr.row.id) {
 
         <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)" [attr.data-pinned]="rozieAttr(wr.pinned ? 'true' : null)" [attr.data-depth]="rozieAttr(wr.row.depth)" [attr.data-group-header]="rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? wr.row.depth + 1 : null)">
-          @for (cellCtx of visibleCellsFor(wr.row); track cellCtx.id) {
-    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-expander-td': isExpanderColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx)))" [style]="bodyCellStyle(wr.row, cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx)))" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : null)">
+          @for (cell of visibleCellsFor(wr.row); track cell.id) {
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell)))" [style]="bodyCellStyle(wr.row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell)))" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
             
-            @if (isExpanderColumn(cellCtx.column.id)) {
+            @if (isExpanderColumn(cell.column.id)) {
     <span style="display:contents">
               @if (rowCanExpand(wr.row)) {
     <button type="button" class="rdt-expander" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(wr.row)" [attr.aria-label]="rozieAttr(rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row')" (click)="onToggleExpand(wr.row, $event)">{{ rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸') }}</button>
     }</span>
-    } @else if (isSelectColumn(cellCtx.column.id)) {
+    } @else if (isSelectColumn(cell.column.id)) {
     <span style="display:contents">
               @if ((selectCellTpl ?? templates()?.['selectCell'])) {
-    <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx(wr, cellCtx)" />
+    <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx(wr, cell)" />
     } @else {
 
                 <input class="rdt-select-row" type="checkbox" aria-label="Select row" [checked]="rowIsSelected(wr.row)" (change)="onToggleRow(wr.row, $event)" />
               
     }
             </span>
-    } @else if (cellIsGrouped(cellCtx)) {
+    } @else if (cellIsGrouped(cell)) {
     <span style="display:contents">
               <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(wr.row)" [attr.aria-label]="rozieAttr(rowIsExpanded(wr.row) ? 'Collapse group' : 'Expand group')" (click)="onToggleExpand(wr.row, $event)">{{ rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸') }}</button>
               <span class="rdt-group-value">
                 @if ((cellTpl ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }, columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }" />
+    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }" />
     } @else {
-    {{ rozieDisplay(cellCtx.getValue()) }}
+    {{ rozieDisplay(cell.getValue()) }}
     }
               </span>
               <span class="rdt-group-count">{{ rozieDisplay('(' + groupSubRowCount(wr.row) + ')') }}</span>
             </span>
-    } @else if (isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))) {
+    } @else if (isEditing(wr.vi.index, colIndexOf(wr.row, cell))) {
     <span style="display:contents">
-              @if (hasEditorSlot(cellCtx.column.id)) {
+              @if (hasEditorSlot(cell.column.id)) {
     <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(editorTpl ?? templates()?.['editor']); context: { $implicit: { columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() }, columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() }" />
+                <ng-container *ngTemplateOutlet="(editorTpl ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() }" />
               </span>
-    } @else if (editorTypeOf(cellCtx.column.id) === 'number') {
-    <input class="rdt-cell-editor" type="number" data-editing-cell="" [value]="editorValueFor(cellCtx.column.id)" (input)="onCellEditorInput(cellCtx.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
-    } @else if (editorTypeOf(cellCtx.column.id) === 'select') {
-    <select class="rdt-cell-editor" data-editing-cell="" [value]="editorValueFor(cellCtx.column.id)" (change)="onCellEditorInput(cellCtx.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
-                @for (opt of editorOptionsOf(cellCtx.column.id); track opt.value) {
+    } @else if (editorTypeOf(cell.column.id) === 'number') {
+    <input class="rdt-cell-editor" type="number" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    } @else if (editorTypeOf(cell.column.id) === 'select') {
+    <select class="rdt-cell-editor" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (change)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
+                @for (opt of editorOptionsOf(cell.column.id); track opt.value) {
     <option [attr.value]="rozieAttr(opt.value)">{{ rozieDisplay(opt.label) }}</option>
     }
               </select>
-    } @else if (editorTypeOf(cellCtx.column.id) === 'checkbox') {
-    <input class="rdt-cell-editor" type="checkbox" data-editing-cell="" [checked]="editorCheckedFor(cellCtx.column.id)" (change)="onCellEditorCheckbox(cellCtx.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    } @else if (editorTypeOf(cell.column.id) === 'checkbox') {
+    <input class="rdt-cell-editor" type="checkbox" data-editing-cell="" [checked]="editorCheckedFor(cell.column.id)" (change)="onCellEditorCheckbox(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     } @else {
-    <input class="rdt-cell-editor" type="text" data-editing-cell="" [value]="editorValueFor(cellCtx.column.id)" (input)="onCellEditorInput(cellCtx.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    <input class="rdt-cell-editor" type="text" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     }</span>
     } @else {
     <span class="rdt-cell-value">
               @if ((cellTpl ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }, columnId: cellCtx.column.id, column: cellCtx.column, row: wr.row.original, value: cellCtx.getValue() }" />
+    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }" />
     } @else {
-    {{ rozieDisplay(cellCtx.getValue()) }}
+    {{ rozieDisplay(cell.getValue()) }}
     }
             </span>
-    }@if (isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cellCtx))) {
+    }@if (isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cell))) {
     <span class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" (pointerdown)="onFillHandlePointerDown($event)"></span>
     }</td>
     }
@@ -439,64 +439,64 @@ function rozieToken(key: string): InjectionToken<unknown> {
         @for (row of rows(); track row.id) {
 
         <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(row) }" role="row" [attr.data-depth]="rozieAttr(row.depth)" [attr.aria-rowindex]="rozieAttr(isGrid() ? absRowIndexOf(row) + 1 : null)" [attr.data-group-header]="rozieAttr(rowIsGrouped(row) ? row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(row) ? !!rowIsExpanded(row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? row.depth + 1 : null)">
-          @for (cellCtx of visibleCellsFor(row); track cellCtx.id) {
-    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-expander-td': isExpanderColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cellCtx.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cellCtx))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx)))" [style]="bodyCellStyle(row, cellCtx.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx)))" [attr.data-in-range]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cellCtx) ? cellCtx.column.id : null)">
+          @for (cell of visibleCellsFor(row); track cell.id) {
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell)))" [style]="bodyCellStyle(row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell)))" [attr.data-in-range]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
             
-            @if (isExpanderColumn(cellCtx.column.id)) {
+            @if (isExpanderColumn(cell.column.id)) {
     <span style="display:contents">
               @if (rowCanExpand(row)) {
     <button type="button" class="rdt-expander" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(row)" [attr.aria-label]="rozieAttr(rowIsExpanded(row) ? 'Collapse row' : 'Expand row')" (click)="onToggleExpand(row, $event)">{{ rozieDisplay(rowIsExpanded(row) ? '▾' : '▸') }}</button>
     }</span>
-    } @else if (isSelectColumn(cellCtx.column.id)) {
+    } @else if (isSelectColumn(cell.column.id)) {
     <span style="display:contents">
               @if ((selectCellTpl ?? templates()?.['selectCell'])) {
-    <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx_1(row, cellCtx)" />
+    <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx_1(row, cell)" />
     } @else {
 
                 <input class="rdt-select-row" type="checkbox" aria-label="Select row" [checked]="rowIsSelected(row)" (change)="onToggleRow(row, $event)" />
               
     }
             </span>
-    } @else if (cellIsGrouped(cellCtx)) {
+    } @else if (cellIsGrouped(cell)) {
     <span style="display:contents">
               <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(row)" [attr.aria-label]="rozieAttr(rowIsExpanded(row) ? 'Collapse group' : 'Expand group')" (click)="onToggleExpand(row, $event)">{{ rozieDisplay(rowIsExpanded(row) ? '▾' : '▸') }}</button>
               <span class="rdt-group-value">
                 @if ((cellTpl ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }, columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }" />
+    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }" />
     } @else {
-    {{ rozieDisplay(cellCtx.getValue()) }}
+    {{ rozieDisplay(cell.getValue()) }}
     }
               </span>
               <span class="rdt-group-count">{{ rozieDisplay('(' + groupSubRowCount(row) + ')') }}</span>
             </span>
-    } @else if (isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))) {
+    } @else if (isEditing(rowIndexOf(row), colIndexOf(row, cell))) {
     <span style="display:contents">
-              @if (hasEditorSlot(cellCtx.column.id)) {
+              @if (hasEditorSlot(cell.column.id)) {
     <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(editorTpl ?? templates()?.['editor']); context: { $implicit: { columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() }, columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: editorValueFor(cellCtx.column.id), commit: editorCommitFor(cellCtx.column.id), cancel: editorCancelFor() }" />
+                <ng-container *ngTemplateOutlet="(editorTpl ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() }, columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() }" />
               </span>
-    } @else if (editorTypeOf(cellCtx.column.id) === 'number') {
-    <input class="rdt-cell-editor" type="number" data-editing-cell="" [value]="editorValueFor(cellCtx.column.id)" (input)="onCellEditorInput(cellCtx.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
-    } @else if (editorTypeOf(cellCtx.column.id) === 'select') {
-    <select class="rdt-cell-editor" data-editing-cell="" [value]="editorValueFor(cellCtx.column.id)" (change)="onCellEditorInput(cellCtx.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
-                @for (opt of editorOptionsOf(cellCtx.column.id); track opt.value) {
+    } @else if (editorTypeOf(cell.column.id) === 'number') {
+    <input class="rdt-cell-editor" type="number" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    } @else if (editorTypeOf(cell.column.id) === 'select') {
+    <select class="rdt-cell-editor" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (change)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)">
+                @for (opt of editorOptionsOf(cell.column.id); track opt.value) {
     <option [attr.value]="rozieAttr(opt.value)">{{ rozieDisplay(opt.label) }}</option>
     }
               </select>
-    } @else if (editorTypeOf(cellCtx.column.id) === 'checkbox') {
-    <input class="rdt-cell-editor" type="checkbox" data-editing-cell="" [checked]="editorCheckedFor(cellCtx.column.id)" (change)="onCellEditorCheckbox(cellCtx.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    } @else if (editorTypeOf(cell.column.id) === 'checkbox') {
+    <input class="rdt-cell-editor" type="checkbox" data-editing-cell="" [checked]="editorCheckedFor(cell.column.id)" (change)="onCellEditorCheckbox(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     } @else {
-    <input class="rdt-cell-editor" type="text" data-editing-cell="" [value]="editorValueFor(cellCtx.column.id)" (input)="onCellEditorInput(cellCtx.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
+    <input class="rdt-cell-editor" type="text" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     }</span>
     } @else {
     <span class="rdt-cell-value">
               @if ((cellTpl ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }, columnId: cellCtx.column.id, column: cellCtx.column, row: row.original, value: cellCtx.getValue() }" />
+    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }" />
     } @else {
-    {{ rozieDisplay(cellCtx.getValue()) }}
+    {{ rozieDisplay(cell.getValue()) }}
     }
             </span>
-    }@if (isFillHandleCell(rowIndexOf(row), colIndexOf(row, cellCtx))) {
+    }@if (isFillHandleCell(rowIndexOf(row), colIndexOf(row, cell))) {
     <span class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" (pointerdown)="onFillHandlePointerDown($event)"></span>
     }</td>
     }
@@ -4481,9 +4481,9 @@ export class DataTable {
       return __maxHeight ? 'max-height:' + __maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + __maxHeight : 'overflow:auto';
     }
 
-  private _selectCell_ctx = (wr: any, cellCtx: any) => ({ $implicit: { row: wr.row.original, checked: this.rowIsSelected(wr.row), toggle: e => this.onToggleRow(wr.row, e) }, row: wr.row.original, checked: this.rowIsSelected(wr.row), toggle: e => this.onToggleRow(wr.row, e) });
+  private _selectCell_ctx = (wr: any, cell: any) => ({ $implicit: { row: wr.row.original, checked: this.rowIsSelected(wr.row), toggle: e => this.onToggleRow(wr.row, e) }, row: wr.row.original, checked: this.rowIsSelected(wr.row), toggle: e => this.onToggleRow(wr.row, e) });
 
-  private _selectCell_ctx_1 = (row: any, cellCtx: any) => ({ $implicit: { row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) }, row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) });
+  private _selectCell_ctx_1 = (row: any, cell: any) => ({ $implicit: { row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) }, row: row.original, checked: this.rowIsSelected(row), toggle: e => this.onToggleRow(row, e) });
 
   protected readonly String = String;
 

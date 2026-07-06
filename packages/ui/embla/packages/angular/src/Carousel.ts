@@ -56,12 +56,12 @@ function __rozieAttr(v: unknown): string | null {
     }<div class="rozie-embla__viewport" #viewportEl>
           <div class="rozie-embla__container">
             
-            @for (item of slides(); track keyFor(item, i); let i = $index) {
+            @for (slide of slides(); track keyFor(slide, i); let i = $index) {
     <div class="rozie-embla__slide">
               @if ((slideTpl ?? templates()?.['slide'])) {
-    <ng-container *ngTemplateOutlet="(slideTpl ?? templates()?.['slide']); context: { $implicit: { slide: item, index: i }, slide: item, index: i }" />
+    <ng-container *ngTemplateOutlet="(slideTpl ?? templates()?.['slide']); context: { $implicit: { slide: slide, index: i }, slide: slide, index: i }" />
     } @else {
-    {{ rozieDisplay(item) }}
+    {{ rozieDisplay(slide) }}
     }
             </div>
     }

@@ -1251,13 +1251,16 @@ $expose({
 <!--
   Semantic table markup. The header sort BUTTON carries :aria-sort reflecting the live
   table-core sort state; @click toggles (shift-click adds a secondary sort). The body
-  is a keyed r-for over the pulled row model; the per-row cell r-for loop var is
-  `cellCtx` (NEVER `cell` — a `#cell`-named child slot would shadow it → Svelte mount
-  throw, the embla/rete lesson). The per-cell render is a single `#cell` SCOPED SLOT
-  rendered DIRECTLY inside the keyed <td> (D-A: no portal, no projection); the consumer
-  switches on the `columnId` scope param to vary the render per column, and the slot
-  FALLBACK (`{{ value }}`) is the plain accessor value (the template-less fast path).
-  Same for the `#header` scoped slot in the <th>.
+  is a keyed r-for over the pulled row model; the per-row cell r-for loop var is `cell`
+  — a loop var named the same as the `#cell` child slot is now AUTO-FIXED by the
+  Svelte emitter (Phase 73 item #1): `findRForSlotNameCollisions` detects the shadow
+  and renames the lowered snippet binding to `cell$$slot` (author's loop var + slot-arg
+  values untouched), so the natural name is safe to author directly. The per-cell
+  render is a single `#cell` SCOPED SLOT rendered DIRECTLY inside the keyed <td> (D-A:
+  no portal, no projection); the consumer switches on the `columnId` scope param to
+  vary the render per column, and the slot FALLBACK (`{{ value }}`) is the plain
+  accessor value (the template-less fast path). Same for the `#header` scoped slot in
+  the <th>.
 -->
 <div class="rozie-data-table-wrap">
 <!-- Declarative <Column> children mount here (the DEFAULT slot). They are
@@ -1586,24 +1589,24 @@ $expose({
       <td
         class="rdt-td"
         :role="cellRole()"
-        r-for="cellCtx in visibleCellsFor(wr.row)"
-        :key="cellCtx.id"
-        :data-col="cellCtx.column.id"
+        r-for="cell in visibleCellsFor(wr.row)"
+        :key="cell.id"
+        :data-col="cell.column.id"
         data-grid-cell
         :data-row="wr.vi.index"
-        :data-col-index="colIndexOf(wr.row, cellCtx)"
-        :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cellCtx))"
-        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-expander-td': isExpanderColumn(cellCtx.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) }"
-        :style="bodyCellStyle(wr.row, cellCtx.column.id)"
-        :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cellCtx))"
-        :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cellCtx)) ? 'true' : null"
-        :data-agg-cell="cellIsAggregated(cellCtx) ? cellCtx.column.id : null"
+        :data-col-index="colIndexOf(wr.row, cell)"
+        :tabindex="cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))"
+        :class="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)) }"
+        :style="bodyCellStyle(wr.row, cell.column.id)"
+        :aria-invalid="cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell))"
+        :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null"
+        :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : null"
       >
         <!-- B13 (phase 63) — auto-injected chevron expander cell, windowed body. Identical
              shape to the non-virtual body (~1797): a native <button> (Enter/Space → click
              natively) gated on rowCanExpand(wr.row); aria-expanded reflects wr.row's expanded
              state. FIRST branch (matching the non-virtual order). -->
-        <span style="display:contents" r-if="isExpanderColumn(cellCtx.column.id)">
+        <span style="display:contents" r-if="isExpanderColumn(cell.column.id)">
           <button
             r-if="rowCanExpand(wr.row)"
             type="button"
@@ -1614,7 +1617,7 @@ $expose({
             @click="onToggleExpand(wr.row, $event)"
           >{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button>
         </span>
-        <span style="display:contents" r-else-if="isSelectColumn(cellCtx.column.id)">
+        <span style="display:contents" r-else-if="isSelectColumn(cell.column.id)">
           <slot
             name="selectCell"
             :row="wr.row.original"
@@ -1634,7 +1637,7 @@ $expose({
              virtual body (~1840): the cellIsGrouped branch renders a native <button data-expander
              class="rdt-group-toggle"> (REUSING onToggleExpand — group rows are expandable rows) +
              the group key through the EXISTING #cell slot + the member count. -->
-        <span style="display:contents" r-else-if="cellIsGrouped(cellCtx)">
+        <span style="display:contents" r-else-if="cellIsGrouped(cell)">
           <button
             type="button"
             class="rdt-expander rdt-group-toggle"
@@ -1646,11 +1649,11 @@ $expose({
           <span class="rdt-group-value">
             <slot
               name="cell"
-              :columnId="cellCtx.column.id"
-              :column="cellCtx.column"
+              :columnId="cell.column.id"
+              :column="cell.column"
               :row="wr.row.original"
-              :value="cellCtx.getValue()"
-            >{{ cellCtx.getValue() }}</slot>
+              :value="cell.getValue()"
+            >{{ cell.getValue() }}</slot>
           </span>
           <span class="rdt-group-count">{{ '(' + groupSubRowCount(wr.row) + ')' }}</span>
         </span>
@@ -1658,46 +1661,46 @@ $expose({
              body; keyed on wr.vi.index (the full-model index, the activeRow space). Single-
              cell editing under virtualization (the D-02 pin-row) lands in Plan 51-04; this
              keeps both <td> bodies in lockstep so the branch is structurally consistent. -->
-        <span style="display:contents" r-else-if="isEditing(wr.vi.index, colIndexOf(wr.row, cellCtx))">
-          <span style="display:contents" r-if="hasEditorSlot(cellCtx.column.id)">
+        <span style="display:contents" r-else-if="isEditing(wr.vi.index, colIndexOf(wr.row, cell))">
+          <span style="display:contents" r-if="hasEditorSlot(cell.column.id)">
             <slot
               name="editor"
-              :columnId="cellCtx.column.id"
-              :column="cellCtx.column"
+              :columnId="cell.column.id"
+              :column="cell.column"
               :row="wr.row.original"
-              :value="editorValueFor(cellCtx.column.id)"
-              :commit="editorCommitFor(cellCtx.column.id)"
+              :value="editorValueFor(cell.column.id)"
+              :commit="editorCommitFor(cell.column.id)"
               :cancel="editorCancelFor()"
             />
           </span>
           <input
-            r-else-if="editorTypeOf(cellCtx.column.id) === 'number'"
+            r-else-if="editorTypeOf(cell.column.id) === 'number'"
             class="rdt-cell-editor"
             type="number"
             data-editing-cell
-            :value="editorValueFor(cellCtx.column.id)"
-            @input="onCellEditorInput(cellCtx.column.id, $event)"
+            :value="editorValueFor(cell.column.id)"
+            @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
             @blur="onEditorBlur($event)"
           />
           <select
-            r-else-if="editorTypeOf(cellCtx.column.id) === 'select'"
+            r-else-if="editorTypeOf(cell.column.id) === 'select'"
             class="rdt-cell-editor"
             data-editing-cell
-            :value="editorValueFor(cellCtx.column.id)"
-            @change="onCellEditorInput(cellCtx.column.id, $event)"
+            :value="editorValueFor(cell.column.id)"
+            @change="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
             @blur="onEditorBlur($event)"
           >
-            <option r-for="opt in editorOptionsOf(cellCtx.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            <option r-for="opt in editorOptionsOf(cell.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
           <input
-            r-else-if="editorTypeOf(cellCtx.column.id) === 'checkbox'"
+            r-else-if="editorTypeOf(cell.column.id) === 'checkbox'"
             class="rdt-cell-editor"
             type="checkbox"
             data-editing-cell
-            :checked="editorCheckedFor(cellCtx.column.id)"
-            @change="onCellEditorCheckbox(cellCtx.column.id, $event)"
+            :checked="editorCheckedFor(cell.column.id)"
+            @change="onCellEditorCheckbox(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
             @blur="onEditorBlur($event)"
           />
@@ -1706,8 +1709,8 @@ $expose({
             class="rdt-cell-editor"
             type="text"
             data-editing-cell
-            :value="editorValueFor(cellCtx.column.id)"
-            @input="onCellEditorInput(cellCtx.column.id, $event)"
+            :value="editorValueFor(cell.column.id)"
+            @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
             @blur="onEditorBlur($event)"
           />
@@ -1715,18 +1718,18 @@ $expose({
         <span r-else class="rdt-cell-value">
           <slot
             name="cell"
-            :columnId="cellCtx.column.id"
-            :column="cellCtx.column"
+            :columnId="cell.column.id"
+            :column="cell.column"
             :row="wr.row.original"
-            :value="cellCtx.getValue()"
-          >{{ cellCtx.getValue() }}</slot>
+            :value="cell.getValue()"
+          >{{ cell.getValue() }}</slot>
         </span>
         <!-- Fill handle (req-8 / D-04): the small draggable affordance on the range's
              bottom-right cell. A pointer drag extends the range + value-fills the dragged
              rectangle on release (value-copy ONLY — no series detection). Gated so it renders
              only on the corner cell (byte-identical-off when no range). -->
         <span
-          r-if="isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cellCtx))"
+          r-if="isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cell))"
           class="rdt-fill-handle"
           data-fill-handle
           data-testid="fill-handle"
@@ -1992,24 +1995,24 @@ $expose({
       <td
         class="rdt-td"
         :role="cellRole()"
-        r-for="cellCtx in visibleCellsFor(row)"
-        :key="cellCtx.id"
-        :data-col="cellCtx.column.id"
+        r-for="cell in visibleCellsFor(row)"
+        :key="cell.id"
+        :data-col="cell.column.id"
         data-grid-cell
         :data-row="rowIndexOf(row)"
-        :data-col-index="colIndexOf(row, cellCtx)"
-        :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cellCtx))"
-        :class="{ 'rdt-select-td': isSelectColumn(cellCtx.column.id), 'rdt-expander-td': isExpanderColumn(cellCtx.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) }"
-        :style="bodyCellStyle(row, cellCtx.column.id)"
-        :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cellCtx))"
-        :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cellCtx)) ? 'true' : null"
-        :data-agg-cell="cellIsAggregated(cellCtx) ? cellCtx.column.id : null"
+        :data-col-index="colIndexOf(row, cell)"
+        :tabindex="cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell))"
+        :class="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)) }"
+        :style="bodyCellStyle(row, cell.column.id)"
+        :aria-invalid="cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell))"
+        :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : null"
+        :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : null"
       >
         <!-- auto-injected chevron expander cell (phase 50, D-04) — a native <button>
              (handles Enter/Space → click natively; NO explicit @keydown.enter/.space which
              would double-toggle). aria-expanded reflects row.getIsExpanded(); the chevron
              renders only when row.getCanExpand(). -->
-        <span style="display:contents" r-if="isExpanderColumn(cellCtx.column.id)">
+        <span style="display:contents" r-if="isExpanderColumn(cell.column.id)">
           <button
             r-if="rowCanExpand(row)"
             type="button"
@@ -2029,7 +2032,7 @@ $expose({
              DocumentFragment → never displayed → empty cells). A real element with
              r-if/r-else lowers cleanly on all six; `display:contents` keeps it
              layout-transparent so the <td> box is unaffected. -->
-        <span style="display:contents" r-else-if="isSelectColumn(cellCtx.column.id)">
+        <span style="display:contents" r-else-if="isSelectColumn(cell.column.id)">
           <slot
             name="selectCell"
             :row="row.original"
@@ -2052,7 +2055,7 @@ $expose({
              + the member count. Aggregated cells (cell.getIsAggregated()) are NOT branched here
              — they flow through the #cell r-else below via cell.getValue() (NO aggregatedCell
              template); placeholder cells fall through to the same r-else and render empty. -->
-        <span style="display:contents" r-else-if="cellIsGrouped(cellCtx)">
+        <span style="display:contents" r-else-if="cellIsGrouped(cell)">
           <button
             type="button"
             class="rdt-expander rdt-group-toggle"
@@ -2064,11 +2067,11 @@ $expose({
           <span class="rdt-group-value">
             <slot
               name="cell"
-              :columnId="cellCtx.column.id"
-              :column="cellCtx.column"
+              :columnId="cell.column.id"
+              :column="cell.column"
               :row="row.original"
-              :value="cellCtx.getValue()"
-            >{{ cellCtx.getValue() }}</slot>
+              :value="cell.getValue()"
+            >{{ cell.getValue() }}</slot>
           </span>
           <span class="rdt-group-count">{{ '(' + groupSubRowCount(row) + ')' }}</span>
         </span>
@@ -2078,46 +2081,46 @@ $expose({
              other editable column gets a built-in editor keyed on editorTypeOf. Each editor
              element carries data-editing-cell so focusEditorWhenReady resolves it off
              gridRoot (NEVER $refs.cellEditor — ROZ123 + last-ref-wins + Solid TDZ). -->
-        <span style="display:contents" r-else-if="isEditing(rowIndexOf(row), colIndexOf(row, cellCtx))">
-          <span style="display:contents" r-if="hasEditorSlot(cellCtx.column.id)">
+        <span style="display:contents" r-else-if="isEditing(rowIndexOf(row), colIndexOf(row, cell))">
+          <span style="display:contents" r-if="hasEditorSlot(cell.column.id)">
             <slot
               name="editor"
-              :columnId="cellCtx.column.id"
-              :column="cellCtx.column"
+              :columnId="cell.column.id"
+              :column="cell.column"
               :row="row.original"
-              :value="editorValueFor(cellCtx.column.id)"
-              :commit="editorCommitFor(cellCtx.column.id)"
+              :value="editorValueFor(cell.column.id)"
+              :commit="editorCommitFor(cell.column.id)"
               :cancel="editorCancelFor()"
             />
           </span>
           <input
-            r-else-if="editorTypeOf(cellCtx.column.id) === 'number'"
+            r-else-if="editorTypeOf(cell.column.id) === 'number'"
             class="rdt-cell-editor"
             type="number"
             data-editing-cell
-            :value="editorValueFor(cellCtx.column.id)"
-            @input="onCellEditorInput(cellCtx.column.id, $event)"
+            :value="editorValueFor(cell.column.id)"
+            @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
             @blur="onEditorBlur($event)"
           />
           <select
-            r-else-if="editorTypeOf(cellCtx.column.id) === 'select'"
+            r-else-if="editorTypeOf(cell.column.id) === 'select'"
             class="rdt-cell-editor"
             data-editing-cell
-            :value="editorValueFor(cellCtx.column.id)"
-            @change="onCellEditorInput(cellCtx.column.id, $event)"
+            :value="editorValueFor(cell.column.id)"
+            @change="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
             @blur="onEditorBlur($event)"
           >
-            <option r-for="opt in editorOptionsOf(cellCtx.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            <option r-for="opt in editorOptionsOf(cell.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
           <input
-            r-else-if="editorTypeOf(cellCtx.column.id) === 'checkbox'"
+            r-else-if="editorTypeOf(cell.column.id) === 'checkbox'"
             class="rdt-cell-editor"
             type="checkbox"
             data-editing-cell
-            :checked="editorCheckedFor(cellCtx.column.id)"
-            @change="onCellEditorCheckbox(cellCtx.column.id, $event)"
+            :checked="editorCheckedFor(cell.column.id)"
+            @change="onCellEditorCheckbox(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
             @blur="onEditorBlur($event)"
           />
@@ -2126,8 +2129,8 @@ $expose({
             class="rdt-cell-editor"
             type="text"
             data-editing-cell
-            :value="editorValueFor(cellCtx.column.id)"
-            @input="onCellEditorInput(cellCtx.column.id, $event)"
+            :value="editorValueFor(cell.column.id)"
+            @input="onCellEditorInput(cell.column.id, $event)"
             @keydown="onEditorKeyDown($event)"
             @blur="onEditorBlur($event)"
           />
@@ -2138,16 +2141,16 @@ $expose({
         <span r-else class="rdt-cell-value">
           <slot
             name="cell"
-            :columnId="cellCtx.column.id"
-            :column="cellCtx.column"
+            :columnId="cell.column.id"
+            :column="cell.column"
             :row="row.original"
-            :value="cellCtx.getValue()"
-          >{{ cellCtx.getValue() }}</slot>
+            :value="cell.getValue()"
+          >{{ cell.getValue() }}</slot>
         </span>
         <!-- Fill handle (req-8 / D-04) — non-virtual body. Identical shape to the virtual
              body; keyed on rowIndexOf(row). Renders only on the range's bottom-right corner. -->
         <span
-          r-if="isFillHandleCell(rowIndexOf(row), colIndexOf(row, cellCtx))"
+          r-if="isFillHandleCell(rowIndexOf(row), colIndexOf(row, cell))"
           class="rdt-fill-handle"
           data-fill-handle
           data-testid="fill-handle"
