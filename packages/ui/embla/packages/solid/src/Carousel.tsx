@@ -366,26 +366,18 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
     if (emblaThumbs) emblaThumbs.scrollTo(i);
   }
 
-  // Internal nav handlers for the built-in arrows/dots/thumbs. These call the
-  // `any`-typed engine directly (NOT the $expose verbs scrollPrev/scrollNext/
-  // scrollToIndex, whose strict emitted signatures have a REQUIRED jump/index arg —
-  // invoking them arg-light from the template would trip TS2554 on the leaves).
-  function navPrev() {
-    if (embla) embla.scrollPrev();
-  }
-  function navNext() {
-    if (embla) embla.scrollNext();
-  }
-  function navTo(i: any) {
-    if (embla) embla.scrollTo(i);
-  }
-
   // Thumb click → scroll the MAIN carousel. Guarded by the thumb engine's
   // clickAllowed() so a drag of the strip doesn't register as a click (the Embla
-  // thumbs idiom).
+  // thumbs idiom). Calls the $expose'd scrollToIndex verb directly (below) —
+  // arg-light internal calls to an exposed verb now typecheck cleanly on all
+  // six targets: the emitter lowers a TRAILING $expose verb param optional
+  // (`jump?: any` / `index`+`jump?`) whenever it sees a fewer-arg internal call
+  // site (emitter-hardening backlog item #5). The prior raw-engine
+  // navPrev/navNext/navTo bypass existed ONLY to dodge the pre-fix required-arg
+  // TS2554 and is gone now that the compiler owns the arity.
   function selectThumb(i: any) {
     if (emblaThumbs && !emblaThumbs.clickAllowed()) return;
-    navTo(i);
+    scrollToIndex(i);
   }
   // ─── imperative handle (Phase 21 $expose) — collision-suffix discipline ──────
   // 14 verbs, each guarding the pre-mount/destroyed `embla = null`.
@@ -405,13 +397,13 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   //    progress bars, lazy-load/in-view dots, and directional transitions — no
   //    matching prop, emit, or inherited DOM method — clear.
   //  - scrollNext/scrollPrev/canScrollNext/canScrollPrev/scrollSnapList clear.
-  function scrollNext(jump: any) {
+  function scrollNext(jump?: any) {
     if (embla) embla.scrollNext(jump);
   }
-  function scrollPrev(jump: any) {
+  function scrollPrev(jump?: any) {
     if (embla) embla.scrollPrev(jump);
   }
-  function scrollToIndex(index: any, jump: any) {
+  function scrollToIndex(index: any, jump?: any) {
     if (embla) embla.scrollTo(index, jump);
   }
   function reInitCarousel(opts: any) {
@@ -453,7 +445,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
     <div {...attrs} class={"rozie-embla" + " " + rozieClass({ 'rozie-embla--vertical': local.axis === 'y' }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-4143c216="">
       
       <div class={"rozie-embla__stage"} data-rozie-s-4143c216="">
-        {<Show when={local.arrows}><button type="button" aria-label="Previous slide" class={"rozie-embla__arrow rozie-embla__arrow--prev"} disabled={!canPrev()} onClick={($event) => { navPrev(); }} data-rozie-s-4143c216="">‹</button></Show>}<div class={"rozie-embla__viewport"} ref={(el) => { viewportElRef = el as HTMLElement; }} data-rozie-s-4143c216="">
+        {<Show when={local.arrows}><button type="button" aria-label="Previous slide" class={"rozie-embla__arrow rozie-embla__arrow--prev"} disabled={!canPrev()} onClick={($event) => { scrollPrev(); }} data-rozie-s-4143c216="">‹</button></Show>}<div class={"rozie-embla__viewport"} ref={(el) => { viewportElRef = el as HTMLElement; }} data-rozie-s-4143c216="">
           <div class={"rozie-embla__container"} data-rozie-s-4143c216="">
             
             <For each={local.slides}>{(slide, i) => <div class={"rozie-embla__slide"} data-rozie-s-4143c216="">
@@ -463,11 +455,11 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
             {resolved()}
           </div>
         </div>
-        {<Show when={local.arrows}><button type="button" aria-label="Next slide" class={"rozie-embla__arrow rozie-embla__arrow--next"} disabled={!canNext()} onClick={($event) => { navNext(); }} data-rozie-s-4143c216="">›</button></Show>}</div>
+        {<Show when={local.arrows}><button type="button" aria-label="Next slide" class={"rozie-embla__arrow rozie-embla__arrow--next"} disabled={!canNext()} onClick={($event) => { scrollNext(); }} data-rozie-s-4143c216="">›</button></Show>}</div>
 
       
       {<Show when={local.dots}><div class={"rozie-embla__dots"} data-rozie-s-4143c216="">
-        <Key each={snaps() as readonly any[]} by={(di) => di}>{(di) => <button type="button" aria-label={rozieAttr('Go to slide ' + (di() + 1))} class={"rozie-embla__dot" + " " + rozieClass({ 'is-selected': di() === selected() })} onClick={($event) => { navTo(di()); }} data-rozie-s-4143c216="" />}</Key>
+        <Key each={snaps() as readonly any[]} by={(di) => di}>{(di) => <button type="button" aria-label={rozieAttr('Go to slide ' + (di() + 1))} class={"rozie-embla__dot" + " " + rozieClass({ 'is-selected': di() === selected() })} onClick={($event) => { scrollToIndex(di()); }} data-rozie-s-4143c216="" />}</Key>
       </div></Show>}{<Show when={local.thumbnails}><div class={"rozie-embla__thumbs"} data-rozie-s-4143c216="">
         <div class={"rozie-embla__thumbs-viewport"} ref={(el) => { thumbsViewportElRef = el as HTMLElement; }} data-rozie-s-4143c216="">
           <div class={"rozie-embla__thumbs-container"} data-rozie-s-4143c216="">

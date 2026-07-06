@@ -255,33 +255,27 @@ const syncNav = () => {
   if (emblaThumbs) emblaThumbs.scrollTo(i);
 };
 
-// Internal nav handlers for the built-in arrows/dots/thumbs. These call the
-// `any`-typed engine directly (NOT the $expose verbs scrollPrev/scrollNext/
-// scrollToIndex, whose strict emitted signatures have a REQUIRED jump/index arg —
-// invoking them arg-light from the template would trip TS2554 on the leaves).
-// Internal nav handlers for the built-in arrows/dots/thumbs. These call the
-// `any`-typed engine directly (NOT the $expose verbs scrollPrev/scrollNext/
-// scrollToIndex, whose strict emitted signatures have a REQUIRED jump/index arg —
-// invoking them arg-light from the template would trip TS2554 on the leaves).
-const navPrev = () => {
-  if (embla) embla.scrollPrev();
-};
-const navNext = () => {
-  if (embla) embla.scrollNext();
-};
-const navTo = (i: any) => {
-  if (embla) embla.scrollTo(i);
-};
-
 // Thumb click → scroll the MAIN carousel. Guarded by the thumb engine's
 // clickAllowed() so a drag of the strip doesn't register as a click (the Embla
-// thumbs idiom).
+// thumbs idiom). Calls the $expose'd scrollToIndex verb directly (below) —
+// arg-light internal calls to an exposed verb now typecheck cleanly on all
+// six targets: the emitter lowers a TRAILING $expose verb param optional
+// (`jump?: any` / `index`+`jump?`) whenever it sees a fewer-arg internal call
+// site (emitter-hardening backlog item #5). The prior raw-engine
+// navPrev/navNext/navTo bypass existed ONLY to dodge the pre-fix required-arg
+// TS2554 and is gone now that the compiler owns the arity.
 // Thumb click → scroll the MAIN carousel. Guarded by the thumb engine's
 // clickAllowed() so a drag of the strip doesn't register as a click (the Embla
-// thumbs idiom).
+// thumbs idiom). Calls the $expose'd scrollToIndex verb directly (below) —
+// arg-light internal calls to an exposed verb now typecheck cleanly on all
+// six targets: the emitter lowers a TRAILING $expose verb param optional
+// (`jump?: any` / `index`+`jump?`) whenever it sees a fewer-arg internal call
+// site (emitter-hardening backlog item #5). The prior raw-engine
+// navPrev/navNext/navTo bypass existed ONLY to dodge the pre-fix required-arg
+// TS2554 and is gone now that the compiler owns the arity.
 const selectThumb = (i: any) => {
   if (emblaThumbs && !emblaThumbs.clickAllowed()) return;
-  navTo(i);
+  scrollToIndex(i);
 };
 // ─── imperative handle (Phase 21 $expose) — collision-suffix discipline ──────
 // 14 verbs, each guarding the pre-mount/destroyed `embla = null`.
@@ -301,13 +295,13 @@ const selectThumb = (i: any) => {
 //    progress bars, lazy-load/in-view dots, and directional transitions — no
 //    matching prop, emit, or inherited DOM method — clear.
 //  - scrollNext/scrollPrev/canScrollNext/canScrollPrev/scrollSnapList clear.
-export function scrollNext(jump: any) {
+export function scrollNext(jump?: any) {
   if (embla) embla.scrollNext(jump);
 }
-export function scrollPrev(jump: any) {
+export function scrollPrev(jump?: any) {
   if (embla) embla.scrollPrev(jump);
 }
-export function scrollToIndex(index: any, jump: any) {
+export function scrollToIndex(index: any, jump?: any) {
   if (embla) embla.scrollTo(index, jump);
 }
 export function reInitCarousel(opts: any) {
@@ -423,7 +417,7 @@ $effect(() => { const __watchVal = (() => thumbnails)(); untrack(() => { if (__r
 })(__watchVal); }); });
 </script>
 
-<div {...__rozieAttrs} class={["rozie-embla", { 'rozie-embla--vertical': axis === 'y' }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-4143c216><div class="rozie-embla__stage" data-rozie-s-4143c216>{#if arrows}<button type="button" class="rozie-embla__arrow rozie-embla__arrow--prev" disabled={!canPrev} aria-label="Previous slide" onclick={($event) => { navPrev(); }} data-rozie-s-4143c216>‹</button>{/if}<div class="rozie-embla__viewport" bind:this={viewportEl} data-rozie-s-4143c216><div class="rozie-embla__container" data-rozie-s-4143c216>{#each slides as slide, i (keyFor(slide, i))}<div class="rozie-embla__slide" data-rozie-s-4143c216>{#if slide$$slot}{@render slide$$slot({ slide, index: i })}{:else}{rozieDisplay(slide)}{/if}</div>{/each}{@render children?.()}</div></div>{#if arrows}<button type="button" class="rozie-embla__arrow rozie-embla__arrow--next" disabled={!canNext} aria-label="Next slide" onclick={($event) => { navNext(); }} data-rozie-s-4143c216>›</button>{/if}</div>{#if dots}<div class="rozie-embla__dots" data-rozie-s-4143c216>{#each snaps as di (di)}<button type="button" class={["rozie-embla__dot", { 'is-selected': di === selected }]} aria-label={rozieAttr('Go to slide ' + (di + 1))} onclick={($event) => { navTo(di); }} data-rozie-s-4143c216></button>{/each}</div>{/if}{#if thumbnails}<div class="rozie-embla__thumbs" data-rozie-s-4143c216><div class="rozie-embla__thumbs-viewport" bind:this={thumbsViewportEl} data-rozie-s-4143c216><div class="rozie-embla__thumbs-container" data-rozie-s-4143c216>{#each slides as item, i (keyFor(item, i))}<div class={["rozie-embla__thumb", { 'is-selected': i === selected }]} onclick={($event) => { selectThumb(i); }} data-rozie-s-4143c216>{#if thumb}{@render thumb({ slide: item, index: i })}{:else}{rozieDisplay(item)}{/if}</div>{/each}</div></div></div>{/if}</div>
+<div {...__rozieAttrs} class={["rozie-embla", { 'rozie-embla--vertical': axis === 'y' }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-4143c216><div class="rozie-embla__stage" data-rozie-s-4143c216>{#if arrows}<button type="button" class="rozie-embla__arrow rozie-embla__arrow--prev" disabled={!canPrev} aria-label="Previous slide" onclick={($event) => { scrollPrev(); }} data-rozie-s-4143c216>‹</button>{/if}<div class="rozie-embla__viewport" bind:this={viewportEl} data-rozie-s-4143c216><div class="rozie-embla__container" data-rozie-s-4143c216>{#each slides as slide, i (keyFor(slide, i))}<div class="rozie-embla__slide" data-rozie-s-4143c216>{#if slide$$slot}{@render slide$$slot({ slide, index: i })}{:else}{rozieDisplay(slide)}{/if}</div>{/each}{@render children?.()}</div></div>{#if arrows}<button type="button" class="rozie-embla__arrow rozie-embla__arrow--next" disabled={!canNext} aria-label="Next slide" onclick={($event) => { scrollNext(); }} data-rozie-s-4143c216>›</button>{/if}</div>{#if dots}<div class="rozie-embla__dots" data-rozie-s-4143c216>{#each snaps as di (di)}<button type="button" class={["rozie-embla__dot", { 'is-selected': di === selected }]} aria-label={rozieAttr('Go to slide ' + (di + 1))} onclick={($event) => { scrollToIndex(di); }} data-rozie-s-4143c216></button>{/each}</div>{/if}{#if thumbnails}<div class="rozie-embla__thumbs" data-rozie-s-4143c216><div class="rozie-embla__thumbs-viewport" bind:this={thumbsViewportEl} data-rozie-s-4143c216><div class="rozie-embla__thumbs-container" data-rozie-s-4143c216>{#each slides as item, i (keyFor(item, i))}<div class={["rozie-embla__thumb", { 'is-selected': i === selected }]} onclick={($event) => { selectThumb(i); }} data-rozie-s-4143c216>{#if thumb}{@render thumb({ slide: item, index: i })}{:else}{rozieDisplay(item)}{/if}</div>{/each}</div></div></div>{/if}</div>
 
 <style>
 :global {

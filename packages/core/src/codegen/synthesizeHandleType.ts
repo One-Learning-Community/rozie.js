@@ -29,6 +29,10 @@
 import * as t from '@babel/types';
 import _generate from '@babel/generator';
 import type { IRComponent } from '../ir/types.js';
+import {
+  collectExposedFunctionsByName,
+  type FnLike,
+} from './collectExposedFunctions.js';
 
 // Default-export interop (see collectScriptDecls.ts).
 type GenerateFn = typeof import('@babel/generator').default;
@@ -37,82 +41,7 @@ const generate: GenerateFn =
     ? _generate
     : (_generate as unknown as { default: GenerateFn }).default;
 
-/** A function-like node whose signature we can read. */
-type FnLike =
-  | t.FunctionDeclaration
-  | t.ArrowFunctionExpression
-  | t.FunctionExpression
-  | t.ObjectMethod;
-
 const UNTYPED_METHOD = '(...args: any[]) => any';
-
-/**
- * Build a map of top-level `<script>` function declarations by name:
- *   - `function reset() {}` → FunctionDeclaration
- *   - `const reset = (...) => {}` / `const reset = function () {}` → the init.
- * A `$computed(...)`-bound const is intentionally excluded (reactive value).
- */
-function collectScriptFunctions(ir: IRComponent): Map<string, FnLike> {
-  const out = new Map<string, FnLike>();
-  const body = ir.setupBody.scriptProgram.program.body;
-  for (const stmt of body) {
-    if (t.isFunctionDeclaration(stmt) && stmt.id) {
-      out.set(stmt.id.name, stmt);
-      continue;
-    }
-    if (t.isVariableDeclaration(stmt)) {
-      for (const decl of stmt.declarations) {
-        if (!t.isIdentifier(decl.id)) continue;
-        const init = decl.init;
-        if (
-          init &&
-          (t.isArrowFunctionExpression(init) || t.isFunctionExpression(init))
-        ) {
-          out.set(decl.id.name, init);
-        }
-      }
-    }
-  }
-  return out;
-}
-
-/**
- * Find inline `$expose({ name: () => ... })` arrow/function values so a method
- * exposed only as an inline expression still contributes its signature.
- */
-function collectInlineExposeFns(ir: IRComponent): Map<string, FnLike> {
-  const out = new Map<string, FnLike>();
-  const body = ir.setupBody.scriptProgram.program.body;
-  for (const stmt of body) {
-    if (!t.isExpressionStatement(stmt)) continue;
-    const expr = stmt.expression;
-    if (
-      !t.isCallExpression(expr) ||
-      !t.isIdentifier(expr.callee) ||
-      expr.callee.name !== '$expose'
-    ) {
-      continue;
-    }
-    const arg = expr.arguments[0];
-    if (!arg || !t.isObjectExpression(arg)) continue;
-    for (const prop of arg.properties) {
-      if (t.isObjectMethod(prop) && !prop.computed && t.isIdentifier(prop.key)) {
-        out.set(prop.key.name, prop);
-        continue;
-      }
-      if (t.isObjectProperty(prop) && !prop.computed && t.isIdentifier(prop.key)) {
-        const value = prop.value;
-        if (
-          t.isArrowFunctionExpression(value) ||
-          t.isFunctionExpression(value)
-        ) {
-          out.set(prop.key.name, value);
-        }
-      }
-    }
-  }
-  return out;
-}
 
 /** Generate the TS source for a node fragment (type annotation inner type). */
 function gen(node: t.Node): string {
@@ -122,32 +51,74 @@ function gen(node: t.Node): string {
 /**
  * Render one function parameter, preserving its author type annotation.
  *
- * `@babel/generator` does NOT print a param's `typeAnnotation` when the param
- * node is generated STANDALONE (annotations only print inside a full function
- * context), so we render the binding and its `: <type>` annotation explicitly.
- * Handles Identifier / RestElement / patterns with an attached annotation.
+ * `@babel/generator` does NOT print a param's `typeAnnotation` — NOR its
+ * `optional` (`?`) flag — when the param node is generated STANDALONE
+ * (annotations/optionality only print inside a full function context), so we
+ * render the binding and its `: <type>` / `?` explicitly. Handles Identifier /
+ * RestElement / patterns with an attached annotation.
+ *
+ * Emitter-hardening backlog item #5 (trailing `$expose` verb params lowered
+ * optional): `typeNeutralizeScript` may mark a param `.optional = true` (a
+ * TRAILING untyped param genuinely called with fewer args somewhere
+ * internally — see that file). This renderer must surface that flag as `?`
+ * in the interface member, or the synthesized signature would silently
+ * disagree with the emitted function body's own (now-optional) param.
+ *
+ * A defaulted param (`AssignmentPattern`, e.g. `action = null`) is ALSO
+ * rendered `name?: T` with the default value stripped — a TS interface/type
+ * member cannot carry a default-value expression (that is a hard syntax
+ * error), but a defaulted param is semantically optional for the interface's
+ * purposes.
  */
 function renderParam(param: t.Node): string {
   // The binding text (name, destructuring pattern, rest) without annotation.
   let typeAnnotation: t.TSTypeAnnotation | null = null;
+  let optional = false;
+  if (t.isAssignmentPattern(param)) {
+    // Interface members cannot carry a default value — render the LEFT
+    // binding only, marked optional, mirroring a bare `?` param.
+    const left = param.left;
+    optional = true;
+    if (
+      (t.isIdentifier(left) ||
+        t.isObjectPattern(left) ||
+        t.isArrayPattern(left)) &&
+      left.typeAnnotation &&
+      t.isTSTypeAnnotation(left.typeAnnotation)
+    ) {
+      typeAnnotation = left.typeAnnotation;
+    }
+    const bindingOnly = gen(stripTypeAnnotation(left));
+    return typeAnnotation
+      ? `${bindingOnly}?: ${gen(typeAnnotation.typeAnnotation)}`
+      : `${bindingOnly}?`;
+  }
   if (
     (t.isIdentifier(param) ||
       t.isRestElement(param) ||
       t.isObjectPattern(param) ||
-      t.isArrayPattern(param) ||
-      t.isAssignmentPattern(param)) &&
+      t.isArrayPattern(param)) &&
     param.typeAnnotation &&
     t.isTSTypeAnnotation(param.typeAnnotation)
   ) {
     typeAnnotation = param.typeAnnotation;
+  }
+  if (
+    (t.isIdentifier(param) ||
+      t.isObjectPattern(param) ||
+      t.isArrayPattern(param)) &&
+    param.optional
+  ) {
+    optional = true;
   }
 
   // Generate the binding alone, then strip any annotation the generator did
   // include (it omits it for Identifier but may include it for patterns) and
   // re-append our explicit one for a single consistent shape.
   const bindingOnly = gen(stripTypeAnnotation(param));
-  if (!typeAnnotation) return bindingOnly;
-  return `${bindingOnly}: ${gen(typeAnnotation.typeAnnotation)}`;
+  const optionalMark = optional ? '?' : '';
+  if (!typeAnnotation) return `${bindingOnly}${optionalMark}`;
+  return `${bindingOnly}${optionalMark}: ${gen(typeAnnotation.typeAnnotation)}`;
 }
 
 /** Return a shallow clone of a param node with its typeAnnotation removed. */
@@ -199,13 +170,11 @@ export function synthesizeHandleType(
 ): string | null {
   if (ir.expose.length === 0) return null;
 
-  const scriptFns = collectScriptFunctions(ir);
-  const inlineFns = collectInlineExposeFns(ir);
+  const fnsByName = collectExposedFunctionsByName(ir);
 
-  const members = ir.expose.map((method) => {
-    const fn = scriptFns.get(method.name) ?? inlineFns.get(method.name);
-    return renderMember(method.name, fn);
-  });
+  const members = ir.expose.map((method) =>
+    renderMember(method.name, fnsByName.get(method.name)),
+  );
 
   return `interface ${interfaceName} {\n${members.join('\n')}\n}`;
 }

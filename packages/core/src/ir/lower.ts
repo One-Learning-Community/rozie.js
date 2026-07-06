@@ -287,7 +287,12 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // including the for-of `as any` wrap, fills only the syntactically-detected
   // untyped residue, so typed and untyped `<script>` blocks are handled
   // identically. See packages/core/src/codegen/typeNeutralizeScript.ts.
-  typeNeutralizeScript(ir.setupBody.scriptProgram);
+  //
+  // The `ir` second argument (emitter-hardening backlog item #5) lets the pass
+  // lower TRAILING `$expose` verb params optional when there is internal
+  // fewer-arg call evidence — `ir.expose` is already populated above, so it is
+  // available at this exact call site.
+  typeNeutralizeScript(ir.setupBody.scriptProgram, ir);
 
   // Phase 13 — validate every `$classSelector('<class>')` call (R3/R4/R5).
   // Runs HERE in lowerToIR rather than in compile() for the same reason as

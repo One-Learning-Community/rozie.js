@@ -52,7 +52,7 @@ function __rozieAttr(v: unknown): string | null {
       
       <div class="rozie-embla__stage">
         @if (arrows()) {
-    <button type="button" class="rozie-embla__arrow rozie-embla__arrow--prev" [disabled]="!canPrev()" aria-label="Previous slide" (click)="navPrev()">‹</button>
+    <button type="button" class="rozie-embla__arrow rozie-embla__arrow--prev" [disabled]="!canPrev()" aria-label="Previous slide" (click)="scrollPrev()">‹</button>
     }<div class="rozie-embla__viewport" #viewportEl>
           <div class="rozie-embla__container">
             
@@ -70,14 +70,14 @@ function __rozieAttr(v: unknown): string | null {
           </div>
         </div>
         @if (arrows()) {
-    <button type="button" class="rozie-embla__arrow rozie-embla__arrow--next" [disabled]="!canNext()" aria-label="Next slide" (click)="navNext()">›</button>
+    <button type="button" class="rozie-embla__arrow rozie-embla__arrow--next" [disabled]="!canNext()" aria-label="Next slide" (click)="scrollNext()">›</button>
     }</div>
 
       
       @if (dots()) {
     <div class="rozie-embla__dots">
         @for (di of snaps(); track di) {
-    <button type="button" class="rozie-embla__dot" [ngClass]="{ 'is-selected': di === selected() }" [attr.aria-label]="rozieAttr('Go to slide ' + (di + 1))" (click)="navTo(di)"></button>
+    <button type="button" class="rozie-embla__dot" [ngClass]="{ 'is-selected': di === selected() }" [attr.aria-label]="rozieAttr('Go to slide ' + (di + 1))" (click)="scrollToIndex(di)"></button>
     }
       </div>
     }@if (thumbnails()) {
@@ -427,26 +427,17 @@ export class Carousel {
     this.canNext.set(this.embla.canScrollNext());
     if (this.emblaThumbs) this.emblaThumbs.scrollTo(i);
   };
-  navPrev = () => {
-    if (this.embla) this.embla.scrollPrev();
-  };
-  navNext = () => {
-    if (this.embla) this.embla.scrollNext();
-  };
-  navTo = (i: any) => {
-    if (this.embla) this.embla.scrollTo(i);
-  };
   selectThumb = (i: any) => {
     if (this.emblaThumbs && !this.emblaThumbs.clickAllowed()) return;
-    this.navTo(i);
+    this.scrollToIndex(i);
   };
-  scrollNext = (jump: any) => {
+  scrollNext = (jump?: any) => {
     if (this.embla) this.embla.scrollNext(jump);
   };
-  scrollPrev = (jump: any) => {
+  scrollPrev = (jump?: any) => {
     if (this.embla) this.embla.scrollPrev(jump);
   };
-  scrollToIndex = (index: any, jump: any) => {
+  scrollToIndex = (index: any, jump?: any) => {
     if (this.embla) this.embla.scrollTo(index, jump);
   };
   reInitCarousel = (opts: any) => {

@@ -79,11 +79,50 @@
  * call site. Idempotent: every annotation is guarded on absence, so a second
  * run is a no-op.
  *
+ * ## Item 5 (emitter-hardening backlog) — trailing `$expose` verb params
+ *
+ * A `$expose`'d verb's public contract commonly has a genuinely-optional
+ * TRAILING refinement arg (`execute(action)` where most internal callers omit
+ * `action`; `scrollNext(jump)` where the built-in nav buttons never pass
+ * `jump`). Before this pass filled such a param `: any` — REQUIRED — so an
+ * internal call with fewer args than declared (`execute()`, `scrollNext()`)
+ * fails `TS2554` on whichever target actually body-typechecks the emitted
+ * output (empirically: all six — every target clones this SAME neutralized
+ * function node, they just differ in how strictly their own typecheck/lint
+ * harness exercises it). The two shipped author-side workarounds this closes
+ * (`packages/ui/captcha/src/RecaptchaV3.rozie`'s `action = null` default,
+ * `packages/ui/embla/src/Carousel.rozie`'s raw-engine `navPrev`/`navNext`/
+ * `navTo` bypass) both existed ONLY to dodge this.
+ *
+ * The optional `ir` parameter lets this pass see `ir.expose` + the exposed
+ * function's OWN param list. For each exposed verb, `minInternalCallArity`
+ * scans the whole script for internal `CallExpression`s naming that verb and
+ * records the MINIMUM argument count observed. When that minimum is less
+ * than the verb's declared param count, the params from that index onward
+ * are eligible to lower `?: any` instead of `: any` (still residue-only — an
+ * author-typed param in that range is left untouched, same as every other
+ * guard in this file).
+ *
+ * Public-contract guard: this NEVER touches the verb's NAME (still resolved
+ * by `ir.expose`), only its param optionality. A verb with NO internal call
+ * evidence (never called internally — e.g. rete's `FlowCanvas.rozie`
+ * `autoArrange`/`selectNode`/`centerOnNode`, exposed for CONSUMER use only)
+ * or one called at full arity EVERYWHERE gets no mark — byte-identical to
+ * the pre-item-5 pass (verified: rete needed no fix here, only captcha +
+ * embla did — the backlog's premise named "rete" but the actual second
+ * occurrence is embla; see 73-08-SUMMARY.md).
+ *
+ * `ir` is optional (omitted by pre-existing unit tests that construct a bare
+ * `Program`/`File` with no `IRComponent` context) — when absent, this pass is
+ * byte-identical to its pre-item-5 behavior.
+ *
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
 import type { File } from '@babel/types';
+import type { IRComponent } from '../ir/types.js';
+import { collectExposedFunctionsByName } from './collectExposedFunctions.js';
 
 // CJS interop normalization for @babel/traverse default export.
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -91,6 +130,109 @@ const traverse: TraverseFn =
   typeof _traverse === 'function'
     ? (_traverse as TraverseFn)
     : ((_traverse as unknown as { default: TraverseFn }).default);
+
+/**
+ * Fold `n` into `min` (the running minimum), returning the updated value.
+ * `null` means "no evidence yet" — distinct from "called with 0 args".
+ */
+function foldMin(min: number | null, n: number): number {
+  return min === null || n < min ? n : min;
+}
+
+/**
+ * The minimum argument count observed across every internal `CallExpression`
+ * naming `fnName` (a bare-identifier callee) anywhere in `file`'s `<script>`
+ * AST. `null` when there is no such call.
+ */
+function minScriptCallArity(file: File, fnName: string): number | null {
+  let min: number | null = null;
+  traverse(file, {
+    CallExpression(path) {
+      const callee = path.node.callee;
+      if (t.isIdentifier(callee) && callee.name === fnName) {
+        min = foldMin(min, path.node.arguments.length);
+      }
+    },
+  });
+  return min;
+}
+
+/**
+ * The minimum argument count observed across every internal `CallExpression`
+ * naming `fnName` anywhere in a single (possibly bare, non-Program)
+ * Expression node — used for `ir.listeners[].handler`/`.when` (template
+ * `@event` bindings + `<listeners>` entries lower to the SAME `Listener`
+ * shape, D-20). `t.traverseFast` is a scope-free deep walker (no `File`/
+ * `Program` context required, unlike `@babel/traverse`), which is exactly
+ * what a bare `Expression` needs here. `null` when there is no such call.
+ */
+function minExpressionCallArity(
+  expr: t.Node | null | undefined,
+  fnName: string,
+): number | null {
+  if (!expr) return null;
+  let min: number | null = null;
+  t.traverseFast(expr, (node) => {
+    if (
+      t.isCallExpression(node) &&
+      t.isIdentifier(node.callee) &&
+      node.callee.name === fnName
+    ) {
+      min = foldMin(min, node.arguments.length);
+    }
+  });
+  return min;
+}
+
+/**
+ * The minimum argument count observed across every internal call to
+ * `fnName` — the `<script>` body AND every `ir.listeners[].handler`/`.when`
+ * expression (template `@event="…"` bindings lower to `Listener.handler`,
+ * D-20 — this is how embla's `Carousel.rozie` built-in nav buttons
+ * (`@click="scrollNext()"`) are resolved; that call site is NOT part of
+ * `ir.setupBody.scriptProgram` at all). `null` when there is no such call
+ * anywhere — "no evidence" is deliberately distinct from "called with 0
+ * args" (a zero-arg call site still counts as evidence; the absence of ANY
+ * call does not).
+ */
+function minInternalCallArity(
+  file: File,
+  ir: IRComponent,
+  fnName: string,
+): number | null {
+  let min = minScriptCallArity(file, fnName);
+  for (const listener of ir.listeners) {
+    const handlerMin = minExpressionCallArity(listener.handler, fnName);
+    if (handlerMin !== null) min = foldMin(min, handlerMin);
+    const whenMin = minExpressionCallArity(listener.when, fnName);
+    if (whenMin !== null) min = foldMin(min, whenMin);
+  }
+  return min;
+}
+
+/**
+ * For every `$expose`'d verb resolvable to a `<script>` function node,
+ * compute the param INDEX from which trailing params are eligible for the
+ * optional lowering (item 5) — the verb's own minimum internal call arity.
+ * Absent from the returned Map when there is no internal-call evidence, or
+ * when the verb is already called at full arity everywhere (no lowering
+ * needed — byte-identical).
+ */
+function computeOptionalFromIndex(
+  file: File,
+  ir: IRComponent | undefined,
+): Map<t.Node, number> {
+  const out = new Map<t.Node, number>();
+  if (!ir) return out;
+  const fnsByName = collectExposedFunctionsByName(ir);
+  for (const [name, fn] of fnsByName) {
+    const minArity = minInternalCallArity(file, ir, name);
+    if (minArity !== null && minArity < fn.params.length) {
+      out.set(fn, minArity);
+    }
+  }
+  return out;
+}
 
 /** A fresh `: any` annotation node (callers must not share node identity). */
 const anyAnnotation = (): t.TSTypeAnnotation =>
@@ -137,14 +279,25 @@ const anyArrayAnnotation = (): t.TSTypeAnnotation =>
  *     default does not name element types.
  *
  * Idempotent — skips any node that already carries a `typeAnnotation`.
+ *
+ * @param param - the param node to fill.
+ * @param markOptional - item 5: also stamp `.optional = true` (`?: any`)
+ *   instead of `: any`. Applied ONLY when this call is about to fill the
+ *   annotation itself (residue-only — an already-typed param is never
+ *   touched, matching every other guard in this file). A no-op for
+ *   `RestElement` (already variadic; `?` on a rest param is a syntax error)
+ *   and for `AssignmentPattern` (a default value is already optional for
+ *   arity purposes — no `?` needed, and TS does not allow one there).
  */
-function annotateParam(param: t.Node): void {
+function annotateParam(param: t.Node, markOptional = false): void {
   if (
     t.isIdentifier(param) ||
     t.isObjectPattern(param) ||
     t.isArrayPattern(param)
   ) {
-    if (!param.typeAnnotation) param.typeAnnotation = anyAnnotation();
+    const wasUntyped = !param.typeAnnotation;
+    if (wasUntyped) param.typeAnnotation = anyAnnotation();
+    if (markOptional && wasUntyped && !param.optional) param.optional = true;
     return;
   }
   if (t.isRestElement(param)) {
@@ -176,8 +329,19 @@ function annotateParam(param: t.Node): void {
  *
  * @param file - a Babel `File` the caller owns and may mutate (the compile
  *   pipeline passes `ir.setupBody.scriptProgram`).
+ * @param ir - item 5 (emitter-hardening backlog): the lowered component, used
+ *   ONLY to resolve which top-level functions are `$expose`'d verbs and their
+ *   internal call arities (see the file header). Optional — omitted by
+ *   pre-existing unit tests that construct a bare `Program`/`File`; the pass
+ *   is byte-identical to its pre-item-5 behavior when absent.
  */
-export function typeNeutralizeScript(file: File): void {
+export function typeNeutralizeScript(file: File, ir?: IRComponent): void {
+  // Item 5 pre-pass (read-only, no mutation yet): for each `$expose`'d verb
+  // with genuine fewer-arg internal-call evidence, the param index from which
+  // trailing params should lower optional. Empty when `ir` is omitted or no
+  // verb qualifies — the main traversal below then behaves exactly as before.
+  const optionalFromIndex = computeOptionalFromIndex(file, ir);
+
   traverse(file, {
     // `Function` is the Babel alias covering ArrowFunctionExpression,
     // FunctionExpression, FunctionDeclaration, ObjectMethod, ClassMethod,
@@ -199,7 +363,15 @@ export function typeNeutralizeScript(file: File): void {
       ) {
         return;
       }
-      for (const param of path.node.params) annotateParam(param);
+      // Item 5 — is this Function node one of the exposed verbs qualifying
+      // for trailing-optional lowering? `optionalFromIndex` is keyed by AST
+      // node identity (the SAME nodes `collectExposedFunctionsByName` reads
+      // off this very `file`/`ir.setupBody.scriptProgram`), so a direct Map
+      // lookup on `path.node` is exact — no name re-matching needed.
+      const fromIndex = optionalFromIndex.get(path.node);
+      path.node.params.forEach((param, i) => {
+        annotateParam(param, fromIndex !== undefined && i >= fromIndex);
+      });
     },
 
     // `catch (err)` binds `err` as `unknown` under strict-mode

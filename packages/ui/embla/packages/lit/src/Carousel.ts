@@ -380,7 +380,7 @@ private __rozieFirstUpdateDone = false;
 <div class="${Object.entries({ "rozie-embla": true, 'rozie-embla--vertical': this.axis === 'y' }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-4143c216>
   
   <div class="rozie-embla__stage" data-rozie-s-4143c216>
-    ${this.arrows ? html`<button class="rozie-embla__arrow rozie-embla__arrow--prev" type="button" ?disabled=${!this._canPrev.value} aria-label="Previous slide" @click=${($event: Event) => { this.navPrev(); }} data-rozie-s-4143c216>‹</button>` : nothing}<div class="rozie-embla__viewport" data-rozie-ref="viewportEl" data-rozie-s-4143c216>
+    ${this.arrows ? html`<button class="rozie-embla__arrow rozie-embla__arrow--prev" type="button" ?disabled=${!this._canPrev.value} aria-label="Previous slide" @click=${($event: Event) => { this.scrollPrev(); }} data-rozie-s-4143c216>‹</button>` : nothing}<div class="rozie-embla__viewport" data-rozie-ref="viewportEl" data-rozie-s-4143c216>
       <div class="rozie-embla__container" data-rozie-s-4143c216>
         
         ${repeat<any>(this.slides, (slide, i) => this.keyFor(slide, i), (slide, i) => html`<div class="rozie-embla__slide" key=${rozieAttr(this.keyFor(slide, i))} data-rozie-s-4143c216>
@@ -390,11 +390,11 @@ private __rozieFirstUpdateDone = false;
         <slot></slot>
       </div>
     </div>
-    ${this.arrows ? html`<button class="rozie-embla__arrow rozie-embla__arrow--next" type="button" ?disabled=${!this._canNext.value} aria-label="Next slide" @click=${($event: Event) => { this.navNext(); }} data-rozie-s-4143c216>›</button>` : nothing}</div>
+    ${this.arrows ? html`<button class="rozie-embla__arrow rozie-embla__arrow--next" type="button" ?disabled=${!this._canNext.value} aria-label="Next slide" @click=${($event: Event) => { this.scrollNext(); }} data-rozie-s-4143c216>›</button>` : nothing}</div>
 
   
   ${this.dots ? html`<div class="rozie-embla__dots" data-rozie-s-4143c216>
-    ${repeat<any>(this._snaps.value, (di, _idx) => di, (di, _idx) => html`<button class="${Object.entries({ "rozie-embla__dot": true, 'is-selected': di === this._selected.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(di)} type="button" aria-label=${rozieAttr('Go to slide ' + (di + 1))} @click=${($event: Event) => { this.navTo(di); }} data-rozie-s-4143c216></button>`)}
+    ${repeat<any>(this._snaps.value, (di, _idx) => di, (di, _idx) => html`<button class="${Object.entries({ "rozie-embla__dot": true, 'is-selected': di === this._selected.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(di)} type="button" aria-label=${rozieAttr('Go to slide ' + (di + 1))} @click=${($event: Event) => { this.scrollToIndex(di); }} data-rozie-s-4143c216></button>`)}
   </div>` : nothing}${this.thumbnails ? html`<div class="rozie-embla__thumbs" data-rozie-s-4143c216>
     <div class="rozie-embla__thumbs-viewport" data-rozie-ref="thumbsViewportEl" data-rozie-s-4143c216>
       <div class="rozie-embla__thumbs-container" data-rozie-s-4143c216>
@@ -462,32 +462,20 @@ private __rozieFirstUpdateDone = false;
   if (this.emblaThumbs) this.emblaThumbs.scrollTo(i);
 };
 
-  navPrev = () => {
-  if (this.embla) this.embla.scrollPrev();
-};
-
-  navNext = () => {
-  if (this.embla) this.embla.scrollNext();
-};
-
-  navTo = (i: any) => {
-  if (this.embla) this.embla.scrollTo(i);
-};
-
   selectThumb = (i: any) => {
   if (this.emblaThumbs && !this.emblaThumbs.clickAllowed()) return;
-  this.navTo(i);
+  this.scrollToIndex(i);
 };
 
-  scrollNext(jump: any) {
+  scrollNext(jump?: any) {
     if (this.embla) this.embla.scrollNext(jump);
   }
 
-  scrollPrev(jump: any) {
+  scrollPrev(jump?: any) {
     if (this.embla) this.embla.scrollPrev(jump);
   }
 
-  scrollToIndex(index: any, jump: any) {
+  scrollToIndex(index: any, jump?: any) {
     if (this.embla) this.embla.scrollTo(index, jump);
   }
 

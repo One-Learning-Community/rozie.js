@@ -3,7 +3,7 @@
 <div :class="['rozie-embla', { 'rozie-embla--vertical': props.axis === 'y' }]" v-bind="$attrs">
   
   <div class="rozie-embla__stage">
-    <button v-if="props.arrows" type="button" class="rozie-embla__arrow rozie-embla__arrow--prev" :disabled="!canPrev" aria-label="Previous slide" @click="navPrev()">‹</button><div class="rozie-embla__viewport" ref="viewportElRef">
+    <button v-if="props.arrows" type="button" class="rozie-embla__arrow rozie-embla__arrow--prev" :disabled="!canPrev" aria-label="Previous slide" @click="scrollPrev()">‹</button><div class="rozie-embla__viewport" ref="viewportElRef">
       <div class="rozie-embla__container">
         
         <div v-for="(slide, i) in props.slides" :key="keyFor(slide, i)" class="rozie-embla__slide">
@@ -13,11 +13,11 @@
         <slot></slot>
       </div>
     </div>
-    <button v-if="props.arrows" type="button" class="rozie-embla__arrow rozie-embla__arrow--next" :disabled="!canNext" aria-label="Next slide" @click="navNext()">›</button></div>
+    <button v-if="props.arrows" type="button" class="rozie-embla__arrow rozie-embla__arrow--next" :disabled="!canNext" aria-label="Next slide" @click="scrollNext()">›</button></div>
 
   
   <div v-if="props.dots" class="rozie-embla__dots">
-    <button v-for="di in snaps" :key="di" type="button" :class="['rozie-embla__dot', { 'is-selected': di === selected }]" :aria-label="'Go to slide ' + (di + 1)" @click="navTo(di)"></button>
+    <button v-for="di in snaps" :key="di" type="button" :class="['rozie-embla__dot', { 'is-selected': di === selected }]" :aria-label="'Go to slide ' + (di + 1)" @click="scrollToIndex(di)"></button>
   </div><div v-if="props.thumbnails" class="rozie-embla__thumbs">
     <div class="rozie-embla__thumbs-viewport" ref="thumbsViewportElRef">
       <div class="rozie-embla__thumbs-container">
@@ -252,33 +252,27 @@ const syncNav = () => {
   if (emblaThumbs) emblaThumbs.scrollTo(i);
 };
 
-// Internal nav handlers for the built-in arrows/dots/thumbs. These call the
-// `any`-typed engine directly (NOT the $expose verbs scrollPrev/scrollNext/
-// scrollToIndex, whose strict emitted signatures have a REQUIRED jump/index arg —
-// invoking them arg-light from the template would trip TS2554 on the leaves).
-// Internal nav handlers for the built-in arrows/dots/thumbs. These call the
-// `any`-typed engine directly (NOT the $expose verbs scrollPrev/scrollNext/
-// scrollToIndex, whose strict emitted signatures have a REQUIRED jump/index arg —
-// invoking them arg-light from the template would trip TS2554 on the leaves).
-const navPrev = () => {
-  if (embla) embla.scrollPrev();
-};
-const navNext = () => {
-  if (embla) embla.scrollNext();
-};
-const navTo = (i: any) => {
-  if (embla) embla.scrollTo(i);
-};
-
 // Thumb click → scroll the MAIN carousel. Guarded by the thumb engine's
 // clickAllowed() so a drag of the strip doesn't register as a click (the Embla
-// thumbs idiom).
+// thumbs idiom). Calls the $expose'd scrollToIndex verb directly (below) —
+// arg-light internal calls to an exposed verb now typecheck cleanly on all
+// six targets: the emitter lowers a TRAILING $expose verb param optional
+// (`jump?: any` / `index`+`jump?`) whenever it sees a fewer-arg internal call
+// site (emitter-hardening backlog item #5). The prior raw-engine
+// navPrev/navNext/navTo bypass existed ONLY to dodge the pre-fix required-arg
+// TS2554 and is gone now that the compiler owns the arity.
 // Thumb click → scroll the MAIN carousel. Guarded by the thumb engine's
 // clickAllowed() so a drag of the strip doesn't register as a click (the Embla
-// thumbs idiom).
+// thumbs idiom). Calls the $expose'd scrollToIndex verb directly (below) —
+// arg-light internal calls to an exposed verb now typecheck cleanly on all
+// six targets: the emitter lowers a TRAILING $expose verb param optional
+// (`jump?: any` / `index`+`jump?`) whenever it sees a fewer-arg internal call
+// site (emitter-hardening backlog item #5). The prior raw-engine
+// navPrev/navNext/navTo bypass existed ONLY to dodge the pre-fix required-arg
+// TS2554 and is gone now that the compiler owns the arity.
 const selectThumb = (i: any) => {
   if (emblaThumbs && !emblaThumbs.clickAllowed()) return;
-  navTo(i);
+  scrollToIndex(i);
 };
 // ─── imperative handle (Phase 21 $expose) — collision-suffix discipline ──────
 // 14 verbs, each guarding the pre-mount/destroyed `embla = null`.
@@ -298,13 +292,13 @@ const selectThumb = (i: any) => {
 //    progress bars, lazy-load/in-view dots, and directional transitions — no
 //    matching prop, emit, or inherited DOM method — clear.
 //  - scrollNext/scrollPrev/canScrollNext/canScrollPrev/scrollSnapList clear.
-function scrollNext(jump: any) {
+function scrollNext(jump?: any) {
   if (embla) embla.scrollNext(jump);
 }
-function scrollPrev(jump: any) {
+function scrollPrev(jump?: any) {
   if (embla) embla.scrollPrev(jump);
 }
-function scrollToIndex(index: any, jump: any) {
+function scrollToIndex(index: any, jump?: any) {
   if (embla) embla.scrollTo(index, jump);
 }
 function reInitCarousel(opts: any) {

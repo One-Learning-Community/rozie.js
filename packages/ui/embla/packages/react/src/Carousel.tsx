@@ -224,19 +224,10 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     setCanNext(embla.current.canScrollNext());
     if (emblaThumbs.current) emblaThumbs.current.scrollTo(i);
   }, []);
-  const navPrev = useCallback(() => {
-    if (embla.current) embla.current.scrollPrev();
-  }, []);
-  const navNext = useCallback(() => {
-    if (embla.current) embla.current.scrollNext();
-  }, []);
-  const navTo = useCallback((i: any) => {
-    if (embla.current) embla.current.scrollTo(i);
-  }, []);
   const selectThumb = useCallback((i: any) => {
     if (emblaThumbs.current && !emblaThumbs.current.clickAllowed()) return;
-    navTo(i);
-  }, [navTo]);
+    scrollToIndex(i);
+  }, [scrollToIndex]);
   // ─── imperative handle (Phase 21 $expose) — collision-suffix discipline ──────
   // 14 verbs, each guarding the pre-mount/destroyed `embla = null`.
   //  - reInitCarousel ≠ the `reInit` emit (ROZ121 expose-verb==emit collision).
@@ -255,13 +246,13 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
   //    progress bars, lazy-load/in-view dots, and directional transitions — no
   //    matching prop, emit, or inherited DOM method — clear.
   //  - scrollNext/scrollPrev/canScrollNext/canScrollPrev/scrollSnapList clear.
-  function scrollNext(jump: any) {
+  function scrollNext(jump?: any) {
     if (embla.current) embla.current.scrollNext(jump);
   }
-  function scrollPrev(jump: any) {
+  function scrollPrev(jump?: any) {
     if (embla.current) embla.current.scrollPrev(jump);
   }
-  function scrollToIndex(index: any, jump: any) {
+  function scrollToIndex(index: any, jump?: any) {
     if (embla.current) embla.current.scrollTo(index, jump);
   }
   function reInitCarousel(opts: any) {
@@ -390,7 +381,7 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     <div {...attrs} className={clsx(clsx("rozie-embla", { "rozie-embla--vertical": props.axis === 'y' }), (attrs.className as string | undefined))} data-rozie-s-4143c216="">
       
       <div className={"rozie-embla__stage"} data-rozie-s-4143c216="">
-        {!!(props.arrows) && <button type="button" className={"rozie-embla__arrow rozie-embla__arrow--prev"} disabled={!canPrev} aria-label="Previous slide" onClick={($event) => { navPrev(); }} data-rozie-s-4143c216="">‹</button>}<div className={"rozie-embla__viewport"} ref={viewportEl} data-rozie-s-4143c216="">
+        {!!(props.arrows) && <button type="button" className={"rozie-embla__arrow rozie-embla__arrow--prev"} disabled={!canPrev} aria-label="Previous slide" onClick={($event) => { scrollPrev(); }} data-rozie-s-4143c216="">‹</button>}<div className={"rozie-embla__viewport"} ref={viewportEl} data-rozie-s-4143c216="">
           <div className={"rozie-embla__container"} data-rozie-s-4143c216="">
             
             {props.slides.map((slide, i) => <div key={keyFor(slide, i)} className={"rozie-embla__slide"} data-rozie-s-4143c216="">
@@ -400,11 +391,11 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
             {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
           </div>
         </div>
-        {!!(props.arrows) && <button type="button" className={"rozie-embla__arrow rozie-embla__arrow--next"} disabled={!canNext} aria-label="Next slide" onClick={($event) => { navNext(); }} data-rozie-s-4143c216="">›</button>}</div>
+        {!!(props.arrows) && <button type="button" className={"rozie-embla__arrow rozie-embla__arrow--next"} disabled={!canNext} aria-label="Next slide" onClick={($event) => { scrollNext(); }} data-rozie-s-4143c216="">›</button>}</div>
 
       
       {!!(props.dots) && <div className={"rozie-embla__dots"} data-rozie-s-4143c216="">
-        {snaps.map((di) => <button key={di} type="button" className={clsx("rozie-embla__dot", { "is-selected": di === selected })} aria-label={rozieAttr('Go to slide ' + (di + 1))} onClick={($event) => { navTo(di); }} data-rozie-s-4143c216="" />)}
+        {snaps.map((di) => <button key={di} type="button" className={clsx("rozie-embla__dot", { "is-selected": di === selected })} aria-label={rozieAttr('Go to slide ' + (di + 1))} onClick={($event) => { scrollToIndex(di); }} data-rozie-s-4143c216="" />)}
       </div>}{!!(props.thumbnails) && <div className={"rozie-embla__thumbs"} data-rozie-s-4143c216="">
         <div className={"rozie-embla__thumbs-viewport"} ref={thumbsViewportEl} data-rozie-s-4143c216="">
           <div className={"rozie-embla__thumbs-container"} data-rozie-s-4143c216="">
