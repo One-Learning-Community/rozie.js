@@ -73,6 +73,12 @@ const EXAMPLES = [
   'CodeMirror',
   'FullCalendar',
   'PdfViewer',
+  // Phase 73 Plan 08 (emitter-hardening backlog item #5) — a `$expose`'d
+  // verb with a TRAILING param genuinely called with fewer args at TWO
+  // internal sites (a `<script>`-level call and a template `@event`
+  // binding). Locks the trailing-optional-param fix (`?: any`) as a
+  // permanent regression guard.
+  'ExposeTrailingOptional',
 ];
 
 // TYPED_EXAMPLES — the `examples/typed/*` fixture set (Phase 9

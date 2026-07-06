@@ -1,0 +1,57 @@
+<!--
+  ExposeTrailingOptional.rozie
+
+  Emitter-hardening backlog item #5 (Phase 73 Plan 08) dogfood + permanent
+  regression guard: a `$expose`'d verb whose TRAILING param is genuinely
+  optional — the public contract accepts a fewer-arg call, and this
+  component's OWN internal code calls it that way in two different places
+  (a `<script>`-level call and a template `@event` binding, mirroring the
+  two real shapes this item fixed: captcha's RecaptchaV3.rozie `execute()`
+  and embla's Carousel.rozie `@click="scrollNext()"`).
+
+  Untyped `<script>` (not lang="ts") — this is the emitter-residue case:
+  `typeNeutralizeScript` decides the trailing param's TS type. Before the
+  fix it always stamped a REQUIRED `: any`, so the fewer-arg internal call
+  below failed `TS2554` on every target's body-typecheck. After the fix the
+  trailing param lowers `?: any` because BOTH internal call sites here pass
+  fewer args than declared.
+
+  IMPERATIVE HANDLE ($expose): { note } — `note(id, detail)`; `detail` is the
+  trailing, genuinely-optional refinement.
+-->
+
+<rozie name="ExposeTrailingOptional">
+
+<data>
+{
+  value: '',
+}
+</data>
+
+<script>
+// `detail` is a genuinely-optional trailing refinement — most internal
+// callers omit it (see the `$onMount` call and the template `@click` below).
+function note(id, detail) {
+  $data.value = detail != null ? id + ':' + detail : id
+}
+
+// Internal fewer-arg SCRIPT call site (mirrors captcha's RecaptchaV3.rozie
+// `execute()`).
+$onMount(() => {
+  note('mounted')
+})
+
+$expose({ note })
+</script>
+
+<template>
+<div class="expose-trailing-optional">
+  {{ $data.value }}
+  <!-- Internal fewer-arg TEMPLATE @event call site (mirrors embla's
+       Carousel.rozie `@click="scrollNext()"` built-in nav button) — this
+       call lives in ir.listeners, NOT ir.setupBody.scriptProgram. -->
+  <button type="button" @click="note('clicked')">Note</button>
+</div>
+</template>
+
+</rozie>

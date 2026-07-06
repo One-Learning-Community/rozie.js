@@ -65,6 +65,13 @@ const EXAMPLES = [
   // buildPropJsdoc, T-58-06) + the angle-bracket-bearing `@example` line all
   // pass vue-tsc. The docless sibling `count` prop stays a bare compact member.
   'PropDocs',
+  // Phase 73 Plan 08 (emitter-hardening backlog item #5) — a `$expose`'d
+  // verb with a TRAILING param genuinely called with fewer args at TWO
+  // internal sites (a `<script>`-level call and a template `@event`
+  // binding). Locks the trailing-optional-param fix (`?: any`) as a
+  // permanent regression guard — this is the exact shape vue-tsc originally
+  // flagged (captcha's RecaptchaV3.rozie).
+  'ExposeTrailingOptional',
 ];
 
 // TYPED_EXAMPLES — the `examples/typed/*` fixture set (Phase 9

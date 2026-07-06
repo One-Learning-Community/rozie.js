@@ -74,6 +74,14 @@ const EXAMPLES = [
   // covering it here exercises the class-body emit path. `maplibre-gl` resolves
   // against the ambient `engine-modules.d.ts` stub.
   'MapLibre',
+  // Phase 73 Plan 08 (emitter-hardening backlog item #5) — a `$expose`'d
+  // verb with a TRAILING param genuinely called with fewer args at TWO
+  // internal sites (a class-body call and a template `@event` binding).
+  // Locks the trailing-optional-param fix (`?: any`) as a permanent
+  // regression guard on the class-body signature (the template `@click`
+  // binding itself is verified separately via `ng-packagr` AOT build, since
+  // this gate does not strictTemplates-check the `template:` string).
+  'ExposeTrailingOptional',
 ];
 
 // TYPED_EXAMPLES — the `examples/typed/*` fixture set (Phase 9
