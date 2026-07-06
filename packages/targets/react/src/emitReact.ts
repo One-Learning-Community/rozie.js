@@ -36,6 +36,10 @@
  * @experimental — shape may change before v1.0
  */
 import type { IRComponent } from '../../../core/src/ir/types.js';
+import {
+  deconflictRefsAgainstUserBindings,
+  collectTopLevelFunctionNames,
+} from '../../../core/src/rewrite/deconflict.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { BlockMap } from '../../../core/src/ast/types.js';
@@ -98,6 +102,21 @@ export function emitReact(
   // the IR's component name otherwise (covers test-only synthetic IRs).
   const scopeHash = computeScopeHash(ir.name, opts.filename);
   const scopeAttr = scopeAttrName(scopeHash);
+
+  // Spike-012 R3-5 — a `ref="X"` name colliding with a TOP-LEVEL user `function X`
+  // (often an `$expose` verb) both mint a program-scope `X` binding (`const X =
+  // useRef(...)` + `function X(){}`) → duplicate declaration. The accessor-shadow
+  // pass renames a colliding `const`/`let X` to `X$local`, but it skips function
+  // declarations, and an exposed `function X` is public contract (its name feeds
+  // the emitted `useImperativeHandle` handle) so it CANNOT be renamed. The
+  // renameable side is the INTERNAL ref → rename it to `<name>Ref` (field +
+  // `$refs.X` rewrite + JSX `ref={}` all read the renamed IR). Only-on-collision
+  // (function names only), so the const/let path + the non-colliding corpus stay
+  // byte-identical. Runs on this target's OWN fresh IR before any emit reads a ref.
+  deconflictRefsAgainstUserBindings(
+    ir,
+    collectTopLevelFunctionNames(ir.setupBody.scriptProgram),
+  );
 
   // Spike 004 — reuse the per-component `scopeHash` for the `@portal` closure
   // setAttribute so it matches the emitted `@portal` CSS selectors.

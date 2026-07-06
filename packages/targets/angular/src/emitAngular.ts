@@ -92,7 +92,10 @@ import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
 import { buildPartialLineOffsets } from '../../../core/src/codegen/composeMaps.js';
 import { cloneScriptProgram } from './rewrite/cloneProgram.js';
-import { rewriteRozieIdentifiers } from './rewrite/rewriteScript.js';
+import {
+  rewriteRozieIdentifiers,
+  collectUserMethodNames,
+} from './rewrite/rewriteScript.js';
 import {
   cvaDiagnostics as computeCvaDiagnostics,
   hasBooleanDisabledProp,
@@ -101,6 +104,7 @@ import {
   reservedClassMembers,
   deconflictReservedComputedInjectNames,
   deconflictReservedDataRefNames,
+  deconflictRefsAgainstUserBindings,
 } from '../../../core/src/rewrite/deconflict.js';
 // Phase 71 Plan 09 (r-keynav, Angular — highest blast radius) — resolved
 // ONCE here and threaded through both emitScript (class-body wiring) and
@@ -466,6 +470,14 @@ export function emitAngular(
     ]);
     deconflictReservedDataRefNames(ir, reserved, protectedNames);
     deconflictReservedComputedInjectNames(ir, reserved, protectedNames);
+
+    // Spike-012 R3-5 — a `ref="X"` name colliding with a TOP-LEVEL user
+    // `<script>` binding of the same name (`const box`/`let box`/`function box`,
+    // the last possibly an `$expose` verb) both mint a `box` class member → dup
+    // (TS2300) + the user reference wrongly lowered to the ref's `this.box()`
+    // signal. Rename the INTERNAL ref (field + selector + `#template-ref` var) to
+    // `<name>Ref`; only-on-collision, so the non-colliding corpus is byte-identical.
+    deconflictRefsAgainstUserBindings(ir, collectUserMethodNames(ir.setupBody.scriptProgram));
   }
 
   // Pre-compute collisionRenames + classMembers + signalMembers by running a

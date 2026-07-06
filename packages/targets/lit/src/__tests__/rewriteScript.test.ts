@@ -153,19 +153,30 @@ describe('collectMethodNamesFromProgram', () => {
     expect(names.has('total')).toBe(false);
   });
 
-  it('does NOT collect names colliding with state/computed/ref/prop/slot reserved set', () => {
+  it('does NOT collect names colliding with state/computed/prop/slot reserved set', () => {
     const ir = buildIR({
       state: [state('count')],
       computed: [computed('total')],
-      refs: [ref('panelEl')],
       props: [prop('value', true)],
       slots: [buildSlotDecl('header')],
     });
     const file = parseFile(
-      'const count = 1; const total = 2; const panelEl = 3; const value = 4; const header = 5;',
+      'const count = 1; const total = 2; const value = 4; const header = 5;',
     );
     const names = collectMethodNamesFromProgram(file, ir);
     expect(names.size).toBe(0);
+  });
+
+  it('DOES collect a top-level binding shadowing a ref name (Spike-012 R3-5)', () => {
+    // `$refs.panelEl` lowers to the prefixed `this._refPanelEl` @query field, so a
+    // same-named top-level user binding is a REAL promoted `this.panelEl` field
+    // whose references must be `this.`-qualified — it is NOT reserved by the ref.
+    const ir = buildIR({
+      refs: [ref('panelEl')],
+    });
+    const file = parseFile('const panelEl = 3;');
+    const names = collectMethodNamesFromProgram(file, ir);
+    expect(names.has('panelEl')).toBe(true);
   });
 });
 

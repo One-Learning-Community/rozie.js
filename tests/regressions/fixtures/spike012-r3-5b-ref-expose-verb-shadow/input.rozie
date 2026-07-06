@@ -1,0 +1,18 @@
+<rozie name="RefExposeVerbShadow">
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+function box(): void { $data.n += 1; }
+$onMount(() => { void ($refs.box as HTMLElement); })
+$expose({ box })
+</script>
+
+<template>
+<div class="r"><div ref="box">x</div></div>
+</template>
+
+</rozie>

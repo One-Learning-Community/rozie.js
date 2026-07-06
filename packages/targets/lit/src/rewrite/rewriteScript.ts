@@ -162,7 +162,14 @@ export function collectMethodNamesFromProgram(file: File, ir: IRComponent): Set<
   const reserved = new Set<string>([
     ...ir.state.map((s) => s.name),
     ...ir.computed.map((c) => c.name),
-    ...ir.refs.map((r) => r.name),
+    // Spike-012 R3-5: `$refs.X` lowers to the PREFIXED `this._refX` @query field,
+    // so a same-named TOP-LEVEL user binding (`const box = 0` alongside
+    // `ref="box"`) does NOT collide with the ref field — it is a genuine promoted
+    // class field (`box`) whose references must become `this.box`. Refs are
+    // therefore NOT reserved here: excluding them left the user binding's
+    // references bare (`… + box` instead of `this.box`) → TS2663. A `const box =
+    // $refs.box` self-shadow is impossible to reach (refs outside `$onMount` are a
+    // ROZ123 error), so this only ever promotes a real user binding.
     ...ir.props.map((p) => p.name),
     ...ir.slots.map((s) => (s.name === '' ? 'default' : s.name)),
   ]);

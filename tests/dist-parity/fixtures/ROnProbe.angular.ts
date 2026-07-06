@@ -40,7 +40,7 @@ export class ROnProbe {
     let timer: ReturnType<typeof setTimeout> | null = null;
     return (...args: any[]) => {
       if (timer !== null) clearTimeout(timer);
-      timer = setTimeout(() => (onInput() as (...a: any[]) => any)(...args), 300);
+      timer = setTimeout(() => (this.onInput() as (...a: any[]) => any)(...args), 300);
     };
   })();
 

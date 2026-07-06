@@ -1,0 +1,17 @@
+<rozie name="RefConstShadow">
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+const box = 0
+$onMount(() => { $data.n = ($refs.box as HTMLElement).childElementCount + box; })
+</script>
+
+<template>
+<div class="r"><div ref="box">x</div></div>
+</template>
+
+</rozie>

@@ -1,0 +1,12 @@
+{
+  "id": "REG-SPIKE012-R3-5A",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a top-level `const box` that shares its name with a `ref=\"box\"` must not collide with the emitter-injected ref member: Lit promotes the user binding to `this.box` (ref stays the prefixed `_refBox`), Angular renames the ref field/selector/#template-ref to `boxRef` (user `box` field intact) — no duplicate class member, no wrong `this.box()` signal read",
+  "targets": [
+    "lit",
+    "angular"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012, R3-5)"
+}

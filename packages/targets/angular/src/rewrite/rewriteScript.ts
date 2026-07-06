@@ -282,7 +282,7 @@ function buildAngularSetterCall(
  * Pre-walk Program top-level statements to discover user-method/arrow names.
  * Returns the set of names that map to class methods/arrows in emitted output.
  */
-function collectUserMethodNames(program: File): Set<string> {
+export function collectUserMethodNames(program: File): Set<string> {
   const names = new Set<string>();
   for (const stmt of program.program.body) {
     if (t.isVariableDeclaration(stmt)) {

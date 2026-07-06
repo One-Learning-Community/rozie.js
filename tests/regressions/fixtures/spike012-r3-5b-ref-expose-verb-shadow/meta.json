@@ -1,0 +1,14 @@
+{
+  "id": "REG-SPIKE012-R3-5B",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a `ref=\"box\"` colliding with an $expose verb `function box` must not mint a duplicate binding: the exposed verb name is public contract (feeds the handle), so the renameable side is the INTERNAL ref — React/Svelte rename the ref local to `boxRef`, Angular renames the viewChild field to `boxRef`, Lit's ref is the prefixed `_refBox` — the exposed `box` stays intact",
+  "targets": [
+    "react",
+    "svelte",
+    "angular",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012, R3-5)"
+}

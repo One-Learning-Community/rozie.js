@@ -1003,6 +1003,164 @@ export function deconflictReservedDataRefNames(
 }
 
 /**
+ * IR-LEVEL ref-vs-user-binding deconfliction for the ANGULAR target
+ * (Spike-012 R3-5).
+ *
+ * DISTINCT from `deconflictReservedDataRefNames` (ref name collides with a
+ * reserved CLASS MEMBER): here a `ref="X"` name collides with a TOP-LEVEL user
+ * `<script>` binding of the same name (`const box = 0` / `let box = 1` /
+ * `function box(){}`) that the Angular emitter promotes to a class field/method.
+ * Both mint a `box` class member → duplicate declaration (TS2300), and the user
+ * binding's bare references are wrongly lowered to the ref's `this.box()` signal
+ * accessor. Neither the reserved-member pass nor the per-target clone rename sees
+ * this: the ref name is not a reserved member, and it appears in the clone only as
+ * the `$refs.box` member PROPERTY (which the bare-identifier pass skips).
+ *
+ * The renameable side is the REF (its class field, `viewChild()` selector, and
+ * component-internal `#X` template-ref var are ALL internal — never consumer
+ * contract), NOT the user binding: the user binding may itself be a public
+ * `$expose` verb (`function box` + `$expose({ box })`), which is why the trigger
+ * ignores `protectedNames` — renaming the internal ref is always safe. The ref is
+ * renamed to a fresh `<name>Ref` (a `Ref` suffix rather than `$local`: it stays a
+ * plain identifier, valid as an Angular `#template-ref` variable). This mirrors
+ * what Solid already does UNCONDITIONALLY (every `$refs.X` lowers to a `<name>Ref`
+ * local) — here it is applied only-on-collision so the non-colliding corpus is
+ * byte-identical.
+ *
+ * Renames the ref IR field (`ir.refs[].name` — the codegen source of truth for
+ * the field, the `viewChild('<name>')` selector, and the `$refs.<name>` rewrite),
+ * every `$refs.<old>` non-computed MemberExpression property across the IR (script
+ * + template subtrees), and every template static `ref="<old>"` attribute value
+ * (which becomes the `#<name>` template-ref the selector must match). Refs are not
+ * reactive deps, so there is no `scope:'ref'` to rename, and STATE is never touched.
+ *
+ * Mutates `ir` in place. Invoked from `emitAngular` on the target's OWN fresh IR
+ * (each `compile()` lowers a fresh IR per target — no cross-target leakage), BEFORE
+ * any emitter reads a ref name. Returns the rename map (old → new) for
+ * tests/diagnostics; empty when nothing collided.
+ *
+ * @param ir                the component IR (colliding `refs[].name` renamed).
+ * @param userBindingNames  top-level `<script>` binding names that become class
+ *                          fields/methods (const/let/function ids; $computed
+ *                          excluded — it is a getter, not a plain field).
+ */
+/**
+ * Collect TOP-LEVEL `function X() {}` declaration names from a `<script>`
+ * Program. Used by the React/Svelte ref-collision fix (Spike-012 R3-5): a
+ * top-level function that shadows a `ref="X"` name is the ONE ref-collision the
+ * bare-ident accessor-shadow pass cannot repair — a `const`/`let X` is renamed to
+ * `X$local`, but a `function X` is skipped by the accessor group AND may be a
+ * public `$expose` verb (whose name is fixed by the emitted handle). The
+ * renameable side is therefore the internal ref, triggered on the function name.
+ */
+export function collectTopLevelFunctionNames(program: File): Set<string> {
+  const names = new Set<string>();
+  for (const stmt of program.program.body) {
+    if (t.isFunctionDeclaration(stmt) && stmt.id) names.add(stmt.id.name);
+  }
+  return names;
+}
+
+export function deconflictRefsAgainstUserBindings(
+  ir: {
+    state: { name: string }[];
+    refs: { name: string }[];
+    computed?: { name: string }[];
+    props?: { name: string }[];
+  },
+  userBindingNames: ReadonlySet<string>,
+): Map<string, string> {
+  const renames = new Map<string, string>();
+  if (userBindingNames.size === 0 || ir.refs.length === 0) return renames;
+
+  // Names already occupied across the class surface — the fresh `<name>Ref` must
+  // avoid every ref/state/computed/prop AND every user binding.
+  const taken = new Set<string>([
+    ...ir.refs.map((r) => r.name),
+    ...ir.state.map((s) => s.name),
+    ...(ir.computed ?? []).map((c) => c.name),
+    ...(ir.props ?? []).map((p) => p.name),
+    ...userBindingNames,
+  ]);
+  const freshName = (base: string): string => {
+    let candidate = `${base}Ref`;
+    let i = 2;
+    while (taken.has(candidate)) candidate = `${base}Ref${i++}`;
+    taken.add(candidate);
+    return candidate;
+  };
+
+  for (const r of ir.refs) {
+    if (renames.has(r.name)) continue;
+    // Trigger: a top-level user binding of the ref's name exists. `protectedNames`
+    // is intentionally NOT consulted — we rename the INTERNAL ref, never the user
+    // (possibly public `$expose`) binding, so a protected name is still a valid
+    // trigger (the `function box` + `$expose({ box })` + `ref="box"` case).
+    if (userBindingNames.has(r.name)) {
+      renames.set(r.name, freshName(r.name));
+    }
+  }
+  if (renames.size === 0) return renames;
+
+  // 1. Rename the ref IR fields (field name + viewChild selector source of truth
+  //    + `$refs.<name>` rewrite key — all read back from `ir.refs[].name`).
+  for (const r of ir.refs) {
+    const renamed = renames.get(r.name);
+    if (renamed) r.name = renamed;
+  }
+
+  // 2. Deep-walk the ENTIRE IR: rename every `$refs.<old>` non-computed member
+  //    property + every template static `ref="<old>"` attribute value. STATE and
+  //    `$data.<key>` members are deliberately untouched.
+  const seen = new WeakSet<object>();
+  const isNode = (v: unknown): v is { type: string } =>
+    !!v && typeof v === 'object' && typeof (v as { type?: unknown }).type === 'string';
+
+  const walk = (value: unknown): void => {
+    if (!value || typeof value !== 'object') return;
+    if (seen.has(value)) return;
+    seen.add(value);
+
+    const asAttr = value as { kind?: unknown; name?: unknown; value?: unknown };
+    if (asAttr.kind === 'static' && asAttr.name === 'ref' && typeof asAttr.value === 'string') {
+      const renamed = renames.get(asAttr.value);
+      if (renamed) (value as { value: string }).value = renamed;
+    }
+
+    if (isNode(value)) {
+      const node = value as {
+        type: string;
+        computed?: boolean;
+        object?: { type?: string; name?: string };
+        property?: { type?: string; name?: string };
+      };
+      if (
+        (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') &&
+        node.computed !== true &&
+        node.object?.type === 'Identifier' &&
+        node.object.name === '$refs' &&
+        node.property?.type === 'Identifier' &&
+        typeof node.property.name === 'string'
+      ) {
+        const renamed = renames.get(node.property.name);
+        if (renamed) node.property.name = renamed;
+      }
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item);
+      return;
+    }
+    for (const key of Object.keys(value)) {
+      walk((value as Record<string, unknown>)[key]);
+    }
+  };
+  walk(ir);
+
+  return renames;
+}
+
+/**
  * IR-LEVEL generated-binding / vue-import deconfliction for the VUE target
  * (Phase 61 Plan 07 — SC-2, collision-vue §3 risks 2 + 3).
  *

@@ -26,6 +26,10 @@
  * @experimental — shape may change before v1.0
  */
 import type { IRComponent, TemplateNode } from '../../../core/src/ir/types.js';
+import {
+  deconflictRefsAgainstUserBindings,
+  collectTopLevelFunctionNames,
+} from '../../../core/src/rewrite/deconflict.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { BlockMap } from '../../../core/src/ast/types.js';
@@ -141,6 +145,19 @@ export function emitSvelte(
   opts: EmitSvelteOptions = {},
 ): EmitSvelteResult {
   const registry = opts.modifierRegistry ?? createDefaultRegistry();
+
+  // Spike-012 R3-5 — a `ref="X"` name colliding with a TOP-LEVEL user `function X`
+  // (often an exported `$expose` verb) both mint a program-scope `X` binding
+  // (`let X = $state(...)` + `export function X(){}`) → duplicate declaration. A
+  // colliding `const`/`let X` is renamed to `X$local` by the accessor-shadow pass,
+  // but a function is skipped there and an exported verb is public contract, so the
+  // renameable side is the INTERNAL ref → `<name>Ref` (state local + `$refs.X`
+  // rewrite + `bind:this={}` all read the renamed IR). Only-on-collision (function
+  // names only) → const/let path + non-colliding corpus stay byte-identical.
+  deconflictRefsAgainstUserBindings(
+    ir,
+    collectTopLevelFunctionNames(ir.setupBody.scriptProgram),
+  );
 
   // 1. Script-side emission.
   // Phase 06.1 P2: thread filename for sourceFileName + capture scriptMap + preambleSectionLines.

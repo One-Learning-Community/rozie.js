@@ -69,7 +69,10 @@ function collectMethodNames(ir: IRComponent): Set<string> {
   const reserved = new Set<string>([
     ...ir.state.map((s) => s.name),
     ...ir.computed.map((c) => c.name),
-    ...ir.refs.map((r) => r.name),
+    // Spike-012 R3-5: refs lower to the prefixed `this._refX` @query field, so a
+    // same-named top-level user binding is a real promoted `this.X` field whose
+    // template references must be `this.`-qualified. Kept in sync with
+    // rewriteScript.ts's collectMethodNamesFromProgram (see its comment).
     ...ir.props.map((p) => p.name),
     ...ir.slots.map((s) => (s.name === '' ? 'default' : s.name)),
   ]);
