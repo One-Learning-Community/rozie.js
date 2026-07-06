@@ -113,7 +113,7 @@ const dropAtCenter = () => {
         <template #body="{ node }">
           <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
         </template>
-        <Port input="in" label="in" :multiple="true" />
+        <Port input="in" label="in" multiple />
         <Port output="out" label="out" />
       </NodeType>
     </FlowCanvas>

@@ -81,16 +81,21 @@
   // (`multiple !== false`), inputs default single (`multiple === true`). Forcing
   // `type: Boolean` would make Lit coerce an ABSENT attribute to `false` (not undefined),
   // flipping default-output multiplicity on Lit ONLY (a cross-target divergence that would
-  // regress the passing rete-flow-drag Lit cell). A consumer that needs an EXPLICIT multi
-  // port must BIND it (`:multiple="true"`) rather than use the bare boolean attribute
-  // (`multiple`): on Lit an untyped prop is `@property({ type: Object })`, so the BARE
-  // attribute is the empty string → `JSON.parse('')` THROWS → multiple stays undefined;
-  // a BOUND `:multiple="true"` passes a real boolean through the framework prop binding
-  // (no HTML-attribute JSON parse), landing true on all 6 targets.
+  // regress the passing rete-flow-drag Lit cell).
+  //
+  // A consumer that needs an EXPLICIT multi port can use the bare `multiple` attribute
+  // (`<Port input="..." multiple />`) — the emitter coerces a valueless static attr on a
+  // COMPONENT tag to a real `true` binding at the IR layer (Phase 46 ITEM-2:
+  // `isComponentElement` gate in `lowerTemplate.ts`), so it lands as `true` on all 6
+  // targets, INCLUDING Lit (`.multiple=${true}`, a property binding — not the HTML-
+  // attribute `JSON.parse('')` path an untyped `@property({ type: Object })` would hit).
+  // The older `:multiple="true"` bound form still works identically; both are
+  // byte-identical post-lowering. Only a bare attr on a DOM ELEMENT (not a component)
+  // is unaffected by this coercion.
   multiple: { default: undefined,
     docs: {
       description:
-        "Allow multiple connections into/out of this socket. Left undefined by default to preserve the canvas's side asymmetry: outputs default to multi, inputs default to single. To force an explicit multi input, BIND it (`:multiple=\"true\"`) rather than using the bare boolean attribute (a bare `multiple` lands as undefined on Lit).",
+        "Allow multiple connections into/out of this socket. Left undefined by default to preserve the canvas's side asymmetry: outputs default to multi, inputs default to single. To force an explicit multi input, use the bare `multiple` attribute (`<Port ... multiple />`) — it resolves to `true` on all six targets.",
     } },
   // VISUAL placement of the socket on the node: 'left' | 'right' | 'top' | 'bottom'.
   // Default by DIRECTION (input → left, output → right — exact back-compat; existing

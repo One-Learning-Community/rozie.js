@@ -84,7 +84,7 @@ const onTranslated = (e) => { $data.tx = e && typeof e.x === 'number' ? Math.rou
             <strong>{{ node.data.label }}</strong>
           </div>
         </template>
-        <Port input="in" label="in" :multiple="true" />
+        <Port input="in" label="in" multiple />
         <Port output="out" label="out" />
       </NodeType>
     </FlowCanvas>

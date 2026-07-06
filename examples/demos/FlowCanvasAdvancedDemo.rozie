@@ -307,7 +307,7 @@ const kindGlyph = (type) =>
           input never evicts, so the rejected self-loop leaves num→math intact (the
           intended "reject does not mutate the graph" semantics).
         -->
-        <Port input="in" type="number" label="number" :multiple="true" />
+        <Port input="in" type="number" label="number" multiple />
         <Port output="out" type="number" label="number" />
       </NodeType>
 
@@ -357,8 +357,8 @@ const kindGlyph = (type) =>
             </div>
           </div>
         </template>
-        <Port input="num" type="number" label="number" :multiple="true" />
-        <Port input="str" type="string" label="string" :multiple="true" />
+        <Port input="num" type="number" label="number" multiple />
+        <Port input="str" type="string" label="string" multiple />
       </NodeType>
     </FlowCanvas>
   </div>

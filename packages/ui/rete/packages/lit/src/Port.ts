@@ -26,7 +26,7 @@ export default class Port extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) label: string = undefined;
   /**
-   * Allow multiple connections into/out of this socket. Left undefined by default to preserve the canvas's side asymmetry: outputs default to multi, inputs default to single. To force an explicit multi input, BIND it (`:multiple="true"`) rather than using the bare boolean attribute (a bare `multiple` lands as undefined on Lit).
+   * Allow multiple connections into/out of this socket. Left undefined by default to preserve the canvas's side asymmetry: outputs default to multi, inputs default to single. To force an explicit multi input, use the bare `multiple` attribute (`<Port ... multiple />`) — it resolves to `true` on all six targets.
    */
   @property({ type: Object }) multiple: unknown = undefined;
   /**

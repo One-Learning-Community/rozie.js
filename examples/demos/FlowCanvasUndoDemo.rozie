@@ -66,7 +66,7 @@ const doRedo = () => { const c = $refs.canvas; if (c && c.redo) c.redo() }
         <template #body="{ node }">
           <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
         </template>
-        <Port input="in" label="in" :multiple="true" />
+        <Port input="in" label="in" multiple />
         <Port output="out" label="out" />
       </NodeType>
     </FlowCanvas>

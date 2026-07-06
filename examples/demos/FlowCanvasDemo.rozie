@@ -123,11 +123,12 @@ const onConnect = () => { $data.lastConnect = ($data.lastConnect || 0) + 1 }
              than EVICTS the existing one (a Rete single-input holds exactly one, and
              dropping a replacement onto an OCCUPIED single-input evicts-then-adds — a
              two-step that does NOT commit on Solid, leaving the edge undrawn). `multiple`
-             makes the drop a clean add on all 6 targets. BOUND `:multiple="true"` (NOT the
-             bare `multiple` attribute): on Lit an untyped prop is `@property({type:Object})`,
-             so a bare boolean attribute is `JSON.parse('')` → THROWS → multiple undefined;
-             a bound prop passes a real boolean through the framework binding (no attr parse). -->
-        <Port input="in" label="in" :multiple="true" />
+             makes the drop a clean add on all 6 targets. Bare `multiple` (a valueless
+             attr on the `<Port>` COMPONENT) now resolves correctly on all six targets —
+             the emitter coerces a bare attr on a component to `true` at the IR layer
+             (Phase 46 ITEM-2), so the earlier `:multiple="true"` bound-form workaround
+             is no longer needed. -->
+        <Port input="in" label="in" multiple />
         <Port output="out" label="out" />
       </NodeType>
     </FlowCanvas>
