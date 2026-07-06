@@ -43,7 +43,7 @@ const EXAMPLES = [
 // tsc-checked in separate describe blocks so a typed-fixture failure is
 // distinguishable from an untyped regression. Solid uses a LINT gate (this
 // workspace) as its per-target gate — it has no separate typecheck workspace.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'DataCast', 'PropsCustomType', 'PropsRequired', 'DialogRef'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'DataCast', 'PropsCustomType', 'PropsRequired', 'DialogRef', 'RefTagTypeProbe'];
 
 describe('SOLID-T-04 — eslint-plugin-solid clean (--max-warnings 0)', () => {
   it('all 8 emitted Solid TSX files lint clean', () => {

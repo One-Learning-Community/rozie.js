@@ -80,7 +80,7 @@ const EXAMPLES = [
 // `examples/typed/`, NOT added to the dist-parity EXAMPLES baseline. Checked
 // in a separate describe block so a typed-fixture failure is distinguishable
 // from an untyped regression.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType', 'PropsRequired', 'DialogRef'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType', 'PropsRequired', 'DialogRef', 'RefTagTypeProbe'];
 
 describe('SVELTE-CHECK — svelte-check --threshold error clean over emitted Svelte SFCs', () => {
   it('all 18 emitted Svelte .svelte files (8 reference + 10 engine-wrapper) svelte-check clean', () => {

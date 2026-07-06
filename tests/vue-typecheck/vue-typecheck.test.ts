@@ -72,7 +72,7 @@ const EXAMPLES = [
 // `examples/typed/`, NOT added to the dist-parity EXAMPLES baseline. Checked
 // in a separate describe block so a typed-fixture failure is distinguishable
 // from an untyped regression.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType', 'PropsRequired', 'DialogRef'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType', 'PropsRequired', 'DialogRef', 'RefTagTypeProbe'];
 
 describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
   it('all 13 emitted Vue SFC files (8 reference + 5 engine-wrapper) typecheck clean', () => {

@@ -84,7 +84,7 @@ const EXAMPLES = [
 // interface/type module-scope hoist (Plan 09-04 OQ-3) on this class-based
 // target — a TSInterfaceDeclaration inside the @Component class body would be
 // a tsc syntax error if the hoist regressed.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType', 'PropsRequired', 'DialogRef'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType', 'PropsRequired', 'DialogRef', 'RefTagTypeProbe'];
 
 describe('ANGULAR-TSC — tsc --noEmit clean over emitted Angular standalone components', () => {
   it('all 13 emitted Angular .ts files (8 reference + 5 engine-wrapper) tsc clean', () => {

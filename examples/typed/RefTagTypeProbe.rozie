@@ -1,0 +1,52 @@
+<!--
+  typed/RefTagTypeProbe.rozie
+
+  Red-first typed fixture for emitter-hardening backlog item #4 — the
+  tag→element-type map gaps (`img`/`ul`/`li`).
+
+  A `ref` on `<img>` / `<ul>` / `<li>` must type to HTMLImageElement /
+  HTMLUListElement / HTMLLIElement (not the HTMLElement fallback) on every
+  target, so a distinguishing DOM member absent from plain HTMLElement
+  typechecks: `.naturalWidth` (img), `.compact` (ul, deprecated-but-typed),
+  `.value` (li). Before the map gains these three tags, the emitted ref
+  types fall back to `HTMLElement`, on which these members do not exist →
+  the per-target tsc/vue-tsc/svelte-check/eslint-plugin-solid/eslint-plugin-lit
+  gates fail (TS2339, or TS2322 on React's `ref={imageEl}` JSX-attribute
+  assignment — the exact class the shipped `dialog` fix (typed/DialogRef.rozie,
+  LB6 SEAM 1) and the cropper/pdf `HTMLImageElement` codegen type-aids paper
+  over today). After the map entries land they pass with NO per-target
+  workaround needed.
+
+  $refs reads are confined to $onMount (ROZ123 — $refs elsewhere crashes
+  Solid + is null on Lit).
+-->
+
+<rozie name="RefTagTypeProbe">
+
+<script lang="ts">
+$onMount(() => {
+  // Each read is a member that exists on the specific element interface but
+  // NOT on the bare `HTMLElement` fallback — a regression to the fallback
+  // type fails tsc with TS2339 (or TS2322 on React's ref-attribute binding).
+  const imgWidth: number | undefined = $refs.imgRef?.naturalWidth
+  const ulCompact: boolean | undefined = $refs.listRef?.compact
+  const liValue: number | undefined = $refs.itemRef?.value
+  console.log(imgWidth, ulCompact, liValue)
+})
+</script>
+
+<template>
+<div class="ref-tag-type-probe">
+  <img ref="imgRef" class="probe-img" src="" alt="" />
+  <ul ref="listRef" class="probe-list">
+    <li ref="itemRef" class="probe-item">probe</li>
+  </ul>
+</div>
+</template>
+
+<style>
+.ref-tag-type-probe { font-family: sans-serif; }
+.probe-list { list-style: none; padding: 0; }
+</style>
+
+</rozie>

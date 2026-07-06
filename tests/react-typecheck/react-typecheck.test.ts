@@ -71,7 +71,7 @@ const EXAMPLES = [
 // `examples/typed/`, NOT added to the dist-parity EXAMPLES baseline. This gate
 // compiles + tsc-checks them in a separate describe block so a typed-fixture
 // failure is distinguishable from an untyped regression.
-const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType', 'PropsRequired', 'DialogRef'];
+const TYPED_EXAMPLES = ['Counter', 'Dropdown', 'SortableList', 'TypedCard', 'MatchUnion', 'DataCast', 'PropsCustomType', 'PropsRequired', 'DialogRef', 'RefTagTypeProbe'];
 
 describe('REACT-TSC — tsc --noEmit clean over emitted React TSX', () => {
   it('all 13 emitted React TSX files (8 reference + 5 engine-wrapper) tsc clean', () => {
