@@ -669,6 +669,15 @@ function emitTemplateRefs(ir: IRComponent, imports: VueImportCollector): string[
       case 'dialog':
         domType = 'HTMLDialogElement';
         break;
+      case 'img':
+        domType = 'HTMLImageElement';
+        break;
+      case 'ul':
+        domType = 'HTMLUListElement';
+        break;
+      case 'li':
+        domType = 'HTMLLIElement';
+        break;
     }
     lines.push(`const ${r.name}Ref = ref<${domType}>();`);
   }

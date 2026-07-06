@@ -132,7 +132,7 @@ let {
   ...__rozieAttrs
 }: Props = $props();
 
-let imageEl = $state<HTMLElement | undefined>(undefined);
+let imageEl = $state<HTMLImageElement | undefined>(undefined);
 
 // The engine default-import is aliased `CropperEngine` — a bare `import Cropper`
 // would collide with the component name `Cropper` (the rozie `name`), which the

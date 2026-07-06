@@ -875,6 +875,15 @@ function emitRefDecls(ir: IRComponent): string[] {
       case 'dialog':
         domType = 'HTMLDialogElement';
         break;
+      case 'img':
+        domType = 'HTMLImageElement';
+        break;
+      case 'ul':
+        domType = 'HTMLUListElement';
+        break;
+      case 'li':
+        domType = 'HTMLLIElement';
+        break;
     }
     lines.push(`let ${r.name} = $state<${domType} | undefined>(undefined);`);
   }

@@ -943,6 +943,12 @@ function inferRefDomType(refName: string, refs: RefDecl[]): string {
       return 'HTMLCanvasElement';
     case 'div':
       return 'HTMLDivElement';
+    case 'img':
+      return 'HTMLImageElement';
+    case 'ul':
+      return 'HTMLUListElement';
+    case 'li':
+      return 'HTMLLIElement';
   }
   return 'HTMLElement';
 }

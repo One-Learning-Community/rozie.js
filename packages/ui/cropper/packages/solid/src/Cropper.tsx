@@ -189,7 +189,7 @@ export default function Cropper(_props: CropperProps): JSX.Element {
     if (sameData(v, instance.getData())) return;
     instance.setData(v);
   })(v)), { defer: true }));
-  let imageElRef: HTMLElement | null = null;
+  let imageElRef: HTMLImageElement | null = null;
 
   // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
   // instance is the Cropper (whose strict Options/Data types the loosely-typed
@@ -384,7 +384,7 @@ export default function Cropper(_props: CropperProps): JSX.Element {
   return (
     <>
     <div {...attrs} class={"rozie-cropper" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-cddf3b42="">
-      <img class={"rozie-cropper-img"} ref={(el) => { imageElRef = el as HTMLElement; }} src={local.src} alt="" data-rozie-s-cddf3b42="" />
+      <img class={"rozie-cropper-img"} ref={(el) => { imageElRef = el as HTMLImageElement; }} src={local.src} alt="" data-rozie-s-cddf3b42="" />
     </div>
     </>
   );

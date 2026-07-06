@@ -688,12 +688,27 @@ function emitNonClassAttribute(
       // name for a composed ref; DOM refs are ABSENT → the `dialog`/HTMLElement
       // cast below runs unchanged (inertness/byte-identity carve-out).
       const componentLocalName = resolveComponentRefs(ctx.ir).get(attr.value);
-      const castType =
-        componentLocalName !== undefined
-          ? `${componentLocalName}Handle`
-          : ctx.tagName?.toLowerCase() === 'dialog'
-            ? 'HTMLDialogElement'
-            : 'HTMLElement';
+      // Emitter-hardening backlog item #4 — this callback-cast site is an
+      // 8th duplicate of the tag→element-type map (not in the original 7-site
+      // table; found while verifying this fix against the current emitter).
+      // It MUST agree with emitScript.ts's `let fooRef: <domType> | null`
+      // declaration or the cast narrows to the wrong type under strict tsc.
+      let domType = 'HTMLElement';
+      switch (ctx.tagName?.toLowerCase()) {
+        case 'dialog':
+          domType = 'HTMLDialogElement';
+          break;
+        case 'img':
+          domType = 'HTMLImageElement';
+          break;
+        case 'ul':
+          domType = 'HTMLUListElement';
+          break;
+        case 'li':
+          domType = 'HTMLLIElement';
+          break;
+      }
+      const castType = componentLocalName !== undefined ? `${componentLocalName}Handle` : domType;
       return { jsx: `ref={(el) => { ${varName} = el as ${castType}; }}`, diagnostics };
     }
     // Unknown ref — pass through as static

@@ -115,7 +115,7 @@ export default class Cropper extends SignalWatcher(LitElement) {
    * Raw Cropper.js `Options` passthrough — spread into the constructor before the curated keys (explicit props win). Use it for any v1 option not surfaced as a first-class prop (`modal`, `restore`, `minCropBoxWidth`, `wheelZoomRatio`, …).
    */
   @property({ type: Object }) options: any = {};
-  @query('[data-rozie-ref="imageEl"]') private _refImageEl!: HTMLElement;
+  @query('[data-rozie-ref="imageEl"]') private _refImageEl!: HTMLImageElement;
 private __rozieWatchInitial_4 = true;
 private __rozieFirstUpdateDone = false;
 

@@ -2406,6 +2406,15 @@ export function emitScript(
       case 'dialog':
         domType = 'HTMLDialogElement';
         break;
+      case 'img':
+        domType = 'HTMLImageElement';
+        break;
+      case 'ul':
+        domType = 'HTMLUListElement';
+        break;
+      case 'li':
+        domType = 'HTMLLIElement';
+        break;
     }
     hookLines.push(`const ${r.name} = useRef<${domType} | null>(null);`);
   }

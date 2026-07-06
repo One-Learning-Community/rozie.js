@@ -778,9 +778,24 @@ export function emitScript(
     }
     // LB6 SEAM 1 — gated carve-out: a ref on a native `<dialog>` types to
     // HTMLDialogElement so `$refs.x.showModal()` / `.close()` are accessible.
-    // Every other tag keeps the byte-identical `HTMLElement | null` default.
-    const domType =
-      ref.elementTag.toLowerCase() === 'dialog' ? 'HTMLDialogElement' : 'HTMLElement';
+    // Emitter-hardening backlog item #4 — extended to `img`/`ul`/`li`
+    // (promoted from the dialog-only ternary to a switch; every other tag
+    // keeps the byte-identical `HTMLElement | null` default).
+    let domType = 'HTMLElement';
+    switch (ref.elementTag.toLowerCase()) {
+      case 'dialog':
+        domType = 'HTMLDialogElement';
+        break;
+      case 'img':
+        domType = 'HTMLImageElement';
+        break;
+      case 'ul':
+        domType = 'HTMLUListElement';
+        break;
+      case 'li':
+        domType = 'HTMLLIElement';
+        break;
+    }
     hookLines.push(`let ${ref.name}Ref: ${domType} | null = null;`);
   }
 

@@ -130,7 +130,7 @@ export class Cropper {
    * Raw Cropper.js `Options` passthrough — spread into the constructor before the curated keys (explicit props win). Use it for any v1 option not surfaced as a first-class prop (`modal`, `restore`, `minCropBoxWidth`, `wheelZoomRatio`, …).
    */
   options = input<Record<string, any>>((() => ({}))());
-  imageEl = viewChild<ElementRef<HTMLElement>>('imageEl');
+  imageEl = viewChild<ElementRef<HTMLImageElement>>('imageEl');
   ready = output<void>();
   cropstart = output<unknown>();
   cropmove = output<unknown>();

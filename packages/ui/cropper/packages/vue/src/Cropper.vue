@@ -111,7 +111,7 @@ const emit = defineEmits<{
   zoom: [...args: any[]];
 }>();
 
-const imageElRef = ref<HTMLElement>();
+const imageElRef = ref<HTMLImageElement>();
 
 // The engine default-import is aliased `CropperEngine` — a bare `import Cropper`
 // would collide with the component name `Cropper` (the rozie `name`), which the
