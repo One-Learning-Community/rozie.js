@@ -319,9 +319,18 @@ export function emitTemplateEvent(
         // a parse ambiguity (`((arrow) as T)` is required).
         wrappedHandlerCode = `(($event: any) => { ${prefixed}; })`;
       } else {
-        wrappedHandlerCode = /^[a-zA-Z_$][\w$]*$/.test(origHandlerCode)
-          ? `this.${origHandlerCode}`
-          : origHandlerCode;
+        // Spike-012 R3-3 — a callable (non-statement) handler that is not a bare
+        // identifier — e.g. `@input.debounce="$props.onPick"` → `onPick()` — must
+        // also be `this`-qualified, or the IIFE references a free `onPick`.
+        // `applyThisPrefixing` covers props/state/methods/top-level bindings, so
+        // it handles both the bare-method form (`onSearch` → `this.onSearch`,
+        // byte-identical to the old regex) and the member/call form.
+        wrappedHandlerCode = applyThisPrefixing(
+          origHandlerCode,
+          ctx.ir,
+          ctx.collisionRenames,
+          collectTopLevelScriptBindings(ctx.ir),
+        );
       }
       const decl =
         descriptor.helperName === 'debounce'

@@ -1,0 +1,22 @@
+<rozie name="AngularCallablePropDebounce">
+<props>
+{
+  onPick: { type: Function, default: () => {} },
+}
+</props>
+
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+function bump(): void { $data.n += 1; }
+</script>
+
+<template>
+<div class="r"><input @input.debounce(300)="$props.onPick" /></div>
+</template>
+
+</rozie>

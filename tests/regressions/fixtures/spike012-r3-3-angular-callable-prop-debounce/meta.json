@@ -1,0 +1,11 @@
+{
+  "id": "REG-SPIKE012-R3-3",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a callable (non-statement, non-bare-identifier) handler under `.debounce`/`.throttle` — `@input.debounce(300)=\"$props.onPick\"` → `onPick()` — is routed through applyThisPrefixing so the Angular debounce IIFE calls `this.onPick()` (Spike-012 R3-3); pre-fix NEW-2's angular this-prefix covered only the statement thunk, leaving the callable branch a free, un-`this`-qualified `onPick`",
+  "targets": [
+    "angular"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012)"
+}
