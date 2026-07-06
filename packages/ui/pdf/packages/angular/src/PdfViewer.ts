@@ -187,7 +187,12 @@ export class PdfViewer {
   }
 
   ngAfterViewInit() {
-    this.cancelled = false;
+    // mount-local (not a top-level script `let`) — set here so a late-resolving
+    // dynamic import() below bails, and read by the returned teardown. Emitter-
+    // hardening backlog item #2 (project_emitter_hardening_backlog): every
+    // target keeps a $onMount setup-local in scope for its own returned
+    // teardown, so this no longer needs the prior TOP-LEVEL-`let` workaround.
+    let cancelled = false;
     this.containerEl = this.viewerEl()?.nativeElement;
     this.current.set(Math.max(1, this.page()));
     this.zoom.set(this.scale());
@@ -210,7 +215,7 @@ export class PdfViewer {
     // lazy-load the engine (SSR-safe + code-split), then configure the worker and
     // load the document.
     import('pdfjs-dist').then((mod: any) => {
-      if (this.cancelled) return;
+      if (cancelled) return;
       this.pdfjsLib = mod;
       this.pdfjsLib.GlobalWorkerOptions.workerSrc = this.workerSrc() || this.cdnBase() + '/build/pdf.worker.min.mjs';
       // hand off to the lazy $watch below rather than calling load() from this
@@ -218,7 +223,7 @@ export class PdfViewer {
       this.engineReady.set(this.engineReady() + 1);
     });
     this.__rozieDestroyRef.onDestroy(() => {
-      this.cancelled = true;
+      cancelled = true;
       this.renderToken++;
       if (this.observer) {
         this.observer.disconnect();
@@ -249,7 +254,6 @@ export class PdfViewer {
   findQuery = '';
   findMatches = [];
   findIndex = -1;
-  cancelled = false;
   buildSource = () => {
     const __password = this.password();
     let cfg: any = null;

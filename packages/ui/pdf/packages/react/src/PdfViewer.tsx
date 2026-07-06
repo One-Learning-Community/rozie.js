@@ -110,7 +110,6 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     void src; void page; void scale; void rotation; void workerSrc; void standardFontDataUrl; void renderAllPages; void textLayer; void password; void query; void autoFit; void options; void defaultValue; void onPageChange; void defaultPage;
     return rest;
   })();
-  const cancelled = useRef(false);
   const containerEl = useRef<any>(null);
   const resizeObserver = useRef<any>(null);
   const pdfjsLib = useRef<any>(null);
@@ -579,7 +578,12 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
   }
 
   useEffect(() => {
-    cancelled.current = false;
+    // mount-local (not a top-level script `let`) — set here so a late-resolving
+    // dynamic import() below bails, and read by the returned teardown. Emitter-
+    // hardening backlog item #2 (project_emitter_hardening_backlog): every
+    // target keeps a $onMount setup-local in scope for its own returned
+    // teardown, so this no longer needs the prior TOP-LEVEL-`let` workaround.
+    let cancelled = false;
     containerEl.current = viewerEl.current;
     setCurrent(Math.max(1, _pageRef.current));
     setZoom(_scaleRef.current);
@@ -595,7 +599,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     // lazy-load the engine (SSR-safe + code-split), then configure the worker and
     // load the document.
     import('pdfjs-dist').then((mod: any) => {
-      if (cancelled.current) return;
+      if (cancelled) return;
       pdfjsLib.current = mod;
       pdfjsLib.current.GlobalWorkerOptions.workerSrc = _workerSrcRef.current || cdnBase() + '/build/pdf.worker.min.mjs';
       // hand off to the lazy $watch below rather than calling load() from this
@@ -603,7 +607,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       setEngineReady(prev => prev + 1);
     });
     return () => {
-      cancelled.current = true;
+      cancelled = true;
       renderToken.current++;
       if (observer.current) {
         observer.current.disconnect();

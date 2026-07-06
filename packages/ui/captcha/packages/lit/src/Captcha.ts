@@ -9,10 +9,8 @@ import { createLitControllableProperty, rozieListeners, rozieSpread } from '@roz
 import { loadCaptchaApi } from './internal/loadCaptchaApi';
 
 // Live widget handle. Top-level lets → React hoists to useRef (setup-once).
-// `disposed` MUST be top-level (not declared inside $onMount): the Solid emitter
-// extracts the teardown into a separate onCleanup() whose scope can't see a
-// mount-body local, so a `let disposed` inside $onMount is out of scope in the
-// teardown (TS2304). Top-level — like api/widgetId — is visible to both.
+// `api`/`widgetId` MUST be top-level — reset()/execute()/getResponse() (the
+// $expose'd imperative handle, callable any time) read them outside $onMount.
 
 @customElement('rozie-captcha')
 export default class Captcha extends SignalWatcher(LitElement) {
@@ -56,15 +54,21 @@ export default class Captcha extends SignalWatcher(LitElement) {
 
   firstUpdated(): void {
     this._disconnectCleanups.push((() => {
-      this.disposed = true;
+      disposed = true;
       if (this.widgetId == null || !this.api) return;
       // Turnstile fully removes a widget; reCAPTCHA/hCaptcha only reset.
       if (typeof this.api.remove === 'function') this.api.remove(this.widgetId);else if (typeof this.api.reset === 'function') this.api.reset(this.widgetId);
     }));
 
-    this.disposed = false;
+    // Mount-local (not top-level) — read only by this closure's own async
+    // .then()/.catch() and the returned teardown below. Emitter-hardening
+    // backlog item #2 (project_emitter_hardening_backlog): every target keeps
+    // a $onMount setup-local in scope for its own returned teardown, so this
+    // no longer needs the prior TOP-LEVEL-`let` workaround (unlike `api`/
+    // `widgetId` above, which stay top-level for the unrelated $expose reason).
+    let disposed = false;
     loadCaptchaApi(this.provider).then((a: any) => {
-      if (this.disposed) return;
+      if (disposed) return;
       this.api = a;
       this.widgetId = this.api.render(this._refWidgetEl, this.buildConfig());
     }).catch((err: any) => {
@@ -103,8 +107,6 @@ export default class Captcha extends SignalWatcher(LitElement) {
   api: any = null;
 
   widgetId: any = null;
-
-  disposed = false;
 
   buildConfig = () => ({
   sitekey: this.sitekey,

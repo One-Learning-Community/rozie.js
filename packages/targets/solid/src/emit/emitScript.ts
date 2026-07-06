@@ -68,6 +68,77 @@ function capitalize(name: string): string {
 }
 
 /**
+ * Top-level `let`/`const`/`var`/function-declaration binding names declared
+ * directly in a BlockStatement's own statement list (not recursing into
+ * nested blocks/functions — matches the depth at which a `$onMount` setup
+ * body declares its mount-locals).
+ */
+function topLevelDeclaredNames(block: t.BlockStatement): Set<string> {
+  const names = new Set<string>();
+  for (const stmt of block.body) {
+    if (t.isVariableDeclaration(stmt)) {
+      for (const decl of stmt.declarations) {
+        if (t.isIdentifier(decl.id)) names.add(decl.id.name);
+      }
+    } else if (t.isFunctionDeclaration(stmt) && stmt.id) {
+      names.add(stmt.id.name);
+    }
+  }
+  return names;
+}
+
+/**
+ * Free-identifier names referenced anywhere inside `node` (over-approximates —
+ * property keys of non-computed member/object-property access are excluded;
+ * everything else that walks by as an Identifier counts). Used only to detect
+ * "does the teardown reference a mount-local", so a conservative
+ * over-approximation is safe: at worst it takes the scope-preserving splice
+ * path below when it wasn't strictly necessary, never the reverse.
+ */
+function collectReferencedNames(node: t.Node): Set<string> {
+  const names = new Set<string>();
+  const VISITOR_KEYS = (t as unknown as { VISITOR_KEYS: Record<string, string[]> }).VISITOR_KEYS;
+  const visit = (n: unknown, parent: t.Node | null): void => {
+    if (!n || typeof n !== 'object' || typeof (n as t.Node).type !== 'string') return;
+    const current = n as t.Node;
+    if (t.isIdentifier(current)) {
+      if (parent) {
+        if (t.isMemberExpression(parent) && parent.property === current && !parent.computed) return;
+        if (t.isObjectProperty(parent) && parent.key === current && !parent.computed) return;
+      }
+      names.add(current.name);
+      return;
+    }
+    const keys = VISITOR_KEYS[current.type] ?? [];
+    for (const key of keys) {
+      const child = (current as unknown as Record<string, unknown>)[key];
+      if (Array.isArray(child)) {
+        for (const c of child) visit(c, current);
+      } else {
+        visit(child, current);
+      }
+    }
+  };
+  visit(node, null);
+  return names;
+}
+
+/**
+ * True when `cleanup`'s teardown references a mount-local declared at the
+ * top level of `setup`'s own block — the exact shape backlog item #2
+ * (`project_emitter_hardening_backlog`, 73-02) describes.
+ */
+function cleanupReferencesSetupLocal(setup: t.BlockStatement, cleanup: t.Expression): boolean {
+  const declared = topLevelDeclaredNames(setup);
+  if (declared.size === 0) return false;
+  const referenced = collectReferencedNames(cleanup);
+  for (const name of declared) {
+    if (referenced.has(name)) return true;
+  }
+  return false;
+}
+
+/**
  * Convert `const X = (...args) => body` (or function expression) into
  * `function X(...args) { ... }` so the binding HOISTS. Returns the new
  * statement, or null when the input is not a single-declarator
@@ -557,19 +628,55 @@ export function emitScript(
         collectors.solidImports.add('onCleanup');
         // Rule 1 fix: rewrite $props/$data/$refs in the setup body; wrap BlockStatement in IIFE.
         const rewrittenSetup = rewriteNode(lh.setup, ir);
-        const rawSetup = genCode(rewrittenSetup);
-        const setupCall = t.isBlockStatement(lh.setup)
-          ? `(() => ${rawSetup})()`
-          : `(${rawSetup})()`;
         const rewrittenCleanup = rewriteNode(lh.cleanup, ir);
-        const cleanupCode = genCode(rewrittenCleanup);
-        hookLines.push(
-          `onMount(() => {\n` +
-          `  const _cleanup = ${setupCall} as unknown;\n` +
-          `  if (_cleanup) onCleanup(_cleanup as () => void);\n` +
-          `  onCleanup(${cleanupCode});\n` +
-          `});`,
-        );
+
+        // Fix #2 (73-02 emitter-hardening batch, project_emitter_hardening_backlog):
+        // the IIFE below re-parents the setup body into its OWN function
+        // scope, so a mount-local `let`/`const` it declares is out of scope
+        // for the `onCleanup(cleanupCode)` sibling call (TS2304). When the
+        // returned teardown actually references such a local, splice the
+        // setup block's OWN statements directly into the outer
+        // `onMount(() => { ... })` closure instead — no wrapping IIFE — so
+        // the mount-local and the onCleanup(...) call share ONE scope.
+        // Gated strictly to that shape: the non-block / no-shared-local path
+        // (the `else` below) is UNCHANGED so the existing corpus
+        // (SearchInput, Modal, the 06.4 onMount-arrow-cleanup regression
+        // fixture) stays byte-identical.
+        const sharesLocal =
+          t.isBlockStatement(lh.setup) && cleanupReferencesSetupLocal(lh.setup, lh.cleanup);
+
+        if (sharesLocal) {
+          const setupStatements = (rewrittenSetup as t.BlockStatement).body;
+          const onMountArrow = t.arrowFunctionExpression(
+            [],
+            t.blockStatement([
+              ...setupStatements,
+              t.expressionStatement(
+                t.callExpression(t.identifier('onCleanup'), [rewrittenCleanup]),
+              ),
+            ]),
+          );
+          hookLines.push(
+            genCode(
+              t.expressionStatement(
+                t.callExpression(t.identifier('onMount'), [onMountArrow]),
+              ),
+            ),
+          );
+        } else {
+          const rawSetup = genCode(rewrittenSetup);
+          const setupCall = t.isBlockStatement(lh.setup)
+            ? `(() => ${rawSetup})()`
+            : `(${rawSetup})()`;
+          const cleanupCode = genCode(rewrittenCleanup);
+          hookLines.push(
+            `onMount(() => {\n` +
+            `  const _cleanup = ${setupCall} as unknown;\n` +
+            `  if (_cleanup) onCleanup(_cleanup as () => void);\n` +
+            `  onCleanup(${cleanupCode});\n` +
+            `});`,
+          );
+        }
       } else {
         collectors.solidImports.add('onMount');
         const rewrittenSetup = rewriteNode(lh.setup, ir);

@@ -149,15 +149,6 @@ let renderToken = 0;
 let findQuery = '';
 let findMatches = [];
 let findIndex = -1;
-// set in the $onMount teardown so a late-resolving dynamic import() bails. A
-// TOP-LEVEL let (not $onMount-local): the Solid emitter hoists the $onMount
-// teardown into a sibling onCleanup() OUTSIDE the mount closure, so a mount-local
-// would be out of scope there.
-// set in the $onMount teardown so a late-resolving dynamic import() bails. A
-// TOP-LEVEL let (not $onMount-local): the Solid emitter hoists the $onMount
-// teardown into a sibling onCleanup() OUTSIDE the mount closure, so a mount-local
-// would be out of scope there.
-let cancelled = false;
 
 // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
 // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
@@ -603,7 +594,12 @@ function clearFind() {
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
-  cancelled = false;
+  // mount-local (not a top-level script `let`) — set here so a late-resolving
+  // dynamic import() below bails, and read by the returned teardown. Emitter-
+  // hardening backlog item #2 (project_emitter_hardening_backlog): every
+  // target keeps a $onMount setup-local in scope for its own returned
+  // teardown, so this no longer needs the prior TOP-LEVEL-`let` workaround.
+  let cancelled = false;
   containerEl = viewerElRef.value;
   current.value = Math.max(1, page.value);
   zoom.value = props.scale;

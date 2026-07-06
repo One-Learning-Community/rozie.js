@@ -8,11 +8,13 @@ import { createLitControllableProperty, rozieListeners, rozieSpread } from '@roz
 // codegen copies src/internal/ into every leaf, so this import resolves ×6.
 import { loadRecaptchaV3, execute as v3Execute } from './internal/loadRecaptchaV3';
 
-// `disposed` MUST be top-level (not declared inside $onMount): the Solid emitter
-// extracts the teardown into a separate onCleanup() whose scope can't see a
-// mount-body local, so a `let disposed` inside $onMount is out of scope in the
-// teardown. Top-level — visible to both the mount body and the teardown. It also
-// guards a late execute() resolve that fires after the component unmounts.
+// `disposed` MUST be top-level (not $onMount-local): the exported `execute()`
+// below — callable any time via `$expose({ execute })`, including after
+// unmount — reads it to guard a late resolve that fires post-unmount. That
+// cross-function visibility (not a per-target emitter limitation) is why this
+// one stays top-level even after emitter-hardening backlog item #2 landed
+// (contrast Captcha.rozie's `disposed`, which IS $onMount-local — its
+// exposed handle functions don't read it).
 
 @customElement('rozie-recaptcha-v3')
 export default class RecaptchaV3 extends SignalWatcher(LitElement) {

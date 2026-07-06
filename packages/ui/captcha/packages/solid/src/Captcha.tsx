@@ -8,10 +8,8 @@ import { createControllableSignal } from '@rozie/runtime-solid';
 import { loadCaptchaApi } from './internal/loadCaptchaApi';
 
 // Live widget handle. Top-level lets → React hoists to useRef (setup-once).
-// `disposed` MUST be top-level (not declared inside $onMount): the Solid emitter
-// extracts the teardown into a separate onCleanup() whose scope can't see a
-// mount-body local, so a `let disposed` inside $onMount is out of scope in the
-// teardown (TS2304). Top-level — like api/widgetId — is visible to both.
+// `api`/`widgetId` MUST be top-level — reset()/execute()/getResponse() (the
+// $expose'd imperative handle, callable any time) read them outside $onMount.
 
 interface CaptchaProps {
   /**
@@ -65,8 +63,13 @@ export default function Captcha(_props: CaptchaProps): JSX.Element {
 
   const [token, setToken] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'token', '');
   onMount(() => {
-    const _cleanup = (() => {
-    disposed = false;
+    // Mount-local (not top-level) — read only by this closure's own async
+    // .then()/.catch() and the returned teardown below. Emitter-hardening
+    // backlog item #2 (project_emitter_hardening_backlog): every target keeps
+    // a $onMount setup-local in scope for its own returned teardown, so this
+    // no longer needs the prior TOP-LEVEL-`let` workaround (unlike `api`/
+    // `widgetId` above, which stay top-level for the unrelated $expose reason).
+    let disposed = false;
     loadCaptchaApi(local.provider).then((a: any) => {
       if (disposed) return;
       api = a;
@@ -77,25 +80,20 @@ export default function Captcha(_props: CaptchaProps): JSX.Element {
         error: err
       });
     });
-  })() as unknown;
-    if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => {
-    disposed = true;
-    if (widgetId == null || !api) return;
-    // Turnstile fully removes a widget; reCAPTCHA/hCaptcha only reset.
-    if (typeof api.remove === 'function') api.remove(widgetId);else if (typeof api.reset === 'function') api.reset(widgetId);
-  });
+      disposed = true;
+      if (widgetId == null || !api) return;
+      // Turnstile fully removes a widget; reCAPTCHA/hCaptcha only reset.
+      if (typeof api.remove === 'function') api.remove(widgetId);else if (typeof api.reset === 'function') api.reset(widgetId);
+    });
   });
   let widgetElRef: HTMLElement | null = null;
 
   // Live widget handle. Top-level lets → React hoists to useRef (setup-once).
-  // `disposed` MUST be top-level (not declared inside $onMount): the Solid emitter
-  // extracts the teardown into a separate onCleanup() whose scope can't see a
-  // mount-body local, so a `let disposed` inside $onMount is out of scope in the
-  // teardown (TS2304). Top-level — like api/widgetId — is visible to both.
+  // `api`/`widgetId` MUST be top-level — reset()/execute()/getResponse() (the
+  // $expose'd imperative handle, callable any time) read them outside $onMount.
   let api: any = null;
   let widgetId: any = null;
-  let disposed = false;
 
   // The render config shared across all three providers. The hyphenated
   // `expired-callback` / `error-callback` keys are the common option names each

@@ -120,18 +120,6 @@ let instance: any = null;
 // `ref="canvasEl"` binding, which the per-target emitters lower to their own
 // `canvasEl` ref declaration (a same-name script local double-declares it).
 let canvasNode: any = null;
-// Tooltip-portal teardown state at COMPONENT scope (not inside $onMount): the
-// $onMount-returned cleanup references these, and the Solid emitter hoists that
-// returned cleanup into a sibling onCleanup() OUTSIDE the mount-body IIFE — so a
-// cleanup that closed over $onMount-locals would lose scope. Component-scope
-// state (like `instance`) is in scope wherever the per-target cleanup lands.
-// Tooltip-portal teardown state at COMPONENT scope (not inside $onMount): the
-// $onMount-returned cleanup references these, and the Solid emitter hoists that
-// returned cleanup into a sibling onCleanup() OUTSIDE the mount-body IIFE — so a
-// cleanup that closed over $onMount-locals would lose scope. Component-scope
-// state (like `instance`) is in scope wherever the per-target cleanup lands.
-let tooltipEl: any = null;
-let tooltipDispose: any = null;
 // buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
 // references are bound in the mount-lifecycle scope the per-target emitters
 // provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
@@ -293,6 +281,14 @@ onMounted(() => {
   // throttles external calls to active-element changes, so the dispose+remount
   // on body-change is cheap. enabled:false suppresses the built-in canvas
   // tooltip when we take over.
+  //
+  // Mount-locals (not top-level script `let`s) — read only by tooltipExternal
+  // and the returned teardown below, both defined in THIS $onMount closure.
+  // Emitter-hardening backlog item #2 (project_emitter_hardening_backlog):
+  // every target keeps a $onMount setup-local in scope for its own returned
+  // teardown, so these no longer need the prior COMPONENT-scope workaround.
+  let tooltipEl: any = null;
+  let tooltipDispose: any = null;
   let tooltipKey = '';
   const tooltipExternal = (context: any) => {
     const {

@@ -150,8 +150,12 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   const [rot, setRot] = createSignal(0);
   const [engineReady, setEngineReady] = createSignal(0);
   onMount(() => {
-    const _cleanup = (() => {
-    cancelled = false;
+    // mount-local (not a top-level script `let`) — set here so a late-resolving
+    // dynamic import() below bails, and read by the returned teardown. Emitter-
+    // hardening backlog item #2 (project_emitter_hardening_backlog): every
+    // target keeps a $onMount setup-local in scope for its own returned
+    // teardown, so this no longer needs the prior TOP-LEVEL-`let` workaround.
+    let cancelled = false;
     containerEl = viewerElRef;
     setCurrent(Math.max(1, page()));
     setZoom(local.scale);
@@ -174,25 +178,23 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
       // (React: mount-frozen) closure — see the $data.engineReady note above.
       setEngineReady(engineReady() + 1);
     });
-  })() as unknown;
-    if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => {
-    cancelled = true;
-    renderToken++;
-    if (observer) {
-      observer.disconnect();
-      observer = null;
-    }
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    if (loadingTask) {
-      loadingTask.destroy();
-      loadingTask = null;
-    }
-    instance = null;
-  });
+      cancelled = true;
+      renderToken++;
+      if (observer) {
+        observer.disconnect();
+        observer = null;
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver = null;
+      }
+      if (loadingTask) {
+        loadingTask.destroy();
+        loadingTask = null;
+      }
+      instance = null;
+    });
   });
   createEffect(on(() => (() => engineReady())(), (v) => untrack(() => (() => load())()), { defer: true }));
   createEffect(on(() => (() => local.src)(), (v) => untrack(() => (() => load())()), { defer: true }));
@@ -274,11 +276,6 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   let findQuery = '';
   let findMatches = [];
   let findIndex = -1;
-  // set in the $onMount teardown so a late-resolving dynamic import() bails. A
-  // TOP-LEVEL let (not $onMount-local): the Solid emitter hoists the $onMount
-  // teardown into a sibling onCleanup() OUTSIDE the mount closure, so a mount-local
-  // would be out of scope there.
-  let cancelled = false;
 
   // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
   function buildSource() {

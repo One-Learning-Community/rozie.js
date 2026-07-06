@@ -163,8 +163,8 @@ private _portalContainers = new Set<HTMLElement>();
     // importing one is tree-shakable by construction.
 
     this._disconnectCleanups.push((() => {
-      this.tooltipDispose?.();
-      this.tooltipEl?.remove();
+      tooltipDispose?.();
+      tooltipEl?.remove();
       // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
       // can finish. The captured `dying` instance is destroyed after the grace;
       // 0 (default) destroys synchronously.
@@ -239,6 +239,12 @@ private _portalContainers = new Set<HTMLElement>();
     // throttles external calls to active-element changes, so the dispose+remount
     // on body-change is cheap. enabled:false suppresses the built-in canvas
     // tooltip when we take over.
+    //
+    // Mount-locals (not top-level script `let`s) — read only by tooltipExternal
+    // and the returned teardown below, both defined in THIS $onMount closure.
+    // Emitter-hardening backlog item #2 (project_emitter_hardening_backlog):
+    // every target keeps a $onMount setup-local in scope for its own returned
+    // teardown, so these no longer need the prior COMPONENT-scope workaround.
     // ─── external-HTML tooltip portal slot ─────────────────────────────────────
     // Only active when the consumer fills <slot name="tooltip">. The external
     // handler positions a container over the canvas and mounts the consumer's
@@ -247,22 +253,30 @@ private _portalContainers = new Set<HTMLElement>();
     // throttles external calls to active-element changes, so the dispose+remount
     // on body-change is cheap. enabled:false suppresses the built-in canvas
     // tooltip when we take over.
+    //
+    // Mount-locals (not top-level script `let`s) — read only by tooltipExternal
+    // and the returned teardown below, both defined in THIS $onMount closure.
+    // Emitter-hardening backlog item #2 (project_emitter_hardening_backlog):
+    // every target keeps a $onMount setup-local in scope for its own returned
+    // teardown, so these no longer need the prior COMPONENT-scope workaround.
+    let tooltipEl: any = null;
+    let tooltipDispose: any = null;
     let tooltipKey = '';
     const tooltipExternal = (context: any) => {
       const {
         chart,
         tooltip
       } = context;
-      if (!this.tooltipEl) {
-        this.tooltipEl = document.createElement('div');
-        this.tooltipEl.className = 'rozie-chart-tooltip';
-        this.tooltipEl.style.position = 'absolute';
-        this.tooltipEl.style.pointerEvents = 'none';
-        this.tooltipEl.style.transition = 'opacity 0.1s ease';
-        chart.canvas.parentNode.appendChild(this.tooltipEl);
+      if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.className = 'rozie-chart-tooltip';
+        tooltipEl.style.position = 'absolute';
+        tooltipEl.style.pointerEvents = 'none';
+        tooltipEl.style.transition = 'opacity 0.1s ease';
+        chart.canvas.parentNode.appendChild(tooltipEl);
       }
       if (tooltip.opacity === 0) {
-        this.tooltipEl.style.opacity = '0';
+        tooltipEl.style.opacity = '0';
         return;
       }
       const title = (tooltip.title || []).join(' ');
@@ -270,7 +284,7 @@ private _portalContainers = new Set<HTMLElement>();
       const key = `${title}::${body}`;
       if (key !== tooltipKey) {
         tooltipKey = key;
-        this.tooltipDispose?.();
+        tooltipDispose?.();
         // The scope MUST match the slot's declared param (`model`): the consumer's
         // <slot name="tooltip"> receives a single `model` scoped value.
         const scope = {
@@ -281,15 +295,15 @@ private _portalContainers = new Set<HTMLElement>();
             opacity: tooltip.opacity
           }
         };
-        this.tooltipDispose = portals.tooltip(this.tooltipEl, scope);
+        tooltipDispose = portals.tooltip(tooltipEl, scope);
       }
       const {
         offsetLeft,
         offsetTop
       } = chart.canvas;
-      this.tooltipEl.style.opacity = '1';
-      this.tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`;
-      this.tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`;
+      tooltipEl.style.opacity = '1';
+      tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`;
+      tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`;
     };
 
     // ─── config builder ────────────────────────────────────────────────────────
@@ -422,10 +436,6 @@ private _portalContainers = new Set<HTMLElement>();
   instance: any = null;
 
   canvasNode: any = null;
-
-  tooltipEl: any = null;
-
-  tooltipDispose: any = null;
 
   buildConfig: any = null;
 

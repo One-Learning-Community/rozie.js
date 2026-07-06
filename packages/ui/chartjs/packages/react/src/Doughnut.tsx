@@ -103,8 +103,6 @@ const Doughnut = forwardRef<DoughnutHandle, DoughnutProps>(function Doughnut(_pr
   const _renderTooltipRef = useRef(props.renderTooltip);
   _renderTooltipRef.current = props.renderTooltip;
   const canvasNode = useRef<any>(null);
-  const tooltipEl = useRef<any>(null);
-  const tooltipDispose = useRef<any>(null);
   const buildConfig = useRef<any>(null);
   const instance = useRef<any>(null);
   const _dataRef = useRef(props.data);
@@ -270,22 +268,30 @@ const Doughnut = forwardRef<DoughnutHandle, DoughnutProps>(function Doughnut(_pr
     // throttles external calls to active-element changes, so the dispose+remount
     // on body-change is cheap. enabled:false suppresses the built-in canvas
     // tooltip when we take over.
+    //
+    // Mount-locals (not top-level script `let`s) — read only by tooltipExternal
+    // and the returned teardown below, both defined in THIS $onMount closure.
+    // Emitter-hardening backlog item #2 (project_emitter_hardening_backlog):
+    // every target keeps a $onMount setup-local in scope for its own returned
+    // teardown, so these no longer need the prior COMPONENT-scope workaround.
+    let tooltipEl: any = null;
+    let tooltipDispose: any = null;
     let tooltipKey = '';
     const tooltipExternal = (context: any) => {
       const {
         chart,
         tooltip
       } = context;
-      if (!tooltipEl.current) {
-        tooltipEl.current = document.createElement('div');
-        tooltipEl.current.className = 'rozie-chart-tooltip';
-        tooltipEl.current.style.position = 'absolute';
-        tooltipEl.current.style.pointerEvents = 'none';
-        tooltipEl.current.style.transition = 'opacity 0.1s ease';
-        chart.canvas.parentNode.appendChild(tooltipEl.current);
+      if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.className = 'rozie-chart-tooltip';
+        tooltipEl.style.position = 'absolute';
+        tooltipEl.style.pointerEvents = 'none';
+        tooltipEl.style.transition = 'opacity 0.1s ease';
+        chart.canvas.parentNode.appendChild(tooltipEl);
       }
       if (tooltip.opacity === 0) {
-        tooltipEl.current.style.opacity = '0';
+        tooltipEl.style.opacity = '0';
         return;
       }
       const title = (tooltip.title || []).join(' ');
@@ -293,7 +299,7 @@ const Doughnut = forwardRef<DoughnutHandle, DoughnutProps>(function Doughnut(_pr
       const key = `${title}::${body}`;
       if (key !== tooltipKey) {
         tooltipKey = key;
-        tooltipDispose.current?.();
+        tooltipDispose?.();
         // The scope MUST match the slot's declared param (`model`): the consumer's
         // <slot name="tooltip"> receives a single `model` scoped value.
         const scope = {
@@ -304,15 +310,15 @@ const Doughnut = forwardRef<DoughnutHandle, DoughnutProps>(function Doughnut(_pr
             opacity: tooltip.opacity
           }
         };
-        tooltipDispose.current = portals.tooltip(tooltipEl.current, scope);
+        tooltipDispose = portals.tooltip(tooltipEl, scope);
       }
       const {
         offsetLeft,
         offsetTop
       } = chart.canvas;
-      tooltipEl.current.style.opacity = '1';
-      tooltipEl.current.style.left = `${offsetLeft + tooltip.caretX}px`;
-      tooltipEl.current.style.top = `${offsetTop + tooltip.caretY}px`;
+      tooltipEl.style.opacity = '1';
+      tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`;
+      tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`;
     };
 
     // ─── config builder ────────────────────────────────────────────────────────
@@ -350,8 +356,8 @@ const Doughnut = forwardRef<DoughnutHandle, DoughnutProps>(function Doughnut(_pr
     return () => {
       for (const root of portalRoots.current) root.unmount();
   portalRoots.current.clear();
-      tooltipDispose.current?.();
-      tooltipEl.current?.remove();
+      tooltipDispose?.();
+      tooltipEl?.remove();
       // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
       // can finish. The captured `dying` instance is destroyed after the grace;
       // 0 (default) destroys synchronously.

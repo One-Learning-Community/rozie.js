@@ -127,7 +127,7 @@ private __rozieFirstUpdateDone = false;
 
   firstUpdated(): void {
     this._disconnectCleanups.push((() => {
-      this.cancelled = true;
+      cancelled = true;
       this.renderToken++;
       if (this.observer) {
         this.observer.disconnect();
@@ -165,7 +165,12 @@ private __rozieFirstUpdateDone = false;
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._zoom.value)(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => this.renderView())(); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._rot.value)(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => this.renderView())(); }); }));
 
-    this.cancelled = false;
+    // mount-local (not a top-level script `let`) — set here so a late-resolving
+    // dynamic import() below bails, and read by the returned teardown. Emitter-
+    // hardening backlog item #2 (project_emitter_hardening_backlog): every
+    // target keeps a $onMount setup-local in scope for its own returned
+    // teardown, so this no longer needs the prior TOP-LEVEL-`let` workaround.
+    let cancelled = false;
     this.containerEl = this._refViewerEl;
     this._current.value = Math.max(1, this.page);
     this._zoom.value = this.scale;
@@ -187,7 +192,7 @@ private __rozieFirstUpdateDone = false;
     // lazy-load the engine (SSR-safe + code-split), then configure the worker and
     // load the document.
     import('pdfjs-dist').then((mod: any) => {
-      if (this.cancelled) return;
+      if (cancelled) return;
       this.pdfjsLib = mod;
       this.pdfjsLib.GlobalWorkerOptions.workerSrc = this.workerSrc || this.cdnBase() + '/build/pdf.worker.min.mjs';
       // hand off to the lazy $watch below rather than calling load() from this
@@ -262,8 +267,6 @@ private __rozieFirstUpdateDone = false;
   findMatches = [];
 
   findIndex = -1;
-
-  cancelled = false;
 
   buildSource = () => {
   let cfg: any = null;
