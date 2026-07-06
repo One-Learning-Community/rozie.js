@@ -1,0 +1,9 @@
+{
+  "id": "REG-73.10-CR01",
+  "source": "73-REVIEW.md#CR-01",
+  "sourceKind": "deviation-log",
+  "phase": "73-10",
+  "desc": "a polymorphic model-guard nested inside an if-block (neither of hoistPolymorphicModelGuards' two known-safe shapes) must be a TRUE no-op, never an undeclared local reference",
+  "targets": ["solid"],
+  "discoveredBy": "73-REVIEW.md CR-01 (gsd-code-reviewer)"
+}

@@ -1,0 +1,36 @@
+<rozie name="NestedPolymorphicModelGuard">
+
+<props>
+{
+  // Same polymorphic/union `model: true` prop shape as the 73-02 fixture
+  // (project_solid_polymorphic_model_typeof_narrow_gap), but the
+  // `typeof`/re-read guard is nested ONE level inside an `if` block instead
+  // of being the arrow's own concise body — CR-01 (73-REVIEW.md): before the
+  // fix, `hoistPolymorphicModelGuards` mutated every `$props.value` read
+  // inside the conditional to a bare `v` UNCONDITIONALLY, before checking
+  // whether either of its two known-safe shapes applied. Neither shape
+  // matches this nesting, so the pre-fix code fell to its own documented
+  // "leave as-is" branch with the tree ALREADY mutated — emitting a
+  // reference to an undeclared `v` (ReferenceError / TS2304 at runtime).
+  value: {
+    type: [String, Object],
+    default: '',
+    model: true,
+  },
+}
+</props>
+
+<script lang="ts">
+function selected(): string {
+  if (true) {
+    return typeof $props.value === 'string' ? $props.value : '';
+  }
+  return '';
+}
+</script>
+
+<template>
+<div class="selected">{{ selected() }}</div>
+</template>
+
+</rozie>
