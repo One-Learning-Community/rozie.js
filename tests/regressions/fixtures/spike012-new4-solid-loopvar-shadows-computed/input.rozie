@@ -1,0 +1,19 @@
+<rozie name="LoopVarShadowsComputed">
+<data>
+{
+  items: [1, 2, 3],
+}
+</data>
+
+<script lang="ts">
+const item = $computed(() => 'c')
+</script>
+
+<template>
+<ul class="list">
+  <li r-for="item in $data.items">{{ item }}</li>
+  <li class="computed">{{ item }}</li>
+</ul>
+</template>
+
+</rozie>

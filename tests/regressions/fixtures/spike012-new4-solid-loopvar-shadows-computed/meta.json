@@ -1,0 +1,11 @@
+{
+  "id": "REG-SPIKE012-NEW4",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a keyless `<For>` item alias that shadows a `$computed` of the same name stays a BARE reference in the loop body (Spike-012 NEW-4 — loopValueBindings excludes it from the computed/accessor rewrite); pre-fix `{{ item }}` inside the loop emitted `item()`, CALLING the raw scalar loop value (TS2349 + runtime TypeError). The same-named computed read OUTSIDE the loop still correctly emits `item()`.",
+  "targets": [
+    "solid"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012)"
+}

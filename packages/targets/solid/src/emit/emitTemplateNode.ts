@@ -97,6 +97,15 @@ export interface EmitNodeCtx {
    */
   invokeAccessors?: ReadonlySet<string> | undefined;
   /**
+   * Spike-012 NEW-4 — identifiers bound to a RAW loop value by an enclosing
+   * keyless `<For>` (the item alias). Threaded into every `rewriteTemplateExpression`
+   * call in a loop body so a bare loop var stays bare even when it shadows a
+   * `$computed` (which would otherwise be rewritten to `name()` — calling the
+   * scalar). Keyed `<Key>` item aliases are real accessors and go via
+   * `invokeAccessors` instead. Undefined outside any loop (back-compat no-op).
+   */
+  loopValueBindings?: ReadonlySet<string> | undefined;
+  /**
    * Phase 33 / REQ-26 — reactive-portal scope-accessor rewrite, threaded onto
    * the child ctx used to render a reactive portal slot fill body (see
    * emitSlotFiller). Maps each consumer scope-param local name to the scope
@@ -148,7 +157,7 @@ function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
 function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): string {
   const code = rewriteTemplateExpression(node.expression, ctx.ir, {
     invokeAccessors: ctx.invokeAccessors,
-      scopeAccessorParams: ctx.scopeAccessorParams,
+    loopValueBindings: ctx.loopValueBindings,      scopeAccessorParams: ctx.scopeAccessorParams,
   });
   // Phase 26 (D-06/D-07/A4) — the wrap sits INSIDE the JSX `{}` so Solid still
   // tracks the reactive accessor read (the accessor invocation lives in `code`).
@@ -245,7 +254,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   // there), so keyless output stays byte-identical.
   const iterableCode = rewriteTemplateExpression(node.iterableExpression, ctx.ir, {
     invokeAccessors: ctx.invokeAccessors,
-    scopeAccessorParams: ctx.scopeAccessorParams,
+    loopValueBindings: ctx.loopValueBindings,    scopeAccessorParams: ctx.scopeAccessorParams,
   });
 
   // Phase 71 (r-keynav) — SPEC §5: "item index comes from the r-for
@@ -286,14 +295,29 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     ...(keyed ? [node.itemAlias] : []),
     ...(indexAlias ? [indexAlias] : []),
   ]);
+  // Spike-012 NEW-4 — under a keyless `<For>` the item alias is a RAW value, so
+  // it must be excluded from the computed/accessor rewrite in the body (a bare
+  // `item` stays `item`, never `item()`, even when it shadows a `$computed`).
+  // A keyed `<Key>` item alias is a real accessor and lives in `bodyAccessors`
+  // above, NOT here. Parent raw-loop bindings accumulate so a nested keyless
+  // loop keeps its outer shadow correct.
+  const bodyLoopValueBindings = new Set([
+    ...(ctx.loopValueBindings ?? []),
+    ...(keyed ? [] : [node.itemAlias]),
+  ]);
   const childCtx: EmitNodeCtx =
     keyed || indexAlias
       ? {
           ...ctx,
           invokeAccessors: bodyAccessors,
+          loopValueBindings: bodyLoopValueBindings,
           keynavItemIndexAlias: indexAlias,
         }
-      : { ...ctx, keynavItemIndexAlias: null };
+      : {
+          ...ctx,
+          loopValueBindings: bodyLoopValueBindings,
+          keynavItemIndexAlias: null,
+        };
 
   let bodyJsx: string;
   if (node.body.length === 1) {
@@ -317,7 +341,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   // item invokes it correctly. The iterable stays outside loop scope.
   const keyCode = rewriteTemplateExpression(node.keyExpression!, ctx.ir, {
     invokeAccessors: ctx.invokeAccessors,
-  });
+    loopValueBindings: ctx.loopValueBindings,  });
   // `<Key>`'s `each?: readonly T[]` infers `T = unknown` from a bare `any`
   // iterable (e.g. a `Record<string, any>` member access), which then poisons
   // the item accessor (`x` is `unknown` → TS18046 in the body). Solid's `<For>`
@@ -499,7 +523,7 @@ function emitElementListeners(
       ir: ctx.ir,
       collectors: ctx.collectors,
       invokeAccessors: ctx.invokeAccessors,
-    };
+      loopValueBindings: ctx.loopValueBindings,    };
     return { eventsJsx: '', extraSpreads: [emitListenerSpread(only, attrCtx)] };
   }
 
@@ -517,7 +541,7 @@ function emitElementListeners(
       // Phase 16 R2 / D-03 — thread the For-body loop-accessor set into
       // event-handler lowering so call-arg index references emit as `index()`.
       invokeAccessors: ctx.invokeAccessors,
-    });
+      loopValueBindings: ctx.loopValueBindings,    });
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
     const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{(.*)\}$/s);
     if (!match) continue;
@@ -561,7 +585,7 @@ function emitElementListeners(
     ir: ctx.ir,
     collectors: ctx.collectors,
     invokeAccessors: ctx.invokeAccessors,
-  };
+    loopValueBindings: ctx.loopValueBindings,  };
   for (const spread of node.listenerSpreads) {
     mergeArgs.push(emitListenerSpreadAsMergePartial(spread, attrCtx));
   }
@@ -596,7 +620,7 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       // Phase 16 R2 / D-03 — thread the For-body loop-accessor set into
       // event-handler lowering so call-arg index references emit as `index()`.
       invokeAccessors: ctx.invokeAccessors,
-    });
+      loopValueBindings: ctx.loopValueBindings,    });
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
 
     // Parse `<jsxName>={<body>}` so we can re-group when names collide.
@@ -771,7 +795,7 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
   ) {
     const keyExprCode = rewriteTemplateExpression(origNode.remountKeyExpression, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
-      scopeAccessorParams: ctx.scopeAccessorParams,
+      loopValueBindings: ctx.loopValueBindings,      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     ctx.collectors.solid.add('Show');
     return `<Show keyed when={\`k\${${keyExprCode}}\`}>${markup}</Show>`;
@@ -822,10 +846,10 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     }
     const exprCode = rewriteTemplateExpression(rHtmlAttr.expression, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
-      scopeAccessorParams: ctx.scopeAccessorParams,
+      loopValueBindings: ctx.loopValueBindings,      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     workingAttrs = workingAttrs.filter((a) => a !== rHtmlAttr);
-    const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams, elementTagKind: node.tagKind, tagName: node.tagName });
+    const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams, elementTagKind: node.tagKind, tagName: node.tagName });
     for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
     const listenerResult = emitElementListeners(node, ctx);
     const headParts = [
@@ -846,7 +870,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   if (rTextAttr && rTextAttr.kind === 'binding') {
     const exprCode = rewriteTemplateExpression(rTextAttr.expression, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
-      scopeAccessorParams: ctx.scopeAccessorParams,
+      loopValueBindings: ctx.loopValueBindings,      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     rTextChildren = `{${exprCode}}`;
     workingAttrs = workingAttrs.filter((a) => a !== rTextAttr);
@@ -860,7 +884,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   if (rShowAttr && rShowAttr.kind === 'binding') {
     const exprCode = rewriteTemplateExpression(rShowAttr.expression, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
-      scopeAccessorParams: ctx.scopeAccessorParams,
+      loopValueBindings: ctx.loopValueBindings,      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     rShowStyleAttr = `style={{ display: (${exprCode}) ? '' : 'none' }}`;
     workingAttrs = workingAttrs.filter((a) => a !== rShowAttr);
@@ -878,7 +902,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   }
 
   // Standard attribute emission
-  const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams, elementTagKind: node.tagKind, tagName: node.tagName });
+  const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams, elementTagKind: node.tagKind, tagName: node.tagName });
   for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
 
   const listenerResult = emitElementListeners(node, ctx);
@@ -1023,7 +1047,7 @@ function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
       : ladder;
     const discriminantCode = rewriteTemplateExpression(node.discriminant, ctx.ir, {
       invokeAccessors: ctx.invokeAccessors,
-      scopeAccessorParams: ctx.scopeAccessorParams,
+      loopValueBindings: ctx.loopValueBindings,      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     const hoisted = `{(() => { const ${node.tempName} = ${discriminantCode}; return ${inner}; })()}`;
     if (node.hostElement !== undefined) {

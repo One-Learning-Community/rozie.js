@@ -41,6 +41,12 @@ export interface EmitAttrCtx {
    */
   invokeAccessors?: ReadonlySet<string> | undefined;
   /**
+   * Spike-012 NEW-4 — keyless-`<For>` raw item aliases in scope; threaded so an
+   * attribute binding using a loop var (`:title="item"`) stays bare when it
+   * shadows a `$computed` (see `EmitNodeCtx.loopValueBindings`).
+   */
+  loopValueBindings?: ReadonlySet<string> | undefined;
+  /**
    * Phase 33 / REQ-26 — reactive-portal scope-accessor map, threaded from the
    * EmitNodeCtx so attribute bindings inside a reactive portal fill body
    * (`:data-selected`, `:data-label`, `:class`, …) rewrite scope-param reads to
@@ -412,6 +418,7 @@ function capitalize(name: string): string {
  */
 type RenderExprOpts = {
   invokeAccessors?: ReadonlySet<string> | undefined;
+  loopValueBindings?: ReadonlySet<string> | undefined;
   scopeAccessorParams?:
     | { accessorIdent: string; params: ReadonlyMap<string, string> }
     | undefined;
@@ -424,6 +431,7 @@ function renderExpr(
 ): string {
   return rewriteTemplateExpression(expr, ir, {
     invokeAccessors: opts?.invokeAccessors,
+    loopValueBindings: opts?.loopValueBindings,
     scopeAccessorParams: opts?.scopeAccessorParams,
   });
 }
@@ -754,13 +762,13 @@ function emitNonClassAttribute(
       }
       if (!t.isObjectExpression(attr.expression)) {
         ctx.collectors.runtime.add('parseInlineStyle');
-        const exprCode = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams });
+        const exprCode = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
         return { jsx: `style={parseInlineStyle(${exprCode})}`, diagnostics };
       }
       // ObjectExpression falls through to the generic binding emit.
     }
     const jsxName = colonPropToSolidName(attr.name);
-    const exprCode = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams });
+    const exprCode = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
     // Phase 26 (D-06/SPEC-4) — attribute-binding wrap on an HTML host attribute
     // text position only (structural component props / controlled-input props
     // are exempt). A non-primitive value renders portable JSON; raw otherwise
@@ -832,7 +840,7 @@ function emitNonClassAttribute(
     const target = resolveTwoWayTarget(attr.expression, ctx.ir);
     if (target === null) {
       const jsxNameFallback = colonPropToSolidName(attr.name);
-      const exprCodeFallback = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams });
+      const exprCodeFallback = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
       return { jsx: `${jsxNameFallback}={${exprCodeFallback}}`, diagnostics };
     }
     const { local, setter } = target;
@@ -849,7 +857,7 @@ function emitNonClassAttribute(
   // as a pair). This guard is for TS exhaustiveness only.
   if (attr.kind === 'spreadBinding') {
     return {
-      jsx: `{...${renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams })}}`,
+      jsx: `{...${renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })}}`,
       diagnostics,
     };
   }
@@ -865,7 +873,7 @@ function emitNonClassAttribute(
         .replace(/\$\{/g, '\\${');
     } else {
       // Phase 26 (D-06/SPEC-4) — per-segment wrap for attribute interpolation.
-      const segCode = renderExpr(seg.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams });
+      const segCode = renderExpr(seg.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
       if (seg.wrapForDisplay) {
         ctx.collectors.runtime.add('rozieDisplay');
         lit += '${rozieDisplay(' + segCode + ')}';
@@ -912,20 +920,20 @@ function emitSpread(
 ): string {
   if (isAttrsIdentifier(attr.expression)) {
     // D-04 — $attrs spread, no key normalization.
-    return `{...${renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams })}}`;
+    return `{...${renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })}}`;
   }
   if (t.isObjectExpression(attr.expression)) {
     // D-03 LITERAL — compile-time key remap, zero runtime cost.
     const remapped = remapObjectKeysSolid(attr.expression);
     if (hasExplicitClass) {
       const { rest } = splitClassStyleFromLiteral(remapped);
-      return `{...${renderExpr(rest, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams })}}`;
+      return `{...${renderExpr(rest, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })}}`;
     }
-    return `{...${renderExpr(remapped, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams })}}`;
+    return `{...${renderExpr(remapped, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })}}`;
   }
   // D-03 DYNAMIC — runtime key remap.
   ctx.collectors.runtime.add('normalizeAttrs');
-  return `{...normalizeAttrs(${renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams })})}`;
+  return `{...normalizeAttrs(${renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })})}`;
 }
 
 /**
@@ -962,10 +970,10 @@ export function emitListenerSpread(
   ctx: EmitAttrCtx,
 ): string {
   if (isListenersIdentifier(spread.expression)) {
-    return `{...${renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams })}}`;
+    return `{...${renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })}}`;
   }
   ctx.collectors.runtime.add('normalizeListeners');
-  return `{...normalizeListeners(${renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams })})}`;
+  return `{...normalizeListeners(${renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })})}`;
 }
 
 /**
@@ -981,10 +989,10 @@ export function emitListenerSpreadAsMergePartial(
   ctx: EmitAttrCtx,
 ): string {
   if (isListenersIdentifier(spread.expression)) {
-    return renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams });
+    return renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
   }
   ctx.collectors.runtime.add('normalizeListeners');
-  return `normalizeListeners(${renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams })})`;
+  return `normalizeListeners(${renderExpr(spread.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })})`;
 }
 
 /**
@@ -1040,7 +1048,7 @@ function opaqueSpreadClassReadExpr(
   // Dynamic — read `.class` off the source expression. `normalizeAttrs` does
   // not alter the `class` key for Solid (SOLID_ATTR_KEY_MAP omits `class`),
   // so reading from the raw expression matches the spread's `class` key.
-  const exprCode = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams });
+  const exprCode = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
   return `((${exprCode}) as unknown as Record<string, unknown>)?.class as string | undefined`;
 }
 
@@ -1151,7 +1159,7 @@ export function emitAttributes(
       // Emit a single `class=` for all class sources (object forms wrapped in
       // rozieClass by composeClassValue).
       if (classStrAttrs.length > 0) {
-        let classValue = composeClassValue(classStrAttrs, ctx.ir, { invokeAccessors: ctx.invokeAccessors, scopeAccessorParams: ctx.scopeAccessorParams }, ctx.collectors.runtime);
+        let classValue = composeClassValue(classStrAttrs, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams }, ctx.collectors.runtime);
         if (needsPostSpreadClass) {
           // R6 opaque-spread merge: append each opaque spread's class at the
           // tail of the value so an `extra-variant` from `$attrs` joins our

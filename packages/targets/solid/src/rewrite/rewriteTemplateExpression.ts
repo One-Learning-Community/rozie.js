@@ -130,6 +130,18 @@ export interface RewriteTemplateOpts {
   scopeAccessorParams?:
     | { accessorIdent: string; params: ReadonlyMap<string, string> }
     | undefined;
+  /**
+   * Spike-012 NEW-4 — identifiers bound to a RAW loop VALUE by an enclosing
+   * keyless `<For>` (the item alias). Under `<For>` the item callback param is a
+   * scalar, NOT an accessor, so a bare reference must stay bare — even when the
+   * SAME name also happens to be a `$computed` (a lexical shadow: the loop param
+   * shadows the outer memo inside the body). Without this, the Identifier visitor
+   * would see the name in `computedNames` and rewrite `item` → `item()`, calling
+   * the scalar (TS2349 + runtime TypeError). Populated by `emitLoop` on the child
+   * ctx for the keyless-`<For>` body only; a keyed `<Key>` item alias is a real
+   * accessor and is threaded via `invokeAccessors` instead (so it DOES get `()`).
+   */
+  loopValueBindings?: ReadonlySet<string> | undefined;
 }
 
 /**
@@ -151,6 +163,7 @@ export function rewriteTemplateExpression(
   const slotNames = new Set(ir.slots.map((s) => s.name));
   const invokeAccessors = opts.invokeAccessors;
   const scopeAccessor = opts.scopeAccessorParams;
+  const loopValueBindings = opts.loopValueBindings;
 
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
@@ -397,6 +410,12 @@ export function rewriteTemplateExpression(
         path.skip();
         return;
       }
+
+      // Spike-012 NEW-4 — a keyless `<For>` item alias is a RAW value in the
+      // loop body; leave it bare even if the same name is also a `$computed`
+      // (the loop param lexically shadows the memo). Guard BEFORE the computed /
+      // invoke-accessor rewrite so `item` never becomes `item()` inside the loop.
+      if (loopValueBindings?.has(name)) return;
 
       const isComputed = computedNames.has(name);
       const isInvokeAccessor = invokeAccessors?.has(name) ?? false;

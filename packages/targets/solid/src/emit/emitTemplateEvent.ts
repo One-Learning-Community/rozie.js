@@ -57,6 +57,12 @@ export interface EmitEventCtx {
    * `invokeAccessors?.has(name)`.
    */
   invokeAccessors?: ReadonlySet<string> | undefined;
+  /**
+   * Spike-012 NEW-4 — keyless-`<For>` raw item aliases in scope; threaded into
+   * the handler rewrite so a loop var that shadows a `$computed` stays bare (see
+   * `EmitNodeCtx.loopValueBindings`).
+   */
+  loopValueBindings?: ReadonlySet<string> | undefined;
 }
 
 export interface EmitTemplateEventResult {
@@ -227,6 +233,7 @@ function renderHandler(
   handler: t.Expression,
   ir: IRComponent,
   invokeAccessors?: ReadonlySet<string> | undefined,
+  loopValueBindings?: ReadonlySet<string> | undefined,
 ): string {
   // Phase 16 R2 / D-03 — thread the loop-accessor unwrap set into the
   // template-expression rewriter. The set is sourced from `EmitEventCtx`
@@ -234,7 +241,11 @@ function renderHandler(
   // body branch. Without it, an `index` alias passed as a CallExpression
   // argument (e.g. `@keydown="fn($event, index)"`) emits the bare accessor
   // function instead of invoking it — the bug SPEC R2 closes.
-  return rewriteTemplateExpression(handler, ir, { invokeAccessors });
+  //
+  // Spike-012 NEW-4 — also thread the raw keyless-item-alias set so a loop var
+  // used in a handler (`@click="pick(item)"`) stays bare when it shadows a
+  // `$computed`, instead of being called (`pick(item())` on a scalar).
+  return rewriteTemplateExpression(handler, ir, { invokeAccessors, loopValueBindings });
 }
 
 /**
@@ -354,7 +365,7 @@ export function emitTemplateEvent(
     if (desc.helperName === 'createDebouncedHandler' || desc.helperName === 'createThrottledHandler') {
       const solidHelper = desc.helperName;
       ctx.collectors.runtime.add(solidHelper);
-      const originalHandlerCode = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors);
+      const originalHandlerCode = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
       // Spike-012 NEW-2 — a statement-kind handler (`@input.debounce(300)="bump()"`)
       // must be wrapped in a thunk so the FUNCTION is debounced, not its invoked
       // `void` result (TS2345). The param is left UN-annotated here (unlike the
@@ -393,7 +404,7 @@ export function emitTemplateEvent(
     // Pure helper-wrap: reference the wrapper name directly.
     handlerExpr = handlerRef;
   } else if (inlineGuards.length === 0) {
-    const code = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors);
+    const code = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
     if (handlerKind === 'identifier') {
       handlerExpr = code;
     } else if (handlerKind === 'callable') {
@@ -421,12 +432,12 @@ export function emitTemplateEvent(
     } else if (handlerKind === 'identifier') {
       // Bare identifier (e.g. `onSearch`) — call without args so handlers typed
       // `() => void` don't complain about the synthetic event parameter.
-      handlerInvocation = `${renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors)}()`;
+      handlerInvocation = `${renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings)}()`;
     } else if (handlerKind === 'callable') {
       // Optional-call so optional callback props don't TS2722.
-      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors)})?.($event)`;
+      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings)})?.($event)`;
     } else {
-      handlerInvocation = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors);
+      handlerInvocation = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
     }
     handlerExpr = `($event: ${eventType}) => { ${guardLines} ${handlerInvocation}; }`;
   }

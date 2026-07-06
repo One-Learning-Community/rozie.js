@@ -63,10 +63,11 @@ function buildParamObj(
   args: TemplateSlotInvocationIR['args'],
   ir: IRComponent,
   invokeAccessors?: ReadonlySet<string> | undefined,
+  loopValueBindings?: ReadonlySet<string> | undefined,
 ): string {
   if (args.length === 0) return '{}';
   const parts = args.map((a) => {
-    const code = rewriteTemplateExpression(a.expression, ir, { invokeAccessors });
+    const code = rewriteTemplateExpression(a.expression, ir, { invokeAccessors, loopValueBindings });
     if (code === a.name) return a.name;
     return `${a.name}: ${code}`;
   });
@@ -131,7 +132,7 @@ export function emitSlotInvocation(
   if (slotName === '') {
     const slotHasParams = slot ? slot.params.length > 0 : false;
     if (slotHasParams) {
-      const paramObj = buildParamObj(node.args, ctx.ir, ctx.invokeAccessors);
+      const paramObj = buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
       // Function-child case: invoke with scope. Non-function child case: fall
       // back to the standard `resolved()` (Solid children() accessor) path so
       // existing static-child reactivity semantics are preserved.
@@ -149,7 +150,7 @@ export function emitSlotInvocation(
   // Named slot — build the prop field name with Slot suffix.
   const slotFieldName = slotName + 'Slot';
   const hasParams = slot ? slot.params.length > 0 : false;
-  const paramObj = slot && hasParams ? buildParamObj(node.args, ctx.ir, ctx.invokeAccessors) : null;
+  const paramObj = slot && hasParams ? buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings) : null;
 
   // Phase 07.3.2 — merge static slot prop with the consumer-side dynamic
   // `slots?:` map (D-SV-16 cross-target port of commit 6060408,
