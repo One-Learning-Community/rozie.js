@@ -1,0 +1,17 @@
+<rozie name="GlobalProbe">
+
+<props>
+{
+  count: { type: Number, default: 42 },
+}
+</props>
+
+<template>
+<div class="global-probe">
+  <span class="result">{{ String($props.count) }}</span>
+  <span class="result2">{{ Number('7') }}</span>
+  <span class="result3">{{ JSON.stringify($props.count) }}</span>
+</div>
+</template>
+
+</rozie>

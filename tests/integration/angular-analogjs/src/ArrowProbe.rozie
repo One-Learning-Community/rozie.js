@@ -1,0 +1,15 @@
+<rozie name="ArrowProbe">
+
+<props>
+{
+  items: { type: Array, default: () => [1, 2, 3] },
+}
+</props>
+
+<template>
+<div class="arrow-probe">
+  <span class="result">{{ $props.items.find((x) => x > 1) }}</span>
+</div>
+</template>
+
+</rozie>
