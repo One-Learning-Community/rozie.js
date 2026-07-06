@@ -143,6 +143,15 @@ function foldMin(min: number | null, n: number): number {
  * The minimum argument count observed across every internal `CallExpression`
  * naming `fnName` (a bare-identifier callee) anywhere in `file`'s `<script>`
  * AST. `null` when there is no such call.
+ *
+ * CR-02 fix (73-REVIEW.md, 73-10 gap-closure): a call only counts as
+ * evidence when `fnName` resolves — via real scope/binding resolution — to
+ * the SAME top-level declaration `collectExposedFunctionsByName` reads the
+ * exposed verb's own param list off. Before this fix, a call was matched by
+ * bare callee NAME alone, so an unrelated, differently-scoped local (e.g. a
+ * same-named function PARAMETER belonging to a totally unrelated helper)
+ * was indistinguishable from a genuine internal call to the exposed verb,
+ * polluting the observed minimum arity.
  */
 function minScriptCallArity(file: File, fnName: string): number | null {
   let min: number | null = null;
@@ -150,7 +159,14 @@ function minScriptCallArity(file: File, fnName: string): number | null {
     CallExpression(path) {
       const callee = path.node.callee;
       if (t.isIdentifier(callee) && callee.name === fnName) {
-        min = foldMin(min, path.node.arguments.length);
+        const binding = path.scope.getBinding(fnName);
+        // Only count this call if `fnName` resolves (in the call's own
+        // scope chain) to a binding registered directly on the Program's
+        // own scope — i.e. the SAME top-level declaration as the exposed
+        // verb, not a shadowing local (function param, nested const, etc.).
+        if (binding && binding.scope === path.scope.getProgramParent()) {
+          min = foldMin(min, path.node.arguments.length);
+        }
       }
     },
   });
@@ -162,9 +178,23 @@ function minScriptCallArity(file: File, fnName: string): number | null {
  * naming `fnName` anywhere in a single (possibly bare, non-Program)
  * Expression node — used for `ir.listeners[].handler`/`.when` (template
  * `@event` bindings + `<listeners>` entries lower to the SAME `Listener`
- * shape, D-20). `t.traverseFast` is a scope-free deep walker (no `File`/
- * `Program` context required, unlike `@babel/traverse`), which is exactly
- * what a bare `Expression` needs here. `null` when there is no such call.
+ * shape, D-20). This Expression is never part of a real `Program` (no
+ * `File`/module-level scope exists for it), so `@babel/traverse`'s
+ * scope/binding resolution — used by `minScriptCallArity` above — is not
+ * available here. `null` when there is no such call.
+ *
+ * CR-02 fix (73-REVIEW.md, 73-10 gap-closure): a nested function's own
+ * parameter (or a block-level `const`/`let`/`var`/function declaration) that
+ * shares `fnName` SHADOWS the top-level exposed verb for that function's
+ * entire subtree — a call to that shadowed local must never be folded into
+ * the exposed verb's arity evidence. Since there is no real scope API to
+ * consult, shadowing is tracked manually while walking: entering a
+ * function or block adds every name it directly binds to the active shadow
+ * set for its ENTIRE subtree. This is a conservative OVER-approximation
+ * (mirrors the same discipline already used elsewhere in this codebase,
+ * e.g. Solid's `collectReferencedNames` in emitScript.ts): at worst it
+ * misses some genuine internal-call evidence — leaving a trailing param
+ * required rather than optional, the SAFE direction — never the reverse.
  */
 function minExpressionCallArity(
   expr: t.Node | null | undefined,
@@ -172,15 +202,81 @@ function minExpressionCallArity(
 ): number | null {
   if (!expr) return null;
   let min: number | null = null;
-  t.traverseFast(expr, (node) => {
+
+  const VISITOR_KEYS = (t as unknown as { VISITOR_KEYS: Record<string, string[]> })
+    .VISITOR_KEYS;
+
+  /** Names directly bound by `node` itself (not recursing into children). */
+  const declaredNames = (node: t.Node): string[] => {
+    const names: string[] = [];
+    const collectPattern = (p: t.Node): void => {
+      if (t.isIdentifier(p)) {
+        names.push(p.name);
+      } else if (t.isAssignmentPattern(p)) {
+        collectPattern(p.left);
+      } else if (t.isRestElement(p)) {
+        collectPattern(p.argument);
+      } else if (t.isObjectPattern(p)) {
+        for (const prop of p.properties) {
+          if (t.isObjectProperty(prop)) collectPattern(prop.value as t.Node);
+          else if (t.isRestElement(prop)) collectPattern(prop.argument);
+        }
+      } else if (t.isArrayPattern(p)) {
+        for (const el of p.elements) if (el) collectPattern(el);
+      }
+    };
     if (
-      t.isCallExpression(node) &&
-      t.isIdentifier(node.callee) &&
-      node.callee.name === fnName
+      t.isFunctionExpression(node) ||
+      t.isArrowFunctionExpression(node) ||
+      t.isFunctionDeclaration(node)
     ) {
-      min = foldMin(min, node.arguments.length);
+      for (const p of node.params) collectPattern(p);
+      if (t.isFunctionDeclaration(node) && node.id) names.push(node.id.name);
     }
-  });
+    if (t.isBlockStatement(node)) {
+      for (const stmt of node.body) {
+        if (t.isVariableDeclaration(stmt)) {
+          for (const decl of stmt.declarations) collectPattern(decl.id);
+        } else if (t.isFunctionDeclaration(stmt) && stmt.id) {
+          names.push(stmt.id.name);
+        }
+      }
+    }
+    return names;
+  };
+
+  const walk = (node: unknown, shadowed: Set<string>): void => {
+    if (!node || typeof node !== 'object' || typeof (node as t.Node).type !== 'string') return;
+    const current = node as t.Node;
+
+    let active = shadowed;
+    const introduced = declaredNames(current);
+    if (introduced.length > 0) {
+      active = new Set(shadowed);
+      for (const n of introduced) active.add(n);
+    }
+
+    if (
+      t.isCallExpression(current) &&
+      t.isIdentifier(current.callee) &&
+      current.callee.name === fnName &&
+      !active.has(fnName)
+    ) {
+      min = foldMin(min, current.arguments.length);
+    }
+
+    const keys = VISITOR_KEYS[current.type] ?? [];
+    for (const key of keys) {
+      const child = (current as unknown as Record<string, unknown>)[key];
+      if (Array.isArray(child)) {
+        for (const c of child) walk(c, active);
+      } else {
+        walk(child, active);
+      }
+    }
+  };
+
+  walk(expr, new Set());
   return min;
 }
 
