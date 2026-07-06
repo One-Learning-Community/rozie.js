@@ -162,6 +162,13 @@ const tableColumns = () => {
       isExpanderColumn: true,
       pinned: '',
       width: '',
+      // Explicit narrow size so table-core's getSize()/getStart('left') match the RENDERED
+      // width. Without it table-core assumes its 150px default, which is fine for an UNPINNED
+      // chrome column (a CSS `width:1%` trick shrinks it visually) but breaks the moment the
+      // column joins the left-pinned rail: pinStyle's sticky offset is Σ preceding pinned
+      // SIZES, so a phantom 150px would push every real pinned column ~150px too far right and
+      // overlap. Keep this in sync with the `--rdt-expander-col-width` CSS default (40px).
+      size: 40,
     }
     withExpander = [expanderCol].concat(cols)
   }
@@ -174,6 +181,10 @@ const tableColumns = () => {
       isSelectColumn: true,
       pinned: '',
       width: '',
+      // Explicit narrow size so table-core's sticky-offset math (getStart('left')) matches the
+      // rendered checkbox width once this column joins the left-pinned rail — see the expander
+      // note above. Keep in sync with the `--rdt-select-col-width` CSS default (44px).
+      size: 44,
     }
     return [selectCol].concat(withExpander)
   }

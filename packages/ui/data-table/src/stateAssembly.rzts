@@ -4,24 +4,30 @@
 const groupingActiveDefault = () =>
   ((($props.grouping != null ? $props.grouping : $data.groupingDefault) || []).length > 0)
 
-// effectiveColumnPinning(): force the auto-injected select/expander chrome columns to the
-// FRONT of the effective left-pinned rail so they stay the structural leftmost body cells
-// even when a consumer pins a DATA column left. TanStack's getVisibleCells() returns
-// [left-pinned, center, right-pinned] and orders the left group by the columnPinning.left
-// array — so a consumer pinning e.g. `name` left would otherwise render the name cell to the
-// LEFT of the checkbox (which is a center column, pinned:''). Prepending SELECT_COL_ID then
-// EXPANDER_COL_ID to `left` (matching the tableColumns injection order [select, expander,
-// ...userCols]) guarantees they lead the pinned rail regardless of a custom columnOrder
-// (columnOrder only orders the CENTER group). CRITICAL: the empty-left DEFAULT returns `base`
-// UNCHANGED — select/expander are already center-leftmost when nothing is pinned, so the
-// no-pin table stays byte-identical (VR/snapshot baselines must not drift).
+// effectiveColumnPinning(): the auto-injected select/expander chrome columns are a STRUCTURAL
+// left-pinned rail — they ALWAYS lead the pinned-left group so the checkbox/chevron stay the
+// leftmost body cells in EVERY case (fresh, pinned, AND grouped). Two forces would otherwise
+// push a data column ahead of the checkbox:
+//   1. Pinning — a consumer pinning `name` left makes it left-pinned; getVisibleCells() returns
+//      [left-pinned, center, right-pinned], so an unpinned (center) checkbox renders AFTER it.
+//   2. Grouping — table-core's groupedColumnMode defaults to 'reorder', which moves a grouped
+//      column to the FRONT of the order, ahead of an unpinned center checkbox.
+// Pinning the rail left beats BOTH: the left group always precedes the (grouped-reordered)
+// center group. We prepend SELECT_COL_ID then EXPANDER_COL_ID (matching the tableColumns
+// injection order [select, expander, ...userCols]) ahead of any consumer left-pins.
+// REQUIRES: the chrome column defs carry an explicit `size` (columnBuilders.rzts) — pinStyle's
+// sticky offset is col.getStart('left') = Σ preceding pinned SIZES, so a size-less chrome column
+// (table-core's 150px default) would inflate every real pinned column's `left` and overlap.
+// The consumer's columnPinning model never sees these ids: writeColumnPinning() strips them
+// on the way back out (writeFunnels.rzts). Note: this ALWAYS-pin makes the default (no-pin)
+// checkbox a sticky-left rail — an intentional baseline change (VR/snapshot baselines drift).
 const effectiveColumnPinning = (): any => {
   const base = $props.columnPinning != null ? $props.columnPinning : $data.columnPinningDefault
-  const left = base && base.left ? base.left : []
-  if (left.length === 0) return base
   const rail: string[] = []
   if (selectionEnabled()) rail.push(SELECT_COL_ID)
   if ($props.expandable === true) rail.push(EXPANDER_COL_ID)
+  if (rail.length === 0) return base
+  const left = base && base.left ? base.left : []
   const deduped = left.filter((id: string) => id !== SELECT_COL_ID && id !== EXPANDER_COL_ID)
   return { ...base, left: rail.concat(deduped) }
 }

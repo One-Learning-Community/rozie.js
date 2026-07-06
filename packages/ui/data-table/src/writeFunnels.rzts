@@ -152,10 +152,16 @@ const writeColumnOrder = (next) => {
 // binding.
 const writeColumnPinning = (next) => {
   if (programmatic) return
+  // effectiveColumnPinning() forces the auto-injected chrome ids (select/expander) into the
+  // table-core `left` rail, so table-core hands them back here on every pin change. Strip them
+  // before persisting: the CONSUMER's columnPinning model + the pin-change event must reflect
+  // only their own columns, never our internal rail ids (which re-inject each render anyway).
+  const strip = (ids) => (ids || []).filter((id) => id !== SELECT_COL_ID && id !== EXPANDER_COL_ID)
+  const clean = { ...next, left: strip(next && next.left), right: strip(next && next.right) }
   programmatic++
-  $data.columnPinningDefault = next
-  $model.columnPinning = next
-  $emit('pin-change', next)
+  $data.columnPinningDefault = clean
+  $model.columnPinning = clean
+  $emit('pin-change', clean)
   programmatic--
 }
 

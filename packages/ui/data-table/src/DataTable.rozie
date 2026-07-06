@@ -2584,19 +2584,25 @@ $expose({
   cursor: pointer;
   white-space: nowrap;
 }
-/* Auto-injected select column (req-7, D-04) — token-driven, narrow checkbox cell. */
+/* Auto-injected select column (req-7, D-04) — token-driven, narrow checkbox cell. The default
+   width MUST equal the select column def's `size` (44 — columnBuilders.rzts): the select column
+   is a permanently left-pinned rail, and pinStyle's sticky offset is computed from table-core's
+   column SIZE, so a rendered width that disagreed with the size would misalign the sticky rail.
+   Overriding this var alone (without matching the def size) is unsupported for that reason. */
 .rozie-data-table .rdt-select-th,
 .rozie-data-table .rdt-select-td {
-  width: var(--rdt-select-col-width, 1%);
+  width: var(--rdt-select-col-width, 44px);
   text-align: var(--rdt-select-col-align, center);
   white-space: nowrap;
 }
-/* Expander is a chevron-only CHROME column — shrink it to its content (the `width: 1%`
-   table trick, mirroring the select column) instead of inheriting table-core's 150px
-   default column size, which leaves a large empty gap beside the toggle. */
+/* Expander is a chevron-only CHROME column. Its width default MUST equal the expander column
+   def's `size` (40 — columnBuilders.rzts) for the same left-pinned-rail reason as the select
+   column above (a fixed narrow width now replaces the old `width:1%` shrink trick, which only
+   fixed the VISUAL width and left table-core's 150px size model — hence the sticky offset —
+   wrong once pinned). Deep tree indentation is applied as padding-left WITHIN the cell. */
 .rozie-data-table .rdt-expander-th,
 .rozie-data-table .rdt-expander-td {
-  width: var(--rdt-expander-col-width, 1%);
+  width: var(--rdt-expander-col-width, 40px);
   text-align: var(--rdt-expander-col-align, center);
   white-space: nowrap;
 }
