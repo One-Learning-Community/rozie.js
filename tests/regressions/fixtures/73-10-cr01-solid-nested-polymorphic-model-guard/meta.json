@@ -3,7 +3,7 @@
   "source": "73-REVIEW.md#CR-01",
   "sourceKind": "deviation-log",
   "phase": "73-10",
-  "desc": "a polymorphic model-guard nested inside an if-block (neither of hoistPolymorphicModelGuards' two known-safe shapes) must be a TRUE no-op, never an undeclared local reference",
+  "desc": "a polymorphic model-guard nested inside an if-block is hoisted to a local so it narrows on Solid (Spike-012 BUG-4 — hoistPolymorphicModelGuards' Shape-2 generalized to control-flow-nested statements); pre-fix it was left un-narrowed (Solid TS2322), and earlier still it emitted an undeclared `v` (73-10 CR-01, TS2304)",
   "targets": ["solid"],
   "discoveredBy": "73-REVIEW.md CR-01 (gsd-code-reviewer)"
 }

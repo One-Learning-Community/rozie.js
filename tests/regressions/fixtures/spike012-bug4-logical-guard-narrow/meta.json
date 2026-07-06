@@ -1,0 +1,11 @@
+{
+  "id": "REG-SPIKE012-BUG4",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a polymorphic model-guard inside a compound `&&` test is hoisted to a local so it narrows on Solid (Spike-012 BUG-4 — matchesPolymorphicModelGuard recurses into LogicalExpression); pre-fix the accessor-call reads left the union un-narrowed (TS2322)",
+  "targets": [
+    "solid"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012)"
+}

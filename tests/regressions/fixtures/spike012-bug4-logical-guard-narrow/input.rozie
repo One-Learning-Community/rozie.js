@@ -1,0 +1,18 @@
+<rozie name="LogicalGuardNarrow">
+<props>
+{
+  value: { type: [String, Object], default: '', model: true },
+}
+</props>
+
+<script lang="ts">
+function selected(): string {
+  return (typeof $props.value === 'string' && $props.value.length > 0) ? $props.value : '';
+}
+</script>
+
+<template>
+<div class="selected">{{ selected() }}</div>
+</template>
+
+</rozie>

@@ -140,6 +140,16 @@ function matchesPolymorphicModelGuard(
   test: t.Expression,
   polymorphicModelProps: Set<string>,
 ): string | null {
+  // A compound guard (`typeof $props.X === 'string' && $props.X.length > 0`)
+  // still narrows once the reads are bound to a local — recurse into both sides
+  // of a `&&`/`||` and hoist for the first branch that carries the guard
+  // (Spike-012 BUG-4, `logical-guard` context).
+  if (t.isLogicalExpression(test)) {
+    return (
+      matchesPolymorphicModelGuard(test.left, polymorphicModelProps) ??
+      matchesPolymorphicModelGuard(test.right, polymorphicModelProps)
+    );
+  }
   if (!t.isBinaryExpression(test)) return null;
   const { operator, left, right } = test;
   if (operator === '===' || operator === '!==') {
@@ -179,14 +189,16 @@ function matchesPolymorphicModelGuard(
  * authored `const v = $props.value; return typeof v === 'string' ? v : ''`
  * workaround this replaces (DatePicker.rozie, commit bf3766b5).
  *
- * Gated strictly to two known-safe shapes so this never mis-hoists into the
- * wrong scope:
+ * Gated to two known-safe shapes so this never mis-hoists into the wrong scope:
  *   1. the conditional IS an arrow function's own concise body — converted to
  *      a block body wrapping `const v = ...; return <conditional>;`
- *   2. the conditional sits inside a statement that is a DIRECT child of its
- *      nearest enclosing function's block body — the local is inserted right
- *      before that statement.
- * Any other nesting is left alone (falsify-to-no-op, never a wrong fix).
+ *   2. the conditional sits inside a statement that lives in a statement LIST
+ *      (block body, switch-case consequent, program body) — including
+ *      statements nested inside control-flow blocks (`if`/`for`/`while`/
+ *      `switch`/`try`). The local is inserted right before that statement, in
+ *      the same block as the guarded reads (Spike-012 BUG-4).
+ * A conditional not in either shape (e.g. a bare single-statement `if (x)
+ * return …;` with no block) is left alone (falsify-to-no-op, never a wrong fix).
  *
  * Runs on the raw (pre-$props-rewrite) Program, before the main
  * `rewriteRozieIdentifiers` traversal — the injected `$props.X` reference is
@@ -229,15 +241,22 @@ function hoistPolymorphicModelGuards(cloned: File, polymorphicModelProps: Set<st
       const isConciseArrowBody =
         parentPath.isArrowFunctionExpression() && parentPath.node.body === path.node;
 
-      const fnPath = path.getFunctionParent();
+      // Shape 2 (generalized — 73-10 CR-01 → Spike-012 BUG-4): the conditional
+      // sits inside a statement that lives in a statement LIST (a block body,
+      // switch-case consequent, program body), INCLUDING statements nested
+      // inside control-flow blocks (`if`/`for`/`while`/`switch`/`try`). The
+      // `const v` is inserted immediately before that statement via
+      // `insertBefore`, landing in the SAME block as the guarded reads, so it is
+      // always in scope for them. This was previously gated to a DIRECT child of
+      // the function body only — the identical guard one level deeper (inside an
+      // `if`, etc.) was left un-narrowed and failed strict tsc (Solid TS2322).
+      // The shape is still computed BEFORE any mutation (the CR-01 invariant:
+      // never leave the tree referencing an undeclared local when no insertion
+      // point applies).
       const stmtPath = path.getStatementParent();
-      const isDirectBlockChild =
-        !!fnPath &&
-        !!stmtPath &&
-        t.isBlockStatement(fnPath.node.body) &&
-        stmtPath.parentPath?.node === fnPath.node.body;
+      const canInsertBeforeStmt = !!stmtPath && stmtPath.inList;
 
-      if (!isConciseArrowBody && !isDirectBlockChild) return; // true no-op, nothing touched
+      if (!isConciseArrowBody && !canInsertBeforeStmt) return; // true no-op, nothing touched
 
       // Pick a local name, defaulting to `v` (mirrors the hand-authored
       // pattern) — fall back to a generated uid on the rare collision.
