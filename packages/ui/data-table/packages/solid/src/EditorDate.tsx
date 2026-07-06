@@ -65,7 +65,7 @@ export default function EditorDate(_props: EditorDateProps): JSX.Element {
 
   return (
     <>
-    <input type="date" data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={draft()} onInput={($event) => { onInput($event); }} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-7abe1a56="" />
+    <input type="date" data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={draft()} onInput={($event: InputEvent) => { onInput($event); }} onChange={($event: Event) => { onChange($event); }} onKeyDown={($event: KeyboardEvent) => { onKeydown($event); }} onBlur={($event: FocusEvent) => { onBlur(); }} data-rozie-s-7abe1a56="" />
     </>
   );
 }

@@ -1144,7 +1144,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
             ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: wr.row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor()}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: wr.row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor()}); } catch { return '{}'; } })()}></slot>`}
           </span>` : this.editorTypeOf(cell.column.id) === 'number' ? html`<input class="rdt-cell-editor" type="number" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: Event) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cell.column.id) === 'select' ? html`<select class="rdt-cell-editor" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @change=${($event: Event) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c>
             ${repeat<any>(this.editorOptionsOf(cell.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option key=${rozieAttr(opt.value)} value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
-          </select>` : this.editorTypeOf(cell.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${this.editorCheckedFor(cell.column.id)} @change=${($event: Event) => { this.onCellEditorCheckbox(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: Event) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
+          </select>` : this.editorTypeOf(cell.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${this.editorCheckedFor(cell.column.id)} @change=${($event: Event) => { this.onCellEditorCheckbox(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: Event) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : this.cellIsPlaceholder(cell) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
           ${this.cell !== undefined ? this.cell({columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue()}) : html`<slot name="cell" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue()}); } catch { return '{}'; } })()}>${rozieDisplay(cell.getValue())}</slot>`}
         </span>`}${this.isFillHandleCell(wr.vi.index, this.colIndexOf(wr.row, cell)) ? html`<span class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown=${($event: Event) => { this.onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c></span>` : nothing}</td>`)}
     </tr>
@@ -1224,7 +1224,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
             ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor()}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor()}); } catch { return '{}'; } })()}></slot>`}
           </span>` : this.editorTypeOf(cell.column.id) === 'number' ? html`<input class="rdt-cell-editor" type="number" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: Event) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cell.column.id) === 'select' ? html`<select class="rdt-cell-editor" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @change=${($event: Event) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c>
             ${repeat<any>(this.editorOptionsOf(cell.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option key=${rozieAttr(opt.value)} value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
-          </select>` : this.editorTypeOf(cell.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${this.editorCheckedFor(cell.column.id)} @change=${($event: Event) => { this.onCellEditorCheckbox(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: Event) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
+          </select>` : this.editorTypeOf(cell.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${this.editorCheckedFor(cell.column.id)} @change=${($event: Event) => { this.onCellEditorCheckbox(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: Event) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: Event) => { this.onEditorKeyDown($event); }} @blur=${($event: Event) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : this.cellIsPlaceholder(cell) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
           ${this.cell !== undefined ? this.cell({columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue()}) : html`<slot name="cell" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue()}); } catch { return '{}'; } })()}>${rozieDisplay(cell.getValue())}</slot>`}
         </span>`}${this.isFillHandleCell(this.rowIndexOf(row), this.colIndexOf(row, cell)) ? html`<span class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown=${($event: Event) => { this.onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c></span>` : nothing}</td>`)}
     </tr>
@@ -1271,6 +1271,20 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   groupingActiveDefault = () => ((this.grouping != null ? this.grouping : this._groupingDefault.value) || []).length > 0;
 
+  effectiveColumnPinning = (): any => {
+  const base = this.columnPinning != null ? this.columnPinning : this._columnPinningDefault.value;
+  const left = base && base.left ? base.left : [];
+  if (left.length === 0) return base;
+  const rail: string[] = [];
+  if (this.selectionEnabled()) rail.push(this.SELECT_COL_ID);
+  if (this.expandable === true) rail.push(this.EXPANDER_COL_ID);
+  const deduped = left.filter((id: string) => id !== this.SELECT_COL_ID && id !== this.EXPANDER_COL_ID);
+  return {
+    ...base,
+    left: rail.concat(deduped)
+  };
+};
+
   currentState = (): any => ({
   sorting: this.sorting != null ? this.sorting : this._sortingDefault.value,
   globalFilter: this.globalFilter != null ? this.globalFilter : this._globalFilterDefault.value,
@@ -1294,7 +1308,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   columnVisibility: this.columnVisibility != null ? this.columnVisibility : this._columnVisibilityDefault.value,
   columnSizing: this.columnSizing != null ? this.columnSizing : this._columnSizingDefault.value,
   columnOrder: this.columnOrder != null ? this.columnOrder : this._columnOrderDefault.value,
-  columnPinning: this.columnPinning != null ? this.columnPinning : this._columnPinningDefault.value,
+  columnPinning: this.effectiveColumnPinning(),
   // columnSizingInfo: table-core's transient resize-gesture state. We pass an
   // EXPLICIT `state` object, so table-core does NOT fill its own defaults — and
   // `column.getIsResizing()` / `getResizeHandler()` read
@@ -2256,6 +2270,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   cellIsGrouped = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped());
 
   cellIsAggregated = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated());
+
+  cellIsPlaceholder = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
 
   groupSubRowCount = (row: any) => row && row.subRows ? row.subRows.length : 0;
 

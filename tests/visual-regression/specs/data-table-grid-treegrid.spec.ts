@@ -254,3 +254,70 @@ for (const target of TARGETS) {
     ).toHaveAttribute('aria-expanded', 'true');
   });
 }
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// PLACEHOLDER-BLANK (grouping fix 260706-h2d) — on a group-header row, a PLACEHOLDER cell
+//   renders BLANK (no leaked first-leaf value), while AGGREGATED cells still render. A
+//   placeholder cell (cell.getIsPlaceholder()) only exists under MULTI-LEVEL grouping: a
+//   cell whose column IS a grouping column but NOT the one this row is grouped by. The
+//   DataTableGroupPlaceholder fixture groups by ['region','city']; on the top-level REGION
+//   group-header row the `city` cell is a placeholder (city is a grouping column, but that
+//   row groups by region) while `product`/`qty` are aggregated. table-core fills a
+//   placeholder cell's getValue() with the FIRST leaf row's value, so pre-fix the region
+//   row's city cell leaked "Oslo". The cellIsPlaceholder r-else-if empty branch suppresses
+//   that leak; aggregated cells (carrying [data-agg-cell]) are unchanged.
+//
+//   RED pre-fix: the placeholder `city` cell renders "Oslo" (leaked first-leaf) → non-empty.
+//   GREEN post-fix: the placeholder cell renders empty text; the aggregated cell still shows
+//   its value.
+// ════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-grid-treegrid [${target}]: multi-level group-header placeholder cell renders blank (no leaked first-leaf value); aggregated cell unchanged`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableGroupPlaceholder&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const mount = page.getByTestId('rozie-mount');
+    const container = mount.getByTestId('placeholder-table');
+    await expect(container.locator('table')).toBeVisible({ timeout: 15_000 });
+
+    // Multi-level grouping engages one frame after mount → group-header rows render
+    // (2 top-level region groups + nested city subgroups). This demo is role="table" (NOT
+    // grid mode), so wait on the group-header row locator directly rather than the
+    // grid-only groupHeaderCount() probe.
+    await expect
+      .poll(async () => container.locator('tbody tr[data-group-header]').count(), { timeout: 15_000 })
+      .toBeGreaterThan(0);
+
+    // The FIRST group-header row is the top-level region group (North). Its placeholder cells
+    // are grid cells that are NEITHER the grouped cell (no `.rdt-group-value`) NOR aggregated
+    // (no `[data-agg-cell]`) — here that is the `city` column cell.
+    const firstGroupTr = container.locator('tbody tr[data-group-header]').first();
+    const placeholderCells = firstGroupTr.locator(
+      '[data-grid-cell]:not(:has(.rdt-group-value)):not([data-agg-cell])',
+    );
+
+    // The multi-level fixture yields exactly one placeholder cell (`city`) on the region row —
+    // assert it exists so the blank check can't vacuously pass.
+    await expect.poll(async () => placeholderCells.count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(1);
+    // The placeholder city cell is the one addressed by data-col.
+    const cityPlaceholder = firstGroupTr.locator('[data-grid-cell][data-col="city"]');
+    await expect(cityPlaceholder).toHaveCount(1, { timeout: 15_000 });
+
+    const count = await placeholderCells.count();
+    for (let i = 0; i < count; i++) {
+      // GREEN post-fix: blank. RED pre-fix: the leaked first-leaf value ("Oslo").
+      await expect(placeholderCells.nth(i)).toHaveText('', { timeout: 15_000 });
+    }
+
+    // AGGREGATED cells still render their rolled-up value — UNCHANGED by the fix. The `qty`
+    // column carries aggregationFn="sum", so on the North region row it shows the summed value
+    // (3+5+2 = 10). It flows through the #cell r-else (NOT the placeholder empty branch): it
+    // carries [data-agg-cell] AND renders non-empty text.
+    const qtyAgg = firstGroupTr.locator('[data-grid-cell][data-col="qty"]');
+    await expect(qtyAgg).toHaveCount(1, { timeout: 15_000 });
+    await expect(qtyAgg).toHaveAttribute('data-agg-cell', 'qty', { timeout: 15_000 });
+    await expect(qtyAgg).toHaveText('10', { timeout: 15_000 });
+  });
+}

@@ -132,6 +132,12 @@ const groupingActive = () => (tick() >= 0 && ((currentState().grouping || []).le
 // Art). A placeholder cell (neither) falls through to the #cell r-else and renders its empty value.
 const cellIsGrouped = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped())
 const cellIsAggregated = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated())
+// cellIsPlaceholder: a PLACEHOLDER cell on a group-header row — a non-grouped, non-aggregated
+// cell that table-core fills with the FIRST leaf row's value (cell.getValue() leaks e.g.
+// "Services"/"Edsger Dijkstra" onto the group line). Renders BLANK via a dedicated empty
+// template branch so the leaked leaf value never paints. Tick-gated exactly like cellIsGrouped
+// so the group chrome re-derives on a re-pull on the fine-grained targets (Solid/Lit).
+const cellIsPlaceholder = (cellCtx) => !!(tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder())
 // groupSubRowCount: the number of immediate members under a group-header row (the count shown in
 // the header, e.g. "North (3)").
 const groupSubRowCount = (row) => (row && row.subRows ? row.subRows.length : 0)
@@ -206,4 +212,4 @@ const hasAnyFilterableColumn = () => {
   return false
 }
 
-export { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, pageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, groupSubRowCount, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn }
+export { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, pageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn }

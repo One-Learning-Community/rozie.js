@@ -1,0 +1,113 @@
+<!--
+  DataTableGroupPlaceholderDemo.rozie — placeholder-blank behavioral VR cell (quick 260706-h2d).
+
+  Proves that on a group-header row, table-core PLACEHOLDER cells render BLANK (no leaked
+  first-leaf value), INSIDE the real DataTable.rozie, while AGGREGATED cells still render.
+
+  A placeholder cell (cell.getIsPlaceholder()) only exists under MULTI-LEVEL grouping: a
+  cell whose column IS a grouping column but NOT the one this row is grouped by. Here the
+  table groups by ['region', 'city']; on the top-level REGION group-header row the `city`
+  cell is a placeholder (city is a grouping column, but that row is grouped by region), while
+  `product` / `qty` are AGGREGATED (non-grouping columns on a grouped row). table-core fills a
+  placeholder cell's getValue() with the FIRST leaf row's value, so pre-fix the region row's
+  city cell leaked "Oslo" (the first leaf's city). The cellIsPlaceholder r-else-if empty
+  branch suppresses that leak; the aggregated product/qty cells still render (unchanged).
+
+  data-table-grid-treegrid.spec.ts drives ?example=DataTableGroupPlaceholder and asserts the
+  placeholder city cell is blank ×6 while an aggregated cell stays non-empty. RED pre-fix
+  (city cell leaked "Oslo"), GREEN post-fix (blank). DOM assertion only — NOT a PNG cell.
+  Static dataset (no clock / no random) for determinism. NO loop var or slot named
+  `cell`/`row`/`header` (the slot binding name is `value`); the grouping model field is
+  `groupingModel` (NOT `grouping`) per the Angular slot-var/signal shadow note.
+-->
+
+<rozie name="DataTableGroupPlaceholderDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // Two regions, nested cities. Grouped by [region, city] → on the North region-header row
+  // the `city` cell is a PLACEHOLDER (city is a grouping column, but this row groups by
+  // region); pre-fix it leaked the first leaf's city ("Oslo").
+  rows: [
+    { id: 1, region: 'North', city: 'Oslo',   product: 'Apple',  qty: 3 },
+    { id: 2, region: 'North', city: 'Oslo',   product: 'Banana', qty: 5 },
+    { id: 3, region: 'North', city: 'Bergen', product: 'Carrot', qty: 2 },
+    { id: 4, region: 'South', city: 'Rome',   product: 'Pea',    qty: 7 },
+  ],
+  // Controlled MULTI-LEVEL grouping. Seeded [] then APPLIED in $onMount (a post-mount write)
+  // so the grouped-model rebuild keys on the CHANGE (reliable on React; the treegrid pattern).
+  groupingModel: [],
+  // Large pageSize so every flattened row is on one page.
+  pageConfig: { pageIndex: 0, pageSize: 50 },
+}
+</data>
+
+<script lang="ts">
+// Apply the two-level grouping AFTER mount (one frame later) — a post-mount grouping WRITE so
+// the grouped row-model rebuild keys on the CHANGE (reliable on React).
+$onMount(() => {
+  const applyGrouping = (): void => { $data.groupingModel = ['region', 'city'] }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(applyGrouping)
+  else applyGrouping()
+})
+</script>
+
+<template>
+<div class="dt-placeholder-demo">
+  <h3>DataTable — multi-level grouping (placeholder cells)</h3>
+
+  <div class="controls">
+    <span class="label">grouping:</span>
+    <span class="readout" data-testid="grouping-readout">{{ $data.groupingModel.join(',') }}</span>
+  </div>
+
+  <div data-testid="placeholder-table">
+    <DataTable
+      :data="$data.rows"
+      :groupable="true"
+      :pagination="$data.pageConfig"
+      r-model:grouping="$data.groupingModel"
+    >
+      <Column field="region" header="Region" />
+      <Column field="city" header="City" />
+      <Column field="product" header="Product" />
+      <!-- Built-in `sum` aggregation → on the region group-header row the qty cell shows a
+           real rolled-up value (3+5+2 = 10 for North), proving aggregated cells still render
+           through the #cell r-else (unchanged by the placeholder-blank fix). -->
+      <Column field="qty" header="Qty" aggregationFn="sum" />
+      <template #cell="{ value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-placeholder-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 520px;
+}
+.dt-placeholder-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+</style>
+
+</rozie>

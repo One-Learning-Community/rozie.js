@@ -46,7 +46,7 @@ export default function EditorCheckbox(_props: EditorCheckboxProps): JSX.Element
 
   return (
     <>
-    <input type="checkbox" data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} checked={!!local.value} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-3d792482="" />
+    <input type="checkbox" data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} checked={!!local.value} onChange={($event: Event) => { onChange($event); }} onKeyDown={($event: KeyboardEvent) => { onKeydown($event); }} data-rozie-s-3d792482="" />
     </>
   );
 }

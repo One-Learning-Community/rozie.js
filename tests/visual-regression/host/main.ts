@@ -759,6 +759,19 @@ export const EXAMPLES = [
   // sweep already cover it, importing the data-table source pkg already registered for
   // Angular cross-tree AOT in phase 48).
   'DataTableGroupTreegrid',
+  // Quick 260706-h2d — DataTableGroupPlaceholder is the multi-level-grouping
+  // placeholder-blank behavioral fixture (loader → examples/demos/
+  // DataTableGroupPlaceholderDemo.rozie, importing
+  // ../../packages/ui/data-table/src/{DataTable,Column}.rozie). Groups by
+  // ['region','city'] so the top-level region group-header row has a genuine
+  // PLACEHOLDER cell (the `city` column — a grouping column, but not this row's
+  // level); data-table-grid-treegrid.spec.ts asserts it renders blank while
+  // aggregated cells still render. Behavioral-only; NOT in matrix.spec.ts EXAMPLES
+  // (no pixel baseline). Lives under examples/demos/ so no new Angular 3-file
+  // registration is needed (prebuildExtraRoots[examplesRoot] + the examples tsconfig
+  // include + the glob-driven build-cells demos sweep already cover it, importing the
+  // data-table source pkg already registered for Angular cross-tree AOT in phase 48).
+  'DataTableGroupPlaceholder',
   // Phase 63 Wave-7 (B13 LOCKED: full parity — windowed-tbody grouping/expand) — the two
   // virtual+feature RED-first fixtures (loaders → examples/demos/DataTableVirtual{Group,
   // Expand}Demo.rozie, each importing ../../packages/ui/data-table/src/{DataTable,Column}.rozie).
@@ -1224,6 +1237,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 63 wave-8 treegrid — '-demo' appended on Lit →
   // 'rozie-data-table-group-treegrid-demo' = kebab of DataTableGroupTreegridDemo.
   DataTableGroupTreegrid: 'rozie-data-table-group-treegrid',
+  // Quick 260706-h2d — the lit entry appends '-demo' → tag
+  // 'rozie-data-table-group-placeholder-demo' = kebab of DataTableGroupPlaceholderDemo.
+  DataTableGroupPlaceholder: 'rozie-data-table-group-placeholder',
   // Phase 63 wave-7 windowed-body parity — '-demo' appended on Lit → tags
   // 'rozie-data-table-virtual-group-demo' / 'rozie-data-table-virtual-expand-demo' =
   // kebab of DataTableVirtualGroupDemo / DataTableVirtualExpandDemo.
@@ -1567,6 +1583,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 63 wave-8 treegrid — self-contained ($data only: the rows + grouping model +
   // the readouts). The DataTable is mounted inline with its props.
   DataTableGroupTreegrid: {},
+  // Quick 260706-h2d placeholder-blank — self-contained ($data only: rows + grouping
+  // model). The DataTable is mounted inline with its props. No parent-supplied props.
+  DataTableGroupPlaceholder: {},
   // Phase 53 virtualization — both windowing demos are self-contained: each seeds its
   // own rows in $onMount and passes :virtual + the bounded-container sizing inline
   // (DataTableVirtual via maxHeight prop, DataTableVirtualVarHeight via the

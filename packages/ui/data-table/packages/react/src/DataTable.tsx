@@ -402,6 +402,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function groupingActiveDefault() {
     return ((grouping != null ? grouping : groupingDefault) || []).length > 0;
   }
+  function effectiveColumnPinning(): any {
+    const base = columnPinning != null ? columnPinning : columnPinningDefault;
+    const left = base && base.left ? base.left : [];
+    if (left.length === 0) return base;
+    const rail: string[] = [];
+    if (selectionEnabled()) rail.push(SELECT_COL_ID);
+    if (props.expandable === true) rail.push(EXPANDER_COL_ID);
+    const deduped = left.filter((id: string) => id !== SELECT_COL_ID && id !== EXPANDER_COL_ID);
+    return {
+      ...base,
+      left: rail.concat(deduped)
+    };
+  }
   const currentState = useCallback((): any => ({
     sorting: sorting != null ? sorting : sortingDefault,
     globalFilter: globalFilter != null ? globalFilter : globalFilterDefault,
@@ -425,7 +438,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     columnVisibility: columnVisibility != null ? columnVisibility : columnVisibilityDefault,
     columnSizing: columnSizing != null ? columnSizing : columnSizingDefault,
     columnOrder: columnOrder != null ? columnOrder : columnOrderDefault,
-    columnPinning: columnPinning != null ? columnPinning : columnPinningDefault,
+    columnPinning: effectiveColumnPinning(),
     // columnSizingInfo: table-core's transient resize-gesture state. We pass an
     // EXPLICIT `state` object, so table-core does NOT fill its own defaults — and
     // `column.getIsResizing()` / `getResizeHandler()` read
@@ -435,7 +448,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // every render. Not a two-way model slice (transient gesture state, not consumer
     // state) — held in $data.columnSizingInfo and reset by table-core mid-drag.
     columnSizingInfo: columnSizingInfo
-  }), [columnFilters, columnFiltersDefault, columnOrder, columnOrderDefault, columnPinning, columnPinningDefault, columnSizing, columnSizingDefault, columnSizingInfo, columnVisibility, columnVisibilityDefault, expanded, expandedDefault, globalFilter, globalFilterDefault, grouping, groupingActiveDefault, groupingDefault, pagination, paginationDefault, rowSelection, rowSelectionDefault, sorting, sortingDefault]);
+  }), [columnFilters, columnFiltersDefault, columnOrder, columnOrderDefault, columnSizing, columnSizingDefault, columnSizingInfo, columnVisibility, columnVisibilityDefault, effectiveColumnPinning, expanded, expandedDefault, globalFilter, globalFilterDefault, grouping, groupingActiveDefault, groupingDefault, pagination, paginationDefault, rowSelection, rowSelectionDefault, sorting, sortingDefault]);
   const currentData = useCallback((): any => data != null ? data : dataDefault, [data, dataDefault]);
   function isSafeKey(k: any) {
     return k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
@@ -1296,6 +1309,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   function cellIsAggregated(cellCtx: any) {
     return !!(tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated());
+  }
+  function cellIsPlaceholder(cellCtx: any) {
+    return !!(tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
   }
   function groupSubRowCount(row: any) {
     return row && row.subRows ? row.subRows.length : 0;
@@ -4015,7 +4031,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
                 {(props.renderEditor ?? props.slots?.['editor'])?.({ columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() })}
               </span> : (editorTypeOf(cell.column.id) === 'number') ? <input className={"rdt-cell-editor"} type="number" data-editing-cell="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'select') ? <select className={"rdt-cell-editor"} data-editing-cell="" value={editorValueFor(cell.column.id)} onChange={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 {editorOptionsOf(cell.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
-              </select> : (editorTypeOf(cell.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" checked={editorCheckedFor(cell.column.id)} onChange={($event) => { onCellEditorCheckbox(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
+              </select> : (editorTypeOf(cell.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" checked={editorCheckedFor(cell.column.id)} onChange={($event) => { onCellEditorCheckbox(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : (cellIsPlaceholder(cell)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }) : rozieDisplay(cell.getValue())}
             </span>}{!!(isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cell))) && <span className={"rdt-fill-handle"} data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" />}</td>)}
         </tr>
@@ -4093,7 +4109,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
                 {(props.renderEditor ?? props.slots?.['editor'])?.({ columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() })}
               </span> : (editorTypeOf(cell.column.id) === 'number') ? <input className={"rdt-cell-editor"} type="number" data-editing-cell="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'select') ? <select className={"rdt-cell-editor"} data-editing-cell="" value={editorValueFor(cell.column.id)} onChange={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 {editorOptionsOf(cell.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
-              </select> : (editorTypeOf(cell.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" checked={editorCheckedFor(cell.column.id)} onChange={($event) => { onCellEditorCheckbox(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
+              </select> : (editorTypeOf(cell.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" checked={editorCheckedFor(cell.column.id)} onChange={($event) => { onCellEditorCheckbox(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : (cellIsPlaceholder(cell)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }) : rozieDisplay(cell.getValue())}
             </span>}{!!(isFillHandleCell(rowIndexOf(row), colIndexOf(row, cell))) && <span className={"rdt-fill-handle"} data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" />}</td>)}
         </tr>

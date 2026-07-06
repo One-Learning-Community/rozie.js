@@ -790,3 +790,45 @@ for (const target of TARGETS) {
     expect(await countVirtualPaginationWarns(`/?example=DataTableFilterPaginate&target=${target}`)).toBe(0);
   });
 }
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// SELECT-LEFTMOST-WHEN-PINNED (grouping/layout fix 260706-h2d) — the auto-injected select
+//   checkbox column stays the LEFTMOST body cell even when a consumer left-pins a DATA column.
+//   The DataTableVirtualStickySelect fixture binds r-model:columnPinning = { left: ['name'] }
+//   with selectionMode="multiple". Pre-fix the select column was a CENTER column (pinned:''),
+//   so the left-pinned `name` cell rendered to the LEFT of the checkbox (visible order:
+//   name, select, city, value → first [data-grid-cell] = name). effectiveColumnPinning() now
+//   prepends __rdt_select to columnPinning.left so table-core treats it as left-pinned and
+//   getVisibleCells() leads with it (select, name, city, value → first cell = select).
+//
+//   RED pre-fix: the first body [data-grid-cell] has data-col="name".
+//   GREEN post-fix: the first body [data-grid-cell] is the select cell (.rdt-select-td /
+//   data-col="__rdt_select").
+// ════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`data-table-virtual [${target}]: select checkbox column is leftmost body cell even when a data column is pinned left`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DataTableVirtualStickySelect&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const mount = page.getByTestId('rozie-mount');
+    await expect
+      .poll(async () => page.getByTestId('row-count').textContent(), { timeout: 20_000 })
+      .toBe('2000');
+
+    const scroll = mount.locator('.rdt-scroll');
+    await expect(scroll).toBeVisible({ timeout: 15_000 });
+    await scrollWindowTo(page, 0);
+    await expect.poll(async () => windowedRows(mount).count(), { timeout: 15_000 }).toBeGreaterThan(0);
+
+    // The FIRST grid cell of the first windowed body row is the select checkbox column — it
+    // precedes the left-pinned `name` column. RED pre-fix: data-col="name".
+    const firstRow = windowedRows(mount).first();
+    const firstCell = firstRow.locator('[data-grid-cell]').first();
+    await expect(firstCell).toHaveAttribute('data-col', '__rdt_select', { timeout: 15_000 });
+    await expect(firstCell).toHaveClass(/rdt-select-td/, { timeout: 15_000 });
+    // The checkbox lives inside that leftmost cell.
+    await expect(firstCell.locator('input.rdt-select-row')).toHaveCount(1, { timeout: 15_000 });
+  });
+}

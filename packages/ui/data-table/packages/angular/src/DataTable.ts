@@ -318,6 +318,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     } @else {
     <input class="rdt-cell-editor" type="text" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     }</span>
+    } @else if (cellIsPlaceholder(cell)) {
+    <span style="display:contents"></span>
     } @else {
     <span class="rdt-cell-value">
               @if ((cellTpl ?? templates()?.['cell'])) {
@@ -488,6 +490,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     } @else {
     <input class="rdt-cell-editor" type="text" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
     }</span>
+    } @else if (cellIsPlaceholder(cell)) {
+    <span style="display:contents"></span>
     } @else {
     <span class="rdt-cell-value">
               @if ((cellTpl ?? templates()?.['cell'])) {
@@ -1296,6 +1300,20 @@ export class DataTable {
   programmatic = 0;
   expandedTouched = false;
   groupingActiveDefault = () => ((this.grouping() != null ? this.grouping() : this.groupingDefault()) || []).length > 0;
+  effectiveColumnPinning = (): any => {
+    const __columnPinning = this.columnPinning();
+    const base = __columnPinning != null ? __columnPinning : this.columnPinningDefault();
+    const left = base && base.left ? base.left : [];
+    if (left.length === 0) return base;
+    const rail: string[] = [];
+    if (this.selectionEnabled()) rail.push(this.SELECT_COL_ID);
+    if (this.expandable() === true) rail.push(this.EXPANDER_COL_ID);
+    const deduped = left.filter((id: string) => id !== this.SELECT_COL_ID && id !== this.EXPANDER_COL_ID);
+    return {
+      ...base,
+      left: rail.concat(deduped)
+    };
+  };
   currentState = (): any => ({
     sorting: this.sorting() != null ? this.sorting() : this.sortingDefault(),
     globalFilter: this.globalFilter() != null ? this.globalFilter() : this.globalFilterDefault(),
@@ -1319,7 +1337,7 @@ export class DataTable {
     columnVisibility: this.columnVisibility() != null ? this.columnVisibility() : this.columnVisibilityDefault(),
     columnSizing: this.columnSizing() != null ? this.columnSizing() : this.columnSizingDefault(),
     columnOrder: this.columnOrder() != null ? this.columnOrder() : this.columnOrderDefault(),
-    columnPinning: this.columnPinning() != null ? this.columnPinning() : this.columnPinningDefault(),
+    columnPinning: this.effectiveColumnPinning(),
     // columnSizingInfo: table-core's transient resize-gesture state. We pass an
     // EXPLICIT `state` object, so table-core does NOT fill its own defaults — and
     // `column.getIsResizing()` / `getResizeHandler()` read
@@ -2140,6 +2158,7 @@ export class DataTable {
   groupingActive = () => this.tick() >= 0 && (this.currentState().grouping || []).length > 0;
   cellIsGrouped = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped());
   cellIsAggregated = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated());
+  cellIsPlaceholder = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
   groupSubRowCount = (row: any) => row && row.subRows ? row.subRows.length : 0;
   groupingKeys = () => this.currentState().grouping || [];
   groupableColumns = () => {

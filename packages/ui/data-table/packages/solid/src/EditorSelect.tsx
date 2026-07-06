@@ -71,7 +71,7 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
 
   return (
     <>
-    <select data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={draft()} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-117f1a16="">
+    <select data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={draft()} onChange={($event: Event) => { onChange($event); }} onKeyDown={($event: KeyboardEvent) => { onKeydown($event); }} onBlur={($event: FocusEvent) => { onBlur(); }} data-rozie-s-117f1a16="">
       <Key each={local.options as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-117f1a16="">{rozieDisplay(opt().label)}</option>}</Key>
     </select>
     </>

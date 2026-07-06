@@ -4,6 +4,28 @@
 const groupingActiveDefault = () =>
   ((($props.grouping != null ? $props.grouping : $data.groupingDefault) || []).length > 0)
 
+// effectiveColumnPinning(): force the auto-injected select/expander chrome columns to the
+// FRONT of the effective left-pinned rail so they stay the structural leftmost body cells
+// even when a consumer pins a DATA column left. TanStack's getVisibleCells() returns
+// [left-pinned, center, right-pinned] and orders the left group by the columnPinning.left
+// array — so a consumer pinning e.g. `name` left would otherwise render the name cell to the
+// LEFT of the checkbox (which is a center column, pinned:''). Prepending SELECT_COL_ID then
+// EXPANDER_COL_ID to `left` (matching the tableColumns injection order [select, expander,
+// ...userCols]) guarantees they lead the pinned rail regardless of a custom columnOrder
+// (columnOrder only orders the CENTER group). CRITICAL: the empty-left DEFAULT returns `base`
+// UNCHANGED — select/expander are already center-leftmost when nothing is pinned, so the
+// no-pin table stays byte-identical (VR/snapshot baselines must not drift).
+const effectiveColumnPinning = (): any => {
+  const base = $props.columnPinning != null ? $props.columnPinning : $data.columnPinningDefault
+  const left = base && base.left ? base.left : []
+  if (left.length === 0) return base
+  const rail: string[] = []
+  if (selectionEnabled()) rail.push(SELECT_COL_ID)
+  if ($props.expandable === true) rail.push(EXPANDER_COL_ID)
+  const deduped = left.filter((id: string) => id !== SELECT_COL_ID && id !== EXPANDER_COL_ID)
+  return { ...base, left: rail.concat(deduped) }
+}
+
 // Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
 // All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
 // this whole object as `state`. Return type annotated `any`: the inferred object-literal
@@ -36,7 +58,7 @@ const currentState = (): any => ({
   columnVisibility: $props.columnVisibility != null ? $props.columnVisibility : $data.columnVisibilityDefault,
   columnSizing: $props.columnSizing != null ? $props.columnSizing : $data.columnSizingDefault,
   columnOrder: $props.columnOrder != null ? $props.columnOrder : $data.columnOrderDefault,
-  columnPinning: $props.columnPinning != null ? $props.columnPinning : $data.columnPinningDefault,
+  columnPinning: effectiveColumnPinning(),
   // columnSizingInfo: table-core's transient resize-gesture state. We pass an
   // EXPLICIT `state` object, so table-core does NOT fill its own defaults — and
   // `column.getIsResizing()` / `getResizeHandler()` read

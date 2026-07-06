@@ -88,7 +88,7 @@
             <slot name="editor" :columnId="cell.column.id" :column="cell.column" :row="wr.row.original" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()"></slot>
           </span><input v-else-if="editorTypeOf(cell.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cell.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" :value="editorValueFor(cell.column.id)" @change="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
             <option v-for="opt in editorOptionsOf(cell.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else class="rdt-cell-value">
+          </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else-if="cellIsPlaceholder(cell)" style="display:contents"></span><span v-else class="rdt-cell-value">
           <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="wr.row.original" :value="cell.getValue()">{{ cell.getValue() }}</slot>
         </span><span v-if="isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cell))" class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown="onFillHandlePointerDown($event)"></span></td>
     </tr>
@@ -170,7 +170,7 @@
             <slot name="editor" :columnId="cell.column.id" :column="cell.column" :row="row.original" :value="editorValueFor(cell.column.id)" :commit="editorCommitFor(cell.column.id)" :cancel="editorCancelFor()"></slot>
           </span><input v-else-if="editorTypeOf(cell.column.id) === 'number'" class="rdt-cell-editor" type="number" data-editing-cell="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><select v-else-if="editorTypeOf(cell.column.id) === 'select'" class="rdt-cell-editor" data-editing-cell="" :value="editorValueFor(cell.column.id)" @change="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)">
             <option v-for="opt in editorOptionsOf(cell.column.id)" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else class="rdt-cell-value">
+          </select><input v-else-if="editorTypeOf(cell.column.id) === 'checkbox'" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :checked="editorCheckedFor(cell.column.id)" @change="onCellEditorCheckbox(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /><input v-else class="rdt-cell-editor" type="text" data-editing-cell="" :value="editorValueFor(cell.column.id)" @input="onCellEditorInput(cell.column.id, $event)" @keydown="onEditorKeyDown($event)" @blur="onEditorBlur($event)" /></span><span v-else-if="cellIsPlaceholder(cell)" style="display:contents"></span><span v-else class="rdt-cell-value">
           <slot name="cell" :columnId="cell.column.id" :column="cell.column" :row="row.original" :value="cell.getValue()">{{ cell.getValue() }}</slot>
         </span><span v-if="isFillHandleCell(rowIndexOf(row), colIndexOf(row, cell))" class="rdt-fill-handle" data-fill-handle="" data-testid="fill-handle" aria-hidden="true" @pointerdown="onFillHandlePointerDown($event)"></span></td>
     </tr>
@@ -523,6 +523,42 @@ let expandedTouched = false;
 // the expanded auto-default below tracks the live grouping state on every target.
 const groupingActiveDefault = () => ((grouping.value != null ? grouping.value : groupingDefault.value) || []).length > 0;
 
+// effectiveColumnPinning(): force the auto-injected select/expander chrome columns to the
+// FRONT of the effective left-pinned rail so they stay the structural leftmost body cells
+// even when a consumer pins a DATA column left. TanStack's getVisibleCells() returns
+// [left-pinned, center, right-pinned] and orders the left group by the columnPinning.left
+// array — so a consumer pinning e.g. `name` left would otherwise render the name cell to the
+// LEFT of the checkbox (which is a center column, pinned:''). Prepending SELECT_COL_ID then
+// EXPANDER_COL_ID to `left` (matching the tableColumns injection order [select, expander,
+// ...userCols]) guarantees they lead the pinned rail regardless of a custom columnOrder
+// (columnOrder only orders the CENTER group). CRITICAL: the empty-left DEFAULT returns `base`
+// UNCHANGED — select/expander are already center-leftmost when nothing is pinned, so the
+// no-pin table stays byte-identical (VR/snapshot baselines must not drift).
+// effectiveColumnPinning(): force the auto-injected select/expander chrome columns to the
+// FRONT of the effective left-pinned rail so they stay the structural leftmost body cells
+// even when a consumer pins a DATA column left. TanStack's getVisibleCells() returns
+// [left-pinned, center, right-pinned] and orders the left group by the columnPinning.left
+// array — so a consumer pinning e.g. `name` left would otherwise render the name cell to the
+// LEFT of the checkbox (which is a center column, pinned:''). Prepending SELECT_COL_ID then
+// EXPANDER_COL_ID to `left` (matching the tableColumns injection order [select, expander,
+// ...userCols]) guarantees they lead the pinned rail regardless of a custom columnOrder
+// (columnOrder only orders the CENTER group). CRITICAL: the empty-left DEFAULT returns `base`
+// UNCHANGED — select/expander are already center-leftmost when nothing is pinned, so the
+// no-pin table stays byte-identical (VR/snapshot baselines must not drift).
+const effectiveColumnPinning = (): any => {
+  const base = columnPinning.value != null ? columnPinning.value : columnPinningDefault.value;
+  const left = base && base.left ? base.left : [];
+  if (left.length === 0) return base;
+  const rail: string[] = [];
+  if (selectionEnabled()) rail.push(SELECT_COL_ID);
+  if (props.expandable === true) rail.push(EXPANDER_COL_ID);
+  const deduped = left.filter((id: string) => id !== SELECT_COL_ID && id !== EXPANDER_COL_ID);
+  return {
+    ...base,
+    left: rail.concat(deduped)
+  };
+};
+
 // Assemble the live state object from bound r-model slices (?? uncontrolled fallback).
 // All NINE slices are wired (each ?? its own $data.<slice>Default). table-core reads
 // this whole object as `state`. Return type annotated `any`: the inferred object-literal
@@ -560,7 +596,7 @@ const currentState = (): any => ({
   columnVisibility: columnVisibility.value != null ? columnVisibility.value : columnVisibilityDefault.value,
   columnSizing: columnSizing.value != null ? columnSizing.value : columnSizingDefault.value,
   columnOrder: columnOrder.value != null ? columnOrder.value : columnOrderDefault.value,
-  columnPinning: columnPinning.value != null ? columnPinning.value : columnPinningDefault.value,
+  columnPinning: effectiveColumnPinning(),
   // columnSizingInfo: table-core's transient resize-gesture state. We pass an
   // EXPLICIT `state` object, so table-core does NOT fill its own defaults — and
   // `column.getIsResizing()` / `getResizeHandler()` read
@@ -2185,6 +2221,17 @@ const groupingActive = () => tick() >= 0 && (currentState().grouping || []).leng
 // Art). A placeholder cell (neither) falls through to the #cell r-else and renders its empty value.
 const cellIsGrouped = (cellCtx: any) => !!(tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped());
 const cellIsAggregated = (cellCtx: any) => !!(tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated());
+// cellIsPlaceholder: a PLACEHOLDER cell on a group-header row — a non-grouped, non-aggregated
+// cell that table-core fills with the FIRST leaf row's value (cell.getValue() leaks e.g.
+// "Services"/"Edsger Dijkstra" onto the group line). Renders BLANK via a dedicated empty
+// template branch so the leaked leaf value never paints. Tick-gated exactly like cellIsGrouped
+// so the group chrome re-derives on a re-pull on the fine-grained targets (Solid/Lit).
+// cellIsPlaceholder: a PLACEHOLDER cell on a group-header row — a non-grouped, non-aggregated
+// cell that table-core fills with the FIRST leaf row's value (cell.getValue() leaks e.g.
+// "Services"/"Edsger Dijkstra" onto the group line). Renders BLANK via a dedicated empty
+// template branch so the leaked leaf value never paints. Tick-gated exactly like cellIsGrouped
+// so the group chrome re-derives on a re-pull on the fine-grained targets (Solid/Lit).
+const cellIsPlaceholder = (cellCtx: any) => !!(tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
 // groupSubRowCount: the number of immediate members under a group-header row (the count shown in
 // the header, e.g. "North (3)").
 // groupSubRowCount: the number of immediate members under a group-header row (the count shown in
