@@ -21,11 +21,11 @@
 </data>
 
 <script>
-const onChange = (e) => {
-  // Lit delivers a child's @emit as a CustomEvent → payload lives in e.detail;
-  // the other 5 targets pass the payload object as arg0 directly (documented
-  // cross-target consumer edge — see authoring playbook §5).
-  const p = e && e.page == null && e.detail ? e.detail : e
+const onChange = (p) => {
+  // The @emit payload arrives as arg0 directly on all 6 targets (authoring
+  // playbook §5) — including Lit, which unwraps CustomEvent.detail even when
+  // the emit name ('change') collides with a native DOM event name (fixed
+  // 73-04, emitter-hardening backlog #6).
   $data.lastChange = p && p.page != null ? String(p.page) : ''
 }
 const applyPage = () => {

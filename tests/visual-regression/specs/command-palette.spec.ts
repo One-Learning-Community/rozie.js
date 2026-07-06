@@ -37,19 +37,25 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
-// PRE-EXISTING Lit gap (NOT introduced by this plan, NOT fixed/changed by the
-// P3 Listbox→Combobox migration — the composition mechanism is identical):
-// on Lit the vendored child primitive's `@change` does commit the selection at
-// the child level (the option goes `aria-selected`, the value model is written —
-// confirmed in the page snapshot), but CP's `@change`→`@select` re-emit does NOT
-// reach the consumer, so the palette neither reports the selection nor closes.
-// This is the known cross-family <components> composition Lit-shadow limitation
-// (MEMORY: "Cross-family <components> composition — lit shadow-open backlog").
-// The 5 light-DOM targets are the real behavioral green gate for the migration;
-// Lit's selection-report path is tracked as that separate backlog item.
+// FORMERLY a PRE-EXISTING Lit gap (test.fixme'd): on Lit, CommandPalette's
+// `onComboboxChange` handler binds `@change="onComboboxChange($event)"` on the
+// vendored Combobox — a component tag whose OWN `$emit('change', { value,
+// option })` name collides with the native DOM `change` event name. The Lit
+// emitter's `isNativeDomEvent` denylist kept this handler UNWRAPPED (the raw
+// `Event`/`CustomEvent` object, not its `.detail` payload), so
+// `onComboboxChange`'s `e.option` read was always `undefined` — the palette
+// silently never reported or closed on selection (confirmed live: the child
+// Combobox itself DID commit the selection — `aria-selected` flipped, its own
+// value model updated — but CommandPalette's re-emit of the PUBLIC `select`
+// event never fired). Fixed by emitter-hardening backlog #6 (73-04): the Lit
+// component-tag `@event` unwrap now decides `.detail` vs raw event at RUNTIME
+// via `$event instanceof CustomEvent` instead of by event-name denylist, so a
+// component's own `$emit`-under-a-native-colliding-name always unwraps
+// correctly while a genuine native-event auto-fallthrough (ThemedButtonConsumer
+// R4 shape) still receives the raw event. Verified green ×6 locally.
 const KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set<
   (typeof TARGETS)[number]
->(['lit']);
+>([]);
 
 /**
  * Count `[role="option"]` elements, RECURSIVELY piercing every open shadow root

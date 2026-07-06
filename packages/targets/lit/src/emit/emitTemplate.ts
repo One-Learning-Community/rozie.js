@@ -848,45 +848,11 @@ function applyValueTransformsString(
  *                    merge option-bearing listeners with plain ones because
  *                    the options-object form has different runtime semantics.
  */
-/**
- * Native DOM event names. A `@event` whose name is in this set (and is not
- * hyphenated — native DOM events never contain hyphens) is a real DOM event:
- * its handler receives the raw `Event`, NOT a Rozie emit payload. Any other
- * event name on a component tag is a Rozie component emit (`$emit('x', v)` /
- * `model:true` → `<prop>-change`), whose value rides in `CustomEvent.detail`.
- *
- * Mirrors the React target's `EVENT_NAME_TO_JSX_PROP` key set — the same
- * native-vs-custom split React relies on (native events become real DOM
- * `onClick` props; component emits become payload-carrying callback props).
- */
-const NATIVE_DOM_EVENTS: ReadonlySet<string> = new Set([
-  'click', 'dblclick', 'mousedown', 'mouseup', 'mousemove', 'mouseover',
-  'mouseout', 'mouseenter', 'mouseleave', 'contextmenu', 'wheel',
-  'keydown', 'keyup', 'keypress',
-  'change', 'input', 'invalid', 'reset', 'submit', 'beforeinput',
-  'focus', 'blur', 'focusin', 'focusout',
-  'compositionstart', 'compositionend', 'compositionupdate',
-  'select', 'copy', 'cut', 'paste',
-  'touchstart', 'touchend', 'touchmove', 'touchcancel',
-  'pointerdown', 'pointerup', 'pointermove', 'pointercancel', 'pointerover',
-  'pointerout', 'pointerenter', 'pointerleave', 'gotpointercapture',
-  'lostpointercapture',
-  'drag', 'dragend', 'dragenter', 'dragexit', 'dragleave', 'dragover',
-  'dragstart', 'drop',
-  'scroll', 'resize', 'load', 'error', 'abort',
-  'canplay', 'canplaythrough', 'durationchange', 'emptied', 'encrypted',
-  'ended', 'loadeddata', 'loadedmetadata', 'loadstart', 'pause', 'play',
-  'playing', 'progress', 'ratechange', 'seeked', 'seeking', 'stalled',
-  'suspend', 'timeupdate', 'volumechange', 'waiting',
-  'animationstart', 'animationend', 'animationiteration', 'transitionend',
-]);
-
-/** True when `name` is a real native DOM event (raw `Event` to the handler).
- * Hyphenated names are never native — they are Rozie component emits. */
-function isNativeDomEvent(name: string): boolean {
-  if (name.includes('-')) return false;
-  return NATIVE_DOM_EVENTS.has(name.toLowerCase());
-}
+// NOTE: a `NATIVE_DOM_EVENTS` name-based carve-out used to live here, gating
+// whether a `tagKind === 'component'` listener unwrapped `CustomEvent.detail`.
+// Removed in 73-04 (emitter-hardening backlog #6) — see the `unwrapDetail`
+// comment in `buildEventParts` below for why it was both unexercised and
+// parity-breaking.
 
 function buildEventParts(
   listener: Listener,
@@ -1107,11 +1073,38 @@ function buildEventParts(
   // (React callback payload, Vue emit payload) is that the handler sees the
   // EMITTED VALUE, not the DOM event — so on Lit we unwrap `.detail` here,
   // mirroring the r-model (buildRModelParts) and scoped-slot-arg paths that
-  // already do. Native DOM events bubbling from a component tag (e.g. a real
-  // `@click`) keep the raw `Event`. Modifier-bearing handlers (inlineGuards /
-  // debounce / throttle) operate on the raw event and are left untouched —
-  // modifiers on a component emit are not a meaningful pattern.
-  const unwrapDetail = tagKind === 'component' && !isNativeDomEvent(eventName);
+  // already do. Modifier-bearing handlers (inlineGuards / debounce /
+  // throttle) operate on the raw event and are left untouched — modifiers
+  // on a component emit are not a meaningful pattern.
+  //
+  // Emitter-hardening backlog #6 (73-04): a listener on a `tagKind ===
+  // 'component'` tag is genuinely AMBIGUOUS at compile time — it can be
+  // EITHER (a) consuming the child's own `$emit(name, payload)` (always a
+  // real `CustomEvent`, payload in `.detail`), OR (b) an UNDECLARED
+  // consumer listener that auto-fell-through onto the child's forwarded
+  // `$listeners` and is now attached directly to the child's real internal
+  // DOM element — a genuine native `Event`/`MouseEvent` with NO `.detail`
+  // (proven live by `ThemedButtonConsumer.rozie`'s R4 auto-fallthrough
+  // `@click`/`@mouseenter`, which ThemedButton does NOT itself `$emit`).
+  // Both shapes are reachable under the exact same `eventName` (e.g.
+  // `click`/`change` could be either), and single-file compilation has no
+  // static visibility into whether the referenced child actually `$emit`s
+  // that name — so a compile-time, name-based decision (the previous
+  // `isNativeDomEvent` denylist) can only ever be wrong in one direction or
+  // the other. `$emit`-dispatched payloads and the synthesized
+  // `<prop>-change` model event are UNCONDITIONALLY real `CustomEvent`
+  // instances (`rewriteScript.ts` / `createLitControllableProperty`); a
+  // real bubbled/forwarded native DOM event is NEVER a `CustomEvent`. So
+  // decide at RUNTIME via `instanceof CustomEvent` instead of at compile
+  // time via the event name — this fixes the name-collision false-negative
+  // (a component `$emit`ing under a name that also happens to be a native
+  // event name, e.g. `$emit('change', {…})` + `@change="onChange"` — used
+  // by `@rozie-ui/pagination`/`@rozie-ui/switch`/`@rozie-ui/number-field`
+  // `change` and `@rozie-ui/pdf` `load`, each of which needed an
+  // author-side `e.x == null && e.detail ? e.detail : e` fallback to
+  // compensate, now deleted) WITHOUT breaking the real-native-event
+  // fallthrough case the old denylist legitimately protected.
+  const unwrapDetail = tagKind === 'component';
 
   const HANDLER_CAST = ' as (...args: any[]) => any';
   let body: string;
@@ -1123,18 +1116,20 @@ function buildEventParts(
     }
   } else if (unwrapDetail) {
     if (isFunctionLike) {
-      // Bare ref / arrow / member — invoke with the unwrapped payload.
-      body = `($event: CustomEvent) => ((${handler})${HANDLER_CAST})($event.detail)`;
+      // Bare ref / arrow / member — invoke with the unwrapped payload when
+      // the event genuinely carries one, else pass the raw event through.
+      body = `($event: Event) => ((${handler})${HANDLER_CAST})($event instanceof CustomEvent ? $event.detail : $event)`;
     } else {
       // Inline expression that may reference `$event` (e.g.
       // `updateColumnCards(column.id, $event)`). Bind a local `$event` to the
-      // payload so the user's reference resolves to the emitted value. The
+      // unwrapped payload (or the raw event, for the native-fallthrough
+      // case) so the user's reference resolves correctly either way. The
       // `__rozieEv` param keeps its underscore prefix so an unused-param lint
       // never fires when the handler ignores the event.
       const bind = handler.includes('$event')
-        ? 'const $event = __rozieEv.detail; '
+        ? 'const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; '
         : '';
-      body = `(__rozieEv: CustomEvent) => { ${bind}${handler}; }`;
+      body = `(__rozieEv: Event) => { ${bind}${handler}; }`;
     }
   } else {
     body = isFunctionLike ? `${handler}` : `($event: Event) => { ${handler}; }`;

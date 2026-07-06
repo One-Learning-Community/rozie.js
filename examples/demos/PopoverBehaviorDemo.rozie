@@ -13,10 +13,11 @@
   listener is never live for the click that opened the popover and the panel
   stays open on all 6 targets.
 
-  The @change payload is a BARE boolean (not an object), so its Lit-consumer
-  unwrap differs from the object-payload families (number-field/switch): the
-  CustomEvent carries the boolean in e.detail; the typeof guard keeps the boolean
-  primitive path on the other 5 targets from throwing on `'detail' in e`.
+  The @change payload is a BARE boolean (not an object); the emit payload
+  arrives as arg0 directly on all 6 targets (authoring playbook §5),
+  including Lit, which unwraps CustomEvent.detail even though the emit name
+  ('change') collides with a native DOM event name (fixed 73-04,
+  emitter-hardening backlog #6).
 -->
 <rozie name="PopoverBehaviorDemo">
 
@@ -34,8 +35,7 @@
 </data>
 
 <script>
-const onChange = (e) => {
-  const v = e && typeof e === 'object' && 'detail' in e ? e.detail : e
+const onChange = (v) => {
   $data.lastChange = String(v)
 }
 const applyOpen = () => {

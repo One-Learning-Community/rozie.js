@@ -81,23 +81,18 @@ const SAMPLE = 'data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PC9UeXBlL0Nh
 // uniform across all 6 — see the header note about Angular's child-component ref).
 const next = () => { $data.page = $data.page + 1 }
 
-// @load handler — robust to Lit's web-component event model. On Vue/React/Solid/
-// Svelte/Angular the emit payload arrives as the handler arg directly
-// (`e.numPages`); on Lit the consumer's `@load` is a native listener on the
-// custom element, so it receives the DOM CustomEvent and the payload is under
-// `e.detail`. Reading `e.detail.numPages ?? e.numPages` covers both — the
-// documented Lit consumer-event divergence (CLAUDE.md "documented edge cases").
+// @load handler — the emit payload arrives as arg0 directly on all 6 targets
+// (authoring playbook §5), including Lit, which unwraps CustomEvent.detail
+// even though the emit name ('load') collides with a native DOM event name
+// (fixed 73-04, emitter-hardening backlog #6).
 const onLoad = (e) => {
-  const n = e && e.detail && typeof e.detail.numPages === 'number' ? e.detail.numPages : e.numPages
-  $data.total = n
+  $data.total = e.numPages
 }
 
-// @findresult handler — same Lit-robust payload read as onLoad (Lit delivers the
-// payload under `e.detail`). `matches` is the total occurrence count; mirror it
+// @findresult handler — `matches` is the total occurrence count; mirror it
 // into the readout so the spec can assert the count.
 const onFind = (e) => {
-  const m = e && e.detail && typeof e.detail.matches === 'number' ? e.detail.matches : e.matches
-  $data.findCount = m
+  $data.findCount = e.matches
 }
 
 // run the search by copying the query into the CONTROLLED `:query` prop (the
