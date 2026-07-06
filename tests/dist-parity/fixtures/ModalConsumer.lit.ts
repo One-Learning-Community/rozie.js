@@ -43,7 +43,7 @@ export default class ModalConsumer extends SignalWatcher(LitElement) {
       <button class="close" @click=${scope.close} data-rozie-s-5d081d3a>×</button>
     `} .footer=${(scope: { close: unknown }) => html`
       <button @click=${scope.close} data-rozie-s-5d081d3a>Cancel</button>
-      <button @click=${($event: Event) => { this.onConfirm(); }} data-rozie-s-5d081d3a>OK</button>
+      <button @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onConfirm(); }} data-rozie-s-5d081d3a>OK</button>
     `} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}>
     Are you sure you want to proceed?
     </rozie-modal>

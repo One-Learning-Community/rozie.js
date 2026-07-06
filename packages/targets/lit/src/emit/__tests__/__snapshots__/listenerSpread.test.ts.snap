@@ -8,13 +8,13 @@ exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (1) literal-only 
 
 exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (2) literal-with-merge: @click + r-on literal → R6 source-order dispatcher 1`] = `
 "
-  <button @click=\${($event: MouseEvent) => { (this.f1)($event); (this.f2)($event); }} data-rozie-s-8fd6d49e>go</button>
+  <button @click=\${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { (this.f1)($event); (this.f2)($event); }} data-rozie-s-8fd6d49e>go</button>
 "
 `;
 
 exports[`emit (Lit) — ListenerSpreadIR (Plan 15-05 Task 1) > (3) literal modifier-bearing: r-on="{ 'click.stop': fn }" → @click=\${($event) => { stopPropagation; fn; }} 1`] = `
 "
-  <button @click=\${($event: MouseEvent) => { $event.stopPropagation(); ((this.fn) as (...args: any[]) => any)($event); }} data-rozie-s-8fd6d49e>go</button>
+  <button @click=\${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.stopPropagation(); ((this.fn) as (...args: any[]) => any)($event); }} data-rozie-s-8fd6d49e>go</button>
 "
 `;
 

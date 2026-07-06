@@ -29,7 +29,7 @@ export default class InlineExprHandler extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="backdrop" ${rozieSpread(this.$attrs)} @click=${($event: Event) => { this.closeOnBackdrop && this.close(); }} ${rozieListeners(this.$listeners)} data-rozie-s-8ec7623e>
+<div class="backdrop" ${rozieSpread(this.$attrs)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.closeOnBackdrop && this.close(); }} ${rozieListeners(this.$listeners)} data-rozie-s-8ec7623e>
   
   <button @click=${this.close} data-rozie-s-8ec7623e>Close</button>
 </div>

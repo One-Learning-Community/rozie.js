@@ -54,6 +54,7 @@ import type {
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { toKebabCase } from './emitDecorator.js';
 import { eventTypeFor } from './emitListeners.js';
+import { domElementType } from '../../../../core/src/codegen/domElementType.js';
 // Phase 07.2 Plan 03 — consumer-side slot-fill emit for component-tag elements.
 import { emitSlotFiller, findTagClose, type EmitSlotFillerCtx } from './emitSlotFiller.js';
 // Phase 07.3 Plan 09 — consumer-side `r-model:propName=` two-way binding.
@@ -859,11 +860,37 @@ function applyValueTransformsString(
 // comment in `buildEventParts` below for why it was both unexercised and
 // parity-breaking.
 
+/**
+ * Spike-012 R3-5 — the synthesized `$event` param annotation for a Lit handler.
+ *
+ * On a NATIVE element, augment the DOM-event type so `$event.target.value` /
+ * `$event.currentTarget.value` typecheck. Unlike Solid's JSX event slots (which
+ * type `.target` as `Element` and forbid narrowing it by param contravariance),
+ * Lit's `@event=${handler}` binding lives inside a tagged template with NO
+ * contextual param type — so both `.currentTarget` AND `.target` can be
+ * intersected down to the host element's specific type. Only for `html` tags; a
+ * component tag's payload is a `CustomEvent` (handled via unwrapDetail), so it
+ * keeps the bare event type. Shared by `buildEventParts` and the multi-listener
+ * `mergeHandlerBodies` dispatcher so the outer param is assignable to each inner
+ * typed handler.
+ */
+function litEventParamType(
+  eventName: string,
+  tagKind: 'html' | 'component' | 'self',
+  tagName?: string,
+): string {
+  const evtType = eventTypeFor(eventName);
+  return tagKind === 'html' && tagName !== undefined
+    ? `${evtType} & { currentTarget: ${domElementType(tagName)}; target: ${domElementType(tagName)} }`
+    : evtType;
+}
+
 function buildEventParts(
   listener: Listener,
   ir: IRComponent,
   opts: EmitTemplateOpts,
   tagKind: 'html' | 'component' | 'self' = 'html',
+  tagName?: string,
 ): { eventName: string; handlerBody: string; optionParts: string[] } {
   const eventName = listener.event;
   const handlerRaw = rewriteTemplateExpression(listener.handler, ir);
@@ -1067,6 +1094,7 @@ function buildEventParts(
   // keeps the emitted output typecheck-clean. Mirrors emitListeners.ts.
   const isFunctionLike = isHandlerLike(listener.handler);
   const evtType = eventTypeFor(eventName);
+  const evtParamType = litEventParamType(eventName, tagKind, tagName);
   // Cast the handler to a permissive signature when we invoke it with `e`. A
   // user method declared `close = () => void` is a perfectly reasonable @click
   // handler but tsc flags `(this.close)($event)` as TS2554 "Expected 0 arguments,
@@ -1115,9 +1143,9 @@ function buildEventParts(
   let body: string;
   if (inlineGuards.length > 0) {
     if (isFunctionLike) {
-      body = `($event: ${evtType}) => { ${inlineGuards.join(' ')} ((${handler})${HANDLER_CAST})($event); }`;
+      body = `($event: ${evtParamType}) => { ${inlineGuards.join(' ')} ((${handler})${HANDLER_CAST})($event); }`;
     } else {
-      body = `($event: ${evtType}) => { ${inlineGuards.join(' ')} ${handler}; }`;
+      body = `($event: ${evtParamType}) => { ${inlineGuards.join(' ')} ${handler}; }`;
     }
   } else if (unwrapDetail) {
     if (isFunctionLike) {
@@ -1137,7 +1165,7 @@ function buildEventParts(
       body = `(__rozieEv: Event) => { ${bind}${handler}; }`;
     }
   } else {
-    body = isFunctionLike ? `${handler}` : `($event: Event) => { ${handler}; }`;
+    body = isFunctionLike ? `${handler}` : `($event: ${evtParamType}) => { ${handler}; }`;
   }
 
   // WR-15: .debounce/.throttle wrapper must live on a class field so its timer
@@ -1407,7 +1435,7 @@ function emitElementOpenTag(
   const combinedEvents: Listener[] = [...node.events, ...syntheticListenerEvents];
 
   for (const event of combinedEvents) {
-    const parts1 = buildEventParts(event, ir, opts, node.tagKind);
+    const parts1 = buildEventParts(event, ir, opts, node.tagKind, node.tagName);
     if (parts1.optionParts.length > 0) {
       optionEvents.push(parts1);
     } else {
@@ -1432,7 +1460,7 @@ function emitElementOpenTag(
   }
   for (const name of groupOrder) {
     const bodies = groups.get(name)!;
-    const merged = mergeHandlerBodies(bodies, eventTypeFor(name));
+    const merged = mergeHandlerBodies(bodies, litEventParamType(name, node.tagKind, node.tagName));
     parts.push(`@${name}=\${${merged}}`);
   }
 

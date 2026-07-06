@@ -1,0 +1,12 @@
+{
+  "id": "REG-SPIKE012-EVENTPARAM-MERGE",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "two same-event handlers merge into one dispatcher arrow whose OUTER param must carry the SAME augmented DOM-event type as the inner handler arrows — else the dispatcher passes a plain MouseEvent to an augmented `MouseEvent & { currentTarget; target }` inner arrow (TS2345) on Solid + Lit",
+  "targets": [
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012, event-param typing pass)"
+}

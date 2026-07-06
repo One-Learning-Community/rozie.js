@@ -31,7 +31,7 @@ export default function ModelSigil(_props: ModelSigilProps): JSX.Element {
 
   return (
     <>
-      <button {...attrs} {...mergeListeners({ onClick: ($event: MouseEvent) => { setValue(prev => prev + 1); } }, attrs)} data-rozie-s-78a54232="">{value()}</button>
+      <button {...attrs} {...mergeListeners({ onClick: ($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { setValue(prev => prev + 1); } }, attrs)} data-rozie-s-78a54232="">{value()}</button>
     </>
   );
 }

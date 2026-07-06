@@ -1,0 +1,12 @@
+<rozie name="EventParamCurrentTarget">
+<data>
+{
+  q: '',
+}
+</data>
+
+<template>
+<div class="r"><input @input="$data.q = $event.currentTarget.value" /></div>
+</template>
+
+</rozie>

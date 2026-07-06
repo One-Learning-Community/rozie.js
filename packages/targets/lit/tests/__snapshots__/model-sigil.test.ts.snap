@@ -33,7 +33,7 @@ export default class ModelSigil extends SignalWatcher(LitElement) {
 
   render() {
     return html\`
-  <button \${rozieSpread(this.$attrs)} @click=\${($event: Event) => { this.value += 1; }} \${rozieListeners(this.$listeners)} data-rozie-s-78a54232>\${this.value}</button>
+  <button \${rozieSpread(this.$attrs)} @click=\${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.value += 1; }} \${rozieListeners(this.$listeners)} data-rozie-s-78a54232>\${this.value}</button>
 \`;
   }
 

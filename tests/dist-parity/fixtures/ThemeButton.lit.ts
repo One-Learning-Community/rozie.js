@@ -38,7 +38,7 @@ private get theme() { return this.__rozieCtxConsumer_theme.value; }
 
   render() {
     return html`
-<button class="theme-button" data-theme-button="" type="button" ${rozieSpread(this.$attrs)} @click=${($event: Event) => { this.theme && this.theme.cycle(); }} ${rozieListeners(this.$listeners)} data-rozie-s-9f40a7ea>
+<button class="theme-button" data-theme-button="" type="button" ${rozieSpread(this.$attrs)} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.theme && this.theme.cycle(); }} ${rozieListeners(this.$listeners)} data-rozie-s-9f40a7ea>
   ${rozieDisplay(this.theme && this.theme.color)}
 </button>
 `;

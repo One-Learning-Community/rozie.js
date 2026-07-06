@@ -50,7 +50,7 @@ import {
   emitListenerSpreadAsMergePartial,
 } from './emitTemplateAttribute.js';
 import { emitConditional } from './emitConditional.js';
-import { emitTemplateEvent, domEventType } from './emitTemplateEvent.js';
+import { emitTemplateEvent, domEventType, solidEventParamType } from './emitTemplateEvent.js';
 import { emitRModel } from './emitRModel.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 // Phase 07.2 Plan 03 — consumer-side slot-fill emission for component-tag elements.
@@ -547,7 +547,8 @@ function emitElementListeners(
       // Phase 16 R2 / D-03 — thread the For-body loop-accessor set into
       // event-handler lowering so call-arg index references emit as `index()`.
       invokeAccessors: ctx.invokeAccessors,
-      loopValueBindings: ctx.loopValueBindings,    });
+      loopValueBindings: ctx.loopValueBindings,
+      elementTag: node.tagKind === 'html' ? node.tagName : undefined,    });
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
     const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{(.*)\}$/s);
     if (!match) continue;
@@ -579,7 +580,7 @@ function emitElementListeners(
       // event's specific DOM interface (`name` is the JSX prop, e.g. onKeyDown)
       // so a strict consumer (`noImplicitAny`) typechecks and the param is
       // assignable to each inner typed handler arrow.
-      `${name}: ($event: ${domEventType(name)}) => { ${branches.join(' ')} }`,
+      `${name}: ($event: ${solidEventParamType(name, node.tagKind === 'html' ? node.tagName : undefined)}) => { ${branches.join(' ')} }`,
     );
   }
 
@@ -626,7 +627,8 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       // Phase 16 R2 / D-03 — thread the For-body loop-accessor set into
       // event-handler lowering so call-arg index references emit as `index()`.
       invokeAccessors: ctx.invokeAccessors,
-      loopValueBindings: ctx.loopValueBindings,    });
+      loopValueBindings: ctx.loopValueBindings,
+      elementTag: node.tagKind === 'html' ? node.tagName : undefined,    });
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
 
     // Parse `<jsxName>={<body>}` so we can re-group when names collide.
@@ -668,7 +670,7 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     });
     // Spike-012 NEW-3 — typed dispatcher param (strict-consumer TS7006); the
     // event's specific DOM interface (`name` is the JSX prop, e.g. onKeyDown).
-    const dispatcher = `($event: ${domEventType(name)}) => { ${branches.join(' ')} }`;
+    const dispatcher = `($event: ${solidEventParamType(name, node.tagKind === 'html' ? node.tagName : undefined)}) => { ${branches.join(' ')} }`;
     out.push(`${name}={${dispatcher}}`);
   }
   return out.join(' ');
@@ -730,7 +732,11 @@ function parseNamedProps(attrStr: string): { named: Map<string, string>; rest: s
  *  2. For names that appear in both: build a merged dispatcher arrow.
  *  3. Reassemble the combined attribute string.
  */
-function mergeEventAttributes(attrsJsx: string, eventsJsx: string): string {
+function mergeEventAttributes(
+  attrsJsx: string,
+  eventsJsx: string,
+  elementTag?: string,
+): string {
   if (!attrsJsx.trim() || !eventsJsx.trim()) {
     return [attrsJsx, eventsJsx].filter(Boolean).join(' ');
   }
@@ -752,7 +758,7 @@ function mergeEventAttributes(attrsJsx: string, eventsJsx: string): string {
       };
       // Spike-012 NEW-3 — typed dispatcher param (strict-consumer TS7006); the
       // event's specific DOM interface (`name` is the JSX prop, e.g. onKeyDown).
-      merged.push(`${name}={($event: ${domEventType(name)}) => { ${wrap(attrsBody)} ${wrap(eventsBody)} }}`);
+      merged.push(`${name}={($event: ${solidEventParamType(name, elementTag)}) => { ${wrap(attrsBody)} ${wrap(eventsBody)} }}`);
       eventsNamed.delete(name);
     } else {
       merged.push(`${name}={${attrsBody}}`);
@@ -921,7 +927,11 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   // string — the spread is an opaque `...{}` token — so we append it after
   // mergeEventAttributes finishes.
   const headParts = [
-    mergeEventAttributes(attrsResult.jsx, listenerResult.eventsJsx),
+    mergeEventAttributes(
+      attrsResult.jsx,
+      listenerResult.eventsJsx,
+      node.tagKind === 'html' ? node.tagName : undefined,
+    ),
     ...listenerResult.extraSpreads,
     ...keynavAttrs,
   ];

@@ -42,9 +42,9 @@ export default function ModelParamShadow(_props: ModelParamShadowProps): JSX.Ele
   return (
     <>
     <div {...attrs} class={"model-param-shadow" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-9db1b80e="">
-      <button onClick={($event: MouseEvent) => { solve('demo-token'); }} data-rozie-s-9db1b80e="">solve</button>
-      <button onClick={($event: MouseEvent) => { setStatus('ready'); }} data-rozie-s-9db1b80e="">status</button>
-      <button onClick={($event: MouseEvent) => { logLabel('hi'); }} data-rozie-s-9db1b80e="">label</button>
+      <button onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { solve('demo-token'); }} data-rozie-s-9db1b80e="">solve</button>
+      <button onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { setStatus('ready'); }} data-rozie-s-9db1b80e="">status</button>
+      <button onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { logLabel('hi'); }} data-rozie-s-9db1b80e="">label</button>
       <span class={"status"} data-rozie-s-9db1b80e="">{status()}</span>
     </div>
     </>

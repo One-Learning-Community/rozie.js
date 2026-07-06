@@ -26,7 +26,7 @@ export default function EventLoopVarShadow(_props: EventLoopVarShadowProps): JSX
       <Key each={items() as readonly any[]} by={(e) => e.id}>{(e) => <li data-rozie-s-a955b18d="">
         <span data-rozie-s-a955b18d="">{rozieDisplay(e().label)}</span>
         
-        <button type="button" onClick={($event: MouseEvent) => { removeItem(e().id); }} data-rozie-s-a955b18d="">×</button>
+        <button type="button" onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { removeItem(e().id); }} data-rozie-s-a955b18d="">×</button>
       </li>}</Key>
     </ul>
     </>

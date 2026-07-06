@@ -32,9 +32,9 @@ export default class ModelParamShadow extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="model-param-shadow" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-9db1b80e>
-  <button @click=${($event: Event) => { this.solve('demo-token'); }} data-rozie-s-9db1b80e>solve</button>
-  <button @click=${($event: Event) => { this.setStatus('ready'); }} data-rozie-s-9db1b80e>status</button>
-  <button @click=${($event: Event) => { this.logLabel('hi'); }} data-rozie-s-9db1b80e>label</button>
+  <button @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.solve('demo-token'); }} data-rozie-s-9db1b80e>solve</button>
+  <button @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.setStatus('ready'); }} data-rozie-s-9db1b80e>status</button>
+  <button @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.logLabel('hi'); }} data-rozie-s-9db1b80e>label</button>
   <span class="status" data-rozie-s-9db1b80e>${this._status.value}</span>
 </div>
 `;

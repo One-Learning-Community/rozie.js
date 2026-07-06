@@ -46,7 +46,7 @@ button[data-rozie-s-c72e01d0]:disabled { opacity: 0.4; cursor: not-allowed; }
 
   render() {
     return html`
-<div class="${Object.entries({ "counter": true, hovering: this._hovering.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} @mouseenter=${($event: Event) => { this._hovering.value = true; }} @mouseleave=${($event: Event) => { this._hovering.value = false; }} ${rozieListeners(this.$listeners)} data-rozie-s-c72e01d0>
+<div class="${Object.entries({ "counter": true, hovering: this._hovering.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this._hovering.value = true; }} @mouseleave=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this._hovering.value = false; }} ${rozieListeners(this.$listeners)} data-rozie-s-c72e01d0>
   <button ?disabled=${!this.canDecrement} aria-label="Decrement" @click=${this.decrement} data-rozie-s-c72e01d0>−</button>
   <span class="value" data-rozie-s-c72e01d0>${this.value}</span>
   <button ?disabled=${!this.canIncrement} aria-label="Increment" @click=${this.increment} data-rozie-s-c72e01d0>+</button>

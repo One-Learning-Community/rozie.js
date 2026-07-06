@@ -1,0 +1,12 @@
+<rozie name="EventParamLitTarget">
+<data>
+{
+  q: '',
+}
+</data>
+
+<template>
+<div class="r"><input @input.debounce(300)="$data.q = $event.target.value" /></div>
+</template>
+
+</rozie>

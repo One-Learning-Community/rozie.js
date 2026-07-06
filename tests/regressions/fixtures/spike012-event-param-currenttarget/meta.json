@@ -1,0 +1,12 @@
+{
+  "id": "REG-SPIKE012-EVENTPARAM-CT",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a direct @event handler reading `$event.currentTarget.value` must typecheck under a strict consumer: the synthesized param is annotated with the host element's specific currentTarget (`InputEvent & { currentTarget: HTMLInputElement; target: Element }` on Solid; both narrowed on Lit) — not a bare Event/InputEvent whose .currentTarget is EventTarget|null",
+  "targets": [
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012, event-param typing pass)"
+}

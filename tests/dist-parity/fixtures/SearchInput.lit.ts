@@ -61,7 +61,7 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
     return html`
 <div class="search-input" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-8bbc4a60>
   
-  <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${($event: InputEvent) => { (($event: Event) => this._query.value = ($event.target as HTMLInputElement).value)($event); (this._tw0)($event); }} @keydown=${($event: KeyboardEvent) => { (($event: KeyboardEvent) => { if ($event.key !== 'Enter') return; ((this.onSearch) as (...args: any[]) => any)($event); })($event); (($event: KeyboardEvent) => { if ($event.key !== 'Escape') return; ((this.clear) as (...args: any[]) => any)($event); })($event); }} data-rozie-ref="inputEl" data-rozie-s-8bbc4a60 />
+  <input type="search" placeholder=${this.placeholder} .value=${this._query.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { (($event: Event) => this._query.value = ($event.target as HTMLInputElement).value)($event); (this._tw0)($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { (($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { if ($event.key !== 'Enter') return; ((this.onSearch) as (...args: any[]) => any)($event); })($event); (($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { if ($event.key !== 'Escape') return; ((this.clear) as (...args: any[]) => any)($event); })($event); }} data-rozie-ref="inputEl" data-rozie-s-8bbc4a60 />
 
   ${this._query.value.length > 0 ? html`<button class="clear-btn" aria-label="Clear" @click=${this.clear} data-rozie-s-8bbc4a60>
     ×

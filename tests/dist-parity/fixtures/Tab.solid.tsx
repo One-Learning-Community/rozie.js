@@ -29,7 +29,7 @@ export default function Tab(_props: TabProps): JSX.Element {
 
   return (
     <>
-    <button data-tab="" type="button" role="tab" data-active={rozieAttr(tabs && tabs.active === local.index)} {...attrs} class={"tab" + " " + rozieClass({ 'is-active': tabs && tabs.active === local.index }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event: MouseEvent) => { tabs && tabs.setActive(local.index); } }, attrs)} data-rozie-s-18645a16="">
+    <button data-tab="" type="button" role="tab" data-active={rozieAttr(tabs && tabs.active === local.index)} {...attrs} class={"tab" + " " + rozieClass({ 'is-active': tabs && tabs.active === local.index }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { tabs && tabs.setActive(local.index); } }, attrs)} data-rozie-s-18645a16="">
       {local.label}
     </button>
     </>

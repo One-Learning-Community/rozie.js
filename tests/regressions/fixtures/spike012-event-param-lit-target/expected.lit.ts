@@ -1,23 +1,31 @@
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
-import { repeat } from 'lit/directives/repeat.js';
+import { debounce, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
-@customElement('rozie-event-loop-var-shadow')
-export default class EventLoopVarShadow extends SignalWatcher(LitElement) {
-  private _items = signal([{
-  id: 'a',
-  label: 'A'
-}, {
-  id: 'b',
-  label: 'B'
-}]);
+@customElement('rozie-event-param-lit-target')
+export default class EventParamLitTarget extends SignalWatcher(LitElement) {
+  private _q = signal('');
+
+  private _tw0 = debounce(($event: Event) => ((($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this._q.value = $event.target.value; }) as (...args: any[]) => any)($event), 300);
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
   // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
   private _rozieTornDown = false;
+
+  private _armListeners(): void {
+    this._disconnectCleanups.push(() => this._tw0.cancel());
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+  }
+
+  firstUpdated(): void {
+    this._armListeners();
+  }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
@@ -31,19 +39,9 @@ export default class EventLoopVarShadow extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<ul ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-a955b18d>
-  ${repeat<any>(this._items.value, (e, _idx) => e.id, (e, _idx) => html`<li key=${rozieAttr(e.id)} data-rozie-s-a955b18d>
-    <span data-rozie-s-a955b18d>${rozieDisplay(e.label)}</span>
-    
-    <button type="button" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.removeItem(e.id); }} data-rozie-s-a955b18d>×</button>
-  </li>`)}
-</ul>
+<div class="r" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-eb3abdfd><input @input=${this._tw0} data-rozie-s-eb3abdfd /></div>
 `;
   }
-
-  removeItem = (id: any) => {
-  this._items.value = this._items.value.filter((x: any) => x.id !== id);
-};
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the

@@ -19,7 +19,7 @@ export default function ThemeButton(_props: ThemeButtonProps): JSX.Element {
 
   return (
     <>
-    <button data-theme-button="" type="button" {...attrs} class={"theme-button" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event: MouseEvent) => { theme && theme.cycle(); } }, attrs)} data-rozie-s-9f40a7ea="">
+    <button data-theme-button="" type="button" {...attrs} class={"theme-button" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { theme && theme.cycle(); } }, attrs)} data-rozie-s-9f40a7ea="">
       {rozieDisplay(theme && theme.color)}
     </button>
     </>

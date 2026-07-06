@@ -1,0 +1,17 @@
+<rozie name="EventParamMerge">
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+function bump(): void { $data.n += 1; }
+function other(): void { $data.n += 2; }
+</script>
+
+<template>
+<div class="r"><button @click.stop="bump()" @click="other()">go</button></div>
+</template>
+
+</rozie>

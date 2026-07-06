@@ -118,7 +118,7 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
     </slot>`}
   </header>
 
-  <form @submit=${($event: SubmitEvent) => { $event.preventDefault(); ((this.add) as (...args: any[]) => any)($event); }} data-rozie-s-52bec3de>
+  <form @submit=${($event: SubmitEvent & { currentTarget: HTMLFormElement; target: HTMLFormElement }) => { $event.preventDefault(); ((this.add) as (...args: any[]) => any)($event); }} data-rozie-s-52bec3de>
     <input placeholder="What needs doing?" .value=${this._draft.value} @input=${($event: Event) => this._draft.value = ($event.target as HTMLInputElement).value} data-rozie-s-52bec3de />
     <button type="submit" ?disabled=${!this._draft.value.trim()} data-rozie-s-52bec3de>Add</button>
   </form>
@@ -127,8 +127,8 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
     ${repeat<any>(this.items, (item, _idx) => item.id, (item, _idx) => html`<li class="${Object.entries({ done: item.done }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(item.id)} data-rozie-s-52bec3de>
       
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, toggle: () => this.toggle(item.id), remove: () => this.removeItem(item.id)}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item}); } catch { return '{}'; } })()} @rozie-default-toggle=${($event: CustomEvent) => ((() => this.toggle(item.id)) as (...args: any[]) => any)($event.detail)} @rozie-default-remove=${($event: CustomEvent) => ((() => this.removeItem(item.id)) as (...args: any[]) => any)($event.detail)}>
-        <label data-rozie-s-52bec3de><input type="checkbox" ?checked=${item.done} @change=${($event: Event) => { this.toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>${rozieDisplay(item.text)}</span></label>
-        <button aria-label="Remove" @click=${($event: Event) => { this.removeItem(item.id); }} data-rozie-s-52bec3de>×</button>
+        <label data-rozie-s-52bec3de><input type="checkbox" ?checked=${item.done} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.toggle(item.id); }} data-rozie-s-52bec3de /><span data-rozie-s-52bec3de>${rozieDisplay(item.text)}</span></label>
+        <button aria-label="Remove" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.removeItem(item.id); }} data-rozie-s-52bec3de>×</button>
       </slot>`}
     </li>`)}
   </ul>` : html`<p class="empty" data-rozie-s-52bec3de>

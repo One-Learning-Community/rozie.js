@@ -36,6 +36,7 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { domElementType } from '../../../../core/src/codegen/domElementType.js';
 
 export interface EmitEventCtx {
   ir: IRComponent;
@@ -63,6 +64,14 @@ export interface EmitEventCtx {
    * `EmitNodeCtx.loopValueBindings`).
    */
   loopValueBindings?: ReadonlySet<string> | undefined;
+  /**
+   * Spike-012 R3-5 — the host element's tag name (`input`, `button`, …) for a
+   * listener on a native HTML element. Threaded so the synthesized `$event`
+   * param's DOM-event annotation can be augmented with the element's specific
+   * `currentTarget` type (`$event.currentTarget.value` typechecks). Undefined for
+   * a listener on a component tag (no meaningful DOM element type).
+   */
+  elementTag?: string | undefined;
 }
 
 export interface EmitTemplateEventResult {
@@ -185,6 +194,30 @@ function eventNameToJsxProp(eventName: string): string {
  * assignable to the JSX slot (param contravariance: `MouseEvent` ⊇ `MouseEvent &
  * { currentTarget; target }`), so no call site narrows.
  */
+/**
+ * Spike-012 R3-5 — the synthesized `$event` param annotation for a Solid handler.
+ *
+ * On a NATIVE element, augment the DOM-event type with the host's specific
+ * `currentTarget` so `$event.currentTarget.value` typechecks. `.target` is
+ * intersected down to a non-null `Element` (silences TS18047) but CANNOT be
+ * narrowed to the element type: Solid types each JSX event slot's `target` as
+ * `Element` natively, and param contravariance forbids a subtype there — so
+ * `$event.target.value` is inherently "use `.currentTarget`". The augmented type
+ * stays assignable to the slot (its `currentTarget` is the same/wider element),
+ * and identical to what the merge dispatcher composes, so an outer dispatcher
+ * param flows into each inner typed handler. A component tag (no `elementTag`)
+ * keeps the bare event type (byte-identical to NEW-3).
+ */
+export function solidEventParamType(
+  eventOrProp: string,
+  elementTag: string | undefined,
+): string {
+  const eventType = domEventType(eventOrProp);
+  return elementTag !== undefined
+    ? `${eventType} & { currentTarget: ${domElementType(elementTag)}; target: Element }`
+    : eventType;
+}
+
 export function domEventType(eventOrProp: string): string {
   const s = eventOrProp.replace(/^on/, '').toLowerCase();
   if (s.startsWith('key')) return 'KeyboardEvent';
@@ -287,8 +320,10 @@ export function emitTemplateEvent(
   const diagnostics: Diagnostic[] = [];
   const eventName = listener.event;
   const jsxName = eventNameToJsxProp(eventName);
-  // Spike-012 NEW-3 — DOM interface for synthesized `$event` param annotations.
-  const eventType = domEventType(eventName);
+  // Spike-012 R3-5 — augmented DOM-event param type (shared with the merge
+  // dispatchers in emitTemplateNode.ts so an outer dispatcher param is assignable
+  // to each inner typed handler arrow).
+  const eventParamType = solidEventParamType(eventName, ctx.elementTag);
 
   const inlineGuards: string[] = [];
   let scriptInjection: string | null = null;
@@ -420,10 +455,10 @@ export function emitTemplateEvent(
       // Spike-012 NEW-3 — annotate the synthesized `$event` param with the
       // event's specific DOM interface (see `domEventType`) so a strict consumer
       // (`noImplicitAny`) typechecks.
-      handlerExpr = `($event: ${eventType}) => { (${code})?.($event); }`;
+      handlerExpr = `($event: ${eventParamType}) => { (${code})?.($event); }`;
     } else {
       // Already a call / statement expression — splice verbatim.
-      handlerExpr = `($event: ${eventType}) => { ${code}; }`;
+      handlerExpr = `($event: ${eventParamType}) => { ${code}; }`;
     }
   } else {
     const guardLines = inlineGuards.join(' ');
@@ -440,7 +475,7 @@ export function emitTemplateEvent(
     } else {
       handlerInvocation = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
     }
-    handlerExpr = `($event: ${eventType}) => { ${guardLines} ${handlerInvocation}; }`;
+    handlerExpr = `($event: ${eventParamType}) => { ${guardLines} ${handlerInvocation}; }`;
   }
 
   return {

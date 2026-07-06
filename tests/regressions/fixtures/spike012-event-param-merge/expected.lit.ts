@@ -1,18 +1,11 @@
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
-import { repeat } from 'lit/directives/repeat.js';
+import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
-@customElement('rozie-event-loop-var-shadow')
-export default class EventLoopVarShadow extends SignalWatcher(LitElement) {
-  private _items = signal([{
-  id: 'a',
-  label: 'A'
-}, {
-  id: 'b',
-  label: 'B'
-}]);
+@customElement('rozie-event-param-merge')
+export default class EventParamMerge extends SignalWatcher(LitElement) {
+  private _n = signal(0);
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -31,19 +24,17 @@ export default class EventLoopVarShadow extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<ul ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-a955b18d>
-  ${repeat<any>(this._items.value, (e, _idx) => e.id, (e, _idx) => html`<li key=${rozieAttr(e.id)} data-rozie-s-a955b18d>
-    <span data-rozie-s-a955b18d>${rozieDisplay(e.label)}</span>
-    
-    <button type="button" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.removeItem(e.id); }} data-rozie-s-a955b18d>×</button>
-  </li>`)}
-</ul>
+<div class="r" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-9690701e><button @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { (($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.stopPropagation(); this.bump(); })($event); (($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.other(); })($event); }} data-rozie-s-9690701e>go</button></div>
 `;
   }
 
-  removeItem = (id: any) => {
-  this._items.value = this._items.value.filter((x: any) => x.id !== id);
-};
+  bump(): void {
+    this._n.value += 1;
+  }
+
+  other(): void {
+    this._n.value += 2;
+  }
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the

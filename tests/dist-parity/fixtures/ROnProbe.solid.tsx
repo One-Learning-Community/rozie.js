@@ -31,9 +31,9 @@ export default function ROnProbe(_props: ROnProbeProps): JSX.Element {
   return (
     <>
     <div class={"r-on-probe"} data-rozie-s-c4bd99aa="">
-      <span onClick={($event: MouseEvent) => { $event.stopPropagation(); fn(); }} onInput={_rozieDebouncedOnInput} data-rozie-s-c4bd99aa="">literal modifier-bearing</span>
+      <span onClick={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); fn(); }} onInput={_rozieDebouncedOnInput} data-rozie-s-c4bd99aa="">literal modifier-bearing</span>
       <span {...normalizeListeners(someObj)} data-rozie-s-c4bd99aa="">dynamic</span>
-      <span onClick={($event: MouseEvent) => { f1($event); f2($event); }} data-rozie-s-c4bd99aa="">R6 source-order merge</span>
+      <span onClick={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { f1($event); f2($event); }} data-rozie-s-c4bd99aa="">R6 source-order merge</span>
     </div>
     </>
   );

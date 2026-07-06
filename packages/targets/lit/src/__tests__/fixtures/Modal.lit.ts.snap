@@ -134,7 +134,7 @@ private __rozieWatchInitial_0 = true;
 
   render() {
     return html`
-${this.open ? html`<div class="modal-backdrop" @click=${($event: MouseEvent) => { if ($event.target !== $event.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl" data-rozie-s-fc45feb2>
+${this.open ? html`<div class="modal-backdrop" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { if ($event.target !== $event.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl" data-rozie-s-fc45feb2>
   <div class="modal-dialog" role="dialog" aria-modal="true" aria-label=${rozieAttr(this.title || undefined)} tabindex="-1" data-rozie-ref="dialogEl" data-rozie-s-fc45feb2>
     ${this.title || this._hasSlotHeader || this.header !== undefined ? html`<header data-rozie-s-fc45feb2>
       ${this.header !== undefined ? this.header({close: this.close}) : html`<slot name="header" @rozie-header-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}>

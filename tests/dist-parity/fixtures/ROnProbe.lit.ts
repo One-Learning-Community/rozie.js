@@ -59,9 +59,9 @@ export default class ROnProbe extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="r-on-probe" data-rozie-s-c4bd99aa>
-  <span @click=${($event: MouseEvent) => { $event.stopPropagation(); ((this._fn.value) as (...args: any[]) => any)($event); }} @input=${this._tw0} data-rozie-s-c4bd99aa>literal modifier-bearing</span>
+  <span @click=${($event: MouseEvent & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { $event.stopPropagation(); ((this._fn.value) as (...args: any[]) => any)($event); }} @input=${this._tw0} data-rozie-s-c4bd99aa>literal modifier-bearing</span>
   <span ${rozieListeners(this._someObj.value)} data-rozie-s-c4bd99aa>dynamic</span>
-  <span @click=${($event: MouseEvent) => { (this._f1.value)($event); (this._f2.value)($event); }} data-rozie-s-c4bd99aa>R6 source-order merge</span>
+  <span @click=${($event: MouseEvent & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { (this._f1.value)($event); (this._f2.value)($event); }} data-rozie-s-c4bd99aa>R6 source-order merge</span>
 </div>
 `;
   }

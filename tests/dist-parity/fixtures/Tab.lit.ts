@@ -46,7 +46,7 @@ private get tabs() { return this.__rozieCtxConsumer_tabs.value; }
 
   render() {
     return html`
-<button class="${Object.entries({ "tab": true, 'is-active': this.tabs && this.tabs.active === this.index }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-tab="" type="button" role="tab" data-active=${rozieAttr(this.tabs && this.tabs.active === this.index)} ${rozieSpread(this.$attrs)} @click=${($event: Event) => { this.tabs && this.tabs.setActive(this.index); }} ${rozieListeners(this.$listeners)} data-rozie-s-18645a16>
+<button class="${Object.entries({ "tab": true, 'is-active': this.tabs && this.tabs.active === this.index }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-tab="" type="button" role="tab" data-active=${rozieAttr(this.tabs && this.tabs.active === this.index)} ${rozieSpread(this.$attrs)} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.tabs && this.tabs.setActive(this.index); }} ${rozieListeners(this.$listeners)} data-rozie-s-18645a16>
   ${this.label}
 </button>
 `;
