@@ -1,0 +1,19 @@
+<rozie name="SolidEventParamType">
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+function bump(): void { $data.n += 1; }
+</script>
+
+<template>
+<div class="root">
+  <button class="stop" @click.stop="bump()">{{ $data.n }}</button>
+  <button class="plain" @click="bump()">plain</button>
+</div>
+</template>
+
+</rozie>

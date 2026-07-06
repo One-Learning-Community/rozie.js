@@ -36,7 +36,7 @@ export default function Counter(_props: CounterProps): JSX.Element {
 
   return (
     <>
-    <div {...attrs} class={"counter" + " " + rozieClass({ hovering: hovering() }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onMouseEnter: ($event) => { setHovering(true); }, onMouseLeave: ($event) => { setHovering(false); } }, attrs)} data-rozie-s-c72e01d0="">
+    <div {...attrs} class={"counter" + " " + rozieClass({ hovering: hovering() }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onMouseEnter: ($event: MouseEvent) => { setHovering(true); }, onMouseLeave: ($event: MouseEvent) => { setHovering(false); } }, attrs)} data-rozie-s-c72e01d0="">
       <button aria-label="Decrement" disabled={!canDecrement()} onClick={decrement} data-rozie-s-c72e01d0="">−</button>
       <span class={"value"} data-rozie-s-c72e01d0="">{value()}</span>
       <button aria-label="Increment" disabled={!canIncrement()} onClick={increment} data-rozie-s-c72e01d0="">+</button>

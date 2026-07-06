@@ -1,0 +1,11 @@
+{
+  "id": "REG-SPIKE012-NEW3",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Solid synthesizes typed ($event: Event) params for template event handlers (Spike-012 NEW-3 — the inline-guard `.stop` path and the plain statement-handler path both annotate the synthesized arrow param); pre-fix the bare ($event) => untyped param was TS7006 under noImplicitAny (strict-consumer-facing)",
+  "targets": [
+    "solid"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012)"
+}

@@ -19,7 +19,7 @@ export default function CardHeader(_props: CardHeaderProps): JSX.Element {
     <>
     <header {...attrs} class={"card-header" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-f3e60f5a="">
       <h3 class={"card-header__title"} data-rozie-s-f3e60f5a="">{local.title}</h3>
-      {<Show when={local.onClose}><button class={"card-header__close"} onClick={($event) => { (local.onClose)?.($event); }} data-rozie-s-f3e60f5a="">×</button></Show>}</header>
+      {<Show when={local.onClose}><button class={"card-header__close"} onClick={($event: MouseEvent) => { (local.onClose)?.($event); }} data-rozie-s-f3e60f5a="">×</button></Show>}</header>
     </>
   );
 }

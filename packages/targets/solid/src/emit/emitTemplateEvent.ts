@@ -166,6 +166,37 @@ function eventNameToJsxProp(eventName: string): string {
 }
 
 /**
+ * Spike-012 NEW-3 — the DOM event-interface name for a synthesized handler
+ * param's type annotation. Accepts either a raw event name (`keydown`) or a
+ * JSX event prop (`onKeyDown`).
+ *
+ * WHY a precise type, not `Event`: Solid types every JSX event slot as a UNION
+ * (`EventHandlerUnion<T, E>`), and TS provides NO contextual param type from a
+ * union of function types — so an un-annotated synthesized `($event) => …` is
+ * `noImplicitAny` TS7006. Annotating with the *specific* DOM event both silences
+ * TS7006 and lets an inline guard read event-specific props (a key filter reads
+ * `$event.key`, which `Event` lacks → TS2339). The specific type is still
+ * assignable to the JSX slot (param contravariance: `MouseEvent` ⊇ `MouseEvent &
+ * { currentTarget; target }`), so no call site narrows.
+ */
+export function domEventType(eventOrProp: string): string {
+  const s = eventOrProp.replace(/^on/, '').toLowerCase();
+  if (s.startsWith('key')) return 'KeyboardEvent';
+  if (/^(click|dblclick|mouse|contextmenu|auxclick)/.test(s)) return 'MouseEvent';
+  if (s.startsWith('pointer') || s === 'gotpointercapture' || s === 'lostpointercapture') return 'PointerEvent';
+  if (s.startsWith('touch')) return 'TouchEvent';
+  if (s.startsWith('wheel')) return 'WheelEvent';
+  if (s.startsWith('drag') || s === 'drop') return 'DragEvent';
+  if (s.startsWith('focus') || s === 'blur') return 'FocusEvent';
+  if (s === 'input' || s === 'beforeinput') return 'InputEvent';
+  if (s.startsWith('composition')) return 'CompositionEvent';
+  if (s.startsWith('animation')) return 'AnimationEvent';
+  if (s.startsWith('transition')) return 'TransitionEvent';
+  if (s === 'copy' || s === 'cut' || s === 'paste') return 'ClipboardEvent';
+  return 'Event';
+}
+
+/**
  * Render a ModifierArg as a JS source string for inlining into the wrap call.
  */
 function renderModifierArg(arg: ModifierArg): string {
@@ -245,6 +276,8 @@ export function emitTemplateEvent(
   const diagnostics: Diagnostic[] = [];
   const eventName = listener.event;
   const jsxName = eventNameToJsxProp(eventName);
+  // Spike-012 NEW-3 — DOM interface for synthesized `$event` param annotations.
+  const eventType = domEventType(eventName);
 
   const inlineGuards: string[] = [];
   let scriptInjection: string | null = null;
@@ -359,10 +392,14 @@ export function emitTemplateEvent(
       // possibly 'undefined'". Runtime semantics are unchanged — `?.()` is a
       // no-op when the LHS is null/undefined, matching what users expect when
       // they pass no handler.
-      handlerExpr = `($event) => { (${code})?.($event); }`;
+      //
+      // Spike-012 NEW-3 — annotate the synthesized `$event` param with the
+      // event's specific DOM interface (see `domEventType`) so a strict consumer
+      // (`noImplicitAny`) typechecks.
+      handlerExpr = `($event: ${eventType}) => { (${code})?.($event); }`;
     } else {
       // Already a call / statement expression — splice verbatim.
-      handlerExpr = `($event) => { ${code}; }`;
+      handlerExpr = `($event: ${eventType}) => { ${code}; }`;
     }
   } else {
     const guardLines = inlineGuards.join(' ');
@@ -379,7 +416,7 @@ export function emitTemplateEvent(
     } else {
       handlerInvocation = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors);
     }
-    handlerExpr = `($event) => { ${guardLines} ${handlerInvocation}; }`;
+    handlerExpr = `($event: ${eventType}) => { ${guardLines} ${handlerInvocation}; }`;
   }
 
   return {

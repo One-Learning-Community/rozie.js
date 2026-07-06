@@ -20,7 +20,7 @@ export default function InlineExprHandler(_props: InlineExprHandlerProps): JSX.E
 
   return (
     <>
-    <div {...attrs} class={"backdrop" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event) => { local.closeOnBackdrop && close(); } }, attrs)} data-rozie-s-8ec7623e="">
+    <div {...attrs} class={"backdrop" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onClick: ($event: MouseEvent) => { local.closeOnBackdrop && close(); } }, attrs)} data-rozie-s-8ec7623e="">
       
       <button onClick={close} data-rozie-s-8ec7623e="">Close</button>
     </div>

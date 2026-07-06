@@ -50,7 +50,7 @@ import {
   emitListenerSpreadAsMergePartial,
 } from './emitTemplateAttribute.js';
 import { emitConditional } from './emitConditional.js';
-import { emitTemplateEvent } from './emitTemplateEvent.js';
+import { emitTemplateEvent, domEventType } from './emitTemplateEvent.js';
 import { emitRModel } from './emitRModel.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 // Phase 07.2 Plan 03 — consumer-side slot-fill emission for component-tag elements.
@@ -545,7 +545,11 @@ function emitElementListeners(
         : `(${it.body})($event);`,
     );
     eventsPartialEntries.push(
-      `${name}: ($event) => { ${branches.join(' ')} }`,
+      // Spike-012 NEW-3 — annotate the synthesized dispatcher param with the
+      // event's specific DOM interface (`name` is the JSX prop, e.g. onKeyDown)
+      // so a strict consumer (`noImplicitAny`) typechecks and the param is
+      // assignable to each inner typed handler arrow.
+      `${name}: ($event: ${domEventType(name)}) => { ${branches.join(' ')} }`,
     );
   }
 
@@ -632,7 +636,9 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       }
       return `(${body})($event);`;
     });
-    const dispatcher = `($event) => { ${branches.join(' ')} }`;
+    // Spike-012 NEW-3 — typed dispatcher param (strict-consumer TS7006); the
+    // event's specific DOM interface (`name` is the JSX prop, e.g. onKeyDown).
+    const dispatcher = `($event: ${domEventType(name)}) => { ${branches.join(' ')} }`;
     out.push(`${name}={${dispatcher}}`);
   }
   return out.join(' ');
@@ -714,7 +720,9 @@ function mergeEventAttributes(attrsJsx: string, eventsJsx: string): string {
         if (/^[A-Za-z_$][\w$]*$/.test(body)) return `${body}($event);`;
         return `(${body})($event);`;
       };
-      merged.push(`${name}={($event) => { ${wrap(attrsBody)} ${wrap(eventsBody)} }}`);
+      // Spike-012 NEW-3 — typed dispatcher param (strict-consumer TS7006); the
+      // event's specific DOM interface (`name` is the JSX prop, e.g. onKeyDown).
+      merged.push(`${name}={($event: ${domEventType(name)}) => { ${wrap(attrsBody)} ${wrap(eventsBody)} }}`);
       eventsNamed.delete(name);
     } else {
       merged.push(`${name}={${attrsBody}}`);

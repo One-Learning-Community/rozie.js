@@ -103,7 +103,7 @@ export default function Modal(_props: ModalProps): JSX.Element {
 
   return (
     <>
-    {<Show when={open()}><div class={"modal-backdrop"} ref={(el) => { backdropElRef = el as HTMLElement; }} onClick={($event) => { if ($event.target !== $event.currentTarget) return; local.closeOnBackdrop && close(); }} data-rozie-s-fc45feb2="">
+    {<Show when={open()}><div class={"modal-backdrop"} ref={(el) => { backdropElRef = el as HTMLElement; }} onClick={($event: MouseEvent) => { if ($event.target !== $event.currentTarget) return; local.closeOnBackdrop && close(); }} data-rozie-s-fc45feb2="">
       <div ref={(el) => { dialogElRef = el as HTMLElement; }} class={"modal-dialog"} role="dialog" aria-modal="true" aria-label={rozieAttr(local.title || undefined)} tabIndex={-1} data-rozie-s-fc45feb2="">
         {<Show when={local.title || (_props.headerSlot ?? _props.slots?.['header'])}><header data-rozie-s-fc45feb2="">
           {(_props.headerSlot ?? _props.slots?.['header'])?.({ close }) ?? <h2 data-rozie-s-fc45feb2="">{local.title}</h2>}
