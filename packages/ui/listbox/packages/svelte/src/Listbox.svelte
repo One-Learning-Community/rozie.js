@@ -275,32 +275,52 @@ const resolveInitialActive = () => {
 };
 
 // ---- open / close ------------------------------------------------------
-// Single open-state mutator → the ONLY `$emit('open-change')` site, so the
-// React prop-destructure for `onOpenChange` hoists exactly once.
+// Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
+// $emit's directly — no longer funneled through a single wrapper. The
+// former "route every emit through ONE wrapper fn" workaround guarded
+// against a React duplicate `const {onOpenChange}=props` per emit-site
+// (TS2451); verified against the current emitter (target-react
+// `emitScript-multiEmitDedupe.test.ts`) that the shipped ITEM-1 (Phase 46)
+// hoist-once dedupe already collapses N ESCAPING helpers sharing an emit
+// target into exactly one destructure, and a non-escaping function (e.g.
+// `open`, reachable here only via `$expose`) never destructures at all — so
+// no combination of these three functions can produce the duplicate-const
+// shape. See project_next_port_listbox / project_emitter_hardening_backlog.
 // ---- open / close ------------------------------------------------------
-// Single open-state mutator → the ONLY `$emit('open-change')` site, so the
-// React prop-destructure for `onOpenChange` hoists exactly once.
-const applyExpanded = (next: any) => {
-  if (next && disabled) return;
-  if (open$local === next) return;
-  open$local = next;
-  activeIndex = next ? resolveInitialActive() : -1;
+// Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
+// $emit's directly — no longer funneled through a single wrapper. The
+// former "route every emit through ONE wrapper fn" workaround guarded
+// against a React duplicate `const {onOpenChange}=props` per emit-site
+// (TS2451); verified against the current emitter (target-react
+// `emitScript-multiEmitDedupe.test.ts`) that the shipped ITEM-1 (Phase 46)
+// hoist-once dedupe already collapses N ESCAPING helpers sharing an emit
+// target into exactly one destructure, and a non-escaping function (e.g.
+// `open`, reachable here only via `$expose`) never destructures at all — so
+// no combination of these three functions can produce the duplicate-const
+// shape. See project_next_port_listbox / project_emitter_hardening_backlog.
+export const open = () => {
+  if (disabled) return;
+  if (open$local) return;
+  open$local = true;
+  activeIndex = resolveInitialActive();
   onopenchange?.({
-    open: next
+    open: true
   });
 };
-export const open = () => applyExpanded(true);
-export const close = () => applyExpanded(false);
-export const toggle = () => applyExpanded(!open$local);
+export const close = () => {
+  if (!open$local) return;
+  open$local = false;
+  activeIndex = -1;
+  onopenchange?.({
+    open: false
+  });
+};
+export const toggle = () => {
+  if (open$local) close();else open();
+};
 
 // ---- selection ---------------------------------------------------------
-// Single `$emit('change')` site (called from both select + clear).
 // ---- selection ---------------------------------------------------------
-// Single `$emit('change')` site (called from both select + clear).
-const fireChange = (value: any, option: any) => onchange?.({
-  value,
-  option
-});
 const select = (opt: any) => {
   if (disabledOf(opt)) return;
   const v = valueOf(opt);
@@ -311,10 +331,16 @@ const select = (opt: any) => {
     // React/Solid/Lit/Angular change detectors.
     const next = arr.includes(v) ? arr.filter((x: any) => x !== v) : [...arr, v];
     value = next;
-    fireChange(next, opt);
+    onchange?.({
+      value: next,
+      option: opt
+    });
   } else {
     value = v;
-    fireChange(v, opt);
+    onchange?.({
+      value: v,
+      option: opt
+    });
     if (closeOnSelect) {
       close();
       focusControl();
@@ -325,7 +351,10 @@ export const clear = () => {
   const empty = multiple ? [] : null;
   value = empty;
   query = '';
-  fireChange(empty, null);
+  onchange?.({
+    value: empty,
+    option: null
+  });
 };
 
 // ---- keyboard navigation over the VISIBLE list -------------------------

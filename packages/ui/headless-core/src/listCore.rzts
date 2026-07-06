@@ -107,23 +107,36 @@ const resolveInitialActive = () => {
 }
 
 // ---- open / close ------------------------------------------------------
-// Single open-state mutator → the ONLY `$emit('open-change')` site, so the
-// React prop-destructure for `onOpenChange` hoists exactly once.
-const applyExpanded = (next) => {
-  if (next && $props.disabled) return
-  if ($data.open === next) return
-  $data.open = next
-  $data.activeIndex = next ? resolveInitialActive() : -1
-  $emit('open-change', { open: next })
+// Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
+// $emit's directly — no longer funneled through a single wrapper. The
+// former "route every emit through ONE wrapper fn" workaround guarded
+// against a React duplicate `const {onOpenChange}=props` per emit-site
+// (TS2451); verified against the current emitter (target-react
+// `emitScript-multiEmitDedupe.test.ts`) that the shipped ITEM-1 (Phase 46)
+// hoist-once dedupe already collapses N ESCAPING helpers sharing an emit
+// target into exactly one destructure, and a non-escaping function (e.g.
+// `open`, reachable here only via `$expose`) never destructures at all — so
+// no combination of these three functions can produce the duplicate-const
+// shape. See project_next_port_listbox / project_emitter_hardening_backlog.
+const open = () => {
+  if ($props.disabled) return
+  if ($data.open) return
+  $data.open = true
+  $data.activeIndex = resolveInitialActive()
+  $emit('open-change', { open: true })
 }
-const open = () => applyExpanded(true)
-const close = () => applyExpanded(false)
-const toggle = () => applyExpanded(!$data.open)
+const close = () => {
+  if (!$data.open) return
+  $data.open = false
+  $data.activeIndex = -1
+  $emit('open-change', { open: false })
+}
+const toggle = () => {
+  if ($data.open) close()
+  else open()
+}
 
 // ---- selection ---------------------------------------------------------
-// Single `$emit('change')` site (called from both select + clear).
-const fireChange = (value, option) => $emit('change', { value, option })
-
 const select = (opt) => {
   if (disabledOf(opt)) return
   const v = valueOf(opt)
@@ -134,10 +147,10 @@ const select = (opt) => {
     // React/Solid/Lit/Angular change detectors.
     const next = arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]
     $model.value = next
-    fireChange(next, opt)
+    $emit('change', { value: next, option: opt })
   } else {
     $model.value = v
-    fireChange(v, opt)
+    $emit('change', { value: v, option: opt })
     if ($props.closeOnSelect) { close(); focusControl() }
   }
 }
@@ -146,7 +159,7 @@ const clear = () => {
   const empty = $props.multiple ? [] : null
   $model.value = empty
   $data.query = ''
-  fireChange(empty, null)
+  $emit('change', { value: empty, option: null })
 }
 
 // ---- keyboard navigation over the VISIBLE list -------------------------
@@ -240,4 +253,4 @@ const onOptionPointerMove = (index) => {
   if ($data.activeIndex !== index) $data.activeIndex = index
 }
 
-export { labelOf, valueOf, disabledOf, optionId, visibleOptions, selectedLabel, activeDescendant, isSelected, resolveInitialActive, applyExpanded, open, close, toggle, fireChange, select, clear, nextEnabled, move, moveEdge, commitActive, onTypeahead, onControlKeyDown, fireSearch, onInput, onOptionPointerMove }
+export { labelOf, valueOf, disabledOf, optionId, visibleOptions, selectedLabel, activeDescendant, isSelected, resolveInitialActive, open, close, toggle, select, clear, nextEnabled, move, moveEdge, commitActive, onTypeahead, onControlKeyDown, fireSearch, onInput, onOptionPointerMove }

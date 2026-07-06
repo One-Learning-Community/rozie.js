@@ -32,8 +32,13 @@
     - The focus verb is `focusControl`, not `focus` — a `focus` $expose verb is a
       DELIBERATE override of the inherited HTMLElement.focus on the Lit custom
       element (ROZ137 warns, does not auto-rename — the public handle is intended).
-    - Every event is fired through ONE wrapper fn so its prop-destructure hoists
-      once (a duplicate-emit-site would emit two `const … = props` in React).
+    - `open`/`close`/`toggle` (and `select`/`clear`) each `$emit` directly in
+      `listCore.rzts` — Phase 73 item #8 removed the old "route every emit
+      through ONE wrapper fn" workaround after verifying against the current
+      emitter that the shipped Phase 46 ITEM-1 hoist-once dedupe already
+      collapses N escaping helpers sharing an emit target into a single
+      `const {onX}=props` destructure (no TS2451), regardless of how many
+      functions call `$emit` for the same event.
 
   Consumer example (select-only):
 
@@ -252,7 +257,7 @@ let typeTimer = null
 // input-mode `select-only` + multi + type-ahead. The spine closes over this
 // host's pieces by convention: the reassigned module-`let`s typeBuffer/typeTimer
 // (above) and the impure ref fns focusControl/scrollActiveIntoView (below).
-import { labelOf, valueOf, disabledOf, optionId, visibleOptions, selectedLabel, activeDescendant, isSelected, resolveInitialActive, applyExpanded, open, close, toggle, fireChange, select, clear, nextEnabled, move, moveEdge, commitActive, onTypeahead, onControlKeyDown, onOptionPointerMove } from '@rozie-ui/headless-core/listCore.rzts'
+import { labelOf, valueOf, disabledOf, optionId, visibleOptions, selectedLabel, activeDescendant, isSelected, resolveInitialActive, open, close, toggle, select, clear, nextEnabled, move, moveEdge, commitActive, onTypeahead, onControlKeyDown, onOptionPointerMove } from '@rozie-ui/headless-core/listCore.rzts'
 
 // ---- shared windowing math (Phase 64 P4: @rozie-ui/headless-core/windowing.rzts) ----
 // The PURE windowing math (the windowed slice + spacer geometry) is the SAME

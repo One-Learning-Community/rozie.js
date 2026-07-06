@@ -424,22 +424,26 @@ export class Listbox {
     if (sel !== -1) return sel;
     return opts.findIndex((o: any) => !this.disabledOf(o));
   };
-  applyExpanded = (next: any) => {
-    if (next && (this.disabled() || this.__rozieCvaDisabled())) return;
-    if (this.open$local() === next) return;
-    this.open$local.set(next);
-    this.activeIndex.set(next ? this.resolveInitialActive() : -1);
+  open = () => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    if (this.open$local()) return;
+    this.open$local.set(true);
+    this.activeIndex.set(this.resolveInitialActive());
     this.openChange.emit({
-      open: next
+      open: true
     });
   };
-  open = () => this.applyExpanded(true);
-  close = () => this.applyExpanded(false);
-  toggle = () => this.applyExpanded(!this.open$local());
-  fireChange = (value: any, option: any) => this.change.emit({
-    value: this.value(),
-    option
-  });
+  close = () => {
+    if (!this.open$local()) return;
+    this.open$local.set(false);
+    this.activeIndex.set(-1);
+    this.openChange.emit({
+      open: false
+    });
+  };
+  toggle = () => {
+    if (this.open$local()) this.close();else this.open();
+  };
   select = (opt: any) => {
     if (this.disabledOf(opt)) return;
     const v = this.valueOf$local(opt);
@@ -450,10 +454,16 @@ export class Listbox {
       // React/Solid/Lit/Angular change detectors.
       const next = arr.includes(v) ? arr.filter((x: any) => x !== v) : [...arr, v];
       this.value.set(next), this.__rozieCvaOnChange(next);
-      this.fireChange(next, opt);
+      this.change.emit({
+        value: next,
+        option: opt
+      });
     } else {
       this.value.set(v), this.__rozieCvaOnChange(v);
-      this.fireChange(v, opt);
+      this.change.emit({
+        value: v,
+        option: opt
+      });
       if (this.closeOnSelect()) {
         this.close();
         this.focusControl();
@@ -464,7 +474,10 @@ export class Listbox {
     const empty = this.multiple() ? [] : null;
     this.value.set(empty), this.__rozieCvaOnChange(empty);
     this.query.set('');
-    this.fireChange(empty, null);
+    this.change.emit({
+      value: empty,
+      option: null
+    });
   };
   nextEnabled = (from: any, dir: any) => {
     const opts = this.visibleOptions();

@@ -310,32 +310,52 @@ const resolveInitialActive = () => {
 };
 
 // ---- open / close ------------------------------------------------------
-// Single open-state mutator → the ONLY `$emit('open-change')` site, so the
-// React prop-destructure for `onOpenChange` hoists exactly once.
+// Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
+// $emit's directly — no longer funneled through a single wrapper. The
+// former "route every emit through ONE wrapper fn" workaround guarded
+// against a React duplicate `const {onOpenChange}=props` per emit-site
+// (TS2451); verified against the current emitter (target-react
+// `emitScript-multiEmitDedupe.test.ts`) that the shipped ITEM-1 (Phase 46)
+// hoist-once dedupe already collapses N ESCAPING helpers sharing an emit
+// target into exactly one destructure, and a non-escaping function (e.g.
+// `open`, reachable here only via `$expose`) never destructures at all — so
+// no combination of these three functions can produce the duplicate-const
+// shape. See project_next_port_listbox / project_emitter_hardening_backlog.
 // ---- open / close ------------------------------------------------------
-// Single open-state mutator → the ONLY `$emit('open-change')` site, so the
-// React prop-destructure for `onOpenChange` hoists exactly once.
-const applyExpanded = (next: any) => {
-  if (next && props.disabled) return;
-  if (open$local.value === next) return;
-  open$local.value = next;
-  activeIndex.value = next ? resolveInitialActive() : -1;
+// Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
+// $emit's directly — no longer funneled through a single wrapper. The
+// former "route every emit through ONE wrapper fn" workaround guarded
+// against a React duplicate `const {onOpenChange}=props` per emit-site
+// (TS2451); verified against the current emitter (target-react
+// `emitScript-multiEmitDedupe.test.ts`) that the shipped ITEM-1 (Phase 46)
+// hoist-once dedupe already collapses N ESCAPING helpers sharing an emit
+// target into exactly one destructure, and a non-escaping function (e.g.
+// `open`, reachable here only via `$expose`) never destructures at all — so
+// no combination of these three functions can produce the duplicate-const
+// shape. See project_next_port_listbox / project_emitter_hardening_backlog.
+const open = () => {
+  if (props.disabled) return;
+  if (open$local.value) return;
+  open$local.value = true;
+  activeIndex.value = resolveInitialActive();
   emit('open-change', {
-    open: next
+    open: true
   });
 };
-const open = () => applyExpanded(true);
-const close = () => applyExpanded(false);
-const toggle = () => applyExpanded(!open$local.value);
+const close = () => {
+  if (!open$local.value) return;
+  open$local.value = false;
+  activeIndex.value = -1;
+  emit('open-change', {
+    open: false
+  });
+};
+const toggle = () => {
+  if (open$local.value) close();else open();
+};
 
 // ---- selection ---------------------------------------------------------
-// Single `$emit('change')` site (called from both select + clear).
 // ---- selection ---------------------------------------------------------
-// Single `$emit('change')` site (called from both select + clear).
-const fireChange = (value: any, option: any) => emit('change', {
-  value,
-  option
-});
 const select = (opt: any) => {
   if (disabledOf(opt)) return;
   const v = valueOf(opt);
@@ -346,10 +366,16 @@ const select = (opt: any) => {
     // React/Solid/Lit/Angular change detectors.
     const next = arr.includes(v) ? arr.filter((x: any) => x !== v) : [...arr, v];
     value.value = next;
-    fireChange(next, opt);
+    emit('change', {
+      value: next,
+      option: opt
+    });
   } else {
     value.value = v;
-    fireChange(v, opt);
+    emit('change', {
+      value: v,
+      option: opt
+    });
     if (props.closeOnSelect) {
       close();
       focusControl();
@@ -360,7 +386,10 @@ const clear = () => {
   const empty = props.multiple ? [] : null;
   value.value = empty;
   query.value = '';
-  fireChange(empty, null);
+  emit('change', {
+    value: empty,
+    option: null
+  });
 };
 
 // ---- keyboard navigation over the VISIBLE list -------------------------

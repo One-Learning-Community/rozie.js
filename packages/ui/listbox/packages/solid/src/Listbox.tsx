@@ -370,35 +370,39 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   }
 
   // ---- open / close ------------------------------------------------------
-  // Single open-state mutator → the ONLY `$emit('open-change')` site, so the
-  // React prop-destructure for `onOpenChange` hoists exactly once.
-  function applyExpanded(next: any) {
-    if (next && local.disabled) return;
-    if (open$local() === next) return;
-    setOpen$local(next);
-    setActiveIndex(next ? resolveInitialActive() : -1);
+  // Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
+  // $emit's directly — no longer funneled through a single wrapper. The
+  // former "route every emit through ONE wrapper fn" workaround guarded
+  // against a React duplicate `const {onOpenChange}=props` per emit-site
+  // (TS2451); verified against the current emitter (target-react
+  // `emitScript-multiEmitDedupe.test.ts`) that the shipped ITEM-1 (Phase 46)
+  // hoist-once dedupe already collapses N ESCAPING helpers sharing an emit
+  // target into exactly one destructure, and a non-escaping function (e.g.
+  // `open`, reachable here only via `$expose`) never destructures at all — so
+  // no combination of these three functions can produce the duplicate-const
+  // shape. See project_next_port_listbox / project_emitter_hardening_backlog.
+  function open() {
+    if (local.disabled) return;
+    if (open$local()) return;
+    setOpen$local(true);
+    setActiveIndex(resolveInitialActive());
     _props.onOpenChange?.({
-      open: next
+      open: true
     });
   }
-  function open() {
-    return applyExpanded(true);
-  }
   function close() {
-    return applyExpanded(false);
+    if (!open$local()) return;
+    setOpen$local(false);
+    setActiveIndex(-1);
+    _props.onOpenChange?.({
+      open: false
+    });
   }
   function toggle() {
-    return applyExpanded(!open$local());
+    if (open$local()) close();else open();
   }
 
   // ---- selection ---------------------------------------------------------
-  // Single `$emit('change')` site (called from both select + clear).
-  function fireChange(value: any, option: any) {
-    return _props.onChange?.({
-      value,
-      option
-    });
-  }
   function select(opt: any) {
     if (disabledOf(opt)) return;
     const v = valueOf(opt);
@@ -409,10 +413,16 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
       // React/Solid/Lit/Angular change detectors.
       const next = arr.includes(v) ? arr.filter((x: any) => x !== v) : [...arr, v];
       setValue(next);
-      fireChange(next, opt);
+      _props.onChange?.({
+        value: next,
+        option: opt
+      });
     } else {
       setValue(v);
-      fireChange(v, opt);
+      _props.onChange?.({
+        value: v,
+        option: opt
+      });
       if (local.closeOnSelect) {
         close();
         focusControl();
@@ -423,7 +433,10 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     const empty = local.multiple ? [] : null;
     setValue(empty);
     setQuery('');
-    fireChange(empty, null);
+    _props.onChange?.({
+      value: empty,
+      option: null
+    });
   }
 
   // ---- keyboard navigation over the VISIBLE list -------------------------

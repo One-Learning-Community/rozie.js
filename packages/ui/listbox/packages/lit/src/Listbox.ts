@@ -419,34 +419,36 @@ private __rozieWatchInitial_0 = true;
   return opts.findIndex((o: any) => !this.disabledOf(o));
 };
 
-  applyExpanded = (next: any) => {
-  if (next && this.disabled) return;
-  if (this._open$local.value === next) return;
-  this._open$local.value = next;
-  this._activeIndex.value = next ? this.resolveInitialActive() : -1;
+  open = () => {
+  if (this.disabled) return;
+  if (this._open$local.value) return;
+  this._open$local.value = true;
+  this._activeIndex.value = this.resolveInitialActive();
   this.dispatchEvent(new CustomEvent("open-change", {
     detail: {
-      open: next
+      open: true
     },
     bubbles: true,
     composed: true
   }));
 };
 
-  open = () => this.applyExpanded(true);
+  close = () => {
+  if (!this._open$local.value) return;
+  this._open$local.value = false;
+  this._activeIndex.value = -1;
+  this.dispatchEvent(new CustomEvent("open-change", {
+    detail: {
+      open: false
+    },
+    bubbles: true,
+    composed: true
+  }));
+};
 
-  close = () => this.applyExpanded(false);
-
-  toggle = () => this.applyExpanded(!this._open$local.value);
-
-  fireChange = (value: any, option: any) => this.dispatchEvent(new CustomEvent("change", {
-  detail: {
-    value,
-    option
-  },
-  bubbles: true,
-  composed: true
-}));
+  toggle = () => {
+  if (this._open$local.value) this.close();else this.open();
+};
 
   select = (opt: any) => {
   if (this.disabledOf(opt)) return;
@@ -458,10 +460,24 @@ private __rozieWatchInitial_0 = true;
     // React/Solid/Lit/Angular change detectors.
     const next = arr.includes(v) ? arr.filter((x: any) => x !== v) : [...arr, v];
     this._valueControllable.write(next);
-    this.fireChange(next, opt);
+    this.dispatchEvent(new CustomEvent("change", {
+      detail: {
+        value: next,
+        option: opt
+      },
+      bubbles: true,
+      composed: true
+    }));
   } else {
     this._valueControllable.write(v);
-    this.fireChange(v, opt);
+    this.dispatchEvent(new CustomEvent("change", {
+      detail: {
+        value: v,
+        option: opt
+      },
+      bubbles: true,
+      composed: true
+    }));
     if (this.closeOnSelect) {
       this.close();
       this.focusControl();
@@ -473,7 +489,14 @@ private __rozieWatchInitial_0 = true;
   const empty = this.multiple ? [] : null;
   this._valueControllable.write(empty);
   this._query.value = '';
-  this.fireChange(empty, null);
+  this.dispatchEvent(new CustomEvent("change", {
+    detail: {
+      value: empty,
+      option: null
+    },
+    bubbles: true,
+    composed: true
+  }));
 };
 
   nextEnabled = (from: any, dir: any) => {

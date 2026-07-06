@@ -205,27 +205,29 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     if (sel !== -1) return sel;
     return opts.findIndex((o: any) => !disabledOf(o));
   }
-  function applyExpanded(next: any) {
-    if (next && props.disabled) return;
-    if (open$local === next) return;
-    setOpen$local(next);
-    setActiveIndex(next ? resolveInitialActive() : -1);
-    props.onOpenChange && props.onOpenChange({
-      open: next
-    });
-  }
   function open() {
-    return applyExpanded(true);
-  }
-  const close = useCallback(() => applyExpanded(false), [applyExpanded]);
-  const toggle = useCallback(() => applyExpanded(!open$local), [applyExpanded, open$local]);
-  function fireChange(value: any, option: any) {
-    return props.onChange && props.onChange({
-      value,
-      option
+    if (props.disabled) return;
+    if (open$local) return;
+    setOpen$local(true);
+    setActiveIndex(resolveInitialActive());
+    props.onOpenChange && props.onOpenChange({
+      open: true
     });
   }
-  const select = useCallback((opt: any) => {
+  const { onOpenChange: _rozieProp_onOpenChange } = props;
+    const close = useCallback(() => {
+    if (!open$local) return;
+    setOpen$local(false);
+    setActiveIndex(-1);
+    _rozieProp_onOpenChange && _rozieProp_onOpenChange({
+      open: false
+    });
+  }, [_rozieProp_onOpenChange, open$local]);
+  const toggle = useCallback(() => {
+    if (open$local) close();else open();
+  }, [close, open, open$local]);
+  const { onChange: _rozieProp_onChange } = props;
+    const select = useCallback((opt: any) => {
     if (disabledOf(opt)) return;
     const v = valueOf(opt);
     if (props.multiple) {
@@ -235,21 +237,30 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       // React/Solid/Lit/Angular change detectors.
       const next = arr.includes(v) ? arr.filter((x: any) => x !== v) : [...arr, v];
       setValue(next);
-      fireChange(next, opt);
+      _rozieProp_onChange && _rozieProp_onChange({
+        value: next,
+        option: opt
+      });
     } else {
       setValue(v);
-      fireChange(v, opt);
+      _rozieProp_onChange && _rozieProp_onChange({
+        value: v,
+        option: opt
+      });
       if (props.closeOnSelect) {
         close();
         focusControl();
       }
     }
-  }, [close, disabledOf, fireChange, focusControl, props.closeOnSelect, props.multiple, setValue, value, valueOf]);
+  }, [_rozieProp_onChange, close, disabledOf, focusControl, props.closeOnSelect, props.multiple, setValue, value, valueOf]);
   function clear() {
     const empty = props.multiple ? [] : null;
     setValue(empty);
     setQuery('');
-    fireChange(empty, null);
+    props.onChange && props.onChange({
+      value: empty,
+      option: null
+    });
   }
   function nextEnabled(from: any, dir: any) {
     const opts = visibleOptions();
