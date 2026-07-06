@@ -1,0 +1,9 @@
+{
+  "id": "REG-73.02-002",
+  "source": "project_solid_polymorphic_model_typeof_narrow_gap (emitter-hardening backlog item #11)",
+  "sourceKind": "deviation-log",
+  "phase": "73-02",
+  "desc": "a polymorphic/union model prop read through a typeof guard must narrow on every target (Solid-only TS2322 before the fix — the accessor CALL defeats narrowing across two reads)",
+  "targets": ["lit", "react", "solid", "svelte", "vue", "angular"],
+  "discoveredBy": "project_emitter_hardening_backlog Tier 2 item #11"
+}
