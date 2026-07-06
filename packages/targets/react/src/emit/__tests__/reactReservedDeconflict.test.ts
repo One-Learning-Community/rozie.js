@@ -81,6 +81,36 @@ describe('Phase 61-05 risk A — declare-then-assign ref shadow', () => {
   });
 });
 
+describe('Phase 73 item #9 — hoisted capture-let == ref name collides WITHOUT a $refs.X read', () => {
+  it('renames the colliding module-let to chart$local even though it never reads $refs.chart (chartjs case)', () => {
+    const code = emit('ReactRefLetHoistCollision');
+
+    // The ref-const is the contract — exactly one `const chart = useRef`.
+    expect(count(code, 'const chart = useRef')).toBe(1);
+
+    // The user module-let is renamed; it is NEVER re-declared as a second
+    // `chart` (the TS2451 shape). The hoisted let surfaces as `chart$local`.
+    expect(code).toContain('chart$local');
+
+    // After stripping comments + the renamed local, exactly one `chart`
+    // BINDING remains (the ref-const).
+    const codeNoComments = code
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '')
+      .replace(/chart\$local/g, 'STRIPPED');
+    expect(count(codeNoComments, 'chart = useRef')).toBe(1);
+
+    // The $onMount body still assigns/reads the renamed local (mirrors the
+    // shipped risk-A precedent: the RENAME is the fix's contract — whether
+    // the renamed local is ALSO hoisted to a useRef is a separate, orthogonal
+    // concern already governed by hoistModuleLet's pre-existing reachability
+    // detection over `ir.lifecycle`'s ORIGINAL identifiers, same as
+    // `anchorEl$local` above staying a bare local rather than `.current`).
+    expect(code).toMatch(/chart\$local\s*=\s*new FakeEngine/);
+    expect(code).toMatch(/chart\$local\.destroy\(\)/);
+  });
+});
+
 describe('Phase 61-05 risk B — expose-body module-let hoist', () => {
   it('hoists `nextId` to a useRef (not a per-render `let nextId = 0`)', () => {
     const code = emit('ReactExposeModuleLet');

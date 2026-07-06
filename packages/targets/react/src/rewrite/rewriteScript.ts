@@ -44,6 +44,7 @@ import {
 } from '../../../../core/src/rewrite/deconflict.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { reactGeneratedBindingNames } from './reactGeneratedNames.js';
+import { getHoistableModuleLetNames } from './hoistModuleLet.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -352,10 +353,21 @@ function normalizeModelAccessor(program: File): void {
  * `hoistModuleLet` and the ref-const generation run. The hoist then lifts
  * `anchorEl$local` to its own `useRef`, and the ref-const keeps the bare name.
  *
- * Gated on an actual `$refs.<name>` read ANYWHERE in the program (not just the
- * declarator init) so the declare-then-assign form is caught while a non-
- * colliding module-let stays byte-identical. MUST run on the freshly-cloned,
- * not-yet-mutated Program (scope cache valid). Mutates `program` in place.
+ * Gated on EITHER of two signals:
+ *   1. an actual `$refs.<name>` read ANYWHERE in the program (the original
+ *      declare-then-assign signal — `anchorEl = $refs.anchorEl`), OR
+ *   2. (Phase 73 item #9) the module-`let` is ITSELF reachable from a
+ *      lifecycle hook/watcher/`$expose` verb/template-called helper — i.e.
+ *      `hoistModuleLet` WILL hoist it regardless of whether it ever reads
+ *      `$refs.<name>`. The chartjs case: `let chart = null` populated from
+ *      `new Chart(...)` (never `$refs.chart`), colliding with `ref="chart"`
+ *      on the canvas element. Signal 1 alone missed this — the collision
+ *      still fires because BOTH sides mint a `useRef` regardless of how the
+ *      let's value was produced.
+ * A non-colliding module-let (no ref-name match) stays byte-identical either
+ * way. MUST run on the freshly-cloned, not-yet-mutated Program (scope cache
+ * valid, and `getHoistableModuleLetNames` needs the pre-hoist shape).
+ * Mutates `program` in place.
  */
 export function deconflictDeclareThenAssignRef(
   program: File,
@@ -364,10 +376,17 @@ export function deconflictDeclareThenAssignRef(
   const refNames = new Set(ir.refs.map((r) => r.name));
   if (refNames.size === 0) return;
 
+  // Phase 73 item #9 — names `hoistModuleLet` WILL hoist regardless of a
+  // direct `$refs.X` read (computed lazily; cheap no-op when there are no
+  // module-lets at all).
+  const hoistableLetNames = getHoistableModuleLetNames(program, ir);
+
   // Collect program-scope `let` declarator names that collide with a ref name
-  // AND whose program scope reads `$refs.<name>` somewhere (the declare-then-
-  // assign signal). A `const X = $refs.X` init-shape is already handled by the
-  // accessor group; this catches the `let`-declared, later-assigned form.
+  // AND (a) whose program scope reads `$refs.<name>` somewhere (the declare-
+  // then-assign signal — a `const X = $refs.X` init-shape is already handled
+  // by the accessor group; this catches the `let`-declared, later-assigned
+  // form) OR (b) that `hoistModuleLet` will hoist independent of any `$refs.X`
+  // read (Phase 73 item #9 — the chartjs case).
   const targets = new Set<string>();
   for (const stmt of program.program.body) {
     if (!t.isVariableDeclaration(stmt) || stmt.kind !== 'let') continue;
@@ -375,8 +394,16 @@ export function deconflictDeclareThenAssignRef(
       if (!t.isIdentifier(decl.id)) continue;
       const name = decl.id.name;
       if (!refNames.has(name)) continue;
-      // Only-on-collision: require an actual `$refs.<name>` read in the program.
-      if (subtreeReads(program.program, '$refs', name)) targets.add(name);
+      // Only-on-collision: require EITHER an actual `$refs.<name>` read in
+      // the program (signal 1) OR that this let is independently reachable
+      // from a hook/watcher/$expose/template-called helper — i.e. would be
+      // hoisted regardless (signal 2, Phase 73 item #9).
+      if (
+        subtreeReads(program.program, '$refs', name) ||
+        hoistableLetNames.has(name)
+      ) {
+        targets.add(name);
+      }
     }
   }
   if (targets.size === 0) return;

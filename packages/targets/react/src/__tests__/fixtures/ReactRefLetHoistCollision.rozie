@@ -1,0 +1,51 @@
+<!--
+  ReactRefLetHoistCollision.rozie — Phase 73 item #9 fixture.
+
+  The chartjs case (collision-react / project_next_port_chartjs): a capture-`let`
+  holding an engine instance is named IDENTICALLY to a template `ref="X"`, but
+  — unlike ReactDeclareThenAssignRef.rozie — the let is populated from
+  `new FakeEngine(...)`, NEVER from `$refs.chart`. `deconflictDeclareThenAssignRef`'s
+  original gate (`subtreeReads('$refs', name)`) misses this shape entirely: there
+  is no `$refs.chart` read anywhere in the program.
+
+  `chart` is still HOISTED, though — it's referenced from the `$onMount` body,
+  so `hoistModuleLet` mints `const chart = useRef(null)`. The template's
+  `ref="chart"` ALSO mints `const chart = useRef(...)` in emitScript. Two `chart`
+  bindings → TS2451 redeclare (rolldown parse error), even without any `$refs.chart`
+  read.
+
+  FIX: `deconflictDeclareThenAssignRef` also fires when the colliding let is
+  independently reachable from a hook (i.e. `hoistModuleLet` will hoist it
+  regardless) — `getHoistableModuleLetNames` (Phase 73 item #9).
+-->
+<rozie name="ReactRefLetHoistCollision">
+
+<data>
+{
+  ready: false,
+}
+</data>
+
+<script>
+class FakeEngine {
+  destroy() {}
+}
+
+// Populated from `new FakeEngine()`, NEVER from `$refs.chart` — the
+// declare-then-assign gate's original `$refs.<name>` read signal misses this.
+let chart = null
+
+$onMount(() => {
+  chart = new FakeEngine()
+  $data.ready = true
+  return () => {
+    chart.destroy()
+  }
+})
+</script>
+
+<template>
+  <canvas ref="chart"></canvas>
+</template>
+
+</rozie>

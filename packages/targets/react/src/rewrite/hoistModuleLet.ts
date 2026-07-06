@@ -163,27 +163,48 @@ function collectIdentifierRefs(
 }
 
 /**
- * Auto-hoist module-scoped `let` declarations referenced from lifecycle setup
- * bodies. Mutates `program` in place.
+ * OQ-2 (Phase 09 Plan 03) resolved `useRef<…>` shape carried through both the
+ * analysis pass and the mutating hoist pass. Module-scope so both
+ * `analyzeModuleLetReachability` and `hoistModuleLet` share one definition.
  */
-export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
-  const diagnostics: Diagnostic[] = [];
+type LetCandidate = {
+  name: string;
+  initialExpr: t.Expression;
+  declStmt: t.VariableDeclaration;
+  declIndex: number;
+  declaratorIndex: number;
+  sourceLoc: { start: number; end: number };
+  /**
+   * OQ-2: resolved `useRef<…>` type argument — the author's declared type
+   * when annotated, `'any'` for the typeNeutralizeScript-injected bare
+   * `: any` residue, `undefined` when the declarator carried no annotation.
+   */
+  hoistTsType: string | undefined;
+};
 
+export interface ModuleLetReachability {
+  moduleLets: Map<string, LetCandidate>;
+  /** Every module-let name reachable from a lifecycle hook / watcher /
+   *  `$expose` verb / template-called helper — i.e. what WOULD be hoisted. */
+  referencedLets: Set<string>;
+}
+
+/**
+ * Pure analysis pass (no mutation): resolve which module-scoped `let`
+ * declarations are reachable from a lifecycle hook, watcher, `$expose` verb,
+ * or (Phase 73 item #11-b) a template-called helper — through any depth of
+ * top-level helper-call indirection. Shared by the mutating `hoistModuleLet`
+ * AND `getHoistableModuleLetNames` (Phase 73 item #9 — used by
+ * `deconflictDeclareThenAssignRef` in rewriteScript.ts to decide whether a
+ * capture-`let` colliding with a `ref="X"` name needs deconfliction even
+ * without a direct `$refs.X` read, because it WILL be hoisted to its own
+ * `useRef` regardless).
+ */
+function analyzeModuleLetReachability(
+  program: File,
+  ir: IRComponent,
+): ModuleLetReachability {
   // 1. Collect module-let candidates: top-level VariableDeclaration with kind === 'let'.
-  type LetCandidate = {
-    name: string;
-    initialExpr: t.Expression;
-    declStmt: t.VariableDeclaration;
-    declIndex: number;
-    declaratorIndex: number;
-    sourceLoc: { start: number; end: number };
-    /**
-     * OQ-2: resolved `useRef<…>` type argument — the author's declared type
-     * when annotated, `'any'` for the typeNeutralizeScript-injected bare
-     * `: any` residue, `undefined` when the declarator carried no annotation.
-     */
-    hoistTsType: string | undefined;
-  };
   const moduleLets = new Map<string, LetCandidate>();
   program.program.body.forEach((stmt, idx) => {
     if (!t.isVariableDeclaration(stmt)) return;
@@ -204,7 +225,7 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
       });
     });
   });
-  if (moduleLets.size === 0) return { hoisted: [], diagnostics };
+  if (moduleLets.size === 0) return { moduleLets, referencedLets: new Set() };
 
   const moduleLetNames = new Set(moduleLets.keys());
 
@@ -349,6 +370,34 @@ export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
     // (c) Anything else — conservative no-hoist.
   }
 
+  return { moduleLets, referencedLets };
+}
+
+/**
+ * Phase 73 item #9 — non-mutating reachability query used by
+ * `deconflictDeclareThenAssignRef` (rewriteScript.ts) to decide whether a
+ * capture-`let` colliding with a `ref="X"` name will be HOISTED by
+ * `hoistModuleLet` (and therefore needs deconfliction to `X$local`) even
+ * when it carries no direct `$refs.X` read anywhere in the program — the
+ * chartjs case (`let chart` populated from `new Chart(...)`, never read via
+ * `$refs.chart`, but still hoisted because it's referenced from a lifecycle
+ * hook).
+ */
+export function getHoistableModuleLetNames(
+  program: File,
+  ir: IRComponent,
+): Set<string> {
+  return analyzeModuleLetReachability(program, ir).referencedLets;
+}
+
+/**
+ * Auto-hoist module-scoped `let` declarations referenced from lifecycle setup
+ * bodies. Mutates `program` in place.
+ */
+export function hoistModuleLet(program: File, ir: IRComponent): HoistResult {
+  const diagnostics: Diagnostic[] = [];
+  const { moduleLets, referencedLets } = analyzeModuleLetReachability(program, ir);
+  if (moduleLets.size === 0) return { hoisted: [], diagnostics };
   if (referencedLets.size === 0) return { hoisted: [], diagnostics };
 
   // 4. Hoist: synthesize HoistInstructions, remove the let declarations,
