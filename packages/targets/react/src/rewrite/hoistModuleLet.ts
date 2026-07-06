@@ -42,7 +42,7 @@ import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
 import _generate from '@babel/generator';
 import type { File } from '@babel/types';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent, TemplateNode } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 
@@ -159,6 +159,97 @@ function collectIdentifierRefs(
       found.add(path.node.name);
     },
   });
+  return found;
+}
+
+/**
+ * Phase 73 item #11-b — collect every top-level HELPER NAME referenced
+ * anywhere inside a template expression (attribute bindings, interpolation,
+ * r-if/r-match tests + discriminant, r-for iterable/key, slot-invocation
+ * args). A helper called ONLY from the template (never from a lifecycle
+ * hook, watcher, or `$expose` verb) previously fell through `classifyExpr`
+ * case (c) and any module-let it mutates stayed an un-hoisted per-render
+ * `let` — the sortable-list `keyFor()`/`__rowKeySeq` gap
+ * (`project_react_transitive_hoist_modulelet`, "EDGE found 2026-06-20").
+ *
+ * Deliberately does NOT walk `TemplateElementIR.events` (template `@event`
+ * bindings) — those are unified into `ir.listeners` (D-20) and already feed
+ * `escapingHelperNames` in emitScript.ts; a helper reachable ONLY via a
+ * template event is therefore already accounted for as a lifecycle-adjacent
+ * root elsewhere. This walker exists for the residual case: a helper called
+ * from a plain BINDING expression (`:key`, `:data-id`, `{{ }}`, an `r-if`
+ * test, a slot-invocation arg, …), which carries no such coverage.
+ */
+function collectTemplateReferencedHelperNames(
+  node: TemplateNode | null,
+  helperNames: ReadonlySet<string>,
+): Set<string> {
+  const found = new Set<string>();
+  function visitExpr(expr: t.Expression | null | undefined): void {
+    if (!expr) return;
+    for (const n of collectIdentifierRefs(expr, helperNames)) found.add(n);
+  }
+  function visit(n: TemplateNode | null | undefined): void {
+    if (!n) return;
+    switch (n.type) {
+      case 'TemplateElement': {
+        for (const attr of n.attributes) {
+          if (
+            attr.kind === 'binding' ||
+            attr.kind === 'twoWayBinding' ||
+            attr.kind === 'spreadBinding'
+          ) {
+            visitExpr(attr.expression);
+          } else if (attr.kind === 'interpolated') {
+            for (const seg of attr.segments) {
+              if (seg.kind === 'binding') visitExpr(seg.expression);
+            }
+          }
+        }
+        for (const spread of n.listenerSpreads) visitExpr(spread.expression);
+        for (const c of n.children) visit(c);
+        break;
+      }
+      case 'TemplateConditional': {
+        for (const b of n.branches) {
+          visitExpr(b.test);
+          for (const c of b.body) visit(c);
+        }
+        break;
+      }
+      case 'TemplateMatch': {
+        visitExpr(n.discriminant);
+        for (const b of n.branches) {
+          visitExpr(b.test);
+          for (const c of b.body) visit(c);
+        }
+        if (n.hostElement) visit(n.hostElement);
+        break;
+      }
+      case 'TemplateLoop': {
+        visitExpr(n.iterableExpression);
+        visitExpr(n.keyExpression);
+        for (const c of n.body) visit(c);
+        break;
+      }
+      case 'TemplateSlotInvocation': {
+        for (const a of n.args) visitExpr(a.expression);
+        for (const c of n.fallback) visit(c);
+        break;
+      }
+      case 'TemplateFragment': {
+        for (const c of n.children) visit(c);
+        break;
+      }
+      case 'TemplateInterpolation': {
+        visitExpr(n.expression);
+        break;
+      }
+      case 'TemplateStaticText':
+        break;
+    }
+  }
+  visit(node);
   return found;
 }
 
@@ -330,6 +421,16 @@ function analyzeModuleLetReachability(
   // scope-completeness fix — NO rename.
   for (const ex of ir.expose ?? []) {
     classifyExpr(t.identifier(ex.name));
+  }
+  // Phase 73 item #11-b — a helper called ONLY from a template expression
+  // (`:key="keyFor(item, index)"`, an `r-if` test, a slot-invocation arg, …)
+  // is ALSO a reachability root, for the same reason as the `$expose` verb
+  // roots above: it is never routed through a lifecycle hook or watcher, so
+  // a module-let it mutates previously fell through to case (c) and stayed a
+  // per-render `let` (sortable-list `keyFor()`/`__rowKeySeq` —
+  // `project_react_transitive_hoist_modulelet`). Scope-completeness — NO rename.
+  for (const name of collectTemplateReferencedHelperNames(ir.template, helperNames)) {
+    classifyExpr(t.identifier(name));
   }
 
   /** Pull every let a body reaches: its DIRECT refs plus the transitive lets

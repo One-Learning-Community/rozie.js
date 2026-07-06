@@ -269,10 +269,8 @@ export class SortableList {
   }
 
   instance: any = null;
-  __rowKey = {
-    map: new WeakMap(),
-    seq: 0
-  };
+  __rowKeyMap = new WeakMap();
+  __rowKeySeq = 0;
   keyFor = (item: any, index: any) => {
     const __itemKey = this.itemKey();
     // (a) function itemKey: consumer-supplied (item, index) => key.
@@ -286,10 +284,10 @@ export class SortableList {
     // (c) id-less object (or function) item: assign-on-first-sight WeakMap
     //     synthetic id. Survives reorder because it is keyed by object identity.
     if (item !== null && typeof item === 'object' || typeof item === 'function') {
-      if (!this.__rowKey.map.has(item)) {
-        this.__rowKey.map.set(item, '__rk' + this.__rowKey.seq++);
+      if (!this.__rowKeyMap.has(item)) {
+        this.__rowKeyMap.set(item, '__rk' + this.__rowKeySeq++);
       }
-      return this.__rowKey.map.get(item);
+      return this.__rowKeyMap.get(item);
     }
     // (d) primitive item: fall back to index. NOTE: duplicate primitives are
     //     unsafe to reorder this way — pass a function itemKey for those.

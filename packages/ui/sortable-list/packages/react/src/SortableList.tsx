@@ -139,6 +139,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     return rest;
   })();
   const instance = useRef<any>(null);
+  const __rowKeySeq = useRef(0);
   const [items, setItems] = useControllableState({
     value: props.items,
     defaultValue: props.defaultItems ?? (() => [])(),
@@ -175,10 +176,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   const _watch6First = useRef(true);
   const _watch7First = useRef(true);
 
-  const __rowKey = useMemo(() => ({
-    map: new WeakMap(),
-    seq: 0
-  }), []);
+  const __rowKeyMap = useMemo(() => new WeakMap(), []);
   function keyFor(item: any, index: any) {
     // (a) function itemKey: consumer-supplied (item, index) => key.
     if (typeof props.itemKey === 'function') {
@@ -191,10 +189,10 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     // (c) id-less object (or function) item: assign-on-first-sight WeakMap
     //     synthetic id. Survives reorder because it is keyed by object identity.
     if (item !== null && typeof item === 'object' || typeof item === 'function') {
-      if (!__rowKey.map.has(item)) {
-        __rowKey.map.set(item, '__rk' + __rowKey.seq++);
+      if (!__rowKeyMap.has(item)) {
+        __rowKeyMap.set(item, '__rk' + __rowKeySeq.current++);
       }
-      return __rowKey.map.get(item);
+      return __rowKeyMap.get(item);
     }
     // (d) primitive item: fall back to index. NOTE: duplicate primitives are
     //     unsafe to reorder this way — pass a function itemKey for those.

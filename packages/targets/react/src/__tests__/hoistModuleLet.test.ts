@@ -14,7 +14,7 @@ import { parse as babelParse } from '@babel/parser';
 import { parse } from '../../../../core/src/parse.js';
 import { lowerToIR } from '../../../../core/src/ir/lower.js';
 import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
-import type { IRComponent } from '../../../../core/src/ir/types.js';
+import type { IRComponent, TemplateElementIR } from '../../../../core/src/ir/types.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { hoistModuleLet } from '../rewrite/hoistModuleLet.js';
 
@@ -290,5 +290,94 @@ $onMount(helperB);
     // `useRef(0)`), and every reference is rewritten to `nested.current`.
     expect(out).not.toContain('let nested');
     expect(out).toMatch(/nested\.current\s*=\s*1/);
+  });
+
+  it('Test 6 (Phase 73 item #11-b, template-only reachability): a let mutated only inside a helper called from a TEMPLATE binding (never a hook/watcher/$expose) IS hoisted', () => {
+    // Synthetic: sortable-list's real shape — `keyFor(item)` is called ONLY
+    // from a `:key="keyFor(item)"` template binding (no lifecycle hook, no
+    // watcher, no $expose verb references it). Before Phase 73 item #11-b
+    // this fell through `classifyExpr` case (c) and stayed a per-render
+    // `let __rowKeySeq = 0` — reset to 0 every React render.
+    const src = `
+let __rowKeySeq = 0;
+const keyFor = (item) => {
+  return '__rk' + __rowKeySeq++;
+};
+`;
+    const program = babelParse(src, { sourceType: 'module' });
+    const keyBinding = {
+      kind: 'binding' as const,
+      name: 'key',
+      expression: t.callExpression(t.identifier('keyFor'), [t.identifier('item')]),
+      deps: [],
+      sourceLoc: { start: 0, end: 0 },
+    };
+    const templateEl: TemplateElementIR = {
+      type: 'TemplateElement',
+      tagName: 'div',
+      attributes: [keyBinding],
+      events: [],
+      listenerSpreads: [],
+      children: [],
+      sourceLoc: { start: 0, end: 0 },
+      tagKind: 'html',
+    };
+    const syntheticIR: IRComponent = {
+      type: 'IRComponent',
+      name: 'Synth',
+      props: [],
+      state: [],
+      computed: [],
+      refs: [],
+      slots: [],
+      emits: [],
+      lifecycle: [],
+      watchers: [],
+      listeners: [],
+      setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
+      template: templateEl,
+      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      sourceLoc: { start: 0, end: 0 },
+    } as IRComponent;
+    const { hoisted } = hoistModuleLet(program, syntheticIR);
+    expect(hoisted).toHaveLength(1);
+    expect(hoisted[0]!.name).toBe('__rowKeySeq');
+    const out = generate(program).code;
+    expect(out).not.toContain('let __rowKeySeq');
+    expect(out).toMatch(/__rowKeySeq\.current\+\+/);
+  });
+
+  it('Test 7 (false-positive guard): a let mutated only inside a helper NEVER reached from a hook, watcher, $expose, OR the template stays un-hoisted', () => {
+    // Companion control for Test 6 — `keyFor` is declared but never CALLED
+    // from anywhere reachable (no template, no hook). The let must be left
+    // alone (conservative case (c), unchanged from pre-Phase-73 behavior).
+    const src = `
+let __rowKeySeq = 0;
+const keyFor = (item) => {
+  return '__rk' + __rowKeySeq++;
+};
+`;
+    const program = babelParse(src, { sourceType: 'module' });
+    const syntheticIR: IRComponent = {
+      type: 'IRComponent',
+      name: 'Synth',
+      props: [],
+      state: [],
+      computed: [],
+      refs: [],
+      slots: [],
+      emits: [],
+      lifecycle: [],
+      watchers: [],
+      listeners: [],
+      setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
+      template: null,
+      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      sourceLoc: { start: 0, end: 0 },
+    } as IRComponent;
+    const { hoisted } = hoistModuleLet(program, syntheticIR);
+    expect(hoisted).toHaveLength(0);
+    const out = generate(program).code;
+    expect(out).toContain('let __rowKeySeq');
   });
 });

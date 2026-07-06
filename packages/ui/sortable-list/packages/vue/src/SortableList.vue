@@ -131,29 +131,27 @@ let instance: any = null;
 // Instance-scoped synthetic-id store for id-less object items. Keyed by object
 // IDENTITY, so the same object keeps its synthetic id across a reorder (the
 // framework reconciler then rebinds the row component instance to its ORIGINAL
-// item, not its slot position — the data-corruption fix). BOTH the WeakMap and
-// the monotonic counter live in ONE member-mutated fresh-instance object so the
-// React emitter hoists the whole thing to a single useMemo(() => …, []) (the
-// setup-once-persistence guarantee). Folding the counter in is deliberate: a
-// bare `let __rowKeySeq = 0` mutated only inside the non-hook keyFor helper is
-// NOT caught by React's hoistModuleLet (it resets every render → an item added
-// in a later render collides on an already-issued synthetic id → corruption).
-// new WeakMap()/seq inside one object dodges that emitter gap. Verified in codegen.
+// item, not its slot position — the data-corruption fix).
+//
+// Phase 73 item #11-b removed the former "fold the WeakMap + counter into ONE
+// member-mutated object const" workaround: `hoistModuleLet`'s reachability
+// walk now also roots at helpers called ONLY from a template expression
+// (`keyFor` is called from `:key`/`:data-id`, never from a hook), so the bare
+// `let __rowKeySeq = 0` below hoists to a `useRef` on React exactly like the
+// hook-reached case — no more per-render reset. Verified in codegen.
 // Instance-scoped synthetic-id store for id-less object items. Keyed by object
 // IDENTITY, so the same object keeps its synthetic id across a reorder (the
 // framework reconciler then rebinds the row component instance to its ORIGINAL
-// item, not its slot position — the data-corruption fix). BOTH the WeakMap and
-// the monotonic counter live in ONE member-mutated fresh-instance object so the
-// React emitter hoists the whole thing to a single useMemo(() => …, []) (the
-// setup-once-persistence guarantee). Folding the counter in is deliberate: a
-// bare `let __rowKeySeq = 0` mutated only inside the non-hook keyFor helper is
-// NOT caught by React's hoistModuleLet (it resets every render → an item added
-// in a later render collides on an already-issued synthetic id → corruption).
-// new WeakMap()/seq inside one object dodges that emitter gap. Verified in codegen.
-const __rowKey = {
-  map: new WeakMap(),
-  seq: 0
-};
+// item, not its slot position — the data-corruption fix).
+//
+// Phase 73 item #11-b removed the former "fold the WeakMap + counter into ONE
+// member-mutated object const" workaround: `hoistModuleLet`'s reachability
+// walk now also roots at helpers called ONLY from a template expression
+// (`keyFor` is called from `:key`/`:data-id`, never from a hook), so the bare
+// `let __rowKeySeq = 0` below hoists to a `useRef` on React exactly like the
+// hook-reached case — no more per-render reset. Verified in codegen.
+const __rowKeyMap = new WeakMap();
+let __rowKeySeq = 0;
 
 // 4-tier per-row key precedence. Its return feeds BOTH :key and :data-id.
 // 4-tier per-row key precedence. Its return feeds BOTH :key and :data-id.
@@ -169,10 +167,10 @@ const keyFor = (item: any, index: any) => {
   // (c) id-less object (or function) item: assign-on-first-sight WeakMap
   //     synthetic id. Survives reorder because it is keyed by object identity.
   if (item !== null && typeof item === 'object' || typeof item === 'function') {
-    if (!__rowKey.map.has(item)) {
-      __rowKey.map.set(item, '__rk' + __rowKey.seq++);
+    if (!__rowKeyMap.has(item)) {
+      __rowKeyMap.set(item, '__rk' + __rowKeySeq++);
     }
-    return __rowKey.map.get(item);
+    return __rowKeyMap.get(item);
   }
   // (d) primitive item: fall back to index. NOTE: duplicate primitives are
   //     unsafe to reorder this way — pass a function itemKey for those.
