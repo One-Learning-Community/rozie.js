@@ -161,6 +161,51 @@ $expose({ execute })
     expect(params[0]?.optional).toBeFalsy();
   });
 
+  it('CR-02 (73-REVIEW.md): a same-named PARAMETER shadowing the exposed verb in an unrelated helper is NOT counted as internal-call evidence', () => {
+    // The ONLY zero-arg call in the file is `unrelatedHelper`'s own shadowed
+    // parameter being invoked — `execute` here is a function PARAMETER of a
+    // totally different, unrelated function, not the top-level exposed
+    // verb. Before the CR-02 fix, `minScriptCallArity` matched by bare
+    // callee NAME only (no scope/binding resolution), so this shadowed call
+    // polluted the "minimum observed arity" and silently marked the
+    // genuinely-required `action` param optional.
+    const src = `<rozie name="Probe">
+<data>{ value: '' }</data>
+<script>
+function execute(action) {
+  $data.value = action.toUpperCase()
+}
+function unrelatedHelper(execute) {
+  execute()
+}
+$expose({ execute })
+</script>
+<template><div>{{ $data.value }}</div></template>
+</rozie>`;
+    const params = findVerbParams(lower(src), 'execute');
+    expect(params[0]?.optional).toBeFalsy();
+  });
+
+  it('CR-02 (73-REVIEW.md): a same-named PARAMETER shadowing the exposed verb inside a template `@event` listener expression is NOT counted as evidence either', () => {
+    // Mirrors the script-level shadow above, but the shadowing happens
+    // inside an IIFE embedded in a template `@event` binding — exercising
+    // `minExpressionCallArity`'s scope-free shadow tracking (listener
+    // expressions are bare Expressions, never part of a real Program, so
+    // there is no `@babel/traverse` scope/binding API available there).
+    const src = `<rozie name="Probe">
+<data>{ value: '' }</data>
+<script>
+function scrollNext(jump) {
+  $data.value = jump ? 'jump' : 'plain'
+}
+$expose({ scrollNext })
+</script>
+<template><button @click="(function(scrollNext) { scrollNext(); })(() => {})">Next</button></template>
+</rozie>`;
+    const params = findVerbParams(lower(src), 'scrollNext');
+    expect(params[0]?.optional).toBeFalsy();
+  });
+
   it('synthesizeHandleType renders the SAME trailing param as `?:` in the Handle interface (typed script)', () => {
     // The untyped-script case falls to the `(...args: any[]) => any` fallback
     // (already fully permissive — nothing to assert there). The interface
