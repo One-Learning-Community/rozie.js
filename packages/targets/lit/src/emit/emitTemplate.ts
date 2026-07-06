@@ -758,7 +758,10 @@ function buildRModelParts(
     return {
       propBinding: `.checked=\${${code}}`,
       eventName: 'change',
-      handlerBody: `($event) => ${code} = ($event.target as HTMLInputElement).checked`,
+      // Spike-012 R3-4 — annotate the synthesized param (`: Event`) so a strict
+      // consumer (`noImplicitAny`) does not see TS7006; the body already casts
+      // `$event.target as HTMLInputElement`.
+      handlerBody: `($event: Event) => ${code} = ($event.target as HTMLInputElement).checked`,
     };
   }
 
@@ -775,7 +778,9 @@ function buildRModelParts(
   return {
     propBinding: `.value=\${${code}}`,
     eventName: isLazy ? 'change' : 'input',
-    handlerBody: `($event) => ${code} = ${committedValue}`,
+    // Spike-012 R3-4 — typed synthesized param (strict-consumer TS7006); the
+    // value access already casts `$event.target as HTMLInputElement`.
+    handlerBody: `($event: Event) => ${code} = ${committedValue}`,
   };
 }
 

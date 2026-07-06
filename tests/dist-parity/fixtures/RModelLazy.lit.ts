@@ -30,7 +30,7 @@ export default class RModelLazy extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="rmodel-lazy" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-34fe9f5a>
-  <input type="text" placeholder="Commit on blur" .value=${this._draft.value} @change=${($event) => this._draft.value = ($event.target as HTMLInputElement).value} data-rozie-s-34fe9f5a />
+  <input type="text" placeholder="Commit on blur" .value=${this._draft.value} @change=${($event: Event) => this._draft.value = ($event.target as HTMLInputElement).value} data-rozie-s-34fe9f5a />
   <p class="echo" data-rozie-s-34fe9f5a>Committed: ${this._draft.value}</p>
 </div>
 `;

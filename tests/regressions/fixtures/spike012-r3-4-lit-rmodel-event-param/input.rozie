@@ -1,0 +1,20 @@
+<rozie name="LitRModelCheckbox">
+<props>
+{
+  checked: { type: Boolean, default: false, model: true },
+  text: { type: String, default: '', model: true },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<div class="r">
+  <input type="checkbox" r-model="$props.checked" />
+  <input type="text" r-model="$props.text" />
+</div>
+</template>
+
+</rozie>

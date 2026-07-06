@@ -119,7 +119,7 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   </header>
 
   <form @submit=${($event: SubmitEvent) => { $event.preventDefault(); ((this.add) as (...args: any[]) => any)($event); }} data-rozie-s-52bec3de>
-    <input placeholder="What needs doing?" .value=${this._draft.value} @input=${($event) => this._draft.value = ($event.target as HTMLInputElement).value} data-rozie-s-52bec3de />
+    <input placeholder="What needs doing?" .value=${this._draft.value} @input=${($event: Event) => this._draft.value = ($event.target as HTMLInputElement).value} data-rozie-s-52bec3de />
     <button type="submit" ?disabled=${!this._draft.value.trim()} data-rozie-s-52bec3de>Add</button>
   </form>
 

@@ -32,7 +32,7 @@ input[data-rozie-s-dd2b93b0] { padding: 0.25rem 0.5rem; }
   render() {
     return html`
 <div class="expose-probe" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-dd2b93b0>
-  <input type="text" placeholder="Type something" .value=${this._value.value} @input=${($event) => this._value.value = ($event.target as HTMLInputElement).value} data-rozie-ref="field" data-rozie-s-dd2b93b0 />
+  <input type="text" placeholder="Type something" .value=${this._value.value} @input=${($event: Event) => this._value.value = ($event.target as HTMLInputElement).value} data-rozie-ref="field" data-rozie-s-dd2b93b0 />
   <span class="echo" data-rozie-s-dd2b93b0>${this._value.value}</span>
 </div>
 `;
