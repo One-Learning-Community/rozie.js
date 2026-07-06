@@ -85,6 +85,27 @@ function chromeLabel(element, title) {
 </template>
 </rozie>`;
 
+// NESTED-SCOPE variant — mirrors the REAL rete FlowCanvas shape: the colliding
+// helper is declared INSIDE $onMount's callback (a nested function body), not
+// as a direct top-level <script> statement. `program.program.body` alone never
+// sees this declaration — the detector must walk the FULL script AST, not just
+// the top-level statement list.
+const NESTED_ARROW_PARAM_SHADOW = `<rozie name="NestedArrowParamShadow">
+<script>
+$onMount(() => {
+  const renderNode = (element, header) => {
+    return $slots.header ? 'CUSTOM' : 'DEFAULT'
+  }
+  renderNode(null, true)
+})
+</script>
+<template>
+  <div>
+    <slot name="header">fallback</slot>
+  </div>
+</template>
+</rozie>`;
+
 // A declared <props> key `header` sharing a name with `<slot name="header">`
 // is the pre-existing ROZ127 HARD ERROR — never a rename target for this
 // detector, regardless of whether lowerToIR still returns a (diagnostic-
@@ -106,6 +127,11 @@ describe('findRForSlotNameCollisions — script/param-scope shadow (Class 2)', (
 
   it('flags a slot name shadowed by a top-level const-arrow-helper parameter', () => {
     const { ir } = lower(ARROW_CONST_PARAM_SHADOW);
+    expect(findRForSlotNameCollisions(ir)).toEqual(new Set(['header']));
+  });
+
+  it('flags a slot name shadowed by a helper NESTED inside $onMount (the real FlowCanvas shape)', () => {
+    const { ir } = lower(NESTED_ARROW_PARAM_SHADOW);
     expect(findRForSlotNameCollisions(ir)).toEqual(new Set(['header']));
   });
 
