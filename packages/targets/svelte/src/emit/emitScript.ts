@@ -48,8 +48,6 @@ import { buildSlotTypeFields, distinctSlotsByName } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
-import { findRForSlotNameCollisions } from '../../../../core/src/ir/findRForSlotNameCollisions.js';
-import { findReprojectionSlotNameCollisions } from '../../../../core/src/ir/findReprojectionSlotNameCollisions.js';
 import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 
 // CJS interop normalization for @babel/generator default export.
@@ -688,40 +686,25 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
 function emitSlotDerivedMerges(ir: IRComponent): string[] {
   if (ir.slots.length === 0) return [];
   const lines: string[] = [];
-  // r-for-loop-var == slot-name collision auto-fix: when a `<slot name="X">` is
-  // rendered inside an `r-for` whose loop var is also `X`, the compiled
-  // `{#each … as X}` shadows the bare `X` snippet binding within the loop body
-  // (`{@render X()}` → loop item, a non-function → runtime crash on Svelte
-  // only). Rename ONLY the emitter-generated binding to the safe suffixed
-  // `X$$slot` (lockstep with emitSlotInvocation's render-site rename); the
-  // author's loop var `X` and the slot-arg VALUES stay untouched. Conditional —
-  // only collides → non-colliding components stay byte-identical (supersedes the
-  // retired ROZ980 warning).
-  const loopCollisions = findRForSlotNameCollisions(ir);
-  // re-projected-slot == child-fill-name collision auto-fix: when a
-  // `<slot name="X">` is re-projected into a child component's slot ALSO named
-  // `X`, the forwarded `{#snippet X}` shadows the same-named resolver. Rename the
-  // resolver IDENTIFIER to `X$$slot` (lockstep with emitSlotInvocation) so the
-  // re-projection render-site resolves the consumer slot, not the fill snippet.
-  // Phase 999.4 (command-palette → vendored-listbox). Conditional → non-colliding
-  // components stay byte-identical.
-  const reprojectionCollisions = findReprojectionSlotNameCollisions(ir);
   // Dedupe by distinct slot name — a repeated `<slot name="X">` must produce
   // exactly ONE `$derived` merge declaration (see distinctSlotsByName).
+  //
+  // `portalSlotMergeName` is the SINGLE source of truth for the merge
+  // identifier (Phase 73 item #1 folded the r-for-loop-var / script-param-scope
+  // / reprojection collision checks into it — see its docstring): a `X$$slot`
+  // suffix when a `<slot name="X">` is rendered inside an `r-for` whose loop
+  // var is also `X` (runtime crash — Svelte shadows the snippet binding with
+  // the loop item), OR a top-level `<script>` helper's PARAMETER is named `X`
+  // (script-side `$slots.X` reads would otherwise resolve to the shadowed
+  // param), OR `X` is re-projected into a child component's same-named slot; a
+  // `XSlot` suffix when `X` collides with a declared `<data>`/`$computed`/
+  // top-level-helper NAME (duplicate-declaration compile error, not a runtime
+  // shadow); else the bare name. Lockstep with the SAME helper used by
+  // emitPortals.ts / rewriteScript.ts / rewriteTemplateExpression.ts and the
+  // emitSlotInvocation.ts render site. Non-colliding slots stay byte-identical.
   for (const s of distinctSlotsByName(ir.slots)) {
     const key = s.name === '' ? 'children' : s.name;
-    // Collision-gated `Slot` suffix on the merge IDENTIFIER only: when the slot
-    // name equals a declared `<props>` name, the props destructure already binds
-    // `<key>`, so a bare `const <key> = $derived(...)` would be a duplicate
-    // declaration ("Identifier '<key>' has already been declared"). The
-    // destructure temp (`__<key>Prop`) and the `snippets?.<key>` map key stay
-    // bare — only the lvalue is disambiguated. Non-colliding slots are
-    // byte-identical. Lockstep with portalSlotMergeName usages in emitPortals /
-    // rewriteScript / rewriteTemplateExpression.
-    const ident =
-      loopCollisions.has(key) || reprojectionCollisions.has(key)
-        ? `${key}$$slot`
-        : portalSlotMergeName(key, ir);
+    const ident = portalSlotMergeName(key, ir);
     lines.push(`const ${ident} = $derived(__${key}Prop ?? snippets?.${key});`);
   }
   return lines;

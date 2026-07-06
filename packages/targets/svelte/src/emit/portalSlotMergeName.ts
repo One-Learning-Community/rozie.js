@@ -24,6 +24,17 @@
  * collides with a declared prop name. Non-colliding slots keep their bare-name
  * `$derived` merge.
  *
+ * Phase 73 item #1: this is now the SINGLE point that also folds in
+ * `findRForSlotNameCollisions` (r-for-loop-var shadow — Class 1 — AND the
+ * script/param-scope shadow — Class 2, e.g. a top-level helper's PARAMETER
+ * named the same as a slot) + `findReprojectionSlotNameCollisions`, using the
+ * shared `$$slot` suffix those two detectors already use. This keeps every
+ * consumer of this helper (rewriteScript.ts's `$slots.X`/`$portals.X` rewrite,
+ * rewriteTemplateExpression.ts, emitPortals.ts, emitScript.ts's merge decl —
+ * see the file list below) in lockstep automatically: a script-side
+ * `$slots.node` read inside a helper whose OWN parameter shadows `node`
+ * resolves to the renamed `node$$slot` merge, not the shadowed local param.
+ *
  * The collision is producer-internal (entirely within one component's
  * `<script>`), so — unlike Lit's `producerPropCollision` thread — no
  * consumer-side wiring is needed.
@@ -42,6 +53,8 @@
  */
 import * as t from '@babel/types';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
+import { findRForSlotNameCollisions } from '../../../../core/src/ir/findRForSlotNameCollisions.js';
+import { findReprojectionSlotNameCollisions } from '../../../../core/src/ir/findReprojectionSlotNameCollisions.js';
 
 /**
  * Phase 61 Plan 08 — the WIDENED collision set for the slot-merge `Slot` suffix
@@ -92,6 +105,17 @@ export function portalSlotMergeName(slotKey: string, ir: IRComponent): string {
   // (a prop named `children` would be its own pre-existing collision surface
   // outside this concern). Phase 37: a default PORTAL slot reads `children`.
   if (slotKey === '' || slotKey === 'children') return 'children';
+  // Class 1 (r-for-loop-var) / Class 2 (script/param-scope shadow, Phase 73
+  // item #1) / reprojection collisions take priority and share the `$$slot`
+  // suffix already used at the emitSlotInvocation.ts render site + the
+  // emitScript.ts merge decl — checked FIRST so every consumer of this helper
+  // agrees on the identifier without each having to re-derive the union.
+  if (
+    findRForSlotNameCollisions(ir).has(slotKey) ||
+    findReprojectionSlotNameCollisions(ir).has(slotKey)
+  ) {
+    return `${slotKey}$$slot`;
+  }
   const collides = widenedMergeCollisionNames(ir).has(slotKey);
   return collides ? slotKey + 'Slot' : slotKey;
 }
