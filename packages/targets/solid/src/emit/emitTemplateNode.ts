@@ -341,7 +341,13 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   // item invokes it correctly. The iterable stays outside loop scope.
   const keyCode = rewriteTemplateExpression(node.keyExpression!, ctx.ir, {
     invokeAccessors: ctx.invokeAccessors,
-    loopValueBindings: ctx.loopValueBindings,  });
+    // Spike-012 R3-2 — the keyed `by` param is a RAW item (not an accessor), so
+    // it too must be excluded from the computed rewrite when it shadows a
+    // `$computed` (else `by={(item) => item().id}` CALLS the raw item). NEW-4
+    // threaded only the KEYLESS body; the keyed `by` needs the current alias
+    // added on top of the inherited (parent) raw-loop bindings.
+    loopValueBindings: new Set([...(ctx.loopValueBindings ?? []), node.itemAlias]),
+  });
   // `<Key>`'s `each?: readonly T[]` infers `T = unknown` from a bare `any`
   // iterable (e.g. a `Record<string, any>` member access), which then poisons
   // the item accessor (`x` is `unknown` → TS18046 in the body). Solid's `<For>`

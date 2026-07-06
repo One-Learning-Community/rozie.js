@@ -1,0 +1,20 @@
+<rozie name="KeyedLoopVarShadowsComputed">
+<data>
+{
+  items: [{ id: 1 }, { id: 2 }],
+}
+</data>
+
+<script lang="ts">
+const item = $computed(() => ({ id: 0 }))
+</script>
+
+<template>
+<div class="r">
+  <ul>
+    <li r-for="item in $data.items" :key="item.id">{{ item.id }}</li>
+  </ul>
+</div>
+</template>
+
+</rozie>

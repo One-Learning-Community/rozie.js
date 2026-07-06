@@ -1,0 +1,11 @@
+{
+  "id": "REG-SPIKE012-R3-2",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a KEYED <For> `by` receives the RAW item, so a loop var that shadows a $computed must stay bare in the by-expression (Spike-012 R3-2 — extends NEW-4's loopValueBindings to the keyed by-expr): `by={(item) => item.id}` (bare) while the children body keeps the keyed accessor `item().id`. Pre-fix the by-expr emitted `item().id`, CALLING the raw item (runtime TypeError; invisible to strict-tsc because <Key each={… as readonly any[]}> makes item `any`)",
+  "targets": [
+    "solid"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012)"
+}
