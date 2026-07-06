@@ -832,3 +832,118 @@ export function hoistTemplateDoubleReadAccessor(
 
   return { memberName, decl };
 }
+
+/**
+ * Emitter-hardening item #7 sub-shape (ii) — walk `node` (and every
+ * descendant) for an ArrowFunctionExpression or FunctionExpression. Angular's
+ * template expression parser is a deliberately restricted subset of JS that
+ * rejects function-literal expressions wherever they appear (e.g.
+ * `{{ items.find((x) => x > 1) }}`) — the component silently JIT-falls-back
+ * and then throws "JIT compiler unavailable" at runtime under an AOT-only
+ * bootstrap (`project_angular_aot_no_template_arrow`; passes `compile()` ×6
+ * and the surface gate, fails only the AOT/consumer-demo build).
+ *
+ * Mirrors `emitSlotInvocation.ts`'s `containsFunctionExpression` — kept as a
+ * separate small local predicate (not imported) per this codebase's IN-04
+ * per-seam-AST-predicate convention; both walk the exact same two node kinds.
+ */
+function containsFunctionLiteral(node: t.Node): boolean {
+  if (t.isArrowFunctionExpression(node) || t.isFunctionExpression(node)) return true;
+  for (const key of Object.keys(node)) {
+    const child = (node as unknown as Record<string, unknown>)[key];
+    if (child && typeof child === 'object' && 'type' in (child as object)) {
+      if (containsFunctionLiteral(child as t.Node)) return true;
+    }
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        if (item && typeof item === 'object' && 'type' in (item as object)) {
+          if (containsFunctionLiteral(item as t.Node)) return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Emitter-hardening item #7 sub-shape (ii) — when `expr` (or any descendant)
+ * is a function literal, hoist the WHOLE expression into a generated
+ * class-body getter, mirroring `hoistTemplateDoubleReadAccessor`'s getter
+ * shape (Analog B — item #7's `rozieDisplay`/`usedGlobals` field-injection
+ * precedent generalized to an arbitrary expression). The arrow now lives in
+ * real TS class-body code — never spliced into the template string — so the
+ * template reference becomes a bare identifier (`{{ __interp_0 }}`), which
+ * Angular's restricted template-expression grammar always accepts.
+ *
+ * `hintName` seeds the synthesized member name (same disambiguation scheme as
+ * `hoistTemplateDoubleReadAccessor`'s `attrName`); callers pass a
+ * position-derived hint (e.g. `interp_<N>`) since an interpolation has no
+ * natural "attribute name".
+ *
+ * Bails (returns `null`) when `expr` touches a loop-local binding — a
+ * synthesized getter lives in class scope and cannot see loop variables (same
+ * discipline as `hoistTemplateDoubleReadAccessor`; a loop-element expression
+ * that ALSO contains a function literal is a vanishingly rare shape left as a
+ * pre-existing residual, not a regression).
+ *
+ * Returns `null` when `expr` has no function literal — every existing
+ * fixture with no arrow-bearing template expression is unaffected, so this is
+ * purely additive (zero-drift on the corpus).
+ */
+export function hoistNonPureTemplateExpression(
+  expr: t.Expression,
+  ir: IRComponent,
+  hintName: string,
+  takenNames: ReadonlySet<string>,
+  opts: RewriteTemplateOpts = {},
+): TemplateAccessorHoist | null {
+  // Phase 18 (Req 2) — normalize `$model.X` → `$props.X` on a CLONE first, so
+  // the function-literal scan below sees the SAME shape rewriteTemplateExpression
+  // will eventually lower (mirrors hoistTemplateDoubleReadAccessor).
+  const normalized = normalizeTemplateModelAccessor(expr);
+  if (!containsFunctionLiteral(normalized)) return null;
+
+  const loopBindings = opts.loopBindings;
+  if (loopBindings !== undefined && loopBindings.size > 0) {
+    let touchesLoopVar = false;
+    const scanLoop = (node: t.Node): void => {
+      if (touchesLoopVar) return;
+      if (t.isIdentifier(node) && loopBindings.has(node.name)) {
+        touchesLoopVar = true;
+        return;
+      }
+      for (const key of Object.keys(node)) {
+        if (key === 'loc') continue;
+        const child = (node as unknown as Record<string, unknown>)[key];
+        if (Array.isArray(child)) {
+          for (const c of child) {
+            if (c && typeof c === 'object' && 'type' in c) scanLoop(c as t.Node);
+          }
+        } else if (child && typeof child === 'object' && 'type' in child) {
+          scanLoop(child as t.Node);
+        }
+      }
+    };
+    scanLoop(normalized);
+    if (touchesLoopVar) return null;
+  }
+
+  const lowerOpts: RewriteTemplateOpts = { ...opts, prefixThis: true };
+  const loweredReturn = rewriteTemplateExpression(normalized, ir, lowerOpts);
+
+  const base = `__${hintName.replace(/[^A-Za-z0-9_$]/g, '_')}`;
+  let memberName = base;
+  let n = 2;
+  while (takenNames.has(memberName)) {
+    memberName = `${base}_${n}`;
+    n++;
+  }
+
+  const decl = [
+    `protected get ${memberName}() {`,
+    `    return ${loweredReturn};`,
+    `  }`,
+  ].join('\n');
+
+  return { memberName, decl };
+}

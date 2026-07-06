@@ -34,7 +34,10 @@ import type {
 import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import {
+  rewriteTemplateExpression,
+  hoistNonPureTemplateExpression,
+} from '../rewrite/rewriteTemplateExpression.js';
 import {
   emitAttributes,
   emitListenerSpread,
@@ -236,12 +239,40 @@ function emitInterpolation(
   node: TemplateInterpolationIR,
   ctx: EmitNodeCtx,
 ): string {
-  const expr = rewriteTemplateExpression(node.expression, ctx.ir, {
-    collisionRenames: ctx.collisionRenames,
-    loopBindings: ctx.loopBindings,
-    cvaModelProp: ctx.cvaModelProp,
-    cvaMergeDisabled: ctx.cvaMergeDisabled,
-  });
+  // Emitter-hardening item #7 sub-shape (ii) — an inline arrow/function
+  // literal anywhere in the interpolated expression (e.g.
+  // `{{ items().find((x) => x > 1) }}`) is illegal in Angular's template
+  // expression grammar and silently JIT-falls-back, throwing "JIT compiler
+  // unavailable" under AOT. Hoist the WHOLE expression into a generated
+  // class-body getter FIRST; only fall back to the plain inline rewrite when
+  // no function literal is present (byte-identical to pre-fix for every
+  // existing interpolation, which never contains one).
+  const taken = new Set(ctx.scriptInjections.map((si) => si.name));
+  const hoist = hoistNonPureTemplateExpression(
+    node.expression,
+    ctx.ir,
+    `interp_${ctx.injectionCounter.next}`,
+    taken,
+    {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
+    },
+  );
+  let expr: string;
+  if (hoist !== null) {
+    ctx.injectionCounter.next++;
+    ctx.scriptInjections.push({ name: hoist.memberName, decl: hoist.decl });
+    expr = hoist.memberName;
+  } else {
+    expr = rewriteTemplateExpression(node.expression, ctx.ir, {
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
+    });
+  }
   // Phase 26 (SPEC-1, D-06/D-07) — gate on the IR-precomputed wrap decision.
   // When `wrapForDisplay` is true the value may be a non-primitive
   // (object/array/unknown) which renders as `[object Object]` on Angular;

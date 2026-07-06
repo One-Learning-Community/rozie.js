@@ -342,6 +342,74 @@ function applyValueTransformsString(
 }
 
 /**
+ * Emitter-hardening item #7 sub-shape (i) — a modifier `valueTransform`
+ * fragment is DOCUMENTED to be a single pure, statement-free expression
+ * (`project_modifier_valuetransform_pure_expr`) because Angular splices the
+ * resolved `committedValue` verbatim into a template EVENT BINDING
+ * (`(ngModelChange)="value.set(<committedValue>)"`), whose grammar forbids
+ * block-body arrows / `const` / `return` the same way Angular's property/
+ * interpolation grammar forbids bare function literals (sub-shape ii). The
+ * shipped built-in modifiers (`.number`, `.trim`) already follow this
+ * discipline by convention — but `registerModifier` is a PUBLIC API (Phase
+ * 12), and nothing in the emitter enforces or repairs an impure THIRD-PARTY
+ * fragment: it silently JIT-falls-back and throws "JIT compiler unavailable"
+ * under an AOT-only bootstrap (passes `compile()` ×6 and the surface gate).
+ *
+ * A crude marker scan is deliberately used instead of a full parse: `=>`, a
+ * `function` keyword, or a `const`/`let`/`var`/`return` statement token are
+ * exactly the shapes the pure-expression convention forbids (per the memory
+ * note's own wording) and exactly what an IIFE-with-block-body needs.
+ */
+const IMPURE_FRAGMENT_MARKER =
+  /=>|(?:^|[^.\w$])function\b|(?:^|[;{]\s*)(?:const|let|var|return)\b/;
+
+/**
+ * When any resolved `valueTransforms` fragment is impure (see
+ * `IMPURE_FRAGMENT_MARKER`), hoist the FULL composed transform into a
+ * generated parameterized class-body method — mirroring
+ * `emitSlotInvocation.ts`'s `buildSlotCtxHelper` arrow-field shape (Analog C).
+ * The impure body now lives in real TS method-body code, never spliced into
+ * the template string, so the template reference becomes a plain call
+ * expression (`_rModelTransform_0($event)`), which Angular's restricted
+ * template-expression grammar always accepts.
+ *
+ * Returns `committedValue` UNCHANGED when every fragment is pure (the
+ * overwhelming majority — every shipped built-in is pure) or when no
+ * injection channel is available (defensive fallback for callers that don't
+ * plumb `scriptInjections`, e.g. the per-block `emitTemplate.test.ts`
+ * harness) — zero-drift on every existing r-model modifier fixture.
+ */
+function hoistValueTransformIfImpure(
+  valueTransforms: string[],
+  valueAccess: string,
+  committedValue: string,
+  ctx: EmitAttrCtx,
+): string {
+  if (valueTransforms.length === 0) return committedValue;
+  if (!valueTransforms.some((f) => IMPURE_FRAGMENT_MARKER.test(f))) {
+    return committedValue;
+  }
+  if (ctx.scriptInjections === undefined || ctx.injectionCounter === undefined) {
+    return committedValue;
+  }
+  const taken = new Set(ctx.scriptInjections.map((si) => si.name));
+  const base = '_rModelTransform';
+  let methodName = `${base}_${ctx.injectionCounter.next}`;
+  ctx.injectionCounter.next++;
+  while (taken.has(methodName)) {
+    methodName = `${base}_${ctx.injectionCounter.next}`;
+    ctx.injectionCounter.next++;
+  }
+  // Re-apply the SAME transform chain against a plain parameter name so the
+  // impure body lives inside the method, not the template. `__v` cannot
+  // collide with the outer `valueAccess` ($event / $event.target.value).
+  const methodBody = applyValueTransformsString('__v', valueTransforms);
+  const decl = `private ${methodName} = (__v: unknown): unknown => (${methodBody});`;
+  ctx.scriptInjections.push({ name: methodName, decl });
+  return `${methodName}(${valueAccess})`;
+}
+
+/**
  * Resolve a writable signal-backed LHS to its signal identifier name.
  *
  * Returns the bare signal name when `expr` is `$data.X` (where X is a declared
@@ -1238,9 +1306,19 @@ export function emitSingleAttr(
         // access expression and the resolved transforms are chained in D-07
         // list order.
         const valueAccess = isLazy ? '$event.target.value' : '$event';
-        const committedValue = applyValueTransformsString(
+        const committedValueRaw = applyValueTransformsString(
           valueAccess,
           valueTransforms,
+        );
+        // Item #7 sub-shape (i) — hoist to a generated method when the
+        // resolved transform chain is impure (see hoistValueTransformIfImpure);
+        // a no-op passthrough of committedValueRaw for the pure/no-transform
+        // case (every shipped built-in), so this is zero-drift there.
+        const committedValue = hoistValueTransformIfImpure(
+          valueTransforms,
+          valueAccess,
+          committedValueRaw,
+          ctx,
         );
         const eventBinding = isLazy ? 'change' : 'ngModelChange';
         // Phase 23 CR-01 — the view→model bridge for the native `r-model` form
