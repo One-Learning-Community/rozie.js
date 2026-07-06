@@ -628,7 +628,11 @@ export function emitScript(
         collectors.solidImports.add('onCleanup');
         // Rule 1 fix: rewrite $props/$data/$refs in the setup body; wrap BlockStatement in IIFE.
         const rewrittenSetup = rewriteNode(lh.setup, ir);
-        const rewrittenCleanup = rewriteNode(lh.cleanup, ir);
+        // lh.cleanup is declared `Expression` on LifecycleHook (never a
+        // BlockStatement); rewriteRozieExpressionNode's signature is broader
+        // (shared with the BlockStatement setup-rewrite call above), so the
+        // return type must be narrowed back for use as a bare call argument.
+        const rewrittenCleanup = rewriteNode(lh.cleanup, ir) as t.Expression;
 
         // Fix #2 (73-02 emitter-hardening batch, project_emitter_hardening_backlog):
         // the IIFE below re-parents the setup body into its OWN function
