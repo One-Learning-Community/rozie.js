@@ -411,12 +411,12 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // ---- derived view (ONE plain function, uniform x6) ---------------------
   // The current selected ISO, normalized to a string. In range mode the value is
   // an object → this returns '' (so the SINGLE-mode grid highlight no-ops there).
-  // CAPTURE the polymorphic value into a local const BEFORE the typeof guard so
-  // the narrowing flows uniformly on all six targets — on Solid `$props.value`
-  // lowers to the accessor CALL `value()`, and TS does NOT narrow across two
-  // separate `value()` calls (`typeof value() === 'string' ? value()` keeps the
-  // union → TS2322 where it feeds the string grid params). A local const narrows
-  // identically on Solid (accessor call), React (variable), Vue/Lit (property).
+  // Emitter-hardening backlog item #11 (project_solid_polymorphic_model_typeof_narrow_gap):
+  // this used to need a hand-authored `const v = $props.value` capture BEFORE the
+  // typeof guard so Solid's TS narrowing held (its accessor-CALL `value()` didn't
+  // narrow across two separate calls the way the other five targets' plain
+  // variable/property reads did). The emitter now binds that local itself, so the
+  // guard is authored directly here.
   function selected(): string {
     const v = value();
     return typeof v === 'string' ? v : '';

@@ -120,6 +120,154 @@ function normalizeModelAccessor(file: File): void {
   });
 }
 
+/** True for `$props.X` where X is in `polymorphicModelProps`. */
+function isPolymorphicModelRead(node: t.Node, polymorphicModelProps: Set<string>): boolean {
+  return (
+    t.isMemberExpression(node) &&
+    !node.computed &&
+    t.isIdentifier(node.object) &&
+    node.object.name === '$props' &&
+    t.isIdentifier(node.property) &&
+    polymorphicModelProps.has(node.property.name)
+  );
+}
+
+/**
+ * When `test` is `typeof $props.X === '<lit>'` (or `!==`) or `'<lit>' in
+ * $props.X`, for X in `polymorphicModelProps`, returns X. Otherwise null.
+ */
+function matchesPolymorphicModelGuard(
+  test: t.Expression,
+  polymorphicModelProps: Set<string>,
+): string | null {
+  if (!t.isBinaryExpression(test)) return null;
+  const { operator, left, right } = test;
+  if (operator === '===' || operator === '!==') {
+    if (
+      t.isUnaryExpression(left) &&
+      left.operator === 'typeof' &&
+      isPolymorphicModelRead(left.argument, polymorphicModelProps) &&
+      t.isStringLiteral(right)
+    ) {
+      return (left.argument as t.MemberExpression & { property: t.Identifier }).property.name;
+    }
+    if (
+      t.isUnaryExpression(right) &&
+      right.operator === 'typeof' &&
+      isPolymorphicModelRead(right.argument, polymorphicModelProps) &&
+      t.isStringLiteral(left)
+    ) {
+      return (right.argument as t.MemberExpression & { property: t.Identifier }).property.name;
+    }
+    return null;
+  }
+  if (operator === 'in' && isPolymorphicModelRead(right, polymorphicModelProps)) {
+    return (right as t.MemberExpression & { property: t.Identifier }).property.name;
+  }
+  return null;
+}
+
+/**
+ * Emitter-hardening backlog item #11 (project_solid_polymorphic_model_typeof_narrow_gap,
+ * 73-02 Task 2). `$props.X` lowers to a Solid accessor CALL (`X()`); TS does not
+ * narrow a `typeof`/`in` guard across two SEPARATE calls to that accessor the
+ * way it narrows a plain variable/property read. When a `ConditionalExpression`
+ * guards on `typeof $props.X === '<lit>'` / `'<lit>' in $props.X` (X a
+ * polymorphic/unknown model prop) AND re-reads `$props.X` again inside the
+ * conditional, hoist ONE local binding before the guard and route every
+ * `$props.X` read inside the conditional through it — mirroring the hand-
+ * authored `const v = $props.value; return typeof v === 'string' ? v : ''`
+ * workaround this replaces (DatePicker.rozie, commit bf3766b5).
+ *
+ * Gated strictly to two known-safe shapes so this never mis-hoists into the
+ * wrong scope:
+ *   1. the conditional IS an arrow function's own concise body — converted to
+ *      a block body wrapping `const v = ...; return <conditional>;`
+ *   2. the conditional sits inside a statement that is a DIRECT child of its
+ *      nearest enclosing function's block body — the local is inserted right
+ *      before that statement.
+ * Any other nesting is left alone (falsify-to-no-op, never a wrong fix).
+ *
+ * Runs on the raw (pre-$props-rewrite) Program, before the main
+ * `rewriteRozieIdentifiers` traversal — the injected `$props.X` reference is
+ * left for that later pass to lower to the normal `X()` accessor call.
+ */
+function hoistPolymorphicModelGuards(cloned: File, polymorphicModelProps: Set<string>): void {
+  if (polymorphicModelProps.size === 0) return;
+
+  traverse(cloned, {
+    ConditionalExpression(path: NodePath<t.ConditionalExpression>) {
+      const propName = matchesPolymorphicModelGuard(path.node.test, polymorphicModelProps);
+      if (!propName) return;
+
+      // Count occurrences of `$props.<propName>` in test+consequent+alternate;
+      // need at least 2 (the guard's own occurrence + at least one re-read) to
+      // be worth hoisting.
+      let occurrences = 0;
+      path.traverse({
+        MemberExpression(inner: NodePath<t.MemberExpression>) {
+          if (
+            isPolymorphicModelRead(inner.node, polymorphicModelProps) &&
+            (inner.node.property as t.Identifier).name === propName
+          ) {
+            occurrences++;
+          }
+        },
+      });
+      if (occurrences < 2) return;
+
+      // Pick a local name, defaulting to `v` (mirrors the hand-authored
+      // pattern) — fall back to a generated uid on the rare collision.
+      const localName = path.scope.hasBinding('v')
+        ? path.scope.generateUidIdentifier('v').name
+        : 'v';
+
+      // Replace every `$props.<propName>` read inside the conditional
+      // (including the guard itself) with a bare reference to the local.
+      path.traverse({
+        MemberExpression(inner: NodePath<t.MemberExpression>) {
+          if (
+            isPolymorphicModelRead(inner.node, polymorphicModelProps) &&
+            (inner.node.property as t.Identifier).name === propName
+          ) {
+            inner.replaceWith(t.identifier(localName));
+            inner.skip();
+          }
+        },
+      });
+
+      const varDecl = t.variableDeclaration('const', [
+        t.variableDeclarator(
+          t.identifier(localName),
+          t.memberExpression(t.identifier('$props'), t.identifier(propName)),
+        ),
+      ]);
+
+      // Shape 1: the conditional IS the arrow function's own concise body.
+      const parentPath = path.parentPath;
+      if (parentPath.isArrowFunctionExpression() && parentPath.node.body === path.node) {
+        parentPath.node.body = t.blockStatement([varDecl, t.returnStatement(path.node)]);
+        return;
+      }
+
+      // Shape 2: the conditional sits inside a statement that is a direct
+      // child of its nearest enclosing function's own block body.
+      const fnPath = path.getFunctionParent();
+      const stmtPath = path.getStatementParent();
+      if (
+        fnPath &&
+        stmtPath &&
+        t.isBlockStatement(fnPath.node.body) &&
+        stmtPath.parentPath?.node === fnPath.node.body
+      ) {
+        stmtPath.insertBefore(varDecl);
+      }
+      // Otherwise: leave as-is. Falsify-to-no-op rather than risk hoisting
+      // into the wrong scope.
+    },
+  });
+}
+
 /**
  * Rewrite $props/$data/$refs in a single expression node (cloned from IR).
  *
@@ -197,6 +345,25 @@ export function rewriteRozieIdentifiers(
       .filter((p) => p.isModel && renderType(p.typeAnnotation) === 'unknown')
       .map((p) => p.name),
   );
+  // Emitter-hardening backlog item #11 (project_solid_polymorphic_model_typeof_narrow_gap,
+  // 73-02 Task 2): a model prop widened to a UNION (`type: [String, Object]`,
+  // rendering `string | Record<string, any>`) OR to `unknown` (`type: null`,
+  // above) is read via a fresh accessor CALL each time (`value()`), and TS does
+  // NOT narrow a `typeof`/`in` guard across two SEPARATE calls the way it
+  // narrows a plain variable/property read (React/Vue/Lit). Superset of
+  // `unknownModelProps` — feeds `hoistPolymorphicModelGuards` below, which binds
+  // ONE local before the guard so the narrowing holds. A monomorphic
+  // (single-identifier-type) model prop is NEVER in this set, so that corpus is
+  // untouched.
+  const polymorphicModelProps = new Set(
+    ir.props
+      .filter(
+        (p) =>
+          p.isModel &&
+          (p.typeAnnotation.kind === 'union' || renderType(p.typeAnnotation) === 'unknown'),
+      )
+      .map((p) => p.name),
+  );
   const dataNames = new Set(ir.state.map((s) => s.name));
   const computedNames = new Set(ir.computed.map((c) => c.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
@@ -216,6 +383,14 @@ export function rewriteRozieIdentifiers(
   // write, same `value()` accessor on read) → byte-identical emit. Reuse, not
   // reimplement (SPEC Req 2).
   normalizeModelAccessor(cloned);
+
+  // Emitter-hardening backlog item #11 (73-02 Task 2) — hoist a local binding
+  // before a `typeof`/`in` guard on a polymorphic/unknown model-prop accessor
+  // read, so Solid's TS narrowing holds across the guard + the re-read it
+  // guards. Must run on the raw (pre-rewrite) Program, same as
+  // `normalizeModelAccessor` above — the injected `$props.X` reference is left
+  // for the main traversal below to lower to the normal accessor call.
+  hoistPolymorphicModelGuards(cloned, polymorphicModelProps);
 
   // UNIFIED DECONFLICTION PASS (Phase 46 ITEM-5 / D-02) — net-new Solid wiring.
   // Solid lowers `$props.X` / `$data.X` to bare signal-accessor reads `X()` and
