@@ -1,0 +1,28 @@
+<rozie name="DestructuredMountLocalCleanup">
+
+<data>
+{
+  ticks: 0,
+}
+</data>
+
+<script>
+// WR-01 (73-REVIEW.md): a $onMount setup block that declares its mount-local
+// via a DESTRUCTURING pattern (`const { timer } = ...`), not a plain
+// Identifier declarator. topLevelDeclaredNames only recorded
+// `t.isIdentifier(decl.id)` declarators before the fix, so this shape was
+// silently excluded — cleanupReferencesSetupLocal returned false, and the
+// emitter fell back to the pre-73-02-fix IIFE-wrapping path, reproducing the
+// exact TS2304 ("timer" out of scope for the teardown) item #2 was meant to
+// close.
+$onMount(() => {
+  const { timer } = { timer: setInterval(() => { $data.ticks += 1 }, 1000) }
+  return () => clearInterval(timer)
+})
+</script>
+
+<template>
+<div class="ticks">{{ $data.ticks }}</div>
+</template>
+
+</rozie>

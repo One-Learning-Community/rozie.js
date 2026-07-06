@@ -1,0 +1,9 @@
+{
+  "id": "REG-73.10-WR01",
+  "source": "73-REVIEW.md#WR-01",
+  "sourceKind": "deviation-log",
+  "phase": "73-10",
+  "desc": "a $onMount mount-local declared via a destructuring pattern (const { timer } = ...) must stay in scope for its returned teardown, same as a plain identifier declarator",
+  "targets": ["solid"],
+  "discoveredBy": "73-REVIEW.md WR-01 (gsd-code-reviewer)"
+}
