@@ -396,6 +396,16 @@ export function emitTemplateEvent(
     if (desc.helperName === 'useDebouncedCallback' || desc.helperName === 'useThrottledCallback') {
       ctx.collectors.runtime.add(desc.helperName);
       const originalHandlerCode = renderHandler(listener.handler, ctx.ir);
+      // Spike-012 NEW-2 — a statement-kind handler (`@input.debounce(300)="bump()"`)
+      // is a CallExpression: passing it verbatim would INVOKE it and hand the
+      // helper its `void` result (TS2345). Wrap it in a thunk so the FUNCTION is
+      // debounced, exactly as the plain-event path below wraps a statement in
+      // `($event) => { … }`. Identifier / callable handlers are already function
+      // references — left untouched (byte-identity for the bare-method form).
+      const helperCallback =
+        classifyHandler(listener.handler) === 'statement'
+          ? `($event) => { ${originalHandlerCode}; }`
+          : originalHandlerCode;
       const wrapName = makeWrapName(desc.helperName, listener.handler, ctx.injectionCounter);
       const argList = desc.args.map(renderModifierArg).join(', ');
       // Plan 04-04 — spread Listener.deps into the wrapper deps[] so
@@ -403,7 +413,7 @@ export function emitTemplateEvent(
       // marquee technical claim — Phase 2's ReactiveDepGraph populates
       // listener.deps even for template @event bindings).
       const depsLiteral = renderDepArray(listener.deps, ctx.ir);
-      const injection = `const ${wrapName} = ${desc.helperName}(${originalHandlerCode}, ${depsLiteral}${argList ? ', ' + argList : ''});`;
+      const injection = `const ${wrapName} = ${desc.helperName}(${helperCallback}, ${depsLiteral}${argList ? ', ' + argList : ''});`;
       scriptInjection = injection;
       handlerRef = wrapName;
       continue;

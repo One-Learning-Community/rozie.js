@@ -355,10 +355,22 @@ export function emitTemplateEvent(
       const solidHelper = desc.helperName;
       ctx.collectors.runtime.add(solidHelper);
       const originalHandlerCode = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors);
+      // Spike-012 NEW-2 — a statement-kind handler (`@input.debounce(300)="bump()"`)
+      // must be wrapped in a thunk so the FUNCTION is debounced, not its invoked
+      // `void` result (TS2345). The param is left UN-annotated here (unlike the
+      // direct-JSX paths, which need NEW-3's specific event type): the helper's
+      // generic bound `<T extends (...args: unknown[]) => unknown>` supplies the
+      // contextual type (`$event: unknown`) — so there is no TS7006, and any
+      // concrete annotation (`Event`, `MouseEvent`) would FAIL the `unknown[]`
+      // arg-contravariance bound (TS2345).
+      const helperCallback =
+        classifyHandler(listener.handler) === 'statement'
+          ? `($event) => { ${originalHandlerCode}; }`
+          : originalHandlerCode;
       const wrapName = makeWrapName(solidHelper, listener.handler, ctx.injectionCounter);
       const argList = desc.args.map(renderModifierArg).join(', ');
       // Solid createDebouncedHandler(fn, ms) — no dep array needed (Solid auto-tracks).
-      const injection = `const ${wrapName} = ${solidHelper}(${originalHandlerCode}${argList ? ', ' + argList : ''});`;
+      const injection = `const ${wrapName} = ${solidHelper}(${helperCallback}${argList ? ', ' + argList : ''});`;
       scriptInjection = injection;
       ctx.scriptInjections.push(injection);
       handlerRef = wrapName;

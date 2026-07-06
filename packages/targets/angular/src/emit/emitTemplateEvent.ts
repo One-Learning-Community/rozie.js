@@ -299,9 +299,30 @@ export function emitTemplateEvent(
       // For Counter/SearchInput/Modal/TodoList/Dropdown the IIFE wraps a
       // user-method identifier, so we need `this.${origHandlerCode}` if it's
       // bare. For Dropdown's `reposition` etc., this is the case.
-      const wrappedHandlerCode = /^[a-zA-Z_$][\w$]*$/.test(origHandlerCode)
-        ? `this.${origHandlerCode}`
-        : origHandlerCode;
+      //
+      // Spike-012 NEW-2 — a statement-kind handler (`@input.debounce(300)="bump()"`)
+      // is a CallExpression, not a function reference: the IIFE would invoke it
+      // (`(bump() as …)(...args)`) and pass its `void` result, with `bump` left
+      // un-`this`-qualified (a free identifier). Wrap it in a `this`-prefixed
+      // thunk so the IIFE debounces the FUNCTION, matching the plain-event path.
+      let wrappedHandlerCode: string;
+      if (classifyHandler(listener.handler) === 'statement') {
+        const topLevelBindings = collectTopLevelScriptBindings(ctx.ir);
+        const prefixed = applyThisPrefixing(
+          origHandlerCode,
+          ctx.ir,
+          ctx.collisionRenames,
+          topLevelBindings,
+        );
+        // Parenthesize the arrow: the IIFE splices this as `(${code} as
+        // (...a: any[]) => any)`, and `(arrow as T)` without the inner parens is
+        // a parse ambiguity (`((arrow) as T)` is required).
+        wrappedHandlerCode = `(($event: any) => { ${prefixed}; })`;
+      } else {
+        wrappedHandlerCode = /^[a-zA-Z_$][\w$]*$/.test(origHandlerCode)
+          ? `this.${origHandlerCode}`
+          : origHandlerCode;
+      }
       const decl =
         descriptor.helperName === 'debounce'
           ? buildDebounceIIFE(wrapName, wrappedHandlerCode, ms)

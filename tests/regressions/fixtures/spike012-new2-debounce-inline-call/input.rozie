@@ -1,0 +1,19 @@
+<rozie name="DebounceInlineCall">
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+function bump(): void { $data.n += 1; }
+</script>
+
+<template>
+<div class="root">
+  <input class="deb" @input.debounce(300)="bump()" />
+  <button class="thr" @click.throttle(200)="bump()">{{ $data.n }}</button>
+</div>
+</template>
+
+</rozie>
