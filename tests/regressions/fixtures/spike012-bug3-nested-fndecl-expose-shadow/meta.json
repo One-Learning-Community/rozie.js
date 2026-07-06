@@ -1,0 +1,12 @@
+{
+  "id": "REG-SPIKE012-BUG3",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "an inner `function verb(){}` declaration that shadows an $expose verb must keep its bare `verb()` call (not rewritten to `this.verb()` — wrong target + arity) on the class targets",
+  "targets": [
+    "lit",
+    "angular"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012)"
+}

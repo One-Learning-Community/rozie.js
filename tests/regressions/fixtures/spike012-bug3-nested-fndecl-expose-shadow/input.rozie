@@ -1,0 +1,21 @@
+<rozie name="NestedFnDeclExposeShadow">
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+function reset(a: number, b?: number): void { $data.n = a + (b ?? 0); }
+function outer(): void {
+  function reset(): void {}
+  reset();
+}
+$expose({ reset });
+</script>
+
+<template>
+<div class="n">{{ $data.n }}</div>
+</template>
+
+</rozie>

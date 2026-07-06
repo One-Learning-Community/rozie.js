@@ -1,0 +1,12 @@
+{
+  "id": "REG-SPIKE012-BUG1",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a catch-clause param `catch (verb)` whose name shadows an $expose verb must NOT be rewritten to `this.verb` (invalid CatchClause.param → compile crash) on the class targets; the binding stays local",
+  "targets": [
+    "lit",
+    "angular"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012)"
+}

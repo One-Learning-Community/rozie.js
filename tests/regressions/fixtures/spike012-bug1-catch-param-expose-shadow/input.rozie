@@ -1,0 +1,24 @@
+<rozie name="CatchParamExposeShadow">
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+function reset(a: number, b?: number): void { $data.n = a + (b ?? 0); }
+function noise(): void {
+  try {
+    reset(1);
+  } catch (reset) {
+    void reset;
+  }
+}
+$expose({ reset });
+</script>
+
+<template>
+<div class="n">{{ $data.n }}</div>
+</template>
+
+</rozie>

@@ -119,14 +119,32 @@ export function hasShadowingBinding(
       }
       // Don't stop here — keep walking outer scopes.
     }
+    // Catch-clause binding: `catch (name)` / `catch ({ name })` shadows the
+    // promoted name inside the catch block. `CatchClause.param` is a binding
+    // position babel-types forbids from being a MemberExpression, so a reference
+    // to `name` inside the catch body must resolve to the LOCAL, never
+    // `this.<name>`.
+    if (t.isCatchClause(node) && node.param && patternIntroducesBinding(node.param, name)) {
+      return true;
+    }
     // Inner block-scoped declarations. The Program node is intentionally
     // EXCLUDED: a top-level `const name = …` IS the promoted declaration the
     // rewrite targets, not a shadow.
     if (t.isBlockStatement(node)) {
       for (const stmt of node.body) {
-        if (!t.isVariableDeclaration(stmt)) continue;
-        for (const decl of stmt.declarations) {
-          if (patternIntroducesBinding(decl.id, name)) return true;
+        // Inner `let`/`const`/`var` declarations.
+        if (t.isVariableDeclaration(stmt)) {
+          for (const decl of stmt.declarations) {
+            if (patternIntroducesBinding(decl.id, name)) return true;
+          }
+          continue;
+        }
+        // Inner `function name() {}` declarations shadow the promoted name for
+        // any reference in the same block (the declaration is hoisted within
+        // the block). A bare call `name()` intended for the inner function must
+        // NOT be rewritten to `this.<name>()` (wrong target + arity).
+        if (t.isFunctionDeclaration(stmt) && stmt.id && stmt.id.name === name) {
+          return true;
         }
       }
     }
