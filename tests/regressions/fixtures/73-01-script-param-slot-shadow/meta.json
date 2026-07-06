@@ -1,0 +1,9 @@
+{
+  "id": "REG-73.1-001",
+  "source": "packages/ui/rete/src/FlowCanvas.rozie renderNode(element, reteNode) manual workaround",
+  "sourceKind": "commit",
+  "phase": "73-03",
+  "desc": "a helper NESTED inside $onMount whose parameter shadows a declared slot must not shadow the script-side $slots.X presence check (Svelte-only; Phase 73 item #1 script/param-scope shadow class)",
+  "targets": ["svelte"],
+  "discoveredBy": "Phase 73 Plan 03 execution — rete FlowCanvas workaround deletion"
+}
