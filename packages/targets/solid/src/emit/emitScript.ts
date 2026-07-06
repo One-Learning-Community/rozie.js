@@ -68,17 +68,62 @@ function capitalize(name: string): string {
 }
 
 /**
+ * WR-01 fix (73-REVIEW.md, 73-10 gap-closure): collect every Identifier
+ * binding name introduced by a declarator's `id` pattern — Identifier
+ * directly, or recursively through ObjectPattern / ArrayPattern /
+ * AssignmentPattern / RestElement for destructured forms (`const { timer } =
+ * …`, `const [a, b] = …`). Mirrors the same recursive pattern-name walk
+ * already used for `patternIntroducesBinding` in the React target's
+ * `hoistModuleLet.ts`, but collects ALL names into `out` rather than testing
+ * for one specific name.
+ */
+function collectPatternNames(pattern: t.Node, out: Set<string>): void {
+  if (t.isIdentifier(pattern)) {
+    out.add(pattern.name);
+    return;
+  }
+  if (t.isObjectPattern(pattern)) {
+    for (const prop of pattern.properties) {
+      if (t.isObjectProperty(prop)) collectPatternNames(prop.value as t.Node, out);
+      else if (t.isRestElement(prop)) collectPatternNames(prop.argument, out);
+    }
+    return;
+  }
+  if (t.isArrayPattern(pattern)) {
+    for (const el of pattern.elements) {
+      if (el) collectPatternNames(el, out);
+    }
+    return;
+  }
+  if (t.isAssignmentPattern(pattern)) {
+    collectPatternNames(pattern.left, out);
+    return;
+  }
+  if (t.isRestElement(pattern)) {
+    collectPatternNames(pattern.argument, out);
+  }
+}
+
+/**
  * Top-level `let`/`const`/`var`/function-declaration binding names declared
  * directly in a BlockStatement's own statement list (not recursing into
  * nested blocks/functions — matches the depth at which a `$onMount` setup
  * body declares its mount-locals).
+ *
+ * WR-01 fix (73-REVIEW.md, 73-10 gap-closure): previously only recorded a
+ * declarator name when `t.isIdentifier(decl.id)` was true, so a destructured
+ * top-level mount-local (`const { timer } = engine.start();`) was silently
+ * excluded — `cleanupReferencesSetupLocal` then missed it and fell back to
+ * the buggy IIFE-wrapping path (TS2304, the original bug this mechanism was
+ * meant to close). Route every declarator through `collectPatternNames` so
+ * destructured forms are recognized too.
  */
 function topLevelDeclaredNames(block: t.BlockStatement): Set<string> {
   const names = new Set<string>();
   for (const stmt of block.body) {
     if (t.isVariableDeclaration(stmt)) {
       for (const decl of stmt.declarations) {
-        if (t.isIdentifier(decl.id)) names.add(decl.id.name);
+        collectPatternNames(decl.id, names);
       }
     } else if (t.isFunctionDeclaration(stmt) && stmt.id) {
       names.add(stmt.id.name);
