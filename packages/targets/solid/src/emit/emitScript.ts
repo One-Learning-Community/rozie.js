@@ -17,6 +17,7 @@ import type { EncodedSourceMap } from '@ampproject/remapping';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
+import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/propDefaultFactory.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
@@ -525,11 +526,13 @@ export function emitScript(
   if (nonModelDefaultProps.length > 0) {
     collectors.solidImports.add('mergeProps');
     const defaultEntries = nonModelDefaultProps.map((p) => {
-      const raw = genCode(p.defaultValue!);
-      const val = (
-        t.isArrowFunctionExpression(p.defaultValue!) ||
-        t.isFunctionExpression(p.defaultValue!)
-      ) ? `(${raw})()` : raw;
+      const dv = p.defaultValue!;
+      const raw = genCode(dv);
+      // Spike-012 — only an array/object-LITERAL-body arrow (`() => []` /
+      // `() => ({…})`) is a per-instance mutable-default FACTORY to invoke. A
+      // `type: Function, default: () => {}` arrow is the default VALUE (matching
+      // Vue/Angular/Lit); invoking it would pass its `void` result as the prop.
+      const val = isMutableLiteralFactoryDefault(dv) ? `(${raw})()` : raw;
       return `${p.name}: ${val}`;
     });
     mergePropsCall = `const _merged = mergeProps({ ${defaultEntries.join(', ')} }, _props);\n`;
@@ -548,14 +551,13 @@ export function emitScript(
     let dflt = zeroValueFor(p.typeAnnotation);
     if (p.defaultValue !== null) {
       const raw = genCode(p.defaultValue);
-      // When the prop default is a factory arrow/function (e.g. `default: () => []`),
-      // the emitted `createControllableSignal` third arg should be the *initial value*
-      // (the result of calling the factory), not the factory itself — otherwise
-      // TypeScript infers T as the function type rather than the array/object type.
-      if (
-        t.isArrowFunctionExpression(p.defaultValue) ||
-        t.isFunctionExpression(p.defaultValue)
-      ) {
+      // When the prop default is an array/object-literal-body factory arrow
+      // (e.g. `default: () => []`), the `createControllableSignal` third arg
+      // should be the *initial value* (the result of calling the factory), not
+      // the factory itself — else TS infers T as the function type. A
+      // `type: Function, default: () => {}` arrow is NOT a factory (Spike-012):
+      // the arrow IS the value, so it stays un-invoked.
+      if (isMutableLiteralFactoryDefault(p.defaultValue)) {
         dflt = `(${raw})()`;
       } else {
         dflt = raw;

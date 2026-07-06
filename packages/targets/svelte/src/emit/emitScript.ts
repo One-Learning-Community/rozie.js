@@ -41,6 +41,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
+import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/propDefaultFactory.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers, svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 import { collectSvelteImports } from '../rewrite/collectSvelteImports.js';
@@ -571,12 +572,11 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
       // function" on a bare-mounted Svelte component. Mirror the React target,
       // which emits the invoked `(() => [])()` form. A non-function default
       // (literal / identifier) is passed straight through.
+      // Spike-012 — invoke ONLY an array/object-literal-body factory arrow; a
+      // `type: Function, default: () => {}` arrow is the noop-function VALUE, not
+      // a factory (matching Vue/Angular/Lit) — passed through un-invoked.
       let inner = dflt !== null ? dflt : '';
-      if (
-        p.defaultValue !== null &&
-        (t.isArrowFunctionExpression(p.defaultValue) ||
-          t.isFunctionExpression(p.defaultValue))
-      ) {
+      if (isMutableLiteralFactoryDefault(p.defaultValue)) {
         inner = `(${dflt})()`;
       }
       entries.push(`${p.name} = $bindable(${inner})`);
@@ -594,10 +594,7 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
       // for SPEC R1 D-02.
       //
       // Literal/identifier/null/primitive defaults pass through verbatim.
-      const isFactory =
-        p.defaultValue !== null &&
-        (t.isArrowFunctionExpression(p.defaultValue) ||
-          t.isFunctionExpression(p.defaultValue));
+      const isFactory = isMutableLiteralFactoryDefault(p.defaultValue);
       const value = isFactory ? `__default${capitalize(p.name)}` : dflt;
       entries.push(`${p.name} = ${value}`);
     } else {
@@ -727,10 +724,9 @@ function buildPropsFactoryDefaultPrelude(ir: IRComponent): string[] {
   for (const p of ir.props) {
     if (p.isModel) continue;
     if (p.defaultValue === null) continue;
-    if (
-      !t.isArrowFunctionExpression(p.defaultValue) &&
-      !t.isFunctionExpression(p.defaultValue)
-    ) continue;
+    // Only array/object-literal-body factory arrows are cached + invoked; a
+    // `type: Function` value default (`() => {}`) is not a factory (Spike-012).
+    if (!isMutableLiteralFactoryDefault(p.defaultValue)) continue;
     const raw = genCode(p.defaultValue);
     lines.push(`let __default${capitalize(p.name)} = (${raw})();`);
   }

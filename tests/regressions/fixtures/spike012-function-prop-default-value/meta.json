@@ -1,0 +1,16 @@
+{
+  "id": "REG-SPIKE012-FN-PROP-DEFAULT",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a `type: Function, default: () => {}` prop default is the noop-function VALUE, not a mutable-literal factory to invoke: only array/object-literal-body arrows (`() => []` / `() => ({…})`) are invoked. Pre-fix React/Solid/Svelte invoked it (`(() => {})()` → void) so `props.onPick` typed `void | ((…)=>any)` (TS2322/TS2345); Vue/Angular/Lit were already correct — all 6 now agree",
+  "targets": [
+    "react",
+    "vue",
+    "svelte",
+    "angular",
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012, debounce-callable-prop)"
+}

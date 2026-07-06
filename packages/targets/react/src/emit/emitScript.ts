@@ -43,6 +43,7 @@ import type { SignalRef } from '../../../../core/src/reactivity/signalRef.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
+import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/propDefaultFactory.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import {
@@ -1981,10 +1982,12 @@ export function emitScript(
     // (<factory>)()).current;` BEFORE the merged-`props` block. The ref's
     // initializer arg is invoked exactly once at mount time and the cached
     // value is reused across the instance's lifetime (D-02 once-per-instance).
-    const factoryDefaultProps = defaultedNonModelProps.filter(
-      (p) =>
-        t.isArrowFunctionExpression(p.defaultValue!) ||
-        t.isFunctionExpression(p.defaultValue!),
+    // Spike-012 — a FACTORY default is an arrow whose BODY is an array/object
+    // LITERAL (per-instance mutable default). A `type: Function, default: () => {}`
+    // arrow is NOT a factory (the arrow IS the value) — matching the file's own
+    // model-prop rule below + Vue/Angular/Lit.
+    const factoryDefaultProps = defaultedNonModelProps.filter((p) =>
+      isMutableLiteralFactoryDefault(p.defaultValue),
     );
     if (factoryDefaultProps.length > 0) {
       collectors.react.add('useState');
@@ -2003,16 +2006,22 @@ export function emitScript(
       }
     }
     const defaultLines = defaultedNonModelProps.map((p) => {
-      const isFactory =
-        t.isArrowFunctionExpression(p.defaultValue!) ||
-        t.isFunctionExpression(p.defaultValue!);
+      const dv = p.defaultValue!;
+      // FACTORY = array/object-literal-body arrow (see the filter above); it is
+      // cached in a `__default<X>` useState above and reused here.
+      const isFactory = isMutableLiteralFactoryDefault(dv);
       let dflt: string;
       if (isFactory) {
         dflt = `__default${capitalize(p.name)}`;
+      } else if (t.isArrowFunctionExpression(dv) || t.isFunctionExpression(dv)) {
+        // A NON-factory function VALUE (e.g. `type: Function, default: () => {}`) —
+        // the arrow IS the default. Parenthesize so `?? (() => {})` parses (arrow
+        // has lower precedence than `??`).
+        dflt = `(${genCode(dv)})`;
       } else {
         // Primitive default — emit the literal expression in the coalesce
         // operand (null / 0 / '' / false / identifier / member expr / etc.).
-        dflt = genCode(p.defaultValue!);
+        dflt = genCode(dv);
       }
       return `  ${p.name}: _props.${p.name} ?? ${dflt},`;
     });
