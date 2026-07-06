@@ -16,8 +16,10 @@
  *   slot invocation in distinct namespaces and are immune.
  *
  * CLASS 2 — script/param-scope shadow (Phase 73 item #1 broadening): a
- * top-level `<script>` HELPER's PARAMETER — a `function foo(X) {...}` or a
- * top-level `const foo = (X) => {...}` — named the same as a declared slot:
+ * `<script>` HELPER's PARAMETER — a `function foo(X) {...}` or a `const foo =
+ * (X) => {...}`, at ANY nesting depth (including inside `$onMount`/`$watch`/
+ * event-handler closures) — named the same as a declared slot, where that
+ * SAME helper's own body reads the `$slots.X` sigil:
  *
  *   <script>
  *   function renderNode(element, node) {   // param `node`
@@ -38,22 +40,24 @@
  *   nested-scope PARAMETER binding, which no other detector scans for.
  *
  * Both classes are AUTO-FIXED by the Svelte emitter: the emitter-generated
- * snippet binding (and every reference — render site, `$slots.X`/`$portals.X`
+ * snippet binding (and every reference — render site, `$slots.X`
  * rewrites) is renamed to a safe suffixed identifier (`X$$slot`), so the
  * component Just Works on all six targets with NO author action. This
  * detector is the single source of truth `portalSlotMergeName` +
  * `emitSlotInvocation` consult to decide which slots to rename.
  *
- * Class 1 is SCOPE-PRECISE: a name is returned ONLY when the colliding slot is
- * rendered inside the shadowing loop's body — a slot and a loop var that
- * merely share a name in disjoint scopes do NOT collide. Class 2 is
- * CONSERVATIVE (not scope-precise to the read site): ANY top-level helper
- * parameter matching a declared slot name triggers the rename, regardless of
- * whether that helper's body actually reads `$slots.X` — a false-positive
- * rename is harmless (just an extra safe suffix), while a false negative is a
- * silent runtime footgun. Neither class ever flags a slot name that only
- * equals a declared `<props>` key — that collision is the separate, already-
- * hard-error ROZ127 (`validateSlotPropCollision`), never a rename target.
+ * Both classes are SCOPE-PRECISE: Class 1 requires the colliding slot to be
+ * rendered inside the shadowing loop's body (a slot and a loop var that
+ * merely share a name in disjoint scopes do NOT collide); Class 2 requires the
+ * shadowing helper's OWN body to actually read `$slots.<name>` (a helper
+ * param that merely shares a slot's name but never reads the sigil — e.g. a
+ * plain data-object param — is NOT flagged). This keeps unrelated existing
+ * components byte-identical: a false positive here would force an unplanned
+ * rebless of every `@rozie-ui` leaf whose helper happens to reuse a slot name
+ * as a parameter, defeating "batching shares only the REBLESS, not the
+ * fixing." Neither class ever flags a slot name that only equals a declared
+ * `<props>` key — that collision is the separate, already-hard-error ROZ127
+ * (`validateSlotPropCollision`), never a rename target.
  *
  * Case-sensitive (`X` ≠ `x`). NEVER throws; NEVER mutates `ir`. Pure (input
  * `ir` → output `Set<string>`).
@@ -84,10 +88,70 @@ function functionParamNames(
   return names;
 }
 
+/** Generic shallow recursive walk over any Babel node's child nodes. */
+function walkNode(node: t.Node | null | undefined, onNode: (n: t.Node) => void): void {
+  if (node === null || node === undefined) return;
+  onNode(node);
+  for (const key of t.VISITOR_KEYS[node.type] ?? []) {
+    const child = (node as unknown as Record<string, unknown>)[key];
+    if (Array.isArray(child)) {
+      for (const c of child) {
+        if (c !== null && typeof (c as t.Node)?.type === 'string') {
+          walkNode(c as t.Node, onNode);
+        }
+      }
+    } else if (child !== null && typeof (child as t.Node)?.type === 'string') {
+      walkNode(child as t.Node, onNode);
+    }
+  }
+}
+
 /**
- * CLASS 2 — collect every slot name shadowed by a top-level `<script>`
- * helper's PARAMETER: a `function foo(X) {...}` FunctionDeclaration, or a
- * top-level `const/let foo = (X) => {...}` / `function (X) {...}` expression.
+ * Does `body` contain a `$slots.<name>` read (a non-computed MemberExpression
+ * on the bare `$slots` sigil identifier)? This is the ONLY sigil shape that
+ * routes through the shared slot-merge identifier (`portalSlotMergeName`) at
+ * script scope — `$portals.<name>(...)` is a plain method call on the
+ * `portals` closure object and is NEVER renamed, so it is not scanned here.
+ */
+function bodyReadsSlotSigil(body: t.Node, name: string): boolean {
+  let found = false;
+  walkNode(body, (node) => {
+    if (found) return;
+    if (
+      t.isMemberExpression(node) &&
+      !node.computed &&
+      t.isIdentifier(node.object) &&
+      node.object.name === '$slots' &&
+      t.isIdentifier(node.property) &&
+      node.property.name === name
+    ) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+/**
+ * CLASS 2 — collect every slot name shadowed by a `<script>` helper's
+ * PARAMETER where that SAME helper's own body reads the `$slots.<name>` sigil:
+ * a `function foo(X) {...}` FunctionDeclaration, a `const/let foo = (X) => {...}`
+ * / `function (X) {...}` expression, or — critically — the SAME shapes NESTED
+ * inside another closure (e.g. a helper declared inside `$onMount(() => {
+ * const renderNode = (element, node) => {...} })`, the real `rete` FlowCanvas
+ * shape). A top-level-only scan misses this: FlowCanvas's `renderNode` lives
+ * inside `$onMount`'s callback, not as a direct top-level `<script>` statement
+ * — so this walks the FULL script AST (every function-like node, at any
+ * nesting depth), not just `program.body`'s direct children.
+ *
+ * SCOPE-PRECISE (unlike an earlier draft of this detector): a param name
+ * matching a slot name is flagged ONLY when that function's OWN body actually
+ * reads `$slots.<name>` — a helper param that merely happens to share a slot's
+ * name but never reads the sigil (e.g. `startTimer(toast)` in
+ * `packages/ui/toast` — a plain data-object param, no `$slots.toast` read
+ * anywhere) is NOT flagged, keeping unrelated existing components
+ * byte-identical. This mirrors the scope-precision of Class 1 and the sibling
+ * `findRForLoopVarShadows.loopVarHelperShadows` check (which also gates on an
+ * actual in-body reference, not a bare name match).
  */
 function findScriptParamSlotShadows(ir: IRComponent): Set<string> {
   const shadows = new Set<string>();
@@ -99,27 +163,21 @@ function findScriptParamSlotShadows(ir: IRComponent): Set<string> {
   const program = ir.setupBody?.scriptProgram;
   if (!program) return shadows;
 
-  const checkParams = (params: Array<t.Identifier | t.Pattern | t.RestElement>): void => {
-    for (const name of functionParamNames(params)) {
-      if (slotNames.has(name)) shadows.add(name);
+  walkNode(program.program, (node) => {
+    if (
+      !t.isFunctionDeclaration(node) &&
+      !t.isFunctionExpression(node) &&
+      !t.isArrowFunctionExpression(node)
+    ) {
+      return;
     }
-  };
-
-  for (const stmt of program.program.body) {
-    if (t.isFunctionDeclaration(stmt)) {
-      checkParams(stmt.params);
-    } else if (t.isVariableDeclaration(stmt)) {
-      for (const decl of stmt.declarations) {
-        const init = decl.init;
-        if (
-          init !== null &&
-          (t.isArrowFunctionExpression(init) || t.isFunctionExpression(init))
-        ) {
-          checkParams(init.params);
-        }
+    for (const name of functionParamNames(node.params)) {
+      if (slotNames.has(name) && bodyReadsSlotSigil(node.body, name)) {
+        shadows.add(name);
       }
     }
-  }
+  });
+
   return shadows;
 }
 
