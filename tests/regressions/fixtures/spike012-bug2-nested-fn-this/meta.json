@@ -1,0 +1,12 @@
+{
+  "id": "REG-SPIKE012-BUG2",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a component-state read ($props/$data) inside a nested plain `function` must resolve to the component on the class targets — the `this.X` is redirected through a `const __rozieSelf = this` alias (a bare nested `this` is undefined at runtime)",
+  "targets": [
+    "lit",
+    "angular"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012)"
+}

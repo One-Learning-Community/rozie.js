@@ -1,0 +1,12 @@
+{
+  "id": "REG-SPIKE012-NEW1",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a statement label / break-label / continue-label named like an $expose verb must NOT be rewritten to `this.verb` (invalid LabeledStatement.label → compile crash) on the class targets",
+  "targets": [
+    "lit",
+    "angular"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012, expansion)"
+}

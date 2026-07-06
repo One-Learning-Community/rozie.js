@@ -36,6 +36,7 @@ import {
   hasShadowingBinding,
   isInBindingPosition,
 } from './scopeAwareSkip.js';
+import { redirectNestedThis } from './redirectNestedThis.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import type { RuntimeLitImportCollector } from './collectLitImports.js';
 
@@ -555,6 +556,17 @@ export function rewriteScript(
       if (parentPath.isVariableDeclarator() && parentPath.node.id === path.node) return;
       if (parentPath.isFunctionDeclaration() && parentPath.node.id === path.node) return;
 
+      // Skip statement-LABEL slots — a `LabeledStatement.label`, `break X`, or
+      // `continue X` label named like a promoted verb is a non-reference
+      // identifier position babel-types forbids from being a MemberExpression
+      // (rewriting `reset: for (…)` → `this.reset: for (…)` throws). Same class
+      // as the import/export-specifier + catch-param guards. Spike-012 NEW-1.
+      if (
+        (parentPath.isLabeledStatement() && parentPath.node.label === path.node) ||
+        (parentPath.isBreakStatement() && parentPath.node.label === path.node) ||
+        (parentPath.isContinueStatement() && parentPath.node.label === path.node)
+      ) return;
+
       // Skip import/export specifier NAME slots — `imported`/`local`/`exported`
       // are module-binding names, never value references. An aliased import whose
       // imported name equals a promoted verb (`import { undo as undoCmd }` where
@@ -806,6 +818,10 @@ export function rewriteScript(
       // template/listener expressions are also rewritten elsewhere.
     },
   });
+
+  // Post-pass: repair `this` inside nested plain functions (BUG-2). Runs after
+  // the main lowering so every emitter-injected `this.<…>` is visible.
+  redirectNestedThis(cloned);
 
   return { file: cloned, program: cloned.program };
 }

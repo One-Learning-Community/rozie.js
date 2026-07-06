@@ -50,6 +50,7 @@ import {
   hasShadowingBinding,
   isInBindingPosition,
 } from './scopeAwareSkip.js';
+import { redirectNestedThis } from './redirectNestedThis.js';
 import { sanitizeEventName } from './sanitizeEventName.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { hasBooleanDisabledProp } from '../cvaDiagnostics.js';
@@ -1371,6 +1372,10 @@ export function rewriteRozieIdentifiers(
       path.replaceWith(t.callExpression(memberExpr, []));
     },
   });
+
+  // Post-pass: repair `this` inside nested plain functions (BUG-2). Runs after
+  // the main lowering so every emitter-injected `this.<…>` is visible.
+  redirectNestedThis(program);
 
   return {
     rewrittenProgram: program,

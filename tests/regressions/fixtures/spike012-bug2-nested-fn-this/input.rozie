@@ -1,0 +1,27 @@
+<rozie name="NestedFnThis">
+<props>
+{
+  value: { type: [String, Object], default: '', model: true },
+}
+</props>
+
+<data>
+{
+  tag: 'x',
+}
+</data>
+
+<script lang="ts">
+function selected(): string {
+  function inner(): string {
+    return typeof $props.value === 'string' ? $props.value + $data.tag : '';
+  }
+  return inner();
+}
+</script>
+
+<template>
+<div class="selected">{{ selected() }}</div>
+</template>
+
+</rozie>

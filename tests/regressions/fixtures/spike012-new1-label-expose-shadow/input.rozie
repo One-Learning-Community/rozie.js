@@ -1,0 +1,23 @@
+<rozie name="LabelExposeShadow">
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+function reset(a: number, b?: number): void { $data.n = a + (b ?? 0); }
+function noise(): void {
+  reset: for (let i = 0; i < 3; i++) {
+    if (i === 1) continue reset;
+    if (i === 2) break reset;
+  }
+}
+$expose({ reset });
+</script>
+
+<template>
+<div class="n">{{ $data.n }}</div>
+</template>
+
+</rozie>
