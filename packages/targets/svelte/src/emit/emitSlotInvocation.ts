@@ -73,10 +73,14 @@ export function emitSlotInvocation(
 
   // Slot-RESOLVER rename (lockstep with emitScript's emitSlotDerivedMerges
   // binding rename): render the safe suffixed binding instead of the bare `X`
-  // whenever the resolver `X` is shadowed in the compiled output.
-  // `portalSlotMergeName` is the SINGLE source of truth for this identifier
-  // (Phase 73 item #1 folded every collision class into it — see its
-  // docstring): a `X$$slot` suffix for
+  // whenever the resolver `X` is shadowed in the compiled output. (This used to
+  // be a locally-computed `needsResolverSuffix` boolean unioning
+  // findRForSlotNameCollisions + findReprojectionSlotNameCollisions inline;
+  // Phase 73 item #1 moved that union — now ALSO including the script/param-
+  // scope shadow class — into `portalSlotMergeName` so every consumer of the
+  // merge identifier agrees automatically.) `portalSlotMergeName` is the
+  // SINGLE source of truth for this identifier (see its docstring): a
+  // `X$$slot` suffix for
   //   1. r-for-loop-var == slot-name — inside `{#each … as X}` the bare `X`
   //      resolves to the loop ITEM (a non-function) → runtime crash.
   //   2. script/param-scope shadow — a top-level `<script>` helper's own
