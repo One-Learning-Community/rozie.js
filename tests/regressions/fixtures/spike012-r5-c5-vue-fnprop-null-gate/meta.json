@@ -1,0 +1,9 @@
+{
+  "id": "REG-SPIKE012-R5-C5",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-5 C5 (closes R4-D): the vue Function-prop type gated `| null` on default:null. `renderType` unconditionally appended `| null` to EVERY Function prop, diverging from the canonical `.d.ts` path (renderPropsInterface.ts, which gates on a NullLiteral default). A required / non-null-default Function prop (`onSave: default: () => {}`) then failed to bind to an element event slot under strictNullChecks (TS2345). Fix (vue emitScript.ts renderType + emitDefineModels): drop the unconditional `| null`; the NullLiteral-default gate in renderPropField/emitDefineModels re-adds it only for `default: null`. Both directions asserted here: `onSave` (default: () => {}) → `((...args: any[]) => any)` (no null); `onCancel` (default: null) → `((...args: any[]) => any) | null` (kept). Found by the shape-matrix harness (fnprop-cross/required-no-default, fnprop-default/function-expr-noop, model-function-prop).",
+  "targets": ["react", "vue", "svelte", "angular", "solid", "lit"],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 5"
+}

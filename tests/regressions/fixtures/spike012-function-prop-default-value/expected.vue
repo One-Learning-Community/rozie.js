@@ -9,7 +9,7 @@ import { ref } from 'vue';
 import { debounce } from '@rozie/runtime-vue';
 
 const props = withDefaults(
-  defineProps<{ onPick?: ((...args: any[]) => any) | null }>(),
+  defineProps<{ onPick?: ((...args: any[]) => any) }>(),
   { onPick: () => {} }
 );
 

@@ -248,7 +248,7 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
  *   - { kind: 'identifier', name: 'Boolean' }  → 'boolean'
  *   - { kind: 'identifier', name: 'Array' }    → 'any[]'
  *   - { kind: 'identifier', name: 'Object' }   → 'Record<string, any>'
- *   - { kind: 'identifier', name: 'Function' } → '((...args: any[]) => any) | null'
+ *   - { kind: 'identifier', name: 'Function' } → '((...args: any[]) => any)'  (| null added only on default:null)
  *   - { kind: 'union', members: [...] }        → join with ' | '
  *   - { kind: 'literal', value: 'string' }     → 'string'
  *
@@ -262,11 +262,13 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
  * expressions ergonomic without requiring inner-type annotations in the rozie
  * source. Matches the Solid/Lit fix from commit 536575a (vue-tsc gate).
  *
- * Why `((...args: any[]) => any) | null` for Function: rozie source patterns
- * like `onClose: { type: Function, default: null }` (Card.rozie, CardHeader.rozie)
- * emit `withDefaults(..., { onClose: null })` — vue-tsc rejects `null` against
- * a non-nullable function type. Including `| null` in the type accepts the
- * default and matches the Lit target's `renderTsType` convention.
+ * Function renders as the bare `((...args: any[]) => any)`. The `| null` is NOT
+ * baked in here (Spike-012 R5, C5): a `default: null` Function prop (Card.rozie,
+ * CardHeader.rozie — `withDefaults(..., { onClose: null })`) gets the `| null`
+ * widening from the caller's NullLiteral-default gate (`renderPropField` /
+ * `emitDefineModels`), exactly as the canonical `.d.ts` path does
+ * (renderPropsInterface.ts). A required / non-null-default Function prop stays
+ * non-null so it binds cleanly to an element event slot under strictNullChecks.
  */
 function renderType(t: PropTypeAnnotation): string {
   if (t.kind === 'identifier') {
@@ -282,7 +284,14 @@ function renderType(t: PropTypeAnnotation): string {
       case 'Object':
         return 'Record<string, any>';
       case 'Function':
-        return '((...args: any[]) => any) | null';
+        // Spike-012 R5 (C5, closes R4-D): NO unconditional `| null`. The `| null`
+        // widening is added by `renderPropField` / `emitDefineModels` ONLY when
+        // the prop declares an explicit `default: null` (NullLiteral) — mirroring
+        // the canonical `.d.ts` path (renderPropsInterface.ts). Previously every
+        // Function prop got `| null`, which (a) diverged from the published .d.ts
+        // and (b) fails to bind a required / non-null-default Function prop to an
+        // element event slot under strictNullChecks (TS2345).
+        return '((...args: any[]) => any)';
       default:
         return t.name; // Pass through user-declared types verbatim.
     }
@@ -294,7 +303,7 @@ function renderType(t: PropTypeAnnotation): string {
     // 'string'|'number'|'boolean'|'function'|'object'|'array'
     if (t.value === 'array') return 'any[]';
     if (t.value === 'object') return 'Record<string, any>';
-    if (t.value === 'function') return '((...args: any[]) => any) | null';
+    if (t.value === 'function') return '((...args: any[]) => any)'; // R5 C5 — see Function case above.
     return t.value;
   }
   // Should be exhaustive — but fall back to 'unknown' for safety.
@@ -510,7 +519,13 @@ function emitDefineModels(ir: IRComponent): string[] {
   const lines: string[] = [];
   for (const p of ir.props) {
     if (!p.isModel) continue;
-    const tsType = renderType(p.typeAnnotation);
+    // Spike-012 R5 (C5) — `renderType` no longer bakes `| null` into a Function
+    // type, so a model prop declaring an explicit `default: null` gets the
+    // widening here, matching the non-model `renderPropField` gate and the
+    // canonical `.d.ts` path. (Zero corpus impact — no shipped model prop pairs
+    // `type: Function`/`default: null`; only correctness for that shape.)
+    const baseType = renderType(p.typeAnnotation);
+    const tsType = hasExplicitNullDefault(p) ? `${baseType} | null` : baseType;
     // SC-3: prepend the gated JSDoc block above the `defineModel` line for a
     // documented model prop. `buildPropJsdoc('')` builds the block at zero
     // indent (model lines sit at column 0 in the <script setup> body) with a

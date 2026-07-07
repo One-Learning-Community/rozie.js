@@ -1,0 +1,24 @@
+<rozie name="FnPropNullGate">
+
+<props>
+{
+  onSave: { type: Function, default: () => {} },
+  onCancel: { type: Function, default: null },
+}
+</props>
+
+<data>
+{
+  n: 0,
+}
+</data>
+
+<template>
+<div class="fpg">
+  <button class="save" @click="$props.onSave">save</button>
+  <button class="cancel" @click="$props.onCancel && $props.onCancel()">cancel</button>
+  <span class="n">{{ $data.n }}</span>
+</div>
+</template>
+
+</rozie>
