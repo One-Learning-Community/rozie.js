@@ -1,0 +1,21 @@
+<rozie name="RefEmitDedup">
+
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+function go(): void { $emit('save', $data.n); }
+$onMount(() => { void ($refs.save as HTMLElement); })
+</script>
+
+<template>
+<div class="red">
+  <div ref="save">x</div>
+  <button @click="go()">go</button>
+</div>
+</template>
+
+</rozie>

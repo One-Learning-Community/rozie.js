@@ -1,0 +1,9 @@
+{
+  "id": "REG-SPIKE012-R5-C4",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-5 C4-emit: a `ref=\"save\"` whose name equals an `$emit('save')` event. On Angular an emit mints a `save = output()` class member AND the ref minted a `save = viewChild()` member → duplicate member (TS2300, silent — no scope-walk/nested-this signal). R4-A's deconflictRefsAgainstUserBindings collision surface covered state/computed/prop/user-binding names but not emit-output names. Fix (angular emitAngular.ts): include `ir.emits.map(sanitizeEventName)` in the userBindingNames passed to the pass, so the INTERNAL ref renames to `saveRef` (field + viewChild selector + #template-ref); the `save` output stays. Angular-only — React/Svelte emits lower to `onX` prop callbacks (no `save` member), so their callers are unchanged and byte-identical. Found by the shape-matrix harness angular-dup-member invariant (ref-rename-cross/ref-name-equals-emit).",
+  "targets": ["react", "vue", "svelte", "angular", "solid", "lit"],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 5"
+}

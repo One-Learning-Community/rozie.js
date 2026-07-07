@@ -96,6 +96,7 @@ import {
   rewriteRozieIdentifiers,
   collectUserMethodNames,
 } from './rewrite/rewriteScript.js';
+import { sanitizeEventName } from './rewrite/sanitizeEventName.js';
 import {
   cvaDiagnostics as computeCvaDiagnostics,
   hasBooleanDisabledProp,
@@ -477,7 +478,18 @@ export function emitAngular(
     // (TS2300) + the user reference wrongly lowered to the ref's `this.box()`
     // signal. Rename the INTERNAL ref (field + selector + `#template-ref` var) to
     // `<name>Ref`; only-on-collision, so the non-colliding corpus is byte-identical.
-    deconflictRefsAgainstUserBindings(ir, collectUserMethodNames(ir.setupBody.scriptProgram));
+    //
+    // Spike-012 R5 (C4-emit) — on Angular an `$emit('X')` also mints a class
+    // member (`X = output()`, named `sanitizeEventName('X')`), so a `ref="X"` of
+    // the same name is a second same-named member → TS2300. Include the emitted
+    // output member names in the collision surface so the internal ref renames to
+    // `<name>Ref`. Angular-only: on React/Svelte an emit lowers to an `onX` prop
+    // callback / dispatch — no `X` member — so those callers do NOT pass emits.
+    const angularUserBindings = new Set<string>([
+      ...collectUserMethodNames(ir.setupBody.scriptProgram),
+      ...ir.emits.map(sanitizeEventName),
+    ]);
+    deconflictRefsAgainstUserBindings(ir, angularUserBindings);
   }
 
   // Pre-compute collisionRenames + classMembers + signalMembers by running a
