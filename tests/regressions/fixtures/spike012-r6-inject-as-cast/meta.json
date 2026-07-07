@@ -1,0 +1,16 @@
+{
+  "id": "REG-SPIKE012-R6-INJECT-AS-CAST",
+  "source": ".planning/spikes/012-emitter-shape-matrix/lib/generate.mjs (R6-A inject cells)",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "ROZ132 (INJECT_UNBOUND) false-positive: `const theme = $inject('theme') as { color: string; cycle: () => void } | undefined` is bound to a `const` — the ONLY valid `$inject` shape — but the collector/validator required `declarator.init` to be a DIRECT CallExpression, so a TS wrapper (`as T` / `!` / `satisfies T` / angle-cast `<T>`) around the call falsely tripped ROZ132 even though the value IS const-bound. Fix: `unwrapTsCast` (packages/core/src/ast/unwrapTsCast.ts) peels TSAsExpression/TSNonNullExpression/TSSatisfiesExpression/TSTypeAssertion before the CallExpression/boundToConst checks in collectScriptDecls.ts, and each target's duplicate `readClonedContext`/`allInject`-strip detection does the same. `computeTsCastWrapText` re-applies the ORIGINAL wrapper text around the target's native inject read (React/Solid useContext, Vue inject, Svelte getContext, Angular inject(rozieToken), Lit ContextConsumer getter) so the author's type survives into the emitted output instead of silently downgrading to an untyped binding. Found by the shape-matrix torture harness (inject/read-in-template, inject/read-in-computed, inject/read-in-watch cells).",
+  "targets": [
+    "react",
+    "vue",
+    "svelte",
+    "angular",
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 6"
+}

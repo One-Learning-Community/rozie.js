@@ -36,6 +36,7 @@ import _generate from '@babel/generator';
 import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { VueImportCollector } from '../rewrite/collectVueImports.js';
+import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
 // CJS interop normalization for @babel/generator default export (mirrors emitScript).
 type GenerateFn = typeof import('@babel/generator').default;
@@ -86,6 +87,8 @@ function readClonedContext(clonedProgram: t.File): {
     localName: string;
     keyArg: t.Expression;
     fallbackArg?: t.Expression;
+    castPrefix: string;
+    castSuffix: string;
   }[];
 } {
   const provideValues: { keyArg: t.Expression; valueArg: t.Expression }[] = [];
@@ -93,6 +96,8 @@ function readClonedContext(clonedProgram: t.File): {
     localName: string;
     keyArg: t.Expression;
     fallbackArg?: t.Expression;
+    castPrefix: string;
+    castSuffix: string;
   }[] = [];
 
   for (const stmt of clonedProgram.program.body) {
@@ -114,18 +119,27 @@ function readClonedContext(clonedProgram: t.File): {
       continue;
     }
     // const x = $inject('k', f?) — a top-level VariableDeclaration declarator.
+    // ROZ132 cast-blindness fix — `d.init` may be a TS wrapper (`as T` / `!` /
+    // `satisfies T` / `<T>`) around the real `$inject(...)` call; unwrap before
+    // the CallExpression check, and re-apply the SAME wrapper text around the
+    // emitted read (castPrefix/castSuffix) so the author's type survives.
     if (t.isVariableDeclaration(stmt)) {
       for (const d of stmt.declarations) {
         if (!t.isIdentifier(d.id)) continue;
-        if (!d.init || !t.isCallExpression(d.init)) continue;
-        if (!t.isIdentifier(d.init.callee) || d.init.callee.name !== '$inject') continue;
-        const keyArg = d.init.arguments[0];
+        if (!d.init) continue;
+        const call = unwrapTsCast(d.init);
+        if (!t.isCallExpression(call)) continue;
+        if (!t.isIdentifier(call.callee) || call.callee.name !== '$inject') continue;
+        const keyArg = call.arguments[0];
         if (!keyArg || !t.isExpression(keyArg)) continue;
-        const fallbackArg = d.init.arguments[1];
+        const fallbackArg = call.arguments[1];
+        const { prefix, suffix } = computeTsCastWrapText(d.init, genCode);
         injectBinders.push({
           localName: d.id.name,
           keyArg,
           ...(fallbackArg && t.isExpression(fallbackArg) ? { fallbackArg } : {}),
+          castPrefix: prefix,
+          castSuffix: suffix,
         });
       }
     }
@@ -166,13 +180,13 @@ export function emitContext(
     imports.use('inject');
     for (const b of injectBinders) {
       const keyCode = genCode(b.keyArg);
-      if (b.fallbackArg) {
-        injectLines.push(
-          `const ${b.localName} = inject(${keyCode}, ${genCode(b.fallbackArg)});`,
-        );
-      } else {
-        injectLines.push(`const ${b.localName} = inject(${keyCode});`);
-      }
+      // ROZ132 cast-blindness fix — re-apply the author's original TS wrapper
+      // (`as T` / `!` / `satisfies T`) around the read so the injected value
+      // keeps its author-declared type in the emitted output.
+      const inner = b.fallbackArg
+        ? `inject(${keyCode}, ${genCode(b.fallbackArg)})`
+        : `inject(${keyCode})`;
+      injectLines.push(`const ${b.localName} = ${b.castPrefix}${inner}${b.castSuffix};`);
     }
   }
 

@@ -24,7 +24,9 @@
  */
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
+import type { NodePath } from '@babel/traverse';
 import { locFromBabel } from '../../diagnostics/locFromBabel.js';
+import { isTsCastWrapper, unwrapTsCast } from '../../ast/unwrapTsCast.js';
 import type { ScriptAST } from '../../ast/blocks/ScriptAST.js';
 import type {
   BindingsTable,
@@ -218,12 +220,19 @@ function extractProvideFromExpression(
  * when the first argument is not a StringLiteral (malformed key — the VALIDATOR
  * emits ROZ130; the collector stays silent). The optional 2nd argument is the
  * fallback expression.
+ *
+ * ROZ132 cast-blindness fix — `init` is unwrapped through any TS wrapper
+ * (`as T` / `!` / `satisfies T` / `<T>`) before the CallExpression check, so
+ * `const theme = $inject('theme') as ThemeContext` is collected exactly like
+ * the bare form. The wrapper is type-only sugar around the same runtime call;
+ * emitters re-apply it via `computeTsCastWrapText` (see per-target emitContext).
  */
 function extractInjectFromDeclarator(
   declarator: t.VariableDeclarator,
 ): InjectEntry | null {
   if (!t.isIdentifier(declarator.id)) return null;
-  const init = declarator.init;
+  const rawInit = declarator.init;
+  const init = rawInit ? unwrapTsCast(rawInit) : null;
   if (!init || !t.isCallExpression(init)) return null;
   if (!t.isIdentifier(init.callee) || init.callee.name !== '$inject') return null;
   const keyArg = init.arguments[0];
@@ -335,12 +344,29 @@ export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): 
       // (`const x = $inject('key')`). Anything else (bare statement, assigned to
       // a non-const, nested in an expression) → ROZ132. ROZ130 (non-string key)
       // is checked against the call's first argument by the validator.
+      //
+      // ROZ132 cast-blindness fix — `const theme = $inject('theme') as T` parses
+      // the call's immediate parent as the `TSAsExpression`, NOT the
+      // VariableDeclarator, so the direct-parent check below would falsely
+      // report ROZ132 for a cast-wrapped-but-bound const. Walk UP through any
+      // chain of TS wrapper ancestors (`as` / `!` / `satisfies` / `<T>`) first —
+      // each wrapper's `.expression` must be exactly the node we came from — so
+      // `boundToConst` reflects the OUTERMOST wrapper's placement, not the bare
+      // call's.
       if (callee.name === '$inject') {
-        const parent = path.parent;
-        const grandparent = path.parentPath?.parent;
+        let outer: NodePath = path;
+        while (
+          outer.parentPath &&
+          isTsCastWrapper(outer.parentPath.node) &&
+          outer.parentPath.node.expression === outer.node
+        ) {
+          outer = outer.parentPath;
+        }
+        const parent = outer.parent;
+        const grandparent = outer.parentPath?.parent;
         const boundToConst =
           t.isVariableDeclarator(parent) &&
-          parent.init === path.node &&
+          parent.init === outer.node &&
           t.isVariableDeclaration(grandparent) &&
           grandparent.kind === 'const';
         // CR-02 WR-02 — record whether this $inject is the SOLE declarator of its

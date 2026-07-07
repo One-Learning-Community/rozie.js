@@ -1,0 +1,10 @@
+<rozie name="InjectAsCast">
+<script lang="ts">
+const theme = $inject('theme') as { color: string; cycle: () => void } | undefined
+</script>
+
+<template>
+<div class="r"><button @click="theme && theme.cycle()">{{ theme && theme.color }}</button></div>
+</template>
+
+</rozie>

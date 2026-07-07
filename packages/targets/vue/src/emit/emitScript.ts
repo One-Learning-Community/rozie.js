@@ -53,6 +53,7 @@ import { VueImportCollector } from '../rewrite/collectVueImports.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { buildSlotTypeBlock } from './refineSlotTypes.js';
+import { unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -1058,15 +1059,20 @@ function emitResidualScriptBody(
       // directives consumed via ir.injects and re-emitted by emitContext as
       // `const x = inject('k', f?)`. Strip them from the residual body so the
       // bare `$inject` identifier never leaks as an undefined runtime ref.
+      // ROZ132 cast-blindness fix — `d.init` unwraps through any TS wrapper
+      // (`as T` / `!` / `satisfies T` / `<T>`) before the CallExpression check,
+      // so `const theme = $inject('theme') as ThemeContext` is stripped too.
       const allInject =
         stmt.declarations.length > 0 &&
-        stmt.declarations.every(
-          (d) =>
-            d.init &&
-            t.isCallExpression(d.init) &&
-            t.isIdentifier(d.init.callee) &&
-            d.init.callee.name === '$inject',
-        );
+        stmt.declarations.every((d) => {
+          if (!d.init) return false;
+          const call = unwrapTsCast(d.init);
+          return (
+            t.isCallExpression(call) &&
+            t.isIdentifier(call.callee) &&
+            call.callee.name === '$inject'
+          );
+        });
       if (allInject) continue;
     }
 

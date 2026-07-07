@@ -40,6 +40,7 @@ import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { toKebabCase } from './emitDecorator.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
+import { unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
@@ -574,15 +575,20 @@ function partitionScript(program: t.File): PartitionedScript {
     // all-`$inject` declaration form is stripped; a mixed declarator flows
     // through unchanged (ROZ130 forbids mixing in practice).
     if (t.isVariableDeclaration(stmt)) {
+      // ROZ132 cast-blindness fix — `d.init` unwraps through any TS wrapper
+      // (`as T` / `!` / `satisfies T` / `<T>`) before the CallExpression check,
+      // so `const theme = $inject('theme') as ThemeContext` is stripped too.
       const allInject =
         stmt.declarations.length > 0 &&
-        stmt.declarations.every(
-          (d) =>
-            d.init &&
-            t.isCallExpression(d.init) &&
-            t.isIdentifier(d.init.callee) &&
-            d.init.callee.name === '$inject',
-        );
+        stmt.declarations.every((d) => {
+          if (!d.init) return false;
+          const call = unwrapTsCast(d.init);
+          return (
+            t.isCallExpression(call) &&
+            t.isIdentifier(call.callee) &&
+            call.callee.name === '$inject'
+          );
+        });
       if (allInject) continue;
     }
     // Quick plan 260515-u2b — top-level $watch call detection.
