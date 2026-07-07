@@ -1,0 +1,16 @@
+{
+  "id": "REG-SPIKE012-R6B-PROVIDE-AS-CAST",
+  "source": ".planning/spikes/012-emitter-shape-matrix/lib/generate.mjs (sigil-cast/provide-as, sigil-cast/onmount-as, sigil-cast/watch-as, sigil-cast/expose-as)",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Sibling of the ROZ132 $inject cast-blindness bug (a84c1714), statement-form sigils: `$provide('key', value) as void` parses the call's immediate parent as the TSAsExpression, NOT the ExpressionStatement, so the collector's `t.isExpressionStatement(parent)` statement-position check (mirrored by the `$expose`/`$onMount`/`$onUnmount`/`$onUpdate`/`$watch` extractors) falsely failed to recognize the cast-wrapped call: `$provide` raised a FALSE ROZ131 (PROVIDE_NOT_STATEMENT — wrong, it IS a top-level statement) and — because collectScriptDecls' `extractProvideFromExpression`/`extractWatchFromExpression`/`extractLifecycleFromExpression`/`extractExposeFromExpression` all shared the same `if (!t.isCallExpression(expr)) return null;` shape — the directive was silently dropped from collection, leaking the raw sigil call into the emitted output as a free-identifier ReferenceError on every target. Fix: each extractor unwraps its expression via the shared `unwrapTsCast` before the CallExpression check, and the collector's `$provide`/`$expose` call-site tracking (used by the ROZ131/ROZ120 validators) walks up through any chain of TS wrapper ancestors before computing `isStatement`/`atTopLevel` — mirroring the existing $inject walk. No cast is preserved on emit for these statement-form sigils (they bind no value; the meaningless wrapper simply vanishes from the output). Found by the shape-matrix torture harness (spike 012, Round 6b — sibling cast-blindness probe).",
+  "targets": [
+    "react",
+    "vue",
+    "svelte",
+    "angular",
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 6b"
+}

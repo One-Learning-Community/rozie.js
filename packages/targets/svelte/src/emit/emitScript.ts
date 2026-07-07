@@ -50,7 +50,7 @@ import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
 import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
-import { unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
+import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -890,46 +890,65 @@ function emitRefDecls(ir: IRComponent): string[] {
 /**
  * Walk the cloned program and locate, for each ComputedDecl by name, the
  * corresponding initializer expression in the clone (post-rewrite).
+ *
+ * ROZ-cast-blindness fix — `d.init` unwraps through any TS wrapper (`as T` /
+ * `!` / `satisfies T` / `<T>`) before the CallExpression check, so
+ * `const label = $computed(() => ...) as string` is still recognized. The
+ * cast text is captured per name (`casts`) so `emitDerivedDecls` can re-wrap
+ * the emitted `$derived(...)` read in it.
  */
-function findClonedComputedBodies(
-  clonedProgram: t.File,
-): Map<string, t.Expression | t.BlockStatement> {
-  const out = new Map<string, t.Expression | t.BlockStatement>();
+function findClonedComputedBodies(clonedProgram: t.File): {
+  bodies: Map<string, t.Expression | t.BlockStatement>;
+  casts: Map<string, { prefix: string; suffix: string }>;
+} {
+  const bodies = new Map<string, t.Expression | t.BlockStatement>();
+  const casts = new Map<string, { prefix: string; suffix: string }>();
   for (const stmt of clonedProgram.program.body) {
     if (!t.isVariableDeclaration(stmt)) continue;
     for (const d of stmt.declarations) {
       if (!t.isIdentifier(d.id)) continue;
-      if (!d.init || !t.isCallExpression(d.init)) continue;
-      if (!t.isIdentifier(d.init.callee) || d.init.callee.name !== '$computed') continue;
-      const cb = d.init.arguments[0];
+      if (!d.init) continue;
+      const call = unwrapTsCast(d.init);
+      if (!t.isCallExpression(call)) continue;
+      if (!t.isIdentifier(call.callee) || call.callee.name !== '$computed') continue;
+      const cb = call.arguments[0];
       if (!cb) continue;
       if (t.isArrowFunctionExpression(cb) || t.isFunctionExpression(cb)) {
-        out.set(d.id.name, cb.body);
+        bodies.set(d.id.name, cb.body);
+        casts.set(d.id.name, computeTsCastWrapText(d.init, genCode));
       }
     }
   }
-  return out;
+  return { bodies, casts };
 }
 
 /**
  * Emit `const X = $derived(expr);` per ComputedDecl. Block-bodied computed
  * functions get `$derived.by(() => { ... })` per RESEARCH Pattern 1.
+ *
+ * ROZ-cast-blindness fix — re-apply the author's original TS wrapper (`as T`
+ * / `!` / `satisfies T`) around the `$derived(...)`/`$derived.by(...)` read
+ * so a cast-typed `$computed` keeps its author-declared type in the output.
  */
 function emitDerivedDecls(
   computedDecls: ComputedDecl[],
   clonedComputedBodies: Map<string, t.Expression | t.BlockStatement>,
+  clonedComputedCasts: Map<string, { prefix: string; suffix: string }>,
 ): string[] {
   const lines: string[] = [];
   for (const c of computedDecls) {
     const body = clonedComputedBodies.get(c.name) ?? c.body;
+    const cast = clonedComputedCasts.get(c.name);
+    const prefix = cast?.prefix ?? '';
+    const suffix = cast?.suffix ?? '';
     if (t.isBlockStatement(body)) {
-      lines.push(`const ${c.name} = $derived.by(${arrowBody(body)});`);
+      lines.push(`const ${c.name} = ${prefix}$derived.by(${arrowBody(body)})${suffix};`);
     } else {
       // Plain Expression body — pass directly to $derived(expr) so reactivity
       // tracks the read sites in `expr`. ObjectExpression bodies render as
       // `$derived({ x: 1 })` which is valid (and tracks any reactive reads
       // inside the object literal).
-      lines.push(`const ${c.name} = $derived(${genCode(body)});`);
+      lines.push(`const ${c.name} = ${prefix}$derived(${genCode(body)})${suffix};`);
     }
   }
   return lines;
@@ -988,7 +1007,9 @@ function emitWatcherHooks(
   for (let i = 0; i < body.length; i++) {
     const stmt = body[i];
     if (!stmt || !t.isExpressionStatement(stmt)) continue;
-    const expr = stmt.expression;
+    // ROZ-cast-blindness fix — unwrap through any TS wrapper before the
+    // CallExpression check, so `$watch(...) as void` is still recognized.
+    const expr = unwrapTsCast(stmt.expression);
     if (!t.isCallExpression(expr) || !t.isIdentifier(expr.callee)) continue;
     if (expr.callee.name !== '$watch') continue;
     const getterArg = expr.arguments[0];
@@ -1099,7 +1120,9 @@ function emitLifecycleHooks(
     if (consumed.has(i)) continue;
     const stmt = body[i];
     if (!stmt || !t.isExpressionStatement(stmt)) continue;
-    const expr = stmt.expression;
+    // ROZ-cast-blindness fix — unwrap through any TS wrapper before the
+    // CallExpression check, so `$onMount(...) as void` is still recognized.
+    const expr = unwrapTsCast(stmt.expression);
     if (!t.isCallExpression(expr) || !t.isIdentifier(expr.callee)) continue;
     const calleeName = expr.callee.name;
     if (
@@ -1245,16 +1268,22 @@ function emitResidualScriptBody(
     if (consumedLifecycleIndices.has(i)) continue;
 
     // Skip VariableDeclarations whose declarators are ALL $computed initializers.
+    // ROZ-cast-blindness fix — `d.init` unwraps through any TS wrapper before
+    // the CallExpression check, so a cast-typed `$computed` is stripped too
+    // (its `$derived(...)` re-emit already carries the cast — see
+    // emitDerivedDecls above).
     if (t.isVariableDeclaration(stmt)) {
       const allComputed =
         stmt.declarations.length > 0 &&
-        stmt.declarations.every(
-          (d) =>
-            d.init &&
-            t.isCallExpression(d.init) &&
-            t.isIdentifier(d.init.callee) &&
-            d.init.callee.name === '$computed',
-        );
+        stmt.declarations.every((d) => {
+          if (!d.init) return false;
+          const call = unwrapTsCast(d.init);
+          return (
+            t.isCallExpression(call) &&
+            t.isIdentifier(call.callee) &&
+            call.callee.name === '$computed'
+          );
+        });
       if (allComputed) continue;
 
       // Phase 36 (REQ-32 / R6) — `const x = $inject('k', f?)` binders are
@@ -1280,8 +1309,11 @@ function emitResidualScriptBody(
     }
 
     // Skip lifecycle ExpressionStatements (defensive; should already be in consumed).
-    if (t.isExpressionStatement(stmt) && t.isCallExpression(stmt.expression)) {
-      const callee = stmt.expression.callee;
+    // ROZ-cast-blindness fix — unwrap `stmt.expression` through any TS wrapper
+    // before the CallExpression check, so e.g. `$onMount(...) as void` /
+    // `($provide(...) as void)` is still recognized as the sigil and stripped.
+    if (t.isExpressionStatement(stmt) && t.isCallExpression(unwrapTsCast(stmt.expression))) {
+      const callee = (unwrapTsCast(stmt.expression) as t.CallExpression).callee;
       if (t.isIdentifier(callee)) {
         if (
           callee.name === '$onMount' ||
@@ -1458,8 +1490,9 @@ export function emitScript(
   const stateLines = emitStateDecls(ir);
   const refLines = emitRefDecls(ir);
 
-  const clonedComputedBodies = findClonedComputedBodies(cloned);
-  const derivedLines = emitDerivedDecls(ir.computed, clonedComputedBodies);
+  const { bodies: clonedComputedBodies, casts: clonedComputedCasts } =
+    findClonedComputedBodies(cloned);
+  const derivedLines = emitDerivedDecls(ir.computed, clonedComputedBodies, clonedComputedCasts);
 
   const {
     lines: lifecycleLines,

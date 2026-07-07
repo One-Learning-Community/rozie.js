@@ -1,0 +1,16 @@
+{
+  "id": "REG-SPIKE012-R6B-COMPUTED-AS-CAST",
+  "source": ".planning/spikes/012-emitter-shape-matrix/lib/generate.mjs (sigil-cast/computed-as, sigil-cast/computed-nonnull)",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Sibling of the ROZ132 $inject cast-blindness bug (a84c1714): `const label = $computed(() => ...) as string` shares the identical `if (!t.isCallExpression(declarator.init)) return null;` collector shape as $inject — a TS wrapper (`as T` / `!` / `satisfies T` / angle-cast `<T>`) around the `$computed(...)` call made the collector silently DROP the computed entirely (worse than the inject bug, which at least hard-errored): the raw `$computed(...)` call leaked verbatim into every target's emitted output as a free identifier reference — a SILENT runtime ReferenceError, with no compile diagnostic. Fix: `extractComputedFromDeclarator` (collectScriptDecls.ts) unwraps `declarator.init` via the shared `unwrapTsCast` before the CallExpression check, and each target's residual-strip (`allComputed`) does the same. Each target's computed-emission re-applies the author's cast — but at the CALLBACK'S RETURN VALUE, not around the outer reactive-primitive call (`useMemo`/`computed`/`createMemo`/`$derived`/getter) — because Vue's `computed()` returns `ComputedRef<T>` and Solid's `createMemo()` returns `Accessor<T>` (not `T` directly); casting THOSE wrapper types to `T` is a genuine `TS2352` type error (confirmed by the shape-matrix harness) that also breaks every downstream `.value`/`()` read. React's `useMemo` happens to return `T` directly so either placement is type-safe there, but the return-value placement is correct on every target uniformly. Found by the shape-matrix torture harness (spike 012, Round 6b — sibling cast-blindness probe).",
+  "targets": [
+    "react",
+    "vue",
+    "svelte",
+    "angular",
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 6b"
+}

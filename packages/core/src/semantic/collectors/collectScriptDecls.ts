@@ -60,11 +60,21 @@ const LIFECYCLE_CALLS: Record<string, 'mount' | 'unmount' | 'update'> = {
   $onUpdate: 'update',
 };
 
+/**
+ * ROZ-cast-blindness fix (sibling to the ROZ132 $inject fix) — `declarator.init`
+ * is unwrapped through any TS wrapper (`as T` / `!` / `satisfies T` / `<T>`)
+ * before the CallExpression check, so `const label = $computed(() => ...) as
+ * string` is collected exactly like the bare form. The wrapper is type-only
+ * sugar around the same runtime call; emitters re-apply it via
+ * `computeTsCastWrapText` around the emitted `useMemo`/`computed`/`createMemo`/
+ * etc. read (see per-target emitScript computed emission).
+ */
 function extractComputedFromDeclarator(
   declarator: t.VariableDeclarator,
 ): ComputedDeclEntry | null {
   if (!t.isIdentifier(declarator.id)) return null;
-  const init = declarator.init;
+  const rawInit = declarator.init;
+  const init = rawInit ? unwrapTsCast(rawInit) : null;
   if (!init || !t.isCallExpression(init)) return null;
   if (!t.isIdentifier(init.callee) || init.callee.name !== '$computed') return null;
   const cb = init.arguments[0];
@@ -77,19 +87,27 @@ function extractComputedFromDeclarator(
   };
 }
 
+/**
+ * ROZ-cast-blindness fix — `expr` (a top-level ExpressionStatement's
+ * expression) is unwrapped through any TS wrapper before the CallExpression
+ * check, so `$onMount(...) as void` (a nonsensical but authored cast) is
+ * still collected. No cast is preserved on emit — lifecycle hooks have no
+ * bound value; the meaningless wrapper simply vanishes from the output.
+ */
 function extractLifecycleFromExpression(
   expr: t.Expression,
 ): LifecycleHookEntry | null {
-  if (!t.isCallExpression(expr)) return null;
-  if (!t.isIdentifier(expr.callee)) return null;
-  const phase = LIFECYCLE_CALLS[expr.callee.name];
+  const call = unwrapTsCast(expr);
+  if (!t.isCallExpression(call)) return null;
+  if (!t.isIdentifier(call.callee)) return null;
+  const phase = LIFECYCLE_CALLS[call.callee.name];
   if (!phase) return null;
-  const callback = expr.arguments[0];
+  const callback = call.arguments[0];
   if (!callback || !t.isExpression(callback)) return null;
   return {
     phase,
     callback,
-    sourceLoc: locFromBabel(expr),
+    sourceLoc: locFromBabel(call),
   };
 }
 
@@ -100,12 +118,16 @@ function extractLifecycleFromExpression(
  * silent per Plan 02-01 contract) — the validator emits ROZ109 separately.
  */
 function extractWatchFromExpression(expr: t.Expression): WatchEntry | null {
-  if (!t.isCallExpression(expr)) return null;
-  if (!t.isIdentifier(expr.callee)) return null;
-  if (expr.callee.name !== '$watch') return null;
-  if (expr.arguments.length < 2) return null;
-  const getter = expr.arguments[0];
-  const callback = expr.arguments[1];
+  // ROZ-cast-blindness fix — unwrap through any TS wrapper before the
+  // CallExpression check, so `$watch(...) as void` is still collected. No
+  // cast is preserved on emit (a watcher has no bound value).
+  const call = unwrapTsCast(expr);
+  if (!t.isCallExpression(call)) return null;
+  if (!t.isIdentifier(call.callee)) return null;
+  if (call.callee.name !== '$watch') return null;
+  if (call.arguments.length < 2) return null;
+  const getter = call.arguments[0];
+  const callback = call.arguments[1];
   if (
     !getter ||
     (!t.isArrowFunctionExpression(getter) && !t.isFunctionExpression(getter))
@@ -125,7 +147,7 @@ function extractWatchFromExpression(expr: t.Expression): WatchEntry | null {
   // defaults to `immediate = false`. The collector stays silent on malformed
   // input (Plan 02-01 contract); no eval / dynamic-key execution.
   let immediate = false;
-  const optionsArg = expr.arguments[2];
+  const optionsArg = call.arguments[2];
   if (optionsArg && t.isObjectExpression(optionsArg)) {
     for (const prop of optionsArg.properties) {
       if (!t.isObjectProperty(prop)) continue;
@@ -143,7 +165,7 @@ function extractWatchFromExpression(expr: t.Expression): WatchEntry | null {
     getter,
     callback,
     immediate,
-    sourceLoc: locFromBabel(expr),
+    sourceLoc: locFromBabel(call),
   };
 }
 
@@ -163,10 +185,14 @@ function extractWatchFromExpression(expr: t.Expression): WatchEntry | null {
 function extractExposeFromExpression(
   expr: t.Expression,
 ): ExposedMethodEntry[] | null {
-  if (!t.isCallExpression(expr)) return null;
-  if (!t.isIdentifier(expr.callee)) return null;
-  if (expr.callee.name !== '$expose') return null;
-  const arg = expr.arguments[0];
+  // ROZ-cast-blindness fix — unwrap through any TS wrapper before the
+  // CallExpression check, so `($expose({...}) as unknown)` is still
+  // collected (and correctly seen as top-level — see the ROZ120 walk below).
+  const call = unwrapTsCast(expr);
+  if (!t.isCallExpression(call)) return null;
+  if (!t.isIdentifier(call.callee)) return null;
+  if (call.callee.name !== '$expose') return null;
+  const arg = call.arguments[0];
   if (!arg || !t.isObjectExpression(arg)) return [];
   const entries: ExposedMethodEntry[] = [];
   for (const prop of arg.properties) {
@@ -199,17 +225,21 @@ function extractExposeFromExpression(
 function extractProvideFromExpression(
   expr: t.Expression,
 ): ProvideEntry | null {
-  if (!t.isCallExpression(expr)) return null;
-  if (!t.isIdentifier(expr.callee)) return null;
-  if (expr.callee.name !== '$provide') return null;
-  const keyArg = expr.arguments[0];
+  // ROZ-cast-blindness fix — unwrap through any TS wrapper before the
+  // CallExpression check, so `($provide(...) as void)` is still collected
+  // (and correctly seen as a top-level statement — see the ROZ131 walk below).
+  const call = unwrapTsCast(expr);
+  if (!t.isCallExpression(call)) return null;
+  if (!t.isIdentifier(call.callee)) return null;
+  if (call.callee.name !== '$provide') return null;
+  const keyArg = call.arguments[0];
   if (!keyArg || !t.isStringLiteral(keyArg)) return null;
-  const valueArg = expr.arguments[1];
+  const valueArg = call.arguments[1];
   if (!valueArg || !t.isExpression(valueArg)) return null;
   return {
     key: keyArg.value,
     valueExpr: valueArg,
-    sourceLoc: locFromBabel(expr),
+    sourceLoc: locFromBabel(call),
   };
 }
 
@@ -320,9 +350,23 @@ export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): 
       // parent is the Program body (the only valid placement). Anything nested
       // inside a function / block is atTopLevel:false → the validator emits
       // ROZ120. Duplicate top-level calls (>1) → ROZ119.
+      //
+      // ROZ120 cast-blindness fix — `($expose({...}) as unknown)` parses the
+      // call's immediate parent as the `TSAsExpression`, NOT the
+      // ExpressionStatement, so the direct-parent check below would falsely
+      // report ROZ120 for a cast-wrapped-but-top-level call. Walk UP through
+      // any chain of TS wrapper ancestors first, mirroring the $inject walk.
       if (callee.name === '$expose') {
-        const parent = path.parent;
-        const grandparent = path.parentPath?.parent;
+        let outer: NodePath = path;
+        while (
+          outer.parentPath &&
+          isTsCastWrapper(outer.parentPath.node) &&
+          outer.parentPath.node.expression === outer.node
+        ) {
+          outer = outer.parentPath;
+        }
+        const parent = outer.parent;
+        const grandparent = outer.parentPath?.parent;
         const atTopLevel =
           t.isExpressionStatement(parent) && t.isProgram(grandparent);
         bindings.exposeCalls.push({ call: path.node, atTopLevel });
@@ -333,8 +377,22 @@ export function collectScriptDecls(script: ScriptAST, bindings: BindingsTable): 
       // ExpressionStatement. Anything else (expression position — assigned,
       // returned, nested in a larger expression) → ROZ131. ROZ129 (non-string
       // key) is checked against the call's first argument by the validator.
+      //
+      // ROZ131 cast-blindness fix — `($provide(...) as void)` parses the
+      // call's immediate parent as the `TSAsExpression`, NOT the
+      // ExpressionStatement, so the direct-parent check below would falsely
+      // report ROZ131 for a cast-wrapped-but-statement-position call. Walk UP
+      // through any chain of TS wrapper ancestors first, mirroring $inject.
       if (callee.name === '$provide') {
-        const parent = path.parent;
+        let outer: NodePath = path;
+        while (
+          outer.parentPath &&
+          isTsCastWrapper(outer.parentPath.node) &&
+          outer.parentPath.node.expression === outer.node
+        ) {
+          outer = outer.parentPath;
+        }
+        const parent = outer.parent;
         const isStatement = t.isExpressionStatement(parent);
         bindings.provideCalls.push({ call: path.node, isStatement });
         return;

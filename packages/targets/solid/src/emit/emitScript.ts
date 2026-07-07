@@ -25,7 +25,7 @@ import { rewriteRozieIdentifiers, rewriteRozieExpressionNode as rewriteNode } fr
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { renderType, zeroValueFor } from './emitPropsInterface.js';
-import { unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
+import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -52,6 +52,35 @@ function genCode(node: t.Node): string {
 }
 
 /**
+ * ROZ-cast-blindness fix — Solid emits each ComputedDecl's body via
+ * `rewriteNode(c.body, ir)` directly from IR (never re-scanning the cloned
+ * Program for the body itself), so there is no existing "find the cloned
+ * declarator" seam to piggyback a cast lookup onto. This walks the cloned
+ * (post-rewrite) Program's top level to find, for each `$computed`-bound
+ * declarator name, the author's original TS wrapper (`as T` / `!` /
+ * `satisfies T` / `<T>`) so `createMemo(...)` can be re-wrapped in it —
+ * unwrapping through the wrapper before the CallExpression check so
+ * `const label = $computed(() => ...) as string` is still recognized.
+ */
+function findClonedComputedCasts(
+  clonedProgram: t.File,
+): Map<string, { prefix: string; suffix: string }> {
+  const casts = new Map<string, { prefix: string; suffix: string }>();
+  for (const stmt of clonedProgram.program.body) {
+    if (!t.isVariableDeclaration(stmt)) continue;
+    for (const d of stmt.declarations) {
+      if (!t.isIdentifier(d.id)) continue;
+      if (!d.init) continue;
+      const call = unwrapTsCast(d.init);
+      if (!t.isCallExpression(call)) continue;
+      if (!t.isIdentifier(call.callee) || call.callee.name !== '$computed') continue;
+      casts.set(d.id.name, computeTsCastWrapText(d.init, genCode));
+    }
+  }
+  return casts;
+}
+
+/**
  * Emit `() => body` for an Expression or BlockStatement body.
  *
  * Building the arrow as a Babel node (rather than string-templating
@@ -62,6 +91,28 @@ function genCode(node: t.Node): string {
  */
 function arrowBody(body: t.Expression | t.BlockStatement): string {
   return genCode(t.arrowFunctionExpression([], body));
+}
+
+/**
+ * ROZ-cast-blindness fix — render a `$computed` callback body as a
+ * `() => ...` arrow, re-applying the author's original TS wrapper (`as T` /
+ * `!` / `satisfies T`) around the callback's RETURN VALUE rather than around
+ * the whole `createMemo(...)` call. Solid's `createMemo()` returns an
+ * `Accessor<T>` wrapper (read via `label()`) — casting THAT to `T` is a
+ * genuine type error (TS2352, confirmed by the shape-matrix harness) that
+ * ALSO breaks every downstream `label()` call-read (TS2349, "not callable").
+ * Casting the return value keeps `Accessor<T>` intact while still typing the
+ * produced value. No cast → byte-identical to plain `arrowBody(body)`.
+ */
+function renderComputedArrow(
+  body: t.Expression | t.BlockStatement,
+  cast: { prefix: string; suffix: string } | undefined,
+): string {
+  if (!cast || (cast.prefix === '' && cast.suffix === '')) {
+    return arrowBody(body);
+  }
+  const inner = t.isBlockStatement(body) ? `(${arrowBody(body)})()` : genCode(body);
+  return `() => (${cast.prefix}${inner}${cast.suffix})`;
 }
 
 function capitalize(name: string): string {
@@ -613,10 +664,14 @@ export function emitScript(
 
   // 3. createMemo for each ComputedDecl.
   // Rule 1 fix: rewrite $props/$data/$refs in the computed body before emitting.
+  const clonedComputedCasts = findClonedComputedCasts(rewriteResult.rewrittenProgram);
   for (const c of ir.computed) {
     collectors.solidImports.add('createMemo');
     const rewrittenBody = rewriteNode(c.body, ir);
-    hookLines.push(`const ${c.name} = createMemo(${arrowBody(rewrittenBody)});`);
+    // ROZ-cast-blindness fix — renderComputedArrow re-applies the author's
+    // original TS wrapper around the callback's return value (see its doc).
+    const cast = clonedComputedCasts.get(c.name);
+    hookLines.push(`const ${c.name} = createMemo(${renderComputedArrow(rewrittenBody, cast)});`);
   }
 
   // Portal-slot primitive (Spike 003) — emit portal scaffolding just before
@@ -852,14 +907,19 @@ export function emitScript(
   const residualStmts: t.Statement[] = [];
   for (const stmt of rewriteResult.rewrittenProgram.program.body) {
     // Skip $computed variable declarations.
+    // ROZ-cast-blindness fix — `d.init` unwraps through any TS wrapper before
+    // the CallExpression check, so a cast-typed `$computed` is stripped too
+    // (its `createMemo(...)` re-emit already carries the cast — see above).
     if (t.isVariableDeclaration(stmt)) {
-      const allComputed = stmt.declarations.every(
-        (d) =>
-          d.init &&
-          t.isCallExpression(d.init) &&
-          t.isIdentifier(d.init.callee) &&
-          d.init.callee.name === '$computed',
-      );
+      const allComputed = stmt.declarations.every((d) => {
+        if (!d.init) return false;
+        const call = unwrapTsCast(d.init);
+        return (
+          t.isCallExpression(call) &&
+          t.isIdentifier(call.callee) &&
+          call.callee.name === '$computed'
+        );
+      });
       if (allComputed) continue;
 
       // Phase 36 — `const x = $inject('k', f?)` binders are COMPILE-TIME
@@ -884,8 +944,11 @@ export function emitScript(
       if (allInject) continue;
     }
     // Skip lifecycle call expressions.
-    if (t.isExpressionStatement(stmt) && t.isCallExpression(stmt.expression)) {
-      const callee = stmt.expression.callee;
+    // ROZ-cast-blindness fix — unwrap `stmt.expression` through any TS wrapper
+    // before the CallExpression check, so e.g. `$onMount(...) as void` /
+    // `($provide(...) as void)` is still recognized as the sigil and stripped.
+    if (t.isExpressionStatement(stmt) && t.isCallExpression(unwrapTsCast(stmt.expression))) {
+      const callee = (unwrapTsCast(stmt.expression) as t.CallExpression).callee;
       if (
         t.isIdentifier(callee) &&
         (callee.name === '$onMount' ||

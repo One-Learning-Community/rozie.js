@@ -1,0 +1,16 @@
+<rozie name="ProvideAsCast">
+<data>
+{
+  color: 'red',
+}
+</data>
+
+<script lang="ts">
+$provide('theme', { get color(): string { return $data.color } }) as void
+</script>
+
+<template>
+<div class="r"><slot></slot></div>
+</template>
+
+</rozie>

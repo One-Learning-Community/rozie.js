@@ -40,7 +40,7 @@ import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { toKebabCase } from './emitDecorator.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
-import { unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
+import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
@@ -436,7 +436,9 @@ function isLifecycleCall(stmt: t.Statement): {
   argument?: t.Expression;
 } {
   if (!t.isExpressionStatement(stmt)) return { isHook: false };
-  const expr = stmt.expression;
+  // ROZ-cast-blindness fix — unwrap through any TS wrapper before the
+  // CallExpression check, so `$onMount(...) as void` is still recognized.
+  const expr = unwrapTsCast(stmt.expression);
   if (!t.isCallExpression(expr)) return { isHook: false };
   if (!t.isIdentifier(expr.callee)) return { isHook: false };
   const name = expr.callee.name;
@@ -546,7 +548,10 @@ function partitionScript(program: t.File): PartitionedScript {
     // top-level call form; non-$expose statements flow through unchanged so
     // byte-identity holds when ir.expose is empty.
     if (t.isExpressionStatement(stmt)) {
-      const callExpr = stmt.expression;
+      // ROZ-cast-blindness fix — unwrap through any TS wrapper before the
+      // CallExpression check, so e.g. `($expose({...}) as unknown)` /
+      // `($provide(...) as void)` is still recognized as the sigil.
+      const callExpr = unwrapTsCast(stmt.expression);
       if (
         t.isCallExpression(callExpr) &&
         t.isIdentifier(callExpr.callee) &&
@@ -592,8 +597,10 @@ function partitionScript(program: t.File): PartitionedScript {
       if (allInject) continue;
     }
     // Quick plan 260515-u2b — top-level $watch call detection.
+    // ROZ-cast-blindness fix — unwrap through any TS wrapper before the
+    // CallExpression check, so `$watch(...) as void` is still recognized.
     if (t.isExpressionStatement(stmt)) {
-      const expr = stmt.expression;
+      const expr = unwrapTsCast(stmt.expression);
       if (
         t.isCallExpression(expr) &&
         t.isIdentifier(expr.callee) &&
@@ -727,26 +734,51 @@ function classBodyFromStatements(
         const name = decl.id.name;
 
         // $computed(() => expr) → getter method
+        // ROZ-cast-blindness fix — `decl.init` unwraps through any TS wrapper
+        // (`as T` / `!` / `satisfies T` / `<T>`) before the CallExpression
+        // check, so `const label = $computed(() => ...) as string` is still
+        // recognized (rather than falling through to the "plain value
+        // initializer" branch below, which would leak the raw `$computed`
+        // identifier as a class field — a ReferenceError at runtime). The
+        // getter has no natural "wrapped read" call site the way
+        // useMemo/computed/createMemo do on the other targets, so the cast is
+        // re-applied around the RETURN VALUE instead — `return (expr) as T;`
+        // for an expression body, or around an IIFE-wrapped block body.
+        const computedCall = unwrapTsCast(decl.init);
         if (
           computedNames.has(name) &&
-          t.isCallExpression(decl.init) &&
-          t.isIdentifier(decl.init.callee) &&
-          decl.init.callee.name === '$computed' &&
-          decl.init.arguments.length > 0
+          t.isCallExpression(computedCall) &&
+          t.isIdentifier(computedCall.callee) &&
+          computedCall.callee.name === '$computed' &&
+          computedCall.arguments.length > 0
         ) {
-          const arrow = decl.init.arguments[0]!;
+          const arrow = computedCall.arguments[0]!;
           if (t.isArrowFunctionExpression(arrow) || t.isFunctionExpression(arrow)) {
+            const cast = computeTsCastWrapText(
+              decl.init,
+              (node) => generate(node, GEN_OPTS).code,
+            );
             if (t.isExpression(arrow.body)) {
               methodChunks.push(
-                `  get ${name}() { return ${renderExpression(arrow.body)}; }`,
+                `  get ${name}() { return ${cast.prefix}${renderExpression(arrow.body)}${cast.suffix}; }`,
               );
             } else if (t.isBlockStatement(arrow.body)) {
               const bodyCode = arrow.body.body
                 .map((s) => generate(s, GEN_OPTS).code)
                 .join('\n');
-              methodChunks.push(
-                `  get ${name}() {\n${indent(bodyCode, 4)}\n  }`,
-              );
+              if (cast.prefix === '' && cast.suffix === '') {
+                methodChunks.push(
+                  `  get ${name}() {\n${indent(bodyCode, 4)}\n  }`,
+                );
+              } else {
+                // Cast-typed block-bodied computed — no single "return value"
+                // to splice the cast onto without re-walking every return
+                // statement, so wrap the whole block in an IIFE arrow
+                // (preserves `this` binding) and cast its result.
+                methodChunks.push(
+                  `  get ${name}() { return ${cast.prefix}(() => {\n${indent(bodyCode, 4)}\n  })()${cast.suffix}; }`,
+                );
+              }
             }
             continue;
           }

@@ -243,8 +243,11 @@ function readClonedContext(clonedProgram: t.File): {
 
   for (const stmt of clonedProgram.program.body) {
     // $provide('k', v) — a top-level ExpressionStatement CallExpression.
-    if (t.isExpressionStatement(stmt) && t.isCallExpression(stmt.expression)) {
-      const call = stmt.expression;
+    // ROZ131 cast-blindness fix — unwrap `stmt.expression` through any TS
+    // wrapper (`as void` etc.) before the CallExpression check, so a
+    // cast-wrapped `$provide(...)` statement is still emitted.
+    if (t.isExpressionStatement(stmt) && t.isCallExpression(unwrapTsCast(stmt.expression))) {
+      const call = unwrapTsCast(stmt.expression) as t.CallExpression;
       if (
         t.isIdentifier(call.callee) &&
         call.callee.name === '$provide' &&

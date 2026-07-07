@@ -53,7 +53,7 @@ import { VueImportCollector } from '../rewrite/collectVueImports.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { buildSlotTypeBlock } from './refineSlotTypes.js';
-import { unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
+import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -107,6 +107,28 @@ function genCode(node: t.Node): string {
  */
 function arrowBody(body: t.Expression | t.BlockStatement): string {
   return genCode(t.arrowFunctionExpression([], body));
+}
+
+/**
+ * ROZ-cast-blindness fix — render a `$computed` callback body as a
+ * `() => ...` arrow, re-applying the author's original TS wrapper (`as T` /
+ * `!` / `satisfies T`) around the callback's RETURN VALUE rather than around
+ * the whole `computed(...)` call. Vue's `computed()` returns a
+ * `ComputedRef<T>` wrapper (read via `.value`) — casting THAT to `T` is a
+ * genuine type error (TS2352), and every downstream `.value` read still
+ * expects the wrapper. Casting the return value keeps `ComputedRef<T>`
+ * intact while still typing the produced value. No cast → byte-identical to
+ * plain `arrowBody(body)`.
+ */
+function renderComputedArrow(
+  body: t.Expression | t.BlockStatement,
+  cast: { prefix: string; suffix: string } | undefined,
+): string {
+  if (!cast || (cast.prefix === '' && cast.suffix === '')) {
+    return arrowBody(body);
+  }
+  const inner = t.isBlockStatement(body) ? `(${arrowBody(body)})()` : genCode(body);
+  return `() => (${cast.prefix}${inner}${cast.suffix})`;
 }
 
 /**
@@ -715,6 +737,7 @@ function emitComputedDecls(
   computedDecls: ComputedDecl[],
   cloneClonedComputedBodies: Map<string, t.Expression | t.BlockStatement>,
   imports: VueImportCollector,
+  clonedComputedCasts: Map<string, { prefix: string; suffix: string }>,
 ): string[] {
   const lines: string[] = [];
   for (const c of computedDecls) {
@@ -725,7 +748,10 @@ function emitComputedDecls(
     // rewriteRozieIdentifiers' Identifier visitor in templates / scripts.
     // genCode handles both BlockStatement (`{ return x; }`) and Expression (`x`)
     // bodies correctly — the if/else was dead code (both branches identical).
-    lines.push(`const ${c.name} = computed(${arrowBody(body)});`);
+    // ROZ-cast-blindness fix — renderComputedArrow re-applies the author's
+    // original TS wrapper around the callback's return value (see its doc).
+    const cast = clonedComputedCasts.get(c.name);
+    lines.push(`const ${c.name} = computed(${renderComputedArrow(body, cast)});`);
   }
   return lines;
 }
@@ -737,25 +763,36 @@ function emitComputedDecls(
  * The clone preserves source-order indices, so we walk and match VariableDeclarator
  * id.name === computed.name where the initializer is a CallExpression to $computed
  * (the arrow's body is the body we want).
+ *
+ * ROZ-cast-blindness fix — `d.init` unwraps through any TS wrapper (`as T` /
+ * `!` / `satisfies T` / `<T>`) before the CallExpression check, so
+ * `const label = $computed(() => ...) as string` is still recognized. The
+ * cast text is captured per name (`casts`) so `emitComputedDecls` can
+ * re-wrap the emitted `computed(...)` read in it.
  */
-function findClonedComputedBodies(
-  clonedProgram: t.File,
-): Map<string, t.Expression | t.BlockStatement> {
-  const out = new Map<string, t.Expression | t.BlockStatement>();
+function findClonedComputedBodies(clonedProgram: t.File): {
+  bodies: Map<string, t.Expression | t.BlockStatement>;
+  casts: Map<string, { prefix: string; suffix: string }>;
+} {
+  const bodies = new Map<string, t.Expression | t.BlockStatement>();
+  const casts = new Map<string, { prefix: string; suffix: string }>();
   for (const stmt of clonedProgram.program.body) {
     if (!t.isVariableDeclaration(stmt)) continue;
     for (const d of stmt.declarations) {
       if (!t.isIdentifier(d.id)) continue;
-      if (!d.init || !t.isCallExpression(d.init)) continue;
-      if (!t.isIdentifier(d.init.callee) || d.init.callee.name !== '$computed') continue;
-      const cb = d.init.arguments[0];
+      if (!d.init) continue;
+      const call = unwrapTsCast(d.init);
+      if (!t.isCallExpression(call)) continue;
+      if (!t.isIdentifier(call.callee) || call.callee.name !== '$computed') continue;
+      const cb = call.arguments[0];
       if (!cb) continue;
       if (t.isArrowFunctionExpression(cb) || t.isFunctionExpression(cb)) {
-        out.set(d.id.name, cb.body);
+        bodies.set(d.id.name, cb.body);
+        casts.set(d.id.name, computeTsCastWrapText(d.init, genCode));
       }
     }
   }
-  return out;
+  return { bodies, casts };
 }
 
 /**
@@ -821,7 +858,9 @@ function emitWatcherHooks(
   for (let i = 0; i < body.length; i++) {
     const stmt = body[i];
     if (!stmt || !t.isExpressionStatement(stmt)) continue;
-    const expr = stmt.expression;
+    // ROZ-cast-blindness fix — unwrap through any TS wrapper before the
+    // CallExpression check, so `$watch(...) as void` is still recognized.
+    const expr = unwrapTsCast(stmt.expression);
     if (!t.isCallExpression(expr) || !t.isIdentifier(expr.callee)) continue;
     if (expr.callee.name !== '$watch') continue;
     const getterArg = expr.arguments[0];
@@ -874,7 +913,9 @@ function emitLifecycleHooks(
     if (consumed.has(i)) continue;
     const stmt = body[i];
     if (!stmt || !t.isExpressionStatement(stmt)) continue;
-    const expr = stmt.expression;
+    // ROZ-cast-blindness fix — unwrap through any TS wrapper before the
+    // CallExpression check, so `$onMount(...) as void` is still recognized.
+    const expr = unwrapTsCast(stmt.expression);
     if (!t.isCallExpression(expr) || !t.isIdentifier(expr.callee)) continue;
     const calleeName = expr.callee.name;
     if (
@@ -1043,16 +1084,22 @@ function emitResidualScriptBody(
     if (consumedLifecycleIndices.has(i)) continue;
 
     // Skip VariableDeclarations whose declarators are ALL $computed initializers.
+    // ROZ-cast-blindness fix — `d.init` unwraps through any TS wrapper before
+    // the CallExpression check, so a cast-typed `$computed` is stripped too
+    // (its `computed(...)` re-emit already carries the cast — see
+    // emitComputedDecls above).
     if (t.isVariableDeclaration(stmt)) {
       const allComputed =
         stmt.declarations.length > 0 &&
-        stmt.declarations.every(
-          (d) =>
-            d.init &&
-            t.isCallExpression(d.init) &&
-            t.isIdentifier(d.init.callee) &&
-            d.init.callee.name === '$computed',
-        );
+        stmt.declarations.every((d) => {
+          if (!d.init) return false;
+          const call = unwrapTsCast(d.init);
+          return (
+            t.isCallExpression(call) &&
+            t.isIdentifier(call.callee) &&
+            call.callee.name === '$computed'
+          );
+        });
       if (allComputed) continue;
 
       // Phase 36 — `const x = $inject('k', f?)` binders are COMPILE-TIME
@@ -1078,8 +1125,11 @@ function emitResidualScriptBody(
 
     // Skip ExpressionStatements that are $emit/$computed/$onMount/$onUnmount/$onUpdate
     // calls at top level — these would only get here if not consumed above (rare/safety).
-    if (t.isExpressionStatement(stmt) && t.isCallExpression(stmt.expression)) {
-      const callee = stmt.expression.callee;
+    // ROZ-cast-blindness fix — unwrap `stmt.expression` through any TS wrapper
+    // before the CallExpression check, so e.g. `$onMount(...) as void` /
+    // `($provide(...) as void)` is still recognized as the sigil and stripped.
+    if (t.isExpressionStatement(stmt) && t.isCallExpression(unwrapTsCast(stmt.expression))) {
+      const callee = (unwrapTsCast(stmt.expression) as t.CallExpression).callee;
       if (t.isIdentifier(callee)) {
         if (
           callee.name === '$onMount' ||
@@ -1217,8 +1267,14 @@ export function emitScript(
   const dataLines = emitDataRefs(ir, imports);
   const refLines = emitTemplateRefs(ir, imports);
 
-  const clonedComputedBodies = findClonedComputedBodies(cloned);
-  const computedLines = emitComputedDecls(ir.computed, clonedComputedBodies, imports);
+  const { bodies: clonedComputedBodies, casts: clonedComputedCasts } =
+    findClonedComputedBodies(cloned);
+  const computedLines = emitComputedDecls(
+    ir.computed,
+    clonedComputedBodies,
+    imports,
+    clonedComputedCasts,
+  );
 
   const { lines: lifecycleLines, consumedIndices } = emitLifecycleHooks(cloned, imports);
 
