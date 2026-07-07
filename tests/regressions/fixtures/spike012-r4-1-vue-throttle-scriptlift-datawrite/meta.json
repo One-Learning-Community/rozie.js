@@ -1,0 +1,11 @@
+{
+  "id": "REG-SPIKE012-R4-1",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-4 Seam-1: a `.throttle(N)` / `.debounce(N)` statement handler that WRITES a $data ref (`@click.throttle(200)=\"$data.n = 5\"`) is lifted into <script setup>, where the Ref auto-unwrap Vue applies in templates is NOT in effect. Pre-R4 the lifted body emitted `n = 5` — a write to the `const n = ref(0)` binding → TS2588 (const-assign) + a runtime 'Assignment to constant variable' that never updated the ref. R4 renders the lifted handler in SCRIPT context so it emits `n.value = 5`; the synthesized thunk param is typed `($event: any)` (the body may read `$event.target.value`, which is `unknown`/TS18046 without an annotation). Sibling of R3-1 (debounce + $event read); found by the shape-matrix harness's new vue-tsc leg.",
+  "targets": [
+    "vue"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — vue-tsc leg (Round 4 Phase A)"
+}

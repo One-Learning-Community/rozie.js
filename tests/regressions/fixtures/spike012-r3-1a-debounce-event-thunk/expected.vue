@@ -14,5 +14,5 @@ const q = ref('');
 
 function noop(): void {}
 
-const debouncedHandler0 = debounce(($event) => { q = $event.target.value; }, 300);
+const debouncedHandler0 = debounce(($event: any) => { q.value = $event.target.value; }, 300);
 </script>

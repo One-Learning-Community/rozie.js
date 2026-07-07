@@ -1,0 +1,18 @@
+<rozie name="ThrottleScriptLiftDataWrite">
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<div class="r">
+  <button @click.throttle(200)="$data.n = 5">go</button>
+</div>
+</template>
+
+</rozie>

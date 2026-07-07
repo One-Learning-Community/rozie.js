@@ -59,6 +59,17 @@ function flattenInlineCode(code: string): string {
 export function rewriteTemplateExpression(
   expr: t.Expression,
   ir: IRComponent,
+  /**
+   * Spike-012 R4 — SCRIPT-context rendering (default false = template context).
+   * A `.debounce`/`.throttle` template handler is LIFTED into `<script setup>`
+   * (emitTemplateEvent), where Vue's template Ref auto-unwrap is NOT in effect:
+   * `$data.q` / a model `$props.value` / `$refs.el` must carry an explicit
+   * `.value` (they are `Ref<T>` consts in script scope). Without this the lifted
+   * handler emits `q = …` — a write to a `const` ref → TS2588 + a runtime
+   * "Assignment to constant variable" that never updates the ref. Template
+   * callers pass false (unchanged, byte-identical).
+   */
+  scriptContext = false,
 ): string {
   // Clone the expression so we don't mutate the IR's preserved nodes.
   const cloned = t.cloneNode(expr, true, false);
@@ -67,6 +78,13 @@ export function rewriteTemplateExpression(
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
   const dataNames = new Set(ir.state.map((s) => s.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
+
+  // In script context a lowered Ref name reads/writes through `.value`; in
+  // template context Vue auto-unwraps, so the bare identifier stands.
+  const asRef = (name: string): t.Expression =>
+    scriptContext
+      ? t.memberExpression(t.identifier(name), t.identifier('value'))
+      : t.identifier(name);
 
   // Wrap in a Program shell so traverse() works on a top-level Node.
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
@@ -99,13 +117,13 @@ export function rewriteTemplateExpression(
 
       if (obj.name === '$props') {
         if (modelProps.has(prop.name)) {
-          // $props.value (model) → value  (NO .value in template — auto-unwrap)
-          path.replaceWith(t.identifier(prop.name));
+          // $props.value (model) → value (template) / value.value (script)
+          path.replaceWith(asRef(prop.name));
           path.skip();
           return;
         }
         if (nonModelProps.has(prop.name)) {
-          // $props.step → props.step
+          // $props.step → props.step (proxy — no .value in either context)
           path.node.object = t.identifier('props');
           return;
         }
@@ -113,14 +131,14 @@ export function rewriteTemplateExpression(
         return;
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
-        // $data.hovering → hovering  (NO .value in template)
-        path.replaceWith(t.identifier(prop.name));
+        // $data.hovering → hovering (template) / hovering.value (script)
+        path.replaceWith(asRef(prop.name));
         path.skip();
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
-        // $refs.dialogEl → dialogElRef (NO .value in template — Pitfall 4 suffix only)
-        path.replaceWith(t.identifier(prop.name + 'Ref'));
+        // $refs.dialogEl → dialogElRef (template) / dialogElRef.value (script)
+        path.replaceWith(asRef(prop.name + 'Ref'));
         path.skip();
         return;
       }
@@ -136,7 +154,7 @@ export function rewriteTemplateExpression(
 
       if (obj.name === '$props') {
         if (modelProps.has(prop.name)) {
-          path.replaceWith(t.identifier(prop.name));
+          path.replaceWith(asRef(prop.name));
           path.skip();
           return;
         }
@@ -147,12 +165,12 @@ export function rewriteTemplateExpression(
         return;
       }
       if (obj.name === '$data' && dataNames.has(prop.name)) {
-        path.replaceWith(t.identifier(prop.name));
+        path.replaceWith(asRef(prop.name));
         path.skip();
         return;
       }
       if (obj.name === '$refs' && refNames.has(prop.name)) {
-        path.replaceWith(t.identifier(prop.name + 'Ref'));
+        path.replaceWith(asRef(prop.name + 'Ref'));
         path.skip();
         return;
       }

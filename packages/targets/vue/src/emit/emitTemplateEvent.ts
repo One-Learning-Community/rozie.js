@@ -95,10 +95,12 @@ function renderModifierArg(arg: ModifierArg): string {
 
 /**
  * Render the original handler expression as a Vue-template-friendly string.
- * Shared with emitTemplate for non-modifier-wrap paths.
+ * Shared with emitTemplate for non-modifier-wrap paths. `scriptContext` renders
+ * for `<script setup>` scope (Ref reads/writes carry `.value`) — used by the
+ * `.debounce`/`.throttle` wrap, which LIFTS the handler out of the template.
  */
-function renderHandler(handler: t.Expression, ir: IRComponent): string {
-  return rewriteTemplateExpression(handler, ir);
+function renderHandler(handler: t.Expression, ir: IRComponent, scriptContext = false): string {
+  return rewriteTemplateExpression(handler, ir, scriptContext);
 }
 
 /**
@@ -227,18 +229,26 @@ export function emitTemplateEvent(
     }
 
     if (descriptor.helperName === 'debounce' || descriptor.helperName === 'throttle') {
-      // Pattern 5: script-level handler wrap.
-      const originalHandlerCode = renderHandler(listener.handler, ctx.ir);
+      // Pattern 5: script-level handler wrap. The wrap is lifted to SCRIPT scope,
+      // so render in script context (Spike-012 R4): `$data.q` / a model
+      // `$props.value` / `$refs.el` carry `.value` (they are `Ref` consts here —
+      // template auto-unwrap does NOT apply). Pre-R4 this used template context,
+      // so a lifted `$data.q = …` write emitted `q = …` (TS2588 const-assign +
+      // a runtime write to the const ref that never updated it).
+      const originalHandlerCode = renderHandler(listener.handler, ctx.ir, true);
       // Spike-012 R3-1 — the wrap is lifted to SCRIPT scope, where the template's
       // `$event` magic is NOT in scope. A statement-kind handler
       // (`@input.debounce(300)="$data.q = $event.target.value"`) must be wrapped in
       // a thunk so it becomes a FUNCTION with its own `$event` param — otherwise
-      // `debounce(q = $event.target.value, 300)` evaluates the assignment eagerly
-      // with a free `$event`. An identifier / callable handler is already a
-      // function reference — passed bare (byte-identical to the bare-method form).
+      // `debounce(q.value = $event.target.value, 300)` evaluates the assignment
+      // eagerly with a free `$event`. The param is typed `any` (Spike-012 R4) —
+      // the lifted body reads `$event.target.value`, which is `unknown` (TS18046)
+      // without an annotation; `any` matches the react/solid debounce thunk param.
+      // An identifier / callable handler is already a function reference — passed
+      // bare (byte-identical to the bare-method form).
       const helperCallback =
         classifyHandler(listener.handler) === 'statement'
-          ? `($event) => { ${originalHandlerCode}; }`
+          ? `($event: any) => { ${originalHandlerCode}; }`
           : originalHandlerCode;
       const wrapName = makeWrapName(descriptor.helperName, listener.handler, counter);
       const argList = descriptor.args.map(renderModifierArg).join(', ');
