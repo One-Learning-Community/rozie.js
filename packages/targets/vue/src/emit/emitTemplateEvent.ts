@@ -148,6 +148,31 @@ function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'state
   return 'statement';
 }
 
+/**
+ * Spike-012 R4 — true when a handler is `$props.<name>` and `<name>` is a
+ * Function-typed prop. Such a prop's rendered type is
+ * `((...args: any[]) => any) | null` (emitScript renderType — the `| null`
+ * accepts a `default: null`), which is NOT assignable to the debounce/throttle
+ * helper's non-null `(...args: unknown[]) => unknown` param → TS2345 under
+ * strictNullChecks. (Strict-consumer-only: the shipped vue leaf runs
+ * strictNullChecks:false; react/solid coalesce the same callable-prop to a noop,
+ * so this closes the parity gap.)
+ */
+function isNullableFunctionPropRef(handler: t.Expression, ir: IRComponent): boolean {
+  if (!t.isMemberExpression(handler) || handler.computed) return false;
+  const obj = handler.object;
+  const prop = handler.property;
+  if (!t.isIdentifier(obj) || obj.name !== '$props') return false;
+  if (!t.isIdentifier(prop)) return false;
+  const irProp = ir.props.find((p) => p.name === prop.name);
+  if (!irProp) return false;
+  const ta = irProp.typeAnnotation;
+  return (
+    (ta?.kind === 'identifier' && ta.name === 'Function') ||
+    (ta?.kind === 'literal' && ta.value === 'function')
+  );
+}
+
 export function emitTemplateEvent(
   listener: Listener,
   ctx: EmitEventCtx,
@@ -245,11 +270,17 @@ export function emitTemplateEvent(
       // the lifted body reads `$event.target.value`, which is `unknown` (TS18046)
       // without an annotation; `any` matches the react/solid debounce thunk param.
       // An identifier / callable handler is already a function reference — passed
-      // bare (byte-identical to the bare-method form).
+      // bare (byte-identical to the bare-method form) — EXCEPT a `$props.<fn>`
+      // Function-prop callable, whose type carries `| null` (Spike-012 R4):
+      // coalesce it to a noop so it satisfies the helper's non-null param
+      // (matches react/solid; runtime-safe when a consumer passes null).
+      const handlerClass = classifyHandler(listener.handler);
       const helperCallback =
-        classifyHandler(listener.handler) === 'statement'
+        handlerClass === 'statement'
           ? `($event: any) => { ${originalHandlerCode}; }`
-          : originalHandlerCode;
+          : handlerClass === 'callable' && isNullableFunctionPropRef(listener.handler, ctx.ir)
+            ? `(${originalHandlerCode} ?? (() => {}))`
+            : originalHandlerCode;
       const wrapName = makeWrapName(descriptor.helperName, listener.handler, counter);
       const argList = descriptor.args.map(renderModifierArg).join(', ');
       const decl = `const ${wrapName} = ${descriptor.helperName}(${helperCallback}${argList ? ', ' + argList : ''});`;

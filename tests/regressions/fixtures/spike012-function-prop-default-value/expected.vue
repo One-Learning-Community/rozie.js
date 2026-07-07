@@ -19,5 +19,5 @@ function bump(): void {
   n.value += 1;
 }
 
-const debouncedHandler0 = debounce(props.onPick, 300);
+const debouncedHandler0 = debounce((props.onPick ?? (() => {})), 300);
 </script>
