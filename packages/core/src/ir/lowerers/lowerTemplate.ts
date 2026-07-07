@@ -996,6 +996,22 @@ function lowerBareElement(
     if (attr.kind === 'event') {
       const handlerExpr =
         attr.value !== null ? tryParseExpression(attr.value) : null;
+      // ROZ143 (Spike-012 silent-miscompile fix): a non-empty handler that
+      // failed to parse as an expression — dominant cause is a statement-body
+      // handler (`if (...) { a() } else { b() }`, a loop, a bare block) — is a
+      // LOUD compile error, not a silent no-op. Keep the `undefined` fallback
+      // below (emit-neutral); this only adds the diagnostic. A valueless
+      // handler (`attr.value === null`) is a distinct, pre-existing case and
+      // must NOT fire here.
+      if (attr.value !== null && handlerExpr === null) {
+        diagnostics.push({
+          code: RozieErrorCode.EVENT_HANDLER_NOT_EXPRESSION,
+          severity: 'error',
+          message: `@${attr.name}="${attr.value}" is not a valid expression — statement-body event handlers (if/for/while/block) are not supported.`,
+          loc: attr.loc,
+          hint: `Extract it into a <script> method and bind @${attr.name}="method()".`,
+        });
+      }
       const handler = handlerExpr ?? t.identifier('undefined');
       const deps = handlerExpr ? computeExpressionDeps(handlerExpr, bindings) : [];
 

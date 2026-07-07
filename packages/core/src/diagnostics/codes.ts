@@ -451,6 +451,24 @@ export const RozieErrorCode = {
   // for the PUBLIC kinds that must surface as an actionable author diagnostic.
   // ROZ142 is the next free code after ROZ141 in the 100 authoring cluster.
   PUBLIC_CONTRACT_NAME_COLLISION: 'ROZ142', // error — a public-contract identifier (prop/slot/emit/$expose verb/provide-inject key) collides with a per-target reserved name; it cannot be auto-renamed. Rename it (did-you-mean provided).
+  // Spike-012 (target-agnostic silent miscompile) — a template `@event="..."`
+  // handler whose text fails to parse as a single JS EXPRESSION via
+  // `tryParseExpression` (both the plain and the `typescript`-plugin passes).
+  // The dominant cause is a STATEMENT-body handler (`if (...) { a() } else {
+  // b() }`, a `for`/`while` loop, or a bare block) — none of those are
+  // expressions. Previously this silently lowered to a no-op `undefined`
+  // handler on ALL SIX targets with zero diagnostic (the ROZ977-class silent-
+  // compile-failure anti-pattern): the author's handler simply never fires,
+  // discoverable only by clicking the element and nothing happening. Error
+  // severity; the `undefined`-handler fallback is UNCHANGED (emit-neutral —
+  // this diagnostic only ADDS a signal, never alters codegen). Emitted inline
+  // in lowerTemplate's attribute loop (the `attr.kind === 'event'` branch),
+  // right where `tryParseExpression` is called on the handler text. Does NOT
+  // fire for a valueless handler (`attr.value === null`) — that is a
+  // different, pre-existing case. Remediation: extract the statement body
+  // into a `<script>` method and bind `@click="method()"`. ROZ143 is the next
+  // free code after ROZ142 in the 100 semantic-binding cluster.
+  EVENT_HANDLER_NOT_EXPRESSION: 'ROZ143', // error — a template @event handler's text failed to parse as a single expression (dominant cause: a statement-body handler, e.g. an `if`/`for`/`while`/block). Extract it into a <script> method and bind `@click="method()"`. The undefined-handler fallback is unchanged; this only adds the diagnostic.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
