@@ -291,6 +291,10 @@ export function emitTemplateEvent(
         loopBindings: ctx.loopBindings,
         cvaModelProp: ctx.cvaModelProp,
         cvaMergeDisabled: ctx.cvaMergeDisabled,
+        // Spike-012 R4 — this handler is spliced into a class-field IIFE (real
+        // TS), NOT the template string: keep a TS `as` cast intact (Angular's
+        // `$any()` template built-in is undefined in TS code).
+        scriptContext: true,
       });
       // Inside the field initializer, the handler-call references `this.X`
       // class members. Rewrite the original handler code through a "this-prefix"

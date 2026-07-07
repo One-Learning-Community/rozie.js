@@ -1,0 +1,20 @@
+<rozie name="TemplateAsCast">
+<data>
+{
+  q: '',
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<div class="r">
+  <input @input="$data.q = ($event.currentTarget as HTMLInputElement).value" />
+  <span>{{ ($data.n as number).toFixed(0) }}</span>
+</div>
+</template>
+
+</rozie>

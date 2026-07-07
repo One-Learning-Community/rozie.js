@@ -163,6 +163,14 @@ export interface RewriteTemplateOpts {
    */
   prefixThis?: boolean;
   /**
+   * Spike-012 R4 — when true, the rewritten expression is spliced into a REAL TS
+   * position (a `.debounce`/`.throttle` class-field IIFE), NOT the template
+   * string. There a TS `as` cast / `!` is VALID and Angular's `$any()` template
+   * built-in is undefined, so the TS-type-syntax lowering (`as` → `$any`, `!` →
+   * drop) is SUPPRESSED. Default false (template-string context — lower them).
+   */
+  scriptContext?: boolean;
+  /**
    * Phase 23 (angular-cva-forms-integration) — the single CVA model prop name
    * (or null when the component is not CVA-receiving). When non-null, a template
    * model-write to this prop (`@input="$model.value = x"`) additionally emits
@@ -216,6 +224,7 @@ export function rewriteTemplateExpression(
   const loopBindings = opts.loopBindings ?? new Set<string>();
   const collisionRenames = opts.collisionRenames ?? new Map<string, string>();
   const prefixThis = opts.prefixThis ?? false;
+  const scriptContext = opts.scriptContext ?? false;
   const cvaModelProp = opts.cvaModelProp ?? null;
   const cvaMergeDisabled = opts.cvaMergeDisabled ?? false;
   const mkRef = (name: string): t.Expression =>
@@ -262,6 +271,30 @@ export function rewriteTemplateExpression(
     OptionalMemberExpression(path) {
       const obj = path.node.object;
       if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
+    },
+    // Spike-012 R4 — Angular's template expression language has NO TS `as` cast
+    // or `!` non-null assertion (its parser errors on them). Now that a template
+    // expression can carry TS type-syntax (core two-pass parse lets `$event.x as
+    // T` survive instead of collapsing to `undefined`), lower it for Angular:
+    //   `X as T` → `$any(X)`  (Angular's built-in template cast — always parses
+    //             and typechecks; a bare strip to `X` would fail Angular's strict
+    //             template check for e.g. `$event.currentTarget.value`)
+    //   `X!`     → `X`        (drop the non-null assertion)
+    // ONLY in genuine TEMPLATE-STRING context (`!scriptContext`). The debounce/
+    // throttle hoist reuses this rewriter to build a `this.`-prefixed class-field
+    // IIFE (real TS, `as` valid, `$any` undefined) and passes scriptContext:true
+    // to leave the TS type-syntax intact there.
+    // Done in THIS pre-pass so the strip runs BEFORE the AssignmentExpression
+    // lowering reuses `node.right` (babel skips re-visiting a reused node after
+    // replaceWith, so an `as` in a `@click="$data.x = (y as T)"` RHS would
+    // otherwise survive).
+    TSAsExpression(path) {
+      if (scriptContext) return; // hoisted TS field — `as` is valid here.
+      path.replaceWith(t.callExpression(t.identifier('$any'), [path.node.expression]));
+    },
+    TSNonNullExpression(path) {
+      if (scriptContext) return;
+      path.replaceWith(path.node.expression);
     },
   });
 

@@ -260,6 +260,12 @@ export function rewriteListenerExpression(
       const obj = path.node.object;
       if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
     },
+    // NOTE (Spike-012 R4): rewriteListenerExpression is the SCRIPT-context path —
+    // its output lands in a `this.`-prefixed class field / method (the debounce/
+    // throttle hoist, `<listener>` blocks). A TS `as` cast / `!` there is VALID
+    // TS, so it is deliberately LEFT INTACT. Only the TEMPLATE-string path
+    // (rewriteTemplateExpression, used for inline `(event)=` bindings + interps)
+    // lowers `X as T` → `$any(X)`, since Angular's template parser has no `as`.
   });
 
   traverse(wrapper, {

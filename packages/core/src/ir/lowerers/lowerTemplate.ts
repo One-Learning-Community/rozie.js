@@ -208,12 +208,25 @@ export interface LowerTemplateResult {
 /**
  * Helper: try to parse an expression text via @babel/parser. Returns null on
  * failure (D-08 — parser layer already emitted ROZ051).
+ *
+ * Two-pass (Spike-012 R4): parse WITHOUT plugins first (byte-identical to the
+ * historical behavior — every currently-valid template expression takes this
+ * path unchanged, so a `{{ a < b }}` comparison never risks the TS plugin's
+ * type-argument `<…>` reinterpretation). Only if the plain parse throws do we
+ * retry with the `typescript` plugin, which lets a TS `as` cast / `satisfies` /
+ * type-annotated arrow inside a template expression or `@event` handler parse
+ * instead of silently collapsing to `undefined` (the parse threw → tryParse
+ * returned null → the binding/handler lowered to a bare `undefined`).
  */
 function tryParseExpression(text: string): t.Expression | null {
   try {
     return parseExpression(text, { sourceType: 'module' });
   } catch {
-    return null;
+    try {
+      return parseExpression(text, { sourceType: 'module', plugins: ['typescript'] });
+    } catch {
+      return null;
+    }
   }
 }
 

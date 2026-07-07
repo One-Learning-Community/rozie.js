@@ -1,0 +1,16 @@
+{
+  "id": "REG-SPIKE012-R4-3",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-4 Phase B: a TS `as` cast inside a template expression — an inline `@input` handler (`$data.q = ($event.currentTarget as HTMLInputElement).value`) and an interpolation (`($data.n as number).toFixed(0)`). Pre-fix ALL template-expression parses omitted the `typescript` babel plugin, so the `as` cast threw, `tryParseExpression` returned null, and the binding/handler SILENTLY collapsed to a bare `undefined` (5 targets emitted `debounce(undefined,…)` / `{{ undefined }}`; no diagnostic). R4 core parse is two-pass: plain first (byte-identical for every currently-valid expression — no risk of the TS plugin reinterpreting `a < b`), TS-plugin retry only on failure, so the `as` survives to the IR. react/svelte/solid/lit emit it into TS output verbatim; vue keeps `q = (… as …)` in its auto-unwrapping template. Angular's template parser has NO `as`, so its TEMPLATE-STRING path lowers `X as T` → `$any(X)` (Angular's built-in cast) while its SCRIPT-hoisted `.debounce`/`.throttle` field keeps the real TS `as`. Found by the shape-matrix harness (event-param-cross/textarea-input, debounce-currenttarget).",
+  "targets": [
+    "react",
+    "vue",
+    "svelte",
+    "angular",
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 4 Phase B"
+}
