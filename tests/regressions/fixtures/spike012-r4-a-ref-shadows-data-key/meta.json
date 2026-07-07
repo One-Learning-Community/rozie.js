@@ -1,0 +1,16 @@
+{
+  "id": "REG-SPIKE012-R4-A",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-4 R4-A: a template `ref=\"box\"` whose name ALSO names a `<data>` key (`$data.box`). Pre-fix react emitted two `const box` (state + `useRef`) → TS2451 dup + the `$refs.box` read even misbound to the state dep-mirror; svelte two `let box` (state + `bind:this`) → dup + ROZ621; angular two `box` class members (signal + viewChild) → silent TS2300; vue falsely errored ROZ420 even though its own output uses the distinct `boxRef`. Solid (`box$localRef`) + Lit (`_box`/`_refBox`) already prefix refs and were correct. Fix: R3-5's `deconflictRefsAgainstUserBindings` (react/svelte/angular) now triggers on state/computed/prop names too — renaming the INTERNAL ref to `<name>Ref`, never the declared primitive (author-facing $data/$props contract). Vue's Pitfall-4 check now tests the LOWERED `<name>Ref` binding (vue always suffixes refs), so `ref=\"box\"` + `$data.box` no longer false-errors while a real `ref=\"box\"` + `$data.boxRef` collision still fails loud. Found by the shape-matrix harness (react dup-decl + the new Angular duplicate-class-member invariant).",
+  "targets": [
+    "react",
+    "vue",
+    "svelte",
+    "angular",
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 4 (react dup-decl + angular dup-member invariant)"
+}

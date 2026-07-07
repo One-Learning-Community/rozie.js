@@ -1,0 +1,21 @@
+<rozie name="RefShadowsDataKey">
+<data>
+{
+  box: 0,
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+$onMount(() => {
+  $data.n = ($refs.box as HTMLElement).childElementCount + $data.box;
+})
+</script>
+
+<template>
+<div class="r">
+  <div ref="box">x</div>
+</div>
+</template>
+
+</rozie>

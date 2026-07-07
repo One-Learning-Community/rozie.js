@@ -1071,7 +1071,9 @@ export function deconflictRefsAgainstUserBindings(
   userBindingNames: ReadonlySet<string>,
 ): Map<string, string> {
   const renames = new Map<string, string>();
-  if (userBindingNames.size === 0 || ir.refs.length === 0) return renames;
+  // No refs → nothing to rename. (userBindingNames MAY be empty and still trigger
+  // via a state/computed/prop collision — R4-A — so it is not a bail condition.)
+  if (ir.refs.length === 0) return renames;
 
   // Names already occupied across the class surface — the fresh `<name>Ref` must
   // avoid every ref/state/computed/prop AND every user binding.
@@ -1090,13 +1092,29 @@ export function deconflictRefsAgainstUserBindings(
     return candidate;
   };
 
+  // Spike-012 R4-A — a ref ALSO collides with any DECLARED primitive that mints a
+  // same-named class field / closure binding: `<data>` state, `<computed>`, and
+  // props (`ref="box"` + `$data.box` → two `const box` on React, two `let box` on
+  // Svelte, two `box` class members → TS2300 on Angular). R3-5 only triggered on
+  // top-level `<script>` binding names (const/let/function/method); extend the
+  // trigger to state/computed/prop names too. These are the RENAMEABLE-vs-declared
+  // collisions — rename the INTERNAL ref (`<name>Ref`), never the declared
+  // primitive (its name is the author-facing `$data`/`$props` contract). Solid
+  // (`<name>$localRef`) + Lit (`_refX` / `_x`) already prefix refs distinctly and
+  // do not call this pass.
+  const collidesWithDeclared = (name: string): boolean =>
+    userBindingNames.has(name) ||
+    ir.state.some((s) => s.name === name) ||
+    (ir.computed ?? []).some((c) => c.name === name) ||
+    (ir.props ?? []).some((p) => p.name === name);
+
   for (const r of ir.refs) {
     if (renames.has(r.name)) continue;
-    // Trigger: a top-level user binding of the ref's name exists. `protectedNames`
+    // Trigger: a declared binding of the ref's name exists. `protectedNames`
     // is intentionally NOT consulted — we rename the INTERNAL ref, never the user
     // (possibly public `$expose`) binding, so a protected name is still a valid
     // trigger (the `function box` + `$expose({ box })` + `ref="box"` case).
-    if (userBindingNames.has(r.name)) {
+    if (collidesWithDeclared(r.name)) {
       renames.set(r.name, freshName(r.name));
     }
   }

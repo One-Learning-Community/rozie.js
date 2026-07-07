@@ -199,18 +199,25 @@ export function rewriteRozieIdentifiers(
   const propByName = new Map(ir.props.map((p) => [p.name, p]));
   const computedByName = new Map(ir.computed.map((c) => [c.name, c]));
 
-  // Pitfall 4: detect template-ref name collisions with <data>/<computed>/<props>.
+  // Pitfall 4 (Spike-012 R4-A): a Vue template ref lowers to the SUFFIXED binding
+  // `<name>Ref` (`$refs.box` → `boxRef` / `boxRef.value`), so `ref="box"` + a
+  // `$data.box` do NOT collide in emitted output — the historical check tested the
+  // RAW `ref.name` and falsely errored (ROZ420) on that valid, working shape
+  // (Solid/Lit/React/Svelte/Angular all make it work). Test the ACTUAL emitted
+  // binding name `<name>Ref` against the bare top-level bindings a `$data`/
+  // `$computed`/model-prop mints (`<name>` / `<name>.value`). A non-model prop is
+  // namespaced (`props.<name>`) and never collides with a top-level `const`.
   for (const ref of ir.refs) {
+    const emittedRefBinding = ref.name + 'Ref';
     const collides =
-      dataNames.has(ref.name) ||
-      computedNames.has(ref.name) ||
-      modelProps.has(ref.name) ||
-      nonModelProps.has(ref.name);
+      dataNames.has(emittedRefBinding) ||
+      computedNames.has(emittedRefBinding) ||
+      modelProps.has(emittedRefBinding);
     if (collides) {
       diagnostics.push({
         code: RozieErrorCode.TARGET_VUE_RESERVED, // ROZ420
         severity: 'error',
-        message: `Template ref '${ref.name}' collides with <data>/<computed>/<props> declaration of the same name. Rename one to avoid the collision in emitted Vue output.`,
+        message: `Template ref '${ref.name}' lowers to the binding '${emittedRefBinding}', which collides with a <data>/<computed>/model-prop declaration of the same name. Rename one to avoid the collision in emitted Vue output.`,
         loc: ref.sourceLoc,
       });
     }

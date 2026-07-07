@@ -96,8 +96,11 @@ describe('rewriteRozieIdentifiers', () => {
     expect(code).not.toContain('$emit');
   });
 
-  it('Test 6: Template-ref name collision with <data>/<computed>/<props> emits ROZ420', () => {
-    // Fabricate a synthetic IR where state name "foo" collides with a template ref "foo".
+  it('Test 6: a `ref="foo"` + `$data.foo` does NOT emit ROZ420 (lowers to the distinct `fooRef`)', () => {
+    // Spike-012 R4-A — a Vue ref lowers to the SUFFIXED binding `<name>Ref`
+    // (`$refs.foo` → `fooRef`), so `ref="foo"` + a `$data.foo` do not collide in
+    // emitted output (`foo` = ref(), `fooRef` = the template ref). The historical
+    // check tested the RAW name and falsely errored on this valid, working shape.
     const syntheticIR: Partial<IRComponent> & {
       props: IRComponent['props'];
       state: IRComponent['state'];
@@ -132,10 +135,50 @@ describe('rewriteRozieIdentifiers', () => {
     const program = t.file(t.program([], [], 'module'));
     const diagnostics: Diagnostic[] = [];
     rewriteRozieIdentifiers(program, syntheticIR as IRComponent, diagnostics);
+    expect(diagnostics.find((d) => d.code === 'ROZ420')).toBeUndefined();
+  });
+
+  it('Test 6-collision: a `ref="foo"` whose lowered `fooRef` binding DOES collide with `$data.fooRef` emits ROZ420', () => {
+    // A ref "foo" lowers to `fooRef`; a `$data.fooRef` state ALSO emits a top-level
+    // `fooRef` → a genuine emitted-output collision that must still fail loud.
+    const syntheticIR: Partial<IRComponent> & {
+      props: IRComponent['props'];
+      state: IRComponent['state'];
+      computed: IRComponent['computed'];
+      refs: IRComponent['refs'];
+    } = {
+      type: 'IRComponent',
+      name: 'Synthetic',
+      props: [],
+      state: [
+        {
+          type: 'StateDecl',
+          name: 'fooRef',
+          initializer: t.numericLiteral(0),
+          sourceLoc: { start: 0, end: 0 },
+        } satisfies StateDecl,
+      ],
+      computed: [],
+      refs: [
+        {
+          type: 'RefDecl',
+          name: 'foo',
+          elementTag: 'div',
+          sourceLoc: { start: 10, end: 20 },
+        } satisfies RefDecl,
+      ],
+      slots: [],
+      emits: [],
+      lifecycle: [],
+      listeners: [],
+    };
+    const program = t.file(t.program([], [], 'module'));
+    const diagnostics: Diagnostic[] = [];
+    rewriteRozieIdentifiers(program, syntheticIR as IRComponent, diagnostics);
     const collisionDiag = diagnostics.find((d) => d.code === 'ROZ420');
     expect(collisionDiag).toBeDefined();
     expect(collisionDiag!.severity).toBe('error');
-    expect(collisionDiag!.message).toMatch(/foo/);
+    expect(collisionDiag!.message).toMatch(/fooRef/);
   });
 
   it('Test 6b: $refs.dialogEl in Modal rewrites to dialogElRef.value', () => {
