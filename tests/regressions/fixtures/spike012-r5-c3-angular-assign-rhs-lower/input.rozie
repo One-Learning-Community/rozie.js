@@ -1,0 +1,27 @@
+<rozie name="Spike012R5C3">
+
+<props>
+{
+  value: { type: String, default: '', model: true },
+}
+</props>
+
+<data>
+{
+  n: 0,
+  q: '',
+}
+</data>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<div class="r">
+  <button @click="$data.q = $data.n > 0 ? 'a' : 'b'">go</button>
+  <input @input.debounce(300)="$props.value = ($event.currentTarget as HTMLInputElement).value" />
+</div>
+</template>
+
+</rozie>

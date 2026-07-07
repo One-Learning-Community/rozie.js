@@ -551,6 +551,13 @@ function applyThisPrefixing(
   if (extraMembers) {
     for (const name of extraMembers) memberNames.add(name);
   }
+  // Spike-012 R5 (C3b) — the CVA view→model bridge callback is a private class
+  // field. A model-prop write lowered into a `.debounce`/`.throttle` class-field
+  // IIFE (scriptContext) emits a bare `__rozieCvaOnChange(...)` (correct in a
+  // template, which resolves against `this`, but a FREE ident in the field). It
+  // only appears in the code string when a CVA model write was lowered, so
+  // adding it unconditionally is a no-op otherwise (unique name, no false match).
+  memberNames.add('__rozieCvaOnChange');
 
   if (memberNames.size === 0) return code;
 

@@ -256,6 +256,19 @@ export function rewriteTemplateExpression(
     ...computedNames,
   ]);
 
+  // Spike-012 R5 (C3a) — identifiers the AssignmentExpression visitor synthesises
+  // as a SETTER TARGET (`X` in `X.set(...)`). After a write is lowered we let the
+  // traversal descend into the replaced node so the RHS's own `$data`/`$props`/
+  // `$refs` reads get lowered too — but the setter-target `X` must NOT be wrapped
+  // to `X()` by the Identifier visitor. Preserved here so it stays bare.
+  const preserveIdents = new WeakSet<t.Node>();
+  const preserveSetterTarget = (setter: t.CallExpression): void => {
+    const callee = setter.callee;
+    if (t.isMemberExpression(callee) && t.isIdentifier(callee.object)) {
+      preserveIdents.add(callee.object);
+    }
+  };
+
   const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
 
   // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X` in template
@@ -318,10 +331,12 @@ export function rewriteTemplateExpression(
       // `$props.X = Y` for model:true props.
       if (obj.name === '$data' && dataNames.has(prop.name)) {
         const setterCall = buildTemplateSetterCall(prop.name, node.operator, node.right, COMPOUND_OP_MAP);
+        preserveSetterTarget(setterCall);
         path.replaceWith(setterCall);
-        // Skip descending into the new node — the inner Identifier `X` would
-        // otherwise get wrapped to `X()` by the Identifier visitor below.
-        path.skip();
+        // Do NOT path.skip(): the RHS's own `$data`/`$props`/`$refs` reads must
+        // still be lowered by the visitors below (Spike-012 R5 C3a — a raw
+        // `$data.n` on the RHS is undefined in an Angular template). Only the
+        // setter-target `X` is preserved (above) so it is not wrapped to `X()`.
         return;
       }
       if (obj.name === '$props' && modelProps.has(prop.name)) {
@@ -340,17 +355,22 @@ export function rewriteTemplateExpression(
             node.right,
             COMPOUND_OP_MAP,
           );
+          preserveSetterTarget(setterCall);
           path.replaceWith(
             t.sequenceExpression([
               setterCall,
+              // Bare in template context (resolves against `this`); the
+              // `.debounce`/`.throttle` script-lift's applyThisPrefixing pass
+              // prefixes `this.` in the class-field IIFE (Spike-012 R5 C3b).
               t.callExpression(t.identifier('__rozieCvaOnChange'), [newValue]),
             ]),
           );
-          path.skip();
+          // Descend (no skip) so RHS reads in the setter AND the CVA newValue
+          // are lowered; the setter target is preserved above.
           return;
         }
+        preserveSetterTarget(setterCall);
         path.replaceWith(setterCall);
-        path.skip();
         return;
       }
     },
@@ -523,6 +543,9 @@ export function rewriteTemplateExpression(
      */
     Identifier(path) {
       const name = path.node.name;
+      // Spike-012 R5 (C3a) — a synthesised setter target (`X` in `X.set(...)`)
+      // must stay bare, never wrapped to `X()`.
+      if (preserveIdents.has(path.node)) return;
       if (loopBindings.has(name)) return;
       // Skip declaration-site identifiers and member-property positions.
       const parent = path.parent;

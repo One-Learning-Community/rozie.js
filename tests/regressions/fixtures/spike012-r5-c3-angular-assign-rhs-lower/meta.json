@@ -1,0 +1,9 @@
+{
+  "id": "REG-SPIKE012-R5-C3",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-5 C3: the Angular assignment lowering did not lower $data/$props READS on the RHS of a $data/model write (path.skip skipped the whole replaced subtree), and the debounce script-lifted model-write left __rozieCvaOnChange un-this-prefixed. `@click=\"$data.q = $data.n > 0 ? 'a' : 'b'\"` emitted `q.set($data.n > 0 ? ...)` (raw $data.n — broken in an Angular template, config-independent); the debounce model-write emitted a free `__rozieCvaOnChange(...)` in the class-field IIFE. Fix: lower the RHS reads in the AssignmentExpression visitor (preserve the setter-target ident via a WeakSet, then descend into the RHS instead of path.skip) so `q.set((n() > 0) ? ...)`; and add __rozieCvaOnChange to applyThisPrefixing's member set so the debounce field emits `this.__rozieCvaOnChange(...)`. Found by the shape-matrix harness (debounce-lift-cross/{read-and-write,model-write}-in-debounce; also reproduces on a plain non-debounce handler).",
+  "targets": ["react", "vue", "svelte", "angular", "solid", "lit"],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 5"
+}
