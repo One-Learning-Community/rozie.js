@@ -1,0 +1,21 @@
+<rozie name="RefReservedMemberConst">
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+const title = 'hi'
+$onMount(() => {
+  $data.n = ($refs.title as HTMLElement).childElementCount + title.length;
+})
+</script>
+
+<template>
+<div class="r">
+  <div ref="title">x</div>
+</div>
+</template>
+
+</rozie>

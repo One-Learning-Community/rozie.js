@@ -279,6 +279,26 @@ export function rewriteScript(
   const methodNames =
     opts.methodNamesOverride ?? collectMethodNamesFromProgram(cloned, ir);
 
+  // Spike-012 R4-E — a top-level user binding whose name is a reserved class
+  // member (`const title` → HTMLElement.title) is renamed to `title$local` (both
+  // the emitted field AND `methodNames`, via `classFieldName` in
+  // `collectMethodNamesFromProgram`). The MAIN program's references are renamed in
+  // lockstep by `deconflictReservedClassFields`, but a LIFECYCLE-hook FRAGMENT
+  // (`$onMount` body — rewritten from the ORIGINAL `hook.setup.body` with a
+  // `methodNamesOverride`) still carries the bare `title`, which never matched the
+  // `title$local` in `methodNames` → the read stayed a free `title` (TS2663). This
+  // local `classFieldName` normalizes a bare reference to its emitted field name in
+  // BOTH the match guard and the `this.<field>` output, so a fragment `title` reads
+  // as `this.title$local` consistently with the field. Non-reserved names are
+  // identity-mapped (byte-identical).
+  const litReservedFields = reservedClassMembers('lit');
+  const litProtectedFields = new Set<string>([
+    ...(ir.expose ?? []).map((e) => e.name),
+    ...(ir.props ?? []).map((p) => p.name),
+  ]);
+  const classFieldNameFor = (n: string): string =>
+    litReservedFields.has(n) && !litProtectedFields.has(n) ? `${n}${DECONFLICT_SUFFIX}` : n;
+
   // Phase 18 (Req 2) — producer-side two-way-write sigil `$model.X`.
   // `$model` is model-only by contract: Wave 1's core semantic pass already
   // rejected `$model.<nonModelProp>` (ROZ205) / `$model.<nonExistent>` (ROZ113)
@@ -552,7 +572,16 @@ export function rewriteScript(
         return;
       }
 
-      if (!computedNames.has(name) && !methodNames.has(name)) return;
+      // R4-E — a reserved-named binding's field is `<name>$local`; match a bare
+      // reference by its normalized field name (a non-reserved name is unchanged),
+      // and emit `this.<field>` below via `emitField`.
+      const emitField = classFieldNameFor(name);
+      if (
+        !computedNames.has(name) &&
+        !methodNames.has(name) &&
+        !methodNames.has(emitField)
+      )
+        return;
 
       const parentPath = path.parentPath;
       if (!parentPath) return;
@@ -617,7 +646,7 @@ export function rewriteScript(
         // The path is shared between key and value in shorthand form, so
         // mutate the parent ObjectProperty directly rather than replaceWith.
         parentPath.node.shorthand = false;
-        parentPath.node.value = thisDot(name);
+        parentPath.node.value = thisDot(emitField);
         path.skip();
         return;
       }
@@ -665,8 +694,8 @@ export function rewriteScript(
       // ancestor walk.
       if (hasShadowingBinding(path, name)) return;
 
-      // Rewrite to `this.<name>`.
-      path.replaceWith(thisDot(name));
+      // Rewrite to `this.<field>` (`<name>` normalized to its emitted field name).
+      path.replaceWith(thisDot(emitField));
       path.skip();
     },
 

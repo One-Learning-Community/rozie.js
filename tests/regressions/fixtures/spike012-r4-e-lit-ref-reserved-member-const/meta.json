@@ -1,0 +1,11 @@
+{
+  "id": "REG-SPIKE012-R4-E",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-4 R4-E (lit-only): a top-level user `const title` whose name is a reserved DOM class member (HTMLElement.title) is renamed to the `title$local` field (deconflictReservedClassFields). The MAIN program's references are renamed in lockstep, but a LIFECYCLE-hook FRAGMENT ($onMount body — rewritten from the ORIGINAL hook.setup.body with a methodNamesOverride) still carried the bare `title`, which never matched the `title$local` stored in methodNames → the read `title.length` stayed a free identifier (TS2663 'Cannot find name title; did you mean this.title'). Fix: the lit Identifier this-prefix rewrite now normalizes a bare reference through classFieldName in BOTH the match guard and the `this.<field>` output, so a fragment `title` reads as `this.title$local`, consistent with the field. Non-reserved names are identity-mapped (byte-identical). Found by the shape-matrix harness (scope-walk free-ident + strict-tsc TS2663).",
+  "targets": [
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 4 (scope-walk + strict-tsc)"
+}
