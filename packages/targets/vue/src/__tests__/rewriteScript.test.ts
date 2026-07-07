@@ -32,6 +32,7 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import type { IRComponent, RefDecl, StateDecl } from '../../../../core/src/ir/types.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers } from '../rewrite/rewriteScript.js';
+import { deconflictVueRefSuffix } from '../rewrite/deconflictRefSuffix.js';
 import { emitScript } from '../emit/emitScript.js';
 import { emitVue } from '../emitVue.js';
 
@@ -138,9 +139,16 @@ describe('rewriteRozieIdentifiers', () => {
     expect(diagnostics.find((d) => d.code === 'ROZ420')).toBeUndefined();
   });
 
-  it('Test 6-collision: a `ref="foo"` whose lowered `fooRef` binding DOES collide with `$data.fooRef` emits ROZ420', () => {
-    // A ref "foo" lowers to `fooRef`; a `$data.fooRef` state ALSO emits a top-level
-    // `fooRef` → a genuine emitted-output collision that must still fail loud.
+  it('Test 6-collision: a `ref="foo"` whose lowered `fooRef` binding collides with `$data.fooRef` auto-resolves (bumped ref, no ROZ420)', () => {
+    // Spike-012 R5 (C4-rename-collision, Vue "make it work" half) — a ref
+    // "foo" lowers to `fooRef`; a `$data.fooRef` state ALSO emits a top-level
+    // `fooRef` → a genuine emitted-output collision. Historically this failed
+    // loud (ROZ420). Since react/angular/svelte all MAKE THIS SHAPE WORK
+    // (they rename the colliding ref, never error), Vue now does the same via
+    // `deconflictVueRefSuffix` — called BEFORE `rewriteRozieIdentifiers`, same
+    // as `emitVue`'s real pipeline — which bumps the ref's source name to a
+    // fresh `foo2` (landing the suffix on the free `foo2Ref`) instead of
+    // erroring.
     const syntheticIR: Partial<IRComponent> & {
       props: IRComponent['props'];
       state: IRComponent['state'];
@@ -172,13 +180,13 @@ describe('rewriteRozieIdentifiers', () => {
       lifecycle: [],
       listeners: [],
     };
+    const renames = deconflictVueRefSuffix(syntheticIR as IRComponent, new Set());
+    expect(renames.get('foo')).toBe('foo2');
+    expect(syntheticIR.refs[0]!.name).toBe('foo2');
     const program = t.file(t.program([], [], 'module'));
     const diagnostics: Diagnostic[] = [];
     rewriteRozieIdentifiers(program, syntheticIR as IRComponent, diagnostics);
-    const collisionDiag = diagnostics.find((d) => d.code === 'ROZ420');
-    expect(collisionDiag).toBeDefined();
-    expect(collisionDiag!.severity).toBe('error');
-    expect(collisionDiag!.message).toMatch(/fooRef/);
+    expect(diagnostics.find((d) => d.code === 'ROZ420')).toBeUndefined();
   });
 
   it('Test 6b: $refs.dialogEl in Modal rewrites to dialogElRef.value', () => {

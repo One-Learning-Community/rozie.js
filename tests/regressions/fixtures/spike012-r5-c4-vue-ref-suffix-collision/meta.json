@@ -1,0 +1,16 @@
+{
+  "id": "REG-SPIKE012-R5-C4",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-5 C4 (ref-rename-cross/ref-rename-collides-with-const): on Vue a template `ref=\"box\"` UNCONDITIONALLY lowers to the SUFFIXED binding `boxRef` (`const boxRef = useTemplateRef('boxRef')`, `$refs.box` → `boxRef.value`). When the author ALSO has a top-level `<script>` binding literally named `boxRef` (here a `const boxRef = 7`), the emitted `boxRef` DUPLICATES it → invalid Vue output (two `const boxRef` declarations, TS2451). This shape compiles fine on react/svelte/angular/solid/lit (there the ref's UNSUFFIXED name is what would collide, and those targets already rename the colliding ref via the shared `deconflictRefsAgainstUserBindings` core pass), so the correct resolution is to MAKE IT WORK on Vue too, not error. Fix (packages/targets/vue/src/rewrite/deconflictRefSuffix.ts, wired into emitVue.ts): a Vue-specific IR pre-pass renames the colliding ref's SOURCE name to a fresh `<base>N` (here `box` → `box2`) so its emitted binding (`box2Ref`) is free, before any emitter reads a ref name. The user's `const boxRef = 7` and every OTHER target's ref binding stay untouched. Found by the shape-matrix torture harness (ref-rename-cross/ref-rename-collides-with-const) — the vue arm of this cell was an INVALID EMIT structural escape (the solid tsc arm of the same cell is a separate, unrelated bug).",
+  "targets": [
+    "react",
+    "vue",
+    "svelte",
+    "angular",
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 5"
+}

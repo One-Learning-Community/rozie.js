@@ -1,0 +1,17 @@
+<rozie name="RefSuffixCollision">
+<data>
+{
+  n: 0,
+}
+</data>
+
+<script lang="ts">
+const boxRef = 7
+$onMount(() => { $data.n = ($refs.box as HTMLElement).childElementCount + boxRef })
+</script>
+
+<template>
+<div class="r"><div ref="box">x</div></div>
+</template>
+
+</rozie>

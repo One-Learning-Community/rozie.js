@@ -32,6 +32,10 @@ import { rewriteRozieImport } from '../../../core/src/codegen/rewriteRozieImport
 import { computeScopeHash } from '../../../core/src/codegen/portalCss.js';
 import { deconflictVueGeneratedBindingNames } from '../../../core/src/rewrite/deconflict.js';
 import { vueGeneratedBindingNames } from './rewrite/vueGeneratedNames.js';
+import {
+  deconflictVueRefSuffix,
+  collectVueTopLevelBindingNames,
+} from './rewrite/deconflictRefSuffix.js';
 import type { SourceMap } from 'magic-string';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -297,6 +301,22 @@ export function emitVue(ir: IRComponent, opts: EmitVueOptions = {}): EmitVueResu
     ir,
     vueGeneratedBindingNames(ir),
     new Set<string>((ir.expose ?? []).map((e) => e.name)),
+  );
+
+  // Spike-012 R5 (C4-rename-collision, Vue "make it work" half) — a template
+  // ref's UNCONDITIONALLY-suffixed emitted binding (`<name>Ref`) can collide
+  // with a top-level `<script>` binding / `<data>` key / `$computed` name /
+  // prop of that exact suffixed name (`ref="box"` + a top-level `const
+  // boxRef` both mint `const boxRef` → TS2451). Runs AFTER the generated-
+  // binding pass above (so the taken set reflects any already-renamed
+  // `<data>`/`$computed`/`$inject` name) and BEFORE `emitScript` reads any ref
+  // name. `collectVueTopLevelBindingNames` reads the ORIGINAL (not-yet-cloned)
+  // script Program — per-target clone/rewrite happens later, inside
+  // `emitScript`. Only-on-collision: the non-colliding corpus (the entire
+  // existing example set) stays byte-identical.
+  deconflictVueRefSuffix(
+    ir,
+    collectVueTopLevelBindingNames(ir.setupBody.scriptProgram),
   );
 
   // D-85 Vue full (Plan 06-02 Task 3): exactOptionalPropertyTypes:true

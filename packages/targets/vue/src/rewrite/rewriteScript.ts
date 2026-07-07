@@ -207,6 +207,17 @@ export function rewriteRozieIdentifiers(
   // binding name `<name>Ref` against the bare top-level bindings a `$data`/
   // `$computed`/model-prop mints (`<name>` / `<name>.value`). A non-model prop is
   // namespaced (`props.<name>`) and never collides with a top-level `const`.
+  //
+  // Spike-012 R5 (C4-rename-collision) — a genuine collision on the SUFFIXED
+  // name (e.g. `ref="box"` + a top-level `const boxRef` / `$data.boxRef`) is now
+  // auto-resolved BEFORE this function runs: `emitVue` calls
+  // `deconflictVueRefSuffix` (packages/targets/vue/src/rewrite/deconflictRefSuffix.ts)
+  // on the fresh IR, which bumps the colliding ref's SOURCE name to a fresh
+  // `<base>N` so its emitted `<base>NRef` binding is free. Through the real
+  // `emitVue` pipeline this loop is therefore effectively a defensive backstop —
+  // it should never find a collision. It still fires for callers that invoke
+  // `rewriteRozieIdentifiers` directly on an IR that was never run through
+  // `deconflictVueRefSuffix` (e.g. hand-built synthetic IRs in unit tests).
   for (const ref of ir.refs) {
     const emittedRefBinding = ref.name + 'Ref';
     const collides =
