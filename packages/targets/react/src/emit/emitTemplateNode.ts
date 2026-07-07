@@ -145,12 +145,38 @@ function emitFragment(node: TemplateFragmentIR, ctx: EmitNodeCtx): string {
 }
 
 /**
+ * AST node kinds whose printed form can carry a trailing `.map(...)` without
+ * being reparented by member-access precedence. Everything else (a TS `as` /
+ * `satisfies` cast, a binary/logical/conditional/sequence, an arrow, …) binds
+ * looser than member access, so `EXPR.map(...)` would parse as `EXPR_head as
+ * (Type.map)` — the whole iterable must be parenthesized first. Kept as an
+ * allow-list so the entire existing r-for corpus (bare identifiers, `$data.x`
+ * member reads, call results, array literals) stays byte-identical.
+ */
+const POSTFIX_SAFE_ITERABLE_TYPES = new Set<string>([
+  'Identifier',
+  'MemberExpression',
+  'OptionalMemberExpression',
+  'CallExpression',
+  'OptionalCallExpression',
+  'ParenthesizedExpression',
+  'ArrayExpression',
+  'ThisExpression',
+  'TSNonNullExpression', // `x!` — postfix, `x!.map(...)` is well-formed
+]);
+
+/**
  * Emit a TemplateLoop as `{items.map((item) => <El key={...}>...</El>)}`.
  * The body[0] is the bare element; we inject `key={...}` into its attribute
  * list via the pendingKey context channel.
  */
 function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
-  const iterableCode = rewriteTemplateExpression(node.iterableExpression, ctx.ir);
+  const iterableRewritten = rewriteTemplateExpression(node.iterableExpression, ctx.ir);
+  // A low-precedence iterable (e.g. `$data.items as number[]`) must be wrapped
+  // before `.map(...)` is appended, or `items as number[].map(...)` mis-parses.
+  const iterableCode = POSTFIX_SAFE_ITERABLE_TYPES.has(node.iterableExpression.type)
+    ? iterableRewritten
+    : `(${iterableRewritten})`;
 
   // Phase 71 (r-keynav) — SPEC §5: "item index comes from the r-for
   // context". An author who wrote a bare `r-for="it in items"` (no `(it,

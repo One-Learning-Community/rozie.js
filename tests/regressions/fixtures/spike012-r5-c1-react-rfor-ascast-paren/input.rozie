@@ -1,0 +1,16 @@
+<rozie name="RforAsCastParen">
+<data>
+{
+  items: [1, 2, 3],
+}
+</data>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<div class="r"><ul><li r-for="it in ($data.items as number[])" :key="it">{{ it }}</li></ul></div>
+</template>
+
+</rozie>

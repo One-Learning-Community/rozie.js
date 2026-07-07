@@ -1,0 +1,16 @@
+{
+  "id": "REG-SPIKE012-R5-C1",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-5 C1: a TS `as`-cast iterable in an r-for (`r-for=\"it in ($data.items as number[])\"`). React lowered the iterable straight before `.map()` without parenthesizing it, so the emit was `items as number[].map(...)` — which parses as `items as (number[].map)` → a react emit syntax error (TS1005/TS1382). The iterable must be wrapped: `(items as number[]).map(...)`. Fix (react emitTemplateNode.emitLoop): parenthesize the rewritten iterable unless its top-level AST node is postfix-safe (Identifier / member / call / array / this / `!`), an allow-list that keeps the entire existing r-for corpus byte-identical. The other five targets bind the iterable as a JSX/template attribute value (no trailing `.map`), so they were already correct. Found by the shape-matrix harness (as-cast-cross/as-in-r-for).",
+  "targets": [
+    "react",
+    "vue",
+    "svelte",
+    "angular",
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 5"
+}
