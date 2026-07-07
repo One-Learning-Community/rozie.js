@@ -12,7 +12,11 @@
  *   - `$data.hovering`           → `hovering`     (NO .value — auto-unwrap)
  *   - `$refs.dialogEl`           → `dialogElRef`  (NO .value — Pitfall 4 Ref suffix)
  *   - `$emit('foo')` call         → `emit('foo')`
- *   - bare `canIncrement` (computed) → `canIncrement` (NO .value — auto-unwrap)
+ *   - bare `canIncrement` (computed) → `canIncrement` (NO .value — auto-unwrap;
+ *                                      template context) / `canIncrement.value`
+ *                                      (script context — lifted debounce/throttle,
+ *                                      Spike-012 R5 C6: `ComputedRef` is NOT
+ *                                      auto-unwrapped outside the template)
  *   - `$slots.header`            → `$slots.header` (Vue's $slots proxy passthrough)
  *
  * Inputs are deep-cloned BEFORE traversal so the IR's referential preservation
@@ -68,6 +72,15 @@ export function rewriteTemplateExpression(
    * handler emits `q = …` — a write to a `const` ref → TS2588 + a runtime
    * "Assignment to constant variable" that never updates the ref. Template
    * callers pass false (unchanged, byte-identical).
+   *
+   * Spike-012 R5 C6 — the same script-vs-template split applies to a bare
+   * `$computed` READ: `computed()` returns a `ComputedRef<T>`, which Vue's
+   * template compiler auto-unwraps (bare `canIncrement`), but a lifted
+   * `.debounce`/`.throttle` body is real `<script setup>` code where the
+   * `ComputedRef` object itself is in scope — reading it bare (`q.value =
+   * label`) assigns the wrapper object, not its value. In scriptContext a
+   * bare computed identifier now carries `.value`; template context is
+   * unaffected (byte-identical).
    */
   scriptContext = false,
 ): string {
@@ -78,6 +91,7 @@ export function rewriteTemplateExpression(
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
   const dataNames = new Set(ir.state.map((s) => s.name));
   const refNames = new Set(ir.refs.map((r) => r.name));
+  const computedNames = new Set(ir.computed.map((c) => c.name));
 
   // In script context a lowered Ref name reads/writes through `.value`; in
   // template context Vue auto-unwraps, so the bare identifier stands.
@@ -195,6 +209,36 @@ export function rewriteTemplateExpression(
       if (t.isIdentifier(callee) && callee.name === '$emit') {
         path.node.callee = t.identifier('emit');
       }
+    },
+
+    /**
+     * Spike-012 R5 C6 — a bare `$computed` READ inside a lifted
+     * `.debounce`/`.throttle` handler (scriptContext) must carry `.value`;
+     * template context (scriptContext=false, the entire existing corpus) is
+     * UNCHANGED — a bare computed name stays bare (auto-unwrap, doc header
+     * above), so this visitor is a byte-identical no-op there.
+     */
+    Identifier(path) {
+      if (!scriptContext) return;
+      const name = path.node.name;
+      if (!computedNames.has(name)) return;
+      // Only rewrite READ (referenced) positions — excludes declaration ids,
+      // non-computed member-expression properties, object-property keys,
+      // import/export specifiers, labels, etc.
+      if (!path.isReferencedIdentifier()) return;
+      // Object-shorthand value (`{ label }`) is technically a read, but is
+      // deliberately left bare here — no debounce/throttle handler in the
+      // corpus constructs an object shorthand over a computed name, and
+      // rewriting the VALUE half of a shorthand pair changes its printed
+      // shape in a way that's out of scope for this fix.
+      const parent = path.parent;
+      if (t.isObjectProperty(parent) && parent.shorthand && parent.value === path.node) return;
+      // Shadow-safe: a local binding for this name inside the lifted body
+      // (e.g. a parameter or local var that happens to share the computed's
+      // name) is NOT the computed — leave it bare.
+      if (path.scope.getBinding(name)) return;
+      path.replaceWith(t.memberExpression(t.identifier(name), t.identifier('value')));
+      path.skip();
     },
   });
 

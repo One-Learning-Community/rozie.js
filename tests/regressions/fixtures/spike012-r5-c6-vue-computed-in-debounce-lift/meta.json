@@ -1,0 +1,16 @@
+{
+  "id": "REG-SPIKE012-R5-C6",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-5 C6: a bare `$computed` READ inside a `.debounce`/`.throttle` template handler (lifted into `<script setup>` per Spike-012 R4/scriptContext) stayed bare — `q.value = label;` assigns the `ComputedRef` OBJECT to a `Ref<string>`, not its unwrapped value (TS2322 + wrong at runtime). Vue's template compiler auto-unwraps a bare computed name in TEMPLATE context, but the lifted handler body is real `<script setup>` code where that auto-unwrap does not apply — the same script-vs-template split R4 already applied to `$data`/`$props`(model)/`$refs` reads, but R4 did not cover a bare `$computed` identifier. Fix (rewriteTemplateExpression.ts): a new `Identifier` visitor appends `.value` to a bare computed-name READ ONLY when `scriptContext === true` (the lifted-handler path); template context (the entire existing corpus) is unaffected — a bare computed name stays bare. The other five targets already read the debounce-lifted computed correctly via their own reactivity conventions (React/Solid call the accessor, Svelte/Angular getters/`$derived` return the value directly), so they are unaffected by this bug and this fix. Found by the shape-matrix torture harness (debounce-lift-cross/computed-read-in-debounce).",
+  "targets": [
+    "react",
+    "vue",
+    "svelte",
+    "angular",
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 5"
+}

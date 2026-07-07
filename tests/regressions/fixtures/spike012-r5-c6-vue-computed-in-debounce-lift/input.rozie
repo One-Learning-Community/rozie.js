@@ -1,0 +1,16 @@
+<rozie name="ComputedInDebounceLift">
+<data>
+{
+  q: '',
+}
+</data>
+
+<script lang="ts">
+const label = $computed(() => 'x');
+</script>
+
+<template>
+<input @input.debounce(300)="$data.q = label" />
+</template>
+
+</rozie>
