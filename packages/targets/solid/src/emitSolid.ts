@@ -33,6 +33,10 @@ import {
   SOLID_EMITTER_LOCALS,
   SOLID_IMPORT_NAMES,
 } from '../../../core/src/rewrite/reservedNames.js';
+import {
+  deconflictSolidRefSuffix,
+  collectSolidTopLevelBindingNames,
+} from './rewrite/deconflictRefSuffix.js';
 import { SolidImportCollector, RuntimeSolidImportCollector } from './rewrite/collectSolidImports.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
@@ -90,6 +94,24 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     ]);
     deconflictSolidGeneratedNames(ir, solidReserved, protectedNames);
   }
+
+  // Spike-012 R5 (C4-rename-collision, Solid "make it work" half) — a template
+  // ref's UNCONDITIONALLY-suffixed emitted binding (`<name>Ref`) can collide
+  // with a top-level `<script>` binding of that exact suffixed name (`ref="box"`
+  // + a top-level `const boxRef` both mint a `boxRef` binding; the downstream
+  // `$local` rename of the colliding user const can't reach a read of it inside
+  // an `ir.lifecycle` body, so the read silently re-binds to the ref instead).
+  // Runs AFTER the generated-name pass above (so the taken set reflects any
+  // already-renamed `<data>`/`$computed`/`$refs` name) and BEFORE any per-target
+  // rewrite (`rewriteScript`/`rewriteTemplateExpression`/`emitTemplateAttribute`)
+  // reads a ref name. `collectSolidTopLevelBindingNames` reads the ORIGINAL
+  // (not-yet-cloned) script Program — per-target clone/rewrite happens later,
+  // inside `rewriteScript`. Only-on-collision: the non-colliding corpus (the
+  // entire existing example set) stays byte-identical.
+  deconflictSolidRefSuffix(
+    ir,
+    collectSolidTopLevelBindingNames(ir.setupBody.scriptProgram),
+  );
 
   // 1. Resolve registry + blockOffsets.
   const registry = opts.modifierRegistry ?? createDefaultRegistry();

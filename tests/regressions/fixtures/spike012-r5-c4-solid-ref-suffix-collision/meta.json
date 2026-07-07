@@ -1,0 +1,16 @@
+{
+  "id": "REG-SPIKE012-R5-C4-SOLID",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-5 C4 (ref-rename-cross/ref-rename-collides-with-const), Solid half: on Solid a template `ref=\"box\"` UNCONDITIONALLY lowers to the SUFFIXED binding `boxRef` (`let boxRef: HTMLElement | null = null;`, `$refs.box` -> bare `boxRef`). When the author ALSO has a top-level `<script>` binding literally named `boxRef` (here a `const boxRef = 7`), the emitted ref binding DUPLICATES it. The pre-existing `deconflictReservedClassFields` `$local` rename fires on the collision and renames the user's `const boxRef` to `boxRef$local` -- but that pass only walks the cloned top-level `<script>` Program, not the separately-threaded `ir.lifecycle[].setup`/`.cleanup` bodies, so a read of `boxRef` INSIDE the `$onMount` callback stays bare and silently re-binds to the REF (an `HTMLElement`) instead of the (renamed) user const `7` -> TS2365/TS18047 AND a wrong runtime value. This shape compiles fine on react/vue/svelte/angular/lit (there the ref's UNSUFFIXED name is what would collide, and those targets already rename the colliding ref via the shared `deconflictRefsAgainstUserBindings` core pass, or -- for vue -- the analogous `deconflictVueRefSuffix` IR pre-pass), so the correct resolution is to MAKE IT WORK on Solid too, not error. Fix (packages/targets/solid/src/rewrite/deconflictRefSuffix.ts, wired into emitSolid.ts): mirrors the Vue fix -- a Solid-specific IR pre-pass renames the colliding ref's SOURCE name to a fresh `<base>N` (here `box` -> `box2`) so its emitted binding (`box2Ref`) is free, before any per-target rewrite reads a ref name. The user's `const boxRef = 7` and every OTHER target's ref binding stay untouched; since `ir.lifecycle[].setup`/`.cleanup` are AST subtrees reachable directly off `ir`, the SAME generic IR walk that propagates the ref rename also reaches `$refs.<old>` reads inside lifecycle hook bodies -- the exact spot the downstream `$local` rename could not reach. Found by the shape-matrix torture harness (ref-rename-cross/ref-rename-collides-with-const) -- the solid arm of this cell was a tsc-invariant escape (TS2365 + TS18047); the vue arm of the same cell was a separate, already-fixed invalid-emit structural escape.",
+  "targets": [
+    "react",
+    "vue",
+    "svelte",
+    "angular",
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 5"
+}

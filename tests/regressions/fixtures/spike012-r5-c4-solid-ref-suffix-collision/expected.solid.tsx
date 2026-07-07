@@ -16,7 +16,7 @@ export default function RefSuffixCollision(_props: RefSuffixCollisionProps): JSX
 
   return (
     <>
-    <div {...attrs} class={"r" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-54e18fa1=""><div ref={(el) => { box2Ref = el as HTMLElement; }} data-rozie-s-54e18fa1="">x</div></div>
+    <div {...attrs} class={"r" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-3039287c=""><div ref={(el) => { box2Ref = el as HTMLElement; }} data-rozie-s-3039287c="">x</div></div>
     </>
   );
 }
