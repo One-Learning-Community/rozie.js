@@ -984,7 +984,7 @@ export function hoistNonPureTemplateExpression(
     if (touchesLoopVar) return null;
   }
 
-  const lowerOpts: RewriteTemplateOpts = { ...opts, prefixThis: true };
+  const lowerOpts: RewriteTemplateOpts = { ...opts, prefixThis: true, scriptContext: true };
   const loweredReturn = rewriteTemplateExpression(normalized, ir, lowerOpts);
 
   const base = `__${hintName.replace(/[^A-Za-z0-9_$]/g, '_')}`;

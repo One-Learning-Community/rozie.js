@@ -1,0 +1,16 @@
+<rozie name="InterpArrowAsCast">
+<data>
+{
+  items: [1, 2, 3],
+}
+</data>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<div>{{ $data.items.filter((x) => (x as number) > 1).length }}</div>
+</template>
+
+</rozie>

@@ -1,0 +1,16 @@
+{
+  "id": "REG-SPIKE012-R5-C2",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "Round-5 C2: an interpolation containing an inline arrow (illegal in Angular templates) is hoisted into a generated `protected get interp_N()` class-body getter (hoistNonPureTemplateExpression). A TS `as`-cast inside that arrow was wrongly rewritten to Angular's template-only `$any(...)` call — which is undefined in a TS class-body, producing a broken getter (free identifier `$any`). Fix (rewriteTemplateExpression.ts hoistNonPureTemplateExpression): the lowering opts passed to the hoisted getter body set `prefixThis: true` but omitted `scriptContext: true`. `scriptContext` is what tells the rewriter it is emitting real TS (where `as`/`!` must stay intact) vs. an Angular template string (where `X as T` lowers to `$any(X)`). Since the getter body is real TS class-body code, it must pass `scriptContext: true` alongside `prefixThis: true`, so the emitted getter becomes `return this.items().filter(x => (x as number) > 1).length;` instead of the broken `$any(x)` form. The other five targets allow inline arrows directly in the template/JSX expression (no hoist needed), so they were already correct. Found by the shape-matrix harness (as-cast-cross/as-nested-arrow-interp).",
+  "targets": [
+    "react",
+    "vue",
+    "svelte",
+    "angular",
+    "solid",
+    "lit"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012) — Round 5"
+}
