@@ -104,14 +104,20 @@ The pattern across them is consistent:
 
 - **Slot ⚠︎** — the feature works at runtime; the consumer-side *authoring shape* differs (render prop, `data-rozie-params` attribute, additive `slots?:` / `snippets?:` / `templates?:` prop).
 - **Lifecycle ⚠︎** — the hooks fire; the *timing* differs on conditionally-rendered component roots (Lit / Solid keep the instance alive across the toggle).
-- **`r-model` modifiers ⚠︎ (React only)** — `.number`/`.trim`/custom value transforms are byte-identical across all six targets. The one divergence is React's `.lazy`: React has no true `change` event, so `r-model.lazy` emits an **uncontrolled `defaultValue` + `onBlur`** input (the idiomatic React deferred-commit pattern) instead of a controlled `value` + `onChange`. The trade-off — programmatic writes to the bound state mid-edit are not reflected by the uncontrolled input — is a documented parity gap, consistent with the render-prop-slot precedent. See [`r-model` modifiers](/guide/features#r-model-modifiers-—-lazy-number-trim).
+- **`r-model` modifiers ⚠︎ (React only)** — `.number`/`.trim`/custom value transforms behave identically across all six targets. The one divergence is React's `.lazy`: React has no true `change` event, so `r-model.lazy` emits an **uncontrolled `defaultValue` + `onBlur`** input (the idiomatic React deferred-commit pattern) instead of a controlled `value` + `onChange`. The trade-off — programmatic writes to the bound state mid-edit are not reflected by the uncontrolled input — is a documented parity gap, consistent with the render-prop-slot precedent. See [`r-model` modifiers](/guide/features#r-model-modifiers-—-lazy-number-trim).
 
 The only `❌` in the matrix is the Lit-specific scoped + dynamic slot name
 combination — a documented v1 limitation.
 
 Everything else — props, `<data>`, `<listeners>`, `$computed`, `$watch`,
 modifier grammar, two-way binding machinery, default + named slots, refs,
-`$emit`, `<style lang="scss">` preprocessing — is byte-locked identical across
-all six targets, with dist-parity fixtures in `tests/dist-parity/fixtures/`
-verifying each entrypoint
-(compile / cli / babel-plugin / unplugin) emits the same output.
+`$emit`, `<style lang="scss">` preprocessing — has **full feature parity**
+across all six targets: it behaves identically everywhere, with only the
+documented ⚠︎ authoring-shape divergences above.
+
+The *emitted code* is deliberately idiomatic per target — React output is not
+byte-identical to Vue output to Solid output, and that's the whole point.
+What **is** byte-locked is per-target determinism: for a given target, all four
+entrypoints (compile / cli / babel-plugin / unplugin) emit identical bytes.
+That guarantee is verified by the dist-parity fixtures in
+`tests/dist-parity/fixtures/`.
