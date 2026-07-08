@@ -1,0 +1,17 @@
+<rozie name="PolyGuardInComputed">
+<props>
+{
+  value: { type: [String, Object], default: '', model: true },
+}
+</props>
+
+<script lang="ts">
+const asStr = $computed((): string => (typeof $props.value === 'string' ? $props.value : ''))
+const shout = $computed(() => asStr.toUpperCase())
+</script>
+
+<template>
+<div class="poly-guard-in-computed">{{ shout }}</div>
+</template>
+
+</rozie>

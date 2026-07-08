@@ -341,12 +341,31 @@ export function rewriteRozieExpressionNode(
   if (isBlock) {
     return t.blockStatement(body);
   }
-  // Extract the expression from the first statement.
-  const stmt = body[0];
-  if (stmt && t.isExpressionStatement(stmt)) {
-    return stmt.expression;
+  // Fast path: a single ExpressionStatement — the rewrite left the shape
+  // unchanged (no prelude injected). Return the bare expression (byte-identical
+  // to the pre-hoist behaviour for every non-poly-guard computed body).
+  if (body.length === 1 && t.isExpressionStatement(body[0])) {
+    return (body[0] as t.ExpressionStatement).expression;
   }
-  // Fallback: return original
+  // Spike-012 R7: a rewrite pass (`hoistPolymorphicModelGuards`) injected a
+  // `const v = $props.X` prelude BEFORE the guarded expression, so the program
+  // body is now `[VarDecl…, ExpressionStatement(expr)]`. The old single-statement
+  // extraction read `body[0]` (the VarDecl), failed the ExpressionStatement
+  // guard, and fell back to returning the ORIGINAL un-rewritten `expr` — leaking
+  // a raw `$props.value` (free ident, TS2552 + runtime ReferenceError). Preserve
+  // the hoisted prelude by returning a BlockStatement whose trailing statement
+  // `return`s the rewritten expression; emitScript renders it as a `() => { … }`
+  // block-body computed arrow. This only triggers when a prelude exists — the
+  // fast path above keeps every prelude-free body byte-identical.
+  const last = body[body.length - 1];
+  if (last && t.isExpressionStatement(last)) {
+    return t.blockStatement([
+      ...body.slice(0, -1),
+      t.returnStatement((last as t.ExpressionStatement).expression),
+    ]);
+  }
+  // Fallback: return original (unreachable for the computed-body path — a
+  // prelude always precedes a trailing ExpressionStatement).
   return expr;
 }
 

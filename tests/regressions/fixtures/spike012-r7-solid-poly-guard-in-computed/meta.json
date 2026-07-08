@@ -1,0 +1,11 @@
+{
+  "id": "REG-SPIKE012-R7",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "a polymorphic (union-typed) model-prop `typeof` guard written as a TERNARY inside a `$computed` callback leaked a raw `$props.value` on Solid. `hoistPolymorphicModelGuards` fires on the computed body and inserts a `const v = $props.value` prelude before the guarded expression, but `rewriteRozieExpressionNode` only extracted a single ExpressionStatement — the injected prelude made `body[0]` a VariableDeclaration, the isExpressionStatement check failed, and it fell back to returning the ORIGINAL un-rewritten expression (raw `$props.value`, a free ident → TS2552 + runtime ReferenceError). Fix: when the Expression rewrite produced a hoisted prelude, return a BlockStatement whose trailing statement `return`s the rewritten expression, rendered as a `() => { … }` computed body. The block-if form of the same guard was never affected (it lowers to `value()` directly, only the strict-narrow gap remains).",
+  "targets": [
+    "solid"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012, Round 7)"
+}
