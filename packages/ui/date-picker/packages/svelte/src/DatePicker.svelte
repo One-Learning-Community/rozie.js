@@ -126,22 +126,37 @@ const todayIso = () => {
 // ---- derived view (ONE plain function, uniform x6) ---------------------
 // The current selected ISO, normalized to a string. In range mode the value is
 // an object → this returns '' (so the SINGLE-mode grid highlight no-ops there).
-// Emitter-hardening backlog item #11 (project_solid_polymorphic_model_typeof_narrow_gap):
-// this used to need a hand-authored `const v = $props.value` capture BEFORE the
-// typeof guard so Solid's TS narrowing held (its accessor-CALL `value()` didn't
-// narrow across two separate calls the way the other five targets' plain
-// variable/property reads did). The emitter now binds that local itself, so the
-// guard is authored directly here.
+// Capture the polymorphic model prop into a local BEFORE the typeof guard so TS
+// narrows on ALL six targets. `$props.value` lowers to an accessor CALL on both
+// Solid (`value()`) and Angular (`this.value()`); a typeof guard does not narrow
+// across two separate calls the way the other four targets' plain variable /
+// property reads do, so an inline re-read (`typeof $props.value === 'string' ?
+// $props.value : ''`) hits TS2322 on Solid AND Angular.
+// The Solid emitter hoists this local itself (hoistPolymorphicModelGuards, #11
+// — project_solid_polymorphic_model_typeof_narrow_gap), so the guard could be
+// authored inline for Solid; the ANGULAR emitter does NOT yet do this (same
+// accessor-call gap), which broke @rozie-ui/date-picker-angular#build. Until the
+// hoist is ported to Angular, author the capture explicitly here so every target
+// narrows. EMITTER-BACKLOG: extend hoistPolymorphicModelGuards to the Angular target.
 // ---- derived view (ONE plain function, uniform x6) ---------------------
 // The current selected ISO, normalized to a string. In range mode the value is
 // an object → this returns '' (so the SINGLE-mode grid highlight no-ops there).
-// Emitter-hardening backlog item #11 (project_solid_polymorphic_model_typeof_narrow_gap):
-// this used to need a hand-authored `const v = $props.value` capture BEFORE the
-// typeof guard so Solid's TS narrowing held (its accessor-CALL `value()` didn't
-// narrow across two separate calls the way the other five targets' plain
-// variable/property reads did). The emitter now binds that local itself, so the
-// guard is authored directly here.
-const selected = (): string => typeof value === 'string' ? value : '';
+// Capture the polymorphic model prop into a local BEFORE the typeof guard so TS
+// narrows on ALL six targets. `$props.value` lowers to an accessor CALL on both
+// Solid (`value()`) and Angular (`this.value()`); a typeof guard does not narrow
+// across two separate calls the way the other four targets' plain variable /
+// property reads do, so an inline re-read (`typeof $props.value === 'string' ?
+// $props.value : ''`) hits TS2322 on Solid AND Angular.
+// The Solid emitter hoists this local itself (hoistPolymorphicModelGuards, #11
+// — project_solid_polymorphic_model_typeof_narrow_gap), so the guard could be
+// authored inline for Solid; the ANGULAR emitter does NOT yet do this (same
+// accessor-call gap), which broke @rozie-ui/date-picker-angular#build. Until the
+// hoist is ported to Angular, author the capture explicitly here so every target
+// narrows. EMITTER-BACKLOG: extend hoistPolymorphicModelGuards to the Angular target.
+const selected = (): string => {
+  const v = value;
+  return typeof v === 'string' ? v : '';
+};
 
 // The RANGE normalization funnel (mirrors selected()): coerce the polymorphic
 // `value` into a canonical ordered { start, end }. ALL range logic reads through
