@@ -61,7 +61,17 @@ export const number: ModelModifierImpl = {
       return { descriptor: {}, diagnostics };
     }
     return {
-      descriptor: { valueTransform: NUMBER_VALUE_TRANSFORM },
+      // `valueTransformResultType: 'number'` — the transform's runtime result is
+      // `string | number` (the `looseToNumber` NaN→string fallback), but the
+      // author asked for a number and Vue types the model `number`; the
+      // TS-context emitters cast the committed value to keep it assignable to the
+      // typed setter (Spike-012 R7-2). Angular/Vue ignore it (see the descriptor
+      // field docs). `.number` is always TERMINAL (D-07), so it owns the chain's
+      // result type.
+      descriptor: {
+        valueTransform: NUMBER_VALUE_TRANSFORM,
+        valueTransformResultType: 'number',
+      },
       diagnostics: [],
     };
   },

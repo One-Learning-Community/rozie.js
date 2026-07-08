@@ -110,14 +110,41 @@ function makeBindingAttr(name: string, expression: t.Expression): AttributeBindi
  */
 function partitionModifiers(
   modifiers: ResolvedModelModifier[] | undefined,
-): { valueTransforms: string[]; isLazy: boolean } {
+): { valueTransforms: string[]; isLazy: boolean; resultType: string | undefined } {
   const valueTransforms: string[] = [];
   let isLazy = false;
+  // Spike-012 R7-2 — the composed transform's contractual result type is the
+  // LAST modifier that declares one (`.number` is D-07-terminal → `'number'`).
+  let resultType: string | undefined;
   for (const m of modifiers ?? []) {
     if (m.descriptor.valueTransform) valueTransforms.push(m.descriptor.valueTransform);
     if (m.descriptor.eventSwap === 'change') isLazy = true;
+    if (m.descriptor.valueTransformResultType) resultType = m.descriptor.valueTransformResultType;
   }
-  return { valueTransforms, isLazy };
+  return { valueTransforms, isLazy, resultType };
+}
+
+/**
+ * Spike-012 R7-2 — wrap a committed value node in `(<node> as <resultType>)`
+ * when the modifier chain declares a contractual result type (`.number` →
+ * `'number'`). The `.number` transform's runtime result is `string | number`
+ * (the `looseToNumber` NaN→string fallback), but the author asked for a number
+ * and Vue types the model `number`; the cast keeps the value assignable to the
+ * typed signal setter (`setX`) — a pure type assertion, byte-runtime-neutral.
+ * Absent resultType ⇒ the node is returned unchanged (bare / `.trim`-only
+ * r-model stays byte-identical).
+ */
+function applyResultTypeCast(node: t.Expression, resultType: string | undefined): t.Expression {
+  if (!resultType) return node;
+  try {
+    // The `typescript` plugin is required — `parseExpression('null as number')`
+    // throws under the default (non-TS) parser, which silently dropped the cast.
+    const probe = parseExpression(`null as ${resultType}`, { plugins: ['typescript'] });
+    if (t.isTSAsExpression(probe)) return t.tsAsExpression(node, probe.typeAnnotation);
+  } catch {
+    /* fall through — degrade to the uncast node */
+  }
+  return node;
 }
 
 /**
@@ -207,7 +234,7 @@ export function emitRModel(
   // Phase 12 — the resolved `r-model` modifier chain. `valueTransforms` are
   // the ordered `$v`-placeholder fragments (D-07-canonicalized); `isLazy`
   // flags `.lazy`. Both are empty/false for bare `r-model`.
-  const { valueTransforms, isLazy } = partitionModifiers(rModelAttr.modifiers);
+  const { valueTransforms, isLazy, resultType } = partitionModifiers(rModelAttr.modifiers);
 
   // Build Babel nodes for replacement attributes.
   // Signal getter: local() — use a CallExpression so it passes through rewriteTemplateExpression
@@ -307,7 +334,10 @@ export function emitRModel(
     t.memberExpression(eId, t.identifier('currentTarget')),
     t.identifier('value'),
   );
-  const committedValue = applyValueTransforms(eTargetValue, valueTransforms, diagnostics);
+  const committedValue = applyResultTypeCast(
+    applyValueTransforms(eTargetValue, valueTransforms, diagnostics),
+    resultType,
+  );
   const handlerArrow = t.arrowFunctionExpression(
     [eId],
     t.callExpression(setterId, [committedValue]),

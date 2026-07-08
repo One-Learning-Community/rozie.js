@@ -118,14 +118,44 @@ function makeBindingAttr(name: string, expression: t.Expression): AttributeBindi
  */
 function partitionModifiers(
   modifiers: ResolvedModelModifier[] | undefined,
-): { valueTransforms: string[]; isLazy: boolean } {
+): { valueTransforms: string[]; isLazy: boolean; resultType: string | undefined } {
   const valueTransforms: string[] = [];
   let isLazy = false;
+  // Spike-012 R7-2 — the composed transform's contractual result type is the
+  // LAST modifier that declares one (the chain is D-07-canonical: `.number` is
+  // terminal, so its `'number'` wins). Absent ⇒ no cast.
+  let resultType: string | undefined;
   for (const m of modifiers ?? []) {
     if (m.descriptor.valueTransform) valueTransforms.push(m.descriptor.valueTransform);
     if (m.descriptor.eventSwap === 'change') isLazy = true;
+    if (m.descriptor.valueTransformResultType) resultType = m.descriptor.valueTransformResultType;
   }
-  return { valueTransforms, isLazy };
+  return { valueTransforms, isLazy, resultType };
+}
+
+/**
+ * Spike-012 R7-2 — wrap a committed value node in `(<node> as <resultType>)`
+ * when the modifier chain declares a contractual result type (`.number` →
+ * `'number'`). The `.number` transform's runtime result is `string | number`
+ * (the `looseToNumber` NaN→string fallback), but the author asked for a number
+ * and Vue types the model `number`; the cast keeps the value assignable to the
+ * typed setter (react `setX`) — a pure type assertion, byte-runtime-neutral.
+ * `resultType` is parsed once as a probe (`null as <resultType>`) to obtain a
+ * real `TSType` node, so any type string works; a parse failure degrades to the
+ * uncast node (never a crash). Absent resultType ⇒ the node is returned
+ * unchanged, so bare / `.trim`-only r-model stays byte-identical.
+ */
+function applyResultTypeCast(node: t.Expression, resultType: string | undefined): t.Expression {
+  if (!resultType) return node;
+  try {
+    // The `typescript` plugin is required — `parseExpression('null as number')`
+    // throws under the default (non-TS) parser, which silently dropped the cast.
+    const probe = parseExpression(`null as ${resultType}`, { plugins: ['typescript'] });
+    if (t.isTSAsExpression(probe)) return t.tsAsExpression(node, probe.typeAnnotation);
+  } catch {
+    /* fall through — degrade to the uncast node */
+  }
+  return node;
 }
 
 /**
@@ -229,7 +259,7 @@ export function emitRModel(
   // the ordered `$v`-placeholder fragments (already D-07-canonicalized);
   // `isLazy` flags `.lazy`. Both are empty/false for bare `r-model`, so the
   // non-modifier paths below stay byte-identical to pre-phase.
-  const { valueTransforms, isLazy } = partitionModifiers(rModelAttr.modifiers);
+  const { valueTransforms, isLazy, resultType } = partitionModifiers(rModelAttr.modifiers);
 
   // Build babel nodes for replacement attribute expressions.
   // Each replacement attribute is encoded with a binding expression that
@@ -262,7 +292,10 @@ export function emitRModel(
   // Phase 12: `.number`/`.trim` wrap the committed value; `.lazy` swaps to the
   // uncontrolled `defaultValue`+`onBlur` deferred-commit pattern (D-08).
   if (tag === 'select' || tag === 'textarea') {
-    const committed = applyValueTransforms(eTargetValue, valueTransforms, diagnostics);
+    const committed = applyResultTypeCast(
+      applyValueTransforms(eTargetValue, valueTransforms, diagnostics),
+      resultType,
+    );
     const handlerArrow = t.arrowFunctionExpression(
       [eId],
       t.callExpression(setterId, [committed]),
@@ -356,7 +389,10 @@ export function emitRModel(
   // <input type="text"> (default for input).
   // Phase 12: `.number`/`.trim` wrap the committed value; `.lazy` swaps to the
   // uncontrolled `defaultValue`+`onBlur` deferred-commit pattern (D-08).
-  const committedValue = applyValueTransforms(eTargetValue, valueTransforms, diagnostics);
+  const committedValue = applyResultTypeCast(
+    applyValueTransforms(eTargetValue, valueTransforms, diagnostics),
+    resultType,
+  );
   const onChangeArrow = t.arrowFunctionExpression(
     [eId],
     t.callExpression(setterId, [committedValue]),

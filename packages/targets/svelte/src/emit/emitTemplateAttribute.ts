@@ -214,17 +214,28 @@ function escapeAttrValue(s: string): string {
  */
 function partitionSvelteModelModifiers(
   modifiers:
-    | { name: string; descriptor: { valueTransform?: string; eventSwap?: 'change' } }[]
+    | {
+        name: string;
+        descriptor: {
+          valueTransform?: string;
+          eventSwap?: 'change';
+          valueTransformResultType?: string;
+        };
+      }[]
     | undefined,
-): { valueTransforms: string[]; isLazy: boolean; hasAny: boolean } {
+): { valueTransforms: string[]; isLazy: boolean; hasAny: boolean; resultType: string | undefined } {
   const valueTransforms: string[] = [];
   let isLazy = false;
+  // Spike-012 R7-2 — the composed transform's contractual result type is the
+  // LAST modifier that declares one (`.number` is D-07-terminal → `'number'`).
+  let resultType: string | undefined;
   const list = modifiers ?? [];
   for (const m of list) {
     if (m.descriptor.valueTransform) valueTransforms.push(m.descriptor.valueTransform);
     if (m.descriptor.eventSwap === 'change') isLazy = true;
+    if (m.descriptor.valueTransformResultType) resultType = m.descriptor.valueTransformResultType;
   }
-  return { valueTransforms, isLazy, hasAny: list.length > 0 };
+  return { valueTransforms, isLazy, hasAny: list.length > 0, resultType };
 }
 
 /**
@@ -672,7 +683,7 @@ export function emitSingleAttr(
       // The handler body assigns the transformed value back — chaining each
       // `valueTransform` fragment in D-07 list order (the resolved list
       // arrives already canonicalized).
-      const { valueTransforms, isLazy, hasAny } = partitionSvelteModelModifiers(
+      const { valueTransforms, isLazy, hasAny, resultType } = partitionSvelteModelModifiers(
         attr.modifiers,
       );
       if (!hasAny) {
@@ -680,10 +691,16 @@ export function emitSingleAttr(
         // pre-phase.
         return `bind:value={${expr}}`;
       }
-      const committedValue = applyValueTransformsString(
+      const rawCommitted = applyValueTransformsString(
         '$event.currentTarget.value',
         valueTransforms,
       );
+      // Spike-012 R7-2 — cast the committed value to the chain's contractual
+      // result type (`.number` → `number`) so a `string | number` transform
+      // result is assignable to the `number`-typed `$bindable`/prop. Pure type
+      // assertion (svelte-check reads markup expressions as TS); byte-identical
+      // when `resultType` is absent (`.trim`-only / custom-string chains).
+      const committedValue = resultType ? `(${rawCommitted} as ${resultType})` : rawCommitted;
       const eventName = isLazy ? 'onchange' : 'oninput';
       return `value={${expr}} ${eventName}={($event) => ${expr} = ${committedValue}}`;
     }

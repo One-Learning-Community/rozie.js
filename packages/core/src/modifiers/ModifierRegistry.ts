@@ -391,6 +391,23 @@ export interface ModelModifierDescriptor {
    */
   valueTransform?: string;
   /**
+   * The TS type the composed `valueTransform` is CONTRACTUALLY understood to
+   * produce, regardless of its runtime fallback. `.number` is Vue's
+   * `looseToNumber` — it returns the raw string when `parseFloat` yields `NaN`,
+   * so the transform's true runtime result is `string | number`. But the author
+   * asked for numeric coercion, and Vue itself types a `v-model.number` model as
+   * `number` (trusting the declared type). The TS-expression-context emitters
+   * (react/solid/lit/svelte) wrap the committed value in `(<transform> as
+   * <valueTransformResultType>)` so the `string | number` result is assignable
+   * to the typed setter — a pure type assertion, byte-runtime-neutral, matching
+   * Vue's stance. Angular splices the transform into a TEMPLATE binding (where
+   * `as` is illegal and `$event` is untyped anyway → already clean) and Vue uses
+   * the native `v-model.number` (no spliced transform), so both IGNORE this.
+   * Absent ⇒ no cast (the transform's inferred type flows through unchanged, e.g.
+   * `.trim` stays `string`). Spike-012 R7-2.
+   */
+  valueTransformResultType?: string;
+  /**
    * D-03 / D-08 — a flag. `'change'` means the bound input should commit on
    * the `change` event instead of `input`. Each target emitter wires its own
    * event; the per-target divergence (`change` vs `input`, React's

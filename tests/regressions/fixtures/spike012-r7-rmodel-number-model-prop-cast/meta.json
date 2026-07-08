@@ -1,0 +1,14 @@
+{
+  "id": "REG-SPIKE012-R7-2",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md",
+  "sourceKind": "phase-7-loop",
+  "phase": "spike-012",
+  "desc": "`r-model.number` on a `Number`-typed MODEL prop broke strict typecheck on react/solid/lit/svelte. The `.number` modifier is Vue's `looseToNumber` (NaN → raw string), so the committed transform's runtime result is `string | number`, which the `number`-typed setter/accessor rejected (react TS2345, solid TS2769, lit/svelte TS2322). Vue was already clean (native `v-model.number` + `defineModel<number>` trusts the declared type) and Angular clean (untyped `ngModelChange` `$event`). Fix: the `.number` modifier declares `valueTransformResultType: 'number'`, and the four TS-expression-context emitters wrap the committed value in `(<transform> as number)` — a pure type assertion (byte-runtime-neutral, looseToNumber fidelity intact) matching Vue's stance. Absent a result type (bare / `.trim`-only) the emit is byte-identical.",
+  "targets": [
+    "react",
+    "solid",
+    "lit",
+    "svelte"
+  ],
+  "discoveredBy": "shape-matrix torture harness (spike 012, Round 7)"
+}

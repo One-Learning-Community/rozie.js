@@ -10,7 +10,7 @@ let { ...__rozieAttrs }: Props = $props();
 let quantity = $state(0);
 </script>
 
-<div {...__rozieAttrs} class={["rmodel-number-trim", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-dfdb7742><input type="text" value={quantity} oninput={($event) => quantity = (Number.isNaN(Number.parseFloat((($event.currentTarget.value).trim()))) ? (($event.currentTarget.value).trim()) : Number.parseFloat((($event.currentTarget.value).trim())))} placeholder="Enter a quantity" data-rozie-s-dfdb7742 /><p class="echo" data-rozie-s-dfdb7742>Quantity: {quantity}</p></div>
+<div {...__rozieAttrs} class={["rmodel-number-trim", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-dfdb7742><input type="text" value={quantity} oninput={($event) => quantity = ((Number.isNaN(Number.parseFloat((($event.currentTarget.value).trim()))) ? (($event.currentTarget.value).trim()) : Number.parseFloat((($event.currentTarget.value).trim()))) as number)} placeholder="Enter a quantity" data-rozie-s-dfdb7742 /><p class="echo" data-rozie-s-dfdb7742>Quantity: {quantity}</p></div>
 
 <style>
 :global {

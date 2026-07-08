@@ -770,11 +770,17 @@ function buildRModelParts(
   // a `$v`-placeholder value-transform around the value access; `.lazy` swaps
   // the event from `@input` to `@change` (D-08). Both are empty/absent for
   // bare `r-model`, so its emit stays byte-identical to pre-phase.
-  const { valueTransforms, isLazy } = partitionModelModifiers(rModelAttr.modifiers);
-  const committedValue = applyValueTransformsString(
+  const { valueTransforms, isLazy, resultType } = partitionModelModifiers(rModelAttr.modifiers);
+  // Spike-012 R7-2 — cast the committed value to the chain's contractual result
+  // type (`.number` → `number`) so a `string | number` transform result is
+  // assignable to the typed `set <prop>(v: number)` accessor. Pure type
+  // assertion (the emitted handler is TS, `.ts` file); byte-identical when
+  // `resultType` is absent (bare / `.trim`-only r-model).
+  const rawCommitted = applyValueTransformsString(
     '($event.target as HTMLInputElement).value',
     valueTransforms,
   );
+  const committedValue = resultType ? `(${rawCommitted} as ${resultType})` : rawCommitted;
 
   return {
     propBinding: `.value=\${${code}}`,
@@ -793,16 +799,27 @@ function buildRModelParts(
  */
 function partitionModelModifiers(
   modifiers:
-    | { name: string; descriptor: { valueTransform?: string; eventSwap?: 'change' } }[]
+    | {
+        name: string;
+        descriptor: {
+          valueTransform?: string;
+          eventSwap?: 'change';
+          valueTransformResultType?: string;
+        };
+      }[]
     | undefined,
-): { valueTransforms: string[]; isLazy: boolean } {
+): { valueTransforms: string[]; isLazy: boolean; resultType: string | undefined } {
   const valueTransforms: string[] = [];
   let isLazy = false;
+  // Spike-012 R7-2 — the composed transform's contractual result type is the
+  // LAST modifier that declares one (`.number` is D-07-terminal → `'number'`).
+  let resultType: string | undefined;
   for (const m of modifiers ?? []) {
     if (m.descriptor.valueTransform) valueTransforms.push(m.descriptor.valueTransform);
     if (m.descriptor.eventSwap === 'change') isLazy = true;
+    if (m.descriptor.valueTransformResultType) resultType = m.descriptor.valueTransformResultType;
   }
-  return { valueTransforms, isLazy };
+  return { valueTransforms, isLazy, resultType };
 }
 
 /**
