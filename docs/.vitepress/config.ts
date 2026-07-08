@@ -98,6 +98,7 @@ export default defineConfig({
           text: 'Guide',
           items: [
             { text: 'Why Rozie?', link: '/guide/why' },
+            { text: 'Creature comforts', link: '/guide/creature-comforts' },
             { text: 'Why Rozie looks this way', link: '/guide/design-rationale' },
             { text: 'How Rozie compares (Mitosis, Stencil)', link: '/guide/how-rozie-compares' },
             { text: 'Install', link: '/guide/install' },
@@ -113,7 +114,6 @@ export default defineConfig({
           text: 'Adoption',
           items: [
             { text: 'Adopt incrementally', link: '/guide/adopt-incrementally' },
-            { text: 'Creature comforts', link: '/guide/creature-comforts' },
             { text: 'For Angular shops', link: '/guide/for-angular-shops' },
             { text: 'For React teams', link: '/guide/for-react-teams' },
             { text: 'For Preact teams', link: '/guide/for-preact-teams' },
