@@ -247,6 +247,26 @@ Three things make Angular the strongest fit for this pitch:
    --strictTemplates` for every reference example. Type-safety doesn't
    degrade.
 
+## When Rozie isn't the right answer for an Angular team
+
+The honest pre-concession — if any of these is you, Rozie is the wrong tool and
+we'd rather you know now:
+
+- **You're happy authoring Angular's native template DSL and decorators.** The
+  entire pitch is the ergonomics delta. If `*ngFor` / `@for`, `[(ngModel)]`
+  ceremony, and decorator boilerplate don't register as pain for your team,
+  Rozie is just a compile step that buys you nothing — keep writing Angular.
+- **You ship an Angular-only component library** and have no second-framework
+  maintenance burden. You're not the audience; the
+  [cross-framework component-library author](/guide/why#who-rozie-is-for) is —
+  a single-target library gains nothing from a cross-target compiler.
+- **Your components lean on Angular-specific architecture Rozie deliberately
+  doesn't model** — custom structural directives, complex DI provider trees,
+  `HttpInterceptor`s, route guards, or an NgRx / RxJS-stream data layer. Rozie
+  authors *presentational* components (props, `<data>` state, events, two-way
+  binding via `model()` + CVA, slots). It is not a replacement for Angular's
+  application-architecture layer, and it never tries to be.
+
 ## Next steps
 
 - [Quick Start](/guide/quick-start) — write your first `.rozie` file.
