@@ -176,10 +176,14 @@ function renderTable(cluster: DiagnosticCluster): string {
       );
     })
     .join('\n');
+  // `v-pre` on the table: cause/message text is static generated content and
+  // may legitimately contain `{{`/`}}` (e.g. ROZ051, the malformed-mustache
+  // code), which VitePress's Vue compiler would otherwise parse as an
+  // interpolation and fail the build. v-pre makes Vue skip compiling the table.
   return (
     `<h2 id="${cluster.id}" tabindex="-1">${escapeHtml(cluster.title)} ` +
     `<a class="header-anchor" href="#${cluster.id}" aria-label="Permalink to &quot;${escapeHtml(cluster.title)}&quot;">&ZeroWidthSpace;</a></h2>\n` +
-    `<table>\n` +
+    `<table v-pre>\n` +
     `<thead><tr><th>Code</th><th>Severity</th><th>Cause</th></tr></thead>\n` +
     `<tbody>\n${rows}\n</tbody>\n` +
     `</table>`
