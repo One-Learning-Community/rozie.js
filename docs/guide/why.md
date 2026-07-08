@@ -32,7 +32,7 @@ That makes Rozie attractive to a second audience the original positioning unders
 
 You don't have to migrate. You write **one new component this week** in Rozie, and the compiled output drops into your existing app as a native target-framework component. [Adopt incrementally](/guide/adopt-incrementally) walks through what that looks like per stack.
 
-See [Creature comforts](/guide/creature-comforts) for the full pain-point matrix.
+See [Creature comforts](/guide/creature-comforts) for the full pain-point matrix, or [Features & design choices](/guide/features) for the complete feature-by-feature reference — every directive, sigil, and per-target lowering.
 
 ## Compatibility bar
 
