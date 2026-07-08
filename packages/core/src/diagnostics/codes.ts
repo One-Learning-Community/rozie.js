@@ -16,10 +16,10 @@
  */
 export const RozieErrorCode = {
   // ---- SFC envelope (Plan 02) — ROZ001..ROZ009 ----
-  MISSING_ROZIE_ENVELOPE: 'ROZ001',
-  MULTIPLE_ROZIE_ENVELOPES: 'ROZ002',
-  UNKNOWN_TOP_LEVEL_BLOCK: 'ROZ003',
-  DUPLICATE_BLOCK: 'ROZ004',
+  MISSING_ROZIE_ENVELOPE: 'ROZ001', // error — the .rozie file has no <rozie> root element wrapping its blocks.
+  MULTIPLE_ROZIE_ENVELOPES: 'ROZ002', // error — more than one <rozie> root, or a <rozie> nested inside another envelope.
+  UNKNOWN_TOP_LEVEL_BLOCK: 'ROZ003', // error — a tag at envelope top level is not a recognized block (<props> <data> <script> <listeners> <template> <style> <components>).
+  DUPLICATE_BLOCK: 'ROZ004', // error — the same block name appears more than once inside one <rozie> (each block is allowed at most once).
   // 260603 — error: a literal close sequence (e.g. `</script>` inside a JS
   // string or comment in the `<script>` block) terminated its own block early.
   // Block bodies end at the first literal `</blockname>` sequence regardless of
@@ -36,10 +36,10 @@ export const RozieErrorCode = {
   PREMATURE_BLOCK_CLOSE: 'ROZ005', // error — literal `</script>` (or other block close sequence) inside the block's own body ended the block early; escape it as `<\/script>`
 
   // ---- Block parse — declarative <props>/<data>/<listeners> (Plan 03) — ROZ010..ROZ029 ----
-  INVALID_DECLARATIVE_EXPRESSION: 'ROZ010',
-  NOT_OBJECT_LITERAL: 'ROZ011',
-  LISTENER_KEY_NOT_STRING: 'ROZ012',
-  LISTENER_VALUE_NOT_OBJECT: 'ROZ013',
+  INVALID_DECLARATIVE_EXPRESSION: 'ROZ010', // error — a <props>/<data>/<components> body fails to parse as a single JS expression.
+  NOT_OBJECT_LITERAL: 'ROZ011', // error — a <props>/<data>/<components> body parses but is not an object literal — it lowered to an array or some other expression type.
+  LISTENER_KEY_NOT_STRING: 'ROZ012', // error — DORMANT (retired Phase 19): a <listeners> object-literal key was not a string; the object-walk that emitted this was replaced by the <listener> element form.
+  LISTENER_VALUE_NOT_OBJECT: 'ROZ013', // error — DORMANT (retired Phase 19): a <listeners> object-literal value was not an object; replaced by the <listener> element form.
   // A `<props>` entry declared `required: true` also carries a `default:` —
   // the default can never fire (a required prop is always passed), so Rozie
   // drops the default. Warning severity (260521-oao).
@@ -75,8 +75,8 @@ export const RozieErrorCode = {
   INVALID_PROP_DOCS_SHAPE: 'ROZ018', // warning — a <props> `docs:` key is malformed (non-object, wrong-typed description/deprecated/example, or unknown sub-key); the bad docs/sub-key is dropped and no JSDoc is emitted. Shape: docs: { description?: string, deprecated?: true | string, example?: string }.
 
   // ---- Script parse (Plan 03) — ROZ030..ROZ049 ----
-  SCRIPT_PARSE_ERROR: 'ROZ030',
-  SCRIPT_UNRECOVERABLE: 'ROZ031',
+  SCRIPT_PARSE_ERROR: 'ROZ030', // error — recoverable <script> syntax error(s) Babel collected under errorRecovery (one diagnostic per lifted error).
+  SCRIPT_UNRECOVERABLE: 'ROZ031', // error — the <script> block failed to parse at all (Babel threw); caught and collected, not re-thrown.
   // Phase 9 (WR-03): `<script lang="...">` carries an unrecognized value
   // (e.g. `tsx`). Only `ts`/`typescript` enable the TypeScript parser plugin;
   // any other non-empty `lang` would otherwise parse as plain JS and surface
@@ -84,15 +84,15 @@ export const RozieErrorCode = {
   SCRIPT_UNRECOGNIZED_LANG: 'ROZ032',
 
   // ---- Template parse (Plan 03) — ROZ050..ROZ069 ----
-  TEMPLATE_UNCLOSED_ELEMENT: 'ROZ050',
-  TEMPLATE_MALFORMED_MUSTACHE: 'ROZ051',
+  TEMPLATE_UNCLOSED_ELEMENT: 'ROZ050', // error — a <template> element is left open (a mismatched close tag, or elements still on the stack at input end).
+  TEMPLATE_MALFORMED_MUSTACHE: 'ROZ051', // error — an unmatched {{ with no closing }} in the same text run.
 
   // ---- Modifier grammar (Plan 04) — ROZ070..ROZ079 ----
-  MODIFIER_GRAMMAR_ERROR: 'ROZ070',
+  MODIFIER_GRAMMAR_ERROR: 'ROZ070', // error — a malformed @event.modifier(args) chain the modifier grammar could not parse.
 
   // ---- Style parse (Plan 03) — ROZ080..ROZ089 ----
-  STYLE_PARSE_ERROR: 'ROZ080',
-  STYLE_MIXED_ROOT_SELECTOR: 'ROZ081',
+  STYLE_PARSE_ERROR: 'ROZ080', // error — PostCSS threw parsing the <style> body, or an inline :style / style string literal.
+  STYLE_MIXED_ROOT_SELECTOR: 'ROZ081', // error — a comma-separated selector list mixes :root with other selectors (like ':root, .foo {}'); split the unscoped :root rule from the scoped rules.
   STYLE_PORTAL_INVALID_NESTING: 'ROZ082', // @portal nested inside @media (or any non-@portal at-rule) — invalid per Spike 004 locked decision #2
   // Spike 004 (string-form `:style` lowering, quick-task 260520-8iu): a
   // string-literal `:style` carries `!important` AND the target's object-form
