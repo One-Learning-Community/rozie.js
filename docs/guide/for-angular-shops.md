@@ -162,7 +162,7 @@ Rozie quietly does the Angular ceremony you'd otherwise hand-roll:
 
 ### Step 1: Pick the lowest-friction install path
 
-If you're on Angular 17+ with the default Application Builder, you have two
+If you're on Angular 19+ with the default Application Builder, you have two
 options:
 
 **Option A — Pre-compile (recommended for first try):** Use the Rozie CLI

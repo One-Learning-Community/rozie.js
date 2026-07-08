@@ -6,7 +6,7 @@ If you ship a UI library that targets React, Vue, Svelte, Angular, and Solid tod
 
 ## What Rozie is
 
-A compiler. You write `.rozie` files in a Vue/Alpine-flavored block-based syntax. Rozie emits idiomatic React 18+, Vue 3.4+, Svelte 5+, Angular 17+, and Solid 1.8+ components plus Lit 3.2+ web components — each one using the target's native primitives (React's `useState`/`useMemo`, Vue's `defineModel`/`computed`, Svelte 5's runes, Angular's signals, Solid's `createSignal`/`createMemo`/`createEffect`, Lit's reactive properties + `@lit-labs/preact-signals`).
+A compiler. You write `.rozie` files in a Vue/Alpine-flavored block-based syntax. Rozie emits idiomatic React 18+, Vue 3.4+, Svelte 5+, Angular 19+, and Solid 1.8+ components plus Lit 3.2+ web components — each one using the target's native primitives (React's `useState`/`useMemo`, Vue's `defineModel`/`computed`, Svelte 5's runes, Angular's signals, Solid's `createSignal`/`createMemo`/`createEffect`, Lit's reactive properties + `@lit-labs/preact-signals`).
 
 ## What Rozie is not
 
