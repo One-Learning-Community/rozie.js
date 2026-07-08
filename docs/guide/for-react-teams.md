@@ -115,21 +115,6 @@ The runtime cost is **zero**: the `<style>` block becomes a build-time-extracted
 
 The `<style>` block is the headline pitch — but the same compiler that gives you scoped CSS also normalizes a handful of other React papercuts:
 
-### `$classSelector()` — a compile-time-validated class selector
-
-Because React class names are no longer hashed, `el.querySelector('.grip')` and third-party engine config like SortableJS's `handle: '.grip'` work directly on React — the authored class renders literally in the DOM. `$classSelector('grip')` is now a **convenience**, not a necessity: it validates the class against the component's `<style>` scope at compile time (typos get `ROZ965`–`ROZ967` did-you-mean diagnostics) and hands you a correct `".grip"` selector without you typing the literal.
-
-```rozie
-<SortableList r-model:items="$data.items" :handle="$classSelector('grip')">
-  <template #default="{ item }">
-    <span class="grip">⋮⋮</span>
-    <span>{{ item.text }}</span>
-  </template>
-</SortableList>
-```
-
-`$classSelector('grip')` lowers to a static `".grip"` literal on every target, React included. The class is validated against the component's `<style>` scope at compile time — typos are caught with `ROZ966` did-you-mean diagnostics. See the [`$classSelector()` features guide](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine).
-
 ### Statically-computed `useEffect` dep arrays
 
 `eslint-plugin-react-hooks/exhaustive-deps` is the lint rule everyone respects and quietly hates. With Rozie, you don't write the dep array — the compiler emits the correct one from the lifecycle hook's body. Output passes `exhaustive-deps` cleanly.
@@ -235,6 +220,5 @@ If the team likes it, expand. If not, the compiled `.tsx` is a normal React comp
 - [Quick Start](/guide/quick-start) — write your first `.rozie` file.
 - [Adopt incrementally](/guide/adopt-incrementally) — full per-stack install
   walkthrough including Next.js, Astro, Babel-only.
-- [`$classSelector()` features guide](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) — the React-specific bridge.
 - [Creature comforts](/guide/creature-comforts) — the full matrix of cross-framework normalizations.
 - [Examples](/examples/) — full source + per-target output, including the React emit, for every reference component.

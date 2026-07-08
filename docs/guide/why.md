@@ -20,7 +20,7 @@ If you're shipping React/Vue/Svelte/Angular/Solid bindings for a vanilla-JS core
 
 ### Also: ordinary devs stuck on a single stack
 
-Six targets of byte-identical parity required Rozie to quietly normalize a lot of cross-framework behavioral grit. The creature comforts that fell out — scoped CSS without CSS-in-JS, automatic attribute fallthrough, the `$reconcileAfterDomMutation()` escape hatch for engine-vs-keyed-reconciler desync, literal class names on every target (React included) so `querySelector('.x')` and engine selectors just work — with `$classSelector()` as a compile-time typo-check, safe non-primitive interpolation that renders portable JSON instead of crashing React, `:style` precedence that behaves the same on every target — aren't just plumbing for cross-framework authors. They're **fixes for genuine pain points each framework's locked-in users feel every day** and can't escape without leaving the stack.
+Six targets of cross-framework parity required Rozie to quietly normalize a lot of behavioral grit. The creature comforts that fell out — scoped CSS without CSS-in-JS, automatic attribute fallthrough, the `$reconcileAfterDomMutation()` escape hatch for engine-vs-keyed-reconciler desync, literal class names on every target (React included) so `querySelector('.x')` and engine selectors just work, safe non-primitive interpolation that renders portable JSON instead of crashing React, `:style` precedence that behaves the same on every target — aren't just plumbing for cross-framework authors. They're **fixes for genuine pain points each framework's locked-in users feel every day** and can't escape without leaving the stack.
 
 That makes Rozie attractive to a second audience the original positioning understated:
 
