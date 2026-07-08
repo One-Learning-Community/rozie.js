@@ -116,6 +116,7 @@ export default defineConfig({
             { text: 'Adopt incrementally', link: '/guide/adopt-incrementally' },
             { text: 'For Angular shops', link: '/guide/for-angular-shops' },
             { text: 'For React teams', link: '/guide/for-react-teams' },
+            { text: 'Scoped CSS for React (zero runtime)', link: '/guide/scoped-css-for-react' },
             { text: 'For Preact teams', link: '/guide/for-preact-teams' },
             { text: 'For Lit / Web Components teams', link: '/guide/for-lit-teams' },
             { text: 'For Astro / HTML-first shops', link: '/guide/for-astro-and-html-first-shops' },
