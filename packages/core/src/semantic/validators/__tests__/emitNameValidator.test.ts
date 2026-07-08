@@ -140,3 +140,54 @@ describe('emitNameValidator — D-08 coexistence with ROZ121 (878271ad)', () => 
     expect(result.diagnostics.some((d) => d.code === 'ROZ122')).toBe(true);
   });
 });
+
+// Spike-012 R9 — ROZ145 EMIT_MULTIPLE_POSITIONAL_ARGS.
+//
+// `$emit('change', a, b)` (2+ positional payload args — idiomatic multi-arg Vue
+// emit) is not portable: Lit's CustomEvent has one `detail` (silently drops every
+// arg past the first) and Angular's `output().emit(value)` takes one value. React/
+// Vue/Svelte/Solid pass all args, so the break is SILENT on 2/6 targets. Pack the
+// payload into a single object/array — the shape every shipped `.rozie` already
+// uses. The check shares emitNameValidator's three-context $emit-call walk.
+describe('emitNameValidator — multi-positional-arg $emit (ROZ145)', () => {
+  const FLAGGED_SCRIPT: Array<[string, string]> = [
+    ['two positional args', `function fire() { $emit('change', 1, 2) }`],
+    ['three positional args', `function fire() { $emit('change', 1, 2, 3) }`],
+    ['two dynamic args', `function fire(a, b) { $emit('change', a, b) }`],
+  ];
+  for (const [label, script] of FLAGGED_SCRIPT) {
+    it(`flags ${label} in <script> with exactly one ROZ145 (error)`, () => {
+      const hits = byCode(diagnose(wrap(script)), 'ROZ145');
+      expect(hits.length, JSON.stringify(hits)).toBe(1);
+      expect(hits[0]!.severity).toBe('error');
+    });
+  }
+
+  const CLEAN_SCRIPT: Array<[string, string]> = [
+    ['zero payload args', `function fire() { $emit('close') }`],
+    ['one positional payload', `function fire() { $emit('change', 1) }`],
+    ['one object payload (the portable form)', `function fire() { $emit('change', { a: 1, b: 2 }) }`],
+    ['one array payload', `function fire() { $emit('change', [1, 2]) }`],
+  ];
+  for (const [label, script] of CLEAN_SCRIPT) {
+    it(`does NOT flag ${label}`, () => {
+      expect(byCode(diagnose(wrap(script)), 'ROZ145').length).toBe(0);
+    });
+  }
+
+  it('fires in a template @event handler', () => {
+    const src = wrap(`function noop() {}`, `<button @click="$emit('change', 1, 2)">go</button>`);
+    expect(byCode(diagnose(src), 'ROZ145').length).toBe(1);
+  });
+
+  it('fires in a <listeners> handler', () => {
+    const src = wrapWithListeners(``, `<listener :target="window" @resize="$emit('change', 1, 2)" />`);
+    expect(byCode(diagnose(src), 'ROZ145').length).toBe(1);
+  });
+
+  it('compile() to lit surfaces ROZ145 and does not throw', () => {
+    const src = wrap(`function fire() { $emit('change', 1, 2) }`);
+    expect(() => compile(src, { target: 'lit' })).not.toThrow();
+    expect(compile(src, { target: 'lit' }).diagnostics.some((d) => d.code === 'ROZ145')).toBe(true);
+  });
+});

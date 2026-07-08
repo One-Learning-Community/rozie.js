@@ -480,6 +480,19 @@ export const RozieErrorCode = {
   // work cross-target today; a real cross-target array-merge is backlogged.
   STYLE_BINDING_ARRAY_UNSUPPORTED: 'ROZ144', // error — an array-form `:style="[a, b]"` binding. Cross-target array-style merging is not yet supported (only Vue lowers it natively; other targets silently drop the styles). Use a single object binding `:style="{ ... }"` or a `$computed` that returns the merged style object.
 
+  // ROZ145 is the next free code after ROZ144 in the 100 semantic-binding
+  // cluster. Spike-012 R9: a `$emit` call with TWO OR MORE positional payload
+  // args (`$emit('change', a, b)` — idiomatic multi-arg Vue emit) is not
+  // portable. React/Vue/Svelte/Solid lower it to a callback receiving `(a, b)`,
+  // but the class-based targets are single-payload: Lit's `CustomEvent` carries
+  // one `detail` (so it SILENTLY drops every arg past the first), and Angular's
+  // `output().emit(value)` takes one value (drops the rest + a latent TS2554).
+  // Every shipped `.rozie` already packs multi-value payloads into ONE object
+  // (`$emit('change', { a, b })`), which lowers identically on all six targets.
+  // Rather than silently drop data on 2/6 targets, fail loud. A real
+  // multi-positional-arg lowering (a portable payload tuple) is backlogged.
+  EMIT_MULTIPLE_POSITIONAL_ARGS: 'ROZ145', // error — a `$emit` call with 2+ positional payload args. Lit (CustomEvent single `detail`) and Angular (output single value) silently drop every arg past the first. Pack the payload into a single object/array: `$emit('name', { a, b })`.
+
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
   WRITE_TO_REF: 'ROZ201', // $refs.foo = … (refs are read-only DOM-element wrappers)
@@ -530,6 +543,23 @@ export const RozieErrorCode = {
   // next free code after ROZ206. A real cross-target nested-mutation lowering is
   // backlogged (emitter-hardening); until it lands, fail loud here.
   DATA_NESTED_MUTATION_NOT_REACTIVE: 'ROZ207', // error — an in-place mutation of nested `$data` (member/index write, or a mutating array/Map/Set method). Not reactive on React/Solid/Angular/Lit. Replace the whole top-level value instead: `$data.X = { ...$data.X, key: … }`.
+
+  // Spike-012 R9 — a member-access `$`-sigil ($props/$data/$refs/$slots) inside a
+  // `<data>` block INITIALIZER (`data: { count: $props.initial }` — the idiomatic
+  // Vue-port derived-initial pattern). The `<data>` initializer is carried into
+  // the emit VERBATIM with no sigil-lowering pass, so the sigil leaks as a raw
+  // free identifier on ALL SIX targets (`useState($props.initial)` /
+  // `ref($props.initial)` / `signal($props.initial)`) → TS2304 + a runtime
+  // ReferenceError, SILENTLY (no diagnostic). Bare whole-object sigils here are
+  // ROZ978's concern; this is the member-access complement, which ROZ978 does not
+  // cover. Every shipped `.rozie` seeds derived state in `$onMount` instead
+  // (`$onMount(() => { $data.count = $props.initial })`), the corpus idiom — so
+  // this is corpus-safe. Note: even a correctly-lowered `data`-from-`props` init
+  // SNAPSHOTS the prop and would not track later changes (the derived-state
+  // footgun, uniform across frameworks), so steering to an explicit $onMount seed
+  // is the honest fix. A real per-target data-init sigil lowering is backlogged.
+  // ROZ208 is the next free code after ROZ207 in the 200 reactive-state cluster.
+  DATA_INIT_SIGIL_NOT_LOWERED: 'ROZ208', // error — a `$props`/`$data`/`$refs`/`$slots` member access inside a `<data>` initializer. It is not sigil-lowered and leaks a raw free identifier on all six targets. Seed derived state in `$onMount` instead: `$onMount(() => { $data.x = $props.y })`.
 
   // ---- Warnings (Phase 2 Plan 02) — ROZ300..ROZ399 ----
   RFOR_MISSING_KEY: 'ROZ300', // SEM-03: r-for without :key

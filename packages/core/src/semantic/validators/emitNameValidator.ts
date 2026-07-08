@@ -1,9 +1,16 @@
 /**
- * SEM (Quick 260601-l2u) — Empty-`$emit`-event-name validator (ROZ122).
+ * SEM — `$emit`-call shape validator (ROZ122 + ROZ145).
  *
- * Walks the three contexts where a `$emit(...)` call can appear and emits an
- * error when the FIRST argument is a string literal whose `.value.trim() === ''`
- * (empty OR whitespace-only):
+ * Walks the three contexts where a `$emit(...)` call can appear (script /
+ * template handler / listeners) and emits, per call:
+ *   - ROZ122 (Quick 260601-l2u) — the FIRST argument is a string literal whose
+ *     `.value.trim() === ''` (empty OR whitespace-only event name);
+ *   - ROZ145 (Spike-012 R9) — 2+ POSITIONAL payload args (`$emit('name', a, b)`),
+ *     which Lit (CustomEvent single `detail`) and Angular (output single value)
+ *     silently drop past the first. Pack into one object/array payload.
+ *
+ * ROZ122 detail — fires when the first argument is an empty/whitespace-only
+ * string literal:
  *
  *   - <script>     — full Babel program traversal (CallExpression visitor).
  *   - <template>   — for each TemplateAttr where kind === 'binding' | 'directive'
@@ -85,6 +92,23 @@ function checkCallExpression(
   baseOffset: number,
 ): void {
   if (!t.isIdentifier(node.callee) || node.callee.name !== '$emit') return;
+  // Spike-012 R9 (ROZ145) — 2+ POSITIONAL payload args (`$emit('name', a, b)`).
+  // Independent of the event-name shape (fires on a dynamic name too), so it runs
+  // BEFORE the ROZ122 first-arg early-returns. `arguments[0]` is the event name;
+  // `arguments[1..]` are the payload. Lit's CustomEvent (single `detail`) and
+  // Angular's output (single value) silently drop everything past the first
+  // payload arg. A spread in the payload makes the count dynamic — out of scope.
+  const payload = node.arguments.slice(1);
+  if (payload.length >= 2 && payload.every((a) => !t.isSpreadElement(a))) {
+    ctx.diagnostics.push({
+      code: RozieErrorCode.EMIT_MULTIPLE_POSITIONAL_ARGS,
+      severity: 'error',
+      message:
+        '$emit with 2+ positional payload args is not portable — Lit (CustomEvent single `detail`) and Angular (output single value) silently drop every arg past the first.',
+      loc: locFromNodeOffset(node, baseOffset),
+      hint: "Pack the payload into a single object or array, e.g. $emit('change', { a, b }).",
+    });
+  }
   const first = node.arguments[0];
   if (!first || !t.isStringLiteral(first)) return; // missing or dynamic — out of scope
   if (first.value.trim() !== '') return; // non-empty name — valid

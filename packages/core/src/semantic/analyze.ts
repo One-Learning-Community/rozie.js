@@ -44,6 +44,7 @@ import { runExposeReservedMemberValidator } from './validators/exposeReservedMem
 import { runReservedNameCollisionValidator } from './validators/reservedNameCollisionValidator.js';
 import { runReactStaleReadValidator } from './validators/reactStaleReadValidator.js';
 import { runDataNestedMutationValidator } from './validators/dataNestedMutationValidator.js';
+import { runDataInitSigilValidator } from './validators/dataInitSigilValidator.js';
 import { runBareSigilValidator } from './validators/bareSigilValidator.js';
 
 export interface AnalyzeResult {
@@ -106,6 +107,13 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   // non-reactive on React/Solid/Angular/Lit; steer to a whole-object-replace of
   // the top-level key. Reads bindings.data; <script>-scoped (mirrors propWrite).
   runDataNestedMutationValidator(ast, bindings, diagnostics);
+  // Spike-012 R9 — ROZ208 (error): a member-access `$`-sigil ($props/$data/$refs/
+  // $slots) inside a `<data>` INITIALIZER (`data: { count: $props.initial }`) is
+  // carried into the emit verbatim — no sigil-lowering — so it leaks a raw free
+  // identifier on all six targets (TS2304 + runtime ReferenceError), silently.
+  // Steer to seeding derived state in `$onMount`. Reads bindings.data; the
+  // member-access complement of ROZ978 (which covers only bare whole-object sigils).
+  runDataInitSigilValidator(bindings, diagnostics);
   // Phase 26 (SPEC-5, D-04/D-05/D-14) — ROZ978: a bare whole-object
   // $props/$data/$refs/$slots identifier (not a member access; $attrs/$listeners
   // exempt) used across template/script/listeners expressions. Always-on,
