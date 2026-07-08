@@ -46,6 +46,7 @@ import { lowerStyles } from './lowerers/lowerStyles.js';
 import { typeNeutralizeScript } from '../codegen/typeNeutralizeScript.js';
 import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import { validateClassSelector } from './validateClassSelector.js';
+import { validateStyleBinding } from './validateStyleBinding.js';
 import { validateSlotPropCollision } from './validateSlotPropCollision.js';
 import { validateDefaultPortalCollision } from './validateDefaultPortalCollision.js';
 import { annotateDisplayWrap } from './annotateDisplayWrap.js';
@@ -304,6 +305,15 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // Collected-not-thrown (D-08): pushes ROZ965/966/967 diagnostics; never
   // mutates `ir`.
   validateClassSelector(ir, diagnostics);
+
+  // Spike-012 R7-3 — an array-form `:style="[a, b]"` binding silently miscompiles
+  // on 5 of 6 targets (only Vue merges it natively; react/solid/lit route it
+  // through the STRING-only `parseInlineStyle` → an empty `{}`, and Angular's
+  // `[style]` does not merge arrays). Fail loud with ROZ144 instead. Wired into
+  // this SAME lowerToIR chokepoint so it fires for BOTH compile() AND
+  // @rozie/unplugin (Pitfall 1). Collected-not-thrown (D-08): pushes ROZ144;
+  // never mutates `ir`.
+  validateStyleBinding(ir, diagnostics);
 
   // Phase 28 — a `<slot name="X">` whose `X` equals a declared `<props>` key is
   // a HARD ERROR (ROZ127). Svelte 5 collapses snippets + props into one
