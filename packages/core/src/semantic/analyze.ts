@@ -43,6 +43,7 @@ import { runStructuredCloneReactiveValidator } from './validators/structuredClon
 import { runExposeReservedMemberValidator } from './validators/exposeReservedMemberValidator.js';
 import { runReservedNameCollisionValidator } from './validators/reservedNameCollisionValidator.js';
 import { runReactStaleReadValidator } from './validators/reactStaleReadValidator.js';
+import { runDataNestedMutationValidator } from './validators/dataNestedMutationValidator.js';
 import { runBareSigilValidator } from './validators/bareSigilValidator.js';
 
 export interface AnalyzeResult {
@@ -100,6 +101,11 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   // same key (React setState is async → the read binds the pre-write value).
   // Conservative same-body write-before-read scan; no binding dependency.
   runReactStaleReadValidator(ast, diagnostics);
+  // Spike-012 R8 — ROZ207 (error): an in-place mutation of NESTED `$data`
+  // (`$data.obj.field = …`, `$data.arr[i] = …`, `$data.arr.push(…)`) is silently
+  // non-reactive on React/Solid/Angular/Lit; steer to a whole-object-replace of
+  // the top-level key. Reads bindings.data; <script>-scoped (mirrors propWrite).
+  runDataNestedMutationValidator(ast, bindings, diagnostics);
   // Phase 26 (SPEC-5, D-04/D-05/D-14) — ROZ978: a bare whole-object
   // $props/$data/$refs/$slots identifier (not a member access; $attrs/$listeners
   // exempt) used across template/script/listeners expressions. Always-on,

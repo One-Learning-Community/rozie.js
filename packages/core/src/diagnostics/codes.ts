@@ -517,6 +517,19 @@ export const RozieErrorCode = {
   // `<listener>` and PascalCase `<Listener>` trip it, never routed to component
   // resolution). Error severity; never throws. Next free code after ROZ205.
   LISTENER_ELEMENT_MISPLACED: 'ROZ206',
+  // Spike-012 R8 — an IN-PLACE mutation of NESTED `$data` state (`$data.obj.field
+  // = …`, `$data.arr[i] = …`, `$data.arr.push(…)`) is SILENTLY non-reactive on
+  // React/Solid/Angular/Lit: the mutation persists but no re-render fires (React
+  // mutates the useState value without a setter; Solid/Angular read a signal then
+  // mutate its object; Lit skips requestUpdate). Vue/Svelte work (deep
+  // reactivity). Rozie's whole promise is one source → six working targets, so a
+  // silent 4/6 break is exactly the footgun to catch. The portable fix — a
+  // whole-object-replace of the TOP-LEVEL key (`$data.obj = { ...$data.obj, field:
+  // … }`) — lowers to a reactive setter on all six. Three shipped components
+  // (DataTable, MapLibre, rete) already discovered this and comply. ROZ207 is the
+  // next free code after ROZ206. A real cross-target nested-mutation lowering is
+  // backlogged (emitter-hardening); until it lands, fail loud here.
+  DATA_NESTED_MUTATION_NOT_REACTIVE: 'ROZ207', // error — an in-place mutation of nested `$data` (member/index write, or a mutating array/Map/Set method). Not reactive on React/Solid/Angular/Lit. Replace the whole top-level value instead: `$data.X = { ...$data.X, key: … }`.
 
   // ---- Warnings (Phase 2 Plan 02) — ROZ300..ROZ399 ----
   RFOR_MISSING_KEY: 'ROZ300', // SEM-03: r-for without :key
