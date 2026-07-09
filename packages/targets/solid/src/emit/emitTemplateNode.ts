@@ -43,6 +43,7 @@ import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { jsxBoundaryText } from '../../../../core/src/emit/jsxBoundaryWhitespace.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import {
   emitAttributes,
@@ -154,6 +155,25 @@ function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
   return node.text;
 }
 
+/**
+ * Emit a children array, concatenated (JSX has no separator), applying
+ * `jsxBoundaryText` whitespace-parity to static-text children (260709-f7q).
+ * Boundary significance is positional: a rendered sibling precedes when `i > 0`
+ * and follows when `i < len - 1`. Non-text children keep the standard
+ * `emitNode` path. Single-child fast-paths elsewhere intentionally bypass this —
+ * a lone child has no sibling boundary, so its text is emitted verbatim.
+ */
+function emitChildren(children: readonly TemplateNode[], ctx: EmitNodeCtx): string {
+  const len = children.length;
+  return children
+    .map((c, i) =>
+      c.type === 'TemplateStaticText'
+        ? jsxBoundaryText(c.text, i > 0, i < len - 1)
+        : emitNode(c, ctx),
+    )
+    .join('');
+}
+
 function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): string {
   const code = rewriteTemplateExpression(node.expression, ctx.ir, {
     invokeAccessors: ctx.invokeAccessors,
@@ -172,7 +192,7 @@ function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): str
 
 function emitFragment(node: TemplateFragmentIR, ctx: EmitNodeCtx): string {
   if (node.children.length === 1) return emitNode(node.children[0]!, ctx);
-  const parts = node.children.map((c) => emitNode(c, ctx)).join('');
+  const parts = emitChildren(node.children, ctx);
   return `<>${parts}</>`;
 }
 
@@ -323,7 +343,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   if (node.body.length === 1) {
     bodyJsx = emitNode(node.body[0]!, childCtx);
   } else {
-    const parts = node.body.map((c) => emitNode(c, childCtx)).join('');
+    const parts = emitChildren(node.body, childCtx);
     bodyJsx = `<>${parts}</>`;
   }
 
@@ -991,7 +1011,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     return `<${node.tagName}${headOut} />`;
   }
 
-  const inner = node.children.map((c) => emitNode(c, ctx)).join('');
+  const inner = emitChildren(node.children, ctx);
   return `<${node.tagName}${headOut}>${inner}</${node.tagName}>`;
 }
 

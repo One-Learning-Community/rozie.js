@@ -43,6 +43,7 @@ import type {
 import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
+import { jsxBoundaryText } from '../../../../core/src/emit/jsxBoundaryWhitespace.js';
 import {
   ReactImportCollector,
   RuntimeReactImportCollector,
@@ -117,10 +118,32 @@ export interface EmitNodeCtx {
 }
 
 function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
-  // JSX preserves whitespace inside elements; htmlparser2 already produced
-  // clean text. Pass through verbatim. Note: bare text containing JSX-meta
-  // chars like `{` or `}` would be problematic, but our examples don't.
+  // Verbatim pass-through. This is the lone-node dispatch path (`emitNode`) AND
+  // the carrier for spliced JSX handed through as a synthetic static-text node
+  // (the r-match host-element ladder in `delegateMatchToConditional`), so it must
+  // NOT rewrite whitespace. Cross-framework whitespace parity is applied one
+  // level up in `emitChildren`, which alone has the sibling context needed to
+  // decide boundary significance (260709-f7q).
   return node.text;
+}
+
+/**
+ * Emit a children array, concatenated (JSX has no separator), applying
+ * `jsxBoundaryText` whitespace-parity to static-text children (260709-f7q).
+ * Boundary significance is positional: a rendered sibling precedes when `i > 0`
+ * and follows when `i < len - 1`. Non-text children keep the standard `emitNode`
+ * path. Single-child fast-paths elsewhere intentionally bypass this — a lone
+ * child has no sibling boundary, so its text is emitted verbatim.
+ */
+function emitChildren(children: readonly TemplateNode[], ctx: EmitNodeCtx): string {
+  const len = children.length;
+  return children
+    .map((c, i) =>
+      c.type === 'TemplateStaticText'
+        ? jsxBoundaryText(c.text, i > 0, i < len - 1)
+        : emitNode(c, ctx),
+    )
+    .join('');
 }
 
 function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): string {
@@ -140,7 +163,7 @@ function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): str
 
 function emitFragment(node: TemplateFragmentIR, ctx: EmitNodeCtx): string {
   if (node.children.length === 1) return emitNode(node.children[0]!, ctx);
-  const parts = node.children.map((c) => emitNode(c, ctx)).join('');
+  const parts = emitChildren(node.children, ctx);
   return `<>${parts}</>`;
 }
 
@@ -212,7 +235,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     // parent needs a single keyed JSX element. We use the JSX shorthand
     // `<Fragment key={k}>...</Fragment>` only if pendingKey was not consumed;
     // otherwise concatenate.
-    const parts = node.body.map((c) => emitNode(c, childCtx)).join('');
+    const parts = emitChildren(node.body, childCtx);
     if (keyCode !== null) {
       // A keyed multi-root loop body needs a keyed Fragment (the `<>` shorthand
       // cannot carry a key). Use the NAMED `Fragment` import (registered on the
@@ -533,7 +556,7 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
     return `<${node.tagName}${headOut} />`;
   }
 
-  const inner = node.children.map((c) => emitNode(c, childCtx)).join('');
+  const inner = emitChildren(node.children, childCtx);
   return `<${node.tagName}${headOut}>${inner}</${node.tagName}>`;
 }
 
