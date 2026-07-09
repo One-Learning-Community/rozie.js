@@ -940,6 +940,8 @@ $onUnmount(() => {
   if (virtualizerCleanup) virtualizerCleanup()
   // CR-04: remove any live fill-drag document listeners if we unmount mid-drag.
   teardownFillDrag()
+  // §6 (260709-3qt): remove any live drag-select document listeners on a mid-drag unmount.
+  teardownRangeDrag()
 })
 
 // Reactive re-feed: when the bound sorting slice OR data length OR the column registry
@@ -1118,7 +1120,7 @@ $provide('data-table:columns', {
 
 import { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage, cut } from './exposeStateVerbs.rzts'
 
-import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
+import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
 
 import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell } from './gridKeydownHandlers.rzts'
 
@@ -1167,9 +1169,9 @@ let rangeClickPending = false
 // across all six targets. A top-level let → React hoists to useRef.
 let rangeActive = false
 
-import { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, clearRange, clampRange } from './rangeSelection.rzts'
+import { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, selectAllBody, clearRange, clampRange } from './rangeSelection.rzts'
 
-import { announce, clipboardActiveAllowed, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, tileGridToBox, pasteRange, cutRange, tileIndex, fillRange } from './clipboardFill.rzts'
+import { announce, clipboardActiveAllowed, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, tileGridToBox, pasteRange, cutRange, clearActiveRange, tileIndex, fillRange } from './clipboardFill.rzts'
 
 // onFillHandlePointerDown: begin a fill-handle drag (req-8 / D-04). The handle sits on the
 // range's bottom-right cell; a pointer drag extends the range (reusing setRangeFocus off the
@@ -1182,6 +1184,18 @@ let fillDragging = false
 let fillDragMove = null
 let fillDragUp = null
 import { teardownFillDrag, cellIndexFromPoint, onFillHandlePointerDown } from './fillDrag.rzts'
+
+// §6 (260709-3qt) drag-to-select — mirror the fill-drag listener discipline. rangeDragging gates
+// the live gesture; rangeDragMove/rangeDragUp track the document pointermove/pointerup handlers so
+// a mid-drag unmount ($onUnmount → teardownRangeDrag) can remove them (CR-04). rangeDragMoved flips
+// true once the drag enters a DIFFERENT cell than its mousedown anchor; onGridClick reads it to
+// suppress a singleClickEdit editor-open after a drag (reset per-gesture in beginRangeDrag). Each
+// top-level let → React hoists to useRef.
+let rangeDragging = false
+let rangeDragMove = null
+let rangeDragUp = null
+let rangeDragMoved = false
+import { teardownRangeDrag, beginRangeDrag } from './dragSelect.rzts'
 
 import { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit } from './editCellLifecycle.rzts'
 

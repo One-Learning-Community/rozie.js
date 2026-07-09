@@ -105,6 +105,24 @@ const setRangeFocus = (rIdx, cIdx) => {
   emitRangeChange(anchor, nextFocus)
 }
 
+// selectAllBody(): the §8 (260709-3qt) Ctrl+A whole-body select — set the range to span EVERY
+// body cell (anchor at the first body cell (0,0), moving corner at the last (maxRow, maxCol)),
+// driving the SAME range corners shift+arrow / setRangeFocus use. Emits range-change from a single
+// site (the emitRangeChange contract — pass the FRESH corners, never a $data re-read). No-op on an
+// empty grid. Body cells only — a header-active Ctrl+A is gated OUT by the caller (never builds a
+// range from a header). rangeActive is set synchronously so a follow-up clearRange collapses it.
+const selectAllBody = () => {
+  const maxRow = bodyRowCount() - 1
+  const maxCol = visibleColCount() - 1
+  if (maxRow < 0 || maxCol < 0) return
+  const anchor = { rowIndex: 0, colIndex: 0 }
+  const focus = { rowIndex: maxRow, colIndex: maxCol }
+  $data.rangeAnchor = anchor
+  $data.rangeFocus = focus
+  rangeActive = true
+  emitRangeChange(anchor, focus)
+}
+
 // clearRange(): drop the rectangle (a non-shift navigation / edit-entry collapses any
 // range back to a single active cell). Cheap no-op when no range is set (the guard keeps a
 // plain navigation with no active range from emitting). B19: when a range DID exist, emit
@@ -158,4 +176,4 @@ const clampRange = (maxRowArg, maxColArg) => {
   }
 }
 
-export { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, clearRange, clampRange }
+export { inRange, getSelectedRange, isFillHandleCell, emitRangeChange, extendRange, setRangeFocus, selectAllBody, clearRange, clampRange }

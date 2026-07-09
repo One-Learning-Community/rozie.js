@@ -356,6 +356,18 @@ const gotoColEdge = (toEnd) => {
   return nextCol
 }
 
+// gotoRowEdge(toEnd): the §8 (260709-3qt) Ctrl+ArrowUp/Down vertical region-edge jump — move the
+// active cell to the data-region row edge (row 0 / last body row) in the CURRENT column, mirroring
+// gotoColEdge's horizontal edge jump. Body cells only (the caller gates on !activeIsHeader); always
+// lands in the body (activeIsHeader=false). Returns the fresh row index for the shared focus seam.
+const gotoRowEdge = (toEnd) => {
+  const lastRow = bodyRowCount() - 1
+  const nextRow = toEnd ? (lastRow < 0 ? 0 : lastRow) : 0
+  $data.activeRow = nextRow
+  $data.activeIsHeader = false
+  return nextRow
+}
+
 // Ctrl+Home → first body cell (0,0); Ctrl+End → last body cell (lastRow,max). Returns the
 // fresh { row, col } locals. Both land in the body (activeIsHeader=false).
 const gotoStart = () => {
@@ -417,4 +429,4 @@ const cycleWithinCell = (cellEl, forward) => {
   list[i].focus()
 }
 
-export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }
+export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }

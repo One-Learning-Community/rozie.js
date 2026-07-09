@@ -1,0 +1,57 @@
+// ══ Mouse drag-to-select (grid cell-interaction §6, 260709-3qt) ═════════════════════════
+// A plain (non-shift) mousedown on a body cell begins a document-level drag: the FIRST
+// pointermove that reaches a DIFFERENT body cell paints the range moving corner via the
+// SHARED-scope setRangeFocus (the SAME range model shift+click / shift+arrow drive), pointerup
+// ends it. Mirrors fillDrag.rzts's listener discipline VERBATIM (document pointermove/pointerup
+// tracked in module-lets so a mid-drag unmount can remove them — CR-04), and REUSES fillDrag's
+// shadow-piercing cellIndexFromPoint (shared scope) so the Lit shadow target is covered uniformly.
+
+// teardownRangeDrag(): remove the live drag listeners, null them, clear the dragging flag. The
+// `up` handler calls it on a normal release; $onUnmount calls it if we unmount MID-DRAG (mirrors
+// teardownFillDrag). rangeDragMoved is NOT reset here — it is read by onGridClick AFTER pointerup
+// (to suppress a singleClickEdit editor-open) and reset per-gesture in beginRangeDrag.
+const teardownRangeDrag = () => {
+  if (typeof document !== 'undefined') {
+    if (rangeDragMove) document.removeEventListener('pointermove', rangeDragMove)
+    if (rangeDragUp) document.removeEventListener('pointerup', rangeDragUp)
+  }
+  rangeDragMove = null
+  rangeDragUp = null
+  rangeDragging = false
+}
+
+// beginRangeDrag(anchorR, anchorC): start a drag-select anchored at the mousedown cell. The
+// mousedown's native focus/focusin already committed the ACTIVE cell to (anchorR, anchorC), so
+// setRangeFocus (which seeds the anchor from the ACTIVE cell) spans mousedown-cell→pointer-cell —
+// we NEVER write $data.rangeAnchor directly (it is React-stale, ROZ138). rangeDragMoved starts
+// false and flips true only once the pointer reaches a DIFFERENT cell, so a mousedown-with-no-move
+// leaves a single active cell + no range (a normal click). lastCell dedups the many pointermove
+// events per cell (setRangeFocus emits range-change — only extend on a NEW cell, mirroring fillDrag's
+// B20 dedup). Captured per-gesture in the closure (no module-let needed for lastCell).
+const beginRangeDrag = (anchorR, anchorC) => {
+  rangeDragging = true
+  rangeDragMoved = false
+  let lastCell = { r: anchorR, c: anchorC }
+  const move = (ev) => {
+    if (!rangeDragging) return
+    const cell = cellIndexFromPoint(ev.clientX, ev.clientY)
+    if (cell && (cell.r !== lastCell.r || cell.c !== lastCell.c)) {
+      lastCell = cell
+      rangeDragMoved = true
+      setRangeFocus(cell.r, cell.c)
+    }
+  }
+  const up = () => {
+    // teardownRangeDrag clears rangeDragging + removes both listeners (the fill-drag CR-04 path).
+    teardownRangeDrag()
+  }
+  // Track the live handlers so $onUnmount can remove them on a mid-drag unmount (CR-04).
+  rangeDragMove = move
+  rangeDragUp = up
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pointermove', move)
+    document.addEventListener('pointerup', up)
+  }
+}
+
+export { teardownRangeDrag, beginRangeDrag }

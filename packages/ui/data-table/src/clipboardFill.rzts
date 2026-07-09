@@ -308,6 +308,32 @@ const cutRange = () => {
   applyGridToRange(grid, r0, c0)
 }
 
+// clearActiveRange(): the §7 (260709-3qt) Delete/Backspace clear — cutRange() MINUS the clipboard
+// copy. Clears the active cell / selected range through the SAME write-funnel as Cut/paste/fill:
+// applyGridToRange of an empty-string grid sized to the range → coerceCellValue('') per column
+// (null on a numeric column, '' on text) + the D-03 editable/validator/read-only skip rule + ONE
+// writeData + one cell-edit-commit per cleared cell + the N-of-M announce. B11: a no-op while a
+// header cell is active (reuses clipboardActiveAllowed — Delete can never silently clear a body
+// cell from a header anchor). NO undo — the grid is controlled (writeData → $model.data; every
+// clear fires cell-edit-commit), so undo is the consumer's responsibility, the SAME contract
+// Cut/Paste/Fill already carry (design §7, approved 2026-07-09).
+const clearActiveRange = () => {
+  if (!clipboardActiveAllowed()) return
+  // Snapshot the source rectangle synchronously (the ROZ138 concern cutRange/pasteRange share).
+  const box = normalizedRange()
+  const r0 = box ? box.r0 : $data.activeRow
+  const r1 = box ? box.r1 : $data.activeRow
+  const c0 = box ? box.c0 : $data.activeColIndex
+  const c1 = box ? box.c1 : $data.activeColIndex
+  const grid = []
+  for (let r = r0; r <= r1; r++) {
+    const cols = []
+    for (let c = c0; c <= c1; c++) cols.push('')
+    grid.push(cols)
+  }
+  applyGridToRange(grid, r0, c0)
+}
+
 // tileIndex(i, lo, hi): map an index into the inclusive [lo,hi] source span by TILING (repeat
 // the source block), handling indices below lo (negative offset) correctly. A 1-wide source
 // (lo===hi) always returns lo. Used by fillRange to resolve, per target cell, WHICH source
@@ -367,4 +393,4 @@ const fillRange = (sourceBox, endCell) => {
   applyGridToRange(grid, box.r0, box.c0)
 }
 
-export { announce, clipboardActiveAllowed, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, tileGridToBox, pasteRange, cutRange, tileIndex, fillRange }
+export { announce, clipboardActiveAllowed, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, tileGridToBox, pasteRange, cutRange, clearActiveRange, tileIndex, fillRange }
