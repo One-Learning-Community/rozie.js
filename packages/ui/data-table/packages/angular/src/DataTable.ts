@@ -1049,6 +1049,8 @@ export class DataTable {
       if (this.virtualizerCleanup) this.virtualizerCleanup();
       // CR-04: remove any live fill-drag document listeners if we unmount mid-drag.
       this.teardownFillDrag();
+      // §6 (260709-3qt): remove any live drag-select document listeners on a mid-drag unmount.
+      this.teardownRangeDrag();
     });
     effect(() => () => {
       if (!this.table) return;
@@ -2553,6 +2555,13 @@ export class DataTable {
     this.activeColIndex.set(nextCol);
     return nextCol;
   };
+  gotoRowEdge = (toEnd: any) => {
+    const lastRow = this.bodyRowCount() - 1;
+    const nextRow = toEnd ? lastRow < 0 ? 0 : lastRow : 0;
+    this.activeRow.set(nextRow);
+    this.activeIsHeader.set(false);
+    return nextRow;
+  };
   gotoStart = () => {
     this.activeIsHeader.set(false);
     this.activeRow.set(0);
@@ -2661,7 +2670,32 @@ export class DataTable {
     // the active cell's leading edge. Tested BEFORE the plain arrows (a Shift+Arrow must NOT
     // fall through to a plain navigation move). Body cells only (no range from a header). The
     // extendRange call owns focus + the range-change emit, so return immediately. ──────────
-    if (key === 'ArrowRight' && e.shiftKey && !__activeIsHeader) {
+    // ── §8 (260709-3qt) Ctrl/Cmd+Arrow — jump the active cell to the data-region edge (plain
+    // Ctrl) or EXTEND the range to that edge (Ctrl+Shift). Body cells only (a header-active
+    // Ctrl+Arrow falls through to the plain-arrow branches unchanged). Tested BEFORE the
+    // Shift+Arrow / plain-arrow cascade so the modifier combo is matched first. preventDefault
+    // suppresses the browser's native Ctrl+Arrow scroll/word-jump. The Ctrl+Shift branch owns
+    // extendRange's focus + range-change emit (returns); the plain-Ctrl branch sets the fresh
+    // nextRow/nextCol locals and FALLS THROUGH to the shared focus seam (like Ctrl+Home/End). ──
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && !__activeIsHeader && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
+      e.preventDefault();
+      if (key === 'ArrowUp') this.extendRange(-__activeRow, 0);else if (key === 'ArrowDown') this.extendRange(this.bodyRowCount() - 1 - __activeRow, 0);else if (key === 'ArrowLeft') this.extendRange(0, -__activeColIndex);else this.extendRange(0, this.visibleColCount() - 1 - __activeColIndex);
+      return;
+    } else if ((e.ctrlKey || e.metaKey) && !__activeIsHeader && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
+      e.preventDefault();
+      this.clearRange();
+      if (key === 'ArrowUp') {
+        nextRow = this.gotoRowEdge(false);
+        nextIsHeader = false;
+      } else if (key === 'ArrowDown') {
+        nextRow = this.gotoRowEdge(true);
+        nextIsHeader = false;
+      } else if (key === 'ArrowLeft') {
+        nextCol = this.gotoColEdge(false);
+      } else {
+        nextCol = this.gotoColEdge(true);
+      }
+    } else if (key === 'ArrowRight' && e.shiftKey && !__activeIsHeader) {
       e.preventDefault();
       this.extendRange(0, 1);
       return;
@@ -2760,6 +2794,25 @@ export class DataTable {
     else if ((key === 'x' || key === 'X') && (e.ctrlKey || e.metaKey) && this.clipboardActiveAllowed()) {
       e.preventDefault();
       this.cutRange();
+      return;
+    }
+    // ── §7 (260709-3qt) — Delete/Backspace CLEARS the active cell / range through the SAME
+    // write-funnel as Cut (applyGridToRange of an empty grid), MINUS the clipboard copy. B11-gated
+    // by clipboardActiveAllowed so a header-active Delete/Backspace falls through to NATIVE behavior
+    // (never a silent body mutation). The top-of-handler editing early-returns + the line-39
+    // data-grid-cell guard keep this to navigation mode; applyGridToRange skips read-only/non-editable
+    // cells. NO undo (the controlled-grid consumer owns it — the Cut/Paste/Fill contract). ──
+    else if ((key === 'Delete' || key === 'Backspace') && this.clipboardActiveAllowed()) {
+      e.preventDefault();
+      this.clearActiveRange();
+      return;
+    }
+    // ── §8 (260709-3qt) — Ctrl/Cmd+A selects the WHOLE BODY range (drives the same range corners
+    // shift+arrow uses). preventDefault ALWAYS so the page is never selected in grid mode; only a
+    // body-active Ctrl+A builds the range (a header-active Ctrl+A is a no-op — selects nothing). ──
+    else if ((key === 'a' || key === 'A') && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (!__activeIsHeader) this.selectAllBody();
       return;
     }
     // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
@@ -2899,9 +2952,12 @@ export class DataTable {
     if (tgt === cellEl) this.activeInControl.set(false);
   };
   onGridMouseDown = (e: any) => {
-    if (!this.isGrid() || !e || !e.shiftKey) return;
+    if (!this.isGrid() || !e) return;
     const tgt = e.target;
     if (!tgt || !tgt.closest) return;
+    // §6: a plain mousedown inside the fill handle is owned by the handle's own pointerdown drag —
+    // never begin a range paint from it (the shift path never lands on the 8px handle).
+    if (!e.shiftKey && tgt.closest('[data-fill-handle]')) return;
     const cellEl = tgt.closest('[data-grid-cell]');
     if (!cellEl) return;
     const rowAttr = cellEl.getAttribute('data-row');
@@ -2910,11 +2966,21 @@ export class DataTable {
     const row = parseInt(rowAttr, 10);
     const col = parseInt(colAttr, 10);
     if (!Number.isFinite(row) || !Number.isFinite(col)) return;
-    this.setRangeFocus(row, col);
-    this.activeIsHeader.set(false);
-    this.activeRow.set(row);
-    this.activeColIndex.set(col);
-    this.rangeClickPending = true;
+    if (e.shiftKey) {
+      // Shift+Click: set the moving corner (keeping the anchor) and flag rangeClickPending so the
+      // follow-up focusin does not collapse the range (a focusin carries no reliable shiftKey).
+      this.setRangeFocus(row, col);
+      this.activeIsHeader.set(false);
+      this.activeRow.set(row);
+      this.activeColIndex.set(col);
+      this.rangeClickPending = true;
+      return;
+    }
+    // §6 plain mousedown → begin a document-level drag-select anchored at this cell. The mousedown's
+    // native focusin commits the ACTIVE cell to (row,col); beginRangeDrag's first cross-cell
+    // pointermove paints the range via setRangeFocus (anchored at the active cell). A mousedown with
+    // no move collapses to a single active cell (no range).
+    this.beginRangeDrag(row, col);
   };
   onGridDblClick = (e: any) => {
     if (!this.isGrid() || !e) return;
@@ -2957,6 +3023,13 @@ export class DataTable {
     if (!this.isGrid() || !e) return;
     if (!this.singleClickEdit()) return;
     if (e.shiftKey) return;
+    // §6 (260709-3qt): a drag-select that MOVED must never open the editor — the editor opens only
+    // on a genuine mouseup-no-drag click. beginRangeDrag resets rangeDragMoved=false per gesture, so
+    // the flag is always fresh; consume it here so a subsequent plain click still edits.
+    if (this.rangeDragMoved) {
+      this.rangeDragMoved = false;
+      return;
+    }
     const tgt = e.target;
     if (!tgt || !tgt.closest) return;
     const cellEl = tgt.closest('[data-grid-cell]');
@@ -3211,6 +3284,23 @@ export class DataTable {
     this.rangeFocus.set(nextFocus);
     this.rangeActive = true;
     this.emitRangeChange(anchor, nextFocus);
+  };
+  selectAllBody = () => {
+    const maxRow = this.bodyRowCount() - 1;
+    const maxCol = this.visibleColCount() - 1;
+    if (maxRow < 0 || maxCol < 0) return;
+    const anchor = {
+      rowIndex: 0,
+      colIndex: 0
+    };
+    const focus = {
+      rowIndex: maxRow,
+      colIndex: maxCol
+    };
+    this.rangeAnchor.set(anchor);
+    this.rangeFocus.set(focus);
+    this.rangeActive = true;
+    this.emitRangeChange(anchor, focus);
   };
   clearRange = () => {
     // B19: gate on the SYNCHRONOUS rangeActive mirror, NOT a $data re-read. clearRange runs twice
@@ -3540,6 +3630,24 @@ export class DataTable {
     }
     this.applyGridToRange(grid, r0, c0);
   };
+  clearActiveRange = () => {
+    const __activeRow = this.activeRow();
+    const __activeColIndex = this.activeColIndex();
+    if (!this.clipboardActiveAllowed()) return;
+    // Snapshot the source rectangle synchronously (the ROZ138 concern cutRange/pasteRange share).
+    const box = this.normalizedRange();
+    const r0 = box ? box.r0 : __activeRow;
+    const r1 = box ? box.r1 : __activeRow;
+    const c0 = box ? box.c0 : __activeColIndex;
+    const c1 = box ? box.c1 : __activeColIndex;
+    const grid = [];
+    for (let r = r0; r <= r1; r++) {
+      const cols = [];
+      for (let c = c0; c <= c1; c++) cols.push('');
+      grid.push(cols);
+    }
+    this.applyGridToRange(grid, r0, c0);
+  };
   tileIndex = (i: any, lo: any, hi: any) => {
     const span = hi - lo + 1;
     if (span <= 1) return lo;
@@ -3667,6 +3775,47 @@ export class DataTable {
     // Track the live handlers so $onUnmount can remove them on a mid-drag unmount (CR-04).
     this.fillDragMove = move;
     this.fillDragUp = up;
+    if (typeof document !== 'undefined') {
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    }
+  };
+  rangeDragging = false;
+  rangeDragMove: any = null;
+  rangeDragUp: any = null;
+  rangeDragMoved = false;
+  teardownRangeDrag = () => {
+    if (typeof document !== 'undefined') {
+      if (this.rangeDragMove) document.removeEventListener('pointermove', this.rangeDragMove);
+      if (this.rangeDragUp) document.removeEventListener('pointerup', this.rangeDragUp);
+    }
+    this.rangeDragMove = null;
+    this.rangeDragUp = null;
+    this.rangeDragging = false;
+  };
+  beginRangeDrag = (anchorR: any, anchorC: any) => {
+    this.rangeDragging = true;
+    this.rangeDragMoved = false;
+    let lastCell = {
+      r: anchorR,
+      c: anchorC
+    };
+    const move = (ev: any) => {
+      if (!this.rangeDragging) return;
+      const cell = this.cellIndexFromPoint(ev.clientX, ev.clientY);
+      if (cell && (cell.r !== lastCell.r || cell.c !== lastCell.c)) {
+        lastCell = cell;
+        this.rangeDragMoved = true;
+        this.setRangeFocus(cell.r, cell.c);
+      }
+    };
+    const up = () => {
+      // teardownRangeDrag clears rangeDragging + removes both listeners (the fill-drag CR-04 path).
+      this.teardownRangeDrag();
+    };
+    // Track the live handlers so $onUnmount can remove them on a mid-drag unmount (CR-04).
+    this.rangeDragMove = move;
+    this.rangeDragUp = up;
     if (typeof document !== 'undefined') {
       document.addEventListener('pointermove', move);
       document.addEventListener('pointerup', up);

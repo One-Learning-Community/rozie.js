@@ -267,6 +267,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const fillDragMove = useRef<any>(null);
   const fillDragUp = useRef<any>(null);
   const fillDragging = useRef(false);
+  const rangeDragMove = useRef<any>(null);
+  const rangeDragUp = useRef<any>(null);
+  const rangeDragging = useRef(false);
   const lastData = useRef<any>(null);
   const lastDataLen = useRef(-1);
   const committedThisSession = useRef(false);
@@ -1731,6 +1734,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setActiveColIndex(nextCol);
     return nextCol;
   }
+  function gotoRowEdge(toEnd: any) {
+    const lastRow = bodyRowCount() - 1;
+    const nextRow = toEnd ? lastRow < 0 ? 0 : lastRow : 0;
+    setActiveRow(nextRow);
+    setActiveIsHeader(false);
+    return nextRow;
+  }
   function gotoStart() {
     setActiveIsHeader(false);
     setActiveRow(0);
@@ -1835,7 +1845,32 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // the active cell's leading edge. Tested BEFORE the plain arrows (a Shift+Arrow must NOT
     // fall through to a plain navigation move). Body cells only (no range from a header). The
     // extendRange call owns focus + the range-change emit, so return immediately. ──────────
-    if (key === 'ArrowRight' && e.shiftKey && !activeIsHeader) {
+    // ── §8 (260709-3qt) Ctrl/Cmd+Arrow — jump the active cell to the data-region edge (plain
+    // Ctrl) or EXTEND the range to that edge (Ctrl+Shift). Body cells only (a header-active
+    // Ctrl+Arrow falls through to the plain-arrow branches unchanged). Tested BEFORE the
+    // Shift+Arrow / plain-arrow cascade so the modifier combo is matched first. preventDefault
+    // suppresses the browser's native Ctrl+Arrow scroll/word-jump. The Ctrl+Shift branch owns
+    // extendRange's focus + range-change emit (returns); the plain-Ctrl branch sets the fresh
+    // nextRow/nextCol locals and FALLS THROUGH to the shared focus seam (like Ctrl+Home/End). ──
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && !activeIsHeader && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
+      e.preventDefault();
+      if (key === 'ArrowUp') extendRange(-activeRow, 0);else if (key === 'ArrowDown') extendRange(bodyRowCount() - 1 - activeRow, 0);else if (key === 'ArrowLeft') extendRange(0, -activeColIndex);else extendRange(0, visibleColCount() - 1 - activeColIndex);
+      return;
+    } else if ((e.ctrlKey || e.metaKey) && !activeIsHeader && (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight')) {
+      e.preventDefault();
+      clearRange();
+      if (key === 'ArrowUp') {
+        nextRow = gotoRowEdge(false);
+        nextIsHeader = false;
+      } else if (key === 'ArrowDown') {
+        nextRow = gotoRowEdge(true);
+        nextIsHeader = false;
+      } else if (key === 'ArrowLeft') {
+        nextCol = gotoColEdge(false);
+      } else {
+        nextCol = gotoColEdge(true);
+      }
+    } else if (key === 'ArrowRight' && e.shiftKey && !activeIsHeader) {
       e.preventDefault();
       extendRange(0, 1);
       return;
@@ -1936,6 +1971,25 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       cutRange();
       return;
     }
+    // ── §7 (260709-3qt) — Delete/Backspace CLEARS the active cell / range through the SAME
+    // write-funnel as Cut (applyGridToRange of an empty grid), MINUS the clipboard copy. B11-gated
+    // by clipboardActiveAllowed so a header-active Delete/Backspace falls through to NATIVE behavior
+    // (never a silent body mutation). The top-of-handler editing early-returns + the line-39
+    // data-grid-cell guard keep this to navigation mode; applyGridToRange skips read-only/non-editable
+    // cells. NO undo (the controlled-grid consumer owns it — the Cut/Paste/Fill contract). ──
+    else if ((key === 'Delete' || key === 'Backspace') && clipboardActiveAllowed()) {
+      e.preventDefault();
+      clearActiveRange();
+      return;
+    }
+    // ── §8 (260709-3qt) — Ctrl/Cmd+A selects the WHOLE BODY range (drives the same range corners
+    // shift+arrow uses). preventDefault ALWAYS so the page is never selected in grid mode; only a
+    // body-active Ctrl+A builds the range (a header-active Ctrl+A is a no-op — selects nothing). ──
+    else if ((key === 'a' || key === 'A') && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (!activeIsHeader) selectAllBody();
+      return;
+    }
     // ── Full-row edit entry (phase 51 req-6 / D-06) — Shift+F2 on an editable active cell puts
     // EVERY editable cell in the active row into edit at once. Tested BEFORE the plain F2 branch
     // (a Shift+F2 must NOT fall through to single-cell F2). Shift+F2 was chosen for the lowest
@@ -2030,7 +2084,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         colIndex: nextCol
       });
     }
-  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cutRange, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, onToggleExpand, pasteRange, recoverGridFocus, rowIsGrouped, rows, toAbsRow, toggleActiveBooleanCell]);
+  }, [_rozieProp_onActivecellChange, activeCellColumnId, activeColIndex, activeHeaderLevel, activeInControl, activeIsHeader, activeRow, beginEdit, beginRowEdit, bodyRowCount, clearActiveRange, clearRange, clipboardActiveAllowed, copyRange, currentCellEl, cutRange, cycleWithinCell, editingRow, editingRowIndex, editorTypeOf, enterControl, extendRange, focusActiveCell, gotoColEdge, gotoEnd, gotoRowEdge, gotoStart, isActiveCellEditable, isGrid, moveCol, moveRow, onToggleExpand, pasteRange, recoverGridFocus, rowIsGrouped, rows, selectAllBody, toAbsRow, toggleActiveBooleanCell, visibleColCount]);
   const syncActiveFromEvent = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -2073,9 +2127,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (tgt === cellEl) setActiveInControl(false);
   }, [clearRange, headerLeafLevel, isGrid]);
   const onGridMouseDown = useCallback((e: any) => {
-    if (!isGrid() || !e || !e.shiftKey) return;
+    if (!isGrid() || !e) return;
     const tgt = e.target;
     if (!tgt || !tgt.closest) return;
+    // §6: a plain mousedown inside the fill handle is owned by the handle's own pointerdown drag —
+    // never begin a range paint from it (the shift path never lands on the 8px handle).
+    if (!e.shiftKey && tgt.closest('[data-fill-handle]')) return;
     const cellEl = tgt.closest('[data-grid-cell]');
     if (!cellEl) return;
     const rowAttr = cellEl.getAttribute('data-row');
@@ -2084,12 +2141,22 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const row = parseInt(rowAttr, 10);
     const col = parseInt(colAttr, 10);
     if (!Number.isFinite(row) || !Number.isFinite(col)) return;
-    setRangeFocus$local(row, col);
-    setActiveIsHeader(false);
-    setActiveRow(row);
-    setActiveColIndex(col);
-    rangeClickPending = true;
-  }, [isGrid, setRangeFocus$local]);
+    if (e.shiftKey) {
+      // Shift+Click: set the moving corner (keeping the anchor) and flag rangeClickPending so the
+      // follow-up focusin does not collapse the range (a focusin carries no reliable shiftKey).
+      setRangeFocus$local(row, col);
+      setActiveIsHeader(false);
+      setActiveRow(row);
+      setActiveColIndex(col);
+      rangeClickPending = true;
+      return;
+    }
+    // §6 plain mousedown → begin a document-level drag-select anchored at this cell. The mousedown's
+    // native focusin commits the ACTIVE cell to (row,col); beginRangeDrag's first cross-cell
+    // pointermove paints the range via setRangeFocus (anchored at the active cell). A mousedown with
+    // no move collapses to a single active cell (no range).
+    beginRangeDrag(row, col);
+  }, [beginRangeDrag, isGrid, setRangeFocus$local]);
   const onGridDblClick = useCallback((e: any) => {
     if (!isGrid() || !e) return;
     const tgt = e.target;
@@ -2131,6 +2198,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!isGrid() || !e) return;
     if (!props.singleClickEdit) return;
     if (e.shiftKey) return;
+    // §6 (260709-3qt): a drag-select that MOVED must never open the editor — the editor opens only
+    // on a genuine mouseup-no-drag click. beginRangeDrag resets rangeDragMoved=false per gesture, so
+    // the flag is always fresh; consume it here so a subsequent plain click still edits.
+    if (rangeDragMoved) {
+      rangeDragMoved = false;
+      return;
+    }
     const tgt = e.target;
     if (!tgt || !tgt.closest) return;
     const cellEl = tgt.closest('[data-grid-cell]');
@@ -2413,6 +2487,23 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setRangeFocus(nextFocus);
     rangeActive.current = true;
     emitRangeChange(anchor, nextFocus);
+  }
+  function selectAllBody() {
+    const maxRow = bodyRowCount() - 1;
+    const maxCol = visibleColCount() - 1;
+    if (maxRow < 0 || maxCol < 0) return;
+    const anchor = {
+      rowIndex: 0,
+      colIndex: 0
+    };
+    const focus = {
+      rowIndex: maxRow,
+      colIndex: maxCol
+    };
+    setRangeAnchor(anchor);
+    setRangeFocus(focus);
+    rangeActive.current = true;
+    emitRangeChange(anchor, focus);
   }
   function clearRange() {
     // B19: gate on the SYNCHRONOUS rangeActive mirror, NOT a $data re-read. clearRange runs twice
@@ -2740,6 +2831,22 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     applyGridToRange(grid, r0, c0);
   }
+  function clearActiveRange() {
+    if (!clipboardActiveAllowed()) return;
+    // Snapshot the source rectangle synchronously (the ROZ138 concern cutRange/pasteRange share).
+    const box = normalizedRange();
+    const r0 = box ? box.r0 : activeRow;
+    const r1 = box ? box.r1 : activeRow;
+    const c0 = box ? box.c0 : activeColIndex;
+    const c1 = box ? box.c1 : activeColIndex;
+    const grid = [];
+    for (let r = r0; r <= r1; r++) {
+      const cols = [];
+      for (let c = c0; c <= c1; c++) cols.push('');
+      grid.push(cols);
+    }
+    applyGridToRange(grid, r0, c0);
+  }
   function tileIndex(i: any, lo: any, hi: any) {
     const span = hi - lo + 1;
     if (span <= 1) return lo;
@@ -2869,6 +2976,44 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       document.addEventListener('pointerup', up);
     }
   }, [cellIndexFromPoint, fillRange, normalizedRange, setRangeFocus$local, teardownFillDrag]);
+  let rangeDragMoved = false;
+  const teardownRangeDrag = useCallback(() => {
+    if (typeof document !== 'undefined') {
+      if (rangeDragMove.current) document.removeEventListener('pointermove', rangeDragMove.current);
+      if (rangeDragUp.current) document.removeEventListener('pointerup', rangeDragUp.current);
+    }
+    rangeDragMove.current = null;
+    rangeDragUp.current = null;
+    rangeDragging.current = false;
+  }, []);
+  function beginRangeDrag(anchorR: any, anchorC: any) {
+    rangeDragging.current = true;
+    rangeDragMoved = false;
+    let lastCell = {
+      r: anchorR,
+      c: anchorC
+    };
+    const move = (ev: any) => {
+      if (!rangeDragging.current) return;
+      const cell = cellIndexFromPoint(ev.clientX, ev.clientY);
+      if (cell && (cell.r !== lastCell.r || cell.c !== lastCell.c)) {
+        lastCell = cell;
+        rangeDragMoved = true;
+        setRangeFocus$local(cell.r, cell.c);
+      }
+    };
+    const up = () => {
+      // teardownRangeDrag clears rangeDragging + removes both listeners (the fill-drag CR-04 path).
+      teardownRangeDrag();
+    };
+    // Track the live handlers so $onUnmount can remove them on a mid-drag unmount (CR-04).
+    rangeDragMove.current = move;
+    rangeDragUp.current = up;
+    if (typeof document !== 'undefined') {
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    }
+  }
   function activeCellColumnId() {
     if (activeIsHeader) return null;
     const rowList = rows || [];
@@ -3995,6 +4140,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       if (virtualizerCleanup.current) virtualizerCleanup.current();
       // CR-04: remove any live fill-drag document listeners if we unmount mid-drag.
       teardownFillDrag();
+      // §6 (260709-3qt): remove any live drag-select document listeners on a mid-drag unmount.
+      teardownRangeDrag();
     };
   }, []);
   useEffect(() => {
