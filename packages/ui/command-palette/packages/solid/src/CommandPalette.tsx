@@ -292,8 +292,8 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
 
   return (
     <>
-    {<Show when={open()}><div class={"rozie-command-palette"} onClick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
-      <div role="dialog" aria-modal="true" aria-label={local.ariaLabel} ref={(el) => { panelRef = el as HTMLElement; }} class={"rozie-command-palette-panel"} onKeyDown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
+    {<Show when={open()}><div class={"rozie-command-palette"} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
+      <div role="dialog" aria-modal="true" aria-label={local.ariaLabel} ref={(el) => { panelRef = el as HTMLElement; }} class={"rozie-command-palette-panel"} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
         
         <Combobox aria-label={local.ariaLabel} ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={local.placeholder} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
             {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
