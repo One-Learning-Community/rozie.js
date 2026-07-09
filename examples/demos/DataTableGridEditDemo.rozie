@@ -21,6 +21,13 @@
     4 verified — built-in checkbox editor with an ALWAYS-REJECTING validator (`rejectToggle`)
                  — the boolean-toggle D-01 reject vehicle (no model write, no commit bump)
     5 status   — built-in select editor  (B24 no garbage draft; LAST editable col → B5)
+    6 id       — READ-ONLY (no :editable), kept LAST so 0..5 indices are unchanged — the
+                 non-editable-double-click vehicle for data-table-grid-pointer.spec.ts (§3)
+
+  260708-ni6 (grid pointer): also carries a `singleClickEdit` toggle button
+  (data-testid="toggle-single-click-edit") flipping the bound `:singleClickEdit` prop so
+  data-table-grid-pointer.spec.ts exercises the §4 on/off single-click-to-edit paths, and the
+  §1 active-cell ring (`.rdt-cell-active`) / §3 double-click-to-edit against the same fixture.
 
   `r-model:data` binds the dataset so the spec asserts the COMMITTED model values + types
   through the `model-readout` JSON dump. activecell-readout / getactivecell-readout mirror
@@ -64,6 +71,9 @@
   activeCellChangeCount: 0,
   // getActiveCell() handle readout.
   getActiveResult: '',
+  // 260708-ni6 (grid pointer §4): the opt-in single-click-to-edit prop, flipped by the
+  // toggle-single-click-edit control so data-table-grid-pointer.spec.ts exercises on/off.
+  singleClickEdit: false,
 }
 </data>
 
@@ -103,6 +113,11 @@ const editNoteCell = (): void => {
 // rejects, regardless of the proposed value or row — proves toggleActiveBooleanCell blocks
 // the write and never emits cell-edit-commit when the validator rejects.
 const rejectToggle = (value: unknown, row: unknown): string => 'nope'
+
+// 260708-ni6 (grid pointer §4): flip the single-click-to-edit prop so the spec can exercise
+// both the OFF (default: a plain click does not open an editor) and ON (a plain click on an
+// editable cell opens its editor) paths against the same fixture.
+const toggleSingleClickEdit = (): void => { $data.singleClickEdit = !$data.singleClickEdit }
 </script>
 
 <template>
@@ -122,6 +137,9 @@ const rejectToggle = (value: unknown, row: unknown): string => 'nope'
     <span class="readout" data-testid="activecell-count">{{ $data.activeCellChangeCount }}</span>
     <span class="label">getActiveCell:</span>
     <span class="readout" data-testid="getactivecell-readout">{{ $data.getActiveResult }}</span>
+    <button type="button" data-testid="toggle-single-click-edit" @click="toggleSingleClickEdit">toggle single-click-edit</button>
+    <span class="label">single-click-edit:</span>
+    <span class="readout" data-testid="single-click-edit-state">{{ $data.singleClickEdit ? 'on' : 'off' }}</span>
   </div>
 
   <!-- The COMMITTED model, JSON-dumped, so the spec asserts both VALUES and TYPES
@@ -132,6 +150,7 @@ const rejectToggle = (value: unknown, row: unknown): string => 'nope'
     <DataTable
       ref="dt"
       interactionMode="grid"
+      :singleClickEdit="$data.singleClickEdit"
       r-model:data="$data.rows"
       @cell-edit-commit="onCellEditCommit($event)"
       @activecell-change="onActiveCellChange($event)"
@@ -152,6 +171,10 @@ const rejectToggle = (value: unknown, row: unknown): string => 'nope'
         editor="select"
         :editorOptions="$data.statusOptions"
       />
+      <!-- 260708-ni6 (grid pointer §3): a READ-ONLY column (no :editable) kept LAST (col 6) so
+           the existing 0..5 editable-column indices are unchanged — the vehicle for the
+           "double-click a non-editable cell opens no editor; the cell stays active" assertion. -->
+      <Column field="id" header="ID" />
 
       <!-- Read-only display slot. -->
       <template #cell="{ columnId, value }">

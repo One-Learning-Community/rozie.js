@@ -261,6 +261,79 @@ const onGridMouseDown = (e) => {
   rangeClickPending = true
 }
 
+// onGridDblClick: the double-click-into-edit seam (grid pointer §3+§5, 260708-ni6). Wired as
+// ONE @dblclick on the <table> root (mirroring the already-delegated @mousedown/@focusin). A
+// double-click on a BODY cell either toggles a group (group-header cell) or opens the editor
+// (editable cell); a non-editable body cell is a no-op (the cell stays active — its focusin
+// already set the active state + the §1 ring). Header cells return early so they keep their
+// native sort/menu/resize semantics. Reuses the SAME closest/parse/finite guards as
+// syncActiveFromEvent and the SAME beginEdit / onToggleExpand funnels the keyboard path uses —
+// no new edit or expand machinery. isGrid()-gated so 'table' mode never runs it.
+const onGridDblClick = (e) => {
+  if (!isGrid() || !e) return
+  const tgt = e.target
+  if (!tgt || !tgt.closest) return
+  const cellEl = tgt.closest('[data-grid-cell]')
+  if (!cellEl) return
+  const rowAttr = cellEl.getAttribute('data-row')
+  const colAttr = cellEl.getAttribute('data-col-index')
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return
+  const row = parseInt(rowAttr, 10)
+  const col = parseInt(colAttr, 10)
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return
+  // NB the local is `rowObj` (NOT `activeRow`): $data.activeRow lowers to the bare React state
+  // binding `activeRow`, so a `const activeRow = …` local self-shadows it (TS2448 TDZ — the
+  // visibleColCount `rowList` self-shadow class). ($data.rows || [])[row] is the active flattened
+  // row (page-relative non-virtual / full-model virtual — both index $data.rows, matching the C2
+  // Enter-on-group path + syncActiveFromEvent's row parse).
+  const rowObj = ($data.rows || [])[row]
+  if (rowIsGrouped(rowObj)) {
+    // Group-header cell → toggle its collapse/expand through the SAME onToggleExpand funnel the
+    // chevron uses (mirrors the C2 Enter-on-group path verbatim), then re-seat focus after the
+    // re-render (guardMoved=true — the group-header row is unchanged by its own collapse, so a
+    // stale late rAF must not steal focus back after a subsequent nav).
+    e.preventDefault()
+    onToggleExpand(rowObj, e)
+    recoverGridFocus(String(row), col, null, true)
+    return
+  }
+  // Editable body cell → open its editor (seed=null → seed the EXISTING value, the in-place F2/
+  // Enter entry). A non-editable body cell is a no-op: the cell stays active (focusin already set
+  // it + the §1 ring), matching the spreadsheet display-vs-edit convention.
+  const colId = columnIdAt(row, col)
+  if (colId != null && columnEditable(colId)) {
+    e.preventDefault()
+    beginEdit(row, col, null)
+  }
+}
+
+// onGridClick: the opt-in single-click-to-edit seam (grid pointer §4, 260708-ni6). Only active
+// when the `singleClickEdit` prop is true (default false, negative-opt-out). Wired as ONE @click
+// on the <table> root — @click fires on a genuine mouseup-no-drag click (NOT @mousedown), which
+// honors the deferred §6 drag guard (a mousedown that begins a drag-select must not open an
+// editor). A plain click on an EDITABLE body cell opens its editor via the SAME beginEdit funnel;
+// shift+click (range extend) and non-editable cells are unaffected. Same closest/parse/header-skip
+// /finite guards as onGridDblClick. isGrid()-gated so 'table' mode never runs it.
+const onGridClick = (e) => {
+  if (!isGrid() || !e) return
+  if (!$props.singleClickEdit) return
+  if (e.shiftKey) return
+  const tgt = e.target
+  if (!tgt || !tgt.closest) return
+  const cellEl = tgt.closest('[data-grid-cell]')
+  if (!cellEl) return
+  const rowAttr = cellEl.getAttribute('data-row')
+  const colAttr = cellEl.getAttribute('data-col-index')
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return
+  const row = parseInt(rowAttr, 10)
+  const col = parseInt(colAttr, 10)
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return
+  // Already editing THIS exact cell → no-op (a click inside an open editor must not re-open it).
+  if ($data.editingRow === row && $data.editingCol === col) return
+  const colId = columnIdAt(row, col)
+  if (colId != null && columnEditable(colId)) beginEdit(row, col, null)
+}
+
 // WR-02: reset the interaction-mode flag when focus leaves the active cell's subtree.
 // Without this, activeInControl could stick `true` — a mouse click OUTSIDE the cell, or
 // the focused inner control being removed from the DOM — leaving onGridKeyDown wedged in
@@ -412,4 +485,4 @@ const clampActiveCell = (rowCount, colCount) => {
   }
 }
 
-export { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridFocusOut, clampActiveCell }
+export { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell }

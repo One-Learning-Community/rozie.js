@@ -82,6 +82,27 @@ const cellTabindex = (rowKey, colIndex, level = null) => {
   return isActive ? 0 : -1
 }
 
+// ── Active-cell ring predicate (grid pointer §1, 260708-ni6) ───────────────────────────
+// isActiveCell mirrors cellTabindex's ACTIVE branch (the same (rowKey, colIndex, level)
+// address tuples the roving tabindex uses) but returns a BOOLEAN for the `.rdt-cell-active`
+// :class binding, and is STATE-DRIVEN — so the ring shows identically on click AND keyboard
+// (independent of :focus-visible, which browsers gate off for a mouse-focused non-text <td>).
+// It DELIBERATELY omits cellTabindex's B6 empty-grid / header-fallback branch: the ring must
+// NOT light on an empty grid's synthetic tab-stop (there is no real active cell there). Reads
+// ONLY reactive $data (ROZ123-safe, fine-grained). Returns false in 'table' mode so table-mode
+// markup is byte-behaviorally unchanged. Header cells are active only while activeIsHeader is
+// true (addressed by BOTH colIndex and level — a grouped multi-level header carries exactly one
+// ring); body cells only while activeIsHeader is false.
+const isActiveCell = (rowKey, colIndex, level = null) => {
+  if (!isGrid()) return false
+  if ($data.activeIsHeader) {
+    if (rowKey !== '__header') return false
+    return colIndex === $data.activeColIndex && level === $data.activeHeaderLevel
+  }
+  if (rowKey === '__header') return false
+  return rowKey === String($data.activeRow) && colIndex === $data.activeColIndex
+}
+
 // ── The focus SEAM (RESEARCH Pattern 1 + 3, req-6) ─────────────────────────────────────
 // resolveCellEl: index pair → DOM element, via a data-* attribute query off the stable
 // post-mount root. Uniform on all six, shadow-safe (the query runs from inside the
@@ -396,4 +417,4 @@ const cycleWithinCell = (cellEl, forward) => {
   list[i].focus()
 }
 
-export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }
+export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }
