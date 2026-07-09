@@ -698,6 +698,21 @@ export const EXAMPLES = [
   // already cover it, importing the data-table source pkg already registered for Angular
   // cross-tree AOT in phase 48).
   'DataTableGridClipboard',
+  // Quick 260709-8ct (grid-wide Undo/Redo) — the RED-first behavioral fixture (loader →
+  // examples/demos/DataTableGridUndoDemo.rozie, importing
+  // ../../packages/ui/data-table/src/{DataTable,Column}.rozie). TWO grid-mode DataTable
+  // instances (a small undoLimit=2 `undoable` instance + an `undoable`-default-off
+  // instance) with three editable columns (label/qty/city), r-model:data on each, plus a
+  // history-change readout + undo/redo/canUndo/canRedo/clearHistory verb buttons and a
+  // swap-data button, so data-table-grid-undo.spec.ts asserts: cell-edit revert, range-clear
+  // revert, one-step paste revert, Ctrl+Y/Ctrl+Shift+Z redo, redo-invalidation on a new edit,
+  // the undoLimit depth cap, external-swap history clear, undoable=false no-op, and
+  // edge-triggered history-change + verb behavior. Behavioral-only; NOT in matrix.spec.ts
+  // EXAMPLES (no pixel baseline). Lives under examples/demos/ so no new Angular 3-file
+  // registration is needed (prebuildExtraRoots[examplesRoot] + the examples tsconfig include
+  // + the glob-driven build-cells demos sweep already cover it, importing the data-table
+  // source pkg already registered for Angular cross-tree AOT in phase 48).
+  'DataTableGridUndo',
   // Phase 63 Wave-4 (grid-mode nav-edge correctness) — the nav-edge-cluster RED-first
   // fixtures (loaders → examples/demos/DataTableGridEmptyDemo.rozie /
   // DataTableGridGroupedHeaderDemo.rozie, each importing
@@ -1223,6 +1238,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 63 grid-mode clipboard/fill — '-demo' appended on Lit →
   // 'rozie-data-table-grid-clipboard-demo' = kebab of DataTableGridClipboardDemo.
   DataTableGridClipboard: 'rozie-data-table-grid-clipboard',
+  // Quick 260709-8ct grid-wide undo/redo — '-demo' appended on Lit →
+  // 'rozie-data-table-grid-undo-demo' = kebab of DataTableGridUndoDemo.
+  DataTableGridUndo: 'rozie-data-table-grid-undo',
   // Phase 63 grid-mode nav-edge — '-demo' appended on Lit → tags
   // 'rozie-data-table-grid-empty-demo' / 'rozie-data-table-grid-grouped-header-demo' =
   // kebab of DataTableGridEmptyDemo / DataTableGridGroupedHeaderDemo.

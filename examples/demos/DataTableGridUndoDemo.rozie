@@ -1,0 +1,228 @@
+<!--
+  DataTableGridUndoDemo.rozie — 260709-8ct grid-wide Undo/Redo RED-first fixture.
+
+  Drives the design doc's Testing battery (docs/superpowers/specs/2026-07-09-data-table-
+  undo-history-design.md) across all six targets via data-table-grid-undo.spec.ts:
+    (a) edit a cell → Ctrl+Z reverts the old value.
+    (b) Delete/clear a range → Ctrl+Z restores every cleared cell.
+    (c) paste a block → Ctrl+Z restores the whole block in ONE step.
+    (d) Ctrl+Y and Ctrl+Shift+Z both redo.
+    (e) a new edit after an undo clears redo (canRedo() → false).
+    (f) undoLimit caps depth — the oldest step past the cap is unrecoverable.
+    (g) an external data swap clears history (post-swap Ctrl+Z is a no-op).
+    (h) undoable=false → Ctrl+Z is a no-op and no history is held.
+    (i) undo/redo/canUndo/canRedo/clearHistory verbs behave; history-change is
+        EDGE-triggered ({canUndo, canRedo} payload only fires when availability flips).
+
+  TWO DataTable instances:
+    #1 (ref="dt", data-testid="grid-table") — `undoable` ON, a deliberately small
+       `undoLimit={2}` so the depth-cap test (f) is exercised without an enormous edit
+       sequence. Three editable columns (label:text, qty:number, city:text).
+    #2 (ref="dtOff", data-testid="grid-table-off") — `undoable` left at its default
+       (false) — the (h) no-history-when-off vehicle.
+
+  history-change feeds hist-canundo/hist-canredo/hist-count readouts (the (i) edge-trigger
+  assertion: a second edit that does NOT flip canUndo/canRedo must NOT bump hist-count).
+  Verb buttons (undo/redo/canUndo/canRedo/clearHistory) drive the live $refs.dt handle (the
+  GridNavDemo idiom — never cache); each is guarded `if (api && api.undo)` etc. so the demo
+  still COMPILES/renders on a feature-absent build (RED, not a runtime error). A "swap data"
+  button assigns a BRAND-NEW array to $data.rows (the (g) external-swap vehicle). No loop
+  var / slot named row/cell/header (Svelte mount-throw discipline) — the #cell slot binds
+  value/columnId.
+-->
+
+<rozie name="DataTableGridUndoDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  // Primary (undoable) instance dataset. Distinct label/qty/city per row so a per-cell
+  // revert is unambiguous.
+  rows: [
+    { id: 1, label: 'Alpha', qty: 10, city: 'Oslo' },
+    { id: 2, label: 'Beta',  qty: 20, city: 'Lima' },
+    { id: 3, label: 'Gamma', qty: 30, city: 'Cairo' },
+    { id: 4, label: 'Delta', qty: 40, city: 'Tokyo' },
+    { id: 5, label: 'Echo',  qty: 50, city: 'Berlin' },
+  ],
+  // Secondary (undoable=false / default) instance dataset — the (h) no-history vehicle.
+  rowsOff: [
+    { id: 1, label: 'Zed',  qty: 1, city: 'Nome' },
+    { id: 2, label: 'Yak',  qty: 2, city: 'Reno' },
+    { id: 3, label: 'Xray', qty: 3, city: 'Waco' },
+  ],
+  // @history-change readouts (edge-triggered: fires only when canUndo/canRedo flips —
+  // except undo()/redo() themselves, which always emit once per call per the design).
+  histCanUndo: 'false',
+  histCanRedo: 'false',
+  histCount: 0,
+  // canUndo()/canRedo() verb-call readouts.
+  canUndoResult: '',
+  canRedoResult: '',
+}
+</data>
+
+<script lang="ts">
+// @history-change → String(canUndo)/String(canRedo) readouts + an edge-triggered counter
+// (the (i) assertion: a non-flipping writeData must NOT bump this).
+const onHistoryChange = (payload: { canUndo: boolean; canRedo: boolean } | null): void => {
+  $data.histCanUndo = String(payload ? payload.canUndo : false)
+  $data.histCanRedo = String(payload ? payload.canRedo : false)
+  $data.histCount = $data.histCount + 1
+}
+
+// Verb calls — ALWAYS read $refs.dt LIVE (the GridNavDemo idiom — never cache the handle)
+// and guard `if (api && api.<verb>)` so the demo still compiles/renders before the feature
+// lands (RED, not a runtime TypeError).
+const callUndo = (): void => {
+  const api = $refs.dt
+  if (api && api.undo) api.undo()
+}
+const callRedo = (): void => {
+  const api = $refs.dt
+  if (api && api.redo) api.redo()
+}
+const callCanUndo = (): void => {
+  const api = $refs.dt
+  if (api && api.canUndo) $data.canUndoResult = String(api.canUndo())
+}
+const callCanRedo = (): void => {
+  const api = $refs.dt
+  if (api && api.canRedo) $data.canRedoResult = String(api.canRedo())
+}
+const callClearHistory = (): void => {
+  const api = $refs.dt
+  if (api && api.clearHistory) api.clearHistory()
+}
+
+// (g) External data swap: assign a BRAND-NEW array reference (not a mutation of the
+// existing one) to $data.rows — the lastWrittenData reference-latch mismatch that clears
+// history in reFeed.
+const swapData = (): void => {
+  $data.rows = [
+    { id: 100, label: 'New1', qty: 999, city: 'Nowhere' },
+    { id: 101, label: 'New2', qty: 998, city: 'Nowhere' },
+  ]
+}
+</script>
+
+<template>
+<div class="dt-grid-undo-demo">
+  <h3>DataTable — grid-wide undo/redo</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="undo-btn" @click="callUndo">undo()</button>
+    <button type="button" data-testid="redo-btn" @click="callRedo">redo()</button>
+    <button type="button" data-testid="canundo-btn" @click="callCanUndo">canUndo()</button>
+    <button type="button" data-testid="canredo-btn" @click="callCanRedo">canRedo()</button>
+    <button type="button" data-testid="clear-history-btn" @click="callClearHistory">clearHistory()</button>
+    <button type="button" data-testid="swap-data-btn" @click="swapData">swap data</button>
+    <span class="label">canUndo:</span>
+    <span class="readout" data-testid="canundo-readout">{{ $data.canUndoResult }}</span>
+    <span class="label">canRedo:</span>
+    <span class="readout" data-testid="canredo-readout">{{ $data.canRedoResult }}</span>
+    <span class="label">hist-canUndo:</span>
+    <span class="readout" data-testid="hist-canundo">{{ $data.histCanUndo }}</span>
+    <span class="label">hist-canRedo:</span>
+    <span class="readout" data-testid="hist-canredo">{{ $data.histCanRedo }}</span>
+    <span class="label">hist-count:</span>
+    <span class="readout" data-testid="hist-count">{{ $data.histCount }}</span>
+  </div>
+
+  <!-- The COMMITTED model, JSON-dumped, so the spec asserts the undo/redo-restored values. -->
+  <pre class="model" data-testid="model-readout">{{ JSON.stringify($data.rows) }}</pre>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      undoable
+      :undoLimit="2"
+      r-model:data="$data.rows"
+      @history-change="onHistoryChange($event)"
+    >
+      <Column field="label" header="Label" :editable="true" editor="text" />
+      <Column field="qty"   header="Qty"   :editable="true" editor="number" />
+      <Column field="city"  header="City"  :editable="true" editor="text" />
+
+      <!-- Read-only display slot. -->
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+
+  <h3>DataTable — undoable=false (no history held)</h3>
+
+  <pre class="model" data-testid="model-readout-off">{{ JSON.stringify($data.rowsOff) }}</pre>
+
+  <div data-testid="grid-table-off">
+    <DataTable
+      ref="dtOff"
+      interactionMode="grid"
+      r-model:data="$data.rowsOff"
+    >
+      <Column field="label" header="Label" :editable="true" editor="text" />
+      <Column field="qty"   header="Qty"   :editable="true" editor="number" />
+
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-grid-undo-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 680px;
+}
+.dt-grid-undo-demo h3 { margin: 0.75rem 0 0.75rem; font-size: 1rem; }
+.dt-grid-undo-demo h3:first-child { margin-top: 0; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.model {
+  font-size: 0.6875rem;
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0 0 0.75rem;
+  color: #333;
+}
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"],
+[data-testid="grid-table-off"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table-off"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.rdt-cell-editor { font: inherit; }
+</style>
+
+</rozie>
