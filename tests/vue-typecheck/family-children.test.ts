@@ -96,7 +96,13 @@ const FAMILIES: FamilySpec[] = [
         // narrowing + implicit-any indexing) that are NOT emitter-fixable without
         // injecting `as any`/annotations into the user `<script>` body — the same
         // Phase-65 SC-3 finding. They stay baselined as a KNOWN LIMITATION.
-        TS2345: 9,
+        // +2 (9→11) from the grid-pointer batch-1 work (3cd2ab17): the new
+        // `isActiveCell` header calls pass a `number` hgLevel to a `level = null`
+        // param — the identical inherent strict-null residual already baselined for
+        // `cellTabindex`. Batch 1 bumped the react/solid/lit @rozie/strict-conformance
+        // baselines but this SEPARATE @rozie/vue-typecheck family-children gate was
+        // missed; recorded here (not `as any`-patched) per "no cosmetic tsc" discipline.
+        TS2345: 11,
         TS7006: 2,
         TS7022: 1,
         TS7023: 1,
