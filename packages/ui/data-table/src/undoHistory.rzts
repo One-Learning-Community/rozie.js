@@ -1,0 +1,84 @@
+// ── grid-wide undo/redo (260709-8ct) — snapshot-stack history engine ──────────────────────
+// Per the approved design (docs/superpowers/specs/2026-07-09-data-table-undo-history-design.md,
+// decisions 1-6, LOCKED). A pure, unit-testable buffer over the FOUR history lets declared
+// top-level in DataTable.rozie beside `let programmatic = 0` (undoStack/redoStack/
+// restoringHistory/lastWrittenData — NOT $data, so recording an edit causes no reactive
+// re-render churn on every keystroke). This module holds the FUNCTIONS only; it references
+// those component-scope lets + `$props`, `$emit`, `writeData`, `currentData` BARE (by name,
+// zero ES imports) — the SAME inlined-partial pattern writeFunnels.rzts uses for
+// `programmatic`/`$data`/`$model` (DataTable.rozie is the ONLY place that ES-imports across
+// .rzts partials; a cross-import between writeFunnels and undoHistory would create an ES
+// cycle and/or a TDZ on the inlined lets).
+//
+// Collision-safe (ROZ121/124/137): none of undo/redo/canUndo/canRedo/clearHistory are
+// HTMLElement methods, model props, or React auto-generated setters.
+
+// Push the PRE-mutation snapshot (a `data` array reference — never a deep copy; unchanged
+// rows are shared across every retained snapshot because every write funnel already builds a
+// fresh array reusing unchanged row references, per the design's Memory analysis). Evict the
+// oldest snapshot once the stack exceeds `undoLimit` (default 100 — DataTable.rozie prop).
+// Any NEW recording invalidates the redo stack (standard undo semantics).
+const recordSnapshot = (current) => {
+  undoStack.push(current)
+  const limit = $props.undoLimit != null ? $props.undoLimit : 100
+  while (undoStack.length > limit) undoStack.shift()
+  redoStack = []
+}
+
+const canUndo = () => undoStack.length > 0
+const canRedo = () => redoStack.length > 0
+
+// Both stacks empty — the external-swap latch (DataTable.rozie reFeed) and the
+// clearHistory() $expose verb share this single implementation.
+const clearHistory = () => {
+  undoStack = []
+  redoStack = []
+}
+
+// `$emit('history-change', { canUndo, canRedo })` — the imperative/keyboard $expose verb
+// contract. Unconditional (used by undo()/redo() themselves, which always fire exactly once
+// per call per the design — NOT edge-gated there; only the writeData-triggered recording path
+// below is edge-gated, since a routine sequence of edits would otherwise spam the event).
+const emitHistoryChange = () => {
+  $emit('history-change', { canUndo: canUndo(), canRedo: canRedo() })
+}
+
+// Fire `history-change` ONLY when canUndo/canRedo availability flipped since `prevU`/`prevR`
+// were captured (BEFORE recordSnapshot ran). Called from writeData's recording hook so a
+// long streak of edits that doesn't change availability (canUndo already true, redo already
+// empty) does not spam consumers with a no-op event per keystroke.
+const emitHistoryChangeIfEdged = (prevU, prevR) => {
+  const nextU = canUndo()
+  const nextR = canRedo()
+  if (nextU !== prevU || nextR !== prevR) emitHistoryChange()
+}
+
+// undo(): pop the most recent pre-mutation snapshot, push the CURRENT data onto the redo
+// stack (so redo can restore it), then replay the popped snapshot through the SAME writeData
+// seam — under `restoringHistory = true` so writeData's own recording hook does not
+// re-capture this replay (which would corrupt the stack). Replaying through writeData
+// (rather than writing $data/$model directly) is deliberate: the two-way $model.data
+// writeback, the re-feed $watch, and the echo guard all keep working with zero new code.
+const undo = () => {
+  if (!canUndo()) return
+  const prev = undoStack.pop()
+  redoStack.push(currentData())
+  restoringHistory = true
+  writeData(prev)
+  restoringHistory = false
+  emitHistoryChange()
+}
+
+// redo(): symmetric — pop the redo stack, push the CURRENT data back onto the undo stack,
+// replay through the same guarded writeData seam.
+const redo = () => {
+  if (!canRedo()) return
+  const next = redoStack.pop()
+  undoStack.push(currentData())
+  restoringHistory = true
+  writeData(next)
+  restoringHistory = false
+  emitHistoryChange()
+}
+
+export { recordSnapshot, canUndo, canRedo, clearHistory, emitHistoryChange, emitHistoryChangeIfEdged, undo, redo }

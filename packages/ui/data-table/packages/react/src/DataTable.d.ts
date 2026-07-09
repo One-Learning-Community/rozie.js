@@ -114,6 +114,14 @@ export interface DataTableProps {
    */
   singleClickEdit?: boolean;
   /**
+   * Grid mode. When `true`, every committed data mutation (cell/row edit, paste, fill, cut, clear) becomes one undo step: Ctrl/Cmd+Z undoes, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redoes. Default `false` records no history and Ctrl+Z/Y are inert.
+   */
+  undoable?: boolean;
+  /**
+   * The maximum number of undo steps retained (oldest evicted past this depth). Only consulted when `undoable` is `true`.
+   */
+  undoLimit?: number;
+  /**
    * Opt-in vertical **row windowing**. When `true`, only the visible slice of rows renders inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Default `false` is byte-identical to a non-virtual table.
    */
   virtual?: boolean;
@@ -135,6 +143,7 @@ export interface DataTableProps {
   onResizeChange?: (...args: unknown[]) => void;
   onReorderChange?: (...args: unknown[]) => void;
   onPinChange?: (...args: unknown[]) => void;
+  onHistoryChange?: (...args: unknown[]) => void;
   onActivecellChange?: (...args: unknown[]) => void;
   onRangeChange?: (...args: unknown[]) => void;
   onCellEditCommit?: (...args: unknown[]) => void;

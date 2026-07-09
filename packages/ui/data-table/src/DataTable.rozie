@@ -418,6 +418,28 @@
     },
   },
 
+  // ── Grid-wide undo/redo (260709-8ct, D-2/D-4) ─────────────────────────────────────
+  // undoable: opt-in gate, default false (negative-opt-out). Off = zero behavior change,
+  // zero memory — no snapshot recording, no Ctrl+Z/Y key interception.
+  undoable: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Grid mode. When `true`, every committed data mutation (cell/row edit, paste, fill, cut, clear) becomes one undo step: Ctrl/Cmd+Z undoes, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redoes. Default `false` records no history and Ctrl+Z/Y are inert.',
+    },
+  },
+  // undoLimit: bounded history depth — the memory lever for large editable grids (memory
+  // scales linearly with retained snapshots; see the design doc's Memory analysis).
+  undoLimit: {
+    type: Number,
+    default: 100,
+    docs: {
+      description:
+        'The maximum number of undo steps retained (oldest evicted past this depth). Only consulted when `undoable` is `true`.',
+    },
+  },
+
   // ── Vertical row windowing (phase 53, req-1/2/3) ──────────────────────────────────
   // virtual: opt-in gate. Default false → byte-identical to the pre-phase output (req-1):
   // every virtual-core runtime reference sits behind this guard and the <tbody> windowed
@@ -697,6 +719,19 @@ let gridRoot = null
 // the funnel. A counter (not a boolean) so nested writes are safe.
 let programmatic = 0
 
+// ── Grid-wide undo/redo (260709-8ct) — history STATE lives in top-level `let` (mirroring
+// `programmatic` above), NOT $data: recording a snapshot on every keystroke must not trigger
+// a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array
+// REFERENCES (never deep copies — see undoHistory.rzts's header comment on the shared-row
+// invariant). restoringHistory suppresses re-recording while an undo()/redo() replay is
+// in flight. lastWrittenData is the external-swap reference latch: every internal writeback
+// (incl. a replay) sets it, so reFeed() can detect "this data reference was NOT written by
+// us" == an external dataset swap → clearHistory().
+let undoStack = []
+let redoStack = []
+let restoringHistory = false
+let lastWrittenData = null
+
 // Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
 // has not bound `expanded` and has not yet toggled any group, group-header rows default to
 // EXPANDED (so the grouped subtree is visible — the standard grouped-grid affordance + the
@@ -711,6 +746,13 @@ import { groupingActiveDefault, currentState, currentData } from './stateAssembl
 import { isSafeKey, wrapAggregationFn, columnDefs, SELECT_COL_ID, EXPANDER_COL_ID, selectionEnabled, tableColumns } from './columnBuilders.rzts'
 
 import { writeSorting, applyUpdater, writeExpanded, writeGrouping, writeGlobalFilter, writeColumnFilters, writePagination, writeRowSelection, writeColumnVisibility, writeColumnSizing, writeColumnOrder, writeColumnPinning, writeData, columnFilterValue, setColumnFilter } from './writeFunnels.rzts'
+
+// 260709-8ct (grid-wide undo/redo) — the ONLY ES import for the undo engine (undoHistory.rzts
+// itself has ZERO imports, referencing writeData/currentData/$props/$emit/the four history
+// lets above all BARE — the same inlined-partial pattern writeFunnels.rzts uses for
+// programmatic/$data/$model; a cross-import between writeFunnels and undoHistory would
+// create an ES cycle and/or a TDZ on the inlined lets).
+import { recordSnapshot, canUndo, canRedo, clearHistory, emitHistoryChange, emitHistoryChangeIfEdged, undo, redo } from './undoHistory.rzts'
 
 // Re-read the row model + header groups into $data (fresh arrays → the template
 // re-renders). A plain fn (NOT a $computed — getRowModel() must be pulled AFTER a
@@ -982,6 +1024,13 @@ $watch(
 // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
 const reFeed = () => {
   if (!table) return
+  // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl.
+  // an undo()/redo() replay) sets `lastWrittenData` inside writeData. reFeed() fires on
+  // EVERY data-ref change — internal writeback and an external swap (new dataset, server
+  // refetch) look identical here, so a data reference we did NOT write is, by definition,
+  // an external swap → clear history (undoing across a dataset boundary is incoherent).
+  // undoable-gated so a shipped grid with undoable unset never pays this check.
+  if ($props.undoable && currentData() !== lastWrittenData) clearHistory()
   table.setOptions((prev) => ({
     ...prev,
     data: currentData(),

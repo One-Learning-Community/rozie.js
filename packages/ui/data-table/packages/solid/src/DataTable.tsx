@@ -471,6 +471,14 @@ interface DataTableProps {
    */
   singleClickEdit?: boolean;
   /**
+   * Grid mode. When `true`, every committed data mutation (cell/row edit, paste, fill, cut, clear) becomes one undo step: Ctrl/Cmd+Z undoes, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redoes. Default `false` records no history and Ctrl+Z/Y are inert.
+   */
+  undoable?: boolean;
+  /**
+   * The maximum number of undo steps retained (oldest evicted past this depth). Only consulted when `undoable` is `true`.
+   */
+  undoLimit?: number;
+  /**
    * Opt-in vertical **row windowing**. When `true`, only the visible slice of rows renders inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Default `false` is byte-identical to a non-virtual table.
    */
   virtual?: boolean;
@@ -492,6 +500,7 @@ interface DataTableProps {
   onResizeChange?: (...args: unknown[]) => void;
   onReorderChange?: (...args: unknown[]) => void;
   onPinChange?: (...args: unknown[]) => void;
+  onHistoryChange?: (...args: unknown[]) => void;
   onActivecellChange?: (...args: unknown[]) => void;
   onRangeChange?: (...args: unknown[]) => void;
   onCellEditCommit?: (...args: unknown[]) => void;
@@ -543,8 +552,8 @@ export interface DataTableHandle {
 }
 
 export default function DataTable(_props: DataTableProps): JSX.Element {
-  const _merged = mergeProps({ columns: (() => [])(), selectionMode: 'none', manual: false, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, virtual: false, estimateRowHeight: 40, maxHeight: '' }, _props);
-  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'expandable', 'expanded', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'singleClickEdit', 'virtual', 'estimateRowHeight', 'maxHeight', 'children', 'ref']);
+  const _merged = mergeProps({ columns: (() => [])(), selectionMode: 'none', manual: false, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, virtual: false, estimateRowHeight: 40, maxHeight: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'expandable', 'expanded', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'singleClickEdit', 'undoable', 'undoLimit', 'virtual', 'estimateRowHeight', 'maxHeight', 'children', 'ref']);
   const resolved = () => local.children;
   onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut }); });
 
@@ -888,6 +897,19 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
   // the funnel. A counter (not a boolean) so nested writes are safe.
   let programmatic = 0;
+
+  // ── Grid-wide undo/redo (260709-8ct) — history STATE lives in top-level `let` (mirroring
+  // `programmatic` above), NOT $data: recording a snapshot on every keystroke must not trigger
+  // a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array
+  // REFERENCES (never deep copies — see undoHistory.rzts's header comment on the shared-row
+  // invariant). restoringHistory suppresses re-recording while an undo()/redo() replay is
+  // in flight. lastWrittenData is the external-swap reference latch: every internal writeback
+  // (incl. a replay) sets it, so reFeed() can detect "this data reference was NOT written by
+  // us" == an external dataset swap → clearHistory().
+  let undoStack = [];
+  let redoStack = [];
+  let restoringHistory = false;
+  let lastWrittenData: any = null;
 
   // Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
   // has not bound `expanded` and has not yet toggled any group, group-header rows default to
@@ -1374,8 +1396,26 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // from the SINGLE commitEdit call site so the count stays exactly one per commit (React
   // multi-emit dedup, D-07). Echo-guarded by the shared `programmatic` counter so the
   // re-feed watch never re-enters mid-write.
+  //
+  // 260709-8ct (grid-wide undo/redo): record the PRE-mutation snapshot BEFORE writing, but
+  // ONLY when `$props.undoable` is on AND we are not mid-replay (`!restoringHistory` — an
+  // undo()/redo() call routes back through THIS SAME writeData to reuse the two-way model +
+  // re-feed watch; without the guard the replay would re-record itself and corrupt the
+  // stack). `emitHistoryChangeIfEdged` fires `history-change` only when canUndo/canRedo
+  // availability actually flipped (a long streak of edits that doesn't change availability
+  // must not spam consumers). `lastWrittenData` ALWAYS latches to `next` — undoable or not —
+  // it is the external-swap reference latch DataTable.rozie's reFeed() reads; every internal
+  // writeback (incl. an undo/redo replay) sets it, so any array we did NOT write here is, by
+  // definition, an external dataset swap.
   function writeData(next: any) {
     if (programmatic) return;
+    if (local.undoable && !restoringHistory) {
+      const prevU = canUndo();
+      const prevR = canRedo();
+      recordSnapshot(currentData());
+      emitHistoryChangeIfEdged(prevU, prevR);
+    }
+    lastWrittenData = next;
     programmatic++;
     setDataDefault(next); // fresh array only (never in-place)
     setData(next); // two-way emit if bound (no-op-diff if not)
@@ -1403,6 +1443,95 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       value
     });
     writeColumnFilters(next);
+  }
+
+  // ── grid-wide undo/redo (260709-8ct) — snapshot-stack history engine ──────────────────────
+  // Per the approved design (docs/superpowers/specs/2026-07-09-data-table-undo-history-design.md,
+  // decisions 1-6, LOCKED). A pure, unit-testable buffer over the FOUR history lets declared
+  // top-level in DataTable.rozie beside `let programmatic = 0` (undoStack/redoStack/
+  // restoringHistory/lastWrittenData — NOT $data, so recording an edit causes no reactive
+  // re-render churn on every keystroke). This module holds the FUNCTIONS only; it references
+  // those component-scope lets + `$props`, `$emit`, `writeData`, `currentData` BARE (by name,
+  // zero ES imports) — the SAME inlined-partial pattern writeFunnels.rzts uses for
+  // `programmatic`/`$data`/`$model` (DataTable.rozie is the ONLY place that ES-imports across
+  // .rzts partials; a cross-import between writeFunnels and undoHistory would create an ES
+  // cycle and/or a TDZ on the inlined lets).
+  //
+  // Collision-safe (ROZ121/124/137): none of undo/redo/canUndo/canRedo/clearHistory are
+  // HTMLElement methods, model props, or React auto-generated setters.
+
+  // Push the PRE-mutation snapshot (a `data` array reference — never a deep copy; unchanged
+  // rows are shared across every retained snapshot because every write funnel already builds a
+  // fresh array reusing unchanged row references, per the design's Memory analysis). Evict the
+  // oldest snapshot once the stack exceeds `undoLimit` (default 100 — DataTable.rozie prop).
+  // Any NEW recording invalidates the redo stack (standard undo semantics).
+  function recordSnapshot(current: any) {
+    undoStack.push(current);
+    const limit = local.undoLimit != null ? local.undoLimit : 100;
+    while (undoStack.length > limit) undoStack.shift();
+    redoStack = [];
+  }
+  function canUndo() {
+    return undoStack.length > 0;
+  }
+  function canRedo() {
+    return redoStack.length > 0;
+  }
+
+  // Both stacks empty — the external-swap latch (DataTable.rozie reFeed) and the
+  // clearHistory() $expose verb share this single implementation.
+  function clearHistory() {
+    undoStack = [];
+    redoStack = [];
+  }
+
+  // `$emit('history-change', { canUndo, canRedo })` — the imperative/keyboard $expose verb
+  // contract. Unconditional (used by undo()/redo() themselves, which always fire exactly once
+  // per call per the design — NOT edge-gated there; only the writeData-triggered recording path
+  // below is edge-gated, since a routine sequence of edits would otherwise spam the event).
+  function emitHistoryChange() {
+    _props.onHistoryChange?.({
+      canUndo: canUndo(),
+      canRedo: canRedo()
+    });
+  }
+
+  // Fire `history-change` ONLY when canUndo/canRedo availability flipped since `prevU`/`prevR`
+  // were captured (BEFORE recordSnapshot ran). Called from writeData's recording hook so a
+  // long streak of edits that doesn't change availability (canUndo already true, redo already
+  // empty) does not spam consumers with a no-op event per keystroke.
+  function emitHistoryChangeIfEdged(prevU: any, prevR: any) {
+    const nextU = canUndo();
+    const nextR = canRedo();
+    if (nextU !== prevU || nextR !== prevR) emitHistoryChange();
+  }
+
+  // undo(): pop the most recent pre-mutation snapshot, push the CURRENT data onto the redo
+  // stack (so redo can restore it), then replay the popped snapshot through the SAME writeData
+  // seam — under `restoringHistory = true` so writeData's own recording hook does not
+  // re-capture this replay (which would corrupt the stack). Replaying through writeData
+  // (rather than writing $data/$model directly) is deliberate: the two-way $model.data
+  // writeback, the re-feed $watch, and the echo guard all keep working with zero new code.
+  function undo() {
+    if (!canUndo()) return;
+    const prev = undoStack.pop();
+    redoStack.push(currentData());
+    restoringHistory = true;
+    writeData(prev);
+    restoringHistory = false;
+    emitHistoryChange();
+  }
+
+  // redo(): symmetric — pop the redo stack, push the CURRENT data back onto the undo stack,
+  // replay through the same guarded writeData seam.
+  function redo() {
+    if (!canRedo()) return;
+    const next = redoStack.pop();
+    undoStack.push(currentData());
+    restoringHistory = true;
+    writeData(next);
+    restoringHistory = false;
+    emitHistoryChange();
   }
 
   // Re-read the row model + header groups into $data (fresh arrays → the template
@@ -1801,6 +1930,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
   function reFeed() {
     if (!table) return;
+    // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl.
+    // an undo()/redo() replay) sets `lastWrittenData` inside writeData. reFeed() fires on
+    // EVERY data-ref change — internal writeback and an external swap (new dataset, server
+    // refetch) look identical here, so a data reference we did NOT write is, by definition,
+    // an external swap → clear history (undoing across a dataset boundary is incoherent).
+    // undoable-gated so a shipped grid with undoable unset never pays this check.
+    if (local.undoable && currentData() !== lastWrittenData) clearHistory();
     table.setOptions((prev: any) => ({
       ...prev,
       data: currentData(),

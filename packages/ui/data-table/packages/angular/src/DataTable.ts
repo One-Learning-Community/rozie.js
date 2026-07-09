@@ -960,6 +960,14 @@ export class DataTable {
    */
   singleClickEdit = input<boolean>(false);
   /**
+   * Grid mode. When `true`, every committed data mutation (cell/row edit, paste, fill, cut, clear) becomes one undo step: Ctrl/Cmd+Z undoes, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redoes. Default `false` records no history and Ctrl+Z/Y are inert.
+   */
+  undoable = input<boolean>(false);
+  /**
+   * The maximum number of undo steps retained (oldest evicted past this depth). Only consulted when `undoable` is `true`.
+   */
+  undoLimit = input<number>(100);
+  /**
    * Opt-in vertical **row windowing**. When `true`, only the visible slice of rows renders inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Default `false` is byte-identical to a non-virtual table.
    */
   virtual = input<boolean>(false);
@@ -1028,6 +1036,7 @@ export class DataTable {
   resizeChange = output<unknown>({ alias: 'resize-change' });
   reorderChange = output<unknown>({ alias: 'reorder-change' });
   pinChange = output<unknown>({ alias: 'pin-change' });
+  historyChange = output<unknown>({ alias: 'history-change' });
   activecellChange = output<unknown>({ alias: 'activecell-change' });
   rangeChange = output<unknown>({ alias: 'range-change' });
   cellEditCommit = output<unknown>({ alias: 'cell-edit-commit' });
@@ -1309,6 +1318,10 @@ export class DataTable {
   GRID_PAGE_STEP = 10;
   gridRoot: any = null;
   programmatic = 0;
+  undoStack = [];
+  redoStack = [];
+  restoringHistory = false;
+  lastWrittenData: any = null;
   expandedTouched = false;
   groupingActiveDefault = () => ((this.grouping() != null ? this.grouping() : this.groupingDefault()) || []).length > 0;
   effectiveColumnPinning = (): any => {
@@ -1635,6 +1648,13 @@ export class DataTable {
   };
   writeData = (next: any) => {
     if (this.programmatic) return;
+    if (this.undoable() && !this.restoringHistory) {
+      const prevU = this.canUndo();
+      const prevR = this.canRedo();
+      this.recordSnapshot(this.currentData());
+      this.emitHistoryChangeIfEdged(prevU, prevR);
+    }
+    this.lastWrittenData = next;
     this.programmatic++;
     this.dataDefault.set(next); // fresh array only (never in-place)
     this.data.set(next); // two-way emit if bound (no-op-diff if not)
@@ -1654,6 +1674,48 @@ export class DataTable {
       value
     });
     this.writeColumnFilters(next);
+  };
+  recordSnapshot = (current: any) => {
+    const __undoLimit = this.undoLimit();
+    this.undoStack.push(current);
+    const limit = __undoLimit != null ? __undoLimit : 100;
+    while (this.undoStack.length > limit) this.undoStack.shift();
+    this.redoStack = [];
+  };
+  canUndo = () => this.undoStack.length > 0;
+  canRedo = () => this.redoStack.length > 0;
+  clearHistory = () => {
+    this.undoStack = [];
+    this.redoStack = [];
+  };
+  emitHistoryChange = () => {
+    this.historyChange.emit({
+      canUndo: this.canUndo(),
+      canRedo: this.canRedo()
+    });
+  };
+  emitHistoryChangeIfEdged = (prevU: any, prevR: any) => {
+    const nextU = this.canUndo();
+    const nextR = this.canRedo();
+    if (nextU !== prevU || nextR !== prevR) this.emitHistoryChange();
+  };
+  undo = () => {
+    if (!this.canUndo()) return;
+    const prev = this.undoStack.pop();
+    this.redoStack.push(this.currentData());
+    this.restoringHistory = true;
+    this.writeData(prev);
+    this.restoringHistory = false;
+    this.emitHistoryChange();
+  };
+  redo = () => {
+    if (!this.canRedo()) return;
+    const next = this.redoStack.pop();
+    this.undoStack.push(this.currentData());
+    this.restoringHistory = true;
+    this.writeData(next);
+    this.restoringHistory = false;
+    this.emitHistoryChange();
   };
   refreshRowModel: any = null;
   onSortingChangeCb = (updater: any) => {
@@ -1908,6 +1970,13 @@ export class DataTable {
   };
   reFeed = () => {
     if (!this.table) return;
+    // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl.
+    // an undo()/redo() replay) sets `lastWrittenData` inside writeData. reFeed() fires on
+    // EVERY data-ref change — internal writeback and an external swap (new dataset, server
+    // refetch) look identical here, so a data reference we did NOT write is, by definition,
+    // an external swap → clear history (undoing across a dataset boundary is incoherent).
+    // undoable-gated so a shipped grid with undoable unset never pays this check.
+    if (this.undoable() && this.currentData() !== this.lastWrittenData) this.clearHistory();
     this.table.setOptions((prev: any) => ({
       ...prev,
       data: this.currentData(),

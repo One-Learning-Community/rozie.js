@@ -164,6 +164,14 @@ interface DataTableProps {
    */
   singleClickEdit?: boolean;
   /**
+   * Grid mode. When `true`, every committed data mutation (cell/row edit, paste, fill, cut, clear) becomes one undo step: Ctrl/Cmd+Z undoes, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redoes. Default `false` records no history and Ctrl+Z/Y are inert.
+   */
+  undoable?: boolean;
+  /**
+   * The maximum number of undo steps retained (oldest evicted past this depth). Only consulted when `undoable` is `true`.
+   */
+  undoLimit?: number;
+  /**
    * Opt-in vertical **row windowing**. When `true`, only the visible slice of rows renders inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Default `false` is byte-identical to a non-virtual table.
    */
   virtual?: boolean;
@@ -185,6 +193,7 @@ interface DataTableProps {
   onResizeChange?: (...args: any[]) => void;
   onReorderChange?: (...args: any[]) => void;
   onPinChange?: (...args: any[]) => void;
+  onHistoryChange?: (...args: any[]) => void;
   onActivecellChange?: (...args: any[]) => void;
   onRangeChange?: (...args: any[]) => void;
   onCellEditCommit?: (...args: any[]) => void;
@@ -236,7 +245,7 @@ export interface DataTableHandle {
 const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable(_props: DataTableProps, ref): JSX.Element {
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const __defaultColumns = useState(() => (() => [])())[0];
-  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'expandable' | 'getSubRows' | 'groupable' | 'stickyHeader' | 'interactionMode' | 'singleClickEdit' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; expandable: boolean; getSubRows: ((...args: any[]) => any) | null; groupable: boolean; stickyHeader: boolean; interactionMode: string; singleClickEdit: boolean; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
+  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'expandable' | 'getSubRows' | 'groupable' | 'stickyHeader' | 'interactionMode' | 'singleClickEdit' | 'undoable' | 'undoLimit' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; expandable: boolean; getSubRows: ((...args: any[]) => any) | null; groupable: boolean; stickyHeader: boolean; interactionMode: string; singleClickEdit: boolean; undoable: boolean; undoLimit: number; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
     ..._props,
     columns: _props.columns ?? __defaultColumns,
     selectionMode: _props.selectionMode ?? 'none',
@@ -247,6 +256,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     stickyHeader: _props.stickyHeader ?? false,
     interactionMode: _props.interactionMode ?? 'table',
     singleClickEdit: _props.singleClickEdit ?? false,
+    undoable: _props.undoable ?? false,
+    undoLimit: _props.undoLimit ?? 100,
     virtual: _props.virtual ?? false,
     estimateRowHeight: _props.estimateRowHeight ?? 40,
     maxHeight: _props.maxHeight ?? '',
@@ -272,8 +283,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const rangeDragging = useRef(false);
   const lastData = useRef<any>(null);
   const lastDataLen = useRef(-1);
+  const lastWrittenData = useRef<any>(null);
+  const undoStack = useRef([]);
+  const redoStack = useRef([]);
   const committedThisSession = useRef(false);
   const editTransition = useRef(false);
+  const restoringHistory = useRef(false);
   const [data, setData] = useControllableState({
     value: props.data,
     defaultValue: props.defaultData ?? [],
@@ -758,6 +773,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   function writeData(next: any) {
     if (programmatic.current) return;
+    if (props.undoable && !restoringHistory.current) {
+      const prevU = canUndo();
+      const prevR = canRedo();
+      recordSnapshot(currentData());
+      emitHistoryChangeIfEdged(prevU, prevR);
+    }
+    lastWrittenData.current = next;
     programmatic.current++;
     setDataDefault(next); // fresh array only (never in-place)
     setData(next); // two-way emit if bound (no-op-diff if not)
@@ -777,6 +799,51 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       value
     });
     writeColumnFilters(next);
+  }
+  function recordSnapshot(current: any) {
+    undoStack.current.push(current);
+    const limit = props.undoLimit != null ? props.undoLimit : 100;
+    while (undoStack.current.length > limit) undoStack.current.shift();
+    redoStack.current = [];
+  }
+  function canUndo() {
+    return undoStack.current.length > 0;
+  }
+  function canRedo() {
+    return redoStack.current.length > 0;
+  }
+  function clearHistory() {
+    undoStack.current = [];
+    redoStack.current = [];
+  }
+  function emitHistoryChange() {
+    props.onHistoryChange && props.onHistoryChange({
+      canUndo: canUndo(),
+      canRedo: canRedo()
+    });
+  }
+  function emitHistoryChangeIfEdged(prevU: any, prevR: any) {
+    const nextU = canUndo();
+    const nextR = canRedo();
+    if (nextU !== prevU || nextR !== prevR) emitHistoryChange();
+  }
+  function undo() {
+    if (!canUndo()) return;
+    const prev = undoStack.current.pop();
+    redoStack.current.push(currentData());
+    restoringHistory.current = true;
+    writeData(prev);
+    restoringHistory.current = false;
+    emitHistoryChange();
+  }
+  function redo() {
+    if (!canRedo()) return;
+    const next = redoStack.current.pop();
+    undoStack.current.push(currentData());
+    restoringHistory.current = true;
+    writeData(next);
+    restoringHistory.current = false;
+    emitHistoryChange();
   }
   const onSortingChangeCb = useCallback((updater: any) => {
     writeSorting(applyUpdater(updater, currentState().sorting));
@@ -1029,6 +1096,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   const reFeed = useCallback(() => {
     if (!table.current) return;
+    // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl.
+    // an undo()/redo() replay) sets `lastWrittenData` inside writeData. reFeed() fires on
+    // EVERY data-ref change — internal writeback and an external swap (new dataset, server
+    // refetch) look identical here, so a data reference we did NOT write is, by definition,
+    // an external swap → clear history (undoing across a dataset boundary is incoherent).
+    // undoable-gated so a shipped grid with undoable unset never pays this check.
+    if (props.undoable && currentData() !== lastWrittenData.current) clearHistory();
     table.current.setOptions((prev: any) => ({
       ...prev,
       data: currentData(),
@@ -1078,7 +1152,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       onColumnSizingInfoChange: onColumnSizingInfoChangeCb
     }));
     if (refreshRowModel.current) refreshRowModel.current();
-  }, [currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.selectionMode, tableColumns]);
+  }, [clearHistory, currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.selectionMode, props.undoable, tableColumns]);
   const onHeaderSort = useCallback((colId: any, evt: any) => {
     if (!table.current) return;
     const col = table.current.getColumn(colId);
