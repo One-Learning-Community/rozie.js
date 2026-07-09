@@ -218,6 +218,29 @@ export function solidEventParamType(
     : eventType;
 }
 
+/**
+ * The full synthesized `$event` param binding for a Solid handler arrow —
+ * `$event: <type>` on a NATIVE element, bare `$event` on a COMPONENT tag.
+ *
+ * WHY unannotated on a component: the DOM-event annotation (above) exists to
+ * satisfy `noImplicitAny` on Solid's UNION-typed native JSX event slots
+ * (`EventHandlerUnion<T,E>` supplies no contextual param type). A component's
+ * Rozie-emitted emit-handler prop is typed `(...args: unknown[]) => void`, which
+ * DOES supply a contextual param type — so there is no TS7006 to silence — and a
+ * bare `($event: Event)` is NOT assignable to it under `strictFunctionTypes`
+ * (param contravariance: `(Event) => void` ⊄ `(unknown) => void`) → TS2322. So a
+ * component handler is left unannotated and TS infers the param from the prop.
+ * (Native-element behavior is byte-identical to before.)
+ */
+export function solidEventParam(
+  eventOrProp: string,
+  elementTag: string | undefined,
+): string {
+  return elementTag !== undefined
+    ? `$event: ${solidEventParamType(eventOrProp, elementTag)}`
+    : '$event';
+}
+
 export function domEventType(eventOrProp: string): string {
   const s = eventOrProp.replace(/^on/, '').toLowerCase();
   if (s.startsWith('key')) return 'KeyboardEvent';
@@ -323,7 +346,7 @@ export function emitTemplateEvent(
   // Spike-012 R3-5 — augmented DOM-event param type (shared with the merge
   // dispatchers in emitTemplateNode.ts so an outer dispatcher param is assignable
   // to each inner typed handler arrow).
-  const eventParamType = solidEventParamType(eventName, ctx.elementTag);
+  const eventParam = solidEventParam(eventName, ctx.elementTag);
 
   const inlineGuards: string[] = [];
   let scriptInjection: string | null = null;
@@ -455,10 +478,10 @@ export function emitTemplateEvent(
       // Spike-012 NEW-3 — annotate the synthesized `$event` param with the
       // event's specific DOM interface (see `domEventType`) so a strict consumer
       // (`noImplicitAny`) typechecks.
-      handlerExpr = `($event: ${eventParamType}) => { (${code})?.($event); }`;
+      handlerExpr = `(${eventParam}) => { (${code})?.($event); }`;
     } else {
       // Already a call / statement expression — splice verbatim.
-      handlerExpr = `($event: ${eventParamType}) => { ${code}; }`;
+      handlerExpr = `(${eventParam}) => { ${code}; }`;
     }
   } else {
     const guardLines = inlineGuards.join(' ');
@@ -475,7 +498,7 @@ export function emitTemplateEvent(
     } else {
       handlerInvocation = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
     }
-    handlerExpr = `($event: ${eventParamType}) => { ${guardLines} ${handlerInvocation}; }`;
+    handlerExpr = `(${eventParam}) => { ${guardLines} ${handlerInvocation}; }`;
   }
 
   return {

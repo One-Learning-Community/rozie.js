@@ -50,7 +50,7 @@ import {
   emitListenerSpreadAsMergePartial,
 } from './emitTemplateAttribute.js';
 import { emitConditional } from './emitConditional.js';
-import { emitTemplateEvent, domEventType, solidEventParamType } from './emitTemplateEvent.js';
+import { emitTemplateEvent, domEventType, solidEventParam } from './emitTemplateEvent.js';
 import { emitRModel } from './emitRModel.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 // Phase 07.2 Plan 03 — consumer-side slot-fill emission for component-tag elements.
@@ -580,7 +580,7 @@ function emitElementListeners(
       // event's specific DOM interface (`name` is the JSX prop, e.g. onKeyDown)
       // so a strict consumer (`noImplicitAny`) typechecks and the param is
       // assignable to each inner typed handler arrow.
-      `${name}: ($event: ${solidEventParamType(name, node.tagKind === 'html' ? node.tagName : undefined)}) => { ${branches.join(' ')} }`,
+      `${name}: (${solidEventParam(name, node.tagKind === 'html' ? node.tagName : undefined)}) => { ${branches.join(' ')} }`,
     );
   }
 
@@ -670,7 +670,7 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
     });
     // Spike-012 NEW-3 — typed dispatcher param (strict-consumer TS7006); the
     // event's specific DOM interface (`name` is the JSX prop, e.g. onKeyDown).
-    const dispatcher = `($event: ${solidEventParamType(name, node.tagKind === 'html' ? node.tagName : undefined)}) => { ${branches.join(' ')} }`;
+    const dispatcher = `(${solidEventParam(name, node.tagKind === 'html' ? node.tagName : undefined)}) => { ${branches.join(' ')} }`;
     out.push(`${name}={${dispatcher}}`);
   }
   return out.join(' ');
@@ -758,7 +758,7 @@ function mergeEventAttributes(
       };
       // Spike-012 NEW-3 — typed dispatcher param (strict-consumer TS7006); the
       // event's specific DOM interface (`name` is the JSX prop, e.g. onKeyDown).
-      merged.push(`${name}={($event: ${solidEventParamType(name, elementTag)}) => { ${wrap(attrsBody)} ${wrap(eventsBody)} }}`);
+      merged.push(`${name}={(${solidEventParam(name, elementTag)}) => { ${wrap(attrsBody)} ${wrap(eventsBody)} }}`);
       eventsNamed.delete(name);
     } else {
       merged.push(`${name}={${attrsBody}}`);
