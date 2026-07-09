@@ -180,12 +180,12 @@ function rozieToken(key: string): InjectionToken<unknown> {
     </div>
     }@if (virtual()) {
     <div class="rdt-scroll" [style]="__style">
-    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rows().length" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)">
+    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rows().length" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)" (dblclick)="onGridDblClick($event)" (click)="onGridClick($event)">
       <thead class="rdt-thead" role="rowgroup">
         @for (hg of headerGroups(); track hg.id; let hgLevel = $index) {
     <tr class="rdt-tr" role="row">
           @for (header of hg.headers; track header.id) {
-    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
+    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
             @if (isSelectColumn(header.column.id)) {
     <span style="display:contents">
               @if ((selectAllTpl ?? templates()?.['selectAll'])) {
@@ -270,7 +270,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
         <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)" [attr.data-pinned]="rozieAttr(wr.pinned ? 'true' : null)" [attr.data-depth]="rozieAttr(wr.row.depth)" [attr.data-group-header]="rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? wr.row.depth + 1 : null)">
           @for (cell of visibleCellsFor(wr.row); track cell.id) {
-    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell)))" [style]="bodyCellStyle(wr.row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell)))" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell)))" [style]="bodyCellStyle(wr.row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell)))" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
             
             @if (isExpanderColumn(cell.column.id)) {
     <span style="display:contents">
@@ -350,12 +350,12 @@ function rozieToken(key: string): InjectionToken<unknown> {
     </table>
     </div>
     } @else {
-    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rozieAttr(totalRowCount())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)">
+    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rozieAttr(totalRowCount())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)" (dblclick)="onGridDblClick($event)" (click)="onGridClick($event)">
       <thead class="rdt-thead" role="rowgroup">
         @for (hg of headerGroups(); track hg.id; let hgLevel = $index) {
     <tr class="rdt-tr" role="row">
           @for (header of hg.headers; track header.id) {
-    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
+    <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
             
             
             @if (isSelectColumn(header.column.id)) {
@@ -442,7 +442,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
         <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(row) }" role="row" [attr.data-depth]="rozieAttr(row.depth)" [attr.aria-rowindex]="rozieAttr(isGrid() ? absRowIndexOf(row) + 1 : null)" [attr.data-group-header]="rozieAttr(rowIsGrouped(row) ? row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(row) ? !!rowIsExpanded(row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? row.depth + 1 : null)">
           @for (cell of visibleCellsFor(row); track cell.id) {
-    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell)))" [style]="bodyCellStyle(row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell)))" [attr.data-in-range]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
+    <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell)))" [style]="bodyCellStyle(row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell)))" [attr.data-in-range]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
             
             @if (isExpanderColumn(cell.column.id)) {
     <span style="display:contents">
@@ -562,6 +562,11 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }
     .rozie-data-table .rdt-td.rdt-in-range {
       background: var(--rdt-range-bg, rgba(37, 99, 235, 0.12));
+    }
+    .rozie-data-table .rdt-td.rdt-cell-active,
+    .rozie-data-table .rdt-th.rdt-cell-active {
+      outline: var(--rdt-active-cell-outline, 2px solid #2563eb);
+      outline-offset: -2px;
     }
     .rozie-data-table .rdt-td {
       position: relative;
@@ -820,13 +825,13 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }
     .rozie-data-table .rdt-select-th,
     .rozie-data-table .rdt-select-td {
-      width: var(--rdt-select-col-width, 1%);
+      width: var(--rdt-select-col-width, 44px);
       text-align: var(--rdt-select-col-align, center);
       white-space: nowrap;
     }
     .rozie-data-table .rdt-expander-th,
     .rozie-data-table .rdt-expander-td {
-      width: var(--rdt-expander-col-width, 1%);
+      width: var(--rdt-expander-col-width, 40px);
       text-align: var(--rdt-expander-col-align, center);
       white-space: nowrap;
     }
@@ -950,6 +955,10 @@ export class DataTable {
    * `'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` (GA since Phase 63) — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role="grid"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.
    */
   interactionMode = input<string>('table');
+  /**
+   * Grid mode only. When `true`, a plain click on an **editable** cell opens its editor immediately (single-click-to-edit) instead of just activating the cell. Default `false` keeps click-to-activate (double-click opens the editor). Shift+click (range selection) and clicks on non-editable cells are unaffected.
+   */
+  singleClickEdit = input<boolean>(false);
   /**
    * Opt-in vertical **row windowing**. When `true`, only the visible slice of rows renders inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Default `false` is byte-identical to a non-virtual table.
    */
@@ -1303,11 +1312,11 @@ export class DataTable {
   effectiveColumnPinning = (): any => {
     const __columnPinning = this.columnPinning();
     const base = __columnPinning != null ? __columnPinning : this.columnPinningDefault();
-    const left = base && base.left ? base.left : [];
-    if (left.length === 0) return base;
     const rail: string[] = [];
     if (this.selectionEnabled()) rail.push(this.SELECT_COL_ID);
     if (this.expandable() === true) rail.push(this.EXPANDER_COL_ID);
+    if (rail.length === 0) return base;
+    const left = base && base.left ? base.left : [];
     const deduped = left.filter((id: string) => id !== this.SELECT_COL_ID && id !== this.EXPANDER_COL_ID);
     return {
       ...base,
@@ -1480,7 +1489,14 @@ export class DataTable {
         filterable: false,
         isExpanderColumn: true,
         pinned: '',
-        width: ''
+        width: '',
+        // Explicit narrow size so table-core's getSize()/getStart('left') match the RENDERED
+        // width. Without it table-core assumes its 150px default, which is fine for an UNPINNED
+        // chrome column (a CSS `width:1%` trick shrinks it visually) but breaks the moment the
+        // column joins the left-pinned rail: pinStyle's sticky offset is Σ preceding pinned
+        // SIZES, so a phantom 150px would push every real pinned column ~150px too far right and
+        // overlap. Keep this in sync with the `--rdt-expander-col-width` CSS default (40px).
+        size: 40
       };
       withExpander = [expanderCol].concat(cols);
     }
@@ -1492,7 +1508,11 @@ export class DataTable {
         filterable: false,
         isSelectColumn: true,
         pinned: '',
-        width: ''
+        width: '',
+        // Explicit narrow size so table-core's sticky-offset math (getStart('left')) matches the
+        // rendered checkbox width once this column joins the left-pinned rail — see the expander
+        // note above. Keep in sync with the `--rdt-select-col-width` CSS default (44px).
+        size: 44
       };
       return [selectCol].concat(withExpander);
     }
@@ -1595,10 +1615,20 @@ export class DataTable {
   };
   writeColumnPinning = (next: any) => {
     if (this.programmatic) return;
+    // effectiveColumnPinning() forces the auto-injected chrome ids (select/expander) into the
+    // table-core `left` rail, so table-core hands them back here on every pin change. Strip them
+    // before persisting: the CONSUMER's columnPinning model + the pin-change event must reflect
+    // only their own columns, never our internal rail ids (which re-inject each render anyway).
+    const strip = (ids: any) => (ids || []).filter((id: any) => id !== this.SELECT_COL_ID && id !== this.EXPANDER_COL_ID);
+    const clean = {
+      ...next,
+      left: strip(next && next.left),
+      right: strip(next && next.right)
+    };
     this.programmatic++;
-    this.columnPinningDefault.set(next);
-    this.columnPinning.set(next);
-    this.pinChange.emit(next);
+    this.columnPinningDefault.set(clean);
+    this.columnPinning.set(clean);
+    this.pinChange.emit(clean);
     this.programmatic--;
   };
   writeData = (next: any) => {
@@ -2293,6 +2323,16 @@ export class DataTable {
     const isActive = rowKey === String(this.activeRow()) && colIndex === __activeColIndex;
     return isActive ? 0 : -1;
   };
+  isActiveCell = (rowKey: any, colIndex: any, level: any = null) => {
+    const __activeColIndex = this.activeColIndex();
+    if (!this.isGrid()) return false;
+    if (this.activeIsHeader()) {
+      if (rowKey !== '__header') return false;
+      return colIndex === __activeColIndex && level === this.activeHeaderLevel();
+    }
+    if (rowKey === '__header') return false;
+    return rowKey === String(this.activeRow()) && colIndex === __activeColIndex;
+  };
   resolveCellEl = (rowKey: any, colIndex: any, level: any = null) => {
     if (!this.gridRoot) return null;
     // B12: a grouped multi-level header has MULTIPLE cells sharing data-row="__header" at the
@@ -2875,6 +2915,62 @@ export class DataTable {
     this.activeRow.set(row);
     this.activeColIndex.set(col);
     this.rangeClickPending = true;
+  };
+  onGridDblClick = (e: any) => {
+    if (!this.isGrid() || !e) return;
+    const tgt = e.target;
+    if (!tgt || !tgt.closest) return;
+    const cellEl = tgt.closest('[data-grid-cell]');
+    if (!cellEl) return;
+    const rowAttr = cellEl.getAttribute('data-row');
+    const colAttr = cellEl.getAttribute('data-col-index');
+    if (rowAttr == null || colAttr == null || rowAttr === '__header') return;
+    const row = parseInt(rowAttr, 10);
+    const col = parseInt(colAttr, 10);
+    if (!Number.isFinite(row) || !Number.isFinite(col)) return;
+    // NB the local is `rowObj` (NOT `activeRow`): $data.activeRow lowers to the bare React state
+    // binding `activeRow`, so a `const activeRow = …` local self-shadows it (TS2448 TDZ — the
+    // visibleColCount `rowList` self-shadow class). ($data.rows || [])[row] is the active flattened
+    // row (page-relative non-virtual / full-model virtual — both index $data.rows, matching the C2
+    // Enter-on-group path + syncActiveFromEvent's row parse).
+    const rowObj = (this.rows() || [])[row];
+    if (this.rowIsGrouped(rowObj)) {
+      // Group-header cell → toggle its collapse/expand through the SAME onToggleExpand funnel the
+      // chevron uses (mirrors the C2 Enter-on-group path verbatim), then re-seat focus after the
+      // re-render (guardMoved=true — the group-header row is unchanged by its own collapse, so a
+      // stale late rAF must not steal focus back after a subsequent nav).
+      e.preventDefault();
+      this.onToggleExpand(rowObj, e);
+      this.recoverGridFocus(String(row), col, null, true);
+      return;
+    }
+    // Editable body cell → open its editor (seed=null → seed the EXISTING value, the in-place F2/
+    // Enter entry). A non-editable body cell is a no-op: the cell stays active (focusin already set
+    // it + the §1 ring), matching the spreadsheet display-vs-edit convention.
+    const colId = this.columnIdAt(row, col);
+    if (colId != null && this.columnEditable(colId)) {
+      e.preventDefault();
+      this.beginEdit(row, col, null);
+    }
+  };
+  onGridClick = (e: any) => {
+    if (!this.isGrid() || !e) return;
+    if (!this.singleClickEdit()) return;
+    if (e.shiftKey) return;
+    const tgt = e.target;
+    if (!tgt || !tgt.closest) return;
+    const cellEl = tgt.closest('[data-grid-cell]');
+    if (!cellEl) return;
+    const rowAttr = cellEl.getAttribute('data-row');
+    const colAttr = cellEl.getAttribute('data-col-index');
+    if (rowAttr == null || colAttr == null || rowAttr === '__header') return;
+    const row = parseInt(rowAttr, 10);
+    const col = parseInt(colAttr, 10);
+    if (!Number.isFinite(row) || !Number.isFinite(col)) return;
+    // Already editing THIS exact cell → no-op (a click inside an open editor must not re-open it).
+    if (this.editingRow() === row && this.editingCol() === col) return;
+    const colId = this.columnIdAt(row, col);
+    if (colId != null && this.columnEditable(colId)) this.beginEdit(row, col, null);
   };
   onGridFocusOut = (e: any) => {
     if (!this.isGrid() || !this.activeInControl()) return;

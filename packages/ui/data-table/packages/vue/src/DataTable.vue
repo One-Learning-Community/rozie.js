@@ -24,10 +24,10 @@
     <span v-for="gk in groupingKeys()" :key="gk" class="rdt-group-token" data-group-token="">{{ gk }}</span>
   </slot>
 </div><div v-if="props.virtual" class="rdt-scroll" :style="props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto'">
-<table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="rows.length" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)">
+<table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="rows.length" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
   <thead class="rdt-thead" role="rowgroup">
     <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row">
-      <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
+      <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
         <span v-if="isSelectColumn(header.column.id)" style="display:contents">
           <slot name="selectAll" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" :toggle="onToggleAllRows">
             <input v-if="props.selectionMode === 'multiple'" class="rdt-select-all" type="checkbox" aria-label="Select all rows" :checked="isAllRowsSelected()" @change="onToggleAllRows($event)" /></slot>
@@ -70,7 +70,7 @@
     
     <template v-for="wr in windowedRows()" :key="wr.row.id">
     <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined" :data-depth="wr.row.depth" :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined" :aria-expanded="(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined" :aria-level="(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined">
-      <td v-for="cell in visibleCellsFor(wr.row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cell)" :tabindex="(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))) ?? undefined" :style="bodyCellStyle(wr.row, cell.column.id)" :aria-invalid="(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell))) ?? undefined" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
+      <td v-for="cell in visibleCellsFor(wr.row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cell)" :tabindex="(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))) ?? undefined" :style="bodyCellStyle(wr.row, cell.column.id)" :aria-invalid="(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell))) ?? undefined" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
         
         <span v-if="isExpanderColumn(cell.column.id)" style="display:contents">
           <button v-if="rowCanExpand(wr.row)" type="button" class="rdt-expander" data-expander="" :aria-expanded="!!rowIsExpanded(wr.row)" :aria-label="rowIsExpanded(wr.row) ? 'Collapse row' : 'Expand row'" @click="onToggleExpand(wr.row, $event)">{{ rowIsExpanded(wr.row) ? '▾' : '▸' }}</button></span><span v-else-if="isSelectColumn(cell.column.id)" style="display:contents">
@@ -104,10 +104,10 @@
     </tr>
   </tbody>
 </table>
-</div><table v-else :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="(totalRowCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)">
+</div><table v-else :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="(totalRowCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
   <thead class="rdt-thead" role="rowgroup">
     <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row">
-      <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
+      <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
         
         
         <span v-if="isSelectColumn(header.column.id)" style="display:contents">
@@ -152,7 +152,7 @@
     
     <template v-for="row in rows" :key="row.id">
     <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(row) }]" role="row" :data-depth="row.depth" :aria-rowindex="(isGrid() ? absRowIndexOf(row) + 1 : undefined) ?? undefined" :data-group-header="rowIsGrouped(row) ? row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(row) ? row.id : undefined" :aria-expanded="(rowIsGrouped(row) ? !!rowIsExpanded(row) : undefined) ?? undefined" :aria-level="(groupingActive() ? row.depth + 1 : undefined) ?? undefined">
-      <td v-for="cell in visibleCellsFor(row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cell)" :tabindex="(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell))) ?? undefined" :style="bodyCellStyle(row, cell.column.id)" :aria-invalid="(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell))) ?? undefined" :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
+      <td v-for="cell in visibleCellsFor(row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cell)" :tabindex="(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell))) ?? undefined" :style="bodyCellStyle(row, cell.column.id)" :aria-invalid="(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell))) ?? undefined" :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
         
         <span v-if="isExpanderColumn(cell.column.id)" style="display:contents">
           <button v-if="rowCanExpand(row)" type="button" class="rdt-expander" data-expander="" :aria-expanded="!!rowIsExpanded(row)" :aria-label="rowIsExpanded(row) ? 'Collapse row' : 'Expand row'" @click="onToggleExpand(row, $event)">{{ rowIsExpanded(row) ? '▾' : '▸' }}</button></span><span v-else-if="isSelectColumn(cell.column.id)" style="display:contents">
@@ -237,6 +237,10 @@ const props = withDefaults(
      */
     interactionMode?: string;
     /**
+     * Grid mode only. When `true`, a plain click on an **editable** cell opens its editor immediately (single-click-to-edit) instead of just activating the cell. Default `false` keeps click-to-activate (double-click opens the editor). Shift+click (range selection) and clicks on non-editable cells are unaffected.
+     */
+    singleClickEdit?: boolean;
+    /**
      * Opt-in vertical **row windowing**. When `true`, only the visible slice of rows renders inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Default `false` is byte-identical to a non-virtual table.
      */
     virtual?: boolean;
@@ -249,7 +253,7 @@ const props = withDefaults(
      */
     maxHeight?: string;
   }>(),
-  { columns: () => [], selectionMode: 'none', manual: false, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', virtual: false, estimateRowHeight: 40, maxHeight: '' }
+  { columns: () => [], selectionMode: 'none', manual: false, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, virtual: false, estimateRowHeight: 40, maxHeight: '' }
 );
 
 /**
@@ -280,11 +284,11 @@ const pagination = defineModel<Record<string, any>>('pagination', { default: () 
 /**
  * `ExpandedState` — `{ [rowId]: true }`, or the `true` literal after `expandAll` (declared `type: [Object, Boolean]`). Multi-expand (multiple rows open at once). Surfaces through `expand-change`; uncontrolled fallback (`$data.expandedDefault`) when unbound — the default is `null` so the uncontrolled fallback AND the grouping auto-expand default are reachable (a non-null default would short-circuit them). When grouping is active and `expanded` is untouched, group subtrees auto-expand.
  */
-const expanded = defineModel<Record<string, any> | boolean>('expanded', { default: null });
+const expanded = defineModel<Record<string, any> | boolean | null>('expanded', { default: null });
 /**
  * `GroupingState` — an ordered `string[]` of column ids (multi-column → nested groups, e.g. `['region','category']`). An empty/unbound list is ungrouped (byte-identical-off). Group-header rows are collapsible (they ride the expand model). Surfaces through `group-change`; uncontrolled fallback (`$data.groupingDefault`, default `[]`) when unbound — the default is `null` (mirroring `expanded`) so the uncontrolled fallback is reachable and the grouping auto-expand default can activate when a consumer applies grouping without binding `r-model:grouping` (a non-null `[]` default would short-circuit it). All reads are null-guarded, so table-core still receives an array.
  */
-const grouping = defineModel<any[]>('grouping', { default: null });
+const grouping = defineModel<any[] | null>('grouping', { default: null });
 /**
  * `RowSelectionState` — `{ [rowId]: true }`. Checkbox-only toggle (the row body does not select). Driven by the `selectionMode` chrome. Two-way: fires `selection-change` regardless of binding.
  */
@@ -523,35 +527,47 @@ let expandedTouched = false;
 // the expanded auto-default below tracks the live grouping state on every target.
 const groupingActiveDefault = () => ((grouping.value != null ? grouping.value : groupingDefault.value) || []).length > 0;
 
-// effectiveColumnPinning(): force the auto-injected select/expander chrome columns to the
-// FRONT of the effective left-pinned rail so they stay the structural leftmost body cells
-// even when a consumer pins a DATA column left. TanStack's getVisibleCells() returns
-// [left-pinned, center, right-pinned] and orders the left group by the columnPinning.left
-// array — so a consumer pinning e.g. `name` left would otherwise render the name cell to the
-// LEFT of the checkbox (which is a center column, pinned:''). Prepending SELECT_COL_ID then
-// EXPANDER_COL_ID to `left` (matching the tableColumns injection order [select, expander,
-// ...userCols]) guarantees they lead the pinned rail regardless of a custom columnOrder
-// (columnOrder only orders the CENTER group). CRITICAL: the empty-left DEFAULT returns `base`
-// UNCHANGED — select/expander are already center-leftmost when nothing is pinned, so the
-// no-pin table stays byte-identical (VR/snapshot baselines must not drift).
-// effectiveColumnPinning(): force the auto-injected select/expander chrome columns to the
-// FRONT of the effective left-pinned rail so they stay the structural leftmost body cells
-// even when a consumer pins a DATA column left. TanStack's getVisibleCells() returns
-// [left-pinned, center, right-pinned] and orders the left group by the columnPinning.left
-// array — so a consumer pinning e.g. `name` left would otherwise render the name cell to the
-// LEFT of the checkbox (which is a center column, pinned:''). Prepending SELECT_COL_ID then
-// EXPANDER_COL_ID to `left` (matching the tableColumns injection order [select, expander,
-// ...userCols]) guarantees they lead the pinned rail regardless of a custom columnOrder
-// (columnOrder only orders the CENTER group). CRITICAL: the empty-left DEFAULT returns `base`
-// UNCHANGED — select/expander are already center-leftmost when nothing is pinned, so the
-// no-pin table stays byte-identical (VR/snapshot baselines must not drift).
+// effectiveColumnPinning(): the auto-injected select/expander chrome columns are a STRUCTURAL
+// left-pinned rail — they ALWAYS lead the pinned-left group so the checkbox/chevron stay the
+// leftmost body cells in EVERY case (fresh, pinned, AND grouped). Two forces would otherwise
+// push a data column ahead of the checkbox:
+//   1. Pinning — a consumer pinning `name` left makes it left-pinned; getVisibleCells() returns
+//      [left-pinned, center, right-pinned], so an unpinned (center) checkbox renders AFTER it.
+//   2. Grouping — table-core's groupedColumnMode defaults to 'reorder', which moves a grouped
+//      column to the FRONT of the order, ahead of an unpinned center checkbox.
+// Pinning the rail left beats BOTH: the left group always precedes the (grouped-reordered)
+// center group. We prepend SELECT_COL_ID then EXPANDER_COL_ID (matching the tableColumns
+// injection order [select, expander, ...userCols]) ahead of any consumer left-pins.
+// REQUIRES: the chrome column defs carry an explicit `size` (columnBuilders.rzts) — pinStyle's
+// sticky offset is col.getStart('left') = Σ preceding pinned SIZES, so a size-less chrome column
+// (table-core's 150px default) would inflate every real pinned column's `left` and overlap.
+// The consumer's columnPinning model never sees these ids: writeColumnPinning() strips them
+// on the way back out (writeFunnels.rzts). Note: this ALWAYS-pin makes the default (no-pin)
+// checkbox a sticky-left rail — an intentional baseline change (VR/snapshot baselines drift).
+// effectiveColumnPinning(): the auto-injected select/expander chrome columns are a STRUCTURAL
+// left-pinned rail — they ALWAYS lead the pinned-left group so the checkbox/chevron stay the
+// leftmost body cells in EVERY case (fresh, pinned, AND grouped). Two forces would otherwise
+// push a data column ahead of the checkbox:
+//   1. Pinning — a consumer pinning `name` left makes it left-pinned; getVisibleCells() returns
+//      [left-pinned, center, right-pinned], so an unpinned (center) checkbox renders AFTER it.
+//   2. Grouping — table-core's groupedColumnMode defaults to 'reorder', which moves a grouped
+//      column to the FRONT of the order, ahead of an unpinned center checkbox.
+// Pinning the rail left beats BOTH: the left group always precedes the (grouped-reordered)
+// center group. We prepend SELECT_COL_ID then EXPANDER_COL_ID (matching the tableColumns
+// injection order [select, expander, ...userCols]) ahead of any consumer left-pins.
+// REQUIRES: the chrome column defs carry an explicit `size` (columnBuilders.rzts) — pinStyle's
+// sticky offset is col.getStart('left') = Σ preceding pinned SIZES, so a size-less chrome column
+// (table-core's 150px default) would inflate every real pinned column's `left` and overlap.
+// The consumer's columnPinning model never sees these ids: writeColumnPinning() strips them
+// on the way back out (writeFunnels.rzts). Note: this ALWAYS-pin makes the default (no-pin)
+// checkbox a sticky-left rail — an intentional baseline change (VR/snapshot baselines drift).
 const effectiveColumnPinning = (): any => {
   const base = columnPinning.value != null ? columnPinning.value : columnPinningDefault.value;
-  const left = base && base.left ? base.left : [];
-  if (left.length === 0) return base;
   const rail: string[] = [];
   if (selectionEnabled()) rail.push(SELECT_COL_ID);
   if (props.expandable === true) rail.push(EXPANDER_COL_ID);
+  if (rail.length === 0) return base;
+  const left = base && base.left ? base.left : [];
   const deduped = left.filter((id: string) => id !== SELECT_COL_ID && id !== EXPANDER_COL_ID);
   return {
     ...base,
@@ -818,7 +834,14 @@ const tableColumns = () => {
       filterable: false,
       isExpanderColumn: true,
       pinned: '',
-      width: ''
+      width: '',
+      // Explicit narrow size so table-core's getSize()/getStart('left') match the RENDERED
+      // width. Without it table-core assumes its 150px default, which is fine for an UNPINNED
+      // chrome column (a CSS `width:1%` trick shrinks it visually) but breaks the moment the
+      // column joins the left-pinned rail: pinStyle's sticky offset is Σ preceding pinned
+      // SIZES, so a phantom 150px would push every real pinned column ~150px too far right and
+      // overlap. Keep this in sync with the `--rdt-expander-col-width` CSS default (40px).
+      size: 40
     };
     withExpander = [expanderCol].concat(cols);
   }
@@ -830,7 +853,11 @@ const tableColumns = () => {
       filterable: false,
       isSelectColumn: true,
       pinned: '',
-      width: ''
+      width: '',
+      // Explicit narrow size so table-core's sticky-offset math (getStart('left')) matches the
+      // rendered checkbox width once this column joins the left-pinned rail — see the expander
+      // note above. Keep in sync with the `--rdt-select-col-width` CSS default (44px).
+      size: 44
     };
     return [selectCol].concat(withExpander);
   }
@@ -1044,10 +1071,20 @@ const writeColumnOrder = (next: any) => {
 // binding.
 const writeColumnPinning = (next: any) => {
   if (programmatic) return;
+  // effectiveColumnPinning() forces the auto-injected chrome ids (select/expander) into the
+  // table-core `left` rail, so table-core hands them back here on every pin change. Strip them
+  // before persisting: the CONSUMER's columnPinning model + the pin-change event must reflect
+  // only their own columns, never our internal rail ids (which re-inject each render anyway).
+  const strip = (ids: any) => (ids || []).filter((id: any) => id !== SELECT_COL_ID && id !== EXPANDER_COL_ID);
+  const clean = {
+    ...next,
+    left: strip(next && next.left),
+    right: strip(next && next.right)
+  };
   programmatic++;
-  columnPinningDefault.value = next;
-  columnPinning.value = next;
-  emit('pin-change', next);
+  columnPinningDefault.value = clean;
+  columnPinning.value = clean;
+  emit('pin-change', clean);
   programmatic--;
 };
 
@@ -2603,6 +2640,38 @@ const cellTabindex = (rowKey: any, colIndex: any, level = null) => {
   return isActive ? 0 : -1;
 };
 
+// ── Active-cell ring predicate (grid pointer §1, 260708-ni6) ───────────────────────────
+// isActiveCell mirrors cellTabindex's ACTIVE branch (the same (rowKey, colIndex, level)
+// address tuples the roving tabindex uses) but returns a BOOLEAN for the `.rdt-cell-active`
+// :class binding, and is STATE-DRIVEN — so the ring shows identically on click AND keyboard
+// (independent of :focus-visible, which browsers gate off for a mouse-focused non-text <td>).
+// It DELIBERATELY omits cellTabindex's B6 empty-grid / header-fallback branch: the ring must
+// NOT light on an empty grid's synthetic tab-stop (there is no real active cell there). Reads
+// ONLY reactive $data (ROZ123-safe, fine-grained). Returns false in 'table' mode so table-mode
+// markup is byte-behaviorally unchanged. Header cells are active only while activeIsHeader is
+// true (addressed by BOTH colIndex and level — a grouped multi-level header carries exactly one
+// ring); body cells only while activeIsHeader is false.
+// ── Active-cell ring predicate (grid pointer §1, 260708-ni6) ───────────────────────────
+// isActiveCell mirrors cellTabindex's ACTIVE branch (the same (rowKey, colIndex, level)
+// address tuples the roving tabindex uses) but returns a BOOLEAN for the `.rdt-cell-active`
+// :class binding, and is STATE-DRIVEN — so the ring shows identically on click AND keyboard
+// (independent of :focus-visible, which browsers gate off for a mouse-focused non-text <td>).
+// It DELIBERATELY omits cellTabindex's B6 empty-grid / header-fallback branch: the ring must
+// NOT light on an empty grid's synthetic tab-stop (there is no real active cell there). Reads
+// ONLY reactive $data (ROZ123-safe, fine-grained). Returns false in 'table' mode so table-mode
+// markup is byte-behaviorally unchanged. Header cells are active only while activeIsHeader is
+// true (addressed by BOTH colIndex and level — a grouped multi-level header carries exactly one
+// ring); body cells only while activeIsHeader is false.
+const isActiveCell = (rowKey: any, colIndex: any, level = null) => {
+  if (!isGrid()) return false;
+  if (activeIsHeader.value) {
+    if (rowKey !== '__header') return false;
+    return colIndex === activeColIndex.value && level === activeHeaderLevel.value;
+  }
+  if (rowKey === '__header') return false;
+  return rowKey === String(activeRow.value) && colIndex === activeColIndex.value;
+};
+
 // ── The focus SEAM (RESEARCH Pattern 1 + 3, req-6) ─────────────────────────────────────
 // resolveCellEl: index pair → DOM element, via a data-* attribute query off the stable
 // post-mount root. Uniform on all six, shadow-safe (the query runs from inside the
@@ -3388,6 +3457,94 @@ const onGridMouseDown = (e: any) => {
   activeRow.value = row;
   activeColIndex.value = col;
   rangeClickPending = true;
+};
+
+// onGridDblClick: the double-click-into-edit seam (grid pointer §3+§5, 260708-ni6). Wired as
+// ONE @dblclick on the <table> root (mirroring the already-delegated @mousedown/@focusin). A
+// double-click on a BODY cell either toggles a group (group-header cell) or opens the editor
+// (editable cell); a non-editable body cell is a no-op (the cell stays active — its focusin
+// already set the active state + the §1 ring). Header cells return early so they keep their
+// native sort/menu/resize semantics. Reuses the SAME closest/parse/finite guards as
+// syncActiveFromEvent and the SAME beginEdit / onToggleExpand funnels the keyboard path uses —
+// no new edit or expand machinery. isGrid()-gated so 'table' mode never runs it.
+// onGridDblClick: the double-click-into-edit seam (grid pointer §3+§5, 260708-ni6). Wired as
+// ONE @dblclick on the <table> root (mirroring the already-delegated @mousedown/@focusin). A
+// double-click on a BODY cell either toggles a group (group-header cell) or opens the editor
+// (editable cell); a non-editable body cell is a no-op (the cell stays active — its focusin
+// already set the active state + the §1 ring). Header cells return early so they keep their
+// native sort/menu/resize semantics. Reuses the SAME closest/parse/finite guards as
+// syncActiveFromEvent and the SAME beginEdit / onToggleExpand funnels the keyboard path uses —
+// no new edit or expand machinery. isGrid()-gated so 'table' mode never runs it.
+const onGridDblClick = (e: any) => {
+  if (!isGrid() || !e) return;
+  const tgt = e.target;
+  if (!tgt || !tgt.closest) return;
+  const cellEl = tgt.closest('[data-grid-cell]');
+  if (!cellEl) return;
+  const rowAttr = cellEl.getAttribute('data-row');
+  const colAttr = cellEl.getAttribute('data-col-index');
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return;
+  const row = parseInt(rowAttr, 10);
+  const col = parseInt(colAttr, 10);
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return;
+  // NB the local is `rowObj` (NOT `activeRow`): $data.activeRow lowers to the bare React state
+  // binding `activeRow`, so a `const activeRow = …` local self-shadows it (TS2448 TDZ — the
+  // visibleColCount `rowList` self-shadow class). ($data.rows || [])[row] is the active flattened
+  // row (page-relative non-virtual / full-model virtual — both index $data.rows, matching the C2
+  // Enter-on-group path + syncActiveFromEvent's row parse).
+  const rowObj = (rows.value || [])[row];
+  if (rowIsGrouped(rowObj)) {
+    // Group-header cell → toggle its collapse/expand through the SAME onToggleExpand funnel the
+    // chevron uses (mirrors the C2 Enter-on-group path verbatim), then re-seat focus after the
+    // re-render (guardMoved=true — the group-header row is unchanged by its own collapse, so a
+    // stale late rAF must not steal focus back after a subsequent nav).
+    e.preventDefault();
+    onToggleExpand(rowObj, e);
+    recoverGridFocus(String(row), col, null, true);
+    return;
+  }
+  // Editable body cell → open its editor (seed=null → seed the EXISTING value, the in-place F2/
+  // Enter entry). A non-editable body cell is a no-op: the cell stays active (focusin already set
+  // it + the §1 ring), matching the spreadsheet display-vs-edit convention.
+  const colId = columnIdAt(row, col);
+  if (colId != null && columnEditable(colId)) {
+    e.preventDefault();
+    beginEdit(row, col, null);
+  }
+};
+
+// onGridClick: the opt-in single-click-to-edit seam (grid pointer §4, 260708-ni6). Only active
+// when the `singleClickEdit` prop is true (default false, negative-opt-out). Wired as ONE @click
+// on the <table> root — @click fires on a genuine mouseup-no-drag click (NOT @mousedown), which
+// honors the deferred §6 drag guard (a mousedown that begins a drag-select must not open an
+// editor). A plain click on an EDITABLE body cell opens its editor via the SAME beginEdit funnel;
+// shift+click (range extend) and non-editable cells are unaffected. Same closest/parse/header-skip
+// /finite guards as onGridDblClick. isGrid()-gated so 'table' mode never runs it.
+// onGridClick: the opt-in single-click-to-edit seam (grid pointer §4, 260708-ni6). Only active
+// when the `singleClickEdit` prop is true (default false, negative-opt-out). Wired as ONE @click
+// on the <table> root — @click fires on a genuine mouseup-no-drag click (NOT @mousedown), which
+// honors the deferred §6 drag guard (a mousedown that begins a drag-select must not open an
+// editor). A plain click on an EDITABLE body cell opens its editor via the SAME beginEdit funnel;
+// shift+click (range extend) and non-editable cells are unaffected. Same closest/parse/header-skip
+// /finite guards as onGridDblClick. isGrid()-gated so 'table' mode never runs it.
+const onGridClick = (e: any) => {
+  if (!isGrid() || !e) return;
+  if (!props.singleClickEdit) return;
+  if (e.shiftKey) return;
+  const tgt = e.target;
+  if (!tgt || !tgt.closest) return;
+  const cellEl = tgt.closest('[data-grid-cell]');
+  if (!cellEl) return;
+  const rowAttr = cellEl.getAttribute('data-row');
+  const colAttr = cellEl.getAttribute('data-col-index');
+  if (rowAttr == null || colAttr == null || rowAttr === '__header') return;
+  const row = parseInt(rowAttr, 10);
+  const col = parseInt(colAttr, 10);
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return;
+  // Already editing THIS exact cell → no-op (a click inside an open editor must not re-open it).
+  if (editingRow.value === row && editingCol.value === col) return;
+  const colId = columnIdAt(row, col);
+  if (colId != null && columnEditable(colId)) beginEdit(row, col, null);
 };
 
 // WR-02: reset the interaction-mode flag when focus leaves the active cell's subtree.
@@ -6292,6 +6449,11 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
 .rozie-data-table .rdt-td.rdt-in-range {
   background: var(--rdt-range-bg, rgba(37, 99, 235, 0.12));
 }
+.rozie-data-table .rdt-td.rdt-cell-active,
+.rozie-data-table .rdt-th.rdt-cell-active {
+  outline: var(--rdt-active-cell-outline, 2px solid #2563eb);
+  outline-offset: -2px;
+}
 .rozie-data-table .rdt-td {
   position: relative;
 }
@@ -6549,13 +6711,13 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
 }
 .rozie-data-table .rdt-select-th,
 .rozie-data-table .rdt-select-td {
-  width: var(--rdt-select-col-width, 1%);
+  width: var(--rdt-select-col-width, 44px);
   text-align: var(--rdt-select-col-align, center);
   white-space: nowrap;
 }
 .rozie-data-table .rdt-expander-th,
 .rozie-data-table .rdt-expander-td {
-  width: var(--rdt-expander-col-width, 1%);
+  width: var(--rdt-expander-col-width, 40px);
   text-align: var(--rdt-expander-col-align, center);
   white-space: nowrap;
 }

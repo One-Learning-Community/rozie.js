@@ -65,6 +65,11 @@ __rozieInjectStyle('DataTable-d5dcab4c', `.rozie-data-table[data-rozie-s-d5dcab4
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-in-range[data-rozie-s-d5dcab4c] {
   background: var(--rdt-range-bg, rgba(37, 99, 235, 0.12));
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-cell-active[data-rozie-s-d5dcab4c],
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-th.rdt-cell-active[data-rozie-s-d5dcab4c] {
+  outline: var(--rdt-active-cell-outline, 2px solid #2563eb);
+  outline-offset: -2px;
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
   position: relative;
 }
@@ -322,13 +327,13 @@ __rozieInjectStyle('DataTable-d5dcab4c', `.rozie-data-table[data-rozie-s-d5dcab4
 }
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-select-th[data-rozie-s-d5dcab4c],
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-select-td[data-rozie-s-d5dcab4c] {
-  width: var(--rdt-select-col-width, 1%);
+  width: var(--rdt-select-col-width, 44px);
   text-align: var(--rdt-select-col-align, center);
   white-space: nowrap;
 }
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-expander-th[data-rozie-s-d5dcab4c],
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-expander-td[data-rozie-s-d5dcab4c] {
-  width: var(--rdt-expander-col-width, 1%);
+  width: var(--rdt-expander-col-width, 40px);
   text-align: var(--rdt-expander-col-align, center);
   white-space: nowrap;
 }
@@ -462,6 +467,10 @@ interface DataTableProps {
    */
   interactionMode?: string;
   /**
+   * Grid mode only. When `true`, a plain click on an **editable** cell opens its editor immediately (single-click-to-edit) instead of just activating the cell. Default `false` keeps click-to-activate (double-click opens the editor). Shift+click (range selection) and clicks on non-editable cells are unaffected.
+   */
+  singleClickEdit?: boolean;
+  /**
    * Opt-in vertical **row windowing**. When `true`, only the visible slice of rows renders inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Default `false` is byte-identical to a non-virtual table.
    */
   virtual?: boolean;
@@ -534,8 +543,8 @@ export interface DataTableHandle {
 }
 
 export default function DataTable(_props: DataTableProps): JSX.Element {
-  const _merged = mergeProps({ columns: (() => [])(), selectionMode: 'none', manual: false, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', virtual: false, estimateRowHeight: 40, maxHeight: '' }, _props);
-  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'expandable', 'expanded', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'virtual', 'estimateRowHeight', 'maxHeight', 'children', 'ref']);
+  const _merged = mergeProps({ columns: (() => [])(), selectionMode: 'none', manual: false, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, virtual: false, estimateRowHeight: 40, maxHeight: '' }, _props);
+  const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'expandable', 'expanded', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'singleClickEdit', 'virtual', 'estimateRowHeight', 'maxHeight', 'children', 'ref']);
   const resolved = () => local.children;
   onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut }); });
 
@@ -894,24 +903,30 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     return ((grouping() != null ? grouping() : groupingDefault()) || []).length > 0;
   }
 
-  // effectiveColumnPinning(): force the auto-injected select/expander chrome columns to the
-  // FRONT of the effective left-pinned rail so they stay the structural leftmost body cells
-  // even when a consumer pins a DATA column left. TanStack's getVisibleCells() returns
-  // [left-pinned, center, right-pinned] and orders the left group by the columnPinning.left
-  // array — so a consumer pinning e.g. `name` left would otherwise render the name cell to the
-  // LEFT of the checkbox (which is a center column, pinned:''). Prepending SELECT_COL_ID then
-  // EXPANDER_COL_ID to `left` (matching the tableColumns injection order [select, expander,
-  // ...userCols]) guarantees they lead the pinned rail regardless of a custom columnOrder
-  // (columnOrder only orders the CENTER group). CRITICAL: the empty-left DEFAULT returns `base`
-  // UNCHANGED — select/expander are already center-leftmost when nothing is pinned, so the
-  // no-pin table stays byte-identical (VR/snapshot baselines must not drift).
+  // effectiveColumnPinning(): the auto-injected select/expander chrome columns are a STRUCTURAL
+  // left-pinned rail — they ALWAYS lead the pinned-left group so the checkbox/chevron stay the
+  // leftmost body cells in EVERY case (fresh, pinned, AND grouped). Two forces would otherwise
+  // push a data column ahead of the checkbox:
+  //   1. Pinning — a consumer pinning `name` left makes it left-pinned; getVisibleCells() returns
+  //      [left-pinned, center, right-pinned], so an unpinned (center) checkbox renders AFTER it.
+  //   2. Grouping — table-core's groupedColumnMode defaults to 'reorder', which moves a grouped
+  //      column to the FRONT of the order, ahead of an unpinned center checkbox.
+  // Pinning the rail left beats BOTH: the left group always precedes the (grouped-reordered)
+  // center group. We prepend SELECT_COL_ID then EXPANDER_COL_ID (matching the tableColumns
+  // injection order [select, expander, ...userCols]) ahead of any consumer left-pins.
+  // REQUIRES: the chrome column defs carry an explicit `size` (columnBuilders.rzts) — pinStyle's
+  // sticky offset is col.getStart('left') = Σ preceding pinned SIZES, so a size-less chrome column
+  // (table-core's 150px default) would inflate every real pinned column's `left` and overlap.
+  // The consumer's columnPinning model never sees these ids: writeColumnPinning() strips them
+  // on the way back out (writeFunnels.rzts). Note: this ALWAYS-pin makes the default (no-pin)
+  // checkbox a sticky-left rail — an intentional baseline change (VR/snapshot baselines drift).
   function effectiveColumnPinning(): any {
     const base = columnPinning() != null ? columnPinning() : columnPinningDefault();
-    const left = base && base.left ? base.left : [];
-    if (left.length === 0) return base;
     const rail: string[] = [];
     if (selectionEnabled()) rail.push(SELECT_COL_ID);
     if (local.expandable === true) rail.push(EXPANDER_COL_ID);
+    if (rail.length === 0) return base;
+    const left = base && base.left ? base.left : [];
     const deduped = left.filter((id: string) => id !== SELECT_COL_ID && id !== EXPANDER_COL_ID);
     return {
       ...base,
@@ -1142,7 +1157,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         filterable: false,
         isExpanderColumn: true,
         pinned: '',
-        width: ''
+        width: '',
+        // Explicit narrow size so table-core's getSize()/getStart('left') match the RENDERED
+        // width. Without it table-core assumes its 150px default, which is fine for an UNPINNED
+        // chrome column (a CSS `width:1%` trick shrinks it visually) but breaks the moment the
+        // column joins the left-pinned rail: pinStyle's sticky offset is Σ preceding pinned
+        // SIZES, so a phantom 150px would push every real pinned column ~150px too far right and
+        // overlap. Keep this in sync with the `--rdt-expander-col-width` CSS default (40px).
+        size: 40
       };
       withExpander = [expanderCol].concat(cols);
     }
@@ -1154,7 +1176,11 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         filterable: false,
         isSelectColumn: true,
         pinned: '',
-        width: ''
+        width: '',
+        // Explicit narrow size so table-core's sticky-offset math (getStart('left')) matches the
+        // rendered checkbox width once this column joins the left-pinned rail — see the expander
+        // note above. Keep in sync with the `--rdt-select-col-width` CSS default (44px).
+        size: 44
       };
       return [selectCol].concat(withExpander);
     }
@@ -1320,10 +1346,20 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // binding.
   function writeColumnPinning(next: any) {
     if (programmatic) return;
+    // effectiveColumnPinning() forces the auto-injected chrome ids (select/expander) into the
+    // table-core `left` rail, so table-core hands them back here on every pin change. Strip them
+    // before persisting: the CONSUMER's columnPinning model + the pin-change event must reflect
+    // only their own columns, never our internal rail ids (which re-inject each render anyway).
+    const strip = (ids: any) => (ids || []).filter((id: any) => id !== SELECT_COL_ID && id !== EXPANDER_COL_ID);
+    const clean = {
+      ...next,
+      left: strip(next && next.left),
+      right: strip(next && next.right)
+    };
     programmatic++;
-    setColumnPinningDefault(next);
-    setColumnPinning(next);
-    _props.onPinChange?.(next);
+    setColumnPinningDefault(clean);
+    setColumnPinning(clean);
+    _props.onPinChange?.(clean);
     programmatic--;
   }
 
@@ -2539,6 +2575,27 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     return isActive ? 0 : -1;
   }
 
+  // ── Active-cell ring predicate (grid pointer §1, 260708-ni6) ───────────────────────────
+  // isActiveCell mirrors cellTabindex's ACTIVE branch (the same (rowKey, colIndex, level)
+  // address tuples the roving tabindex uses) but returns a BOOLEAN for the `.rdt-cell-active`
+  // :class binding, and is STATE-DRIVEN — so the ring shows identically on click AND keyboard
+  // (independent of :focus-visible, which browsers gate off for a mouse-focused non-text <td>).
+  // It DELIBERATELY omits cellTabindex's B6 empty-grid / header-fallback branch: the ring must
+  // NOT light on an empty grid's synthetic tab-stop (there is no real active cell there). Reads
+  // ONLY reactive $data (ROZ123-safe, fine-grained). Returns false in 'table' mode so table-mode
+  // markup is byte-behaviorally unchanged. Header cells are active only while activeIsHeader is
+  // true (addressed by BOTH colIndex and level — a grouped multi-level header carries exactly one
+  // ring); body cells only while activeIsHeader is false.
+  function isActiveCell(rowKey: any, colIndex: any, level = null) {
+    if (!isGrid()) return false;
+    if (activeIsHeader()) {
+      if (rowKey !== '__header') return false;
+      return colIndex === activeColIndex() && level === activeHeaderLevel();
+    }
+    if (rowKey === '__header') return false;
+    return rowKey === String(activeRow()) && colIndex === activeColIndex();
+  }
+
   // ── The focus SEAM (RESEARCH Pattern 1 + 3, req-6) ─────────────────────────────────────
   // resolveCellEl: index pair → DOM element, via a data-* attribute query off the stable
   // post-mount root. Uniform on all six, shadow-safe (the query runs from inside the
@@ -3231,6 +3288,79 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     setActiveRow(row);
     setActiveColIndex(col);
     rangeClickPending = true;
+  }
+
+  // onGridDblClick: the double-click-into-edit seam (grid pointer §3+§5, 260708-ni6). Wired as
+  // ONE @dblclick on the <table> root (mirroring the already-delegated @mousedown/@focusin). A
+  // double-click on a BODY cell either toggles a group (group-header cell) or opens the editor
+  // (editable cell); a non-editable body cell is a no-op (the cell stays active — its focusin
+  // already set the active state + the §1 ring). Header cells return early so they keep their
+  // native sort/menu/resize semantics. Reuses the SAME closest/parse/finite guards as
+  // syncActiveFromEvent and the SAME beginEdit / onToggleExpand funnels the keyboard path uses —
+  // no new edit or expand machinery. isGrid()-gated so 'table' mode never runs it.
+  function onGridDblClick(e: any) {
+    if (!isGrid() || !e) return;
+    const tgt = e.target;
+    if (!tgt || !tgt.closest) return;
+    const cellEl = tgt.closest('[data-grid-cell]');
+    if (!cellEl) return;
+    const rowAttr = cellEl.getAttribute('data-row');
+    const colAttr = cellEl.getAttribute('data-col-index');
+    if (rowAttr == null || colAttr == null || rowAttr === '__header') return;
+    const row = parseInt(rowAttr, 10);
+    const col = parseInt(colAttr, 10);
+    if (!Number.isFinite(row) || !Number.isFinite(col)) return;
+    // NB the local is `rowObj` (NOT `activeRow`): $data.activeRow lowers to the bare React state
+    // binding `activeRow`, so a `const activeRow = …` local self-shadows it (TS2448 TDZ — the
+    // visibleColCount `rowList` self-shadow class). ($data.rows || [])[row] is the active flattened
+    // row (page-relative non-virtual / full-model virtual — both index $data.rows, matching the C2
+    // Enter-on-group path + syncActiveFromEvent's row parse).
+    const rowObj = (rows() || [])[row];
+    if (rowIsGrouped(rowObj)) {
+      // Group-header cell → toggle its collapse/expand through the SAME onToggleExpand funnel the
+      // chevron uses (mirrors the C2 Enter-on-group path verbatim), then re-seat focus after the
+      // re-render (guardMoved=true — the group-header row is unchanged by its own collapse, so a
+      // stale late rAF must not steal focus back after a subsequent nav).
+      e.preventDefault();
+      onToggleExpand(rowObj, e);
+      recoverGridFocus(String(row), col, null, true);
+      return;
+    }
+    // Editable body cell → open its editor (seed=null → seed the EXISTING value, the in-place F2/
+    // Enter entry). A non-editable body cell is a no-op: the cell stays active (focusin already set
+    // it + the §1 ring), matching the spreadsheet display-vs-edit convention.
+    const colId = columnIdAt(row, col);
+    if (colId != null && columnEditable(colId)) {
+      e.preventDefault();
+      beginEdit(row, col, null);
+    }
+  }
+
+  // onGridClick: the opt-in single-click-to-edit seam (grid pointer §4, 260708-ni6). Only active
+  // when the `singleClickEdit` prop is true (default false, negative-opt-out). Wired as ONE @click
+  // on the <table> root — @click fires on a genuine mouseup-no-drag click (NOT @mousedown), which
+  // honors the deferred §6 drag guard (a mousedown that begins a drag-select must not open an
+  // editor). A plain click on an EDITABLE body cell opens its editor via the SAME beginEdit funnel;
+  // shift+click (range extend) and non-editable cells are unaffected. Same closest/parse/header-skip
+  // /finite guards as onGridDblClick. isGrid()-gated so 'table' mode never runs it.
+  function onGridClick(e: any) {
+    if (!isGrid() || !e) return;
+    if (!local.singleClickEdit) return;
+    if (e.shiftKey) return;
+    const tgt = e.target;
+    if (!tgt || !tgt.closest) return;
+    const cellEl = tgt.closest('[data-grid-cell]');
+    if (!cellEl) return;
+    const rowAttr = cellEl.getAttribute('data-row');
+    const colAttr = cellEl.getAttribute('data-col-index');
+    if (rowAttr == null || colAttr == null || rowAttr === '__header') return;
+    const row = parseInt(rowAttr, 10);
+    const col = parseInt(colAttr, 10);
+    if (!Number.isFinite(row) || !Number.isFinite(col)) return;
+    // Already editing THIS exact cell → no-op (a click inside an open editor must not re-open it).
+    if (editingRow() === row && editingCol() === col) return;
+    const colId = columnIdAt(row, col);
+    if (colId != null && columnEditable(colId)) beginEdit(row, col, null);
   }
 
   // WR-02: reset the interaction-mode flag when focus leaves the active cell's subtree.
@@ -5423,13 +5553,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     <div class={"rdt-column-defs"} style={{ display: "none" }} aria-hidden="true" data-rozie-s-d5dcab4c="">{resolved()}</div>
 
     {<Show when={!!invalidMsg()}><div class={"rdt-sr-live"} role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c="">{invalidMsg()}</div></Show>}{<Show when={!!pasteAnnounce()}><div class={"rdt-sr-live rdt-sr-paste"} data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c="">{pasteAnnounce()}</div></Show>}<div class={"rdt-toolbar"} data-rozie-s-d5dcab4c="">
-      <input type="text" role="searchbox" aria-label="Search table" class={"rdt-global-filter"} value={globalFilterValue()} onInput={($event: InputEvent) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c="" />
+      <input type="text" role="searchbox" aria-label="Search table" class={"rdt-global-filter"} value={globalFilterValue()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c="" />
       
       {<Show when={allLeafColumns().length}><details class={"rdt-colvis"} data-rozie-s-d5dcab4c="">
         <summary class={"rdt-colvis-summary"} data-rozie-s-d5dcab4c="">Columns</summary>
         <div class={"rdt-colvis-menu"} role="group" aria-label="Toggle columns" data-rozie-s-d5dcab4c="">
           <Key each={allLeafColumns() as readonly any[]} by={(lc) => lc.id}>{(lc) => <label class={"rdt-colvis-item"} data-rozie-s-d5dcab4c="">
-            <input type="checkbox" class={"rdt-colvis-checkbox"} checked={lc().visible} onChange={($event: Event) => { onToggleVisibility(lc().id); }} data-rozie-s-d5dcab4c="" />
+            <input type="checkbox" class={"rdt-colvis-checkbox"} checked={lc().visible} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onToggleVisibility(lc().id); }} data-rozie-s-d5dcab4c="" />
             <span class={"rdt-colvis-label"} data-rozie-s-d5dcab4c="">{rozieDisplay(lc().label)}</span>
           </label>}</Key>
         </div>
@@ -5438,10 +5568,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
 
     {<Show when={local.groupable}><div class={"rdt-group-bar-host"} data-rozie-s-d5dcab4c="">
       {(_props.groupBarSlot ?? _props.slots?.['groupBar'])?.({ grouping: groupingKeys(), groupableColumns: groupableColumns(), applyGrouping, clearGrouping }) ?? <Key each={groupingKeys() as readonly any[]} by={(gk) => gk}>{(gk) => <span class={"rdt-group-token"} data-group-token="" data-rozie-s-d5dcab4c="">{rozieDisplay(gk())}</span>}</Key>}
-    </div></Show>}{<Show when={local.virtual} fallback={<table aria-rowcount={rozieAttr(totalRowCount())} class={"rozie-data-table" + " " + rozieClass({ 'rdt-sticky': local.stickyHeader })} role={rozieAttr(tableRole())} onKeyDown={($event: KeyboardEvent) => { onGridKeyDown($event); }} onFocusIn={($event: FocusEvent) => { syncActiveFromEvent($event); }} onFocusOut={($event: FocusEvent) => { onGridFocusOut($event); }} onMouseDown={($event: MouseEvent) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">
+    </div></Show>}{<Show when={local.virtual} fallback={<table aria-rowcount={rozieAttr(totalRowCount())} class={"rozie-data-table" + " " + rozieClass({ 'rdt-sticky': local.stickyHeader })} role={rozieAttr(tableRole())} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridKeyDown($event); }} onFocusIn={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { syncActiveFromEvent($event); }} onFocusOut={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridFocusOut($event); }} onMouseDown={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridMouseDown($event); }} onDblClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridDblClick($event); }} onClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
       <thead class={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         <Key each={headerGroups() as readonly any[]} by={(hg) => hg.id}>{(hg, hgLevel) => <tr class={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
-          <Key each={hg().headers as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(header().column.id), 'rdt-expander-th': isExpanderColumn(header().column.id), 'rdt-th-resizing': columnIsResizing(header().column.id) })} role="columnheader" data-col={rozieAttr(header().column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(header().colSpan > 1 ? header().colSpan : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), header()))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), header()), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(header().column.id))} style={parseInlineStyle(thStyle(header().column.id))} data-rozie-s-d5dcab4c="">
+          <Key each={hg().headers as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(header().column.id), 'rdt-expander-th': isExpanderColumn(header().column.id), 'rdt-th-resizing': columnIsResizing(header().column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg(), header()), hgLevel()) })} role="columnheader" data-col={rozieAttr(header().column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(header().colSpan > 1 ? header().colSpan : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), header()))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), header()), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(header().column.id))} style={parseInlineStyle(thStyle(header().column.id))} data-rozie-s-d5dcab4c="">
             
             
             {<Show when={isSelectColumn(header().column.id)} fallback={<Show when={isExpanderColumn(header().column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
@@ -5450,7 +5580,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
                 <span class={"rdt-header-label"} data-rozie-s-d5dcab4c="">
                   {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? rozieDisplay(headerLabel(header().column.id))}
                 </span>
-              </span>}><button type="button" class={"rdt-sort-btn"} onClick={($event: MouseEvent) => { onHeaderSort(header().column.id, $event); }} data-rozie-s-d5dcab4c="">
+              </span>}><button type="button" class={"rdt-sort-btn"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onHeaderSort(header().column.id, $event); }} data-rozie-s-d5dcab4c="">
                 
                 <span class={"rdt-header-label"} data-rozie-s-d5dcab4c="">
                   {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? rozieDisplay(headerLabel(header().column.id))}
@@ -5459,23 +5589,23 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
               </button></Show>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" anchorSlot={() => (<>
                   <button type="button" class={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(header().column.id))} data-rozie-s-d5dcab4c="">⋯</button>
                 </>)}><div class={"rdt-col-menu"} role="menu" data-rozie-s-d5dcab4c="">
-                  <button type="button" role="menuitem" aria-pressed={columnPinSide(header().column.id) === 'left'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent) => { onPinColumn(header().column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">Pin left</button>
-                  <button type="button" role="menuitem" aria-pressed={columnPinSide(header().column.id) === 'right'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent) => { onPinColumn(header().column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">Pin right</button>
-                  <button type="button" role="menuitem" aria-pressed={!columnPinSide(header().column.id)} class={"rdt-col-menu-item"} onClick={($event: MouseEvent) => { onPinColumn(header().column.id, false, $event); }} data-rozie-s-d5dcab4c="">Unpin</button>
+                  <button type="button" role="menuitem" aria-pressed={columnPinSide(header().column.id) === 'left'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(header().column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">Pin left</button>
+                  <button type="button" role="menuitem" aria-pressed={columnPinSide(header().column.id) === 'right'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(header().column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">Pin right</button>
+                  <button type="button" role="menuitem" aria-pressed={!columnPinSide(header().column.id)} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(header().column.id, false, $event); }} data-rozie-s-d5dcab4c="">Unpin</button>
                   <hr class={"rdt-col-menu-sep"} data-rozie-s-d5dcab4c="" />
-                  <button type="button" role="menuitem" class={"rdt-col-menu-item"} onClick={($event: MouseEvent) => { onHideColumn(header().column.id, $event); }} data-rozie-s-d5dcab4c="">Hide column</button>
+                  <button type="button" role="menuitem" class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onHideColumn(header().column.id, $event); }} data-rozie-s-d5dcab4c="">Hide column</button>
                 </div></Popover>
               
-              <button type="button" aria-label={rozieAttr('Resize ' + headerLabel(header().column.id))} class={"rdt-resize-handle"} onPointerDown={($event: PointerEvent) => { onResizeStart(header().column.id, $event); }} onTouchStart={($event: TouchEvent) => { onResizeStart(header().column.id, $event); }} data-rozie-s-d5dcab4c=""><span class={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
+              <button type="button" aria-label={rozieAttr('Resize ' + headerLabel(header().column.id))} class={"rdt-resize-handle"} onPointerDown={($event: PointerEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onResizeStart(header().column.id, $event); }} onTouchStart={($event: TouchEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onResizeStart(header().column.id, $event); }} data-rozie-s-d5dcab4c=""><span class={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {(_props.selectAllSlot ?? _props.slots?.['selectAll'])?.({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) ?? <Show when={local.selectionMode === 'multiple'}><input type="checkbox" aria-label="Select all rows" class={"rdt-select-all"} checked={isAllRowsSelected()} onChange={($event: Event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" /></Show>}
+              {(_props.selectAllSlot ?? _props.slots?.['selectAll'])?.({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) ?? <Show when={local.selectionMode === 'multiple'}><input type="checkbox" aria-label="Select all rows" class={"rdt-select-all"} checked={isAllRowsSelected()} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" /></Show>}
             </span></Show>}</th>}</Key>
         </tr>}</Key>
         
         {<Show when={hasAnyFilterableColumn()}><tr class={"rdt-filter-row"} data-rozie-s-d5dcab4c="">
           <Key each={headerGroups()[headerGroups().length - 1].headers as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-filter-cell"} role="presentation" style={parseInlineStyle(pinStyle(header().column.id))} data-rozie-s-d5dcab4c="">
             {<Show when={isSelectColumn(header().column.id)} fallback={<Show when={isExpanderColumn(header().column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={columnIsFilterable(header().column.id) && !hasFilterSlot()}><input type="text" aria-label={rozieAttr('Filter ' + headerLabel(header().column.id))} class={"rdt-col-filter"} value={columnFilterValue(header().column.id)} onInput={($event: InputEvent) => { onColumnFilterInput(header().column.id, $event); }} onClick={($event: MouseEvent) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" /></Show>}{<Show when={columnIsFilterable(header().column.id)}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {<Show when={columnIsFilterable(header().column.id) && !hasFilterSlot()}><input type="text" aria-label={rozieAttr('Filter ' + headerLabel(header().column.id))} class={"rdt-col-filter"} value={columnFilterValue(header().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onColumnFilterInput(header().column.id, $event); }} onClick={($event: MouseEvent & { currentTarget: HTMLInputElement; target: Element }) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" /></Show>}{<Show when={columnIsFilterable(header().column.id)}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 {(_props.filterSlot ?? _props.slots?.['filter'])?.({ columnId: header().column.id, value: columnFilterValue(header().column.id), uniqueValues: getFacetedUniqueValues(header().column.id), minMax: getFacetedMinMaxValues(header().column.id), setFilter: setColumnFilter })}
               </span></Show>}</span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}</th>}</Key>
         </tr></Show>}</thead>
@@ -5484,25 +5614,25 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         
         <Key each={rows() as readonly any[]} by={(row) => row.id}>{(row) => <>
         <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-group-header': rowIsGrouped(row()) })} role="row" data-depth={rozieAttr(row().depth)} aria-rowindex={rozieAttr(isGrid() ? absRowIndexOf(row()) + 1 : null)} data-group-header={rozieAttr(rowIsGrouped(row()) ? row().id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row()) ? row().id : null)} aria-expanded={(rowIsGrouped(row()) ? !!rowIsExpanded(row()) : null) ?? undefined} aria-level={rozieAttr(groupingActive() ? row().depth + 1 : null)} data-rozie-s-d5dcab4c="">
-          <Key each={visibleCellsFor(row()) as readonly any[]} by={(cell) => cell.id}>{(cell) => <td class={"rdt-td" + " " + rozieClass({ 'rdt-select-td': isSelectColumn(cell().column.id), 'rdt-expander-td': isExpanderColumn(cell().column.id), 'rdt-in-range': inRange(rowIndexOf(row()), colIndexOf(row(), cell())) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cell().column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row()))} data-col-index={rozieAttr(colIndexOf(row(), cell()))} tabIndex={rozieAttr(cellTabindex(String(rowIndexOf(row())), colIndexOf(row(), cell())))} style={parseInlineStyle(bodyCellStyle(row(), cell().column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row()), colIndexOf(row(), cell())))} data-in-range={rozieAttr(inRange(rowIndexOf(row()), colIndexOf(row(), cell())) ? 'true' : null)} data-agg-cell={rozieAttr(cellIsAggregated(cell()) ? cell().column.id : null)} data-rozie-s-d5dcab4c="">
+          <Key each={visibleCellsFor(row()) as readonly any[]} by={(cell) => cell.id}>{(cell) => <td class={"rdt-td" + " " + rozieClass({ 'rdt-select-td': isSelectColumn(cell().column.id), 'rdt-expander-td': isExpanderColumn(cell().column.id), 'rdt-in-range': inRange(rowIndexOf(row()), colIndexOf(row(), cell())), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row())), colIndexOf(row(), cell())) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cell().column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row()))} data-col-index={rozieAttr(colIndexOf(row(), cell()))} tabIndex={rozieAttr(cellTabindex(String(rowIndexOf(row())), colIndexOf(row(), cell())))} style={parseInlineStyle(bodyCellStyle(row(), cell().column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row()), colIndexOf(row(), cell())))} data-in-range={rozieAttr(inRange(rowIndexOf(row()), colIndexOf(row(), cell())) ? 'true' : null)} data-agg-cell={rozieAttr(cellIsAggregated(cell()) ? cell().column.id : null)} data-rozie-s-d5dcab4c="">
             
             {<Show when={isExpanderColumn(cell().column.id)} fallback={<Show when={isSelectColumn(cell().column.id)} fallback={<Show when={cellIsGrouped(cell())} fallback={<Show when={isEditing(rowIndexOf(row()), colIndexOf(row(), cell()))} fallback={<Show when={cellIsPlaceholder(cell())} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cell().column.id, column: cell().column, row: row().original, value: cell().getValue() }) ?? rozieDisplay(cell().getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={hasEditorSlot(cell().column.id)} fallback={<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onChange={($event: Event) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
+              {<Show when={hasEditorSlot(cell().column.id)} fallback={<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 <Key each={editorOptionsOf(cell().column.id) as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt().label)}</option>}</Key>
-              </select></Show>}><input type="number" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              </select></Show>}><input type="number" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 {(_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cell().column.id, column: cell().column, row: row().original, value: editorValueFor(cell().column.id), commit: editorCommitFor(cell().column.id), cancel: editorCancelFor() })}
               </span></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              <button type="button" data-expander="" aria-expanded={!!rowIsExpanded(row())} aria-label={rozieAttr(rowIsExpanded(row()) ? 'Collapse group' : 'Expand group')} class={"rdt-expander rdt-group-toggle"} onClick={($event: MouseEvent) => { onToggleExpand(row(), $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(row()) ? '▾' : '▸')}</button>
+              <button type="button" data-expander="" aria-expanded={!!rowIsExpanded(row())} aria-label={rozieAttr(rowIsExpanded(row()) ? 'Collapse group' : 'Expand group')} class={"rdt-expander rdt-group-toggle"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onToggleExpand(row(), $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(row()) ? '▾' : '▸')}</button>
               <span class={"rdt-group-value"} data-rozie-s-d5dcab4c="">
                 {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cell().column.id, column: cell().column, row: row().original, value: cell().getValue() }) ?? rozieDisplay(cell().getValue())}
               </span>
               <span class={"rdt-group-count"} data-rozie-s-d5dcab4c="">{rozieDisplay('(' + groupSubRowCount(row()) + ')')}</span>
             </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {(_props.selectCellSlot ?? _props.slots?.['selectCell'])?.({ row: row().original, checked: rowIsSelected(row()), toggle: e => onToggleRow(row(), e) }) ?? <input type="checkbox" aria-label="Select row" class={"rdt-select-row"} checked={rowIsSelected(row())} onChange={($event: Event) => { onToggleRow(row(), $event); }} data-rozie-s-d5dcab4c="" />}
+              {(_props.selectCellSlot ?? _props.slots?.['selectCell'])?.({ row: row().original, checked: rowIsSelected(row()), toggle: e => onToggleRow(row(), e) }) ?? <input type="checkbox" aria-label="Select row" class={"rdt-select-row"} checked={rowIsSelected(row())} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onToggleRow(row(), $event); }} data-rozie-s-d5dcab4c="" />}
             </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={rowCanExpand(row())}><button type="button" data-expander="" aria-expanded={!!rowIsExpanded(row())} aria-label={rozieAttr(rowIsExpanded(row()) ? 'Collapse row' : 'Expand row')} class={"rdt-expander"} onClick={($event: MouseEvent) => { onToggleExpand(row(), $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(row()) ? '▾' : '▸')}</button></Show>}</span></Show>}{<Show when={isFillHandleCell(rowIndexOf(row()), colIndexOf(row(), cell()))}><span data-fill-handle="" data-testid="fill-handle" aria-hidden="true" class={"rdt-fill-handle"} onPointerDown={($event: PointerEvent) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" /></Show>}</td>}</Key>
+              {<Show when={rowCanExpand(row())}><button type="button" data-expander="" aria-expanded={!!rowIsExpanded(row())} aria-label={rozieAttr(rowIsExpanded(row()) ? 'Collapse row' : 'Expand row')} class={"rdt-expander"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onToggleExpand(row(), $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(row()) ? '▾' : '▸')}</button></Show>}</span></Show>}{<Show when={isFillHandleCell(rowIndexOf(row()), colIndexOf(row(), cell()))}><span data-fill-handle="" data-testid="fill-handle" aria-hidden="true" class={"rdt-fill-handle"} onPointerDown={($event: PointerEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" /></Show>}</td>}</Key>
         </tr>
         
         {<Show when={rowShowsDetail(row())}><tr class={"rdt-detail-row"} role="row" data-detail-row={rozieAttr(row().id)} data-rozie-s-d5dcab4c="">
@@ -5512,16 +5642,16 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         </tr></Show>}</>}</Key>
       </tbody>
     </table>}><div class={"rdt-scroll"} style={parseInlineStyle(local.maxHeight ? 'max-height:' + local.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + local.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c="">
-    <table aria-rowcount={rows().length} class={"rozie-data-table" + " " + rozieClass({ 'rdt-sticky': local.stickyHeader })} role={rozieAttr(tableRole())} onKeyDown={($event: KeyboardEvent) => { onGridKeyDown($event); }} onFocusIn={($event: FocusEvent) => { syncActiveFromEvent($event); }} onFocusOut={($event: FocusEvent) => { onGridFocusOut($event); }} onMouseDown={($event: MouseEvent) => { onGridMouseDown($event); }} data-rozie-s-d5dcab4c="">
+    <table aria-rowcount={rows().length} class={"rozie-data-table" + " " + rozieClass({ 'rdt-sticky': local.stickyHeader })} role={rozieAttr(tableRole())} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridKeyDown($event); }} onFocusIn={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { syncActiveFromEvent($event); }} onFocusOut={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridFocusOut($event); }} onMouseDown={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridMouseDown($event); }} onDblClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridDblClick($event); }} onClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
       <thead class={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         <Key each={headerGroups() as readonly any[]} by={(hg) => hg.id}>{(hg, hgLevel) => <tr class={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
-          <Key each={hg().headers as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(header().column.id), 'rdt-expander-th': isExpanderColumn(header().column.id), 'rdt-th-resizing': columnIsResizing(header().column.id) })} role="columnheader" data-col={rozieAttr(header().column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(header().colSpan > 1 ? header().colSpan : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), header()))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), header()), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(header().column.id))} style={parseInlineStyle(thStyle(header().column.id))} data-rozie-s-d5dcab4c="">
+          <Key each={hg().headers as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(header().column.id), 'rdt-expander-th': isExpanderColumn(header().column.id), 'rdt-th-resizing': columnIsResizing(header().column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg(), header()), hgLevel()) })} role="columnheader" data-col={rozieAttr(header().column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(header().colSpan > 1 ? header().colSpan : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), header()))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), header()), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(header().column.id))} style={parseInlineStyle(thStyle(header().column.id))} data-rozie-s-d5dcab4c="">
             {<Show when={isSelectColumn(header().column.id)} fallback={<Show when={isExpanderColumn(header().column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={header().column.getCanSort && header().column.getCanSort()} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 <span class={"rdt-header-label"} data-rozie-s-d5dcab4c="">
                   {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? rozieDisplay(headerLabel(header().column.id))}
                 </span>
-              </span>}><button type="button" class={"rdt-sort-btn"} onClick={($event: MouseEvent) => { onHeaderSort(header().column.id, $event); }} data-rozie-s-d5dcab4c="">
+              </span>}><button type="button" class={"rdt-sort-btn"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onHeaderSort(header().column.id, $event); }} data-rozie-s-d5dcab4c="">
                 <span class={"rdt-header-label"} data-rozie-s-d5dcab4c="">
                   {(_props.colHeaderSlot ?? _props.slots?.['colHeader'])?.({ columnId: header().column.id, column: header().column, label: headerLabel(header().column.id) }) ?? rozieDisplay(headerLabel(header().column.id))}
                 </span>
@@ -5529,22 +5659,22 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
               </button></Show>}<Popover trigger="click" placement="bottom-end" strategy="fixed" offset={4} data-rozie-s-d5dcab4c="" anchorSlot={() => (<>
                   <button type="button" class={"rdt-col-menu-trigger"} aria-label={rozieAttr('Column options for ' + headerLabel(header().column.id))} data-rozie-s-d5dcab4c="">⋯</button>
                 </>)}><div class={"rdt-col-menu"} role="menu" data-rozie-s-d5dcab4c="">
-                  <button type="button" role="menuitem" aria-pressed={columnPinSide(header().column.id) === 'left'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent) => { onPinColumn(header().column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">Pin left</button>
-                  <button type="button" role="menuitem" aria-pressed={columnPinSide(header().column.id) === 'right'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent) => { onPinColumn(header().column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">Pin right</button>
-                  <button type="button" role="menuitem" aria-pressed={!columnPinSide(header().column.id)} class={"rdt-col-menu-item"} onClick={($event: MouseEvent) => { onPinColumn(header().column.id, false, $event); }} data-rozie-s-d5dcab4c="">Unpin</button>
+                  <button type="button" role="menuitem" aria-pressed={columnPinSide(header().column.id) === 'left'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(header().column.id, 'left', $event); }} data-rozie-s-d5dcab4c="">Pin left</button>
+                  <button type="button" role="menuitem" aria-pressed={columnPinSide(header().column.id) === 'right'} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(header().column.id, 'right', $event); }} data-rozie-s-d5dcab4c="">Pin right</button>
+                  <button type="button" role="menuitem" aria-pressed={!columnPinSide(header().column.id)} class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPinColumn(header().column.id, false, $event); }} data-rozie-s-d5dcab4c="">Unpin</button>
                   <hr class={"rdt-col-menu-sep"} data-rozie-s-d5dcab4c="" />
-                  <button type="button" role="menuitem" class={"rdt-col-menu-item"} onClick={($event: MouseEvent) => { onHideColumn(header().column.id, $event); }} data-rozie-s-d5dcab4c="">Hide column</button>
+                  <button type="button" role="menuitem" class={"rdt-col-menu-item"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onHideColumn(header().column.id, $event); }} data-rozie-s-d5dcab4c="">Hide column</button>
                 </div></Popover>
-              <button type="button" aria-label={rozieAttr('Resize ' + headerLabel(header().column.id))} class={"rdt-resize-handle"} onPointerDown={($event: PointerEvent) => { onResizeStart(header().column.id, $event); }} onTouchStart={($event: TouchEvent) => { onResizeStart(header().column.id, $event); }} data-rozie-s-d5dcab4c=""><span class={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
+              <button type="button" aria-label={rozieAttr('Resize ' + headerLabel(header().column.id))} class={"rdt-resize-handle"} onPointerDown={($event: PointerEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onResizeStart(header().column.id, $event); }} onTouchStart={($event: TouchEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onResizeStart(header().column.id, $event); }} data-rozie-s-d5dcab4c=""><span class={"rdt-resize-grip"} aria-hidden="true" data-rozie-s-d5dcab4c="" /></button>
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {(_props.selectAllSlot ?? _props.slots?.['selectAll'])?.({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) ?? <Show when={local.selectionMode === 'multiple'}><input type="checkbox" aria-label="Select all rows" class={"rdt-select-all"} checked={isAllRowsSelected()} onChange={($event: Event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" /></Show>}
+              {(_props.selectAllSlot ?? _props.slots?.['selectAll'])?.({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) ?? <Show when={local.selectionMode === 'multiple'}><input type="checkbox" aria-label="Select all rows" class={"rdt-select-all"} checked={isAllRowsSelected()} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" /></Show>}
             </span></Show>}</th>}</Key>
         </tr>}</Key>
         
         {<Show when={hasAnyFilterableColumn()}><tr class={"rdt-filter-row"} data-rozie-s-d5dcab4c="">
           <Key each={headerGroups()[headerGroups().length - 1].headers as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-filter-cell"} role="presentation" style={parseInlineStyle(pinStyle(header().column.id))} data-rozie-s-d5dcab4c="">
             {<Show when={isSelectColumn(header().column.id)} fallback={<Show when={isExpanderColumn(header().column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={columnIsFilterable(header().column.id) && !hasFilterSlot()}><input type="text" aria-label={rozieAttr('Filter ' + headerLabel(header().column.id))} class={"rdt-col-filter"} value={columnFilterValue(header().column.id)} onInput={($event: InputEvent) => { onColumnFilterInput(header().column.id, $event); }} onClick={($event: MouseEvent) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" /></Show>}{<Show when={columnIsFilterable(header().column.id)}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              {<Show when={columnIsFilterable(header().column.id) && !hasFilterSlot()}><input type="text" aria-label={rozieAttr('Filter ' + headerLabel(header().column.id))} class={"rdt-col-filter"} value={columnFilterValue(header().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onColumnFilterInput(header().column.id, $event); }} onClick={($event: MouseEvent & { currentTarget: HTMLInputElement; target: Element }) => { stopEvent($event); }} data-rozie-s-d5dcab4c="" /></Show>}{<Show when={columnIsFilterable(header().column.id)}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 {(_props.filterSlot ?? _props.slots?.['filter'])?.({ columnId: header().column.id, value: columnFilterValue(header().column.id), uniqueValues: getFacetedUniqueValues(header().column.id), minMax: getFacetedMinMaxValues(header().column.id), setFilter: setColumnFilter })}
               </span></Show>}</span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}</th>}</Key>
         </tr></Show>}</thead>
@@ -5557,25 +5687,25 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         
         <Key each={windowedRows() as readonly any[]} by={(wr) => wr.row.id}>{(wr) => <>
         <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-group-header': rowIsGrouped(wr().row), 'rdt-row-pinned': wr().pinned })} role="row" data-row={rozieAttr(wr().vi.index)} aria-rowindex={rozieAttr(wr().vi.index + 1)} data-index={rozieAttr(wr().vi.index)} data-pinned={rozieAttr(wr().pinned ? 'true' : null)} data-depth={rozieAttr(wr().row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr().row) ? wr().row.id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr().row) ? wr().row.id : null)} aria-expanded={(rowIsGrouped(wr().row) ? !!rowIsExpanded(wr().row) : null) ?? undefined} aria-level={rozieAttr(groupingActive() ? wr().row.depth + 1 : null)} data-rozie-s-d5dcab4c="">
-          <Key each={visibleCellsFor(wr().row) as readonly any[]} by={(cell) => cell.id}>{(cell) => <td class={"rdt-td" + " " + rozieClass({ 'rdt-select-td': isSelectColumn(cell().column.id), 'rdt-expander-td': isExpanderColumn(cell().column.id), 'rdt-in-range': inRange(wr().vi.index, colIndexOf(wr().row, cell())) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cell().column.id)} data-grid-cell="" data-row={rozieAttr(wr().vi.index)} data-col-index={rozieAttr(colIndexOf(wr().row, cell()))} tabIndex={rozieAttr(cellTabindex(String(wr().vi.index), colIndexOf(wr().row, cell())))} style={parseInlineStyle(bodyCellStyle(wr().row, cell().column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr().vi.index, colIndexOf(wr().row, cell())))} data-in-range={rozieAttr(inRange(wr().vi.index, colIndexOf(wr().row, cell())) ? 'true' : null)} data-agg-cell={rozieAttr(cellIsAggregated(cell()) ? cell().column.id : null)} data-rozie-s-d5dcab4c="">
+          <Key each={visibleCellsFor(wr().row) as readonly any[]} by={(cell) => cell.id}>{(cell) => <td class={"rdt-td" + " " + rozieClass({ 'rdt-select-td': isSelectColumn(cell().column.id), 'rdt-expander-td': isExpanderColumn(cell().column.id), 'rdt-in-range': inRange(wr().vi.index, colIndexOf(wr().row, cell())), 'rdt-cell-active': isActiveCell(String(wr().vi.index), colIndexOf(wr().row, cell())) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cell().column.id)} data-grid-cell="" data-row={rozieAttr(wr().vi.index)} data-col-index={rozieAttr(colIndexOf(wr().row, cell()))} tabIndex={rozieAttr(cellTabindex(String(wr().vi.index), colIndexOf(wr().row, cell())))} style={parseInlineStyle(bodyCellStyle(wr().row, cell().column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr().vi.index, colIndexOf(wr().row, cell())))} data-in-range={rozieAttr(inRange(wr().vi.index, colIndexOf(wr().row, cell())) ? 'true' : null)} data-agg-cell={rozieAttr(cellIsAggregated(cell()) ? cell().column.id : null)} data-rozie-s-d5dcab4c="">
             
             {<Show when={isExpanderColumn(cell().column.id)} fallback={<Show when={isSelectColumn(cell().column.id)} fallback={<Show when={cellIsGrouped(cell())} fallback={<Show when={isEditing(wr().vi.index, colIndexOf(wr().row, cell()))} fallback={<Show when={cellIsPlaceholder(cell())} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cell().column.id, column: cell().column, row: wr().row.original, value: cell().getValue() }) ?? rozieDisplay(cell().getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={hasEditorSlot(cell().column.id)} fallback={<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onChange={($event: Event) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
+              {<Show when={hasEditorSlot(cell().column.id)} fallback={<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<input type="text" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><input type="checkbox" data-editing-cell="" class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 <Key each={editorOptionsOf(cell().column.id) as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt().label)}</option>}</Key>
-              </select></Show>}><input type="number" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
+              </select></Show>}><input type="number" data-editing-cell="" class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
                 {(_props.editorSlot ?? _props.slots?.['editor'])?.({ columnId: cell().column.id, column: cell().column, row: wr().row.original, value: editorValueFor(cell().column.id), commit: editorCommitFor(cell().column.id), cancel: editorCancelFor() })}
               </span></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              <button type="button" data-expander="" aria-expanded={!!rowIsExpanded(wr().row)} aria-label={rozieAttr(rowIsExpanded(wr().row) ? 'Collapse group' : 'Expand group')} class={"rdt-expander rdt-group-toggle"} onClick={($event: MouseEvent) => { onToggleExpand(wr().row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr().row) ? '▾' : '▸')}</button>
+              <button type="button" data-expander="" aria-expanded={!!rowIsExpanded(wr().row)} aria-label={rozieAttr(rowIsExpanded(wr().row) ? 'Collapse group' : 'Expand group')} class={"rdt-expander rdt-group-toggle"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onToggleExpand(wr().row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr().row) ? '▾' : '▸')}</button>
               <span class={"rdt-group-value"} data-rozie-s-d5dcab4c="">
                 {(_props.cellSlot ?? _props.slots?.['cell'])?.({ columnId: cell().column.id, column: cell().column, row: wr().row.original, value: cell().getValue() }) ?? rozieDisplay(cell().getValue())}
               </span>
               <span class={"rdt-group-count"} data-rozie-s-d5dcab4c="">{rozieDisplay('(' + groupSubRowCount(wr().row) + ')')}</span>
             </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {(_props.selectCellSlot ?? _props.slots?.['selectCell'])?.({ row: wr().row.original, checked: rowIsSelected(wr().row), toggle: e => onToggleRow(wr().row, e) }) ?? <input type="checkbox" aria-label="Select row" class={"rdt-select-row"} checked={rowIsSelected(wr().row)} onChange={($event: Event) => { onToggleRow(wr().row, $event); }} data-rozie-s-d5dcab4c="" />}
+              {(_props.selectCellSlot ?? _props.slots?.['selectCell'])?.({ row: wr().row.original, checked: rowIsSelected(wr().row), toggle: e => onToggleRow(wr().row, e) }) ?? <input type="checkbox" aria-label="Select row" class={"rdt-select-row"} checked={rowIsSelected(wr().row)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onToggleRow(wr().row, $event); }} data-rozie-s-d5dcab4c="" />}
             </span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-              {<Show when={rowCanExpand(wr().row)}><button type="button" data-expander="" aria-expanded={!!rowIsExpanded(wr().row)} aria-label={rozieAttr(rowIsExpanded(wr().row) ? 'Collapse row' : 'Expand row')} class={"rdt-expander"} onClick={($event: MouseEvent) => { onToggleExpand(wr().row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr().row) ? '▾' : '▸')}</button></Show>}</span></Show>}{<Show when={isFillHandleCell(wr().vi.index, colIndexOf(wr().row, cell()))}><span data-fill-handle="" data-testid="fill-handle" aria-hidden="true" class={"rdt-fill-handle"} onPointerDown={($event: PointerEvent) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" /></Show>}</td>}</Key>
+              {<Show when={rowCanExpand(wr().row)}><button type="button" data-expander="" aria-expanded={!!rowIsExpanded(wr().row)} aria-label={rozieAttr(rowIsExpanded(wr().row) ? 'Collapse row' : 'Expand row')} class={"rdt-expander"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onToggleExpand(wr().row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr().row) ? '▾' : '▸')}</button></Show>}</span></Show>}{<Show when={isFillHandleCell(wr().vi.index, colIndexOf(wr().row, cell()))}><span data-fill-handle="" data-testid="fill-handle" aria-hidden="true" class={"rdt-fill-handle"} onPointerDown={($event: PointerEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" /></Show>}</td>}</Key>
         </tr>
         
         {<Show when={rowShowsDetail(wr().row)}><tr class={"rdt-detail-row"} role="row" data-detail-row={rozieAttr(wr().row.id)} data-rozie-s-d5dcab4c="">
@@ -5590,12 +5720,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       </tbody>
     </table>
     </div></Show>}{<Show when={!local.virtual}><div class={"rdt-pagination"} role="group" aria-label="Pagination" data-rozie-s-d5dcab4c="">
-      <button type="button" class={"rdt-page-btn rdt-page-prev"} disabled={!canPrevPage()} onClick={($event: MouseEvent) => { onPrevPage(); }} data-rozie-s-d5dcab4c="">Prev</button>
+      <button type="button" class={"rdt-page-btn rdt-page-prev"} disabled={!canPrevPage()} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onPrevPage(); }} data-rozie-s-d5dcab4c="">Prev</button>
       <span class={"rdt-page-status"} aria-live="polite" data-rozie-s-d5dcab4c="">
         {rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount())}
       </span>
-      <button type="button" class={"rdt-page-btn rdt-page-next"} disabled={!canNextPage()} onClick={($event: MouseEvent) => { onNextPage(); }} data-rozie-s-d5dcab4c="">Next</button>
-      <select aria-label="Rows per page" class={"rdt-page-size"} value={pageSize()} onChange={($event: Event) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c="">
+      <button type="button" class={"rdt-page-btn rdt-page-next"} disabled={!canNextPage()} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onNextPage(); }} data-rozie-s-d5dcab4c="">Next</button>
+      <select aria-label="Rows per page" class={"rdt-page-size"} value={pageSize()} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c="">
         <option value={10} data-rozie-s-d5dcab4c="">10</option>
         <option value={25} data-rozie-s-d5dcab4c="">25</option>
         <option value={50} data-rozie-s-d5dcab4c="">50</option>

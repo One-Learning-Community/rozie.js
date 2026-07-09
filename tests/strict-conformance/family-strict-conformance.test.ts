@@ -202,7 +202,11 @@ const FAMILIES: FamilySpec[] = [
       'DataTable.tsx': {
         TS7023: 1,
         TS7022: 1,
-        TS2345: 9,
+        // 9 → 11 (260708-ni6, grid pointer §1): the two new `isActiveCell(...)` header
+        // calls mirror `cellTabindex`'s existing `level = null` param shape (a `number`
+        // hgLevel passed to a param TS narrows to `null`) — the identical inherent
+        // strict-null residual already recorded for cellTabindex's header calls.
+        TS2345: 11,
         TS7053: 4,
         TS2379: 1,
         TS7006: 12,
@@ -219,7 +223,9 @@ const FAMILIES: FamilySpec[] = [
     leaf: 'packages/ui/data-table/packages/solid',
     baseline: {
       'DataTable.tsx': {
-        TS2345: 11,
+        // 11 → 13 (260708-ni6, grid pointer §1): the two new `isActiveCell(...)` header
+        // calls mirror `cellTabindex`'s existing `level = null` inherent strict-null shape.
+        TS2345: 13,
         TS2379: 1,
         TS7023: 1,
         TS7022: 1,
@@ -247,7 +253,9 @@ const FAMILIES: FamilySpec[] = [
       'DataTable.ts': {
         TS2322: 1,
         TS2379: 1,
-        TS2345: 9,
+        // 9 → 11 (260708-ni6, grid pointer §1): the two new `isActiveCell(...)` header
+        // calls mirror `cellTabindex`'s existing `level = null` inherent strict-null shape.
+        TS2345: 11,
         TS7006: 2,
         TS7024: 1,
         TS7022: 1,
