@@ -517,21 +517,74 @@ let programmatic = 0;
 // a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array
 // REFERENCES (never deep copies — see undoHistory.rzts's header comment on the shared-row
 // invariant). restoringHistory suppresses re-recording while an undo()/redo() replay is
-// in flight. lastWrittenData is the external-swap reference latch: every internal writeback
-// (incl. a replay) sets it, so reFeed() can detect "this data reference was NOT written by
-// us" == an external dataset swap → clearHistory().
+// in flight.
+//
+// dataWriteSettling is the external-swap latch — a BOOLEAN flag reset on a DEFERRED
+// `requestAnimationFrame`, not synchronously inside reFeed and not via reference/content
+// comparison. THREE failure modes were tried and rejected first:
+//   1. A raw-reference latch (`lastWrittenData === currentData()`) — proved UNRELIABLE
+//      cross-framework: Vue's `reactive()` / Svelte 5 runes' `$state` / Solid's store
+//      wrapping all re-wrap a written array in a NEW Proxy on its way back down through
+//      props, so the prop read is never `===` the raw array we just wrote (only React
+//      `useState` and Angular signals preserve raw reference identity through a model
+//      round-trip).
+//   2. A single-consume boolean flag (`true` before a write, reset to `false` the FIRST time
+//      reFeed observes it) — proved unreliable on EVERY target: the re-feed `$watch` can fire
+//      MULTIPLE times as a single logical write settles, so the flag was already consumed by
+//      the first (correct) reFeed pass, and the second/third redundant pass wrongly read it as
+//      `false` and cleared history that was never actually externally swapped.
+//   3. A content-signature comparison (`JSON.stringify(currentData()) === lastWrittenSignature`,
+//      re-checked idempotently on every reFeed call instead of consumed once) — fixed #1 and
+//      #2's failure modes, but surfaced a THIRD one on Solid/Lit's fine-grained settling: the
+//      re-feed watch can fire ONE OR MORE TIMES with a TRANSIENTLY STALE `currentData()` read
+//      (mid-settle, before that target's own reactivity has propagated the just-written value
+//      all the way to the bound prop) — a real value, just not yet the NEW one — so the
+//      signature genuinely mismatched even though nothing external happened.
+// A boolean flag that stays `true` for an entire DEFERRED settling window (reset via `rAF`,
+// not by reFeed consuming it) tolerates all three: it survives proxy-wrapping (it is not a
+// value comparison at all), it survives an arbitrary NUMBER of redundant/transiently-stale
+// reFeed passes (every one of them sees `true` until the window closes), and a GENUINE external
+// swap — which happens outside any known internal write's settling window — still finds it
+// `false` and correctly clears history.
 // ── Grid-wide undo/redo (260709-8ct) — history STATE lives in top-level `let` (mirroring
 // `programmatic` above), NOT $data: recording a snapshot on every keystroke must not trigger
 // a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array
 // REFERENCES (never deep copies — see undoHistory.rzts's header comment on the shared-row
 // invariant). restoringHistory suppresses re-recording while an undo()/redo() replay is
-// in flight. lastWrittenData is the external-swap reference latch: every internal writeback
-// (incl. a replay) sets it, so reFeed() can detect "this data reference was NOT written by
-// us" == an external dataset swap → clearHistory().
-let undoStack = [];
-let redoStack = [];
-let restoringHistory = false;
-let lastWrittenData: any = null;
+// in flight.
+//
+// dataWriteSettling is the external-swap latch — a BOOLEAN flag reset on a DEFERRED
+// `requestAnimationFrame`, not synchronously inside reFeed and not via reference/content
+// comparison. THREE failure modes were tried and rejected first:
+//   1. A raw-reference latch (`lastWrittenData === currentData()`) — proved UNRELIABLE
+//      cross-framework: Vue's `reactive()` / Svelte 5 runes' `$state` / Solid's store
+//      wrapping all re-wrap a written array in a NEW Proxy on its way back down through
+//      props, so the prop read is never `===` the raw array we just wrote (only React
+//      `useState` and Angular signals preserve raw reference identity through a model
+//      round-trip).
+//   2. A single-consume boolean flag (`true` before a write, reset to `false` the FIRST time
+//      reFeed observes it) — proved unreliable on EVERY target: the re-feed `$watch` can fire
+//      MULTIPLE times as a single logical write settles, so the flag was already consumed by
+//      the first (correct) reFeed pass, and the second/third redundant pass wrongly read it as
+//      `false` and cleared history that was never actually externally swapped.
+//   3. A content-signature comparison (`JSON.stringify(currentData()) === lastWrittenSignature`,
+//      re-checked idempotently on every reFeed call instead of consumed once) — fixed #1 and
+//      #2's failure modes, but surfaced a THIRD one on Solid/Lit's fine-grained settling: the
+//      re-feed watch can fire ONE OR MORE TIMES with a TRANSIENTLY STALE `currentData()` read
+//      (mid-settle, before that target's own reactivity has propagated the just-written value
+//      all the way to the bound prop) — a real value, just not yet the NEW one — so the
+//      signature genuinely mismatched even though nothing external happened.
+// A boolean flag that stays `true` for an entire DEFERRED settling window (reset via `rAF`,
+// not by reFeed consuming it) tolerates all three: it survives proxy-wrapping (it is not a
+// value comparison at all), it survives an arbitrary NUMBER of redundant/transiently-stale
+// reFeed passes (every one of them sees `true` until the window closes), and a GENUINE external
+// swap — which happens outside any known internal write's settling window — still finds it
+// `false` and correctly clears history.
+let undoStack: unknown[] = [];
+let redoStack: unknown[] = [];
+let restoringHistory: boolean = false;
+let dataWriteSettling: boolean = false;
+let dataWriteSettleHandle: number | null = null;
 
 // Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
 // has not bound `expanded` and has not yet toggled any group, group-header rows default to
@@ -1134,10 +1187,16 @@ const writeColumnPinning = (next: any) => {
 // re-feed watch; without the guard the replay would re-record itself and corrupt the
 // stack). `emitHistoryChangeIfEdged` fires `history-change` only when canUndo/canRedo
 // availability actually flipped (a long streak of edits that doesn't change availability
-// must not spam consumers). `lastWrittenData` ALWAYS latches to `next` — undoable or not —
-// it is the external-swap reference latch DataTable.rozie's reFeed() reads; every internal
-// writeback (incl. an undo/redo replay) sets it, so any array we did NOT write here is, by
-// definition, an external dataset swap.
+// must not spam consumers). `dataWriteSettling` ALWAYS arms — undoable or not — it is the
+// external-swap DEFERRED-RESET flag DataTable.rozie's reFeed() reads (NOT a reference/content
+// check — see `let dataWriteSettling`'s declaration comment in DataTable.rozie for why a raw
+// reference latch AND a single-consume boolean AND an idempotent content-signature compare
+// were all rejected); every internal writeback (incl. an undo/redo replay) arms it, so reFeed()
+// finding it already closed (`false`) means an external swap. A double-rAF nesting (not a
+// single frame) gives every target's fine-grained reactivity settling cascade room to finish
+// BEFORE the window closes, however many redundant reFeed passes it takes; re-arming a
+// still-pending prior reset (`cancelAnimationFrame`) keeps back-to-back rapid edits from
+// closing the window between them.
 // ── data slice: STATIC-KEY fresh-array echo-guarded write funnel (Phase 51 req-4) ──
 // A committed cell/row edit (or paste/fill in a later wave) replaces ONE row object in
 // a FRESH array and funnels it here. Writes the uncontrolled default + the two-way
@@ -1154,10 +1213,16 @@ const writeColumnPinning = (next: any) => {
 // re-feed watch; without the guard the replay would re-record itself and corrupt the
 // stack). `emitHistoryChangeIfEdged` fires `history-change` only when canUndo/canRedo
 // availability actually flipped (a long streak of edits that doesn't change availability
-// must not spam consumers). `lastWrittenData` ALWAYS latches to `next` — undoable or not —
-// it is the external-swap reference latch DataTable.rozie's reFeed() reads; every internal
-// writeback (incl. an undo/redo replay) sets it, so any array we did NOT write here is, by
-// definition, an external dataset swap.
+// must not spam consumers). `dataWriteSettling` ALWAYS arms — undoable or not — it is the
+// external-swap DEFERRED-RESET flag DataTable.rozie's reFeed() reads (NOT a reference/content
+// check — see `let dataWriteSettling`'s declaration comment in DataTable.rozie for why a raw
+// reference latch AND a single-consume boolean AND an idempotent content-signature compare
+// were all rejected); every internal writeback (incl. an undo/redo replay) arms it, so reFeed()
+// finding it already closed (`false`) means an external swap. A double-rAF nesting (not a
+// single frame) gives every target's fine-grained reactivity settling cascade room to finish
+// BEFORE the window closes, however many redundant reFeed passes it takes; re-arming a
+// still-pending prior reset (`cancelAnimationFrame`) keeps back-to-back rapid edits from
+// closing the window between them.
 const writeData = (next: any) => {
   if (programmatic) return;
   if (props.undoable && !restoringHistory) {
@@ -1166,7 +1231,19 @@ const writeData = (next: any) => {
     recordSnapshot(currentData());
     emitHistoryChangeIfEdged(prevU, prevR);
   }
-  lastWrittenData = next;
+  dataWriteSettling = true;
+  if (dataWriteSettleHandle != null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(dataWriteSettleHandle);
+  const closeSettleWindow = () => {
+    dataWriteSettling = false;
+    dataWriteSettleHandle = null;
+  };
+  if (typeof requestAnimationFrame === 'function') {
+    dataWriteSettleHandle = requestAnimationFrame(() => {
+      requestAnimationFrame(closeSettleWindow);
+    });
+  } else {
+    setTimeout(closeSettleWindow, 32);
+  }
   programmatic++;
   dataDefault.value = next; // fresh array only (never in-place)
   data.value = next; // two-way emit if bound (no-op-diff if not)
@@ -1206,7 +1283,7 @@ const setColumnFilter = (colId: any, value: any) => {
 // Per the approved design (docs/superpowers/specs/2026-07-09-data-table-undo-history-design.md,
 // decisions 1-6, LOCKED). A pure, unit-testable buffer over the FOUR history lets declared
 // top-level in DataTable.rozie beside `let programmatic = 0` (undoStack/redoStack/
-// restoringHistory/lastWrittenData — NOT $data, so recording an edit causes no reactive
+// restoringHistory/dataWriteSettling — NOT $data, so recording an edit causes no reactive
 // re-render churn on every keystroke). This module holds the FUNCTIONS only; it references
 // those component-scope lets + `$props`, `$emit`, `writeData`, `currentData` BARE (by name,
 // zero ES imports) — the SAME inlined-partial pattern writeFunnels.rzts uses for
@@ -1226,7 +1303,7 @@ const setColumnFilter = (colId: any, value: any) => {
 // Per the approved design (docs/superpowers/specs/2026-07-09-data-table-undo-history-design.md,
 // decisions 1-6, LOCKED). A pure, unit-testable buffer over the FOUR history lets declared
 // top-level in DataTable.rozie beside `let programmatic = 0` (undoStack/redoStack/
-// restoringHistory/lastWrittenData — NOT $data, so recording an edit causes no reactive
+// restoringHistory/dataWriteSettling — NOT $data, so recording an edit causes no reactive
 // re-render churn on every keystroke). This module holds the FUNCTIONS only; it references
 // those component-scope lets + `$props`, `$emit`, `writeData`, `currentData` BARE (by name,
 // zero ES imports) — the SAME inlined-partial pattern writeFunnels.rzts uses for
@@ -1843,13 +1920,19 @@ const rowIsOutsideWindow = (r: any) => {
 // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
 const reFeed = () => {
   if (!table) return;
-  // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl.
-  // an undo()/redo() replay) sets `lastWrittenData` inside writeData. reFeed() fires on
-  // EVERY data-ref change — internal writeback and an external swap (new dataset, server
-  // refetch) look identical here, so a data reference we did NOT write is, by definition,
-  // an external swap → clear history (undoing across a dataset boundary is incoherent).
-  // undoable-gated so a shipped grid with undoable unset never pays this check.
-  if (props.undoable && currentData() !== lastWrittenData) clearHistory();
+  // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl. an
+  // undo()/redo() replay) sets `dataWriteSettling = true` inside writeData and arms a deferred
+  // `rAF` reset. reFeed() fires on EVERY data-ref change — internal writeback and an external
+  // swap (new dataset, server refetch) look identical here — so read the flag: while `true`
+  // (we are still inside a just-triggered write's settling window) skip the clear, no matter
+  // how many redundant/transiently-stale reFeed passes fire during that window; once the
+  // window closes (the flag is back to `false`) a data change reaching reFeed is, by
+  // definition, one WE did not cause → an external swap → clear history (undoing across a
+  // dataset boundary is incoherent). See `let dataWriteSettling`'s declaration comment for the
+  // three rejected alternatives (a raw reference latch, a single-consume flag, and an
+  // idempotent content-signature compare — each broken by a different target's reactivity
+  // timing). undoable-gated so a shipped grid with undoable unset never pays this check.
+  if (props.undoable && !dataWriteSettling) clearHistory();
   table.setOptions((prev: any) => ({
     ...prev,
     data: currentData(),

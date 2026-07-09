@@ -181,10 +181,16 @@ const writeColumnPinning = (next) => {
 // re-feed watch; without the guard the replay would re-record itself and corrupt the
 // stack). `emitHistoryChangeIfEdged` fires `history-change` only when canUndo/canRedo
 // availability actually flipped (a long streak of edits that doesn't change availability
-// must not spam consumers). `lastWrittenData` ALWAYS latches to `next` — undoable or not —
-// it is the external-swap reference latch DataTable.rozie's reFeed() reads; every internal
-// writeback (incl. an undo/redo replay) sets it, so any array we did NOT write here is, by
-// definition, an external dataset swap.
+// must not spam consumers). `dataWriteSettling` ALWAYS arms — undoable or not — it is the
+// external-swap DEFERRED-RESET flag DataTable.rozie's reFeed() reads (NOT a reference/content
+// check — see `let dataWriteSettling`'s declaration comment in DataTable.rozie for why a raw
+// reference latch AND a single-consume boolean AND an idempotent content-signature compare
+// were all rejected); every internal writeback (incl. an undo/redo replay) arms it, so reFeed()
+// finding it already closed (`false`) means an external swap. A double-rAF nesting (not a
+// single frame) gives every target's fine-grained reactivity settling cascade room to finish
+// BEFORE the window closes, however many redundant reFeed passes it takes; re-arming a
+// still-pending prior reset (`cancelAnimationFrame`) keeps back-to-back rapid edits from
+// closing the window between them.
 const writeData = (next) => {
   if (programmatic) return
   if ($props.undoable && !restoringHistory) {
@@ -193,7 +199,14 @@ const writeData = (next) => {
     recordSnapshot(currentData())
     emitHistoryChangeIfEdged(prevU, prevR)
   }
-  lastWrittenData = next
+  dataWriteSettling = true
+  if (dataWriteSettleHandle != null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(dataWriteSettleHandle)
+  const closeSettleWindow = () => { dataWriteSettling = false; dataWriteSettleHandle = null }
+  if (typeof requestAnimationFrame === 'function') {
+    dataWriteSettleHandle = requestAnimationFrame(() => { requestAnimationFrame(closeSettleWindow) })
+  } else {
+    setTimeout(closeSettleWindow, 32)
+  }
   programmatic++
   $data.dataDefault = next   // fresh array only (never in-place)
   $model.data = next          // two-way emit if bound (no-op-diff if not)

@@ -288,12 +288,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const rangeDragging = useRef(false);
   const lastData = useRef<any>(null);
   const lastDataLen = useRef(-1);
-  const lastWrittenData = useRef<any>(null);
-  const undoStack = useRef([]);
-  const redoStack = useRef([]);
+  const dataWriteSettling = useRef<boolean>(false);
+  const undoStack = useRef<unknown[]>([]);
+  const redoStack = useRef<unknown[]>([]);
   const committedThisSession = useRef(false);
   const editTransition = useRef(false);
-  const restoringHistory = useRef(false);
+  const restoringHistory = useRef<boolean>(false);
+  const dataWriteSettleHandle = useRef<number | null>(null);
   const [data, setData] = useControllableState({
     value: props.data,
     defaultValue: props.defaultData ?? [],
@@ -784,7 +785,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       recordSnapshot(currentData());
       emitHistoryChangeIfEdged(prevU, prevR);
     }
-    lastWrittenData.current = next;
+    dataWriteSettling.current = true;
+    if (dataWriteSettleHandle.current != null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(dataWriteSettleHandle.current);
+    const closeSettleWindow = () => {
+      dataWriteSettling.current = false;
+      dataWriteSettleHandle.current = null;
+    };
+    if (typeof requestAnimationFrame === 'function') {
+      dataWriteSettleHandle.current = requestAnimationFrame(() => {
+        requestAnimationFrame(closeSettleWindow);
+      });
+    } else {
+      setTimeout(closeSettleWindow, 32);
+    }
     programmatic.current++;
     setDataDefault(next); // fresh array only (never in-place)
     setData(next); // two-way emit if bound (no-op-diff if not)
@@ -1101,13 +1114,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   const reFeed = useCallback(() => {
     if (!table.current) return;
-    // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl.
-    // an undo()/redo() replay) sets `lastWrittenData` inside writeData. reFeed() fires on
-    // EVERY data-ref change — internal writeback and an external swap (new dataset, server
-    // refetch) look identical here, so a data reference we did NOT write is, by definition,
-    // an external swap → clear history (undoing across a dataset boundary is incoherent).
-    // undoable-gated so a shipped grid with undoable unset never pays this check.
-    if (props.undoable && currentData() !== lastWrittenData.current) clearHistory();
+    // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl. an
+    // undo()/redo() replay) sets `dataWriteSettling = true` inside writeData and arms a deferred
+    // `rAF` reset. reFeed() fires on EVERY data-ref change — internal writeback and an external
+    // swap (new dataset, server refetch) look identical here — so read the flag: while `true`
+    // (we are still inside a just-triggered write's settling window) skip the clear, no matter
+    // how many redundant/transiently-stale reFeed passes fire during that window; once the
+    // window closes (the flag is back to `false`) a data change reaching reFeed is, by
+    // definition, one WE did not cause → an external swap → clear history (undoing across a
+    // dataset boundary is incoherent). See `let dataWriteSettling`'s declaration comment for the
+    // three rejected alternatives (a raw reference latch, a single-consume flag, and an
+    // idempotent content-signature compare — each broken by a different target's reactivity
+    // timing). undoable-gated so a shipped grid with undoable unset never pays this check.
+    if (props.undoable && !dataWriteSettling.current) clearHistory();
     table.current.setOptions((prev: any) => ({
       ...prev,
       data: currentData(),

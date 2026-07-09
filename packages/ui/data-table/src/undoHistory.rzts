@@ -2,7 +2,7 @@
 // Per the approved design (docs/superpowers/specs/2026-07-09-data-table-undo-history-design.md,
 // decisions 1-6, LOCKED). A pure, unit-testable buffer over the FOUR history lets declared
 // top-level in DataTable.rozie beside `let programmatic = 0` (undoStack/redoStack/
-// restoringHistory/lastWrittenData — NOT $data, so recording an edit causes no reactive
+// restoringHistory/dataWriteSettling — NOT $data, so recording an edit causes no reactive
 // re-render churn on every keystroke). This module holds the FUNCTIONS only; it references
 // those component-scope lets + `$props`, `$emit`, `writeData`, `currentData` BARE (by name,
 // zero ES imports) — the SAME inlined-partial pattern writeFunnels.rzts uses for

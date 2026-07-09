@@ -142,7 +142,7 @@ const swapData = (): void => {
     <DataTable
       ref="dt"
       interactionMode="grid"
-      undoable
+      :undoable="true"
       :undoLimit="2"
       r-model:data="$data.rows"
       @history-change="onHistoryChange($event)"

@@ -1286,13 +1286,15 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   programmatic = 0;
 
-  undoStack = [];
+  undoStack: unknown[] = [];
 
-  redoStack = [];
+  redoStack: unknown[] = [];
 
-  restoringHistory = false;
+  restoringHistory: boolean = false;
 
-  lastWrittenData: any = null;
+  dataWriteSettling: boolean = false;
+
+  dataWriteSettleHandle: number | null = null;
 
   expandedTouched = false;
 
@@ -1694,7 +1696,19 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this.recordSnapshot(this.currentData());
     this.emitHistoryChangeIfEdged(prevU, prevR);
   }
-  this.lastWrittenData = next;
+  this.dataWriteSettling = true;
+  if (this.dataWriteSettleHandle != null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.dataWriteSettleHandle);
+  const closeSettleWindow = () => {
+    this.dataWriteSettling = false;
+    this.dataWriteSettleHandle = null;
+  };
+  if (typeof requestAnimationFrame === 'function') {
+    this.dataWriteSettleHandle = requestAnimationFrame(() => {
+      requestAnimationFrame(closeSettleWindow);
+    });
+  } else {
+    setTimeout(closeSettleWindow, 32);
+  }
   this.programmatic++;
   this._dataDefault.value = next; // fresh array only (never in-place)
   this._dataControllable.write(next); // two-way emit if bound (no-op-diff if not)
@@ -2047,13 +2061,19 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   reFeed = () => {
   if (!this.table) return;
-  // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl.
-  // an undo()/redo() replay) sets `lastWrittenData` inside writeData. reFeed() fires on
-  // EVERY data-ref change — internal writeback and an external swap (new dataset, server
-  // refetch) look identical here, so a data reference we did NOT write is, by definition,
-  // an external swap → clear history (undoing across a dataset boundary is incoherent).
-  // undoable-gated so a shipped grid with undoable unset never pays this check.
-  if (this.undoable && this.currentData() !== this.lastWrittenData) this.clearHistory();
+  // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl. an
+  // undo()/redo() replay) sets `dataWriteSettling = true` inside writeData and arms a deferred
+  // `rAF` reset. reFeed() fires on EVERY data-ref change — internal writeback and an external
+  // swap (new dataset, server refetch) look identical here — so read the flag: while `true`
+  // (we are still inside a just-triggered write's settling window) skip the clear, no matter
+  // how many redundant/transiently-stale reFeed passes fire during that window; once the
+  // window closes (the flag is back to `false`) a data change reaching reFeed is, by
+  // definition, one WE did not cause → an external swap → clear history (undoing across a
+  // dataset boundary is incoherent). See `let dataWriteSettling`'s declaration comment for the
+  // three rejected alternatives (a raw reference latch, a single-consume flag, and an
+  // idempotent content-signature compare — each broken by a different target's reactivity
+  // timing). undoable-gated so a shipped grid with undoable unset never pays this check.
+  if (this.undoable && !this.dataWriteSettling) this.clearHistory();
   this.table.setOptions((prev: any) => ({
     ...prev,
     data: this.currentData(),
