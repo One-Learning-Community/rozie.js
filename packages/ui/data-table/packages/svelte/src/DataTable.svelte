@@ -1095,14 +1095,14 @@ const recordSnapshot = (current: any) => {
   while (undoStack.length > limit) undoStack.shift();
   redoStack = [];
 };
-const canUndo = () => undoStack.length > 0;
-const canRedo = () => redoStack.length > 0;
+export const canUndo = () => undoStack.length > 0;
+export const canRedo = () => redoStack.length > 0;
 
 // Both stacks empty — the external-swap latch (DataTable.rozie reFeed) and the
 // clearHistory() $expose verb share this single implementation.
 // Both stacks empty — the external-swap latch (DataTable.rozie reFeed) and the
 // clearHistory() $expose verb share this single implementation.
-const clearHistory = () => {
+export const clearHistory = () => {
   undoStack = [];
   redoStack = [];
 };
@@ -1148,7 +1148,7 @@ const emitHistoryChangeIfEdged = (prevU: any, prevR: any) => {
 // re-capture this replay (which would corrupt the stack). Replaying through writeData
 // (rather than writing $data/$model directly) is deliberate: the two-way $model.data
 // writeback, the re-feed $watch, and the echo guard all keep working with zero new code.
-const undo = () => {
+export const undo = () => {
   if (!canUndo()) return;
   const prev = undoStack.pop();
   redoStack.push(currentData());
@@ -1162,7 +1162,7 @@ const undo = () => {
 // replay through the same guarded writeData seam.
 // redo(): symmetric — pop the redo stack, push the CURRENT data back onto the undo stack,
 // replay through the same guarded writeData seam.
-const redo = () => {
+export const redo = () => {
   if (!canRedo()) return;
   const next = redoStack.pop();
   undoStack.push(currentData());
@@ -2549,6 +2549,13 @@ export const getRowIndexRelativeToPage = (absRow: any) => {
 // inherited Lit DOM method named `cut` (ROZ121/124/137 clear) — `cut` is not on HTMLElement.
 export const cut = () => cutRange();
 
+// 260709-8ct (grid-wide undo/redo): NO pass-through wrapper lands here for
+// undo/redo/canUndo/canRedo/clearHistory. Unlike `cut` above (which delegates to a
+// differently-named clipboardFill export, `cutRange`), the undoHistory.rzts exports already
+// use the exact public verb names and are already component-scope (imported directly into
+// DataTable.rozie) — so DataTable.rozie's $expose references them BY NAME with zero
+// indirection. This file stays the seam for verbs that need a rename/adapter, not a mandatory
+// stop for every $expose entry.
 // ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
 // This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
 // the active-cell index-pair state, the data-* cell markers, and the SINGLE
@@ -3347,12 +3354,40 @@ const onGridKeyDown = (e: any) => {
     cutRange();
     return;
   }
+  // ── 260709-8ct (grid-wide undo/redo) — Ctrl/Cmd+Z undoes; Ctrl/Cmd+Y OR Ctrl/Cmd+Shift+Z
+  // redoes. Undoable-gated (`$props.undoable`) — when off, neither preventDefault nor
+  // undo()/redo() runs, so a shipped grid with undoable unset is byte-behaviorally unchanged
+  // (the browser's own native undo/redo, if any, still fires). NOT clipboardActiveAllowed-
+  // gated (unlike Ctrl+C/V/X/Delete above): undo/redo is GRID-WIDE and must work regardless of
+  // whether a header or body cell is active. Tested the Ctrl+Shift+Z (redo) combo BEFORE the
+  // plain Ctrl+Z (undo) branch so a Shift+Z never falls into undo.
+  else if ((key === 'z' || key === 'Z') && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+    if (undoable) {
+      e.preventDefault();
+      redo();
+      return;
+    }
+  } else if ((key === 'y' || key === 'Y') && (e.ctrlKey || e.metaKey)) {
+    if (undoable) {
+      e.preventDefault();
+      redo();
+      return;
+    }
+  } else if ((key === 'z' || key === 'Z') && (e.ctrlKey || e.metaKey)) {
+    if (undoable) {
+      e.preventDefault();
+      undo();
+      return;
+    }
+  }
   // ── §7 (260709-3qt) — Delete/Backspace CLEARS the active cell / range through the SAME
   // write-funnel as Cut (applyGridToRange of an empty grid), MINUS the clipboard copy. B11-gated
   // by clipboardActiveAllowed so a header-active Delete/Backspace falls through to NATIVE behavior
   // (never a silent body mutation). The top-of-handler editing early-returns + the line-39
   // data-grid-cell guard keep this to navigation mode; applyGridToRange skips read-only/non-editable
-  // cells. NO undo (the controlled-grid consumer owns it — the Cut/Paste/Fill contract). ──
+  // cells. Reversible via Ctrl+Z when `undoable` is on (260709-8ct) — clearActiveRange funnels
+  // through the SAME writeData seam undo/redo replay through, so no separate inverse machinery
+  // is needed here.
   else if ((key === 'Delete' || key === 'Backspace') && clipboardActiveAllowed()) {
     e.preventDefault();
     clearActiveRange();

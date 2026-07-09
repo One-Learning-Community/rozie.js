@@ -201,6 +201,11 @@ export interface DataTableHandle {
   editRow: (...args: any[]) => any;
   getSelectedRange: (...args: any[]) => any;
   cut: (...args: any[]) => any;
+  undo: (...args: any[]) => any;
+  redo: (...args: any[]) => any;
+  canUndo: (...args: any[]) => any;
+  canRedo: (...args: any[]) => any;
+  clearHistory: (...args: any[]) => any;
 }
 
 declare const DataTable: React.ForwardRefExoticComponent<DataTableProps & React.RefAttributes<DataTableHandle>>;

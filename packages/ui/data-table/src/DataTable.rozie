@@ -1321,6 +1321,16 @@ $expose({
   editRow,
   getSelectedRange,
   cut,
+  // 260709-8ct: undo/redo/canUndo/canRedo/clearHistory are already component-scope PRE-
+  // DECLARED consts via the undoHistory.rzts import above — referenced BY NAME directly,
+  // WITHOUT a pass-through wrapper in exposeStateVerbs.rzts (unlike `cut`, which delegates to
+  // clipboardFill's differently-named `cutRange`): no rename/indirection is needed since these
+  // five names are already collision-safe (ROZ121/124/137) and match the public verb name.
+  undo,
+  redo,
+  canUndo,
+  canRedo,
+  clearHistory,
 })
 </script>
 

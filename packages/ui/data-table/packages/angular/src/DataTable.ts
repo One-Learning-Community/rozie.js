@@ -2684,6 +2684,7 @@ export class DataTable {
     const __activeRow = this.activeRow();
     const __activeColIndex = this.activeColIndex();
     const __activeIsHeader = this.activeIsHeader();
+    const __undoable = this.undoable();
     const __rows = this.rows();
     if (!this.isGrid() || !e) return;
     const key = e.key;
@@ -2865,12 +2866,40 @@ export class DataTable {
       this.cutRange();
       return;
     }
+    // ── 260709-8ct (grid-wide undo/redo) — Ctrl/Cmd+Z undoes; Ctrl/Cmd+Y OR Ctrl/Cmd+Shift+Z
+    // redoes. Undoable-gated (`$props.undoable`) — when off, neither preventDefault nor
+    // undo()/redo() runs, so a shipped grid with undoable unset is byte-behaviorally unchanged
+    // (the browser's own native undo/redo, if any, still fires). NOT clipboardActiveAllowed-
+    // gated (unlike Ctrl+C/V/X/Delete above): undo/redo is GRID-WIDE and must work regardless of
+    // whether a header or body cell is active. Tested the Ctrl+Shift+Z (redo) combo BEFORE the
+    // plain Ctrl+Z (undo) branch so a Shift+Z never falls into undo.
+    else if ((key === 'z' || key === 'Z') && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+      if (__undoable) {
+        e.preventDefault();
+        this.redo();
+        return;
+      }
+    } else if ((key === 'y' || key === 'Y') && (e.ctrlKey || e.metaKey)) {
+      if (__undoable) {
+        e.preventDefault();
+        this.redo();
+        return;
+      }
+    } else if ((key === 'z' || key === 'Z') && (e.ctrlKey || e.metaKey)) {
+      if (__undoable) {
+        e.preventDefault();
+        this.undo();
+        return;
+      }
+    }
     // ── §7 (260709-3qt) — Delete/Backspace CLEARS the active cell / range through the SAME
     // write-funnel as Cut (applyGridToRange of an empty grid), MINUS the clipboard copy. B11-gated
     // by clipboardActiveAllowed so a header-active Delete/Backspace falls through to NATIVE behavior
     // (never a silent body mutation). The top-of-handler editing early-returns + the line-39
     // data-grid-cell guard keep this to navigation mode; applyGridToRange skips read-only/non-editable
-    // cells. NO undo (the controlled-grid consumer owns it — the Cut/Paste/Fill contract). ──
+    // cells. Reversible via Ctrl+Z when `undoable` is on (260709-8ct) — clearActiveRange funnels
+    // through the SAME writeData seam undo/redo replay through, so no separate inverse machinery
+    // is needed here.
     else if ((key === 'Delete' || key === 'Backspace') && this.clipboardActiveAllowed()) {
       e.preventDefault();
       this.clearActiveRange();

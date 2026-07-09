@@ -549,13 +549,18 @@ export interface DataTableHandle {
   editRow: (...args: any[]) => any;
   getSelectedRange: (...args: any[]) => any;
   cut: (...args: any[]) => any;
+  undo: (...args: any[]) => any;
+  redo: (...args: any[]) => any;
+  canUndo: (...args: any[]) => any;
+  canRedo: (...args: any[]) => any;
+  clearHistory: (...args: any[]) => any;
 }
 
 export default function DataTable(_props: DataTableProps): JSX.Element {
   const _merged = mergeProps({ columns: (() => [])(), selectionMode: 'none', manual: false, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, virtual: false, estimateRowHeight: 40, maxHeight: '' }, _props);
   const [local, attrs] = splitProps(_merged, ['data', 'columns', 'selectionMode', 'sorting', 'globalFilter', 'columnFilters', 'pagination', 'manual', 'expandable', 'expanded', 'getSubRows', 'groupable', 'grouping', 'rowSelection', 'columnVisibility', 'columnSizing', 'columnOrder', 'columnPinning', 'stickyHeader', 'interactionMode', 'singleClickEdit', 'undoable', 'undoLimit', 'virtual', 'estimateRowHeight', 'maxHeight', 'children', 'ref']);
   const resolved = () => local.children;
-  onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut }); });
+  onMount(() => { local.ref?.({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory }); });
 
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const [data, setData] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'data', []);
@@ -2613,6 +2618,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     return cutRange();
   }
 
+  // 260709-8ct (grid-wide undo/redo): NO pass-through wrapper lands here for
+  // undo/redo/canUndo/canRedo/clearHistory. Unlike `cut` above (which delegates to a
+  // differently-named clipboardFill export, `cutRange`), the undoHistory.rzts exports already
+  // use the exact public verb names and are already component-scope (imported directly into
+  // DataTable.rozie) — so DataTable.rozie's $expose references them BY NAME with zero
+  // indirection. This file stays the seam for verbs that need a rename/adapter, not a mandatory
+  // stop for every $expose entry.
   // ══ Grid interaction mode (phase 49) — STATE + STRUCTURE only ═══════════════════════════
   // This plan (02) establishes the gated ARIA roles, the roving single-tab-stop tabindex,
   // the active-cell index-pair state, the data-* cell markers, and the SINGLE
@@ -3292,12 +3304,40 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       cutRange();
       return;
     }
+    // ── 260709-8ct (grid-wide undo/redo) — Ctrl/Cmd+Z undoes; Ctrl/Cmd+Y OR Ctrl/Cmd+Shift+Z
+    // redoes. Undoable-gated (`$props.undoable`) — when off, neither preventDefault nor
+    // undo()/redo() runs, so a shipped grid with undoable unset is byte-behaviorally unchanged
+    // (the browser's own native undo/redo, if any, still fires). NOT clipboardActiveAllowed-
+    // gated (unlike Ctrl+C/V/X/Delete above): undo/redo is GRID-WIDE and must work regardless of
+    // whether a header or body cell is active. Tested the Ctrl+Shift+Z (redo) combo BEFORE the
+    // plain Ctrl+Z (undo) branch so a Shift+Z never falls into undo.
+    else if ((key === 'z' || key === 'Z') && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+      if (local.undoable) {
+        e.preventDefault();
+        redo();
+        return;
+      }
+    } else if ((key === 'y' || key === 'Y') && (e.ctrlKey || e.metaKey)) {
+      if (local.undoable) {
+        e.preventDefault();
+        redo();
+        return;
+      }
+    } else if ((key === 'z' || key === 'Z') && (e.ctrlKey || e.metaKey)) {
+      if (local.undoable) {
+        e.preventDefault();
+        undo();
+        return;
+      }
+    }
     // ── §7 (260709-3qt) — Delete/Backspace CLEARS the active cell / range through the SAME
     // write-funnel as Cut (applyGridToRange of an empty grid), MINUS the clipboard copy. B11-gated
     // by clipboardActiveAllowed so a header-active Delete/Backspace falls through to NATIVE behavior
     // (never a silent body mutation). The top-of-handler editing early-returns + the line-39
     // data-grid-cell guard keep this to navigation mode; applyGridToRange skips read-only/non-editable
-    // cells. NO undo (the controlled-grid consumer owns it — the Cut/Paste/Fill contract). ──
+    // cells. Reversible via Ctrl+Z when `undoable` is on (260709-8ct) — clearActiveRange funnels
+    // through the SAME writeData seam undo/redo replay through, so no separate inverse machinery
+    // is needed here.
     else if ((key === 'Delete' || key === 'Backspace') && clipboardActiveAllowed()) {
       e.preventDefault();
       clearActiveRange();

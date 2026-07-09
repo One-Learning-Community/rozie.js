@@ -56,4 +56,11 @@ const getRowIndexRelativeToPage = (absRow) => {
 // inherited Lit DOM method named `cut` (ROZ121/124/137 clear) — `cut` is not on HTMLElement.
 const cut = () => cutRange()
 
+// 260709-8ct (grid-wide undo/redo): NO pass-through wrapper lands here for
+// undo/redo/canUndo/canRedo/clearHistory. Unlike `cut` above (which delegates to a
+// differently-named clipboardFill export, `cutRange`), the undoHistory.rzts exports already
+// use the exact public verb names and are already component-scope (imported directly into
+// DataTable.rozie) — so DataTable.rozie's $expose references them BY NAME with zero
+// indirection. This file stays the seam for verbs that need a rename/adapter, not a mandatory
+// stop for every $expose entry.
 export { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage, cut }
