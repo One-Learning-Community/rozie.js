@@ -730,8 +730,8 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
         <button type="button" aria-label="Bold" class={rozieClass({ active: active().bold })} onClick={toggleBold} data-rozie-s-2aeee876=""><strong data-rozie-s-2aeee876="">B</strong></button>
         <button type="button" aria-label="Italic" class={rozieClass({ active: active().italic })} onClick={toggleItalic} data-rozie-s-2aeee876=""><em data-rozie-s-2aeee876="">I</em></button>
         <span class={"sep"} data-rozie-s-2aeee876="" />
-        <button type="button" aria-label="Heading 1" class={rozieClass({ active: active().h1 })} onClick={($event) => { toggleHeading(1); }} data-rozie-s-2aeee876="">H1</button>
-        <button type="button" aria-label="Heading 2" class={rozieClass({ active: active().h2 })} onClick={($event) => { toggleHeading(2); }} data-rozie-s-2aeee876="">H2</button>
+        <button type="button" aria-label="Heading 1" class={rozieClass({ active: active().h1 })} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { toggleHeading(1); }} data-rozie-s-2aeee876="">H1</button>
+        <button type="button" aria-label="Heading 2" class={rozieClass({ active: active().h2 })} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { toggleHeading(2); }} data-rozie-s-2aeee876="">H2</button>
         <span class={"sep"} data-rozie-s-2aeee876="" />
         <button type="button" aria-label="Bullet list" class={rozieClass({ active: active().bulletList })} onClick={toggleBulletList} data-rozie-s-2aeee876="">• List</button>
       </div></Show>}{<Show when={local.editable && (_props.toolbarSlot ?? _props.slots?.['toolbar'])}><div class={"rozie-tiptap-toolbar rozie-tiptap-toolbar--slot"} ref={(el) => { toolbarElRef = el as HTMLElement; }} data-rozie-s-2aeee876="" /></Show>}<div ref={(el) => { editorElRef = el as HTMLElement; }} class={"rozie-tiptap-content"} data-placeholder={local.placeholder} data-rozie-s-2aeee876="" />

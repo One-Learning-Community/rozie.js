@@ -52,7 +52,7 @@ export default class EditorNumber extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<input class="rdt-cell-editor" type="number" data-editing-cell="" aria-label=${this.columnId} .value=${this._draft.value} @input=${($event: Event) => { this.onInput($event); }} @keydown=${($event: Event) => { this.onKeydown($event); }} @blur=${($event: Event) => { this.onBlur(); }} data-rozie-s-b2792b32 />
+<input class="rdt-cell-editor" type="number" data-editing-cell="" aria-label=${this.columnId} .value=${this._draft.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-s-b2792b32 />
 `;
   }
 

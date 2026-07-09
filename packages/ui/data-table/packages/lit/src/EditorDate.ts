@@ -53,7 +53,7 @@ export default class EditorDate extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<input class="rdt-cell-editor" type="date" data-editing-cell="" aria-label=${this.columnId} .value=${this._draft.value} @input=${($event: Event) => { this.onInput($event); }} @change=${($event: Event) => { this.onChange($event); }} @keydown=${($event: Event) => { this.onKeydown($event); }} @blur=${($event: Event) => { this.onBlur(); }} data-rozie-s-7abe1a56 />
+<input class="rdt-cell-editor" type="date" data-editing-cell="" aria-label=${this.columnId} .value=${this._draft.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onChange($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur(); }} data-rozie-s-7abe1a56 />
 `;
   }
 

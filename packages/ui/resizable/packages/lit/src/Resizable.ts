@@ -204,7 +204,7 @@ export default class Resizable extends SignalWatcher(LitElement) {
   </div>
 
   
-  <div class="rozie-resizable-handle" role="separator" tabindex="0" aria-orientation=${rozieAttr(this.isVertical() ? 'horizontal' : 'vertical')} aria-valuenow=${this.size} aria-valuemin=${this.min} aria-valuemax=${this.max} aria-disabled=${!!this.disabled} @pointerdown=${($event: Event) => { this.onPointerDown($event); }} @pointermove=${($event: Event) => { this.onPointerMove($event); }} @pointerup=${($event: Event) => { this.onPointerUp($event); }} @keydown=${($event: Event) => { this.onKeydown($event); }} data-rozie-s-8330bc5a>
+  <div class="rozie-resizable-handle" role="separator" tabindex="0" aria-orientation=${rozieAttr(this.isVertical() ? 'horizontal' : 'vertical')} aria-valuenow=${this.size} aria-valuemin=${this.min} aria-valuemax=${this.max} aria-disabled=${!!this.disabled} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPointerDown($event); }} @pointermove=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPointerMove($event); }} @pointerup=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPointerUp($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onKeydown($event); }} data-rozie-s-8330bc5a>
     <slot name="handle">
       <span class="rozie-resizable-grip" aria-hidden="true" data-rozie-s-8330bc5a></span>
     </slot>

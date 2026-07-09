@@ -46,7 +46,7 @@ export default class EditorCheckbox extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" aria-label=${this.columnId} ?checked=${!!this.value} @change=${($event: Event) => { this.onChange($event); }} @keydown=${($event: Event) => { this.onKeydown($event); }} data-rozie-s-3d792482 />
+<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" aria-label=${this.columnId} ?checked=${!!this.value} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onChange($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} data-rozie-s-3d792482 />
 `;
   }
 

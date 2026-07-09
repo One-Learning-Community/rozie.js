@@ -248,7 +248,7 @@ export default function Resizable(_props: ResizableProps): JSX.Element {
       </div>
 
       
-      <div role="separator" aria-orientation={rozieAttr(isVertical() ? 'horizontal' : 'vertical')} aria-valuenow={size()} aria-valuemin={local.min} aria-valuemax={local.max} aria-disabled={!!local.disabled} class={"rozie-resizable-handle"} tabIndex={0} onPointerDown={($event) => { onPointerDown($event); }} onPointerMove={($event) => { onPointerMove($event); }} onPointerUp={($event) => { onPointerUp($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-8330bc5a="">
+      <div role="separator" aria-orientation={rozieAttr(isVertical() ? 'horizontal' : 'vertical')} aria-valuenow={size()} aria-valuemin={local.min} aria-valuemax={local.max} aria-disabled={!!local.disabled} class={"rozie-resizable-handle"} tabIndex={0} onPointerDown={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPointerDown($event); }} onPointerMove={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPointerMove($event); }} onPointerUp={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPointerUp($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onKeydown($event); }} data-rozie-s-8330bc5a="">
         {(_props.handleSlot ?? _props.slots?.['handle']?.({})) ?? <span class={"rozie-resizable-grip"} aria-hidden="true" data-rozie-s-8330bc5a="" />}
       </div>
 

@@ -61,7 +61,7 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<select class="rdt-cell-editor" data-editing-cell="" aria-label=${this.columnId} .value=${this._draft.value} @change=${($event: Event) => { this.onChange($event); }} @keydown=${($event: Event) => { this.onKeydown($event); }} @blur=${($event: Event) => { this.onBlur(); }} data-rozie-s-117f1a16>
+<select class="rdt-cell-editor" data-editing-cell="" aria-label=${this.columnId} .value=${this._draft.value} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onChange($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onKeydown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onBlur(); }} data-rozie-s-117f1a16>
   ${repeat<any>(this.options, (opt, _idx) => opt.value, (opt, _idx) => html`<option key=${rozieAttr(opt.value)} value=${rozieAttr(opt.value)} data-rozie-s-117f1a16>${rozieDisplay(opt.label)}</option>`)}
 </select>
 `;

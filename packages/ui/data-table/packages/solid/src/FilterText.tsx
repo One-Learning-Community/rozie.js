@@ -59,7 +59,7 @@ export default function FilterText(_props: FilterTextProps): JSX.Element {
 
   return (
     <>
-    <input part="col-filter" type="text" aria-label={local.columnId} class={"rdt-col-filter"} value={draft()} onInput={($event: InputEvent) => { onInput($event); }} onKeyDown={($event: KeyboardEvent) => { onKeydown($event); }} onBlur={($event: FocusEvent) => { onBlur(); }} data-rozie-s-18cbb44e="" />
+    <input part="col-filter" type="text" aria-label={local.columnId} class={"rdt-col-filter"} value={draft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-18cbb44e="" />
     </>
   );
 }

@@ -51,7 +51,7 @@ export default function FilterSelect(_props: FilterSelectProps): JSX.Element {
 
   return (
     <>
-    <select part="col-filter" aria-label={local.columnId} class={"rdt-col-filter"} value={selectValue()} onChange={($event: Event) => { onChange($event); }} data-rozie-s-d75b42b2="">
+    <select part="col-filter" aria-label={local.columnId} class={"rdt-col-filter"} value={selectValue()} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onChange($event); }} data-rozie-s-d75b42b2="">
       <option value="" data-rozie-s-d75b42b2="">All</option>
       <Key each={local.uniqueValues as readonly any[]} by={(opt) => opt}>{(opt) => <option value={rozieAttr(opt())} data-rozie-s-d75b42b2="">{rozieDisplay(opt())}</option>}</Key>
     </select>

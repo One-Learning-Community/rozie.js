@@ -62,7 +62,7 @@ const props = withDefaults(
  * @example
  * <NumberField r-model:modelValue="qty" :min="0" :max="10" />
  */
-const modelValue = defineModel<number>('modelValue', { default: null });
+const modelValue = defineModel<number | null>('modelValue', { default: null });
 
 const emit = defineEmits<{
   change: [...args: any[]];

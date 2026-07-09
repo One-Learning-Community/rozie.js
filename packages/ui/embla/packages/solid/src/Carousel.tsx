@@ -445,7 +445,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
     <div {...attrs} class={"rozie-embla" + " " + rozieClass({ 'rozie-embla--vertical': local.axis === 'y' }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-4143c216="">
       
       <div class={"rozie-embla__stage"} data-rozie-s-4143c216="">
-        {<Show when={local.arrows}><button type="button" aria-label="Previous slide" class={"rozie-embla__arrow rozie-embla__arrow--prev"} disabled={!canPrev()} onClick={($event) => { scrollPrev(); }} data-rozie-s-4143c216="">‹</button></Show>}<div class={"rozie-embla__viewport"} ref={(el) => { viewportElRef = el as HTMLElement; }} data-rozie-s-4143c216="">
+        {<Show when={local.arrows}><button type="button" aria-label="Previous slide" class={"rozie-embla__arrow rozie-embla__arrow--prev"} disabled={!canPrev()} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { scrollPrev(); }} data-rozie-s-4143c216="">‹</button></Show>}<div class={"rozie-embla__viewport"} ref={(el) => { viewportElRef = el as HTMLElement; }} data-rozie-s-4143c216="">
           <div class={"rozie-embla__container"} data-rozie-s-4143c216="">
             
             <For each={local.slides}>{(slide, i) => <div class={"rozie-embla__slide"} data-rozie-s-4143c216="">
@@ -455,15 +455,15 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
             {resolved()}
           </div>
         </div>
-        {<Show when={local.arrows}><button type="button" aria-label="Next slide" class={"rozie-embla__arrow rozie-embla__arrow--next"} disabled={!canNext()} onClick={($event) => { scrollNext(); }} data-rozie-s-4143c216="">›</button></Show>}</div>
+        {<Show when={local.arrows}><button type="button" aria-label="Next slide" class={"rozie-embla__arrow rozie-embla__arrow--next"} disabled={!canNext()} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { scrollNext(); }} data-rozie-s-4143c216="">›</button></Show>}</div>
 
       
       {<Show when={local.dots}><div class={"rozie-embla__dots"} data-rozie-s-4143c216="">
-        <Key each={snaps() as readonly any[]} by={(di) => di}>{(di) => <button type="button" aria-label={rozieAttr('Go to slide ' + (di() + 1))} class={"rozie-embla__dot" + " " + rozieClass({ 'is-selected': di() === selected() })} onClick={($event) => { scrollToIndex(di()); }} data-rozie-s-4143c216="" />}</Key>
+        <Key each={snaps() as readonly any[]} by={(di) => di}>{(di) => <button type="button" aria-label={rozieAttr('Go to slide ' + (di() + 1))} class={"rozie-embla__dot" + " " + rozieClass({ 'is-selected': di() === selected() })} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { scrollToIndex(di()); }} data-rozie-s-4143c216="" />}</Key>
       </div></Show>}{<Show when={local.thumbnails}><div class={"rozie-embla__thumbs"} data-rozie-s-4143c216="">
         <div class={"rozie-embla__thumbs-viewport"} ref={(el) => { thumbsViewportElRef = el as HTMLElement; }} data-rozie-s-4143c216="">
           <div class={"rozie-embla__thumbs-container"} data-rozie-s-4143c216="">
-            <For each={local.slides}>{(item, i) => <div class={"rozie-embla__thumb" + " " + rozieClass({ 'is-selected': i() === selected() })} onClick={($event) => { selectThumb(i()); }} data-rozie-s-4143c216="">
+            <For each={local.slides}>{(item, i) => <div class={"rozie-embla__thumb" + " " + rozieClass({ 'is-selected': i() === selected() })} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { selectThumb(i()); }} data-rozie-s-4143c216="">
               {(_props.thumbSlot ?? _props.slots?.['thumb'])?.({ slide: item, index: i() }) ?? rozieDisplay(item)}
             </div>}</For>
           </div>

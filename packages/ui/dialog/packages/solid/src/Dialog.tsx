@@ -182,7 +182,7 @@ export default function Dialog(_props: DialogProps): JSX.Element {
 
   return (
     <>
-    <dialog aria-label={rozieAttr(local.ariaLabel)} aria-labelledby={rozieAttr(local.ariaLabelledby)} {...attrs} class={"rozie-dialog" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onCancel: ($event) => { onCancel($event); }, onClick: ($event) => { onClick($event); } }, attrs)} data-rozie-s-2a679072="">
+    <dialog aria-label={rozieAttr(local.ariaLabel)} aria-labelledby={rozieAttr(local.ariaLabelledby)} {...attrs} class={"rozie-dialog" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onCancel: ($event: Event & { currentTarget: HTMLDialogElement; target: Element }) => { onCancel($event); }, onClick: ($event: MouseEvent & { currentTarget: HTMLDialogElement; target: Element }) => { onClick($event); } }, attrs)} data-rozie-s-2a679072="">
       
       <div class={"rozie-dialog-panel"} ref={(el) => { panelElRef = el as HTMLElement; }} data-rozie-s-2a679072="">
         {resolved()}

@@ -143,7 +143,7 @@ private __rozieWatchInitial_0 = true;
 
   render() {
     return html`
-<dialog class="rozie-dialog" aria-label=${this.ariaLabel} aria-labelledby=${this.ariaLabelledby} ${rozieSpread(this.$attrs)} @cancel=${($event: Event) => { this.onCancel($event); }} @click=${($event: Event) => { this.onClick($event); }} ${rozieListeners(this.$listeners)} data-rozie-s-2a679072>
+<dialog class="rozie-dialog" aria-label=${this.ariaLabel} aria-labelledby=${this.ariaLabelledby} ${rozieSpread(this.$attrs)} @cancel=${($event: Event & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onCancel($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onClick($event); }} ${rozieListeners(this.$listeners)} data-rozie-s-2a679072>
   
   <div class="rozie-dialog-panel" data-rozie-ref="panelEl" data-rozie-s-2a679072>
     <slot></slot>

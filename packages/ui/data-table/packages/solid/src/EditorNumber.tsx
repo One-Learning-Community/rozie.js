@@ -71,7 +71,7 @@ export default function EditorNumber(_props: EditorNumberProps): JSX.Element {
 
   return (
     <>
-    <input type="number" data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={draft()} onInput={($event: InputEvent) => { onInput($event); }} onKeyDown={($event: KeyboardEvent) => { onKeydown($event); }} onBlur={($event: FocusEvent) => { onBlur(); }} data-rozie-s-b2792b32="" />
+    <input type="number" data-editing-cell="" aria-label={local.columnId} class={"rdt-cell-editor"} value={draft()} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur(); }} data-rozie-s-b2792b32="" />
     </>
   );
 }

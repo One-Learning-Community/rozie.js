@@ -187,10 +187,10 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
 
   return (
     <>
-    <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} class={"rozie-toaster" + " " + rozieClass('rozie-toaster--' + local.position) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onMouseEnter: ($event) => { onMouseEnter(); }, onMouseLeave: ($event) => { onMouseLeave(); } }, attrs)} data-rozie-s-12d4265c="">
+    <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} class={"rozie-toaster" + " " + rozieClass('rozie-toaster--' + local.position) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onMouseEnter: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseEnter(); }, onMouseLeave: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseLeave(); } }, attrs)} data-rozie-s-12d4265c="">
       
       <Key each={toasts() as readonly any[]} by={(t) => t.id}>{(t) => <div class={"rozie-toast" + " " + rozieClass('rozie-toast--' + t().type)} role="status" aria-live={rozieAttr(liveFor(t().type))} data-rozie-s-12d4265c="">
-        {(_props.toastSlot ?? _props.slots?.['toast'])?.({ toast: t(), dismiss }) ?? <><span class={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t().message)}</span><button type="button" aria-label="Dismiss" class={"rozie-toast-close"} onClick={($event) => { dismiss(t().id); }} data-rozie-s-12d4265c="">×</button></>}
+        {(_props.toastSlot ?? _props.slots?.['toast'])?.({ toast: t(), dismiss }) ?? <><span class={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t().message)}</span><button type="button" aria-label="Dismiss" class={"rozie-toast-close"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { dismiss(t().id); }} data-rozie-s-12d4265c="">×</button></>}
       </div>}</Key>
     </div>
     </>

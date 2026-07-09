@@ -93,7 +93,7 @@ const props = withDefaults(
  * @example
  * <Slider r-model:value="volume" :min="0" :max="100" :step="1" ariaLabel="Volume" />
  */
-const value = defineModel<unknown>('value', { default: null });
+const value = defineModel<unknown | null>('value', { default: null });
 
 const emit = defineEmits<{
   change: [...args: any[]];

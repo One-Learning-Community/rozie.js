@@ -145,12 +145,12 @@ export default class Toaster extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="rozie-toaster ${(rozieClass('rozie-toaster--' + this.position))}" role="region" aria-label=${rozieAttr(this.regionLabel())} ${rozieSpread(this.$attrs)} @mouseenter=${($event: Event) => { this.onMouseEnter(); }} @mouseleave=${($event: Event) => { this.onMouseLeave(); }} ${rozieListeners(this.$listeners)} data-rozie-s-12d4265c>
+<div class="rozie-toaster ${(rozieClass('rozie-toaster--' + this.position))}" role="region" aria-label=${rozieAttr(this.regionLabel())} ${rozieSpread(this.$attrs)} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onMouseEnter(); }} @mouseleave=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onMouseLeave(); }} ${rozieListeners(this.$listeners)} data-rozie-s-12d4265c>
   
   ${repeat<any>(this._toasts.value, (t, _idx) => t.id, (t, _idx) => html`<div class="rozie-toast ${(rozieClass('rozie-toast--' + t.type))}" key=${rozieAttr(t.id)} role="status" aria-live=${rozieAttr(this.liveFor(t.type))} data-rozie-s-12d4265c>
     ${this.toast !== undefined ? this.toast({toast: t, dismiss: this.dismiss}) : html`<slot name="toast" data-rozie-params=${(() => { try { return JSON.stringify({toast: t}); } catch { return '{}'; } })()} @rozie-toast-dismiss=${($event: CustomEvent) => ((this.dismiss) as (...args: any[]) => any)($event.detail)}>
       <span class="rozie-toast-message" data-rozie-s-12d4265c>${rozieDisplay(t.message)}</span>
-      <button class="rozie-toast-close" type="button" aria-label="Dismiss" @click=${($event: Event) => { this.dismiss(t.id); }} data-rozie-s-12d4265c>×</button>
+      <button class="rozie-toast-close" type="button" aria-label="Dismiss" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.dismiss(t.id); }} data-rozie-s-12d4265c>×</button>
     </slot>`}
   </div>`)}
 </div>

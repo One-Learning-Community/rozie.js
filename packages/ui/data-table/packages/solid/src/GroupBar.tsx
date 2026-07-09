@@ -189,19 +189,19 @@ export default function GroupBar(_props: GroupBarProps): JSX.Element {
     <>
     <div class={"rdt-group-bar"} data-rozie-s-546c469a="">
       
-      <Key each={local.groupableColumns as readonly any[]} by={(col) => col.id}>{(col) => <span part="group-token" draggable="true" class={"rdt-group-token"} onDragStart={($event: DragEvent) => { onChipDragStart($event, col().id); }} onDragEnd={($event: DragEvent) => { onDragEnd(); }} data-rozie-s-546c469a="">{rozieDisplay(col().label)}</span>}</Key>
+      <Key each={local.groupableColumns as readonly any[]} by={(col) => col.id}>{(col) => <span part="group-token" draggable="true" class={"rdt-group-token"} onDragStart={($event: DragEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onChipDragStart($event, col().id); }} onDragEnd={($event: DragEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onDragEnd(); }} data-rozie-s-546c469a="">{rozieDisplay(col().label)}</span>}</Key>
 
       
-      <span data-group-drop-zone="" class={"rdt-group-drop-zone" + " " + rozieClass({ 'is-over': isOver() })} onDragOver={($event: DragEvent) => { onDragOver($event); }} onDragLeave={($event: DragEvent) => { onDragLeave($event); }} onDrop={($event: DragEvent) => { onDrop($event); }} data-rozie-s-546c469a="">
+      <span data-group-drop-zone="" class={"rdt-group-drop-zone" + " " + rozieClass({ 'is-over': isOver() })} onDragOver={($event: DragEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onDragOver($event); }} onDragLeave={($event: DragEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onDragLeave($event); }} onDrop={($event: DragEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onDrop($event); }} data-rozie-s-546c469a="">
         
-        {<Show when={!local.grouping.length}><span class={"rdt-group-drop-hint"} data-rozie-s-546c469a="">Drag columns here to group</span></Show>}<Key each={local.grouping as readonly any[]} by={(gk) => gk}>{(gk) => <span part="group-token" data-group-token="" draggable="true" class={"rdt-group-token" + " " + rozieClass({ 'is-drop-target': dragKind() === 'token' && dropKey() === gk() && draggingId() !== gk() })} onDragStart={($event: DragEvent) => { onTokenDragStart($event, gk()); }} onDragOver={($event: DragEvent) => { onTokenDragOver($event, gk()); }} onDragEnd={($event: DragEvent) => { onDragEnd(); }} data-rozie-s-546c469a="">
+        {<Show when={!local.grouping.length}><span class={"rdt-group-drop-hint"} data-rozie-s-546c469a="">Drag columns here to group</span></Show>}<Key each={local.grouping as readonly any[]} by={(gk) => gk}>{(gk) => <span part="group-token" data-group-token="" draggable="true" class={"rdt-group-token" + " " + rozieClass({ 'is-drop-target': dragKind() === 'token' && dropKey() === gk() && draggingId() !== gk() })} onDragStart={($event: DragEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onTokenDragStart($event, gk()); }} onDragOver={($event: DragEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onTokenDragOver($event, gk()); }} onDragEnd={($event: DragEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onDragEnd(); }} data-rozie-s-546c469a="">
           {rozieDisplay(labelFor(gk()))}
-          <button type="button" aria-label={rozieAttr('Remove ' + labelFor(gk()) + ' grouping')} class={"rdt-group-token-remove"} onClick={($event: MouseEvent) => { removeKey(gk()); }} data-rozie-s-546c469a="">×</button>
+          <button type="button" aria-label={rozieAttr('Remove ' + labelFor(gk()) + ' grouping')} class={"rdt-group-token-remove"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { removeKey(gk()); }} data-rozie-s-546c469a="">×</button>
         </span>}</Key>
       </span>
 
       
-      {<Show when={local.grouping.length}><button type="button" class={"rdt-group-clear"} onClick={($event: MouseEvent) => { clearAll(); }} data-rozie-s-546c469a="">Clear</button></Show>}</div>
+      {<Show when={local.grouping.length}><button type="button" class={"rdt-group-clear"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { clearAll(); }} data-rozie-s-546c469a="">Clear</button></Show>}</div>
     </>
   );
 }

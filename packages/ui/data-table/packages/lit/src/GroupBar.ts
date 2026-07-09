@@ -106,19 +106,19 @@ export default class GroupBar extends SignalWatcher(LitElement) {
     return html`
 <div class="rdt-group-bar" data-rozie-s-546c469a>
   
-  ${repeat<any>(this.groupableColumns, (col, _idx) => col.id, (col, _idx) => html`<span class="rdt-group-token" part="group-token" key=${rozieAttr(col.id)} draggable="true" @dragstart=${($event: Event) => { this.onChipDragStart($event, col.id); }} @dragend=${($event: Event) => { this.onDragEnd(); }} data-rozie-s-546c469a>${rozieDisplay(col.label)}</span>`)}
+  ${repeat<any>(this.groupableColumns, (col, _idx) => col.id, (col, _idx) => html`<span class="rdt-group-token" part="group-token" key=${rozieAttr(col.id)} draggable="true" @dragstart=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onChipDragStart($event, col.id); }} @dragend=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDragEnd(); }} data-rozie-s-546c469a>${rozieDisplay(col.label)}</span>`)}
 
   
-  <span class="${Object.entries({ "rdt-group-drop-zone": true, 'is-over': this._isOver.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-group-drop-zone="" @dragover=${($event: Event) => { this.onDragOver($event); }} @dragleave=${($event: Event) => { this.onDragLeave($event); }} @drop=${($event: Event) => { this.onDrop($event); }} data-rozie-s-546c469a>
+  <span class="${Object.entries({ "rdt-group-drop-zone": true, 'is-over': this._isOver.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-group-drop-zone="" @dragover=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDragOver($event); }} @dragleave=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDragLeave($event); }} @drop=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDrop($event); }} data-rozie-s-546c469a>
     
-    ${!this.grouping.length ? html`<span class="rdt-group-drop-hint" data-rozie-s-546c469a>Drag columns here to group</span>` : nothing}${repeat<any>(this.grouping, (gk, _idx) => gk, (gk, _idx) => html`<span class="${Object.entries({ "rdt-group-token": true, 'is-drop-target': this._dragKind.value === 'token' && this._dropKey.value === gk && this._draggingId.value !== gk }).filter(([, v]) => v).map(([k]) => k).join(' ')}" part="group-token" data-group-token="" key=${rozieAttr(gk)} draggable="true" @dragstart=${($event: Event) => { this.onTokenDragStart($event, gk); }} @dragover=${($event: Event) => { this.onTokenDragOver($event, gk); }} @dragend=${($event: Event) => { this.onDragEnd(); }} data-rozie-s-546c469a>
+    ${!this.grouping.length ? html`<span class="rdt-group-drop-hint" data-rozie-s-546c469a>Drag columns here to group</span>` : nothing}${repeat<any>(this.grouping, (gk, _idx) => gk, (gk, _idx) => html`<span class="${Object.entries({ "rdt-group-token": true, 'is-drop-target': this._dragKind.value === 'token' && this._dropKey.value === gk && this._draggingId.value !== gk }).filter(([, v]) => v).map(([k]) => k).join(' ')}" part="group-token" data-group-token="" key=${rozieAttr(gk)} draggable="true" @dragstart=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onTokenDragStart($event, gk); }} @dragover=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onTokenDragOver($event, gk); }} @dragend=${($event: Event & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { this.onDragEnd(); }} data-rozie-s-546c469a>
       ${rozieDisplay(this.labelFor(gk))}
-      <button class="rdt-group-token-remove" type="button" aria-label=${rozieAttr('Remove ' + this.labelFor(gk) + ' grouping')} @click=${($event: Event) => { this.removeKey(gk); }} data-rozie-s-546c469a>×</button>
+      <button class="rdt-group-token-remove" type="button" aria-label=${rozieAttr('Remove ' + this.labelFor(gk) + ' grouping')} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.removeKey(gk); }} data-rozie-s-546c469a>×</button>
     </span>`)}
   </span>
 
   
-  ${this.grouping.length ? html`<button class="rdt-group-clear" type="button" @click=${($event: Event) => { this.clearAll(); }} data-rozie-s-546c469a>Clear</button>` : nothing}</div>
+  ${this.grouping.length ? html`<button class="rdt-group-clear" type="button" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.clearAll(); }} data-rozie-s-546c469a>Clear</button>` : nothing}</div>
 `;
   }
 

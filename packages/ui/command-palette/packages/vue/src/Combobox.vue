@@ -96,7 +96,7 @@ const props = withDefaults(
  * @example
  * <Combobox r-model:value="country" :options="countries" />
  */
-const value = defineModel<unknown>('value', { default: null });
+const value = defineModel<unknown | null>('value', { default: null });
 
 const emit = defineEmits<{
   change: [...args: any[]];

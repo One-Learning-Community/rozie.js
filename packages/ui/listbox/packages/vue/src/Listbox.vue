@@ -109,7 +109,7 @@ const props = withDefaults(
  * @example
  * <Listbox r-model:value="fruit" :options="fruits" />
  */
-const value = defineModel<unknown>('value', { default: null });
+const value = defineModel<unknown | null>('value', { default: null });
 
 const emit = defineEmits<{
   'open-change': [...args: any[]];
