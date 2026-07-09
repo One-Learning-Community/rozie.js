@@ -2393,7 +2393,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   const base = this.pinStyle(colId);
   if (this.isExpanderColumn(colId) && row && row.depth) {
     const pad = 'padding-left:' + (0.5 + row.depth * 1.25) + 'rem';
-    return base ? base + ';' + pad : pad;
+    // pinStyle() already ends with ';', so append `pad` directly — inserting a
+    // second ';' produces a `;;` empty declaration. Browsers tolerate that in a
+    // raw style attribute (React/Vue/Svelte/Lit) and Solid's cssText path does
+    // too, but Angular's [style] binding parses the string via ɵɵstyleMap and
+    // DROPS the declaration following the empty one — so the depth padding-left
+    // silently vanished on Angular only. Emit a single, well-formed separator.
+    const sep = base.endsWith(';') ? '' : ';';
+    return base ? base + sep + pad : pad;
   }
   return base;
 };
