@@ -2767,6 +2767,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return hg.length ? hg.length - 1 : 0;
 };
 
+  headerCountAtLevel = (level: any) => {
+  const hg = this._headerGroups.value || [];
+  if (!hg.length) return this.visibleColCount();
+  const grp = level >= 0 && level < hg.length ? hg[level] : null;
+  if (!grp || !grp.headers) return this.visibleColCount();
+  return grp.headers.length;
+};
+
   headerAt = (level: any, colIndex: any) => {
   const hg = this._headerGroups.value || [];
   const grp = hg[level];
@@ -2806,7 +2814,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 };
 
   moveCol = (delta: any) => {
-  const max = this.visibleColCount() - 1;
+  // #10: when a grouped PARENT header is active, clamp against the header count AT THE ACTIVE
+  // LEVEL (which may be fewer than the leaf-column count) so ArrowRight never overruns onto a
+  // phantom cell past that level's headers. Body cells + the leaf header level keep visibleColCount().
+  const count = this._activeIsHeader.value ? this.headerCountAtLevel(this._activeHeaderLevel.value) : this.visibleColCount();
+  const max = count - 1;
   const nextCol = this.clamp(this._activeColIndex.value + delta, 0, max < 0 ? 0 : max);
   this._activeColIndex.value = nextCol;
   return nextCol;
@@ -2904,7 +2916,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 };
 
   gotoColEdge = (toEnd: any) => {
-  const max = this.visibleColCount() - 1;
+  // #10: End on a grouped PARENT header lands on that level's LAST header (headerCountAtLevel-1),
+  // not the leaf-column max — otherwise the ring strands on a phantom cell past the level's
+  // headers. Home is index 0 either way. Body cells + the leaf header level keep visibleColCount().
+  const count = this._activeIsHeader.value ? this.headerCountAtLevel(this._activeHeaderLevel.value) : this.visibleColCount();
+  const max = count - 1;
   const nextCol = toEnd ? max < 0 ? 0 : max : 0;
   this._activeColIndex.value = nextCol;
   return nextCol;

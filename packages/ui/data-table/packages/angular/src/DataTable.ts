@@ -2596,6 +2596,13 @@ export class DataTable {
     const hg = this.headerGroups() || [];
     return hg.length ? hg.length - 1 : 0;
   };
+  headerCountAtLevel = (level: any) => {
+    const hg = this.headerGroups() || [];
+    if (!hg.length) return this.visibleColCount();
+    const grp = level >= 0 && level < hg.length ? hg[level] : null;
+    if (!grp || !grp.headers) return this.visibleColCount();
+    return grp.headers.length;
+  };
   headerAt = (level: any, colIndex: any) => {
     const hg = this.headerGroups() || [];
     const grp = hg[level];
@@ -2632,7 +2639,11 @@ export class DataTable {
     return -1;
   };
   moveCol = (delta: any) => {
-    const max = this.visibleColCount() - 1;
+    // #10: when a grouped PARENT header is active, clamp against the header count AT THE ACTIVE
+    // LEVEL (which may be fewer than the leaf-column count) so ArrowRight never overruns onto a
+    // phantom cell past that level's headers. Body cells + the leaf header level keep visibleColCount().
+    const count = this.activeIsHeader() ? this.headerCountAtLevel(this.activeHeaderLevel()) : this.visibleColCount();
+    const max = count - 1;
     const nextCol = this.clamp(this.activeColIndex() + delta, 0, max < 0 ? 0 : max);
     this.activeColIndex.set(nextCol);
     return nextCol;
@@ -2728,7 +2739,11 @@ export class DataTable {
     };
   };
   gotoColEdge = (toEnd: any) => {
-    const max = this.visibleColCount() - 1;
+    // #10: End on a grouped PARENT header lands on that level's LAST header (headerCountAtLevel-1),
+    // not the leaf-column max — otherwise the ring strands on a phantom cell past the level's
+    // headers. Home is index 0 either way. Body cells + the leaf header level keep visibleColCount().
+    const count = this.activeIsHeader() ? this.headerCountAtLevel(this.activeHeaderLevel()) : this.visibleColCount();
+    const max = count - 1;
     const nextCol = toEnd ? max < 0 ? 0 : max : 0;
     this.activeColIndex.set(nextCol);
     return nextCol;

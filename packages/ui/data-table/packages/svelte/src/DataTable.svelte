@@ -3069,6 +3069,27 @@ const headerLeafLevel = () => {
   const hg = headerGroups || [];
   return hg.length ? hg.length - 1 : 0;
 };
+// #10: the number of header cells AT a given level. A grouped PARENT level may have FEWER
+// headers than there are leaf columns (one parent spans several leaves), so horizontal nav on a
+// non-leaf header must clamp against THIS count — not visibleColCount() (the leaf-column count),
+// which would let ArrowRight/End overrun into a phantom (null) cell → focus dropped to <body>.
+// Degenerate cases (no headerGroups, level out of range) fall back to visibleColCount() so the
+// clamp is never negative or NaN. The LEAF level's count equals visibleColCount() (one header per
+// visible leaf column), so leaf-header + body horizontal nav is byte-behaviorally unchanged.
+// #10: the number of header cells AT a given level. A grouped PARENT level may have FEWER
+// headers than there are leaf columns (one parent spans several leaves), so horizontal nav on a
+// non-leaf header must clamp against THIS count — not visibleColCount() (the leaf-column count),
+// which would let ArrowRight/End overrun into a phantom (null) cell → focus dropped to <body>.
+// Degenerate cases (no headerGroups, level out of range) fall back to visibleColCount() so the
+// clamp is never negative or NaN. The LEAF level's count equals visibleColCount() (one header per
+// visible leaf column), so leaf-header + body horizontal nav is byte-behaviorally unchanged.
+const headerCountAtLevel = (level: any) => {
+  const hg = headerGroups || [];
+  if (!hg.length) return visibleColCount();
+  const grp = level >= 0 && level < hg.length ? hg[level] : null;
+  if (!grp || !grp.headers) return visibleColCount();
+  return grp.headers.length;
+};
 const headerAt = (level: any, colIndex: any) => {
   const hg = headerGroups || [];
   const grp = hg[level];
@@ -3136,7 +3157,11 @@ const firstChildHeaderColIndex = (level: any, colIndex: any) => {
 // ArrowRight/Left — clamp colIndex over [0, visibleColCount()-1] (no wrap; hidden cols
 // already excluded from the visible list per REQ-7).
 const moveCol = (delta: any) => {
-  const max = visibleColCount() - 1;
+  // #10: when a grouped PARENT header is active, clamp against the header count AT THE ACTIVE
+  // LEVEL (which may be fewer than the leaf-column count) so ArrowRight never overruns onto a
+  // phantom cell past that level's headers. Body cells + the leaf header level keep visibleColCount().
+  const count = activeIsHeader ? headerCountAtLevel(activeHeaderLevel) : visibleColCount();
+  const max = count - 1;
   const nextCol = clamp(activeColIndex + delta, 0, max < 0 ? 0 : max);
   activeColIndex = nextCol;
   return nextCol;
@@ -3246,7 +3271,11 @@ const moveRow = (delta: any) => {
 // Home/End within the current row → col 0 / max. Returns the fresh colIndex.
 // Home/End within the current row → col 0 / max. Returns the fresh colIndex.
 const gotoColEdge = (toEnd: any) => {
-  const max = visibleColCount() - 1;
+  // #10: End on a grouped PARENT header lands on that level's LAST header (headerCountAtLevel-1),
+  // not the leaf-column max — otherwise the ring strands on a phantom cell past the level's
+  // headers. Home is index 0 either way. Body cells + the leaf header level keep visibleColCount().
+  const count = activeIsHeader ? headerCountAtLevel(activeHeaderLevel) : visibleColCount();
+  const max = count - 1;
   const nextCol = toEnd ? max < 0 ? 0 : max : 0;
   activeColIndex = nextCol;
   return nextCol;
