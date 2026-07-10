@@ -799,6 +799,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
     this.columns, this._colReg.value])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this.reFeed();
+      this.maybeClearHistoryOnExternalSwap();
     })(); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => [this.sorting, this.columnFilters, this.globalFilter, this._sortingDefault.value, this._columnFiltersDefault.value, this._globalFilterDefault.value])(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
       const msg = this.buildSortFilterAnnounce();
@@ -1092,6 +1093,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   }
 
   updated(changedProperties: Map<string, unknown>): void {
+    this.maybeClearHistoryOnExternalSwap();
     if (!this.table) return;
     // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
     // $data.dataDefault) so a committed edit re-feeds on Lit whether or not r-model:data is
@@ -1354,15 +1356,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   focusIntentEpoch = 0;
 
+  DATA_WRITE_TOKEN_KEY = '__rozieDataWriteToken';
+
   undoStack: unknown[] = [];
 
   redoStack: unknown[] = [];
 
   restoringHistory: boolean = false;
-
-  dataWriteSettling: boolean = false;
-
-  dataWriteSettleHandle: ReturnType<typeof setTimeout> | null = null;
 
   expandedTouched = false;
 
@@ -1772,32 +1772,18 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this.recordSnapshot(this.currentData());
     this.emitHistoryChangeIfEdged(prevU, prevR);
   }
-  this.dataWriteSettling = true;
-  // Re-arm: a rapid back-to-back write cancels the prior pending close so the window
-  // never shuts BETWEEN two writes of one logical action.
-  if (this.dataWriteSettleHandle != null && typeof clearTimeout === 'function') clearTimeout(this.dataWriteSettleHandle);
-  const closeSettleWindow = () => {
-    this.dataWriteSettling = false;
-    this.dataWriteSettleHandle = null;
-  };
-  // WALL-CLOCK macrotask backstop (was a double-rAF nesting — 260709-8ct). reFeed's
-  // re-feed `$watch` on React runs as a POST-COMMIT passive effect; an rAF callback
-  // fires BEFORE paint, so under CI load React's reFeed landed AFTER the 2-frame rAF
-  // window had already closed → it read `dataWriteSettling === false` and WRONGLY
-  // cleared history (data-table-grid-undo [react] (c): paste block → Ctrl+Z was a
-  // no-op). A `setTimeout` runs strictly after React's MessageChannel-scheduled
-  // passive effect (MessageChannel drains before setTimeout), and a ~6-frame window
-  // gives every fine-grained target (Solid/Lit) FAR more settle room than 2 frames.
-  // A genuine external swap still happens outside any write's window → flag `false`
-  // → history cleared, exactly as before.
-  if (typeof setTimeout === 'function') {
-    this.dataWriteSettleHandle = setTimeout(closeSettleWindow, 96);
-  } else {
-    closeSettleWindow();
-  }
+  const fresh = Array.isArray(next) ? next.slice() : next;
+  try {
+    Object.defineProperty(fresh, this.DATA_WRITE_TOKEN_KEY, {
+      value: true,
+      enumerable: false,
+      configurable: true,
+      writable: true
+    });
+  } catch (_e: any) {/* a frozen/sealed array can't be stamped — our fresh arrays never are */}
   this.programmatic++;
-  this._dataDefault.value = next; // fresh array only (never in-place)
-  this._dataControllable.write(next); // two-way emit if bound (no-op-diff if not)
+  this._dataDefault.value = fresh; // fresh raw array only (never in-place, never a proxy)
+  this._dataControllable.write(fresh); // two-way emit if bound (no-op-diff if not)
   this.programmatic--;
 };
 
@@ -2181,19 +2167,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   reFeed = () => {
   if (!this.table) return;
-  // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl. an
-  // undo()/redo() replay) sets `dataWriteSettling = true` inside writeData and arms a deferred
-  // `rAF` reset. reFeed() fires on EVERY data-ref change — internal writeback and an external
-  // swap (new dataset, server refetch) look identical here — so read the flag: while `true`
-  // (we are still inside a just-triggered write's settling window) skip the clear, no matter
-  // how many redundant/transiently-stale reFeed passes fire during that window; once the
-  // window closes (the flag is back to `false`) a data change reaching reFeed is, by
-  // definition, one WE did not cause → an external swap → clear history (undoing across a
-  // dataset boundary is incoherent). See `let dataWriteSettling`'s declaration comment for the
-  // three rejected alternatives (a raw reference latch, a single-consume flag, and an
-  // idempotent content-signature compare — each broken by a different target's reactivity
-  // timing). undoable-gated so a shipped grid with undoable unset never pays this check.
-  if (this.undoable && !this.dataWriteSettling) this.clearHistory();
+  // NOTE: the external-swap history reset does NOT live here. reFeed() fires on EVERY watched
+  // change — including our OWN synchronous internal `$data.dataDefault` write — so a clear keyed
+  // on a `currentData()` read here would (on fine-grained targets) fire mid-round-trip against a
+  // TRANSIENTLY-STALE `$props.data` and wrongly wipe a just-recorded edit's history. The reset is
+  // keyed on the `$props.data` REFERENCE actually changing instead — see the $onUpdate backstop
+  // below (`maybeClearHistoryOnExternalSwap`), which runs on all six targets.
   this.table.setOptions((prev: any) => ({
     ...prev,
     data: this.currentData(),
@@ -2249,6 +2228,17 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     onColumnSizingInfoChange: this.onColumnSizingInfoChangeCb
   }));
   if (this.refreshRowModel) this.refreshRowModel();
+};
+
+  lastPropsData: unknown = null;
+
+  maybeClearHistoryOnExternalSwap = () => {
+  const pd = this.data;
+  if (pd === this.lastPropsData) return; // $props.data did not change → not an external swap
+  this.lastPropsData = pd;
+  if (!this.undoable) return;
+  if (pd != null && (pd as any)[this.DATA_WRITE_TOKEN_KEY] != null) return; // descends from our write → keep
+  this.clearHistory();
 };
 
   lastData: any = null;

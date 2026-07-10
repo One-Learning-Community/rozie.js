@@ -298,14 +298,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const rangeDragging = useRef(false);
   const lastData = useRef<any>(null);
   const lastDataLen = useRef(-1);
-  const dataWriteSettling = useRef<boolean>(false);
+  const lastPropsData = useRef<unknown>(null);
   const undoStack = useRef<unknown[]>([]);
   const redoStack = useRef<unknown[]>([]);
   const focusIntentEpoch = useRef(0);
   const committedThisSession = useRef(false);
   const editTransition = useRef(false);
   const restoringHistory = useRef<boolean>(false);
-  const dataWriteSettleHandle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [data, setData] = useControllableState({
     value: props.data,
     defaultValue: props.defaultData ?? [],
@@ -445,6 +444,37 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // shadow-safe because the query runs from INSIDE the component's own scope (the listbox
   // querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
   // computed/template binding (ROZ123).
+  // ── Grid-wide undo/redo (260709-8ct) — history STATE lives in top-level `let` (mirroring
+  // `programmatic` above), NOT $data: recording a snapshot on every keystroke must not trigger
+  // a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array
+  // REFERENCES (never deep copies — see undoHistory.rzts's header comment on the shared-row
+  // invariant). restoringHistory suppresses re-recording while an undo()/redo() replay is
+  // in flight.
+  //
+  // The external-swap history reset keys on data ORIGIN, not a timing window. Every internal
+  // writeback stamps its fresh `data` array with a durable, non-enumerable marker under
+  // DATA_WRITE_TOKEN_KEY (see writeData in writeFunnels.rzts); the reset (maybeClearHistoryOnExternal
+  // Swap, below) clears history ONLY when a newly-supplied `$props.data` carries no marker — it did
+  // not come from us, so it is a genuine external dataset swap. Presence of the marker ⟺ "descends
+  // from one of our writes", and it survives EVERYTHING that defeated the four flag/timer variants:
+  //   1. A raw-reference latch (`lastWrittenData === currentData()`) — Vue `reactive()` / Svelte 5
+  //      `$state` / Solid store re-wrap a written array in a NEW Proxy on its way back through props,
+  //      so `===` never holds. (A non-enumerable own PROPERTY, by contrast, is forwarded through
+  //      every target's reactive Proxy via `Reflect.get` — readable through the wrap.)
+  //   2. A single-consume boolean — the re-feed watch fires MULTIPLE times per write; the first pass
+  //      consumed the flag, a later pass wrongly cleared.
+  //   3. A content signature (`JSON.stringify`) — the watch can fire with a TRANSIENTLY STALE
+  //      `currentData()` mid-settle (Solid/Lit), a real-but-older value → false mismatch.
+  //   4. A deferred settle-window flag (rAF, then a 96ms macrotask) — a slow re-feed on a LARGE
+  //      controlled table OUTRAN the window (#8); no fixed timeout can be correct (re-feed latency
+  //      scales with dataset size).
+  // A STRING key (not a JS Symbol) is deliberate: it is stable BY VALUE on all six targets with ZERO
+  // caching, whereas a `Symbol()` needs a per-instance memo to hold one identity — and Lit lowers
+  // `$computed(() => Symbol())` to a plain getter that RE-MINTS the Symbol on every read, so writeData
+  // and the reset would stamp/read DIFFERENT symbols and the marker would never match. Non-enumerable
+  // → invisible to JSON.stringify / spread / Object.keys (the consumer's data stays clean); namespaced
+  // so a consumer array never collides.
+  const DATA_WRITE_TOKEN_KEY = '__rozieDataWriteToken';
   function groupingActiveDefault() {
     return ((grouping != null ? grouping : groupingDefault) || []).length > 0;
   }
@@ -811,32 +841,18 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       recordSnapshot(currentData());
       emitHistoryChangeIfEdged(prevU, prevR);
     }
-    dataWriteSettling.current = true;
-    // Re-arm: a rapid back-to-back write cancels the prior pending close so the window
-    // never shuts BETWEEN two writes of one logical action.
-    if (dataWriteSettleHandle.current != null && typeof clearTimeout === 'function') clearTimeout(dataWriteSettleHandle.current);
-    const closeSettleWindow = () => {
-      dataWriteSettling.current = false;
-      dataWriteSettleHandle.current = null;
-    };
-    // WALL-CLOCK macrotask backstop (was a double-rAF nesting — 260709-8ct). reFeed's
-    // re-feed `$watch` on React runs as a POST-COMMIT passive effect; an rAF callback
-    // fires BEFORE paint, so under CI load React's reFeed landed AFTER the 2-frame rAF
-    // window had already closed → it read `dataWriteSettling === false` and WRONGLY
-    // cleared history (data-table-grid-undo [react] (c): paste block → Ctrl+Z was a
-    // no-op). A `setTimeout` runs strictly after React's MessageChannel-scheduled
-    // passive effect (MessageChannel drains before setTimeout), and a ~6-frame window
-    // gives every fine-grained target (Solid/Lit) FAR more settle room than 2 frames.
-    // A genuine external swap still happens outside any write's window → flag `false`
-    // → history cleared, exactly as before.
-    if (typeof setTimeout === 'function') {
-      dataWriteSettleHandle.current = setTimeout(closeSettleWindow, 96);
-    } else {
-      closeSettleWindow();
-    }
+    const fresh = Array.isArray(next) ? next.slice() : next;
+    try {
+      Object.defineProperty(fresh, DATA_WRITE_TOKEN_KEY, {
+        value: true,
+        enumerable: false,
+        configurable: true,
+        writable: true
+      });
+    } catch (_e: any) {/* a frozen/sealed array can't be stamped — our fresh arrays never are */}
     programmatic.current++;
-    setDataDefault(next); // fresh array only (never in-place)
-    setData(next); // two-way emit if bound (no-op-diff if not)
+    setDataDefault(fresh); // fresh raw array only (never in-place, never a proxy)
+    setData(fresh); // two-way emit if bound (no-op-diff if not)
     programmatic.current--;
   }
   function columnFilterValue(colId: any) {
@@ -1179,19 +1195,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   const reFeed = useCallback(() => {
     if (!table.current) return;
-    // 260709-8ct (grid-wide undo/redo, external-swap reset): every INTERNAL writeback (incl. an
-    // undo()/redo() replay) sets `dataWriteSettling = true` inside writeData and arms a deferred
-    // `rAF` reset. reFeed() fires on EVERY data-ref change — internal writeback and an external
-    // swap (new dataset, server refetch) look identical here — so read the flag: while `true`
-    // (we are still inside a just-triggered write's settling window) skip the clear, no matter
-    // how many redundant/transiently-stale reFeed passes fire during that window; once the
-    // window closes (the flag is back to `false`) a data change reaching reFeed is, by
-    // definition, one WE did not cause → an external swap → clear history (undoing across a
-    // dataset boundary is incoherent). See `let dataWriteSettling`'s declaration comment for the
-    // three rejected alternatives (a raw reference latch, a single-consume flag, and an
-    // idempotent content-signature compare — each broken by a different target's reactivity
-    // timing). undoable-gated so a shipped grid with undoable unset never pays this check.
-    if (props.undoable && !dataWriteSettling.current) clearHistory();
+    // NOTE: the external-swap history reset does NOT live here. reFeed() fires on EVERY watched
+    // change — including our OWN synchronous internal `$data.dataDefault` write — so a clear keyed
+    // on a `currentData()` read here would (on fine-grained targets) fire mid-round-trip against a
+    // TRANSIENTLY-STALE `$props.data` and wrongly wipe a just-recorded edit's history. The reset is
+    // keyed on the `$props.data` REFERENCE actually changing instead — see the $onUpdate backstop
+    // below (`maybeClearHistoryOnExternalSwap`), which runs on all six targets.
     table.current.setOptions((prev: any) => ({
       ...prev,
       data: currentData(),
@@ -1247,7 +1256,15 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       onColumnSizingInfoChange: onColumnSizingInfoChangeCb
     }));
     if (refreshRowModel.current) refreshRowModel.current();
-  }, [clearHistory, currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.pageCount, props.rowCount, props.selectionMode, props.undoable, tableColumns]);
+  }, [currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.pageCount, props.rowCount, props.selectionMode, tableColumns]);
+  const maybeClearHistoryOnExternalSwap = useCallback(() => {
+    const pd = data;
+    if (pd === lastPropsData.current) return; // $props.data did not change → not an external swap
+    lastPropsData.current = pd;
+    if (!props.undoable) return;
+    if (pd != null && (pd as any)[DATA_WRITE_TOKEN_KEY] != null) return; // descends from our write → keep
+    clearHistory();
+  }, [clearHistory, data, props.undoable]);
   const onHeaderSort = useCallback((colId: any, evt: any) => {
     if (!table.current) return;
     const col = table.current.getColumn(colId);
@@ -4555,6 +4572,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     };
   }, []);
   useEffect(() => {
+    maybeClearHistoryOnExternalSwap();
     if (!table.current) return;
     // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
     // $data.dataDefault) so a committed edit re-feeds on Lit whether or not r-model:data is
@@ -4565,10 +4583,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     lastData.current = d;
     lastDataLen.current = d.length;
     reFeed();
-  }, [currentData, lastData, lastDataLen, reFeed, table]);
+  }, [currentData, lastData, lastDataLen, maybeClearHistoryOnExternalSwap, reFeed, table]);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     reFeed();
+    maybeClearHistoryOnExternalSwap();
   }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, expanded, globalFilter, grouping, pagination, props.columns, props.expandable, props.groupable, props.pageCount, props.rowCount, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }

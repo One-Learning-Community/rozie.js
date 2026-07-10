@@ -65,6 +65,12 @@
   // canUndo()/canRedo() verb-call readouts.
   canUndoResult: '',
   canRedoResult: '',
+  // (j) CONTROLLED sorting for the primary instance — a NON-data watched state change.
+  // The (j) regression proves that toggling this AFTER an edit (outside any data-write
+  // settle window) must NOT wipe undo history: reFeed's history-clear must key on data
+  // ORIGIN, not on "some watched thing changed while no write was settling". Starts empty
+  // (no sort) so tests (a)-(i) render/behave identically.
+  pSort: [],
 }
 </data>
 
@@ -110,6 +116,14 @@ const swapData = (): void => {
     { id: 101, label: 'New2', qty: 998, city: 'Nowhere' },
   ]
 }
+
+// (j) Controlled-sort toggle: change a NON-data watched state (the sorting model). This
+// fires the re-feed $watch WITHOUT changing the data — so reFeed must NOT treat it as an
+// external dataset swap and wipe undo history. (The dataWriteSettling flag it replaces got
+// this wrong: any watched change outside a write's settle window cleared history.)
+const toggleSort = (): void => {
+  $data.pSort = $data.pSort.length ? [] : [{ id: 'qty', desc: true }]
+}
 </script>
 
 <template>
@@ -123,6 +137,7 @@ const swapData = (): void => {
     <button type="button" data-testid="canredo-btn" @click="callCanRedo">canRedo()</button>
     <button type="button" data-testid="clear-history-btn" @click="callClearHistory">clearHistory()</button>
     <button type="button" data-testid="swap-data-btn" @click="swapData">swap data</button>
+    <button type="button" data-testid="toggle-sort-btn" @click="toggleSort">toggle sort</button>
     <span class="label">canUndo:</span>
     <span class="readout" data-testid="canundo-readout">{{ $data.canUndoResult }}</span>
     <span class="label">canRedo:</span>
@@ -145,6 +160,7 @@ const swapData = (): void => {
       :undoable="true"
       :undoLimit="2"
       r-model:data="$data.rows"
+      r-model:sorting="$data.pSort"
       @history-change="onHistoryChange($event)"
     >
       <Column field="label" header="Label" :editable="true" editor="text" />

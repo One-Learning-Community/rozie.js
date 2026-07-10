@@ -474,4 +474,37 @@ for (const target of TARGETS) {
     await page.getByTestId('redo-btn').click();
     await expect.poll(async () => (await modelRows(page, 'model-readout'))[2]?.label, { timeout: 10_000 }).toBe('Omicron');
   });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // (j) — a NON-data controlled state change (sorting) AFTER an edit must NOT wipe undo
+  //   history. This is the DETERMINISTIC face of the #8 root cause: reFeed cleared history
+  //   whenever the re-feed $watch fired with the data-write settle window CLOSED — regardless
+  //   of whether the DATA actually swapped. A controlled sort/filter tick (or, on a large
+  //   table, a slow internal writeback whose own reFeed lands after the 96ms window) was thus
+  //   misread as an external dataset swap → clearHistory() → Ctrl+Z no-op. The fix keys the
+  //   clear on data ORIGIN (a durable per-write token stamped on the array), so any non-data
+  //   watch tick leaves history intact.
+  // ════════════════════════════════════════════════════════════════════════════════
+  runnerFor(target)(`data-table-grid-undo [${target}]: (j) a controlled sort after an edit does NOT wipe undo history`, async ({ page }) => {
+    await gotoDemo(page, target);
+    expect((await modelRows(page, 'model-readout'))[0]?.label).toBe('Alpha');
+
+    // Edit a cell → history recorded.
+    await enterEditAt(page, 'grid-table', 0, 0);
+    await commitEditorValue(page, 'Kappa');
+    await expect.poll(async () => (await modelRows(page, 'model-readout'))[0]?.label, { timeout: 10_000 }).toBe('Kappa');
+
+    // Let the (old) 96ms data-write settle window close, THEN change a NON-data watched
+    // state (the controlled sorting model). Pre-fix, this reFeed read dataWriteSettling===false
+    // and wrongly cleared history; post-fix the visible data still carries its origin token.
+    await page.waitForTimeout(250);
+    await page.getByTestId('toggle-sort-btn').click();
+    await page.waitForTimeout(150);
+
+    // History must SURVIVE: Ctrl+Z reverts the edit. model-readout is the DATA array (sort is
+    // display-only), so row 0 stays the edited logical row regardless of visual order.
+    await focusBodyCellStable(page, 'grid-table', 0, 0);
+    await page.keyboard.press('Control+z');
+    await expect.poll(async () => (await modelRows(page, 'model-readout'))[0]?.label, { timeout: 10_000 }).toBe('Alpha');
+  });
 }

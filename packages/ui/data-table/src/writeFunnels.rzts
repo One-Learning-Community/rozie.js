@@ -181,16 +181,22 @@ const writeColumnPinning = (next) => {
 // re-feed watch; without the guard the replay would re-record itself and corrupt the
 // stack). `emitHistoryChangeIfEdged` fires `history-change` only when canUndo/canRedo
 // availability actually flipped (a long streak of edits that doesn't change availability
-// must not spam consumers). `dataWriteSettling` ALWAYS arms — undoable or not — it is the
-// external-swap DEFERRED-RESET flag DataTable.rozie's reFeed() reads (NOT a reference/content
-// check — see `let dataWriteSettling`'s declaration comment in DataTable.rozie for why a raw
-// reference latch AND a single-consume boolean AND an idempotent content-signature compare
-// were all rejected); every internal writeback (incl. an undo/redo replay) arms it, so reFeed()
-// finding it already closed (`false`) means an external swap. A double-rAF nesting (not a
-// single frame) gives every target's fine-grained reactivity settling cascade room to finish
-// BEFORE the window closes, however many redundant reFeed passes it takes; re-arming a
-// still-pending prior reset (`cancelAnimationFrame`) keeps back-to-back rapid edits from
-// closing the window between them.
+// must not spam consumers).
+//
+// External-swap origin marker: stamp EVERY array we write (undoable or not, incl. an undo/
+// redo replay) with the durable, non-enumerable marker under DATA_WRITE_TOKEN_KEY. The reset
+// (maybeClearHistoryOnExternalSwap in DataTable.rozie) clears history only when a new $props.data
+// lacks the marker → it did not come from us → a genuine external swap. This replaces the
+// `dataWriteSettling` settle-window flag that a slow re-feed on a large controlled table outran
+// (#8) — see DATA_WRITE_TOKEN_KEY's declaration in DataTable.rozie for the four flag/timer
+// variants it supersedes and why the marker is timing-independent. Stamped on the fresh `next`
+// array (never the consumer's original), non-enumerable so JSON.stringify / spread / Object.keys
+// never see it. We write a FRESH RAW shallow copy (`fresh`) so the marker lands on an UNWRAPPED
+// array: an undo/redo replay reuses a snapshot that, in controlled mode, is a framework reactive
+// PROXY (svelte `$state`, vue `reactive`) — and `Object.defineProperty` does NOT reliably stick
+// through a proxy's trap, so stamping the raw copy (never the possibly-proxied `next`) keeps the
+// marker readable. Normal edits already pass a fresh array; the copy shares row references (cheap).
+// `try` guards the (never-expected) frozen/sealed-array case.
 const writeData = (next) => {
   if (programmatic) return
   if ($props.undoable && !restoringHistory) {
@@ -199,29 +205,13 @@ const writeData = (next) => {
     recordSnapshot(currentData())
     emitHistoryChangeIfEdged(prevU, prevR)
   }
-  dataWriteSettling = true
-  // Re-arm: a rapid back-to-back write cancels the prior pending close so the window
-  // never shuts BETWEEN two writes of one logical action.
-  if (dataWriteSettleHandle != null && typeof clearTimeout === 'function') clearTimeout(dataWriteSettleHandle)
-  const closeSettleWindow = () => { dataWriteSettling = false; dataWriteSettleHandle = null }
-  // WALL-CLOCK macrotask backstop (was a double-rAF nesting — 260709-8ct). reFeed's
-  // re-feed `$watch` on React runs as a POST-COMMIT passive effect; an rAF callback
-  // fires BEFORE paint, so under CI load React's reFeed landed AFTER the 2-frame rAF
-  // window had already closed → it read `dataWriteSettling === false` and WRONGLY
-  // cleared history (data-table-grid-undo [react] (c): paste block → Ctrl+Z was a
-  // no-op). A `setTimeout` runs strictly after React's MessageChannel-scheduled
-  // passive effect (MessageChannel drains before setTimeout), and a ~6-frame window
-  // gives every fine-grained target (Solid/Lit) FAR more settle room than 2 frames.
-  // A genuine external swap still happens outside any write's window → flag `false`
-  // → history cleared, exactly as before.
-  if (typeof setTimeout === 'function') {
-    dataWriteSettleHandle = setTimeout(closeSettleWindow, 96)
-  } else {
-    closeSettleWindow()
-  }
+  const fresh = Array.isArray(next) ? next.slice() : next
+  try {
+    Object.defineProperty(fresh, DATA_WRITE_TOKEN_KEY, { value: true, enumerable: false, configurable: true, writable: true })
+  } catch (_e) { /* a frozen/sealed array can't be stamped — our fresh arrays never are */ }
   programmatic++
-  $data.dataDefault = next   // fresh array only (never in-place)
-  $model.data = next          // two-way emit if bound (no-op-diff if not)
+  $data.dataDefault = fresh   // fresh raw array only (never in-place, never a proxy)
+  $model.data = fresh          // two-way emit if bound (no-op-diff if not)
   programmatic--
 }
 
