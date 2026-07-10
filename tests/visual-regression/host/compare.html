@@ -258,9 +258,23 @@
       }
 
       const initial = paramOrDefault('example', 'ModalConsumer');
-      if (EXAMPLES.includes(initial)) select.value = initial;
-      else select.value = 'Counter';
-      setExample(select.value);
+      // Honor ANY ?example= — even one that isn't in the curated dropdown (e.g. a
+      // Screenshot-only VR cell like SwitchScreenshot). If it's uncurated, add a
+      // transient "From URL" option so the <select> reflects it instead of
+      // snapping back to a default. The example only has to be registered in the
+      // host bootstrap (main.ts) to render. Drive setExample() from `initial`, NOT
+      // select.value, so the URL param is never discarded.
+      if (!EXAMPLES.includes(initial)) {
+        const og = document.createElement('optgroup');
+        og.label = 'From URL';
+        const opt = document.createElement('option');
+        opt.value = initial;
+        opt.textContent = initial;
+        og.appendChild(opt);
+        select.insertBefore(og, select.firstChild);
+      }
+      select.value = initial;
+      setExample(initial);
 
       select.addEventListener('change', () => setExample(select.value));
     </script>
