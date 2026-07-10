@@ -19,6 +19,8 @@ packages/core/src/modifier-grammar/generated.js
 # Playwright test artifacts
 test-results/
 playwright-report/
+# Generated VR diff-report (scripts/vr-diff-report.mjs default output)
+vr-diff-report.html
 
 # Vite test artifacts (left over from spike tests using __dirname-relative tmp)
 examples/consumers/*/.tmp-*/
