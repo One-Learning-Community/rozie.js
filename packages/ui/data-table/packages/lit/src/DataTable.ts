@@ -4286,6 +4286,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (!e) return;
   if (e.preventDefault) e.preventDefault();
   if (e.stopPropagation) e.stopPropagation();
+  // #leak: tear down any orphaned PRIOR gesture BEFORE reassigning the module-let handlers. If a
+  // pointerup was missed (pointer released off-window, context menu, alt-tab), the prior fillDrag's
+  // document pointermove/pointerup stay attached; overwriting fillDragMove/fillDragUp below would
+  // strand them (removeEventListener could never reach the old refs) → a permanent global
+  // pointermove leak. teardownFillDrag is idempotent (no-op when nothing is attached).
+  this.teardownFillDrag();
   this.fillDragging = true;
   // B7: snapshot the PRE-DRAG rectangle (the fill SOURCE) NOW, before pointermove grows the
   // range via setRangeFocus. fillRange reads each source column's own value off THIS box, so an
@@ -4351,6 +4357,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 };
 
   beginRangeDrag = (anchorR: any, anchorC: any) => {
+  // #leak: tear down any orphaned PRIOR range gesture BEFORE reassigning the module-let handlers.
+  // A missed pointerup (off-window release, context menu, alt-tab) leaves the prior drag's document
+  // pointermove/pointerup attached; overwriting rangeDragMove/rangeDragUp below would strand them
+  // (removeEventListener could never reach the old refs) → a permanent global pointermove leak.
+  // teardownRangeDrag is idempotent (no-op when nothing is attached) and does NOT touch
+  // rangeDragMoved, which is reset per-gesture immediately below.
+  this.teardownRangeDrag();
   this.rangeDragging = true;
   this.rangeDragMoved = false;
   let lastCell = {

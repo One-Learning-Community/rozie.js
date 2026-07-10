@@ -4864,6 +4864,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     if (!e) return;
     if (e.preventDefault) e.preventDefault();
     if (e.stopPropagation) e.stopPropagation();
+    // #leak: tear down any orphaned PRIOR gesture BEFORE reassigning the module-let handlers. If a
+    // pointerup was missed (pointer released off-window, context menu, alt-tab), the prior fillDrag's
+    // document pointermove/pointerup stay attached; overwriting fillDragMove/fillDragUp below would
+    // strand them (removeEventListener could never reach the old refs) → a permanent global
+    // pointermove leak. teardownFillDrag is idempotent (no-op when nothing is attached).
+    teardownFillDrag();
     fillDragging = true;
     // B7: snapshot the PRE-DRAG rectangle (the fill SOURCE) NOW, before pointermove grows the
     // range via setRangeFocus. fillRange reads each source column's own value off THIS box, so an
@@ -4951,6 +4957,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // events per cell (setRangeFocus emits range-change — only extend on a NEW cell, mirroring fillDrag's
   // B20 dedup). Captured per-gesture in the closure (no module-let needed for lastCell).
   function beginRangeDrag(anchorR: any, anchorC: any) {
+    // #leak: tear down any orphaned PRIOR range gesture BEFORE reassigning the module-let handlers.
+    // A missed pointerup (off-window release, context menu, alt-tab) leaves the prior drag's document
+    // pointermove/pointerup attached; overwriting rangeDragMove/rangeDragUp below would strand them
+    // (removeEventListener could never reach the old refs) → a permanent global pointermove leak.
+    // teardownRangeDrag is idempotent (no-op when nothing is attached) and does NOT touch
+    // rangeDragMoved, which is reset per-gesture immediately below.
+    teardownRangeDrag();
     rangeDragging = true;
     rangeDragMoved = false;
     let lastCell = {
