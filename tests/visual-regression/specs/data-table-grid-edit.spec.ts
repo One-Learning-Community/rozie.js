@@ -307,15 +307,19 @@ for (const target of TARGETS) {
   //   gridRoot → the editor stays open + onGridKeyDown early-returns while editing.
   // ════════════════════════════════════════════════════════════════════════════════
   runnerFor(target)(`data-table-grid-edit [${target}]: B1 click-away to another grid cell commits+closes; grid stays navigable`, async ({ page }) => {
-    await gotoGrid(page, target);
+    const mount = await gotoGrid(page, target);
     await enterEditAt(page, 0, 0); // open the name editor
     // Confirm the editor <input> actually holds focus before the click-away, else the blur
     // (and the commit that rides it) never fires under container/worker load.
     await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
+    // Change the value so the click-away is a REAL commit (a no-op commit emits nothing — #5).
+    await mount.locator('[data-editing-cell]').fill('B1Edit');
     const before = await commitCount(page);
     await clickBodyCell(page, 1, 1); // click a DIFFERENT grid cell
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull(); // editor closed
     await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(before + 1);
+    // The real edit was written to the model row 0.
+    await expect.poll(async () => (await modelRows(page))[0]?.name, { timeout: 10_000 }).toBe('B1Edit');
     // The grid is navigable again: ArrowDown moves the active cell off row 1.
     await expect.poll(async () => (await activeCellCoords(page))?.row, { timeout: 10_000 }).toBe('1');
     await page.keyboard.press('ArrowDown');
@@ -426,14 +430,18 @@ for (const target of TARGETS) {
   // parity baseline). Single navigation per test so the click-away focus teardown is not
   // coupled across the two editor kinds.
   runnerFor(target)(`data-table-grid-edit [${target}]: B26 built-in editor commits on click-away`, async ({ page }) => {
-    await gotoGrid(page, target);
+    const mount = await gotoGrid(page, target);
     await enterEditAt(page, 0, 0); // built-in text editor
     // Confirm the editor <input> holds focus before the click-away (else no blur → no commit).
     await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
+    // Change the value so the click-away is a REAL commit (a no-op commit emits nothing — #5).
+    await mount.locator('[data-editing-cell]').fill('B26aEdit');
     const before = await commitCount(page);
     await clickBodyCell(page, 2, 0);
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
     await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(before + 1);
+    // The real edit was written to the model row 0.
+    await expect.poll(async () => (await modelRows(page))[0]?.name, { timeout: 10_000 }).toBe('B26aEdit');
   });
 
   // B26b — a #editor DROP-IN editor (EditorText) commits + closes on click-away IDENTICALLY
@@ -450,10 +458,17 @@ for (const target of TARGETS) {
     // focus landed, else the click-away produces no blur (and no commit).
     await focusEditorInput(page);
     await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
+    // Mutate the drop-in draft so the click-away is a REAL commit (a no-op commit emits nothing — #5).
+    // The drop-in renders its <input> in a nested shadow root on Lit, so drive it via the focused
+    // input (keyboard) and assert the model changed by inequality (target/shadow agnostic).
+    const beforeNote = (await modelRows(page))[0]?.note;
+    await page.keyboard.type('X');
     const before = await commitCount(page);
     await clickBodyCell(page, 2, 0);
     await expect.poll(async () => openEditor(page), { timeout: 10_000 }).toBeNull();
     await expect.poll(async () => commitCount(page), { timeout: 10_000 }).toBe(before + 1);
+    // The real edit was written to the model row 0 note.
+    await expect.poll(async () => (await modelRows(page))[0]?.note, { timeout: 10_000 }).not.toBe(beforeNote);
   });
 
   // ════════════════════════════════════════════════════════════════════════════════
