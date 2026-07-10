@@ -206,7 +206,25 @@ const NUMERIC_HTML_ATTRS: ReadonlySet<string> = new Set([
  * `!!x` binding is `wrapForDisplay=false` and never reaches here (raw emit, byte-unchanged).
  */
 const BOOLEAN_NULLISH_ARIA_ATTRS: ReadonlySet<string> = new Set([
+  // Pure-`Booleanish` ARIA attributes (Solid's JSX types each `boolean | 'false'
+  // | 'true' | undefined`). A nullish-branch boolean binding (`cond ? !!x : null`)
+  // routed through `rozieAttr` widens to `string` → TS2322.
+  'aria-atomic',
+  'aria-busy',
+  'aria-disabled',
   'aria-expanded',
+  'aria-grabbed',
+  'aria-hidden',
+  'aria-modal',
+  'aria-multiline',
+  'aria-multiselectable',
+  'aria-readonly',
+  'aria-required',
+  'aria-selected',
+  // Tristate ARIA attributes (`boolean | 'false' | 'mixed' | 'true' | undefined`);
+  // a `boolean | undefined` value from `(expr) ?? undefined` is assignable.
+  'aria-checked',
+  'aria-pressed',
 ]);
 
 /**

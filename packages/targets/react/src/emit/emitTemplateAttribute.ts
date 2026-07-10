@@ -191,7 +191,26 @@ const NUMERIC_HTML_ATTRS: ReadonlySet<string> = new Set([
  * expander-button `aria-expanded={!!rowIsExpanded(row)}` form is byte-unchanged.
  */
 const BOOLEAN_NULLISH_ARIA_ATTRS: ReadonlySet<string> = new Set([
+  // Pure-`Booleanish` ARIA attributes (React `AriaAttributes` types each as
+  // `boolean | 'false' | 'true' | undefined`). A nullish-branch boolean binding
+  // (`cond ? !!x : null`) routed through `rozieAttr` widens to `string` → TS2322.
+  'aria-atomic',
+  'aria-busy',
+  'aria-disabled',
   'aria-expanded',
+  'aria-grabbed',
+  'aria-hidden',
+  'aria-modal',
+  'aria-multiline',
+  'aria-multiselectable',
+  'aria-readonly',
+  'aria-required',
+  'aria-selected',
+  // Tristate ARIA attributes (`boolean | 'false' | 'mixed' | 'true' | undefined`).
+  // A `boolean | undefined` value from `(expr) ?? undefined` is assignable to the
+  // tristate slot, so the same nullish-boolean shape is served correctly here too.
+  'aria-checked',
+  'aria-pressed',
 ]);
 
 /**

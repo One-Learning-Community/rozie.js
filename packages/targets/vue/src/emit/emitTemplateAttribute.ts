@@ -168,8 +168,24 @@ const NULLABLE_DOM_ATTR_SLOTS: ReadonlySet<string> = new Set([
   'aria-valuenow',
   'aria-valuemin',
   'aria-valuemax',
-  // Boolean-enumerated ARIA slot (react BOOLEAN_NULLISH_ARIA_ATTRS).
+  // Boolean-enumerated ARIA slots (react BOOLEAN_NULLISH_ARIA_ATTRS): the
+  // pure-`Booleanish` set plus the tristate attrs (`aria-checked`/`aria-pressed`)
+  // that still accept `boolean`. Each vue-tsc slot is `X | undefined` (never `null`),
+  // so a nullish-branch boolean binding bound RAW is a TS2322 — wrap to drop.
+  'aria-atomic',
+  'aria-busy',
+  'aria-checked',
+  'aria-disabled',
   'aria-expanded',
+  'aria-grabbed',
+  'aria-hidden',
+  'aria-modal',
+  'aria-multiline',
+  'aria-multiselectable',
+  'aria-pressed',
+  'aria-readonly',
+  'aria-required',
+  'aria-selected',
   // String-typed ARIA slots in the vue family-child TS2322 inventory. React
   // routes these through `rozieAttr`; Vue has no such fallback, so it wraps.
   'aria-activedescendant',
