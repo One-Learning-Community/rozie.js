@@ -2402,7 +2402,7 @@ export class DataTable {
   cellIsGrouped = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsGrouped && cellCtx.getIsGrouped());
   cellIsAggregated = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsAggregated && cellCtx.getIsAggregated());
   cellIsPlaceholder = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
-  groupSubRowCount = (row: any) => row && row.subRows ? row.subRows.length : 0;
+  groupSubRowCount = (row: any) => row && row.getLeafRows ? row.getLeafRows().length : row && row.subRows ? row.subRows.length : 0;
   groupingKeys = () => this.currentState().grouping || [];
   groupableColumns = () => {
     const out = [];

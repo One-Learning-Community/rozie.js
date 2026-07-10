@@ -1511,7 +1511,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return !!(tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
   }
   function groupSubRowCount(row: any) {
-    return row && row.subRows ? row.subRows.length : 0;
+    return row && row.getLeafRows ? row.getLeafRows().length : row && row.subRows ? row.subRows.length : 0;
   }
   function groupingKeys() {
     return currentState().grouping || [];

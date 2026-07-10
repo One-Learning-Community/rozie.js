@@ -2643,10 +2643,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   function cellIsPlaceholder(cellCtx: any) {
     return !!(tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
   }
-  // groupSubRowCount: the number of immediate members under a group-header row (the count shown in
-  // the header, e.g. "North (3)").
+  // groupSubRowCount: the number of underlying LEAF RECORDS under a group-header row (the count
+  // shown in the header, e.g. "North (40)"). row.subRows is the IMMEDIATE members — for MULTI-LEVEL
+  // grouping those are sub-GROUPS, not records, so "North" with 2 categories / 40 records would show
+  // "North (2)". getLeafRows() returns all leaf descendants (the actual record count); keep the
+  // subRows fallback for safety. Single-level grouping is unchanged (getLeafRows == subRows when the
+  // children are already leaves).
   function groupSubRowCount(row: any) {
-    return row && row.subRows ? row.subRows.length : 0;
+    return row && row.getLeafRows ? row.getLeafRows().length : row && row.subRows ? row.subRows.length : 0;
   }
   // groupingKeys: the live ordered grouping array — slot prop for the headless #groupBar + the
   // default styled-token reflection. Reads currentState() ($props.grouping ?? $data.groupingDefault),

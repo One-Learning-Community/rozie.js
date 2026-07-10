@@ -2533,7 +2533,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   cellIsPlaceholder = (cellCtx: any) => !!(this.tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
 
-  groupSubRowCount = (row: any) => row && row.subRows ? row.subRows.length : 0;
+  groupSubRowCount = (row: any) => row && row.getLeafRows ? row.getLeafRows().length : row && row.subRows ? row.subRows.length : 0;
 
   groupingKeys = () => this.currentState().grouping || [];
 

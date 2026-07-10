@@ -2532,11 +2532,19 @@ const cellIsAggregated = (cellCtx: any) => !!(tick() >= 0 && cellCtx && cellCtx.
 // template branch so the leaked leaf value never paints. Tick-gated exactly like cellIsGrouped
 // so the group chrome re-derives on a re-pull on the fine-grained targets (Solid/Lit).
 const cellIsPlaceholder = (cellCtx: any) => !!(tick() >= 0 && cellCtx && cellCtx.getIsPlaceholder && cellCtx.getIsPlaceholder());
-// groupSubRowCount: the number of immediate members under a group-header row (the count shown in
-// the header, e.g. "North (3)").
-// groupSubRowCount: the number of immediate members under a group-header row (the count shown in
-// the header, e.g. "North (3)").
-const groupSubRowCount = (row: any) => row && row.subRows ? row.subRows.length : 0;
+// groupSubRowCount: the number of underlying LEAF RECORDS under a group-header row (the count
+// shown in the header, e.g. "North (40)"). row.subRows is the IMMEDIATE members — for MULTI-LEVEL
+// grouping those are sub-GROUPS, not records, so "North" with 2 categories / 40 records would show
+// "North (2)". getLeafRows() returns all leaf descendants (the actual record count); keep the
+// subRows fallback for safety. Single-level grouping is unchanged (getLeafRows == subRows when the
+// children are already leaves).
+// groupSubRowCount: the number of underlying LEAF RECORDS under a group-header row (the count
+// shown in the header, e.g. "North (40)"). row.subRows is the IMMEDIATE members — for MULTI-LEVEL
+// grouping those are sub-GROUPS, not records, so "North" with 2 categories / 40 records would show
+// "North (2)". getLeafRows() returns all leaf descendants (the actual record count); keep the
+// subRows fallback for safety. Single-level grouping is unchanged (getLeafRows == subRows when the
+// children are already leaves).
+const groupSubRowCount = (row: any) => row && row.getLeafRows ? row.getLeafRows().length : row && row.subRows ? row.subRows.length : 0;
 // groupingKeys: the live ordered grouping array — slot prop for the headless #groupBar + the
 // default styled-token reflection. Reads currentState() ($props.grouping ?? $data.groupingDefault),
 // both reactive sources, so the bar re-renders on a grouping change across all six targets.
