@@ -3910,7 +3910,14 @@ export class DataTable {
     const up = () => {
       // teardownFillDrag clears fillDragging + removes both listeners (CR-04 shared path).
       this.teardownFillDrag();
-      this.fillRange(sourceBox, lastCell);
+      // A plain click on the fill handle (pointerdown+up with NO intervening drag) leaves lastCell
+      // at the source box's own origin corner (r1,c1), so fillRange(sourceBox, corner) would
+      // recommit the source range onto ITSELF — a no-op write that pollutes undo history and fires
+      // spurious per-cell cell-edit-commit events (oldValue === newValue). Only fill when the drag
+      // actually reached a cell past the source origin.
+      if (lastCell && sourceBox && (lastCell.r !== sourceBox.r1 || lastCell.c !== sourceBox.c1)) {
+        this.fillRange(sourceBox, lastCell);
+      }
     };
     // Track the live handlers so $onUnmount can remove them on a mid-drag unmount (CR-04).
     this.fillDragMove = move;
