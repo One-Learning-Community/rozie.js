@@ -4621,7 +4621,15 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // nothing. A ragged/short source row defaults the missing cell to '' (coerced per column on write).
   function tileGridToBox(grid: any, box: any) {
     const srcRows = grid.length;
-    const srcCols = srcRows > 0 ? grid[0].length : 0;
+    // srcCols is the MAX row width across ALL rows (not grid[0].length): a RAGGED clipboard
+    // (a later row WIDER than the first, e.g. TSV "a\tb\nc\td\te") would otherwise never read
+    // the extra column and silently drop those cells. A row SHORTER than srcCols tiles its
+    // missing cells as '' (the `v != null ? v : ''` coercion below), never undefined.
+    let srcCols = 0;
+    for (let i = 0; i < srcRows; i++) {
+      const w = grid[i] && grid[i].length ? grid[i].length : 0;
+      if (w > srcCols) srcCols = w;
+    }
     if (srcRows <= 0 || srcCols <= 0) return grid;
     const boxRows = box.r1 - box.r0 + 1;
     const boxCols = box.c1 - box.c0 + 1;
