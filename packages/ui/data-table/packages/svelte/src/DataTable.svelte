@@ -3612,9 +3612,18 @@ const onGridKeyDown = (e: any) => {
   // toAbsRow adds the live page offset (0 in virtual mode where activeRow is already absolute).
   // The change-detection comparison stays in the PAGE-RELATIVE space (nextRow vs prevRow).
   if (nextRow !== prevRow || nextCol !== prevCol || nextIsHeader !== prevIsHeader || nextLevel !== prevLevel) {
-    onactivecellchange?.({
+    // Mirror getActiveCell's shape (this payload + getActiveCell are documented to speak the
+    // SAME language): a header cell has no body-row index, so emit rowIndex:null + isHeader:true
+    // rather than a bogus toAbsRow(nextRow) — which would compute a real body-row absolute index
+    // for a HEADER move, misleading a consumer into thinking that body row is the active cell.
+    onactivecellchange?.(nextIsHeader ? {
+      rowIndex: null,
+      colIndex: nextCol,
+      isHeader: true
+    } : {
       rowIndex: toAbsRow(nextRow),
-      colIndex: nextCol
+      colIndex: nextCol,
+      isHeader: false
     });
   }
 };
