@@ -609,8 +609,10 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _rangeAnchor = signal<any>(null);
   private _rangeFocus = signal<any>(null);
   private _pasteAnnounce = signal('');
+  private _liveAnnounce = signal('');
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
+private __rozieWatchInitial_1 = true;
 private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { context: __rozieCtx_data_table_columns, initialValue: ((__rozieCtxHost) => ({
   registerColumn: (id: any, spec: any) => {
     if (id == null) return;
@@ -797,6 +799,10 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
     this.columns, this._colReg.value])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this.reFeed();
+    })(); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => [this.sorting, this.columnFilters, this.globalFilter, this._sortingDefault.value, this._columnFiltersDefault.value, this._globalFilterDefault.value])(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+      const msg = this.buildSortFilterAnnounce();
+      if (msg) this._liveAnnounce.value = msg;
     })(); }); }));
 
     this._disconnectCleanups.push(effect(() => { void this._colReg.value; this.__rozieCtxProvider_data_table_columns.setValue(((__rozieCtxHost) => ({
@@ -1073,6 +1079,16 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       };
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(afterFirstFrame));else setTimeout(afterFirstFrame, 0);
     }
+
+    // #14: seed the sort/filter announce baseline from the initial (post-mount) state so the LAZY
+    // watch's first fire — a real user sort/filter — compares against the true starting values and
+    // is classified correctly (a null sentinel would misread the first filter change as a sort change).
+    // #14: seed the sort/filter announce baseline from the initial (post-mount) state so the LAZY
+    // watch's first fire — a real user sort/filter — compares against the true starting values and
+    // is classified correctly (a null sentinel would misread the first filter change as a sort change).
+    this.announceState.sorting = this.effectiveSorting();
+    this.announceState.columnFilters = this.effectiveColumnFilters();
+    this.announceState.globalFilter = this.effectiveGlobalFilter();
   }
 
   updated(changedProperties: Map<string, unknown>): void {
@@ -1132,7 +1148,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
 
 <div class="rdt-column-defs" style="display:none" aria-hidden="true" data-rozie-s-d5dcab4c><slot></slot></div>
 
-${!!this._invalidMsg.value ? html`<div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>${this._invalidMsg.value}</div>` : nothing}${!!this._pasteAnnounce.value ? html`<div class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>${this._pasteAnnounce.value}</div>` : nothing}<div class="rdt-toolbar" data-rozie-s-d5dcab4c>
+${!!this._invalidMsg.value ? html`<div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>${this._invalidMsg.value}</div>` : nothing}${!!this._pasteAnnounce.value ? html`<div class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>${this._pasteAnnounce.value}</div>` : nothing}${!!this._liveAnnounce.value ? html`<div class="rdt-sr-live rdt-sr-sortfilter" data-testid="sortfilter-announce" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c>${this._liveAnnounce.value}</div>` : nothing}<div class="rdt-toolbar" data-rozie-s-d5dcab4c>
   <input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" .value=${this.globalFilterValue()} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c />
   
   ${this.allLeafColumns().length ? html`<details class="rdt-colvis" data-rozie-s-d5dcab4c>
@@ -2119,6 +2135,40 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   const items = this.virtualizer.getVirtualItems();
   for (const it of items as any) if (it.index === r) return false;
   return true;
+};
+
+  announceState = {
+  sorting: null,
+  columnFilters: null,
+  globalFilter: null
+};
+
+  effectiveSorting = () => this.sorting != null ? this.sorting : this._sortingDefault.value;
+
+  effectiveColumnFilters = () => this.columnFilters != null ? this.columnFilters : this._columnFiltersDefault.value;
+
+  effectiveGlobalFilter = () => this.globalFilter != null ? this.globalFilter : this._globalFilterDefault.value;
+
+  buildSortFilterAnnounce = () => {
+  const nextSorting = this.effectiveSorting();
+  const nextColumnFilters = this.effectiveColumnFilters();
+  const nextGlobalFilter = this.effectiveGlobalFilter();
+  const sortChanged = nextSorting !== this.announceState.sorting;
+  const filterChanged = nextColumnFilters !== this.announceState.columnFilters || nextGlobalFilter !== this.announceState.globalFilter;
+  this.announceState.sorting = nextSorting;
+  this.announceState.columnFilters = nextColumnFilters;
+  this.announceState.globalFilter = nextGlobalFilter;
+  if (sortChanged) {
+    const active = nextSorting && nextSorting.length ? nextSorting[0] : null;
+    if (!active) return 'Sorting cleared';
+    const rawLabel = this.headerLabel(active.id);
+    const label = typeof rawLabel === 'string' && rawLabel ? rawLabel : active.id;
+    return 'Sorted by ' + label + ', ' + (active.desc ? 'descending' : 'ascending');
+  }
+  if (filterChanged) {
+    return this.totalRowCount() + ' results';
+  }
+  return '';
 };
 
   reFeed = () => {
@@ -5210,7 +5260,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   focusAbsCellWhenReady = (absRow: any, localRow: any, col: any) => {
   if (!this.gridRoot) return;
   let attempts = 0;
-  const want = String(absRow + 1);
+  const want = String(this.headerRowCount() + absRow + 1);
   // #9: capture the focus-intent epoch at arm time (AFTER focusCell's own bump at its top, so
   // this poll never aborts itself). A LATER focus intent — a click landing on a new cell
   // (syncActiveFromEvent) or another focusCell / keyboard nav — bumps the epoch, so this
@@ -5279,8 +5329,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this._activeColIndex.value = c;
     if (switched) {
       // The switched-in page renders ASYNC — poll until the (localRow, c) cell carries the
-      // TARGET page's absolute aria-rowindex (absRow+1) before focusing, so the OLD page's
-      // same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only, React-safe.
+      // TARGET page's body aria-rowindex (headerRowCount + absRow + 1, #13) before focusing, so
+      // the OLD page's same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only.
       this.focusAbsCellWhenReady(absRow, localRow, c);
     } else {
       // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).

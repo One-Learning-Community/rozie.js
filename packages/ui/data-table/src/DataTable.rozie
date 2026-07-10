@@ -663,6 +663,14 @@
   // (D-03). SEPARATE from the validation invalidMsg region (different semantics). '' when no
   // paste has happened (the byte-identical-off baseline: the announce region r-if is false).
   pasteAnnounce: '',
+
+  // ── Sort/filter live announcement (#14) ─────────────────────────────────────────────
+  // The polite aria-live message announced when the consumer changes sorting OR filtering
+  // (columnFilters / globalFilter) — e.g. "Sorted by Name, ascending" / "Sorting cleared" /
+  // "42 results". Set by the sort/filter $watch below (lazy → NO spurious mount announce).
+  // SEPARATE from invalidMsg (validation) and pasteAnnounce (clipboard). '' = nothing to
+  // announce (the byte-identical-off baseline: the announce region r-if is false).
+  liveAnnounce: '',
 }
 </data>
 
@@ -840,6 +848,47 @@ import { onSortingChangeCb, onExpandedChangeCb, onGroupingChangeCb, onGlobalFilt
 
 import { windowSource, scheduleRemeasure, pinnedEditIndex, pinnedMeasurement, remeasureWindow } from './virtualization.rzts'
 import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow } from '@rozie-ui/headless-core/windowing.rzts'
+
+// ── Sort/filter live-announcement (#14) ─────────────────────────────────────────────
+// A polite aria-live announcement whenever the consumer changes sorting or filtering, so a
+// screen-reader user hears that the rows were reordered / narrowed (which is otherwise silent).
+// announceState holds the last-seen references so the lazy watch below can tell WHICH slice
+// changed (sort vs filter) and pick the message. It is a top-level mutable const → stabilized
+// once per instance on all six targets (React useMemo-wraps a mutable instance; the others run
+// setup once), so it PERSISTS across renders — unlike a top-level `let`, which React resets per
+// render. Seeded from the initial state in $onMount so the first (post-mount) change compares
+// against the true starting values, not a null sentinel.
+const announceState = { sorting: null, columnFilters: null, globalFilter: null }
+// Effective (controlled-or-uncontrolled) reads of the sort/filter slices: the bound prop when
+// the consumer bound the matching r-model, else the uncontrolled $data default (mirrors currentState()).
+const effectiveSorting = () => ($props.sorting != null ? $props.sorting : $data.sortingDefault)
+const effectiveColumnFilters = () => ($props.columnFilters != null ? $props.columnFilters : $data.columnFiltersDefault)
+const effectiveGlobalFilter = () => ($props.globalFilter != null ? $props.globalFilter : $data.globalFilterDefault)
+// Build the polite message for a sort/filter change and advance announceState. Sort takes
+// precedence when the sorting reference changed; otherwise a filter changed → the post-filter
+// result count (the FILTERED total via totalRowCount(), NOT the page slice). Returns '' when
+// neither actually changed (a no-op watch tick — do not re-announce).
+const buildSortFilterAnnounce = () => {
+  const nextSorting = effectiveSorting()
+  const nextColumnFilters = effectiveColumnFilters()
+  const nextGlobalFilter = effectiveGlobalFilter()
+  const sortChanged = nextSorting !== announceState.sorting
+  const filterChanged = nextColumnFilters !== announceState.columnFilters || nextGlobalFilter !== announceState.globalFilter
+  announceState.sorting = nextSorting
+  announceState.columnFilters = nextColumnFilters
+  announceState.globalFilter = nextGlobalFilter
+  if (sortChanged) {
+    const active = (nextSorting && nextSorting.length) ? nextSorting[0] : null
+    if (!active) return 'Sorting cleared'
+    const rawLabel = headerLabel(active.id)
+    const label = (typeof rawLabel === 'string' && rawLabel) ? rawLabel : active.id
+    return 'Sorted by ' + label + ', ' + (active.desc ? 'descending' : 'ascending')
+  }
+  if (filterChanged) {
+    return totalRowCount() + ' results'
+  }
+  return ''
+}
 
 $onMount(() => {
   // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
@@ -1081,6 +1130,13 @@ $onMount(() => {
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(afterFirstFrame))
     else setTimeout(afterFirstFrame, 0)
   }
+
+  // #14: seed the sort/filter announce baseline from the initial (post-mount) state so the LAZY
+  // watch's first fire — a real user sort/filter — compares against the true starting values and
+  // is classified correctly (a null sentinel would misread the first filter change as a sort change).
+  announceState.sorting = effectiveSorting()
+  announceState.columnFilters = effectiveColumnFilters()
+  announceState.globalFilter = effectiveGlobalFilter()
 })
 
 // Tear down the virtualizer's scroll-element ResizeObserver on unmount (the embla destroy
@@ -1136,6 +1192,29 @@ $watch(
     $data.colReg,
   ],
   () => { reFeed() },
+)
+
+// #14: sort/filter live announcement. Registered AFTER the re-feed watch above so it runs
+// LATER in the same reactive flush — the filtered "N results" count read (totalRowCount() →
+// getFilteredRowModel) then reflects the NEW filter state that reFeed() just pushed into
+// table-core, not the pre-change model. Lazy (like the re-feed watch) → no spurious mount
+// announce. Watches BOTH the controlled props AND the uncontrolled default slices so it fires
+// in either binding mode; buildSortFilterAnnounce classifies sort-vs-filter and returns '' on a
+// no-op tick (only a real change writes $data.liveAnnounce). Pagination/selection are NOT watched
+// here (out of scope — they must not announce).
+$watch(
+  () => [
+    $props.sorting,
+    $props.columnFilters,
+    $props.globalFilter,
+    $data.sortingDefault,
+    $data.columnFiltersDefault,
+    $data.globalFilterDefault,
+  ],
+  () => {
+    const msg = buildSortFilterAnnounce()
+    if (msg) $data.liveAnnounce = msg
+  },
 )
 
 // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
@@ -1500,6 +1579,12 @@ $expose({
      SEPARATE node from the validation region (different semantics + lifetime). Gated
      `r-if="!!$data.pasteAnnounce"` so a table that never pasted emits nothing (byte-identical-off). -->
 <div class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true" r-if="!!$data.pasteAnnounce">{{ $data.pasteAnnounce }}</div>
+<!-- Sort/filter aria-live region (#14): a visually-hidden polite status region announcing
+     sort + filter changes (silent reorders/removals are otherwise invisible to a screen
+     reader). SEPARATE node from the validation + paste regions (different semantics). Gated
+     `r-if="!!$data.liveAnnounce"` so a never-sorted/never-filtered table emits nothing
+     (byte-identical-off). Fed by the lazy sort/filter $watch (no spurious mount announce). -->
+<div class="rdt-sr-live rdt-sr-sortfilter" data-testid="sortfilter-announce" role="status" aria-live="polite" aria-atomic="true" r-if="!!$data.liveAnnounce">{{ $data.liveAnnounce }}</div>
 <!-- Global search (req-5) — bound, value-driven (NOT eval'd). Narrows all columns. -->
 <div class="rdt-toolbar">
   <input

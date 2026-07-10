@@ -148,6 +148,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true">{{ invalidMsg() }}</div>
     }@if (!!pasteAnnounce()) {
     <div class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true">{{ pasteAnnounce() }}</div>
+    }@if (!!liveAnnounce()) {
+    <div class="rdt-sr-live rdt-sr-sortfilter" data-testid="sortfilter-announce" role="status" aria-live="polite" aria-atomic="true">{{ liveAnnounce() }}</div>
     }<div class="rdt-toolbar">
       <input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" [value]="globalFilterValue()" (input)="onGlobalFilterInput($event)" />
       
@@ -1033,6 +1035,7 @@ export class DataTable {
   rangeAnchor = signal<any>(null);
   rangeFocus = signal<any>(null);
   pasteAnnounce = signal('');
+  liveAnnounce = signal('');
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   sortChange = output<unknown>({ alias: 'sort-change' });
   expandChange = output<unknown>({ alias: 'expand-change' });
@@ -1060,6 +1063,7 @@ export class DataTable {
   @ContentChild('detail', { read: TemplateRef }) detailTpl?: TemplateRef<DetailCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieWatchInitial_0 = true;
+  private __rozieWatchInitial_1 = true;
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -1099,6 +1103,10 @@ export class DataTable {
     // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
     this.columns(), this.colReg()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this.reFeed();
+    })(); }); });
+    effect(() => { const __watchVal = (() => [this.sorting(), this.columnFilters(), this.globalFilter(), this.sortingDefault(), this.columnFiltersDefault(), this.globalFilterDefault()])(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+      const msg = this.buildSortFilterAnnounce();
+      if (msg) this.liveAnnounce.set(msg);
     })(); }); });
   }
 
@@ -1360,6 +1368,16 @@ export class DataTable {
       };
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(afterFirstFrame));else setTimeout(afterFirstFrame, 0);
     }
+
+    // #14: seed the sort/filter announce baseline from the initial (post-mount) state so the LAZY
+    // watch's first fire — a real user sort/filter — compares against the true starting values and
+    // is classified correctly (a null sentinel would misread the first filter change as a sort change).
+    // #14: seed the sort/filter announce baseline from the initial (post-mount) state so the LAZY
+    // watch's first fire — a real user sort/filter — compares against the true starting values and
+    // is classified correctly (a null sentinel would misread the first filter change as a sort change).
+    this.announceState.sorting = this.effectiveSorting();
+    this.announceState.columnFilters = this.effectiveColumnFilters();
+    this.announceState.globalFilter = this.effectiveGlobalFilter();
   }
 
   table: any = null;
@@ -2043,6 +2061,35 @@ export class DataTable {
     const items = this.virtualizer.getVirtualItems();
     for (const it of items as any) if (it.index === r) return false;
     return true;
+  };
+  announceState = {
+    sorting: null,
+    columnFilters: null,
+    globalFilter: null
+  };
+  effectiveSorting = () => this.sorting() != null ? this.sorting() : this.sortingDefault();
+  effectiveColumnFilters = () => this.columnFilters() != null ? this.columnFilters() : this.columnFiltersDefault();
+  effectiveGlobalFilter = () => this.globalFilter() != null ? this.globalFilter() : this.globalFilterDefault();
+  buildSortFilterAnnounce = () => {
+    const nextSorting = this.effectiveSorting();
+    const nextColumnFilters = this.effectiveColumnFilters();
+    const nextGlobalFilter = this.effectiveGlobalFilter();
+    const sortChanged = nextSorting !== this.announceState.sorting;
+    const filterChanged = nextColumnFilters !== this.announceState.columnFilters || nextGlobalFilter !== this.announceState.globalFilter;
+    this.announceState.sorting = nextSorting;
+    this.announceState.columnFilters = nextColumnFilters;
+    this.announceState.globalFilter = nextGlobalFilter;
+    if (sortChanged) {
+      const active = nextSorting && nextSorting.length ? nextSorting[0] : null;
+      if (!active) return 'Sorting cleared';
+      const rawLabel = this.headerLabel(active.id);
+      const label = typeof rawLabel === 'string' && rawLabel ? rawLabel : active.id;
+      return 'Sorted by ' + label + ', ' + (active.desc ? 'descending' : 'ascending');
+    }
+    if (filterChanged) {
+      return this.totalRowCount() + ' results';
+    }
+    return '';
   };
   reFeed = () => {
     if (!this.table) return;
@@ -4917,7 +4964,7 @@ export class DataTable {
   focusAbsCellWhenReady = (absRow: any, localRow: any, col: any) => {
     if (!this.gridRoot) return;
     let attempts = 0;
-    const want = String(absRow + 1);
+    const want = String(this.headerRowCount() + absRow + 1);
     // #9: capture the focus-intent epoch at arm time (AFTER focusCell's own bump at its top, so
     // this poll never aborts itself). A LATER focus intent — a click landing on a new cell
     // (syncActiveFromEvent) or another focusCell / keyboard nav — bumps the epoch, so this
@@ -4985,8 +5032,8 @@ export class DataTable {
       this.activeColIndex.set(c);
       if (switched) {
         // The switched-in page renders ASYNC — poll until the (localRow, c) cell carries the
-        // TARGET page's absolute aria-rowindex (absRow+1) before focusing, so the OLD page's
-        // same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only, React-safe.
+        // TARGET page's body aria-rowindex (headerRowCount + absRow + 1, #13) before focusing, so
+        // the OLD page's same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only.
         this.focusAbsCellWhenReady(absRow, localRow, c);
       } else {
         // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).

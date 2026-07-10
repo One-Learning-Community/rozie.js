@@ -1,4 +1,4 @@
-import { Fragment, forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { Fragment, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { clsx, parseInlineStyle, rozieAttr, rozieContext, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './DataTable.css';
@@ -430,8 +430,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const [rangeAnchor, setRangeAnchor] = useState<any>(null);
   const [rangeFocus, setRangeFocus] = useState<any>(null);
   const [pasteAnnounce, setPasteAnnounce] = useState('');
+  const [liveAnnounce, setLiveAnnounce] = useState('');
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
+  const _watch1First = useRef(true);
 
   // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
   // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
@@ -1137,6 +1139,35 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const items = virtualizer.current.getVirtualItems();
     for (const it of items as any) if (it.index === r) return false;
     return true;
+  }
+  const announceState = useMemo(() => ({
+    sorting: null,
+    columnFilters: null,
+    globalFilter: null
+  }), []);
+  const effectiveSorting = useCallback(() => sorting != null ? sorting : sortingDefault, [sorting, sortingDefault]);
+  const effectiveColumnFilters = useCallback(() => columnFilters != null ? columnFilters : columnFiltersDefault, [columnFilters, columnFiltersDefault]);
+  const effectiveGlobalFilter = useCallback(() => globalFilter != null ? globalFilter : globalFilterDefault, [globalFilter, globalFilterDefault]);
+  function buildSortFilterAnnounce() {
+    const nextSorting = effectiveSorting();
+    const nextColumnFilters = effectiveColumnFilters();
+    const nextGlobalFilter = effectiveGlobalFilter();
+    const sortChanged = nextSorting !== announceState.sorting;
+    const filterChanged = nextColumnFilters !== announceState.columnFilters || nextGlobalFilter !== announceState.globalFilter;
+    announceState.sorting = nextSorting;
+    announceState.columnFilters = nextColumnFilters;
+    announceState.globalFilter = nextGlobalFilter;
+    if (sortChanged) {
+      const active = nextSorting && nextSorting.length ? nextSorting[0] : null;
+      if (!active) return 'Sorting cleared';
+      const rawLabel = headerLabel(active.id);
+      const label = typeof rawLabel === 'string' && rawLabel ? rawLabel : active.id;
+      return 'Sorted by ' + label + ', ' + (active.desc ? 'descending' : 'ascending');
+    }
+    if (filterChanged) {
+      return totalRowCount() + ' results';
+    }
+    return '';
   }
   const reFeed = useCallback(() => {
     if (!table.current) return;
@@ -4090,7 +4121,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function focusAbsCellWhenReady(absRow: any, localRow: any, col: any) {
     if (!gridRoot.current) return;
     let attempts = 0;
-    const want = String(absRow + 1);
+    const want = String(headerRowCount() + absRow + 1);
     // #9: capture the focus-intent epoch at arm time (AFTER focusCell's own bump at its top, so
     // this poll never aborts itself). A LATER focus intent — a click landing on a new cell
     // (syncActiveFromEvent) or another focusCell / keyboard nav — bumps the epoch, so this
@@ -4158,8 +4189,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       setActiveColIndex(c);
       if (switched) {
         // The switched-in page renders ASYNC — poll until the (localRow, c) cell carries the
-        // TARGET page's absolute aria-rowindex (absRow+1) before focusing, so the OLD page's
-        // same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only, React-safe.
+        // TARGET page's body aria-rowindex (headerRowCount + absRow + 1, #13) before focusing, so
+        // the OLD page's same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only.
         focusAbsCellWhenReady(absRow, localRow, c);
       } else {
         // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).
@@ -4477,6 +4508,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       };
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(afterFirstFrame));else setTimeout(afterFirstFrame, 0);
     }
+
+    // #14: seed the sort/filter announce baseline from the initial (post-mount) state so the LAZY
+    // watch's first fire — a real user sort/filter — compares against the true starting values and
+    // is classified correctly (a null sentinel would misread the first filter change as a sort change).
+    announceState.sorting = effectiveSorting();
+    announceState.columnFilters = effectiveColumnFilters();
+    announceState.globalFilter = effectiveGlobalFilter();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     return () => {
@@ -4503,6 +4541,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (_watch0First.current) { _watch0First.current = false; return; }
     reFeed();
   }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, expanded, globalFilter, grouping, pagination, props.columns, props.expandable, props.groupable, props.pageCount, props.rowCount, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch1First.current) { _watch1First.current = false; return; }
+    const msg = buildSortFilterAnnounce();
+    if (msg) setLiveAnnounce(msg);
+  }, [columnFilters, columnFiltersDefault, globalFilter, globalFilterDefault, sorting, sortingDefault]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieExposeRef = useRef({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory });
   _rozieExposeRef.current = { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory };
@@ -4534,7 +4577,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
 
     <div className={"rdt-column-defs"} style={{ display: "none" }} aria-hidden="true" data-rozie-s-d5dcab4c="">{(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}</div>
 
-    {!!(!!invalidMsg) && <div className={"rdt-sr-live"} role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c="">{invalidMsg}</div>}{!!(!!pasteAnnounce) && <div className={"rdt-sr-live rdt-sr-paste"} data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c="">{pasteAnnounce}</div>}<div className={"rdt-toolbar"} data-rozie-s-d5dcab4c="">
+    {!!(!!invalidMsg) && <div className={"rdt-sr-live"} role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c="">{invalidMsg}</div>}{!!(!!pasteAnnounce) && <div className={"rdt-sr-live rdt-sr-paste"} data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c="">{pasteAnnounce}</div>}{!!(!!liveAnnounce) && <div className={"rdt-sr-live rdt-sr-sortfilter"} data-testid="sortfilter-announce" role="status" aria-live="polite" aria-atomic="true" data-rozie-s-d5dcab4c="">{liveAnnounce}</div>}<div className={"rdt-toolbar"} data-rozie-s-d5dcab4c="">
       <input className={"rdt-global-filter"} type="text" role="searchbox" aria-label="Search table" value={globalFilterValue()} onInput={($event) => { onGlobalFilterInput($event); }} data-rozie-s-d5dcab4c="" />
       
       {!!(allLeafColumns().length) && <details className={"rdt-colvis"} data-rozie-s-d5dcab4c="">

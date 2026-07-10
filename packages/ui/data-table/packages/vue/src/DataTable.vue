@@ -5,7 +5,7 @@
 
 <div class="rdt-column-defs" style="display:none" aria-hidden="true"><slot></slot></div>
 
-<div v-if="!!invalidMsg" class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true">{{ invalidMsg }}</div><div v-if="!!pasteAnnounce" class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true">{{ pasteAnnounce }}</div><div class="rdt-toolbar">
+<div v-if="!!invalidMsg" class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true">{{ invalidMsg }}</div><div v-if="!!pasteAnnounce" class="rdt-sr-live rdt-sr-paste" data-testid="paste-announce" role="status" aria-live="polite" aria-atomic="true">{{ pasteAnnounce }}</div><div v-if="!!liveAnnounce" class="rdt-sr-live rdt-sr-sortfilter" data-testid="sortfilter-announce" role="status" aria-live="polite" aria-atomic="true">{{ liveAnnounce }}</div><div class="rdt-toolbar">
   <input class="rdt-global-filter" type="text" role="searchbox" aria-label="Search table" :value="globalFilterValue()" @input="onGlobalFilterInput($event)" />
   
   <details v-if="allLeafColumns().length" class="rdt-colvis">
@@ -418,6 +418,7 @@ const rowDraft = ref({});
 const rangeAnchor = ref<any>(null);
 const rangeFocus = ref<any>(null);
 const pasteAnnounce = ref('');
+const liveAnnounce = ref('');
 
 const __rozieRootRef = ref<HTMLElement>();
 
@@ -1974,8 +1975,66 @@ const rowIsOutsideWindow = (r: any) => {
   for (const it of items as any) if (it.index === r) return false;
   return true;
 };
-// Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
-// re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
+
+// ── Sort/filter live-announcement (#14) ─────────────────────────────────────────────
+// A polite aria-live announcement whenever the consumer changes sorting or filtering, so a
+// screen-reader user hears that the rows were reordered / narrowed (which is otherwise silent).
+// announceState holds the last-seen references so the lazy watch below can tell WHICH slice
+// changed (sort vs filter) and pick the message. It is a top-level mutable const → stabilized
+// once per instance on all six targets (React useMemo-wraps a mutable instance; the others run
+// setup once), so it PERSISTS across renders — unlike a top-level `let`, which React resets per
+// render. Seeded from the initial state in $onMount so the first (post-mount) change compares
+// against the true starting values, not a null sentinel.
+// ── Sort/filter live-announcement (#14) ─────────────────────────────────────────────
+// A polite aria-live announcement whenever the consumer changes sorting or filtering, so a
+// screen-reader user hears that the rows were reordered / narrowed (which is otherwise silent).
+// announceState holds the last-seen references so the lazy watch below can tell WHICH slice
+// changed (sort vs filter) and pick the message. It is a top-level mutable const → stabilized
+// once per instance on all six targets (React useMemo-wraps a mutable instance; the others run
+// setup once), so it PERSISTS across renders — unlike a top-level `let`, which React resets per
+// render. Seeded from the initial state in $onMount so the first (post-mount) change compares
+// against the true starting values, not a null sentinel.
+const announceState = {
+  sorting: null,
+  columnFilters: null,
+  globalFilter: null
+};
+// Effective (controlled-or-uncontrolled) reads of the sort/filter slices: the bound prop when
+// the consumer bound the matching r-model, else the uncontrolled $data default (mirrors currentState()).
+// Effective (controlled-or-uncontrolled) reads of the sort/filter slices: the bound prop when
+// the consumer bound the matching r-model, else the uncontrolled $data default (mirrors currentState()).
+const effectiveSorting = () => sorting.value != null ? sorting.value : sortingDefault.value;
+const effectiveColumnFilters = () => columnFilters.value != null ? columnFilters.value : columnFiltersDefault.value;
+const effectiveGlobalFilter = () => globalFilter.value != null ? globalFilter.value : globalFilterDefault.value;
+// Build the polite message for a sort/filter change and advance announceState. Sort takes
+// precedence when the sorting reference changed; otherwise a filter changed → the post-filter
+// result count (the FILTERED total via totalRowCount(), NOT the page slice). Returns '' when
+// neither actually changed (a no-op watch tick — do not re-announce).
+// Build the polite message for a sort/filter change and advance announceState. Sort takes
+// precedence when the sorting reference changed; otherwise a filter changed → the post-filter
+// result count (the FILTERED total via totalRowCount(), NOT the page slice). Returns '' when
+// neither actually changed (a no-op watch tick — do not re-announce).
+const buildSortFilterAnnounce = () => {
+  const nextSorting = effectiveSorting();
+  const nextColumnFilters = effectiveColumnFilters();
+  const nextGlobalFilter = effectiveGlobalFilter();
+  const sortChanged = nextSorting !== announceState.sorting;
+  const filterChanged = nextColumnFilters !== announceState.columnFilters || nextGlobalFilter !== announceState.globalFilter;
+  announceState.sorting = nextSorting;
+  announceState.columnFilters = nextColumnFilters;
+  announceState.globalFilter = nextGlobalFilter;
+  if (sortChanged) {
+    const active = nextSorting && nextSorting.length ? nextSorting[0] : null;
+    if (!active) return 'Sorting cleared';
+    const rawLabel = headerLabel(active.id);
+    const label = typeof rawLabel === 'string' && rawLabel ? rawLabel : active.id;
+    return 'Sorted by ' + label + ', ' + (active.desc ? 'descending' : 'ascending');
+  }
+  if (filterChanged) {
+    return totalRowCount() + ' results';
+  }
+  return '';
+};
 // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
 // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
 const reFeed = () => {
@@ -6698,10 +6757,13 @@ const editRow = (rowIndex: any) => {
 // page-relative index, so a plain resolveCellEl(localRow, col) poll would grab the OLD page's
 // cell on frame 1 (before the switch commits) and focus it — only for the page switch to then
 // REMOVE it, dropping focus to <body>. Disambiguate by the ABSOLUTE aria-rowindex: poll until
-// the cell at (localRow, col) carries aria-rowindex === absRow+1 (i.e. the TARGET page has
-// actually rendered), THEN focus. DOM-only (reads gridRoot), so React-stale-safe; works for both
-// controlled (round-trips through page-change) and uncontrolled pagination. ~60 frames (~1s) to
-// cover the controlled-state parent round-trip on React/Solid/Lit.
+// the cell at (localRow, col) carries the TARGET page's body aria-rowindex (i.e. the TARGET
+// page has actually rendered), THEN focus. DOM-only (reads gridRoot), so React-stale-safe; works
+// for both controlled (round-trips through page-change) and uncontrolled pagination. ~60 frames
+// (~1s) to cover the controlled-state parent round-trip on React/Solid/Lit.
+//   #13: the body aria-rowindex is now header-offset (bodyAriaRowIndex = headerRowCount + absRow
+//   + 1) so header rows + body rows form one consistent aria-rowindex/aria-rowcount space — so
+//   the poll target must add headerRowCount() too, else it never matches and focus drops.
 // ── Grid active-cell $expose verbs (phase 49 plan 03, D-01) — exactly THREE, joining the
 // existing 12 (→ 15). Collision-safe names (Pitfall 1): focusCell NOT `focus` (would shadow
 // HTMLElement.focus on Lit — ROZ137); clearActiveCell NOT `clear` (listbox already exposes
@@ -6713,14 +6775,17 @@ const editRow = (rowIndex: any) => {
 // page-relative index, so a plain resolveCellEl(localRow, col) poll would grab the OLD page's
 // cell on frame 1 (before the switch commits) and focus it — only for the page switch to then
 // REMOVE it, dropping focus to <body>. Disambiguate by the ABSOLUTE aria-rowindex: poll until
-// the cell at (localRow, col) carries aria-rowindex === absRow+1 (i.e. the TARGET page has
-// actually rendered), THEN focus. DOM-only (reads gridRoot), so React-stale-safe; works for both
-// controlled (round-trips through page-change) and uncontrolled pagination. ~60 frames (~1s) to
-// cover the controlled-state parent round-trip on React/Solid/Lit.
+// the cell at (localRow, col) carries the TARGET page's body aria-rowindex (i.e. the TARGET
+// page has actually rendered), THEN focus. DOM-only (reads gridRoot), so React-stale-safe; works
+// for both controlled (round-trips through page-change) and uncontrolled pagination. ~60 frames
+// (~1s) to cover the controlled-state parent round-trip on React/Solid/Lit.
+//   #13: the body aria-rowindex is now header-offset (bodyAriaRowIndex = headerRowCount + absRow
+//   + 1) so header rows + body rows form one consistent aria-rowindex/aria-rowcount space — so
+//   the poll target must add headerRowCount() too, else it never matches and focus drops.
 const focusAbsCellWhenReady = (absRow: any, localRow: any, col: any) => {
   if (!gridRoot) return;
   let attempts = 0;
-  const want = String(absRow + 1);
+  const want = String(headerRowCount() + absRow + 1);
   // #9: capture the focus-intent epoch at arm time (AFTER focusCell's own bump at its top, so
   // this poll never aborts itself). A LATER focus intent — a click landing on a new cell
   // (syncActiveFromEvent) or another focusCell / keyboard nav — bumps the epoch, so this
@@ -6803,8 +6868,8 @@ const focusCell = (rowIndex: any, colIndex: any) => {
     activeColIndex.value = c;
     if (switched) {
       // The switched-in page renders ASYNC — poll until the (localRow, c) cell carries the
-      // TARGET page's absolute aria-rowindex (absRow+1) before focusing, so the OLD page's
-      // same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only, React-safe.
+      // TARGET page's body aria-rowindex (headerRowCount + absRow + 1, #13) before focusing, so
+      // the OLD page's same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only.
       focusAbsCellWhenReady(absRow, localRow, c);
     } else {
       // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).
@@ -7254,6 +7319,13 @@ onMounted(() => {
     };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(afterFirstFrame));else setTimeout(afterFirstFrame, 0);
   }
+
+  // #14: seed the sort/filter announce baseline from the initial (post-mount) state so the LAZY
+  // watch's first fire — a real user sort/filter — compares against the true starting values and
+  // is classified correctly (a null sentinel would misread the first filter change as a sort change).
+  announceState.sorting = effectiveSorting();
+  announceState.columnFilters = effectiveColumnFilters();
+  announceState.globalFilter = effectiveGlobalFilter();
 });
 onBeforeUnmount(() => {
   if (virtualizerCleanup) virtualizerCleanup();
@@ -7293,6 +7365,10 @@ data.value, dataDefault.value,
 // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
 props.columns, colReg.value], () => {
   reFeed();
+});
+watch(() => [sorting.value, columnFilters.value, globalFilter.value, sortingDefault.value, columnFiltersDefault.value, globalFilterDefault.value], () => {
+  const msg = buildSortFilterAnnounce();
+  if (msg) liveAnnounce.value = msg;
 });
 
 defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory });
