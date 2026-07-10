@@ -746,6 +746,17 @@ let gridRoot = null
 // the funnel. A counter (not a boolean) so nested writes are safe.
 let programmatic = 0
 
+// Focus-intent epoch (#9) — a monotonic counter bumped at every focus-INTENT entry point
+// (focusActiveCell / focusCell+focusAbsCellWhenReady arm / a genuine active-cell-moving
+// focusin in syncActiveFromEvent). The two async focus-recovery polls (focusWhenReady for the
+// virtual off-window scroll, focusAbsCellWhenReady for the paginated page-switch) CAPTURE this
+// value at arm time (AFTER their own bump) and abort at the top of each iteration if it has since
+// changed — so a LATER user nav (ArrowKey / click) supersedes a stale poll instead of the poll
+// yanking focus back frames later. A naive guardMoved "abort if focus moved" check is WRONG here:
+// both polls arm while focus still sits on the OLD/being-left cell BY DESIGN (scroll-to /
+// page-switch), so an epoch — bumped only by a NEWER intent — is the correct abort signal.
+let focusIntentEpoch = 0
+
 // ── Grid-wide undo/redo (260709-8ct) — history STATE lives in top-level `let` (mirroring
 // `programmatic` above), NOT $data: recording a snapshot on every keystroke must not trigger
 // a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array

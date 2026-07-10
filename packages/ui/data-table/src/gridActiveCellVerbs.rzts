@@ -17,7 +17,13 @@ const focusAbsCellWhenReady = (absRow, localRow, col) => {
   if (!gridRoot) return
   let attempts = 0
   const want = String(absRow + 1)
+  // #9: capture the focus-intent epoch at arm time (AFTER focusCell's own bump at its top, so
+  // this poll never aborts itself). A LATER focus intent — a click landing on a new cell
+  // (syncActiveFromEvent) or another focusCell / keyboard nav — bumps the epoch, so this
+  // paginated page-switch poll aborts instead of grabbing focus frames after the user moved on.
+  const myEpoch = focusIntentEpoch
   const tryFocus = () => {
+    if (focusIntentEpoch !== myEpoch) return
     const el = resolveCellEl(String(localRow), col)
     if (el) {
       const rowEl = el.closest ? el.closest('[role="row"]') : null
@@ -46,6 +52,11 @@ const focusCell = (rowIndex, colIndex) => {
   // isGrid-gated; the exposed verb must mirror that so a consumer's focusCell on a table-mode
   // instance does not leak a spurious activecell-change.
   if (!isGrid()) return
+  // #9: focusCell is a focus-INTENT entry point — bump the epoch BEFORE arming any poll (the
+  // switched-page focusAbsCellWhenReady captures the post-bump value; the same-page / virtual
+  // branches route through focusActiveCell, which bumps again — harmless). A subsequent focusCell
+  // or user nav bumps again → a pending focusAbsCellWhenReady from THIS call aborts.
+  focusIntentEpoch = focusIntentEpoch + 1
   const maxCol = visibleColCount() - 1
   const c = clamp(Math.trunc(Number(colIndex)) || 0, 0, (maxCol < 0 ? 0 : maxCol))
   // C1: clamp the ABSOLUTE row index to the full filtered+sorted (pre-pagination) bounds.

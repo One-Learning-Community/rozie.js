@@ -1370,6 +1370,7 @@ export class DataTable {
   GRID_PAGE_STEP = 10;
   gridRoot: any = null;
   programmatic = 0;
+  focusIntentEpoch = 0;
   undoStack: unknown[] = [];
   redoStack: unknown[] = [];
   restoringHistory: boolean = false;
@@ -2512,6 +2513,13 @@ export class DataTable {
   };
   focusActiveCell = (nextRow: any = null, nextCol: any = null, nextIsHeader: any = null, nextLevel: any = null) => {
     if (!this.isGrid() || !this.gridRoot) return;
+    // #9 focus-intent epoch: focusActiveCell is THE single seam every keyboard nav re-asserts
+    // focus through, so it establishes a fresh "where focus should be" on every call — bump the
+    // epoch here (BEFORE arming the virtual-scroll focusWhenReady poll below). A SUBSEQUENT
+    // focusActiveCell (the next user nav) bumps again → any pending focusWhenReady captured the
+    // OLD value → aborts instead of yanking focus back. The poll captures the POST-bump value so
+    // a lone scroll-to-focus with no later nav still lands (epoch stable across its own frames).
+    this.focusIntentEpoch = this.focusIntentEpoch + 1;
     const r = nextRow == null ? this.activeRow() : nextRow;
     const c = nextCol == null ? this.activeColIndex() : nextCol;
     // B12: thread the FRESH post-write header level (the grouped-header analog of the
@@ -2543,7 +2551,14 @@ export class DataTable {
       // across the few frames its async commit needs. The poll ONLY focuses (never measures), so it
       // cannot re-introduce the remeasure-vs-scroll fight. Inside the $props.virtual guard only.
       let focusAttempts = 0;
+      // #9: capture the epoch AFTER this call's own bump (above) so the poll never aborts itself
+      // (its captured value equals the current epoch). A LATER focusActiveCell / focusCell /
+      // active-cell-moving focusin bumps the epoch → the check below aborts this stale poll.
+      const myEpoch = this.focusIntentEpoch;
       const focusWhenReady = () => {
+        // A newer focus intent superseded this poll — abort WITHOUT focusing (the user has since
+        // navigated / clicked elsewhere; re-focusing this off-window target would yank focus back).
+        if (this.focusIntentEpoch !== myEpoch) return;
         const el = this.resolveCellEl(String(r), c);
         if (el) {
           el.focus();
@@ -3122,20 +3137,41 @@ export class DataTable {
     if (rowAttr == null || colAttr == null) return;
     const col = parseInt(colAttr, 10);
     if (!Number.isFinite(col)) return;
+    // #9: snapshot the PRE-write active position so we can bump the focus-intent epoch ONLY when
+    // this focusin genuinely MOVES the active cell (a click landing on a NEW cell). A no-op focusin
+    // — focus arriving on the ALREADY-active cell, e.g. a scroll/page-switch poll's own el.focus()
+    // or focusActiveCell's synchronous re-seat — must NOT bump, or it would abort a legitimate
+    // in-flight recovery on its own settling frames (the poll would see a changed epoch and quit).
+    const prevIsHeader = this.activeIsHeader();
+    const prevRow = this.activeRow();
+    const prevCol = this.activeColIndex();
+    const prevLevel = this.activeHeaderLevel();
     const isHeader = rowAttr === '__header';
     this.activeIsHeader.set(isHeader);
+    let movedRow = prevRow;
+    let movedLevel = prevLevel;
     if (isHeader) {
       // B12: a click/focus onto a grouped header cell must capture its header LEVEL too, so the
       // roving model + a subsequent ArrowUp/ArrowDown resolve from the correct level (not a stale
       // one). data-header-level is an integer marker on the <th>; fall back to the leaf level.
       const lvlAttr = cellEl.getAttribute('data-header-level');
       const lvl = lvlAttr != null ? parseInt(lvlAttr, 10) : this.headerLeafLevel();
-      this.activeHeaderLevel.set(Number.isFinite(lvl) ? lvl : this.headerLeafLevel());
+      movedLevel = Number.isFinite(lvl) ? lvl : this.headerLeafLevel();
+      this.activeHeaderLevel.set(movedLevel);
     } else {
       const row = parseInt(rowAttr, 10);
-      if (Number.isFinite(row)) this.activeRow.set(row);
+      if (Number.isFinite(row)) {
+        movedRow = row;
+        this.activeRow.set(row);
+      }
     }
     this.activeColIndex.set(col);
+    // #9: a genuine active-cell MOVE is a fresh focus intent — supersede any pending async focus
+    // poll (scroll-to / page-switch). Compare against the PRE-write snapshot: bump only when the
+    // header-flag, column, or (per mode) the header LEVEL / body ROW actually changed.
+    if (isHeader !== prevIsHeader || col !== prevCol || (isHeader ? movedLevel !== prevLevel : movedRow !== prevRow)) {
+      this.focusIntentEpoch = this.focusIntentEpoch + 1;
+    }
     // A plain focus collapses any range back to the single active cell — EXCEPT (a) the
     // programmatic settle of an in-flight extendRange (rangeTransition): that focus move lands
     // ON the new range-focus corner and must NOT wipe the range we just set; and (b) the
@@ -4864,7 +4900,13 @@ export class DataTable {
     if (!this.gridRoot) return;
     let attempts = 0;
     const want = String(absRow + 1);
+    // #9: capture the focus-intent epoch at arm time (AFTER focusCell's own bump at its top, so
+    // this poll never aborts itself). A LATER focus intent — a click landing on a new cell
+    // (syncActiveFromEvent) or another focusCell / keyboard nav — bumps the epoch, so this
+    // paginated page-switch poll aborts instead of grabbing focus frames after the user moved on.
+    const myEpoch = this.focusIntentEpoch;
     const tryFocus = () => {
+      if (this.focusIntentEpoch !== myEpoch) return;
       const el = this.resolveCellEl(String(localRow), col);
       if (el) {
         const rowEl = el.closest ? el.closest('[role="row"]') : null;
@@ -4886,6 +4928,11 @@ export class DataTable {
     // isGrid-gated; the exposed verb must mirror that so a consumer's focusCell on a table-mode
     // instance does not leak a spurious activecell-change.
     if (!this.isGrid()) return;
+    // #9: focusCell is a focus-INTENT entry point — bump the epoch BEFORE arming any poll (the
+    // switched-page focusAbsCellWhenReady captures the post-bump value; the same-page / virtual
+    // branches route through focusActiveCell, which bumps again — harmless). A subsequent focusCell
+    // or user nav bumps again → a pending focusAbsCellWhenReady from THIS call aborts.
+    this.focusIntentEpoch = this.focusIntentEpoch + 1;
     const maxCol = this.visibleColCount() - 1;
     const c = this.clamp(Math.trunc(Number(colIndex)) || 0, 0, maxCol < 0 ? 0 : maxCol);
     // C1: clamp the ABSOLUTE row index to the full filtered+sorted (pre-pagination) bounds.

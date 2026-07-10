@@ -136,6 +136,13 @@ const resolveCellEl = (rowKey, colIndex, level = null) => {
 // checks already route those to the live `$data` value — behavior-identical.
 const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, nextLevel = null) => {
   if (!isGrid() || !gridRoot) return
+  // #9 focus-intent epoch: focusActiveCell is THE single seam every keyboard nav re-asserts
+  // focus through, so it establishes a fresh "where focus should be" on every call — bump the
+  // epoch here (BEFORE arming the virtual-scroll focusWhenReady poll below). A SUBSEQUENT
+  // focusActiveCell (the next user nav) bumps again → any pending focusWhenReady captured the
+  // OLD value → aborts instead of yanking focus back. The poll captures the POST-bump value so
+  // a lone scroll-to-focus with no later nav still lands (epoch stable across its own frames).
+  focusIntentEpoch = focusIntentEpoch + 1
   const r = nextRow == null ? $data.activeRow : nextRow
   const c = nextCol == null ? $data.activeColIndex : nextCol
   // B12: thread the FRESH post-write header level (the grouped-header analog of the
@@ -165,7 +172,14 @@ const focusActiveCell = (nextRow = null, nextCol = null, nextIsHeader = null, ne
     // across the few frames its async commit needs. The poll ONLY focuses (never measures), so it
     // cannot re-introduce the remeasure-vs-scroll fight. Inside the $props.virtual guard only.
     let focusAttempts = 0
+    // #9: capture the epoch AFTER this call's own bump (above) so the poll never aborts itself
+    // (its captured value equals the current epoch). A LATER focusActiveCell / focusCell /
+    // active-cell-moving focusin bumps the epoch → the check below aborts this stale poll.
+    const myEpoch = focusIntentEpoch
     const focusWhenReady = () => {
+      // A newer focus intent superseded this poll — abort WITHOUT focusing (the user has since
+      // navigated / clicked elsewhere; re-focusing this off-window target would yank focus back).
+      if (focusIntentEpoch !== myEpoch) return
       const el = resolveCellEl(String(r), c)
       if (el) { el.focus(); return }
       focusAttempts = focusAttempts + 1
