@@ -124,11 +124,32 @@ const onEditorKeyDown = (e) => {
 //    async-render targets the unmount-blur can fire AFTER the synchronous flag cleared, so
 //    the relatedTarget/containment check is the load-bearing guard, not the flag alone.
 const onEditorBlur = (e) => {
-  // Full-row mode (req-6): blur NEVER commits — the row commits as a UNIT only on an
-  // explicit Enter / save / editRow-driven flow (a per-cell blur-commit would split the row
-  // into N writes + N events, violating the one-write/one-event contract). Tabbing between
-  // the row's own editors is a normal focus move, not a commit.
-  if (inRowEdit()) return
+  // Full-row mode (req-6): a blur that stays WITHIN the row editor — Tab/click between the
+  // row's OWN fields — is a normal focus move and must NOT commit (a per-cell blur-commit
+  // would split the row into N writes + N events, violating the one-write/one-event contract).
+  // But an OUTSIDE-click blur (#7) MUST commit the row: otherwise the model is never written
+  // AND editingRowIndex stays set, freezing onGridKeyDown's editingRowIndex early-return so
+  // arrow-nav is dead the moment the user clicks back into the grid. Mirror the single-cell
+  // branch's relatedTarget shape to tell an in-row focus move from a genuine click-away.
+  if (inRowEdit()) {
+    // Guard the teardown blur: commitRow's writeData/endRowEdit re-render unmounts the row's
+    // editors → a same-tick re-render blur must NOT re-enter commitRow (double row-edit-commit).
+    // commitRow sets editTransition synchronously BEFORE writeData, so it is set here during the
+    // teardown window (the async unmount-blur that fires after endRowEdit finds editingRowIndex
+    // already null → inRowEdit() false → the single-cell tail's editingRow<0 guard returns).
+    if (editTransition) return
+    const rowNext = e ? e.relatedTarget : null
+    const rowNextCell = rowNext && rowNext.closest ? rowNext.closest('[data-grid-cell]') : null
+    const rowNextRow = rowNextCell ? rowNextCell.getAttribute('data-row') : null
+    // Focus landing on a cell of the SAME editing row (Tab/click between the row's own fields) →
+    // controlled in-row move, do NOT commit. Anything else — a null relatedTarget, another row,
+    // a toolbar/widget, or outside the grid entirely — is an outside-click → commit the row as a
+    // unit. commitRow clears editingRowIndex, releasing onGridKeyDown's early-return so nav
+    // resumes; a no-op row (nothing changed) takes commitRow's clean #5 no-write/no-emit path.
+    if (rowNextRow != null && rowNextRow === String($data.editingRowIndex)) return
+    commitRow()
+    return
+  }
   if ($data.editingRow < 0 || editTransition) return
   const next = e ? e.relatedTarget : null
   // A null relatedTarget is an unmount-blur (the editor left the DOM) or a focus drop the
