@@ -1464,16 +1464,24 @@ export class DataTable {
     // header spans its leaf children (B12). The group id falls back to its header text so it
     // stays addressable (no accessor; group columns carry no data).
     if (Array.isArray(c.columns)) {
-      const gid = c.id != null ? c.id : c.header;
-      if (gid == null) return null;
-      const id = String(gid);
-      if (!this.isSafeKey(id)) return null;
       const kids = [];
       for (const child of c.columns as any) {
         const cd = this.buildConfigDef(child);
         if (cd) kids.push(cd);
       }
       if (!kids.length) return null;
+      // Group id: an explicit c.id wins. Otherwise synthesize a STABLE UNIQUE id from the child
+      // column ids (which are unique per leaf accessor / recursively-synthesized per nested group)
+      // — NOT the header text. Falling back to c.header collided two same-titled groups (e.g. both
+      // "Details") into one by-id map key, so the columnDefs LWW merge silently dropped one whole
+      // group column + its children. The child-id derivation is deterministic (stable across
+      // renders — no Math.random/Date). A group with neither id nor header (nor derivable children)
+      // stays dropped as before.
+      let gid = c.id;
+      if (gid == null) gid = c.header != null ? '__grp_' + kids.map((k: any) => k.id).join('_') : null;
+      if (gid == null) return null;
+      const id = String(gid);
+      if (!this.isSafeKey(id)) return null;
       return {
         id,
         header: c.header != null ? c.header : id,
