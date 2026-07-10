@@ -779,7 +779,12 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // object → new array ref, identical length → the .length key alone would miss it). The
     // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
     // writeData is echo-guarded (programmatic) and reFeed writes neither sink, so no loop.
-    this.data, this._dataDefault.value, this._colReg.value])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    this.data, this._dataDefault.value, // Column CONFIG prop (the `:columns` array form) — the sibling column source to
+    // $data.colReg (the `<Column>` children). Watch it so a runtime `:columns` swap re-feeds:
+    // columnDefs()/tableColumns() build the UNION of both, and reFeed re-passes columns.
+    // (Consumers memoize the array as with $props.data/$props.sorting; the uncontrolled
+    // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
+    this.columns, this._colReg.value])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this.reFeed();
     })(); }); }));
 

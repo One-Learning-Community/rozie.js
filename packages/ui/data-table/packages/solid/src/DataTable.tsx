@@ -856,7 +856,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // object → new array ref, identical length → the .length key alone would miss it). The
   // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
   // writeData is echo-guarded (programmatic) and reFeed writes neither sink, so no loop.
-  data(), dataDefault(), colReg()])(), (v) => untrack(() => (() => {
+  data(), dataDefault(),
+  // Column CONFIG prop (the `:columns` array form) — the sibling column source to
+  // $data.colReg (the `<Column>` children). Watch it so a runtime `:columns` swap re-feeds:
+  // columnDefs()/tableColumns() build the UNION of both, and reFeed re-passes columns.
+  // (Consumers memoize the array as with $props.data/$props.sorting; the uncontrolled
+  // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
+  local.columns, colReg()])(), (v) => untrack(() => (() => {
     reFeed();
   })()), { defer: true }));
   let __rozieRootRef: HTMLElement | null = null;
