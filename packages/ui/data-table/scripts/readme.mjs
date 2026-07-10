@@ -2077,14 +2077,28 @@ render(html\`
   ],
 };
 
-const FRAMEWORK_PEER_LABEL = {
-  react: 'react + react-dom + @tanstack/table-core',
-  vue: 'vue + @tanstack/table-core',
-  svelte: 'svelte + @tanstack/table-core',
-  angular: '@angular/core + @angular/common + @angular/forms + @tanstack/table-core',
-  solid: 'solid-js + @tanstack/table-core',
-  lit: 'lit + @lit-labs/preact-signals + @preact/signals-core + @tanstack/table-core',
-};
+// The README "Peer dependencies:" install line is DERIVED from each leaf's
+// actual `peerDependencies` (passed in from codegen, read from the leaf
+// package.json) rather than a hand-kept per-target string — a curated list
+// silently drifted from reality (it omitted `@tanstack/virtual-core` and
+// `@floating-ui/dom`, both imported UNCONDITIONALLY at module top of the
+// emitted code, so a reader who `npm i`-ed only the listed peers hit an
+// unresolved-module build failure). Deriving from the manifest makes that
+// class of drift impossible.
+//
+// Ordering is the package.json key order, which is authored framework
+// runtime dep(s) → `@tanstack/table-core` engine → the rest. Only
+// NON-optional peers are listed (optional peers must not be forced on the
+// consumer via "install them alongside this package").
+export function derivePeerLabel(peerDependencies = {}, peerDependenciesMeta = {}) {
+  const keys = Object.keys(peerDependencies).filter(
+    (name) => peerDependenciesMeta[name]?.optional !== true,
+  );
+  if (keys.length === 0) {
+    throw new Error('derivePeerLabel: leaf package.json declares no peerDependencies');
+  }
+  return keys.join(' + ');
+}
 
 // Per-framework "obtain the imperative handle" snippets (`$expose`).
 export const HANDLE_USAGE = {
@@ -2181,7 +2195,10 @@ const cats = el.getFacetedUniqueValues('category'); // getFacetedMinMaxValues to
 // README rendering.
 // ---------------------------------------------------------------------------
 
-export function renderReadme(target, ir, eventManifest, pkgName, handleManifest = {}) {
+export function renderReadme(target, ir, eventManifest, pkgName, handleManifest = {}, peerLabel = '') {
+  if (!peerLabel) {
+    throw new Error(`renderReadme: missing derived peer-dependency label for target "${target}"`);
+  }
   const usageSets = USAGE[target];
   if (!usageSets || usageSets.length === 0) {
     throw new Error(`renderReadme: no usage snippet for target "${target}"`);
@@ -2210,7 +2227,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push(`npm i ${pkgName}`);
   lines.push('```');
   lines.push('');
-  lines.push(`Peer dependencies: \`${FRAMEWORK_PEER_LABEL[target]}\`. Install them alongside this package.`);
+  lines.push(`Peer dependencies: \`${peerLabel}\`. Install them alongside this package.`);
   lines.push('');
 
   // Usage — one heading per aligned example set.

@@ -8,7 +8,7 @@ Idiomatic **solid** `DataTable` — a headless, fully-accessible (WAI-ARIA) data
 npm i @rozie-ui/data-table-solid
 ```
 
-Peer dependencies: `solid-js + @tanstack/table-core`. Install them alongside this package.
+Peer dependencies: `solid-js + @tanstack/table-core + @tanstack/virtual-core + @floating-ui/dom`. Install them alongside this package.
 
 ## Usage
 

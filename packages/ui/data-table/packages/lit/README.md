@@ -8,7 +8,7 @@ Idiomatic **lit** `DataTable` — a headless, fully-accessible (WAI-ARIA) data t
 npm i @rozie-ui/data-table-lit
 ```
 
-Peer dependencies: `lit + @lit-labs/preact-signals + @preact/signals-core + @tanstack/table-core`. Install them alongside this package.
+Peer dependencies: `lit + @lit/context + @lit-labs/preact-signals + @preact/signals-core + @tanstack/table-core + @tanstack/virtual-core + @floating-ui/dom`. Install them alongside this package.
 
 ## Usage
 

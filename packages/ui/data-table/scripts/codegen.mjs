@@ -63,7 +63,7 @@ import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
-import { renderReadme, validateDocsPropsTable } from './readme.mjs';
+import { derivePeerLabel, renderReadme, validateDocsPropsTable } from './readme.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/data-table
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
@@ -173,10 +173,9 @@ const FORBIDDEN_ADAPTERS = [
   '@tanstack/lit-virtual',
 ];
 
-function leafPkgName(dir) {
+function leafPkg(dir) {
   const pkgPath = resolve(ROOT, 'packages', dir, 'package.json');
-  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-  return pkg.name;
+  return JSON.parse(readFileSync(pkgPath, 'utf8'));
 }
 
 /** Copy src/themes/ → leaf src/themes/ (the design-token presets). */
@@ -379,9 +378,13 @@ function main() {
     copyThemes(leafSrc);
     copyInternal(leafSrc);
 
-    // (5) README from the single PARENT IR parse.
-    const pkgName = leafPkgName(cfg.dir);
-    const readme = renderReadme(target, ir, eventManifest, pkgName, handleManifest);
+    // (5) README from the single PARENT IR parse. The peer-dependency install
+    // line is DERIVED from the leaf's real package.json peerDependencies so it
+    // cannot drift from the modules the emitted code actually imports.
+    const pkg = leafPkg(cfg.dir);
+    const pkgName = pkg.name;
+    const peerLabel = derivePeerLabel(pkg.peerDependencies, pkg.peerDependenciesMeta);
+    const readme = renderReadme(target, ir, eventManifest, pkgName, handleManifest, peerLabel);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
     // (6) vendor the repo LICENSE into each published leaf.

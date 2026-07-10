@@ -8,7 +8,7 @@ Idiomatic **react** `DataTable` — a headless, fully-accessible (WAI-ARIA) data
 npm i @rozie-ui/data-table-react
 ```
 
-Peer dependencies: `react + react-dom + @tanstack/table-core`. Install them alongside this package.
+Peer dependencies: `react + react-dom + @tanstack/table-core + @tanstack/virtual-core + @floating-ui/dom`. Install them alongside this package.
 
 ## Usage
 
