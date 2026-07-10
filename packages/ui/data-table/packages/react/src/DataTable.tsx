@@ -1612,9 +1612,6 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   function toAbsRow(localRow: any) {
     return localRow + pageRowOffset();
   }
-  function absRowIndexOf(row: any) {
-    return rowIndexOf(row) + pageRowOffset();
-  }
   function prePaginationRowCount() {
     if (!table.current || props.virtual) return bodyRowCount();
     const pm = table.current.getPrePaginationRowModel();
@@ -1728,6 +1725,18 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!table.current) return (rows || []).length;
     const fm = table.current.getFilteredRowModel();
     return fm && fm.rows ? fm.rows.length : (rows || []).length;
+  }
+  function headerRowCount() {
+    return (headerGroups || []).length;
+  }
+  function gridAriaRowCount() {
+    return headerRowCount() + totalRowCount();
+  }
+  function ariaPageOffset() {
+    return table.current ? pageIndex() * pageSize() : 0;
+  }
+  function bodyAriaRowIndex(row: any) {
+    return headerRowCount() + rowIndexOf(row) + ariaPageOffset() + 1;
   }
   function visibleColCount() {
     // NB: local is `rowList` (NOT `rows`) — the React emitter lowers `$data.rows` to the bare
@@ -4542,9 +4551,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     {!!(props.groupable) && <div className={"rdt-group-bar-host"} data-rozie-s-d5dcab4c="">
       {(props.renderGroupBar ?? props.slots?.['groupBar']) ? ((props.renderGroupBar ?? props.slots?.['groupBar']) as Function)({ grouping: groupingKeys(), groupableColumns: groupableColumns(), applyGrouping, clearGrouping }) : groupingKeys().map((gk) => <span key={gk} className={"rdt-group-token"} data-group-token="" data-rozie-s-d5dcab4c="">{rozieDisplay(gk)}</span>)}
     </div>}{(props.virtual) ? <div className={"rdt-scroll"} style={parseInlineStyle(props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c="">
-    <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} aria-rowcount={rows.length} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} onDoubleClick={($event) => { onGridDblClick($event); }} onClick={($event) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
+    <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} aria-rowcount={gridAriaRowCount()} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} onDoubleClick={($event) => { onGridDblClick($event); }} onClick={($event) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
       <thead className={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
-        {headerGroups.map((hg, hgLevel) => <tr key={hg.id} className={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
+        {headerGroups.map((hg, hgLevel) => <tr key={hg.id} className={"rdt-tr"} role="row" aria-rowindex={hgLevel + 1} data-rozie-s-d5dcab4c="">
           {hg.headers.map((header) => <th key={header.id} className={clsx("rdt-th", { "rdt-select-th": isSelectColumn(header.column.id), "rdt-expander-th": isExpanderColumn(header.column.id), "rdt-th-resizing": columnIsResizing(header.column.id), "rdt-cell-active": isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) })} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel)} colSpan={(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined} data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
             {(isSelectColumn(header.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(props.renderSelectAll ?? props.slots?.['selectAll']) ? ((props.renderSelectAll ?? props.slots?.['selectAll']) as Function)({ checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }) : !!(props.selectionMode === 'multiple') && <input className={"rdt-select-all"} type="checkbox" aria-label="Select all rows" checked={isAllRowsSelected()} onChange={($event) => { onToggleAllRows($event); }} data-rozie-s-d5dcab4c="" />}
@@ -4586,7 +4595,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         </tr>
         
         {windowedRows().map((wr) => <Fragment key={wr.row.id}>
-        <tr key={wr.row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(wr.row), "rdt-row-pinned": wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={wr.vi.index + 1} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : undefined)} data-depth={rozieAttr(wr.row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined)} aria-expanded={(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined} aria-level={(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined} data-rozie-s-d5dcab4c="">
+        <tr key={wr.row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(wr.row), "rdt-row-pinned": wr.pinned })} role="row" data-row={rozieAttr(wr.vi.index)} aria-rowindex={headerRowCount() + wr.vi.index + 1} data-index={rozieAttr(wr.vi.index)} data-pinned={rozieAttr(wr.pinned ? 'true' : undefined)} data-depth={rozieAttr(wr.row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined)} aria-expanded={(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined} aria-level={(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined} data-rozie-s-d5dcab4c="">
           {visibleCellsFor(wr.row).map((cell) => <td key={cell.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cell.column.id), "rdt-expander-td": isExpanderColumn(cell.column.id), "rdt-in-range": inRange(wr.vi.index, colIndexOf(wr.row, cell)), "rdt-cell-active": isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cell.column.id)} data-grid-cell="" data-row={rozieAttr(wr.vi.index)} data-col-index={rozieAttr(colIndexOf(wr.row, cell))} tabIndex={cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))} style={parseInlineStyle(bodyCellStyle(wr.row, cell.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell)))} data-in-range={rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined)} data-agg-cell={rozieAttr(cellIsAggregated(cell) ? cell.column.id : undefined)} data-rozie-s-d5dcab4c="">
             
             {(isExpanderColumn(cell.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
@@ -4619,9 +4628,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         </tr>
       </tbody>
     </table>
-    </div> : <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} aria-rowcount={totalRowCount()} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} onDoubleClick={($event) => { onGridDblClick($event); }} onClick={($event) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
+    </div> : <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} aria-rowcount={gridAriaRowCount()} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} onDoubleClick={($event) => { onGridDblClick($event); }} onClick={($event) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
       <thead className={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
-        {headerGroups.map((hg, hgLevel) => <tr key={hg.id} className={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
+        {headerGroups.map((hg, hgLevel) => <tr key={hg.id} className={"rdt-tr"} role="row" aria-rowindex={hgLevel + 1} data-rozie-s-d5dcab4c="">
           {hg.headers.map((header) => <th key={header.id} className={clsx("rdt-th", { "rdt-select-th": isSelectColumn(header.column.id), "rdt-expander-th": isExpanderColumn(header.column.id), "rdt-th-resizing": columnIsResizing(header.column.id), "rdt-cell-active": isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) })} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel)} colSpan={(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined} data-col-index={rozieAttr(headerColIndexOf(hg, header))} tabIndex={cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header.column.id))} data-rozie-s-d5dcab4c="">
             
             
@@ -4664,7 +4673,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       <tbody className={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         
         {rows.map((row) => <Fragment key={row.id}>
-        <tr key={row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(row) })} role="row" data-depth={rozieAttr(row.depth)} aria-rowindex={(isGrid() ? absRowIndexOf(row) + 1 : undefined) ?? undefined} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : undefined)} aria-expanded={(rowIsGrouped(row) ? !!rowIsExpanded(row) : undefined) ?? undefined} aria-level={(groupingActive() ? row.depth + 1 : undefined) ?? undefined} data-rozie-s-d5dcab4c="">
+        <tr key={row.id} className={clsx("rdt-tr", { "rdt-group-header": rowIsGrouped(row) })} role="row" data-depth={rozieAttr(row.depth)} aria-rowindex={bodyAriaRowIndex(row)} data-group-header={rozieAttr(rowIsGrouped(row) ? row.id : undefined)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : undefined)} aria-expanded={(rowIsGrouped(row) ? !!rowIsExpanded(row) : undefined) ?? undefined} aria-level={(groupingActive() ? row.depth + 1 : undefined) ?? undefined} data-rozie-s-d5dcab4c="">
           {visibleCellsFor(row).map((cell) => <td key={cell.id} className={clsx("rdt-td", { "rdt-select-td": isSelectColumn(cell.column.id), "rdt-expander-td": isExpanderColumn(cell.column.id), "rdt-in-range": inRange(rowIndexOf(row), colIndexOf(row, cell)), "rdt-cell-active": isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cell.column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row))} data-col-index={rozieAttr(colIndexOf(row, cell))} tabIndex={cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell))} style={parseInlineStyle(bodyCellStyle(row, cell.column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell)))} data-in-range={rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : undefined)} data-agg-cell={rozieAttr(cellIsAggregated(cell) ? cell.column.id : undefined)} data-rozie-s-d5dcab4c="">
             
             {(isExpanderColumn(cell.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">

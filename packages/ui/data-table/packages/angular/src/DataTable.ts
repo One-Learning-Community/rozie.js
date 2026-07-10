@@ -180,10 +180,10 @@ function rozieToken(key: string): InjectionToken<unknown> {
     </div>
     }@if (virtual()) {
     <div class="rdt-scroll" [style]="__style">
-    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rows().length" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)" (dblclick)="onGridDblClick($event)" (click)="onGridClick($event)">
+    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rozieAttr(gridAriaRowCount())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)" (dblclick)="onGridDblClick($event)" (click)="onGridClick($event)">
       <thead class="rdt-thead" role="rowgroup">
         @for (hg of headerGroups(); track hg.id; let hgLevel = $index) {
-    <tr class="rdt-tr" role="row">
+    <tr class="rdt-tr" role="row" [attr.aria-rowindex]="rozieAttr(hgLevel + 1)">
           @for (header of hg.headers; track header.id) {
     <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
             @if (isSelectColumn(header.column.id)) {
@@ -268,7 +268,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         
         @for (wr of windowedRows(); track wr.row.id) {
 
-        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)" [attr.data-pinned]="rozieAttr(wr.pinned ? 'true' : null)" [attr.data-depth]="rozieAttr(wr.row.depth)" [attr.data-group-header]="rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? wr.row.depth + 1 : null)">
+        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }" role="row" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.aria-rowindex]="rozieAttr(headerRowCount() + wr.vi.index + 1)" [attr.data-index]="rozieAttr(wr.vi.index)" [attr.data-pinned]="rozieAttr(wr.pinned ? 'true' : null)" [attr.data-depth]="rozieAttr(wr.row.depth)" [attr.data-group-header]="rozieAttr(rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? wr.row.depth + 1 : null)">
           @for (cell of visibleCellsFor(wr.row); track cell.id) {
     <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(wr.vi.index)" [attr.data-col-index]="rozieAttr(colIndexOf(wr.row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell)))" [style]="bodyCellStyle(wr.row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell)))" [attr.data-in-range]="rozieAttr(inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
             
@@ -350,10 +350,10 @@ function rozieToken(key: string): InjectionToken<unknown> {
     </table>
     </div>
     } @else {
-    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rozieAttr(totalRowCount())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)" (dblclick)="onGridDblClick($event)" (click)="onGridClick($event)">
+    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rozieAttr(gridAriaRowCount())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)" (dblclick)="onGridDblClick($event)" (click)="onGridClick($event)">
       <thead class="rdt-thead" role="rowgroup">
         @for (hg of headerGroups(); track hg.id; let hgLevel = $index) {
-    <tr class="rdt-tr" role="row">
+    <tr class="rdt-tr" role="row" [attr.aria-rowindex]="rozieAttr(hgLevel + 1)">
           @for (header of hg.headers; track header.id) {
     <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
             
@@ -440,7 +440,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         
         @for (row of rows(); track row.id) {
 
-        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(row) }" role="row" [attr.data-depth]="rozieAttr(row.depth)" [attr.aria-rowindex]="rozieAttr(isGrid() ? absRowIndexOf(row) + 1 : null)" [attr.data-group-header]="rozieAttr(rowIsGrouped(row) ? row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(row) ? !!rowIsExpanded(row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? row.depth + 1 : null)">
+        <tr class="rdt-tr" [ngClass]="{ 'rdt-group-header': rowIsGrouped(row) }" role="row" [attr.data-depth]="rozieAttr(row.depth)" [attr.aria-rowindex]="rozieAttr(bodyAriaRowIndex(row))" [attr.data-group-header]="rozieAttr(rowIsGrouped(row) ? row.id : null)" [attr.data-group-leaf]="rozieAttr(groupingActive() && !rowIsGrouped(row) ? row.id : null)" [attr.aria-expanded]="rozieAttr(rowIsGrouped(row) ? !!rowIsExpanded(row) : null)" [attr.aria-level]="rozieAttr(groupingActive() ? row.depth + 1 : null)">
           @for (cell of visibleCellsFor(row); track cell.id) {
     <td class="rdt-td" [ngClass]="{ 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) }" [attr.role]="rozieAttr(cellRole())" [attr.data-col]="rozieAttr(cell.column.id)" data-grid-cell="" [attr.data-row]="rozieAttr(rowIndexOf(row))" [attr.data-col-index]="rozieAttr(colIndexOf(row, cell))" [attr.tabindex]="rozieAttr(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell)))" [style]="bodyCellStyle(row, cell.column.id)" [attr.aria-invalid]="rozieAttr(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell)))" [attr.data-in-range]="rozieAttr(inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : null)" [attr.data-agg-cell]="rozieAttr(cellIsAggregated(cell) ? cell.column.id : null)">
             
@@ -2463,7 +2463,6 @@ export class DataTable {
     return this.pageIndex() * this.pageSize();
   };
   toAbsRow = (localRow: any) => localRow + this.pageRowOffset();
-  absRowIndexOf = (row: any) => this.rowIndexOf(row) + this.pageRowOffset();
   prePaginationRowCount = () => {
     if (!this.table || this.virtual()) return this.bodyRowCount();
     const pm = this.table.getPrePaginationRowModel();
@@ -2581,6 +2580,10 @@ export class DataTable {
     const fm = this.table.getFilteredRowModel();
     return fm && fm.rows ? fm.rows.length : (__rows || []).length;
   };
+  headerRowCount = () => (this.headerGroups() || []).length;
+  gridAriaRowCount = () => this.headerRowCount() + this.totalRowCount();
+  ariaPageOffset = () => this.table ? this.pageIndex() * this.pageSize() : 0;
+  bodyAriaRowIndex = (row: any) => this.headerRowCount() + this.rowIndexOf(row) + this.ariaPageOffset() + 1;
   visibleColCount = () => {
     // NB: local is `rowList` (NOT `rows`) — the React emitter lowers `$data.rows` to the bare
     // state binding `rows`, so a `const rows = $data.rows` self-shadows it (TS2448 TDZ). Same

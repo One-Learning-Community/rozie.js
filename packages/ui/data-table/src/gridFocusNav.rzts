@@ -218,6 +218,32 @@ const totalRowCount = () => {
   return fm && fm.rows ? fm.rows.length : ($data.rows || []).length
 }
 
+// ── A11y row bookkeeping (#13): consistent aria-rowindex / aria-rowcount ──────────────
+// WAI-ARIA: when aria-rowcount is set on the grid/table, EVERY row (header rows + body rows)
+// must carry an aria-rowindex, and aria-rowcount must equal the total number of rows INCLUDING
+// the header rows. Before this fix aria-rowcount was set unconditionally to totalRowCount() but
+// aria-rowindex was grid-only — so a paginated 'table'-mode grid advertised e.g. rowcount=100
+// while its 10 visible rows carried NO index (SR announced "row 1..10 of 100" on the LAST page).
+//   headerRowCount = the columnheader rows ($data.headerGroups — a grouped/multi-level header is
+//     >1; the role="presentation" filter row is NOT a row and is excluded).
+//   gridAriaRowCount = header rows + the FILTERED pre-pagination data total → equals the largest
+//     aria-rowindex any body row carries, so count and indices are always mutually consistent.
+// NB the helpers are gridAriaRowCount / bodyAriaRowIndex, NOT ariaRowCount / ariaRowIndex: the
+// latter collide with the inherited HTMLElement.ariaRowCount / .ariaRowIndex reflected properties
+// on Lit (TS2416 — the same inherited-DOM-member collision class as totalRowCount's rename note).
+const headerRowCount = () => ($data.headerGroups || []).length
+const gridAriaRowCount = () => headerRowCount() + totalRowCount()
+// Page offset that is MODE-INDEPENDENT (works in BOTH 'table' and 'grid' mode), unlike
+// pageRowOffset() which is isGrid()-gated for the active-cell API. In the non-virtual body
+// $data.rows is only the page slice, so a data row's ABSOLUTE index = its page-relative
+// rowIndexOf + this offset. Virtual mode never reaches here (that body uses wr.vi.index).
+const ariaPageOffset = () => (table ? pageIndex() * pageSize() : 0)
+// A non-virtual body row's 1-based aria-rowindex: the header rows come first (headerRowCount),
+// then the absolute (page-aware) 0-based data index, +1 to 1-base it. Present in BOTH modes so
+// it is always consistent with gridAriaRowCount. The virtual body binds
+// `headerRowCount() + wr.vi.index + 1` inline (wr.vi.index is already the absolute full-model index).
+const bodyAriaRowIndex = (row) => headerRowCount() + rowIndexOf(row) + ariaPageOffset() + 1
+
 // Column count = the visible cell list length (uniform header+body in a flat grid). Reads
 // $data.rows (reactive) so it is fine-grained-correct on Solid/Lit; falls back to the
 // header leaf count when there are no body rows.
@@ -465,4 +491,4 @@ const cycleWithinCell = (cellEl, forward) => {
   list[i].focus()
 }
 
-export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }
+export { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, ariaPageOffset, bodyAriaRowIndex, visibleColCount, bodyRowCount, clamp, headerLeafLevel, headerAt, parentHeaderColIndex, firstChildHeaderColIndex, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell }

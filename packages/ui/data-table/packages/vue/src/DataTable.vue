@@ -24,9 +24,9 @@
     <span v-for="gk in groupingKeys()" :key="gk" class="rdt-group-token" data-group-token="">{{ gk }}</span>
   </slot>
 </div><div v-if="props.virtual" class="rdt-scroll" :style="props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto'">
-<table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="rows.length" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
+<table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
   <thead class="rdt-thead" role="rowgroup">
-    <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row">
+    <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row" :aria-rowindex="hgLevel + 1">
       <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
         <span v-if="isSelectColumn(header.column.id)" style="display:contents">
           <slot name="selectAll" :checked="isAllRowsSelected()" :indeterminate="isSomeRowsSelected()" :toggle="onToggleAllRows">
@@ -69,7 +69,7 @@
     </tr>
     
     <template v-for="wr in windowedRows()" :key="wr.row.id">
-    <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined" :data-depth="wr.row.depth" :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined" :aria-expanded="(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined" :aria-level="(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined">
+    <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(wr.row), 'rdt-row-pinned': wr.pinned }]" role="row" :data-row="wr.vi.index" :aria-rowindex="headerRowCount() + wr.vi.index + 1" :data-index="wr.vi.index" :data-pinned="wr.pinned ? 'true' : undefined" :data-depth="wr.row.depth" :data-group-header="rowIsGrouped(wr.row) ? wr.row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(wr.row) ? wr.row.id : undefined" :aria-expanded="(rowIsGrouped(wr.row) ? !!rowIsExpanded(wr.row) : undefined) ?? undefined" :aria-level="(groupingActive() ? wr.row.depth + 1 : undefined) ?? undefined">
       <td v-for="cell in visibleCellsFor(wr.row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(wr.vi.index, colIndexOf(wr.row, cell)), 'rdt-cell-active': isActiveCell(String(wr.vi.index), colIndexOf(wr.row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="wr.vi.index" :data-col-index="colIndexOf(wr.row, cell)" :tabindex="(cellTabindex(String(wr.vi.index), colIndexOf(wr.row, cell))) ?? undefined" :style="bodyCellStyle(wr.row, cell.column.id)" :aria-invalid="(cellAriaInvalid(wr.vi.index, colIndexOf(wr.row, cell))) ?? undefined" :data-in-range="inRange(wr.vi.index, colIndexOf(wr.row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
         
         <span v-if="isExpanderColumn(cell.column.id)" style="display:contents">
@@ -104,9 +104,9 @@
     </tr>
   </tbody>
 </table>
-</div><table v-else :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="(totalRowCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
+</div><table v-else :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
   <thead class="rdt-thead" role="rowgroup">
-    <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row">
+    <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row" :aria-rowindex="hgLevel + 1">
       <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header.column.id)">
         
         
@@ -151,7 +151,7 @@
   <tbody class="rdt-tbody" role="rowgroup">
     
     <template v-for="row in rows" :key="row.id">
-    <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(row) }]" role="row" :data-depth="row.depth" :aria-rowindex="(isGrid() ? absRowIndexOf(row) + 1 : undefined) ?? undefined" :data-group-header="rowIsGrouped(row) ? row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(row) ? row.id : undefined" :aria-expanded="(rowIsGrouped(row) ? !!rowIsExpanded(row) : undefined) ?? undefined" :aria-level="(groupingActive() ? row.depth + 1 : undefined) ?? undefined">
+    <tr :class="['rdt-tr', { 'rdt-group-header': rowIsGrouped(row) }]" role="row" :data-depth="row.depth" :aria-rowindex="(bodyAriaRowIndex(row)) ?? undefined" :data-group-header="rowIsGrouped(row) ? row.id : undefined" :data-group-leaf="groupingActive() && !rowIsGrouped(row) ? row.id : undefined" :aria-expanded="(rowIsGrouped(row) ? !!rowIsExpanded(row) : undefined) ?? undefined" :aria-level="(groupingActive() ? row.depth + 1 : undefined) ?? undefined">
       <td v-for="cell in visibleCellsFor(row)" :key="cell.id" :class="['rdt-td', { 'rdt-select-td': isSelectColumn(cell.column.id), 'rdt-expander-td': isExpanderColumn(cell.column.id), 'rdt-in-range': inRange(rowIndexOf(row), colIndexOf(row, cell)), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row)), colIndexOf(row, cell)) }]" :role="cellRole()" :data-col="cell.column.id" data-grid-cell="" :data-row="rowIndexOf(row)" :data-col-index="colIndexOf(row, cell)" :tabindex="(cellTabindex(String(rowIndexOf(row)), colIndexOf(row, cell))) ?? undefined" :style="bodyCellStyle(row, cell.column.id)" :aria-invalid="(cellAriaInvalid(rowIndexOf(row), colIndexOf(row, cell))) ?? undefined" :data-in-range="inRange(rowIndexOf(row), colIndexOf(row, cell)) ? 'true' : undefined" :data-agg-cell="cellIsAggregated(cell) ? cell.column.id : undefined">
         
         <span v-if="isExpanderColumn(cell.column.id)" style="display:contents">
@@ -2950,10 +2950,7 @@ const toAbsRow = (localRow: any) => localRow + pageRowOffset();
 // A body row's ABSOLUTE display-order index = its page-relative index + the page offset. Drives
 // aria-rowindex on the non-virtual paginated body (B27); the virtual path uses wr.vi.index
 // directly (already absolute). Reactive via rowIndexOf's tick().
-// A body row's ABSOLUTE display-order index = its page-relative index + the page offset. Drives
-// aria-rowindex on the non-virtual paginated body (B27); the virtual path uses wr.vi.index
-// directly (already absolute). Reactive via rowIndexOf's tick().
-const absRowIndexOf = (row: any) => rowIndexOf(row) + pageRowOffset();
+
 // Total filtered+sorted PRE-pagination row count — the clamp bound for an absolute focusCell.
 // In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
 // non-virtual paginated body $data.rows is only the page slice, so read the live model.
@@ -3185,6 +3182,53 @@ const totalRowCount = () => {
   const fm = table.getFilteredRowModel();
   return fm && fm.rows ? fm.rows.length : (rows.value || []).length;
 };
+
+// ── A11y row bookkeeping (#13): consistent aria-rowindex / aria-rowcount ──────────────
+// WAI-ARIA: when aria-rowcount is set on the grid/table, EVERY row (header rows + body rows)
+// must carry an aria-rowindex, and aria-rowcount must equal the total number of rows INCLUDING
+// the header rows. Before this fix aria-rowcount was set unconditionally to totalRowCount() but
+// aria-rowindex was grid-only — so a paginated 'table'-mode grid advertised e.g. rowcount=100
+// while its 10 visible rows carried NO index (SR announced "row 1..10 of 100" on the LAST page).
+//   headerRowCount = the columnheader rows ($data.headerGroups — a grouped/multi-level header is
+//     >1; the role="presentation" filter row is NOT a row and is excluded).
+//   gridAriaRowCount = header rows + the FILTERED pre-pagination data total → equals the largest
+//     aria-rowindex any body row carries, so count and indices are always mutually consistent.
+// NB the helpers are gridAriaRowCount / bodyAriaRowIndex, NOT ariaRowCount / ariaRowIndex: the
+// latter collide with the inherited HTMLElement.ariaRowCount / .ariaRowIndex reflected properties
+// on Lit (TS2416 — the same inherited-DOM-member collision class as totalRowCount's rename note).
+// ── A11y row bookkeeping (#13): consistent aria-rowindex / aria-rowcount ──────────────
+// WAI-ARIA: when aria-rowcount is set on the grid/table, EVERY row (header rows + body rows)
+// must carry an aria-rowindex, and aria-rowcount must equal the total number of rows INCLUDING
+// the header rows. Before this fix aria-rowcount was set unconditionally to totalRowCount() but
+// aria-rowindex was grid-only — so a paginated 'table'-mode grid advertised e.g. rowcount=100
+// while its 10 visible rows carried NO index (SR announced "row 1..10 of 100" on the LAST page).
+//   headerRowCount = the columnheader rows ($data.headerGroups — a grouped/multi-level header is
+//     >1; the role="presentation" filter row is NOT a row and is excluded).
+//   gridAriaRowCount = header rows + the FILTERED pre-pagination data total → equals the largest
+//     aria-rowindex any body row carries, so count and indices are always mutually consistent.
+// NB the helpers are gridAriaRowCount / bodyAriaRowIndex, NOT ariaRowCount / ariaRowIndex: the
+// latter collide with the inherited HTMLElement.ariaRowCount / .ariaRowIndex reflected properties
+// on Lit (TS2416 — the same inherited-DOM-member collision class as totalRowCount's rename note).
+const headerRowCount = () => (headerGroups.value || []).length;
+const gridAriaRowCount = () => headerRowCount() + totalRowCount();
+// Page offset that is MODE-INDEPENDENT (works in BOTH 'table' and 'grid' mode), unlike
+// pageRowOffset() which is isGrid()-gated for the active-cell API. In the non-virtual body
+// $data.rows is only the page slice, so a data row's ABSOLUTE index = its page-relative
+// rowIndexOf + this offset. Virtual mode never reaches here (that body uses wr.vi.index).
+// Page offset that is MODE-INDEPENDENT (works in BOTH 'table' and 'grid' mode), unlike
+// pageRowOffset() which is isGrid()-gated for the active-cell API. In the non-virtual body
+// $data.rows is only the page slice, so a data row's ABSOLUTE index = its page-relative
+// rowIndexOf + this offset. Virtual mode never reaches here (that body uses wr.vi.index).
+const ariaPageOffset = () => table ? pageIndex() * pageSize() : 0;
+// A non-virtual body row's 1-based aria-rowindex: the header rows come first (headerRowCount),
+// then the absolute (page-aware) 0-based data index, +1 to 1-base it. Present in BOTH modes so
+// it is always consistent with gridAriaRowCount. The virtual body binds
+// `headerRowCount() + wr.vi.index + 1` inline (wr.vi.index is already the absolute full-model index).
+// A non-virtual body row's 1-based aria-rowindex: the header rows come first (headerRowCount),
+// then the absolute (page-aware) 0-based data index, +1 to 1-base it. Present in BOTH modes so
+// it is always consistent with gridAriaRowCount. The virtual body binds
+// `headerRowCount() + wr.vi.index + 1` inline (wr.vi.index is already the absolute full-model index).
+const bodyAriaRowIndex = (row: any) => headerRowCount() + rowIndexOf(row) + ariaPageOffset() + 1;
 
 // Column count = the visible cell list length (uniform header+body in a flat grid). Reads
 // $data.rows (reactive) so it is fine-grained-correct on Solid/Lit; falls back to the

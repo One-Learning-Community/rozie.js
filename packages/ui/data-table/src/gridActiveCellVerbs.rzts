@@ -9,14 +9,17 @@
 // page-relative index, so a plain resolveCellEl(localRow, col) poll would grab the OLD page's
 // cell on frame 1 (before the switch commits) and focus it — only for the page switch to then
 // REMOVE it, dropping focus to <body>. Disambiguate by the ABSOLUTE aria-rowindex: poll until
-// the cell at (localRow, col) carries aria-rowindex === absRow+1 (i.e. the TARGET page has
-// actually rendered), THEN focus. DOM-only (reads gridRoot), so React-stale-safe; works for both
-// controlled (round-trips through page-change) and uncontrolled pagination. ~60 frames (~1s) to
-// cover the controlled-state parent round-trip on React/Solid/Lit.
+// the cell at (localRow, col) carries the TARGET page's body aria-rowindex (i.e. the TARGET
+// page has actually rendered), THEN focus. DOM-only (reads gridRoot), so React-stale-safe; works
+// for both controlled (round-trips through page-change) and uncontrolled pagination. ~60 frames
+// (~1s) to cover the controlled-state parent round-trip on React/Solid/Lit.
+//   #13: the body aria-rowindex is now header-offset (bodyAriaRowIndex = headerRowCount + absRow
+//   + 1) so header rows + body rows form one consistent aria-rowindex/aria-rowcount space — so
+//   the poll target must add headerRowCount() too, else it never matches and focus drops.
 const focusAbsCellWhenReady = (absRow, localRow, col) => {
   if (!gridRoot) return
   let attempts = 0
-  const want = String(absRow + 1)
+  const want = String(headerRowCount() + absRow + 1)
   // #9: capture the focus-intent epoch at arm time (AFTER focusCell's own bump at its top, so
   // this poll never aborts itself). A LATER focus intent — a click landing on a new cell
   // (syncActiveFromEvent) or another focusCell / keyboard nav — bumps the epoch, so this
@@ -91,8 +94,8 @@ const focusCell = (rowIndex, colIndex) => {
     $data.activeColIndex = c
     if (switched) {
       // The switched-in page renders ASYNC — poll until the (localRow, c) cell carries the
-      // TARGET page's absolute aria-rowindex (absRow+1) before focusing, so the OLD page's
-      // same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only, React-safe.
+      // TARGET page's body aria-rowindex (headerRowCount + absRow + 1, #13) before focusing, so
+      // the OLD page's same-indexed cell is never grabbed-then-removed (drop-to-<body>). DOM-only.
       focusAbsCellWhenReady(absRow, localRow, c)
     } else {
       // Same page: re-seat focus synchronously (the REQ-5 idiom — re-focus after a button click).

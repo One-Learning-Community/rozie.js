@@ -1299,7 +1299,7 @@ $provide('data-table:columns', {
 
 import { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage, cut } from './exposeStateVerbs.rzts'
 
-import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, absRowIndexOf, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, visibleColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
+import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, pageRowOffset, toAbsRow, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, bodyAriaRowIndex, visibleColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
 
 import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell } from './gridKeydownHandlers.rzts'
 
@@ -1575,7 +1575,7 @@ $expose({
   class="rozie-data-table"
   :class="{ 'rdt-sticky': $props.stickyHeader }"
   :role="tableRole()"
-  :aria-rowcount="$data.rows.length"
+  :aria-rowcount="gridAriaRowCount()"
   @keydown="onGridKeyDown($event)"
   @focusin="syncActiveFromEvent($event)"
   @focusout="onGridFocusOut($event)"
@@ -1589,6 +1589,7 @@ $expose({
       role="row"
       r-for="(hg, hgLevel) in $data.headerGroups"
       :key="hg.id"
+      :aria-rowindex="hgLevel + 1"
     >
       <th
         class="rdt-th"
@@ -1795,7 +1796,7 @@ $expose({
       class="rdt-tr"
       role="row"
       :data-row="wr.vi.index"
-      :aria-rowindex="wr.vi.index + 1"
+      :aria-rowindex="headerRowCount() + wr.vi.index + 1"
       :data-index="wr.vi.index"
       :data-pinned="wr.pinned ? 'true' : null"
       :data-depth="wr.row.depth"
@@ -1992,7 +1993,7 @@ $expose({
   class="rozie-data-table"
   :class="{ 'rdt-sticky': $props.stickyHeader }"
   :role="tableRole()"
-  :aria-rowcount="totalRowCount()"
+  :aria-rowcount="gridAriaRowCount()"
   @keydown="onGridKeyDown($event)"
   @focusin="syncActiveFromEvent($event)"
   @focusout="onGridFocusOut($event)"
@@ -2006,6 +2007,7 @@ $expose({
       role="row"
       r-for="(hg, hgLevel) in $data.headerGroups"
       :key="hg.id"
+      :aria-rowindex="hgLevel + 1"
     >
       <th
         class="rdt-th"
@@ -2212,7 +2214,7 @@ $expose({
       :class="{ 'rdt-group-header': rowIsGrouped(row) }"
       role="row"
       :data-depth="row.depth"
-      :aria-rowindex="isGrid() ? (absRowIndexOf(row) + 1) : null"
+      :aria-rowindex="bodyAriaRowIndex(row)"
       :data-group-header="rowIsGrouped(row) ? row.id : null"
       :data-group-leaf="(groupingActive() && !rowIsGrouped(row)) ? row.id : null"
       :aria-expanded="rowIsGrouped(row) ? !!rowIsExpanded(row) : null"

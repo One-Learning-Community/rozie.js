@@ -2838,9 +2838,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // A body row's ABSOLUTE display-order index = its page-relative index + the page offset. Drives
   // aria-rowindex on the non-virtual paginated body (B27); the virtual path uses wr.vi.index
   // directly (already absolute). Reactive via rowIndexOf's tick().
-  function absRowIndexOf(row: any) {
-    return rowIndexOf(row) + pageRowOffset();
-  }
+
   // Total filtered+sorted PRE-pagination row count — the clamp bound for an absolute focusCell.
   // In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
   // non-virtual paginated body $data.rows is only the page slice, so read the live model.
@@ -3015,6 +3013,40 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     if (!table) return (rows() || []).length;
     const fm = table.getFilteredRowModel();
     return fm && fm.rows ? fm.rows.length : (rows() || []).length;
+  }
+
+  // ── A11y row bookkeeping (#13): consistent aria-rowindex / aria-rowcount ──────────────
+  // WAI-ARIA: when aria-rowcount is set on the grid/table, EVERY row (header rows + body rows)
+  // must carry an aria-rowindex, and aria-rowcount must equal the total number of rows INCLUDING
+  // the header rows. Before this fix aria-rowcount was set unconditionally to totalRowCount() but
+  // aria-rowindex was grid-only — so a paginated 'table'-mode grid advertised e.g. rowcount=100
+  // while its 10 visible rows carried NO index (SR announced "row 1..10 of 100" on the LAST page).
+  //   headerRowCount = the columnheader rows ($data.headerGroups — a grouped/multi-level header is
+  //     >1; the role="presentation" filter row is NOT a row and is excluded).
+  //   gridAriaRowCount = header rows + the FILTERED pre-pagination data total → equals the largest
+  //     aria-rowindex any body row carries, so count and indices are always mutually consistent.
+  // NB the helpers are gridAriaRowCount / bodyAriaRowIndex, NOT ariaRowCount / ariaRowIndex: the
+  // latter collide with the inherited HTMLElement.ariaRowCount / .ariaRowIndex reflected properties
+  // on Lit (TS2416 — the same inherited-DOM-member collision class as totalRowCount's rename note).
+  function headerRowCount() {
+    return (headerGroups() || []).length;
+  }
+  function gridAriaRowCount() {
+    return headerRowCount() + totalRowCount();
+  }
+  // Page offset that is MODE-INDEPENDENT (works in BOTH 'table' and 'grid' mode), unlike
+  // pageRowOffset() which is isGrid()-gated for the active-cell API. In the non-virtual body
+  // $data.rows is only the page slice, so a data row's ABSOLUTE index = its page-relative
+  // rowIndexOf + this offset. Virtual mode never reaches here (that body uses wr.vi.index).
+  function ariaPageOffset() {
+    return table ? pageIndex() * pageSize() : 0;
+  }
+  // A non-virtual body row's 1-based aria-rowindex: the header rows come first (headerRowCount),
+  // then the absolute (page-aware) 0-based data index, +1 to 1-base it. Present in BOTH modes so
+  // it is always consistent with gridAriaRowCount. The virtual body binds
+  // `headerRowCount() + wr.vi.index + 1` inline (wr.vi.index is already the absolute full-model index).
+  function bodyAriaRowIndex(row: any) {
+    return headerRowCount() + rowIndexOf(row) + ariaPageOffset() + 1;
   }
 
   // Column count = the visible cell list length (uniform header+body in a flat grid). Reads
@@ -6241,9 +6273,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
 
     {<Show when={local.groupable}><div class={"rdt-group-bar-host"} data-rozie-s-d5dcab4c="">
       {(_props.groupBarSlot ?? _props.slots?.['groupBar'])?.({ grouping: groupingKeys(), groupableColumns: groupableColumns(), applyGrouping, clearGrouping }) ?? <Key each={groupingKeys() as readonly any[]} by={(gk) => gk}>{(gk) => <span class={"rdt-group-token"} data-group-token="" data-rozie-s-d5dcab4c="">{rozieDisplay(gk())}</span>}</Key>}
-    </div></Show>}{<Show when={local.virtual} fallback={<table aria-rowcount={rozieAttr(totalRowCount())} class={"rozie-data-table" + " " + rozieClass({ 'rdt-sticky': local.stickyHeader })} role={rozieAttr(tableRole())} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridKeyDown($event); }} onFocusIn={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { syncActiveFromEvent($event); }} onFocusOut={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridFocusOut($event); }} onMouseDown={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridMouseDown($event); }} onDblClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridDblClick($event); }} onClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
+    </div></Show>}{<Show when={local.virtual} fallback={<table aria-rowcount={rozieAttr(gridAriaRowCount())} class={"rozie-data-table" + " " + rozieClass({ 'rdt-sticky': local.stickyHeader })} role={rozieAttr(tableRole())} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridKeyDown($event); }} onFocusIn={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { syncActiveFromEvent($event); }} onFocusOut={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridFocusOut($event); }} onMouseDown={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridMouseDown($event); }} onDblClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridDblClick($event); }} onClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
       <thead class={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
-        <Key each={headerGroups() as readonly any[]} by={(hg) => hg.id}>{(hg, hgLevel) => <tr class={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
+        <Key each={headerGroups() as readonly any[]} by={(hg) => hg.id}>{(hg, hgLevel) => <tr class={"rdt-tr"} role="row" aria-rowindex={rozieAttr(hgLevel() + 1)} data-rozie-s-d5dcab4c="">
           <Key each={hg().headers as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(header().column.id), 'rdt-expander-th': isExpanderColumn(header().column.id), 'rdt-th-resizing': columnIsResizing(header().column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg(), header()), hgLevel()) })} role="columnheader" data-col={rozieAttr(header().column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(header().colSpan > 1 ? header().colSpan : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), header()))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), header()), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(header().column.id))} style={parseInlineStyle(thStyle(header().column.id))} data-rozie-s-d5dcab4c="">
             
             
@@ -6286,7 +6318,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       <tbody class={"rdt-tbody"} role="rowgroup" data-rozie-s-d5dcab4c="">
         
         <Key each={rows() as readonly any[]} by={(row) => row.id}>{(row) => <>
-        <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-group-header': rowIsGrouped(row()) })} role="row" data-depth={rozieAttr(row().depth)} aria-rowindex={rozieAttr(isGrid() ? absRowIndexOf(row()) + 1 : null)} data-group-header={rozieAttr(rowIsGrouped(row()) ? row().id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row()) ? row().id : null)} aria-expanded={(rowIsGrouped(row()) ? !!rowIsExpanded(row()) : null) ?? undefined} aria-level={rozieAttr(groupingActive() ? row().depth + 1 : null)} data-rozie-s-d5dcab4c="">
+        <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-group-header': rowIsGrouped(row()) })} role="row" data-depth={rozieAttr(row().depth)} aria-rowindex={rozieAttr(bodyAriaRowIndex(row()))} data-group-header={rozieAttr(rowIsGrouped(row()) ? row().id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(row()) ? row().id : null)} aria-expanded={(rowIsGrouped(row()) ? !!rowIsExpanded(row()) : null) ?? undefined} aria-level={rozieAttr(groupingActive() ? row().depth + 1 : null)} data-rozie-s-d5dcab4c="">
           <Key each={visibleCellsFor(row()) as readonly any[]} by={(cell) => cell.id}>{(cell) => <td class={"rdt-td" + " " + rozieClass({ 'rdt-select-td': isSelectColumn(cell().column.id), 'rdt-expander-td': isExpanderColumn(cell().column.id), 'rdt-in-range': inRange(rowIndexOf(row()), colIndexOf(row(), cell())), 'rdt-cell-active': isActiveCell(String(rowIndexOf(row())), colIndexOf(row(), cell())) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cell().column.id)} data-grid-cell="" data-row={rozieAttr(rowIndexOf(row()))} data-col-index={rozieAttr(colIndexOf(row(), cell()))} tabIndex={rozieAttr(cellTabindex(String(rowIndexOf(row())), colIndexOf(row(), cell())))} style={parseInlineStyle(bodyCellStyle(row(), cell().column.id))} aria-invalid={rozieAttr(cellAriaInvalid(rowIndexOf(row()), colIndexOf(row(), cell())))} data-in-range={rozieAttr(inRange(rowIndexOf(row()), colIndexOf(row(), cell())) ? 'true' : null)} data-agg-cell={rozieAttr(cellIsAggregated(cell()) ? cell().column.id : null)} data-rozie-s-d5dcab4c="">
             
             {<Show when={isExpanderColumn(cell().column.id)} fallback={<Show when={isSelectColumn(cell().column.id)} fallback={<Show when={cellIsGrouped(cell())} fallback={<Show when={isEditing(rowIndexOf(row()), colIndexOf(row(), cell()))} fallback={<Show when={cellIsPlaceholder(cell())} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
@@ -6315,9 +6347,9 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         </tr></Show>}</>}</Key>
       </tbody>
     </table>}><div class={"rdt-scroll"} style={parseInlineStyle(local.maxHeight ? 'max-height:' + local.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + local.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c="">
-    <table aria-rowcount={rows().length} class={"rozie-data-table" + " " + rozieClass({ 'rdt-sticky': local.stickyHeader })} role={rozieAttr(tableRole())} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridKeyDown($event); }} onFocusIn={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { syncActiveFromEvent($event); }} onFocusOut={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridFocusOut($event); }} onMouseDown={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridMouseDown($event); }} onDblClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridDblClick($event); }} onClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
+    <table aria-rowcount={rozieAttr(gridAriaRowCount())} class={"rozie-data-table" + " " + rozieClass({ 'rdt-sticky': local.stickyHeader })} role={rozieAttr(tableRole())} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridKeyDown($event); }} onFocusIn={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { syncActiveFromEvent($event); }} onFocusOut={($event: FocusEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridFocusOut($event); }} onMouseDown={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridMouseDown($event); }} onDblClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridDblClick($event); }} onClick={($event: MouseEvent & { currentTarget: HTMLTableElement; target: Element }) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
       <thead class={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
-        <Key each={headerGroups() as readonly any[]} by={(hg) => hg.id}>{(hg, hgLevel) => <tr class={"rdt-tr"} role="row" data-rozie-s-d5dcab4c="">
+        <Key each={headerGroups() as readonly any[]} by={(hg) => hg.id}>{(hg, hgLevel) => <tr class={"rdt-tr"} role="row" aria-rowindex={rozieAttr(hgLevel() + 1)} data-rozie-s-d5dcab4c="">
           <Key each={hg().headers as readonly any[]} by={(header) => header.id}>{(header) => <th class={"rdt-th" + " " + rozieClass({ 'rdt-select-th': isSelectColumn(header().column.id), 'rdt-expander-th': isExpanderColumn(header().column.id), 'rdt-th-resizing': columnIsResizing(header().column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg(), header()), hgLevel()) })} role="columnheader" data-col={rozieAttr(header().column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel())} colSpan={rozieAttr(header().colSpan > 1 ? header().colSpan : null)} data-col-index={rozieAttr(headerColIndexOf(hg(), header()))} tabIndex={rozieAttr(cellTabindex('__header', headerColIndexOf(hg(), header()), hgLevel()))} aria-sort={rozieAttr(ariaSortFor(header().column.id))} style={parseInlineStyle(thStyle(header().column.id))} data-rozie-s-d5dcab4c="">
             {<Show when={isSelectColumn(header().column.id)} fallback={<Show when={isExpanderColumn(header().column.id)} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={header().column.getCanSort && header().column.getCanSort()} fallback={<span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
@@ -6359,7 +6391,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         </tr>
         
         <Key each={windowedRows() as readonly any[]} by={(wr) => wr.row.id}>{(wr) => <>
-        <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-group-header': rowIsGrouped(wr().row), 'rdt-row-pinned': wr().pinned })} role="row" data-row={rozieAttr(wr().vi.index)} aria-rowindex={rozieAttr(wr().vi.index + 1)} data-index={rozieAttr(wr().vi.index)} data-pinned={rozieAttr(wr().pinned ? 'true' : null)} data-depth={rozieAttr(wr().row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr().row) ? wr().row.id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr().row) ? wr().row.id : null)} aria-expanded={(rowIsGrouped(wr().row) ? !!rowIsExpanded(wr().row) : null) ?? undefined} aria-level={rozieAttr(groupingActive() ? wr().row.depth + 1 : null)} data-rozie-s-d5dcab4c="">
+        <tr class={"rdt-tr" + " " + rozieClass({ 'rdt-group-header': rowIsGrouped(wr().row), 'rdt-row-pinned': wr().pinned })} role="row" data-row={rozieAttr(wr().vi.index)} aria-rowindex={rozieAttr(headerRowCount() + wr().vi.index + 1)} data-index={rozieAttr(wr().vi.index)} data-pinned={rozieAttr(wr().pinned ? 'true' : null)} data-depth={rozieAttr(wr().row.depth)} data-group-header={rozieAttr(rowIsGrouped(wr().row) ? wr().row.id : null)} data-group-leaf={rozieAttr(groupingActive() && !rowIsGrouped(wr().row) ? wr().row.id : null)} aria-expanded={(rowIsGrouped(wr().row) ? !!rowIsExpanded(wr().row) : null) ?? undefined} aria-level={rozieAttr(groupingActive() ? wr().row.depth + 1 : null)} data-rozie-s-d5dcab4c="">
           <Key each={visibleCellsFor(wr().row) as readonly any[]} by={(cell) => cell.id}>{(cell) => <td class={"rdt-td" + " " + rozieClass({ 'rdt-select-td': isSelectColumn(cell().column.id), 'rdt-expander-td': isExpanderColumn(cell().column.id), 'rdt-in-range': inRange(wr().vi.index, colIndexOf(wr().row, cell())), 'rdt-cell-active': isActiveCell(String(wr().vi.index), colIndexOf(wr().row, cell())) })} role={rozieAttr(cellRole())} data-col={rozieAttr(cell().column.id)} data-grid-cell="" data-row={rozieAttr(wr().vi.index)} data-col-index={rozieAttr(colIndexOf(wr().row, cell()))} tabIndex={rozieAttr(cellTabindex(String(wr().vi.index), colIndexOf(wr().row, cell())))} style={parseInlineStyle(bodyCellStyle(wr().row, cell().column.id))} aria-invalid={rozieAttr(cellAriaInvalid(wr().vi.index, colIndexOf(wr().row, cell())))} data-in-range={rozieAttr(inRange(wr().vi.index, colIndexOf(wr().row, cell())) ? 'true' : null)} data-agg-cell={rozieAttr(cellIsAggregated(cell()) ? cell().column.id : null)} data-rozie-s-d5dcab4c="">
             
             {<Show when={isExpanderColumn(cell().column.id)} fallback={<Show when={isSelectColumn(cell().column.id)} fallback={<Show when={cellIsGrouped(cell())} fallback={<Show when={isEditing(wr().vi.index, colIndexOf(wr().row, cell()))} fallback={<Show when={cellIsPlaceholder(cell())} fallback={<span class={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
