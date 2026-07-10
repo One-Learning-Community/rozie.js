@@ -5580,8 +5580,12 @@ const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
     return false;
   }
   setInvalid('');
-  const srcIndex = sourceIndexOfRow(editingRow);
-  const next = replaceRowValue(currentData(), srcIndex, field, newValue);
+  // #5: a no-op commit (the coerced value is UNCHANGED — a bare Enter/Tab/blur that edited
+  // nothing) must do NO model write, NO history record, and NO commit event: writeData →
+  // recordSnapshot UNCONDITIONALLY clears the redo stack and mints a fresh row identity, so an
+  // unconditional write on a no-op would destroy redo + spuriously re-render + emit a no-op
+  // cell-edit-commit. Compute `changed` and gate the write/emit on it; ALWAYS close the editor.
+  const changed = !Object.is(newValue, oldValue);
   // Snapshot the EDITING cell to return focus to BEFORE endEdit clears editing state.
   const focusRow = editingRow;
   const focusCol = editingCol;
@@ -5590,34 +5594,47 @@ const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
   editTransition = true;
   // Sync idempotency latch: flip BEFORE writeData/endEdit so the async unmount-blur re-entry
   // (which fires AFTER this call returns, once editTransition is already back to false) finds
-  // it set at the top-of-function guard above and no-ops.
+  // it set at the top-of-function guard above and no-ops. Set on BOTH paths so a no-op commit
+  // is just as re-entry-safe as a real one.
   committedThisSession = true;
-  writeData(next);
-  // Exactly one emit per commit, from this single call site (writeData does NOT emit).
-  oncelleditcommit?.({
-    rowId,
-    columnId: colId,
-    oldValue,
-    newValue
-  });
+  if (changed) {
+    const srcIndex = sourceIndexOfRow(editingRow);
+    const next = replaceRowValue(currentData(), srcIndex, field, newValue);
+    writeData(next);
+    // Exactly one emit per commit, from this single call site (writeData does NOT emit).
+    oncelleditcommit?.({
+      rowId,
+      columnId: colId,
+      oldValue,
+      newValue
+    });
+  }
   endEdit();
   editTransition = false;
-  // Defer the focus return so the display↔editor re-render commits first (async on
-  // React/Solid/Lit) — the cell is focusable with its roving tabindex only after the
-  // editor unmounts and the display branch (+ tabindex) re-renders. Skipped on a
-  // Tab-advance (the caller immediately opens the next editor and focuses THAT).
-  // B23: do NOT focus the FIXED old index here — under an active sort/filter the committed row
-  // RELOCATES, and focusCellWhenReady(oldRow,col) would land on whatever row now sits at the old
-  // index (or drop to <body>). Instead record a pending follow-request the refreshRowModel pass
-  // consumes AFTER the row model re-derives: it resolves the row's NEW display index from the
-  // fresh model (React-stale-safe) and focuses THAT cell; the @focusin sync then re-seats the
-  // active-cell state so it and DOM focus stay coherent. With no sort/filter the row keeps its
-  // index → byte-behaviorally identical to before.
-  if (skipFocusReturn !== true) pendingEditFollow = {
-    rowOriginal,
-    rowId,
-    col: focusCol
-  };
+  if (changed) {
+    // Defer the focus return so the display↔editor re-render commits first (async on
+    // React/Solid/Lit) — the cell is focusable with its roving tabindex only after the
+    // editor unmounts and the display branch (+ tabindex) re-renders. Skipped on a
+    // Tab-advance (the caller immediately opens the next editor and focuses THAT).
+    // B23: do NOT focus the FIXED old index here — under an active sort/filter the committed row
+    // RELOCATES, and focusCellWhenReady(oldRow,col) would land on whatever row now sits at the old
+    // index (or drop to <body>). Instead record a pending follow-request the refreshRowModel pass
+    // consumes AFTER the row model re-derives: it resolves the row's NEW display index from the
+    // fresh model (React-stale-safe) and focuses THAT cell; the @focusin sync then re-seats the
+    // active-cell state so it and DOM focus stay coherent. With no sort/filter the row keeps its
+    // index → byte-behaviorally identical to before.
+    if (skipFocusReturn !== true) pendingEditFollow = {
+      rowOriginal,
+      rowId,
+      col: focusCol
+    };
+  } else if (skipFocusReturn !== true) {
+    // #5 no-op path: nothing was written, so refreshRowModel never runs and would never consume
+    // a pendingEditFollow — focus would drop to <body>. Return focus DIRECTLY. The row does NOT
+    // relocate (no write), so the B23 relocation hazard that forces the pendingEditFollow path on
+    // a real commit does not apply here: the fixed (focusRow, focusCol) is correct and safe.
+    focusCellWhenReady(focusRow, focusCol);
+  }
   return true;
 };
 
@@ -5869,35 +5886,51 @@ const commitRow = () => {
       newValue
     });
   }
-  // ONE fresh-array replace of the SINGLE row object with all field values applied at once.
-  const srcIndex = sourceIndexOfRow(rowIndex);
-  const next = replaceRowValues(currentData(), srcIndex, fieldValues);
-  // Snapshot the active COLUMN to return focus to (the whole row is in edit, so the
-  // active-cell column is the roving focus target), BEFORE endRowEdit clears editing state.
+  // Snapshot the active cell to return focus to (the whole row is in edit, so the active-cell
+  // row/column is the roving focus target), BEFORE endRowEdit clears editing state.
+  const focusRow = activeRow;
   const focusCol = activeColIndex;
+  // #5: a no-op row commit (NO column's value actually changed — a bare Enter/save/outside-click
+  // that edited nothing) must do NO model write, NO history record, NO row-edit-commit event:
+  // writeData → recordSnapshot UNCONDITIONALLY clears the redo stack and mints a fresh row
+  // identity, so an unconditional write on a no-op destroys redo + spuriously re-renders + emits
+  // a no-op row-edit-commit. Gate the write/emit on `changes.length`; ALWAYS close the editor.
+  const changed = changes.length > 0;
   editTransition = true;
-  writeData(next);
-  // EXACTLY ONE emit per row commit, from THIS single call site (React multi-emit dedup, D-07).
-  onroweditcommit?.({
-    rowId,
-    changes
-  });
+  if (changed) {
+    // ONE fresh-array replace of the SINGLE row object with all field values applied at once.
+    const srcIndex = sourceIndexOfRow(rowIndex);
+    const next = replaceRowValues(currentData(), srcIndex, fieldValues);
+    writeData(next);
+    // EXACTLY ONE emit per row commit, from THIS single call site (React multi-emit dedup, D-07).
+    onroweditcommit?.({
+      rowId,
+      changes
+    });
+  }
   endRowEdit();
   editTransition = false;
-  // WR-01/B23 (review): a FULL-ROW commit can RELOCATE its row under an active sort/filter, exactly
-  // like the single-cell commitEdit. Do NOT focus the FIXED old index — focusCellWhenReady(rowIndex,
-  // col) would land on whatever DIFFERENT row now occupies the old index (or drop to <body>) AND leave
-  // $data.activeRow stale, so the @focusin sync writes the WRONG activeRow (IN-02 — roving model +
-  // DOM focus incoherent on the next keystroke). Instead record a pending follow-request the
-  // refreshRowModel pass consumes AFTER the row model re-derives: it resolves the committed row's NEW
-  // display index by IDENTITY (rowId FIRST — stable across a re-sort; rowOriginal as fallback, since
-  // the fresh-spread replace changes the row object) and re-seats focus on THAT cell via the DOM-only
-  // poll (React-stale-safe). With no sort/filter the row keeps its index → byte-behaviorally identical.
-  pendingEditFollow = {
-    rowOriginal,
-    rowId,
-    col: focusCol
-  };
+  if (changed) {
+    // WR-01/B23 (review): a FULL-ROW commit can RELOCATE its row under an active sort/filter, exactly
+    // like the single-cell commitEdit. Do NOT focus the FIXED old index — focusCellWhenReady(rowIndex,
+    // col) would land on whatever DIFFERENT row now occupies the old index (or drop to <body>) AND leave
+    // $data.activeRow stale, so the @focusin sync writes the WRONG activeRow (IN-02 — roving model +
+    // DOM focus incoherent on the next keystroke). Instead record a pending follow-request the
+    // refreshRowModel pass consumes AFTER the row model re-derives: it resolves the committed row's NEW
+    // display index by IDENTITY (rowId FIRST — stable across a re-sort; rowOriginal as fallback, since
+    // the fresh-spread replace changes the row object) and re-seats focus on THAT cell via the DOM-only
+    // poll (React-stale-safe). With no sort/filter the row keeps its index → byte-behaviorally identical.
+    pendingEditFollow = {
+      rowOriginal,
+      rowId,
+      col: focusCol
+    };
+  } else {
+    // #5 no-op path: nothing was written, so refreshRowModel never runs and would never consume a
+    // pendingEditFollow — focus would drop to <body>. Return focus DIRECTLY. The row does NOT
+    // relocate (no write), so the B23 relocation hazard does not apply: (focusRow, focusCol) is safe.
+    focusCellWhenReady(focusRow, focusCol);
+  }
   return true;
 };
 
