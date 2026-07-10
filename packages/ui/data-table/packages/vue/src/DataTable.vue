@@ -6431,10 +6431,20 @@ const editCell = (rowIndex: any, colIndex: any) => {
 };
 
 // commitEditing() — programmatic commit of the open editor ($expose, req-3). No-op when
-// no cell is editing. Collision-clean (not `commit`).
+// nothing is editing. Collision-clean (not `commit`). Handles BOTH edit modes: a full-row
+// edit (editRow()/Shift+F2) drives editingRowIndex and leaves editingRow at -1, so the
+// single-cell commitEdit guard (editingRow >= 0) is false during a row edit — route to
+// commitRow() first so a programmatic commit of a row editor is not a silent no-op.
 // commitEditing() — programmatic commit of the open editor ($expose, req-3). No-op when
-// no cell is editing. Collision-clean (not `commit`).
+// nothing is editing. Collision-clean (not `commit`). Handles BOTH edit modes: a full-row
+// edit (editRow()/Shift+F2) drives editingRowIndex and leaves editingRow at -1, so the
+// single-cell commitEdit guard (editingRow >= 0) is false during a row edit — route to
+// commitRow() first so a programmatic commit of a row editor is not a silent no-op.
 const commitEditing = () => {
+  if (inRowEdit()) {
+    commitRow();
+    return;
+  }
   if (editingRow.value >= 0) commitEdit(undefined);
 };
 

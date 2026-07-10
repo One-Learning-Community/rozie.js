@@ -5015,6 +5015,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 };
 
   commitEditing = () => {
+  if (this.inRowEdit()) {
+    this.commitRow();
+    return;
+  }
   if (this._editingRow.value >= 0) this.commitEdit(undefined);
 };
 

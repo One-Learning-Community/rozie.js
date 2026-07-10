@@ -3926,6 +3926,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     beginEdit(r, c, null);
   }
   function commitEditing() {
+    if (inRowEdit()) {
+      commitRow();
+      return;
+    }
     if (editingRow >= 0) commitEdit(undefined);
   }
   function editRow(rowIndex: any) {

@@ -4728,6 +4728,10 @@ export class DataTable {
     this.beginEdit(r, c, null);
   };
   commitEditing = () => {
+    if (this.inRowEdit()) {
+      this.commitRow();
+      return;
+    }
     if (this.editingRow() >= 0) this.commitEdit(undefined);
   };
   editRow = (rowIndex: any) => {
