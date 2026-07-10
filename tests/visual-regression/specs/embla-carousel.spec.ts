@@ -155,3 +155,69 @@ for (const target of TARGETS) {
     expect(Math.abs(txMid - txBefore)).toBeGreaterThan(20);
   });
 }
+
+/**
+ * Built-in navigation behavioral smoke (dots + arrows + thumbnails) — guards two
+ * bugs that the deterministic `CarouselNavScreenshot` pixel cell alone can't:
+ *
+ *   1. **Snap count reflects every slide (all 6, esp. Lit).** The dots are one
+ *      `<button>` per Embla scroll snap (`r-for` over `$data.snaps`). On Lit the
+ *      trailing empty declarative-mode `<slot/>` used to render as a real 0-width
+ *      shadow-DOM child of `.rozie-embla__container`; Embla counted it as a
+ *      phantom 5th slide and collapsed `scrollSnapList()` to ONE snap — so Lit
+ *      showed a single dot with the next-arrow disabled while the five hostless
+ *      targets showed four. The fix pins Embla's `slides` option to
+ *      `.rozie-embla__slide`, so all six now measure four snaps → four dots.
+ *
+ *   2. **Thumb click scrolls without throwing (Embla-8 `clickAllowed` removed).**
+ *      `selectThumb` used to guard on `emblaThumbs.clickAllowed()`, which Embla 8
+ *      dropped from its public API — every thumb tap threw
+ *      `TypeError: …clickAllowed is not a function`. Clicking a thumb must now
+ *      scroll the main track and raise NO page error.
+ *
+ * Structural/behavioral only (no `toHaveScreenshot`) so it runs on macOS without a
+ * Docker baseline, same as the sibling spec above.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built ? test.fixme : test;
+  runner(`embla-carousel-nav [${target}]: dots reflect all snaps, thumb click scrolls (no clickAllowed throw)`, async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (e) => pageErrors.push(String(e)));
+
+    await page.goto(`/?example=CarouselNavScreenshot&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    // ---- 1. one dot per snap: four slides → four dots on EVERY target ----
+    // (the Lit phantom-<slot> bug measured a single snap → a single dot).
+    await expect
+      .poll(async () => page.locator('.rozie-embla__dot').count(), {
+        timeout: 15_000,
+      })
+      .toBe(4);
+    // >1 snap ⇒ the next arrow is enabled (the bug disabled it on Lit).
+    await expect(
+      page.locator('.rozie-embla__arrow--next').first(),
+    ).toBeEnabled();
+
+    // ---- 2. thumb click scrolls the MAIN track, throwing no clickAllowed error ----
+    const container = page.locator('.rozie-embla__container').first();
+    const trackX = async () =>
+      container.evaluate(
+        (el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41,
+      );
+    const txBefore = await trackX();
+    // Thumb 2 (0-indexed) → scrollTo(2): the track translates left (m41 drops).
+    await page.locator('.rozie-embla__thumb').nth(2).click();
+    await expect
+      .poll(trackX, { timeout: 10_000, intervals: [100, 200, 400, 800] })
+      .toBeLessThan(txBefore - 20);
+
+    // selectThumb ran without hitting the removed Embla-8 clickAllowed() method.
+    expect(pageErrors.join('\n')).toBe('');
+  });
+}

@@ -267,6 +267,17 @@ const keyFor = (slide, i) => {
 const emblaOptionsFromProps = () => {
   let opts = null
   opts = {
+    // Pin the slide set explicitly rather than letting Embla infer it from the
+    // container's direct children. In config-array mode the container also holds a
+    // trailing empty default <slot> (the declarative-mode entry point). On Lit that
+    // <slot> is a real, 0-width node in shadow DOM, so Embla would count it as a
+    // phantom 5th slide and collapse scrollSnapList() to a single snap — one dot,
+    // next-arrow disabled — even though the four real slides render correctly (the
+    // hostless targets emit no node for an unused slot, so they were unaffected).
+    // Both modes label slides `.rozie-embla__slide` (see the mode-b docs), so this
+    // selector is correct for config-array AND declarative usage; `...$props.options`
+    // still overrides it if a consumer needs to.
+    slides:         '.rozie-embla__slide',
     loop:           $props.loop,
     align:          $props.align,
     axis:           $props.axis,
@@ -314,17 +325,20 @@ const syncNav = () => {
   if (emblaThumbs) emblaThumbs.scrollTo(i)
 }
 
-// Thumb click → scroll the MAIN carousel. Guarded by the thumb engine's
-// clickAllowed() so a drag of the strip doesn't register as a click (the Embla
-// thumbs idiom). Calls the $expose'd scrollToIndex verb directly (below) —
-// arg-light internal calls to an exposed verb now typecheck cleanly on all
-// six targets: the emitter lowers a TRAILING $expose verb param optional
-// (`jump?: any` / `index`+`jump?`) whenever it sees a fewer-arg internal call
-// site (emitter-hardening backlog item #5). The prior raw-engine
+// Thumb click → scroll the MAIN carousel. Calls the $expose'd scrollToIndex verb
+// directly (below) — arg-light internal calls to an exposed verb now typecheck
+// cleanly on all six targets: the emitter lowers a TRAILING $expose verb param
+// optional (`jump?: any` / `index`+`jump?`) whenever it sees a fewer-arg internal
+// call site (emitter-hardening backlog item #5). The prior raw-engine
 // navPrev/navNext/navTo bypass existed ONLY to dodge the pre-fix required-arg
 // TS2554 and is gone now that the compiler owns the arity.
+//
+// NB: no `clickAllowed()` drag-vs-click guard. Embla 8 dropped `clickAllowed`
+// from the public API entirely (it isn't a method on EmblaCarouselType), so the
+// old guard threw `TypeError: emblaThumbs.clickAllowed is not a function` on
+// every thumb tap. The modern Embla thumbs idiom calls `scrollTo` directly; a
+// drag that ends on a thumb simply scrolls, which is acceptable for a nav strip.
 const selectThumb = (i) => {
-  if (emblaThumbs && !emblaThumbs.clickAllowed()) return
   scrollToIndex(i)
 }
 

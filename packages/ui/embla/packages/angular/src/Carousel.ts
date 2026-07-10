@@ -389,6 +389,17 @@ export class Carousel {
   emblaOptionsFromProps = () => {
     let opts: any = null;
     opts = {
+      // Pin the slide set explicitly rather than letting Embla infer it from the
+      // container's direct children. In config-array mode the container also holds a
+      // trailing empty default <slot> (the declarative-mode entry point). On Lit that
+      // <slot> is a real, 0-width node in shadow DOM, so Embla would count it as a
+      // phantom 5th slide and collapse scrollSnapList() to a single snap — one dot,
+      // next-arrow disabled — even though the four real slides render correctly (the
+      // hostless targets emit no node for an unused slot, so they were unaffected).
+      // Both modes label slides `.rozie-embla__slide` (see the mode-b docs), so this
+      // selector is correct for config-array AND declarative usage; `...$props.options`
+      // still overrides it if a consumer needs to.
+      slides: '.rozie-embla__slide',
       loop: this.loop(),
       align: this.align(),
       axis: this.axis(),
@@ -429,7 +440,6 @@ export class Carousel {
     if (this.emblaThumbs) this.emblaThumbs.scrollTo(i);
   };
   selectThumb = (i: any) => {
-    if (this.emblaThumbs && !this.emblaThumbs.clickAllowed()) return;
     this.scrollToIndex(i);
   };
   scrollNext = (jump?: any) => {
