@@ -387,12 +387,19 @@ let programmatic = 0;
 //      (mid-settle, before that target's own reactivity has propagated the just-written value
 //      all the way to the bound prop) — a real value, just not yet the NEW one — so the
 //      signature genuinely mismatched even though nothing external happened.
-// A boolean flag that stays `true` for an entire DEFERRED settling window (reset via `rAF`,
+// A boolean flag that stays `true` for an entire DEFERRED settling window (reset on a timer,
 // not by reFeed consuming it) tolerates all three: it survives proxy-wrapping (it is not a
 // value comparison at all), it survives an arbitrary NUMBER of redundant/transiently-stale
 // reFeed passes (every one of them sees `true` until the window closes), and a GENUINE external
 // swap — which happens outside any known internal write's settling window — still finds it
 // `false` and correctly clears history.
+//   4. The window was ORIGINALLY closed on a double-rAF nesting, but that reset fires BEFORE
+//      paint while React's reFeed runs as a POST-COMMIT passive effect — so under CI load
+//      React's reFeed landed AFTER the rAF window closed and wrongly cleared a just-pasted
+//      block's history (data-table-grid-undo [react] (c)). The close is now a WALL-CLOCK
+//      `setTimeout` macrotask (see writeData in writeFunnels.rzts), which drains strictly
+//      after React's MessageChannel-scheduled passive effect and gives the fine-grained
+//      targets more settle room than 2 frames — with no change to the boolean-window design.
 // ── Grid-wide undo/redo (260709-8ct) — history STATE lives in top-level `let` (mirroring
 // `programmatic` above), NOT $data: recording a snapshot on every keystroke must not trigger
 // a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array
@@ -421,17 +428,32 @@ let programmatic = 0;
 //      (mid-settle, before that target's own reactivity has propagated the just-written value
 //      all the way to the bound prop) — a real value, just not yet the NEW one — so the
 //      signature genuinely mismatched even though nothing external happened.
-// A boolean flag that stays `true` for an entire DEFERRED settling window (reset via `rAF`,
+// A boolean flag that stays `true` for an entire DEFERRED settling window (reset on a timer,
 // not by reFeed consuming it) tolerates all three: it survives proxy-wrapping (it is not a
 // value comparison at all), it survives an arbitrary NUMBER of redundant/transiently-stale
 // reFeed passes (every one of them sees `true` until the window closes), and a GENUINE external
 // swap — which happens outside any known internal write's settling window — still finds it
 // `false` and correctly clears history.
+//   4. The window was ORIGINALLY closed on a double-rAF nesting, but that reset fires BEFORE
+//      paint while React's reFeed runs as a POST-COMMIT passive effect — so under CI load
+//      React's reFeed landed AFTER the rAF window closed and wrongly cleared a just-pasted
+//      block's history (data-table-grid-undo [react] (c)). The close is now a WALL-CLOCK
+//      `setTimeout` macrotask (see writeData in writeFunnels.rzts), which drains strictly
+//      after React's MessageChannel-scheduled passive effect and gives the fine-grained
+//      targets more settle room than 2 frames — with no change to the boolean-window design.
 let undoStack: unknown[] = [];
 let redoStack: unknown[] = [];
 let restoringHistory: boolean = false;
 let dataWriteSettling: boolean = false;
-let dataWriteSettleHandle: number | null = null;
+// Pending settle-window close timer id (setTimeout handle); a re-arm clearTimeout()s it.
+// `ReturnType<typeof setTimeout>` (not `number`) — a leaf tsconfig that pulls Node types
+// resolves setTimeout to `NodeJS.Timeout`, so a bare `number` annotation is a TS2322 on the
+// vue-tsc / ng-packagr leaf builds (VR's esbuild does not typecheck, so it slips past there).
+// Pending settle-window close timer id (setTimeout handle); a re-arm clearTimeout()s it.
+// `ReturnType<typeof setTimeout>` (not `number`) — a leaf tsconfig that pulls Node types
+// resolves setTimeout to `NodeJS.Timeout`, so a bare `number` annotation is a TS2322 on the
+// vue-tsc / ng-packagr leaf builds (VR's esbuild does not typecheck, so it slips past there).
+let dataWriteSettleHandle: ReturnType<typeof setTimeout> | null = null;
 
 // Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
 // has not bound `expanded` and has not yet toggled any group, group-header rows default to
@@ -1079,17 +1101,27 @@ const writeData = (next: any) => {
     emitHistoryChangeIfEdged(prevU, prevR);
   }
   dataWriteSettling = true;
-  if (dataWriteSettleHandle != null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(dataWriteSettleHandle);
+  // Re-arm: a rapid back-to-back write cancels the prior pending close so the window
+  // never shuts BETWEEN two writes of one logical action.
+  if (dataWriteSettleHandle != null && typeof clearTimeout === 'function') clearTimeout(dataWriteSettleHandle);
   const closeSettleWindow = () => {
     dataWriteSettling = false;
     dataWriteSettleHandle = null;
   };
-  if (typeof requestAnimationFrame === 'function') {
-    dataWriteSettleHandle = requestAnimationFrame(() => {
-      requestAnimationFrame(closeSettleWindow);
-    });
+  // WALL-CLOCK macrotask backstop (was a double-rAF nesting — 260709-8ct). reFeed's
+  // re-feed `$watch` on React runs as a POST-COMMIT passive effect; an rAF callback
+  // fires BEFORE paint, so under CI load React's reFeed landed AFTER the 2-frame rAF
+  // window had already closed → it read `dataWriteSettling === false` and WRONGLY
+  // cleared history (data-table-grid-undo [react] (c): paste block → Ctrl+Z was a
+  // no-op). A `setTimeout` runs strictly after React's MessageChannel-scheduled
+  // passive effect (MessageChannel drains before setTimeout), and a ~6-frame window
+  // gives every fine-grained target (Solid/Lit) FAR more settle room than 2 frames.
+  // A genuine external swap still happens outside any write's window → flag `false`
+  // → history cleared, exactly as before.
+  if (typeof setTimeout === 'function') {
+    dataWriteSettleHandle = setTimeout(closeSettleWindow, 96);
   } else {
-    setTimeout(closeSettleWindow, 32);
+    closeSettleWindow();
   }
   programmatic++;
   dataDefault = next; // fresh array only (never in-place)

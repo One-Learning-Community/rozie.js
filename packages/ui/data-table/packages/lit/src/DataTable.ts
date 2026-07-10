@@ -1294,7 +1294,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   dataWriteSettling: boolean = false;
 
-  dataWriteSettleHandle: number | null = null;
+  dataWriteSettleHandle: ReturnType<typeof setTimeout> | null = null;
 
   expandedTouched = false;
 
@@ -1697,17 +1697,27 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this.emitHistoryChangeIfEdged(prevU, prevR);
   }
   this.dataWriteSettling = true;
-  if (this.dataWriteSettleHandle != null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.dataWriteSettleHandle);
+  // Re-arm: a rapid back-to-back write cancels the prior pending close so the window
+  // never shuts BETWEEN two writes of one logical action.
+  if (this.dataWriteSettleHandle != null && typeof clearTimeout === 'function') clearTimeout(this.dataWriteSettleHandle);
   const closeSettleWindow = () => {
     this.dataWriteSettling = false;
     this.dataWriteSettleHandle = null;
   };
-  if (typeof requestAnimationFrame === 'function') {
-    this.dataWriteSettleHandle = requestAnimationFrame(() => {
-      requestAnimationFrame(closeSettleWindow);
-    });
+  // WALL-CLOCK macrotask backstop (was a double-rAF nesting — 260709-8ct). reFeed's
+  // re-feed `$watch` on React runs as a POST-COMMIT passive effect; an rAF callback
+  // fires BEFORE paint, so under CI load React's reFeed landed AFTER the 2-frame rAF
+  // window had already closed → it read `dataWriteSettling === false` and WRONGLY
+  // cleared history (data-table-grid-undo [react] (c): paste block → Ctrl+Z was a
+  // no-op). A `setTimeout` runs strictly after React's MessageChannel-scheduled
+  // passive effect (MessageChannel drains before setTimeout), and a ~6-frame window
+  // gives every fine-grained target (Solid/Lit) FAR more settle room than 2 frames.
+  // A genuine external swap still happens outside any write's window → flag `false`
+  // → history cleared, exactly as before.
+  if (typeof setTimeout === 'function') {
+    this.dataWriteSettleHandle = setTimeout(closeSettleWindow, 96);
   } else {
-    setTimeout(closeSettleWindow, 32);
+    closeSettleWindow();
   }
   this.programmatic++;
   this._dataDefault.value = next; // fresh array only (never in-place)

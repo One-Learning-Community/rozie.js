@@ -294,7 +294,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const committedThisSession = useRef(false);
   const editTransition = useRef(false);
   const restoringHistory = useRef<boolean>(false);
-  const dataWriteSettleHandle = useRef<number | null>(null);
+  const dataWriteSettleHandle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [data, setData] = useControllableState({
     value: props.data,
     defaultValue: props.defaultData ?? [],
@@ -786,17 +786,27 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       emitHistoryChangeIfEdged(prevU, prevR);
     }
     dataWriteSettling.current = true;
-    if (dataWriteSettleHandle.current != null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(dataWriteSettleHandle.current);
+    // Re-arm: a rapid back-to-back write cancels the prior pending close so the window
+    // never shuts BETWEEN two writes of one logical action.
+    if (dataWriteSettleHandle.current != null && typeof clearTimeout === 'function') clearTimeout(dataWriteSettleHandle.current);
     const closeSettleWindow = () => {
       dataWriteSettling.current = false;
       dataWriteSettleHandle.current = null;
     };
-    if (typeof requestAnimationFrame === 'function') {
-      dataWriteSettleHandle.current = requestAnimationFrame(() => {
-        requestAnimationFrame(closeSettleWindow);
-      });
+    // WALL-CLOCK macrotask backstop (was a double-rAF nesting — 260709-8ct). reFeed's
+    // re-feed `$watch` on React runs as a POST-COMMIT passive effect; an rAF callback
+    // fires BEFORE paint, so under CI load React's reFeed landed AFTER the 2-frame rAF
+    // window had already closed → it read `dataWriteSettling === false` and WRONGLY
+    // cleared history (data-table-grid-undo [react] (c): paste block → Ctrl+Z was a
+    // no-op). A `setTimeout` runs strictly after React's MessageChannel-scheduled
+    // passive effect (MessageChannel drains before setTimeout), and a ~6-frame window
+    // gives every fine-grained target (Solid/Lit) FAR more settle room than 2 frames.
+    // A genuine external swap still happens outside any write's window → flag `false`
+    // → history cleared, exactly as before.
+    if (typeof setTimeout === 'function') {
+      dataWriteSettleHandle.current = setTimeout(closeSettleWindow, 96);
     } else {
-      setTimeout(closeSettleWindow, 32);
+      closeSettleWindow();
     }
     programmatic.current++;
     setDataDefault(next); // fresh array only (never in-place)
