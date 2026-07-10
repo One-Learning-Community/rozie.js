@@ -22,8 +22,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *          absolute today — the parity anchor).
  *   converter — getRowIndexRelativeToPage() returns the page-relative index (7 - 2*3 = 1),
  *        mirroring MUI getRowIndexRelativeToVisibleRows.
- *   B27 — every rendered body row carries aria-rowindex == abs+1 in BOTH modes (paginated
- *        page-3 rows = 7/8/9; virtual abs-4000 row = 4001).
+ *   B27 — every rendered body row carries aria-rowindex == abs+2 in BOTH modes (header-inclusive;
+ *        paginated page-3 rows = 8/9/10; virtual abs-4000 row = 4002).
  *
  * RED on the pre-fix build (record per-target in SUMMARY):
  *   - paginated focusCell(7) clamps page-relative (reports 2, not 7); never switches page.
@@ -116,7 +116,7 @@ async function bodyAriaRowIndices(page: Page): Promise<(string | null)[]> {
 // absolute focusCell(7) must switch to page 3 and report rowIndex 7 (not the page-relative 2).
 // ═══════════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
-  runnerFor(target)(`data-table-grid-absindex [${target}]: paginated focusCell is ABSOLUTE; getRowIndexRelativeToPage; aria-rowindex=abs+1`, async ({
+  runnerFor(target)(`data-table-grid-absindex [${target}]: paginated focusCell is ABSOLUTE; getRowIndexRelativeToPage; aria-rowindex=abs+2`, async ({
     page,
   }) => {
     await page.goto(`/?example=DataTableGridAbsIndex&target=${target}`);
@@ -132,13 +132,13 @@ for (const target of TARGETS) {
     const getActiveReadout = page.getByTestId('getactivecell-readout');
     const relReadout = page.getByTestId('relindex-readout');
 
-    // Page 1 shows exactly 3 body rows with aria-rowindex 1/2/3 (B27 — absolute, 1-based).
+    // Page 1 shows exactly 3 body rows with aria-rowindex 2/3/4 (B27 — header-inclusive, 1-based).
     await expect
       .poll(async () => (await pageStatus.textContent())?.trim() ?? '', { timeout: 15_000 })
       .toBe('Page 1 of 3');
     await expect
       .poll(async () => bodyAriaRowIndices(page), { timeout: 15_000 })
-      .toEqual(['1', '2', '3']);
+      .toEqual(['2', '3', '4']);
 
     // ── C1: focusCell(7, 1) — abs row 7 lives on page index 2 (floor(7/3)). The grid must
     //    SWITCH to page 3 then focus the abs-row-7 cell. (RED pre-fix: clamps page-relative
@@ -154,19 +154,19 @@ for (const target of TARGETS) {
       .poll(async () => activeReadout.textContent(), { timeout: 15_000 })
       .toBe('7,1');
     // DOM focus landed on a real gridcell of the switched-in page, and that focused cell's
-    // owning row is abs row 7 → aria-rowindex 8 (read BEFORE the handle buttons steal focus).
+    // owning row is abs row 7 → aria-rowindex 9 (read BEFORE the handle buttons steal focus).
     await expect
       .poll(async () => (await activeCellCoords(page))?.role, { timeout: 15_000 })
       .toBe('gridcell');
     await expect
       .poll(async () => (await activeCellCoords(page))?.ariaRowIndex, { timeout: 15_000 })
-      .toBe('8');
+      .toBe('9');
 
-    // B27: page-3 rows carry ABSOLUTE aria-rowindex 7/8/9 (RED pre-fix: non-virtual rows have
+    // B27: page-3 rows carry ABSOLUTE aria-rowindex 8/9/10 (RED pre-fix: non-virtual rows have
     // NO aria-rowindex at all → null).
     await expect
       .poll(async () => bodyAriaRowIndices(page), { timeout: 15_000 })
-      .toEqual(['7', '8', '9']);
+      .toEqual(['8', '9', '10']);
 
     // getActiveCell() reads the same ABSOLUTE index pair back through the handle.
     await page.getByTestId('call-getactivecell').click();
@@ -181,7 +181,7 @@ for (const target of TARGETS) {
       .toBe('1');
 
     // ── Absolute addressing holds over the SORTED display order: sort score desc, then
-    //    focusCell(7) again — still page 3, still aria-rowindex 7/8/9 (the abs index tracks
+    //    focusCell(7) again — still page 3, still aria-rowindex 8/9/10 (the abs index tracks
     //    the filtered+sorted model, not source order).
     await page.getByTestId('call-sort-score').click();
     await page.getByTestId('call-focuscell-page3').click();
@@ -193,16 +193,16 @@ for (const target of TARGETS) {
       .toBe('7,1');
     await expect
       .poll(async () => bodyAriaRowIndices(page), { timeout: 15_000 })
-      .toEqual(['7', '8', '9']);
+      .toEqual(['8', '9', '10']);
   });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // VIRTUAL — DataTableVirtualGrid (5,000 rows, windowing ON). The parity oracle: focusCell(4000)
-// is already ABSOLUTE today; the same public contract + aria-rowindex=abs+1 must hold here too.
+// is already ABSOLUTE today; the same public contract + aria-rowindex=abs+2 must hold here too.
 // ═══════════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
-  runnerFor(target)(`data-table-grid-absindex+virtual [${target}]: virtual focusCell is ABSOLUTE; aria-rowindex=abs+1`, async ({
+  runnerFor(target)(`data-table-grid-absindex+virtual [${target}]: virtual focusCell is ABSOLUTE; aria-rowindex=abs+2`, async ({
     page,
   }) => {
     await page.goto(`/?example=DataTableVirtualGrid&target=${target}`);
@@ -236,7 +236,7 @@ for (const target of TARGETS) {
     await expect
       .poll(async () => getActiveReadout.textContent(), { timeout: 15_000 })
       .toBe('4000,1');
-    // B27 (virtual): the abs-row-4000 row carries aria-rowindex 4001.
+    // B27 (virtual): the abs-row-4000 row carries aria-rowindex 4002.
     await expect
       .poll(
         async () =>
@@ -246,6 +246,6 @@ for (const target of TARGETS) {
             .getAttribute('aria-rowindex'),
         { timeout: 15_000 },
       )
-      .toBe('4001');
+      .toBe('4002');
   });
 }

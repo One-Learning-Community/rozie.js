@@ -1324,8 +1324,8 @@ for (const target of TARGETS) {
       const pinned = rows.find((r) => r.index === 3);
       expect(pinned, 'the editing row 3 must stay mounted out-of-window (D-02)').toBeTruthy();
       expect(pinned?.pinned).toBe(true);
-      // aria-rowindex stays monotonic with no gap across the rendered rows (== data-index + 1).
-      for (const r of rows) expect(r.ariaRowIndex).toBe(r.index + 1);
+      // aria-rowindex stays monotonic with no gap across the rendered rows (== data-index + 2, header-inclusive).
+      for (const r of rows) expect(r.ariaRowIndex).toBe(r.index + 2);
       for (let i = 1; i < rows.length; i++) {
         expect(rows[i].ariaRowIndex).toBeGreaterThan(rows[i - 1].ariaRowIndex);
       }

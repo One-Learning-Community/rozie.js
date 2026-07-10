@@ -21,8 +21,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *
  *   req-1/6 — byte-identical-off rendered-row count + aria mapping: a 100k-row dataset
  *             renders only a SMALL `tr[data-index]` set (< 50) while the root
- *             aria-rowcount equals the full count and a rendered tr's aria-rowindex
- *             equals its data-index + 1.
+ *             aria-rowcount equals the full count + the header row and a rendered tr's
+ *             aria-rowindex equals its data-index + 2 (header-inclusive, WAI-ARIA).
  *   req-2  — variable-height alignment: Σ rendered tr heights track the windowing total
  *             (the rdt-scroll scrollHeight, virtual-core's getTotalSize) with no
  *             cumulative drift; the trailing spacer (padBottom) reaches 0 at scroll-end.
@@ -34,7 +34,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *             checkbox; select-all sets the header checkbox checked / a partial
  *             selection sets it indeterminate; the bound selection count is correct.
  *   req-9  — with virtual on, the .rdt-pagination chrome is ABSENT and all rows are
- *             reachable by scrolling (last aria-rowindex == full count at the end); the
+ *             reachable by scrolling (last aria-rowindex == full count + header at the end); the
  *             D-07 virtual+pagination dev-warn fires exactly once with pagination, zero
  *             without, zero on the virtual=false path.
  *   req-10 — a custom #cell slot shows correct per-visible-row content as rows recycle
@@ -231,16 +231,16 @@ for (const target of TARGETS) {
     await expect.poll(async () => rows.count(), { timeout: 15_000 }).toBeGreaterThan(0);
     await expect.poll(async () => rows.count(), { timeout: 15_000 }).toBeLessThan(50);
 
-    // req-6 — root aria-rowcount == the FULL model count (not the rendered window).
+    // req-6 — root aria-rowcount == the FULL model count + the header row (not the rendered window).
     const table = scroll.locator('table.rozie-data-table');
-    await expect.poll(async () => table.getAttribute('aria-rowcount'), { timeout: 15_000 }).toBe('100000');
+    await expect.poll(async () => table.getAttribute('aria-rowcount'), { timeout: 15_000 }).toBe('100001');
 
-    // req-6 — a rendered tr's aria-rowindex == its data-index + 1 (1-based full-model map).
+    // req-6 — a rendered tr's aria-rowindex == its data-index + 2 (header-inclusive full-model map).
     const firstRow = rows.first();
     const dataIndex = await firstRow.getAttribute('data-index');
     const rowIndex = await firstRow.getAttribute('aria-rowindex');
     expect(dataIndex).not.toBeNull();
-    expect(Number(rowIndex)).toBe(Number(dataIndex) + 1);
+    expect(Number(rowIndex)).toBe(Number(dataIndex) + 2);
 
     // req-3 (PROP form) — the rdt-scroll viewport is bounded to ~400px (maxHeight="400px").
     const ch = await scrollClientHeight(page);
@@ -707,7 +707,7 @@ for (const target of TARGETS) {
     // req-9 — pagination chrome ABSENT under virtual.
     await expect(mount.locator('.rdt-pagination')).toHaveCount(0);
 
-    // req-9 — scroll to the END; the largest rendered aria-rowindex == 100000 (1-based map
+    // req-9 — scroll to the END; the largest rendered aria-rowindex == 100001 (header-inclusive map
     // over the full model → the final row is reachable).
     await scrollWindowToBottom(page);
     await expect
@@ -738,7 +738,7 @@ for (const target of TARGETS) {
           }),
         { timeout: 20_000 },
       )
-      .toBe(100000);
+      .toBe(100001);
 
     // ── req-9 manual+virtual emits a change event (selection-change → bound round-trip).
     await page.goto(`/?example=DataTableVirtualWarn&target=${target}`);
