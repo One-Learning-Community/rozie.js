@@ -6803,6 +6803,32 @@ onMount(() => {
     const nextRowCount = nextRows.length;
     const nextColCount = nextRows.length ? nextRows[0].getVisibleCells().length : nextGroups.length ? (nextGroups[nextGroups.length - 1].headers || []).length : 0;
     clampActiveCell(nextRowCount, nextColCount);
+    // #4: clamp a pageIndex that now points PAST the last page. When the consumer holds
+    // pagination.pageIndex (controlled) and shrinks the data (filter / replace) so there are
+    // fewer pages, the body renders blank ("Page 6 of 3" with Next disabled). Read table-core's
+    // LIVE post-re-derive state: getPageCount() is the fresh count (now correct under `manual`
+    // too, #2) and getState().pagination is the just-fed state. Funnel the correction through
+    // writePagination (the single-emit + two-way-model funnel) so the consumer's controlled
+    // pagination prop converges to the last valid page (page-change carries { pageIndex, pageSize }).
+    //   • pc > 0 skips the manual-WITHOUT-count case (getPageCount() === -1) — never clamp toward
+    //     an unknown total.
+    //   • LOOP-GUARD: emit ONLY when the clamped index actually differs. After the consumer echoes
+    //     the clamp back through the pagination prop, the re-feed re-enters here with
+    //     pageIndex === pc - 1, so `pageIndex > pc - 1` is false → no re-emit; a consumer that
+    //     ignores the event triggers no further re-feed, so it stays a single emit either way.
+    //   • No fight with table-core's autoResetPageIndex: that reset only fires on table-core's OWN
+    //     setX mutations, which this fully-controlled-state architecture never calls (filters/data
+    //     flow through setOptions), so reading the live state here can only fire on a genuine
+    //     overflow — if the index is already valid we stay silent (uncontrolled self-heals too,
+    //     writing paginationDefault, with no regression since table-core does not auto-clamp here).
+    const pgState = table.getState().pagination;
+    const pc = table.getPageCount();
+    if (pc > 0 && pgState.pageIndex > pc - 1) {
+      writePagination({
+        pageIndex: pc - 1,
+        pageSize: pgState.pageSize
+      });
+    }
     // B23: a just-committed single-cell edit may have RELOCATED its row under an active sort/
     // filter. `nextRows` is the FRESH visible model (its index space == the rendered data-row
     // indices), so resolve the committed row's NEW index by identity HERE (never from the React-
