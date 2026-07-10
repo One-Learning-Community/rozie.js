@@ -205,6 +205,33 @@
     },
   },
 
+  // Server-side pagination page-count sources (#2). Under `manual`, table-core does NOT
+  // hold the full dataset, so it cannot derive a page count from `data.length` — without
+  // one, getPageCount() is -1 and getCanNextPage() is permanently false (the consumer can
+  // never leave page 0). Pass EITHER the total server row count (rowCount) OR an explicit
+  // total page count (pageCount); table-core handles precedence — explicit pageCount wins,
+  // else it derives ⌈rowCount / pageSize⌉, else it auto-computes from the loaded data.
+  // Both default null (→ undefined at the option seam) so the client-pagination path is
+  // byte-unchanged. NOTE: `pageCount` here is the PUBLIC prop; the "Page X of Y" chrome
+  // reader was renamed to `displayPageCount` to avoid a same-name collision on Svelte
+  // (destructured props) / Angular / Lit (class fields).
+  rowCount: {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'Total server-side row count for `manual` pagination; lets the table compute page count when it doesn\'t hold the full dataset.',
+    },
+  },
+  pageCount: {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'Explicit total page count for `manual` pagination; overrides rowCount-derived count.',
+    },
+  },
+
   // ── Expandable rows (phase 50 reqs 1-3, D-04) ────────────────────────────────
   // expandable: opt-in gate. Default false → byte-identical-OFF (req-10): no expander
   // column injects and getExpandedRowModel is inert (empty `expanded` + no getSubRows →
@@ -868,6 +895,14 @@ $onMount(() => {
     manualPagination: $props.manual === true,
     manualFiltering: $props.manual === true,
     manualSorting: $props.manual === true,
+    // Server-side page-count sources (#2): pass the consumer-supplied total row count and/or
+    // explicit page count so table-core can compute getPageCount() under `manual` (where it
+    // does not hold the full dataset). undefined when unset → table-core auto-derives from the
+    // loaded data (client-pagination path byte-unchanged). Precedence is table-core's: explicit
+    // pageCount wins, else ⌈rowCount / pageSize⌉, else auto. With a real count getCanNextPage()
+    // becomes true, so a server-pagination consumer can leave page 0.
+    rowCount: $props.rowCount ?? undefined,
+    pageCount: $props.pageCount ?? undefined,
     // Row selection (req-7): enabled unless 'none'; 'single' caps at ≤1
     // (enableMultiRowSelection:false). Select-all scope = filtered rows (TanStack
     // default, D-06 — NOT overridden).
@@ -1035,6 +1070,11 @@ $watch(
     $props.globalFilter,
     $props.columnFilters,
     $props.pagination,
+    // Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
+    // changes at runtime (e.g. a server response updates the total) so getPageCount() and the
+    // Next button availability track the new total.
+    $props.rowCount,
+    $props.pageCount,
     $props.rowSelection,
     $props.expanded,
     $props.expandable,
@@ -1088,6 +1128,12 @@ const reFeed = () => {
     state: currentState(),
     enableRowSelection: $props.selectionMode !== 'none',
     enableMultiRowSelection: $props.selectionMode === 'multiple',
+    // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
+    // takes effect: setOptions REPLACES via `...prev`, which holds the value captured at
+    // createTable time, so an omitted key would freeze the mount-time count. The re-feed
+    // $watch keys on both props below.
+    rowCount: $props.rowCount ?? undefined,
+    pageCount: $props.pageCount ?? undefined,
     // Re-pass the expand model fns + callback (Pitfall 4 — virtual-core/table-core's
     // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
     // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
@@ -1181,7 +1227,7 @@ const onHeaderSort = (colId, evt) => {
 const tick = () => $data.rowModelVer
 import { ariaSortFor, sortIndicator, defFor, visibleCellsFor, editMetaOf, columnEditable, editorTypeOf, editorOptionsOf, hasEditorSlot, hasFilterSlot, columnIsFilterable, headerLabel, headerWidth, onResizeStart, findHeader, columnIsResizing, columnIsVisible, onToggleVisibility, allLeafColumns, columnPinSide, onPinColumn, pinStyle, thStyle } from './columnChrome.rzts'
 
-import { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, pageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn } from './filterPaginationRowChrome.rzts'
+import { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, displayPageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn } from './filterPaginationRowChrome.rzts'
 // `indeterminate` is a DOM PROPERTY, not an HTML attribute — a `:indeterminate="…"`
 // binding only takes effect on Vue (which binds known DOM props); on
 // React/Solid/Angular/Lit/Svelte it lands as an inert attribute and `el.indeterminate`
@@ -2343,7 +2389,7 @@ $expose({
     @click="onPrevPage()"
   >Prev</button>
   <span class="rdt-page-status" aria-live="polite">
-    {{ 'Page ' + (pageIndex() + 1) + ' of ' + pageCount() }}
+    {{ 'Page ' + (pageIndex() + 1) + ' of ' + displayPageCount() }}
   </span>
   <button
     type="button"

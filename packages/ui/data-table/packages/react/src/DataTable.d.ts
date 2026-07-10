@@ -48,6 +48,14 @@ export interface DataTableProps {
    */
   manual?: boolean;
   /**
+   * Total server-side row count for `manual` pagination; lets the table compute page count when it doesn't hold the full dataset.
+   */
+  rowCount?: (number) | null;
+  /**
+   * Explicit total page count for `manual` pagination; overrides rowCount-derived count.
+   */
+  pageCount?: (number) | null;
+  /**
    * Opt-in **expandable rows**. When `true`, a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates; default `false` is byte-identical-off. Every row can expand to reveal a `#detail` panel unless `getSubRows` is supplied (then only rows with children expand). Bind `:expandable="true"` (a bare attr only coerces on Vue+Lit).
    */
   expandable?: boolean;

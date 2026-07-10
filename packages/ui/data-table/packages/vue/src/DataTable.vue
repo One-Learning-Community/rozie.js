@@ -184,7 +184,7 @@
 </table><div v-if="!props.virtual" class="rdt-pagination" role="group" aria-label="Pagination">
   <button type="button" class="rdt-page-btn rdt-page-prev" :disabled="!canPrevPage()" @click="onPrevPage()">Prev</button>
   <span class="rdt-page-status" aria-live="polite">
-    {{ 'Page ' + (pageIndex() + 1) + ' of ' + pageCount() }}
+    {{ 'Page ' + (pageIndex() + 1) + ' of ' + displayPageCount() }}
   </span>
   <button type="button" class="rdt-page-btn rdt-page-next" :disabled="!canNextPage()" @click="onNextPage()">Next</button>
   <select class="rdt-page-size" aria-label="Rows per page" :value="pageSize()" @change="onPageSizeChange($event)">
@@ -216,6 +216,14 @@ const props = withDefaults(
      * Server-side hook: sets `manualPagination` / `manualFiltering` / `manualSorting` so table-core trusts the consumer-supplied rows and only emits the change events (the consumer fetches each page).
      */
     manual?: boolean;
+    /**
+     * Total server-side row count for `manual` pagination; lets the table compute page count when it doesn't hold the full dataset.
+     */
+    rowCount?: number | null;
+    /**
+     * Explicit total page count for `manual` pagination; overrides rowCount-derived count.
+     */
+    pageCount?: number | null;
     /**
      * Opt-in **expandable rows**. When `true`, a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates; default `false` is byte-identical-off. Every row can expand to reveal a `#detail` panel unless `getSubRows` is supplied (then only rows with children expand). Bind `:expandable="true"` (a bare attr only coerces on Vue+Lit).
      */
@@ -261,7 +269,7 @@ const props = withDefaults(
      */
     maxHeight?: string;
   }>(),
-  { columns: () => [], selectionMode: 'none', manual: false, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, virtual: false, estimateRowHeight: 40, maxHeight: '' }
+  { columns: () => [], selectionMode: 'none', manual: false, rowCount: null, pageCount: null, expandable: false, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, virtual: false, estimateRowHeight: 40, maxHeight: '' }
 );
 
 /**
@@ -1972,6 +1980,12 @@ const reFeed = () => {
     state: currentState(),
     enableRowSelection: props.selectionMode !== 'none',
     enableMultiRowSelection: props.selectionMode === 'multiple',
+    // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
+    // takes effect: setOptions REPLACES via `...prev`, which holds the value captured at
+    // createTable time, so an omitted key would freeze the mount-time count. The re-feed
+    // $watch keys on both props below.
+    rowCount: props.rowCount ?? undefined,
+    pageCount: props.pageCount ?? undefined,
     // Re-pass the expand model fns + callback (Pitfall 4 — virtual-core/table-core's
     // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
     // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
@@ -2411,7 +2425,17 @@ const pageSize = () => {
   const p = currentState().pagination;
   return p && p.pageSize != null ? p.pageSize : 10;
 };
-const pageCount = () => {
+// Renamed from `pageCount` → `displayPageCount`: `pageCount` is now a public prop
+// (server-side manual pagination), and a same-named top-level helper collides with the
+// destructured prop on Svelte and the @Input/@property class field on Angular/Lit. This
+// reader is internal (drives the "Page X of Y" chrome) and reads table-core's live
+// getPageCount(), which now reflects rowCount/pageCount when manual.
+// Renamed from `pageCount` → `displayPageCount`: `pageCount` is now a public prop
+// (server-side manual pagination), and a same-named top-level helper collides with the
+// destructured prop on Svelte and the @Input/@property class field on Angular/Lit. This
+// reader is internal (drives the "Page X of Y" chrome) and reads table-core's live
+// getPageCount(), which now reflects rowCount/pageCount when manual.
+const displayPageCount = () => {
   if (tick() < 0 || !table) return 1;
   const c = table.getPageCount();
   return c != null && c > 0 ? c : 1;
@@ -6864,6 +6888,14 @@ onMounted(() => {
     manualPagination: props.manual === true,
     manualFiltering: props.manual === true,
     manualSorting: props.manual === true,
+    // Server-side page-count sources (#2): pass the consumer-supplied total row count and/or
+    // explicit page count so table-core can compute getPageCount() under `manual` (where it
+    // does not hold the full dataset). undefined when unset → table-core auto-derives from the
+    // loaded data (client-pagination path byte-unchanged). Precedence is table-core's: explicit
+    // pageCount wins, else ⌈rowCount / pageSize⌉, else auto. With a real count getCanNextPage()
+    // becomes true, so a server-pagination consumer can leave page 0.
+    rowCount: props.rowCount ?? undefined,
+    pageCount: props.pageCount ?? undefined,
     // Row selection (req-7): enabled unless 'none'; 'single' caps at ≤1
     // (enableMultiRowSelection:false). Select-all scope = filtered rows (TanStack
     // default, D-06 — NOT overridden).
@@ -7024,7 +7056,11 @@ onUpdated(() => {
   reFeed();
 });
 
-watch(() => [sorting.value, globalFilter.value, columnFilters.value, pagination.value, rowSelection.value, expanded.value, props.expandable, grouping.value, props.groupable, columnVisibility.value, columnSizing.value, columnOrder.value, columnPinning.value, props.selectionMode, (data.value || []).length,
+watch(() => [sorting.value, globalFilter.value, columnFilters.value, pagination.value,
+// Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
+// changes at runtime (e.g. a server response updates the total) so getPageCount() and the
+// Next button availability track the new total.
+props.rowCount, props.pageCount, rowSelection.value, expanded.value, props.expandable, grouping.value, props.groupable, columnVisibility.value, columnSizing.value, columnOrder.value, columnPinning.value, props.selectionMode, (data.value || []).length,
 // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
 // even when the fresh array is the SAME length (a single-cell edit replaces one row
 // object → new array ref, identical length → the .length key alone would miss it). The

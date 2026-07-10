@@ -520,7 +520,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <div class="rdt-pagination" role="group" aria-label="Pagination">
       <button type="button" class="rdt-page-btn rdt-page-prev" [disabled]="!canPrevPage()" (click)="onPrevPage()">Prev</button>
       <span class="rdt-page-status" aria-live="polite">
-        {{ rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount()) }}
+        {{ rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + displayPageCount()) }}
       </span>
       <button type="button" class="rdt-page-btn rdt-page-next" [disabled]="!canNextPage()" (click)="onNextPage()">Next</button>
       <select class="rdt-page-size" aria-label="Rows per page" [value]="pageSize()" (change)="onPageSizeChange($event)">
@@ -905,6 +905,14 @@ export class DataTable {
    */
   manual = input<boolean>(false);
   /**
+   * Total server-side row count for `manual` pagination; lets the table compute page count when it doesn't hold the full dataset.
+   */
+  rowCount = input<(number) | null>(null);
+  /**
+   * Explicit total page count for `manual` pagination; overrides rowCount-derived count.
+   */
+  pageCount = input<(number) | null>(null);
+  /**
    * Opt-in **expandable rows**. When `true`, a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates; default `false` is byte-identical-off. Every row can expand to reveal a `#detail` panel unless `getSubRows` is supplied (then only rows with children expand). Bind `:expandable="true"` (a bare attr only coerces on Vue+Lit).
    */
   expandable = input<boolean>(false);
@@ -1073,7 +1081,11 @@ export class DataTable {
       this.lastDataLen = d.length;
       this.reFeed();
     });
-    effect(() => { const __watchVal = (() => [this.sorting(), this.globalFilter(), this.columnFilters(), this.pagination(), this.rowSelection(), this.expanded(), this.expandable(), this.grouping(), this.groupable(), this.columnVisibility(), this.columnSizing(), this.columnOrder(), this.columnPinning(), this.selectionMode(), (this.data() || []).length,
+    effect(() => { const __watchVal = (() => [this.sorting(), this.globalFilter(), this.columnFilters(), this.pagination(),
+    // Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
+    // changes at runtime (e.g. a server response updates the total) so getPageCount() and the
+    // Next button availability track the new total.
+    this.rowCount(), this.pageCount(), this.rowSelection(), this.expanded(), this.expandable(), this.grouping(), this.groupable(), this.columnVisibility(), this.columnSizing(), this.columnOrder(), this.columnPinning(), this.selectionMode(), (this.data() || []).length,
     // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
     // even when the fresh array is the SAME length (a single-cell edit replaces one row
     // object → new array ref, identical length → the .length key alone would miss it). The
@@ -1159,6 +1171,14 @@ export class DataTable {
       manualPagination: __manual === true,
       manualFiltering: __manual === true,
       manualSorting: __manual === true,
+      // Server-side page-count sources (#2): pass the consumer-supplied total row count and/or
+      // explicit page count so table-core can compute getPageCount() under `manual` (where it
+      // does not hold the full dataset). undefined when unset → table-core auto-derives from the
+      // loaded data (client-pagination path byte-unchanged). Precedence is table-core's: explicit
+      // pageCount wins, else ⌈rowCount / pageSize⌉, else auto. With a real count getCanNextPage()
+      // becomes true, so a server-pagination consumer can leave page 0.
+      rowCount: this.rowCount() ?? undefined,
+      pageCount: this.pageCount() ?? undefined,
       // Row selection (req-7): enabled unless 'none'; 'single' caps at ≤1
       // (enableMultiRowSelection:false). Select-all scope = filtered rows (TanStack
       // default, D-06 — NOT overridden).
@@ -2019,6 +2039,12 @@ export class DataTable {
       state: this.currentState(),
       enableRowSelection: this.selectionMode() !== 'none',
       enableMultiRowSelection: this.selectionMode() === 'multiple',
+      // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
+      // takes effect: setOptions REPLACES via `...prev`, which holds the value captured at
+      // createTable time, so an omitted key would freeze the mount-time count. The re-feed
+      // $watch keys on both props below.
+      rowCount: this.rowCount() ?? undefined,
+      pageCount: this.pageCount() ?? undefined,
       // Re-pass the expand model fns + callback (Pitfall 4 — virtual-core/table-core's
       // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
       // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
@@ -2236,7 +2262,7 @@ export class DataTable {
     const p = this.currentState().pagination;
     return p && p.pageSize != null ? p.pageSize : 10;
   };
-  pageCount = () => {
+  displayPageCount = () => {
     if (this.tick() < 0 || !this.table) return 1;
     const c = this.table.getPageCount();
     return c != null && c > 0 ? c : 1;

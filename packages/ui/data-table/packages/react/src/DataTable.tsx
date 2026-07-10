@@ -98,6 +98,14 @@ interface DataTableProps {
    */
   manual?: boolean;
   /**
+   * Total server-side row count for `manual` pagination; lets the table compute page count when it doesn't hold the full dataset.
+   */
+  rowCount?: (number) | null;
+  /**
+   * Explicit total page count for `manual` pagination; overrides rowCount-derived count.
+   */
+  pageCount?: (number) | null;
+  /**
    * Opt-in **expandable rows**. When `true`, a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates; default `false` is byte-identical-off. Every row can expand to reveal a `#detail` panel unless `getSubRows` is supplied (then only rows with children expand). Bind `:expandable="true"` (a bare attr only coerces on Vue+Lit).
    */
   expandable?: boolean;
@@ -250,11 +258,13 @@ export interface DataTableHandle {
 const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable(_props: DataTableProps, ref): JSX.Element {
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const __defaultColumns = useState(() => (() => [])())[0];
-  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'expandable' | 'getSubRows' | 'groupable' | 'stickyHeader' | 'interactionMode' | 'singleClickEdit' | 'undoable' | 'undoLimit' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; expandable: boolean; getSubRows: ((...args: any[]) => any) | null; groupable: boolean; stickyHeader: boolean; interactionMode: string; singleClickEdit: boolean; undoable: boolean; undoLimit: number; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
+  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'rowCount' | 'pageCount' | 'expandable' | 'getSubRows' | 'groupable' | 'stickyHeader' | 'interactionMode' | 'singleClickEdit' | 'undoable' | 'undoLimit' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; rowCount: (number) | null; pageCount: (number) | null; expandable: boolean; getSubRows: ((...args: any[]) => any) | null; groupable: boolean; stickyHeader: boolean; interactionMode: string; singleClickEdit: boolean; undoable: boolean; undoLimit: number; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
     ..._props,
     columns: _props.columns ?? __defaultColumns,
     selectionMode: _props.selectionMode ?? 'none',
     manual: _props.manual ?? false,
+    rowCount: _props.rowCount ?? null,
+    pageCount: _props.pageCount ?? null,
     expandable: _props.expandable ?? false,
     getSubRows: _props.getSubRows ?? null,
     groupable: _props.groupable ?? false,
@@ -363,6 +373,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   });
   const _expandableRef = useRef(props.expandable);
   _expandableRef.current = props.expandable;
+  const _pageCountRef = useRef(props.pageCount);
+  _pageCountRef.current = props.pageCount;
+  const _rowCountRef = useRef(props.rowCount);
+  _rowCountRef.current = props.rowCount;
   const _selectionModeRef = useRef(props.selectionMode);
   _selectionModeRef.current = props.selectionMode;
   const _dataRef = useRef(data);
@@ -1144,6 +1158,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       state: currentState(),
       enableRowSelection: props.selectionMode !== 'none',
       enableMultiRowSelection: props.selectionMode === 'multiple',
+      // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
+      // takes effect: setOptions REPLACES via `...prev`, which holds the value captured at
+      // createTable time, so an omitted key would freeze the mount-time count. The re-feed
+      // $watch keys on both props below.
+      rowCount: props.rowCount ?? undefined,
+      pageCount: props.pageCount ?? undefined,
       // Re-pass the expand model fns + callback (Pitfall 4 — virtual-core/table-core's
       // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
       // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
@@ -1186,7 +1206,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       onColumnSizingInfoChange: onColumnSizingInfoChangeCb
     }));
     if (refreshRowModel.current) refreshRowModel.current();
-  }, [clearHistory, currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.selectionMode, props.undoable, tableColumns]);
+  }, [clearHistory, currentData, currentState, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.pageCount, props.rowCount, props.selectionMode, props.undoable, tableColumns]);
   const onHeaderSort = useCallback((colId: any, evt: any) => {
     if (!table.current) return;
     const col = table.current.getColumn(colId);
@@ -1367,7 +1387,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const p = currentState().pagination;
     return p && p.pageSize != null ? p.pageSize : 10;
   }
-  function pageCount() {
+  function displayPageCount() {
     if (tick() < 0 || !table.current) return 1;
     const c = table.current.getPageCount();
     return c != null && c > 0 ? c : 1;
@@ -4158,6 +4178,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       manualPagination: props.manual === true,
       manualFiltering: props.manual === true,
       manualSorting: props.manual === true,
+      // Server-side page-count sources (#2): pass the consumer-supplied total row count and/or
+      // explicit page count so table-core can compute getPageCount() under `manual` (where it
+      // does not hold the full dataset). undefined when unset → table-core auto-derives from the
+      // loaded data (client-pagination path byte-unchanged). Precedence is table-core's: explicit
+      // pageCount wins, else ⌈rowCount / pageSize⌉, else auto. With a real count getCanNextPage()
+      // becomes true, so a server-pagination consumer can leave page 0.
+      rowCount: _rowCountRef.current ?? undefined,
+      pageCount: _pageCountRef.current ?? undefined,
       // Row selection (req-7): enabled unless 'none'; 'single' caps at ≤1
       // (enableMultiRowSelection:false). Select-all scope = filtered rows (TanStack
       // default, D-06 — NOT overridden).
@@ -4322,7 +4350,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     reFeed();
-  }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, expanded, globalFilter, grouping, pagination, props.columns, props.expandable, props.groupable, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, expanded, globalFilter, grouping, pagination, props.columns, props.expandable, props.groupable, props.pageCount, props.rowCount, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieExposeRef = useRef({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory });
   _rozieExposeRef.current = { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory };
@@ -4524,7 +4552,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     </table>}{!!(!props.virtual) && <div className={"rdt-pagination"} role="group" aria-label="Pagination" data-rozie-s-d5dcab4c="">
       <button type="button" className={"rdt-page-btn rdt-page-prev"} disabled={!canPrevPage()} onClick={($event) => { onPrevPage(); }} data-rozie-s-d5dcab4c="">Prev</button>
       <span className={"rdt-page-status"} aria-live="polite" data-rozie-s-d5dcab4c="">
-        {rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + pageCount())}
+        {rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + displayPageCount())}
       </span>
       <button type="button" className={"rdt-page-btn rdt-page-next"} disabled={!canNextPage()} onClick={($event) => { onNextPage(); }} data-rozie-s-d5dcab4c="">Next</button>
       <select className={"rdt-page-size"} aria-label="Rows per page" value={pageSize()} onChange={($event) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c="">

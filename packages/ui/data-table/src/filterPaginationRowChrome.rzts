@@ -31,7 +31,12 @@ const pageSize = () => {
   const p = currentState().pagination
   return p && p.pageSize != null ? p.pageSize : 10
 }
-const pageCount = () => {
+// Renamed from `pageCount` → `displayPageCount`: `pageCount` is now a public prop
+// (server-side manual pagination), and a same-named top-level helper collides with the
+// destructured prop on Svelte and the @Input/@property class field on Angular/Lit. This
+// reader is internal (drives the "Page X of Y" chrome) and reads table-core's live
+// getPageCount(), which now reflects rowCount/pageCount when manual.
+const displayPageCount = () => {
   if (tick() < 0 || !table) return 1
   const c = table.getPageCount()
   return c != null && c > 0 ? c : 1
@@ -219,4 +224,4 @@ const hasAnyFilterableColumn = () => {
   return false
 }
 
-export { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, pageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn }
+export { onGlobalFilterInput, onColumnFilterInput, globalFilterValue, pageIndex, pageSize, displayPageCount, canPrevPage, canNextPage, onPrevPage, onNextPage, onPageSizeChange, isSelectColumn, isExpanderColumn, rowCanExpand, rowIsExpanded, rowShowsDetail, onToggleExpand, bodyCellStyle, rowIsGrouped, groupingActive, cellIsGrouped, cellIsAggregated, cellIsPlaceholder, groupSubRowCount, groupingKeys, groupableColumns, stopEvent, isAllRowsSelected, isSomeRowsSelected, onToggleAllRows, rowIsSelected, onToggleRow, onHideColumn, hasAnyFilterableColumn }

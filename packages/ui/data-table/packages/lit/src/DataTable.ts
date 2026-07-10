@@ -471,6 +471,14 @@ export default class DataTable extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true }) manual: boolean = false;
   /**
+   * Total server-side row count for `manual` pagination; lets the table compute page count when it doesn't hold the full dataset.
+   */
+  @property({ type: Number, reflect: true }) rowCount: number | null = null;
+  /**
+   * Explicit total page count for `manual` pagination; overrides rowCount-derived count.
+   */
+  @property({ type: Number, reflect: true }) pageCount: number | null = null;
+  /**
    * Opt-in **expandable rows**. When `true`, a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates; default `false` is byte-identical-off. Every row can expand to reveal a `#detail` panel unless `getSubRows` is supplied (then only rows with children expand). Bind `:expandable="true"` (a bare attr only coerces on Vue+Lit).
    */
   @property({ type: Boolean, reflect: true }) expandable: boolean = false;
@@ -774,7 +782,10 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   firstUpdated(): void {
     this._armListeners();
 
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => [this.sorting, this.globalFilter, this.columnFilters, this.pagination, this.rowSelection, this.expanded, this.expandable, this.grouping, this.groupable, this.columnVisibility, this.columnSizing, this.columnOrder, this.columnPinning, this.selectionMode, (this.data || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => [this.sorting, this.globalFilter, this.columnFilters, this.pagination, // Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
+    // changes at runtime (e.g. a server response updates the total) so getPageCount() and the
+    // Next button availability track the new total.
+    this.rowCount, this.pageCount, this.rowSelection, this.expanded, this.expandable, this.grouping, this.groupable, this.columnVisibility, this.columnSizing, this.columnOrder, this.columnPinning, this.selectionMode, (this.data || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
     // even when the fresh array is the SAME length (a single-cell edit replaces one row
     // object → new array ref, identical length → the .length key alone would miss it). The
     // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
@@ -873,6 +884,14 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       manualPagination: this.manual === true,
       manualFiltering: this.manual === true,
       manualSorting: this.manual === true,
+      // Server-side page-count sources (#2): pass the consumer-supplied total row count and/or
+      // explicit page count so table-core can compute getPageCount() under `manual` (where it
+      // does not hold the full dataset). undefined when unset → table-core auto-derives from the
+      // loaded data (client-pagination path byte-unchanged). Precedence is table-core's: explicit
+      // pageCount wins, else ⌈rowCount / pageSize⌉, else auto. With a real count getCanNextPage()
+      // becomes true, so a server-pagination consumer can leave page 0.
+      rowCount: this.rowCount ?? undefined,
+      pageCount: this.pageCount ?? undefined,
       // Row selection (req-7): enabled unless 'none'; 'single' caps at ≤1
       // (enableMultiRowSelection:false). Select-all scope = filtered rows (TanStack
       // default, D-06 — NOT overridden).
@@ -1262,7 +1281,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 </table>`}${!this.virtual ? html`<div class="rdt-pagination" role="group" aria-label="Pagination" data-rozie-s-d5dcab4c>
   <button class="rdt-page-btn rdt-page-prev" type="button" ?disabled=${!this.canPrevPage()} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onPrevPage(); }} data-rozie-s-d5dcab4c>Prev</button>
   <span class="rdt-page-status" aria-live="polite" data-rozie-s-d5dcab4c>
-    ${rozieDisplay('Page ' + (this.pageIndex() + 1) + ' of ' + this.pageCount())}
+    ${rozieDisplay('Page ' + (this.pageIndex() + 1) + ' of ' + this.displayPageCount())}
   </span>
   <button class="rdt-page-btn rdt-page-next" type="button" ?disabled=${!this.canNextPage()} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onNextPage(); }} data-rozie-s-d5dcab4c>Next</button>
   <select class="rdt-page-size" aria-label="Rows per page" .value=${this.pageSize()} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onPageSizeChange($event); }} data-rozie-s-d5dcab4c>
@@ -2096,6 +2115,12 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     state: this.currentState(),
     enableRowSelection: this.selectionMode !== 'none',
     enableMultiRowSelection: this.selectionMode === 'multiple',
+    // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
+    // takes effect: setOptions REPLACES via `...prev`, which holds the value captured at
+    // createTable time, so an omitted key would freeze the mount-time count. The re-feed
+    // $watch keys on both props below.
+    rowCount: this.rowCount ?? undefined,
+    pageCount: this.pageCount ?? undefined,
     // Re-pass the expand model fns + callback (Pitfall 4 — virtual-core/table-core's
     // setOptions REPLACES, so an omitted fn would drop the model on re-feed; on React the
     // onExpandedChange callback must re-capture fresh currentState each cycle, F6).
@@ -2346,7 +2371,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return p && p.pageSize != null ? p.pageSize : 10;
 };
 
-  pageCount = () => {
+  displayPageCount = () => {
   if (this.tick() < 0 || !this.table) return 1;
   const c = this.table.getPageCount();
   return c != null && c > 0 ? c : 1;
