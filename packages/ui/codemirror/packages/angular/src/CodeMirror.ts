@@ -93,6 +93,7 @@ interface DecorationCtx {
     <ng-container #rozie_portalAnchor></ng-container>
   `,
   styles: [`
+    :host(rozie-code-mirror) { display: contents; }
     .rozie-codemirror {
       border: 1px solid rgba(0, 0, 0, 0.12);
       border-radius: 4px;

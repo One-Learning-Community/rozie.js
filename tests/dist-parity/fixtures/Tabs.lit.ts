@@ -9,6 +9,7 @@ const __rozieCtx_tabs = createContext(Symbol.for("rozie:tabs"));
 @customElement('rozie-tabs')
 export default class Tabs extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .tabs[data-rozie-s-97e2d32a] {
   display: flex;
   gap: 0.25rem;

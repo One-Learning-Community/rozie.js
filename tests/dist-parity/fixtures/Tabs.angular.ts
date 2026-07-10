@@ -29,6 +29,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
   `,
   styles: [`
+    :host(rozie-tabs) { display: contents; }
     .tabs {
       display: flex;
       gap: 0.25rem;

@@ -20,6 +20,9 @@ interface StatusCtx {}
     </div>
 
   `,
+  styles: [`
+    :host(rozie-default-content-fallback-fixture) { display: contents; }
+  `],
 })
 export class DefaultContentFallbackFixture {
   @ContentChild('status', { read: TemplateRef }) statusTpl?: TemplateRef<StatusCtx>;

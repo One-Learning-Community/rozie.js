@@ -37,6 +37,7 @@ interface RozieNextControlSlotCtx {
 @customElement('rozie-pagination')
 export default class Pagination extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-pagination[data-rozie-s-de247ae2] {
   display: inline-flex;
   align-items: center;

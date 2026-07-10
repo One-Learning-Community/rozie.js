@@ -26,6 +26,7 @@ interface RozieControlSlotCtx {
 @customElement('rozie-map-libre')
 export default class MapLibre extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-maplibre[data-rozie-s-f1ee1082] {
   width: 100%;
   height: 100%;

@@ -7,6 +7,7 @@ import { repeat } from 'lit/directives/repeat.js';
 @customElement('rozie-otp')
 export default class Otp extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-otp[data-rozie-s-8267d52a] {
   display: inline-flex;
   gap: var(--rozie-otp-gap, 0.5rem);

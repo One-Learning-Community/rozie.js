@@ -15,6 +15,7 @@ interface DefaultCtx {}
 
   `,
   styles: [`
+    :host(rozie-theme-passthrough) { display: contents; }
     .theme-passthrough {
       display: block;
       padding: 0.5rem;

@@ -35,6 +35,7 @@ interface RozieEmptySlotCtx {
 @customElement('rozie-listbox')
 export default class Listbox extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-listbox[data-rozie-s-b576227a] {
   position: relative;
   display: inline-block;

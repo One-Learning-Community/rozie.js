@@ -7,6 +7,7 @@ import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 @customElement('rozie-r-html')
 export default class RHtml extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rhtml[data-rozie-s-09a5f2a6] { font: 1rem/1.4 system-ui; }
 `;
 

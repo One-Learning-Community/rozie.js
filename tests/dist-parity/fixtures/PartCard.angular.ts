@@ -16,6 +16,7 @@ interface DefaultCtx {}
 
   `,
   styles: [`
+    :host(rozie-part-card) { display: contents; }
     .card-body {
       padding: 1rem;
       border-radius: 0.5rem;

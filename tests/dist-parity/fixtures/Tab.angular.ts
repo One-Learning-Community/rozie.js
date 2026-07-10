@@ -47,6 +47,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
   `,
   styles: [`
+    :host(rozie-tab) { display: contents; }
     .tab {
       font-family: system-ui, -apple-system, sans-serif;
       padding: 0.375rem 0.75rem;

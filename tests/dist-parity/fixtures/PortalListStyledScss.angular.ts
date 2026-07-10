@@ -51,6 +51,7 @@ class MiniListEngine {
   `,
   styles: [
     `
+    :host(rozie-portal-list-styled-scss) { display: contents; }
     .rozie-portal-list {
       display: block;
       font-family: system-ui, -apple-system, sans-serif;

@@ -7,6 +7,7 @@ import { styleMap } from 'lit/directives/style-map.js';
 @customElement('rozie-themed-button')
 export default class ThemedButton extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .btn[data-rozie-s-7914ecaa] {
   display: inline-flex;
   align-items: center;

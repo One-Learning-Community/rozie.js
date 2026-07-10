@@ -28,6 +28,7 @@ interface RozieEmptySlotCtx {
 @customElement('rozie-combobox')
 export default class Combobox extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-combobox[data-rozie-s-9546115a] {
   position: relative;
   display: inline-block;

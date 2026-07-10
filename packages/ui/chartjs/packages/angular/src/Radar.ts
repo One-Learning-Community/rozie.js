@@ -27,6 +27,7 @@ interface TooltipCtx {
     <ng-container #rozie_portalAnchor></ng-container>
   `,
   styles: [`
+    :host(rozie-radar) { display: contents; }
     .rozie-chart {
       position: relative;
       width: 100%;

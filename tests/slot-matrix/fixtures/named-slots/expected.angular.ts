@@ -21,6 +21,9 @@ interface FooterCtx {}
     </div>
 
   `,
+  styles: [`
+    :host(rozie-named-slots-fixture) { display: contents; }
+  `],
 })
 export class NamedSlotsFixture {
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;

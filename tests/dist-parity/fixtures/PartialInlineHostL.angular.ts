@@ -45,6 +45,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
     </div>
 
   `,
+  styles: [`
+    :host(rozie-partial-inline-host-l) { display: contents; }
+  `],
   providers: [
     {
       provide: rozieToken('themeL'),

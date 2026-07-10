@@ -14,6 +14,7 @@ interface RozieTooltipSlotCtx {
 @customElement('rozie-doughnut')
 export default class Doughnut extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-chart[data-rozie-s-5b1179de] {
   position: relative;
   width: 100%;

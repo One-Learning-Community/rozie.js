@@ -12,7 +12,7 @@
   </div>
 
   
-  <div v-if="open$local && !props.virtual" ref="listElRef" class="rozie-listbox-list" role="listbox" :id="props.id + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="props.multiple">
+  <div v-if="open$local && !props.virtual" ref="listElRef" class="rozie-listbox-list" role="listbox" :id="props.id + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined">
     <div v-for="(opt, index) in visibleOptions()" :key="optionId(index)" :id="optionId(index)" :class="['rozie-listbox-option', { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]" role="option" :aria-selected="!!isSelected(opt)" :aria-disabled="!!disabledOf(opt)" @click="select(opt)" @mousemove="onOptionPointerMove(index)">
       <slot name="option" :option="opt" :index="index" :active="activeIndex === index" :selected="isSelected(opt)" :disabled="disabledOf(opt)">
         {{ labelOf(opt) }}
@@ -21,7 +21,7 @@
 
     <div v-if="visibleOptions().length === 0" class="rozie-listbox-empty" role="presentation">
       <slot name="empty" :query="query">No options</slot>
-    </div></div><div v-if="props.virtual" ref="listElRef" class="rozie-listbox-list rozie-listbox-list--virtual" role="listbox" :id="props.id + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="props.multiple" :style="(open$local ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + props.maxHeight : 'overflow-y:auto')">
+    </div></div><div v-if="props.virtual" ref="listElRef" class="rozie-listbox-list rozie-listbox-list--virtual" role="listbox" :id="props.id + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined" :style="(open$local ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + props.maxHeight : 'overflow-y:auto')">
     <div class="rozie-listbox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
 
     <div v-for="wr in windowedRows()" :key="wr.row.id" :id="optionId(wr.vi.index)" :data-index="wr.vi.index" :class="['rozie-listbox-option', { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }]" role="option" :aria-selected="!!isSelected(wr.row._opt)" :aria-disabled="!!disabledOf(wr.row._opt)" @click="select(wr.row._opt)" @mousemove="onOptionPointerMove(wr.vi.index)">

@@ -6,6 +6,7 @@ import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-prop-default-coercion')
 export default class PropDefaultCoercion extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .pdc[data-rozie-s-109e595c] {
   display: inline-flex;
   flex-direction: column;

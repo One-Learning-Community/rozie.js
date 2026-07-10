@@ -7,6 +7,7 @@ import flatpickr from 'flatpickr';
 @customElement('rozie-flatpickr')
 export default class Flatpickr extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-flatpickr[data-rozie-s-159070d4] {
   padding: 0.375rem 0.5rem;
   border: 1px solid rgba(0, 0, 0, 0.15);

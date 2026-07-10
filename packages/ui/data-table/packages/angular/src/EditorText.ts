@@ -8,6 +8,9 @@ import { Component, ViewEncapsulation, input, signal } from '@angular/core';
     <input class="rdt-cell-editor" type="text" data-editing-cell="" [attr.aria-label]="columnId()" [value]="draft()" (input)="onInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
 
   `,
+  styles: [`
+    :host(rozie-editor-text) { display: contents; }
+  `],
 })
 export class EditorText {
   /**

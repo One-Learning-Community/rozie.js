@@ -7,6 +7,7 @@ import { repeat } from 'lit/directives/repeat.js';
 @customElement('rozie-badge-grid-styled-scss')
 export default class BadgeGridStyledScss extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .badge[data-rozie-s-44801268] {
   display: inline-flex;
   align-items: center;

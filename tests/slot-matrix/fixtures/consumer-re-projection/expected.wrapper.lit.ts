@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import './inner.rozie';
 
 @customElement('rozie-wrapper')
 export default class Wrapper extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @state() private _hasSlotTitle = false;
   @queryAssignedElements({ slot: 'title', flatten: true }) private _slotTitleElements!: Element[];
   @state() private _hasSlotDefault = false;

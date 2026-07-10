@@ -70,6 +70,7 @@ interface RozieDecorationSlotCtx {
 @customElement('rozie-code-mirror')
 export default class CodeMirror extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-codemirror[data-rozie-s-34cfda5a] {
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 4px;

@@ -23,6 +23,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <div class="rozie-data-table-column" style="display:none"></div>
 
   `,
+  styles: [`
+    :host(rozie-column) { display: contents; }
+  `],
 })
 export class Column {
   /**

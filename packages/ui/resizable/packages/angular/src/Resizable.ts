@@ -66,6 +66,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-resizable) { display: contents; }
     .rozie-resizable {
       display: flex;
       position: relative;

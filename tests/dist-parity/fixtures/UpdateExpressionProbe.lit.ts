@@ -6,6 +6,7 @@ import { createLitControllableProperty, rozieListeners, rozieSpread } from '@roz
 @customElement('rozie-update-expression-probe')
 export default class UpdateExpressionProbe extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .probe[data-rozie-s-0fceff7a] { display: inline-flex; gap: 0.5rem; align-items: center; }
 .count[data-rozie-s-0fceff7a], .value[data-rozie-s-0fceff7a] { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
 button[data-rozie-s-0fceff7a] { padding: 0.25rem 0.5rem; }

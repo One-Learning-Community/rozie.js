@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
 import { ContextConsumer, ContextProvider, createContext } from '@lit/context';
@@ -9,6 +9,10 @@ const __rozieCtx_maplibre_sources = createContext(Symbol.for("rozie:maplibre:sou
 
 @customElement('rozie-source')
 export default class Source extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * The MapLibre source id (required). A `LayerSpecification.source` references this string, and nested `<Layer>` children auto-bind to it. Exposed to children as a live getter so it stays reactive.
    * @example

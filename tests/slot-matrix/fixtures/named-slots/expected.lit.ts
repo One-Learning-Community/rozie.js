@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-named-slots-fixture')
 export default class NamedSlotsFixture extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @state() private _hasSlotHeader = false;
   @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];
   @state() private _hasSlotFooter = false;

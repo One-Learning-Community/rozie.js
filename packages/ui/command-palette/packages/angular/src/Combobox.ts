@@ -106,6 +106,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-combobox) { display: contents; }
     .rozie-combobox {
       position: relative;
       display: inline-block;

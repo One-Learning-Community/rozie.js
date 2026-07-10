@@ -17,6 +17,7 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
   `,
   styles: [`
+    :host(rozie-update-expression-probe) { display: contents; }
     .probe { display: inline-flex; gap: 0.5rem; align-items: center; }
     .count, .value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
     button { padding: 0.25rem 0.5rem; }

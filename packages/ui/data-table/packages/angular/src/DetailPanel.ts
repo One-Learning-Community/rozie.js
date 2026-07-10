@@ -36,6 +36,9 @@ function __rozieAttr(v: unknown): string | null {
     </dl>
 
   `,
+  styles: [`
+    :host(rozie-detail-panel) { display: contents; }
+  `],
 })
 export class DetailPanel {
   /**

@@ -1,9 +1,13 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 
 @customElement('rozie-editor-date')
 export default class EditorDate extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * The column id (mirrors the `#editor` slot scope). Used as the input `aria-label`.
    */

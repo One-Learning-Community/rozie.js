@@ -6,6 +6,7 @@ import { debounce, rozieListeners } from '@rozie/runtime-lit';
 @customElement('rozie-r-on-probe')
 export default class ROnProbe extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .r-on-probe[data-rozie-s-c4bd99aa] {
   display: inline-flex;
   gap: 0.5rem;

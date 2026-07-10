@@ -38,6 +38,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-number-field) { display: contents; }
     .rozie-number-field {
       display: inline-flex;
       align-items: stretch;

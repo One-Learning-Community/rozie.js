@@ -19,6 +19,9 @@ import { loadCaptchaApi } from './internal/loadCaptchaApi';
     <div #widgetEl class="rozie-captcha" #rozieSpread_0 #rozieListenersTarget_1></div>
 
   `,
+  styles: [`
+    :host(rozie-captcha) { display: contents; }
+  `],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,

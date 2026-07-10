@@ -81,6 +81,7 @@ interface NodeViewCtx {
     <ng-container #rozie_portalAnchor></ng-container>
   `,
   styles: [`
+    :host(rozie-tip-tap) { display: contents; }
     .rozie-tiptap {
       border: 1px solid rgba(0, 0, 0, 0.15);
       border-radius: 6px;

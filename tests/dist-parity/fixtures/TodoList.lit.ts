@@ -18,6 +18,7 @@ interface RozieDefaultSlotCtx {
 @customElement('rozie-todo-list')
 export default class TodoList extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .todo-list[data-rozie-s-52bec3de] { font-family: system-ui, sans-serif; }
 ul[data-rozie-s-52bec3de] { list-style: none; padding: 0; }
 li[data-rozie-s-52bec3de] { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }

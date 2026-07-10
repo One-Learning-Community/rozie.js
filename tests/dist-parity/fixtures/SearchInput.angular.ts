@@ -21,6 +21,7 @@ import { FormsModule } from '@angular/forms';
 
   `,
   styles: [`
+    :host(rozie-search-input) { display: contents; }
     .search-input { display: inline-flex; align-items: center; gap: 0.25rem; }
     input { padding: 0.25rem 0.5rem; }
     .clear-btn { background: none; border: none; cursor: pointer; font-size: 1.25rem; }

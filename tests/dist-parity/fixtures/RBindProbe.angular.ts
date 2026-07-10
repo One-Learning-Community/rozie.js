@@ -14,6 +14,7 @@ import { NgClass } from '@angular/common';
 
   `,
   styles: [`
+    :host(rozie-rbind-probe) { display: contents; }
     .rbind-probe {
       display: inline-flex;
       gap: 0.5rem;

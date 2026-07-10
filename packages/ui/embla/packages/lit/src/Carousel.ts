@@ -22,6 +22,7 @@ interface RozieThumbSlotCtx {
 @customElement('rozie-carousel')
 export default class Carousel extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-embla[data-rozie-s-4143c216] { position: relative; }
 .rozie-embla__stage[data-rozie-s-4143c216] { position: relative; }
 .rozie-embla__viewport[data-rozie-s-4143c216] { overflow: hidden; }

@@ -35,6 +35,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-badge-grid-styled-scss) { display: contents; }
     .badge {
       display: inline-flex;
       align-items: center;

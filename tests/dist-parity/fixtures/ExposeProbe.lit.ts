@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-expose-probe')
 export default class ExposeProbe extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .expose-probe[data-rozie-s-dd2b93b0] { display: inline-flex; align-items: center; gap: 0.5rem; }
 input[data-rozie-s-dd2b93b0] { padding: 0.25rem 0.5rem; }
 .echo[data-rozie-s-dd2b93b0] { font-variant-numeric: tabular-nums; color: rgba(0, 0, 0, 0.6); }

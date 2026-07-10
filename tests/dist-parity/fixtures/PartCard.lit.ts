@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-part-card')
 export default class PartCard extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .card-body[data-rozie-s-1462f7ea] {
   padding: 1rem;
   border-radius: 0.5rem;

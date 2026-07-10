@@ -51,6 +51,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-toaster) { display: contents; }
     .rozie-toaster {
       position: fixed;
       z-index: var(--rozie-toast-z, 9999);

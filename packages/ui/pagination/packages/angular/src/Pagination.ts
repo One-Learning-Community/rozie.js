@@ -109,6 +109,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-pagination) { display: contents; }
     .rozie-pagination {
       display: inline-flex;
       align-items: center;

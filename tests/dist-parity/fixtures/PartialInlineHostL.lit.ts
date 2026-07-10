@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
@@ -8,6 +8,10 @@ const __rozieCtx_themeL = createContext(Symbol.for("rozie:themeL"));
 
 @customElement('rozie-partial-inline-host-l')
 export default class PartialInlineHostL extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @property({ type: Number, reflect: true }) base: number = 1;
 private __rozieCtxProvider_themeL = new ContextProvider(this, { context: __rozieCtx_themeL, initialValue: {
   v: 1

@@ -1,9 +1,13 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 
 @customElement('rozie-editor-checkbox')
 export default class EditorCheckbox extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * The column id (mirrors the `#editor` slot scope). Used as the input `aria-label`.
    */

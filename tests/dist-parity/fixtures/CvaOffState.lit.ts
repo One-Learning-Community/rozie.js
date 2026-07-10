@@ -6,6 +6,7 @@ import { createLitControllableProperty, rozieListeners, rozieSpread } from '@roz
 @customElement('rozie-cva-off-state')
 export default class CvaOffState extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .cva-off-state[data-rozie-s-a2873aa8] { display: inline-flex; align-items: center; gap: 0.5rem; }
 input[data-rozie-s-a2873aa8] { padding: 0.25rem 0.5rem; }
 .echo[data-rozie-s-a2873aa8] { color: rgba(0, 0, 0, 0.6); }

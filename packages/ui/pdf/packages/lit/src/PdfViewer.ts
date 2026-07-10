@@ -6,6 +6,7 @@ import { createLitControllableProperty, injectGlobalStyles, rozieListeners, rozi
 @customElement('rozie-pdf-viewer')
 export default class PdfViewer extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-pdf[data-rozie-s-3c863364] {
   width: 100%;
   height: 100%;

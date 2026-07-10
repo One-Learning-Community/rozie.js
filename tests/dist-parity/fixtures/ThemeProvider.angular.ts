@@ -29,6 +29,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
   `,
   styles: [`
+    :host(rozie-theme-provider) { display: contents; }
     .theme-provider {
       display: block;
     }

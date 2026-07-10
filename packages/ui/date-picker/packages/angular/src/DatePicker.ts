@@ -145,6 +145,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-date-picker) { display: contents; }
     .rozie-datepicker {
       display: inline-block;
       font: var(--rozie-datepicker-font, inherit);

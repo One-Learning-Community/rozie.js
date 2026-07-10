@@ -32,6 +32,9 @@ function __rozieAttr(v: unknown): string | null {
     </select>
 
   `,
+  styles: [`
+    :host(rozie-editor-select) { display: contents; }
+  `],
 })
 export class EditorSelect {
   /**

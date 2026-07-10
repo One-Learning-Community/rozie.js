@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
 import { ContextConsumer, createContext } from '@lit/context';
@@ -9,6 +9,10 @@ const __rozieCtx_maplibre_layers = createContext(Symbol.for("rozie:maplibre:laye
 
 @customElement('rozie-layer')
 export default class Layer extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * The MapLibre layer id (required). Identifies the layer in the parent `<MapLibre>` registry and the underlying style.
    * @example

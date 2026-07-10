@@ -1,13 +1,17 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Lit $model producer-side two-way-write sigil > emitted model fixture matches snapshot 1`] = `
-"import { LitElement, html } from 'lit';
+"import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-model-sigil')
 export default class ModelSigil extends SignalWatcher(LitElement) {
+  static styles = css\`
+:host{display:contents}
+\`;
+
   @property({ type: Number, attribute: 'value' }) _value_attr: number = 0;
   private _valueControllable = createLitControllableProperty<number>({ host: this, eventName: 'value-change', defaultValue: 0, initialControlledValue: undefined });
 

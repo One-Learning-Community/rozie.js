@@ -20,6 +20,7 @@ interface DefaultCtx {}
 
   `,
   styles: [`
+    :host(rozie-card) { display: contents; }
     .card { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
     .card__body { padding: 1rem; }
   `],

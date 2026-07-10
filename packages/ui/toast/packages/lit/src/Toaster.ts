@@ -12,6 +12,7 @@ interface RozieToastSlotCtx {
 @customElement('rozie-toaster')
 export default class Toaster extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-toaster[data-rozie-s-12d4265c] {
   position: fixed;
   z-index: var(--rozie-toast-z, 9999);

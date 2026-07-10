@@ -536,6 +536,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
   `,
   styles: [`
+    :host(rozie-data-table) { display: contents; }
     .rozie-data-table {
       border-collapse: collapse;
       width: 100%;

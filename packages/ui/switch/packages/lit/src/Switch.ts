@@ -11,6 +11,7 @@ interface RozieDefaultSlotCtx {
 @customElement('rozie-switch')
 export default class Switch extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-switch[data-rozie-s-5a76e232] {
   display: inline-flex;
   align-items: center;

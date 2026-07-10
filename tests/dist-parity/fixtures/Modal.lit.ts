@@ -6,6 +6,7 @@ import { createLitControllableProperty, injectGlobalStyles, rozieAttr } from '@r
 @customElement('rozie-modal')
 export default class Modal extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .modal-backdrop[data-rozie-s-fc45feb2] {
   position: fixed; inset: 0;
   background: rgba(0, 0, 0, 0.4);

@@ -100,6 +100,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-carousel) { display: contents; }
     .rozie-embla { position: relative; }
     .rozie-embla__stage { position: relative; }
     .rozie-embla__viewport { overflow: hidden; }

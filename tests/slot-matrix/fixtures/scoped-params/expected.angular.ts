@@ -17,6 +17,9 @@ interface ItemCtx {
     </div>
 
   `,
+  styles: [`
+    :host(rozie-scoped-params-fixture) { display: contents; }
+  `],
 })
 export class ScopedParamsFixture {
   label = input<string>('item');

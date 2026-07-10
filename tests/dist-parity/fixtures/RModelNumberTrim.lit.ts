@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-r-model-number-trim')
 export default class RModelNumberTrim extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rmodel-number-trim[data-rozie-s-dfdb7742] { display: inline-flex; flex-direction: column; gap: 0.25rem; }
 .echo[data-rozie-s-dfdb7742] { color: rgba(0, 0, 0, 0.55); font-size: 0.85em; }
 `;

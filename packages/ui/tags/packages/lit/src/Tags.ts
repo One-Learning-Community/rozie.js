@@ -13,6 +13,7 @@ interface RozieTagSlotCtx {
 @customElement('rozie-tags')
 export default class Tags extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-tags[data-rozie-s-64848f8e] {
   display: inline-flex;
   flex-wrap: wrap;

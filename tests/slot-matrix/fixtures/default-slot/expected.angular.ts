@@ -14,6 +14,9 @@ interface DefaultCtx {}
     </div>
 
   `,
+  styles: [`
+    :host(rozie-default-slot-fixture) { display: contents; }
+  `],
 })
 export class DefaultSlotFixture {
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;

@@ -16,6 +16,7 @@ import { PartCard } from './PartCard';
 
   `,
   styles: [`
+    :host(rozie-part-card-consumer) { display: contents; }
     .part-card-consumer {
       display: inline-flex;
       padding: 0.5rem;

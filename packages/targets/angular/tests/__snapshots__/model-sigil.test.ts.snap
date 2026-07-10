@@ -32,6 +32,9 @@ function __rozieAttr(v: unknown): string | null {
       <button [attr.title]="rozieAttr(__title)" #rozieSpread_0 (click)="value.set(value() + 1), __rozieCvaOnChange(value() + 1)" #rozieListenersTarget_1>{{ value() }}</button>
 
   \`,
+  styles: [\`
+    :host(rozie-model-sigil) { display: contents; }
+  \`],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,

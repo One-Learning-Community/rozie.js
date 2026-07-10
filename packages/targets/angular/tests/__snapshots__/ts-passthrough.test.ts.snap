@@ -19,6 +19,7 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
   \`,
   styles: [\`
+    :host(rozie-counter) { display: contents; }
     .counter { display: inline-flex; gap: 0.5rem; align-items: center; }
     .counter.hovering { background: rgba(0, 0, 0, 0.04); }
     .value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }

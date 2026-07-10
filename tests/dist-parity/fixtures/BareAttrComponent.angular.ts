@@ -14,6 +14,9 @@ import { BareAttrChild } from './BareAttrChild';
     </div>
 
   `,
+  styles: [`
+    :host(rozie-bare-attr-component) { display: contents; }
+  `],
 })
 export class BareAttrComponent {
 

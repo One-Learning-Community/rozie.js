@@ -11,6 +11,9 @@ import { Producer } from './producer';
     <rozie-producer [title]="'Hello'"><ng-template #defaultSlot>Body text</ng-template></rozie-producer>
 
   `,
+  styles: [`
+    :host(rozie-consumer) { display: contents; }
+  `],
 })
 export class Consumer {
 

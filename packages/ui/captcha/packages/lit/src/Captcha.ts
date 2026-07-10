@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
@@ -14,6 +14,10 @@ import { loadCaptchaApi } from './internal/loadCaptchaApi';
 
 @customElement('rozie-captcha')
 export default class Captcha extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * Which widget to render: `recaptcha` (Google reCAPTCHA v2), `hcaptcha`, `turnstile` (Cloudflare), or `friendly` (Friendly Captcha). The first three share a near-identical explicit-render API; Friendly Captcha rides an internal `adapt()` bridge onto the same surface. Construction-time — re-key the component to switch it live.
    */

@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
@@ -6,6 +6,10 @@ import './BareAttrChild.rozie';
 
 @customElement('rozie-bare-attr-component')
 export default class BareAttrComponent extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
   // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.

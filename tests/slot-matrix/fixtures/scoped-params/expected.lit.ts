@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
@@ -9,6 +9,10 @@ interface RozieItemSlotCtx {
 
 @customElement('rozie-scoped-params-fixture')
 export default class ScopedParamsFixture extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @property({ type: String, reflect: true }) label: string = 'item';
 
   @state() private _hasSlotItem = false;

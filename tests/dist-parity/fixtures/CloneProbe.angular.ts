@@ -33,6 +33,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-clone-probe) { display: contents; }
     .probe {
       display: block;
       padding: 0.5rem;

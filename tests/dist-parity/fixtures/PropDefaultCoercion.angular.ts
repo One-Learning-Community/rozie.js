@@ -34,6 +34,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-prop-default-coercion) { display: contents; }
     .pdc {
       display: inline-flex;
       flex-direction: column;

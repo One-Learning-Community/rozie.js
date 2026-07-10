@@ -187,6 +187,34 @@ export function emitDecorator(
 ): string {
   void ir;
   const selector = `rozie-${toKebabCase(opts.componentName)}`;
+
+  // Emitter-owned host-display parity default (quick 260710-fjj). Angular emits a
+  // persistent component-selector host element the four hostless targets
+  // (React/Vue/Svelte/Solid) don't; with no display rule that host defaults to
+  // `display: inline`, so a baseline-aligned root picks up a descender/half-leading
+  // gap (@rozie-ui/switch: 24px button → 25.5px host) and a block root
+  // shrinks-to-content. `display: contents` makes the host layout-transparent →
+  // parity with the hostless targets.
+  //
+  // The selector is ELEMENT-NAME-QUALIFIED (`:host(rozie-x)`, not bare `:host`)
+  // for TWO independent reasons, each of which sank an earlier attempt:
+  //   1. Angular emulated encapsulation compiles bare `:host` to `[_nghost-ng-cN]`;
+  //      the component ROOT can carry that same attribute, so a bare rule collapses
+  //      the root's box too. `:host(rozie-x)` compiles to `rozie-x[_nghost-ng-cN]`,
+  //      which requires tag `rozie-x` — the root (a `<button>`/`<div>`/…) can never
+  //      match, so ONLY the true host is hit.
+  //   2. Components that spread `$attrs` onto their root read the host's live
+  //      `element.attributes` and re-apply them to the root with `!important`. A
+  //      host-metadata `[style.display]` binding writes an inline `style` attribute
+  //      on the host → that spread forwards `display:contents !important` onto the
+  //      root → box collapse. A stylesheet rule is NOT an attribute, so the spread
+  //      never sees it. Hence a CSS rule here, not a `host: {}` binding.
+  // Prepended so it leads the sheet; authors override with an equal-or-higher
+  // specificity `:host(rozie-x){display:…}` (bare `:host` is lower specificity).
+  const hostDisplayRule = `:host(${selector}) { display: contents; }`;
+  const stylesBody = opts.stylesArrayBody.length > 0
+    ? `${hostDisplayRule}\n${opts.stylesArrayBody}`
+    : hostDisplayRule;
   const importsList = buildDecoratorImportsList({
     hasSlots: opts.hasSlots,
     hasNgModel: opts.hasNgModel,
@@ -218,32 +246,28 @@ export function emitDecorator(
   lines.push(`  \`,`);
   const portalStylesEntry = opts.portalStylesEntry ?? '';
   if (portalStylesEntry.length === 0) {
-    // Existing single-entry layout — preserved byte-identical for all
-    // @portal-free components.
-    if (opts.stylesArrayBody.length > 0) {
-      lines.push(`  styles: [\``);
-      const indentedStyles = opts.stylesArrayBody
-        .split('\n')
-        .map((l) => (l.length > 0 ? '    ' + l : l))
-        .join('\n');
-      lines.push(escapeForBacktickLiteral(indentedStyles));
-      lines.push(`  \`],`);
-    }
+    // Single-entry layout. stylesBody always carries at least the host-display
+    // parity rule, so the `styles: [...]` array is now always emitted.
+    lines.push(`  styles: [\``);
+    const indentedStyles = stylesBody
+      .split('\n')
+      .map((l) => (l.length > 0 ? '    ' + l : l))
+      .join('\n');
+    lines.push(escapeForBacktickLiteral(indentedStyles));
+    lines.push(`  \`],`);
   } else {
     // Spike 004 — multi-entry layout: scoped/:root entry (when present) +
     // a SECOND @portal entry wrapped in :host ::ng-deep so
     // view-encapsulation's _ngcontent-* scoping doesn't prevent matching
     // engine-created DOM.
     lines.push(`  styles: [`);
-    if (opts.stylesArrayBody.length > 0) {
-      lines.push(`    \``);
-      const indentedStyles = opts.stylesArrayBody
-        .split('\n')
-        .map((l) => (l.length > 0 ? '    ' + l : l))
-        .join('\n');
-      lines.push(escapeForBacktickLiteral(indentedStyles));
-      lines.push(`  \`,`);
-    }
+    lines.push(`    \``);
+    const indentedStyles = stylesBody
+      .split('\n')
+      .map((l) => (l.length > 0 ? '    ' + l : l))
+      .join('\n');
+    lines.push(escapeForBacktickLiteral(indentedStyles));
+    lines.push(`  \`,`);
     lines.push(`    // Spike 004 NEW — @portal item { … } as a separate styles entry`);
     lines.push(`    // wrapped in :host ::ng-deep so view-encapsulation's`);
     lines.push(`    // _ngcontent-* attribute scoping doesn't prevent matching`);

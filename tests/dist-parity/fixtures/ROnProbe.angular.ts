@@ -13,6 +13,7 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, effect
 
   `,
   styles: [`
+    :host(rozie-ron-probe) { display: contents; }
     .r-on-probe {
       display: inline-flex;
       gap: 0.5rem;

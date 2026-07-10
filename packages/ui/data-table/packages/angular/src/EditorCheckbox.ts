@@ -8,6 +8,9 @@ import { Component, ViewEncapsulation, input } from '@angular/core';
     <input class="rdt-cell-editor" type="checkbox" data-editing-cell="" [attr.aria-label]="columnId()" [checked]="!!value()" (change)="onChange($event)" (keydown)="onKeydown($event)" />
 
   `,
+  styles: [`
+    :host(rozie-editor-checkbox) { display: contents; }
+  `],
 })
 export class EditorCheckbox {
   /**

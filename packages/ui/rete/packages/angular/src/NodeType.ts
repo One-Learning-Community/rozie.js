@@ -36,6 +36,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <div class="rozie-node-type-children" style="display:none"><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></div>
     <ng-container #rozie_portalAnchor></ng-container>
   `,
+  styles: [`
+    :host(rozie-node-type) { display: contents; }
+  `],
   providers: [
     {
       provide: rozieToken('rete:nodeType'),

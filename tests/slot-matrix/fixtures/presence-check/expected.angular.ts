@@ -19,6 +19,9 @@ interface AsideCtx {}
     }</div>
 
   `,
+  styles: [`
+    :host(rozie-presence-check-fixture) { display: contents; }
+  `],
 })
 export class PresenceCheckFixture {
   @ContentChild('aside', { read: TemplateRef }) asideTpl?: TemplateRef<AsideCtx>;

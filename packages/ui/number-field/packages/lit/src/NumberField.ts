@@ -6,6 +6,7 @@ import { createLitControllableProperty, rozieAttr, rozieListeners, rozieSpread }
 @customElement('rozie-number-field')
 export default class NumberField extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-number-field[data-rozie-s-ceb089aa] {
   display: inline-flex;
   align-items: stretch;

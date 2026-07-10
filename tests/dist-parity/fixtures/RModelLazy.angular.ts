@@ -14,6 +14,7 @@ import { FormsModule } from '@angular/forms';
 
   `,
   styles: [`
+    :host(rozie-rmodel-lazy) { display: contents; }
     .rmodel-lazy { display: inline-flex; flex-direction: column; gap: 0.25rem; }
     .echo { color: rgba(0, 0, 0, 0.55); font-size: 0.85em; }
   `],

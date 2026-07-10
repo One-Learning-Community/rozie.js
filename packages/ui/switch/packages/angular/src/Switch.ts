@@ -48,6 +48,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-switch) { display: contents; }
     .rozie-switch {
       display: inline-flex;
       align-items: center;

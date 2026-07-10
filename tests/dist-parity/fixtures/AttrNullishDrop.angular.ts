@@ -30,6 +30,9 @@ function __rozieAttr(v: unknown): string | null {
     </div>
 
   `,
+  styles: [`
+    :host(rozie-attr-nullish-drop) { display: contents; }
+  `],
 })
 export class AttrNullishDrop {
   cond = signal(false);

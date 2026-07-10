@@ -14,6 +14,7 @@ interface RozieTooltipSlotCtx {
 @customElement('rozie-pie')
 export default class Pie extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-chart[data-rozie-s-d3ac8fdc] {
   position: relative;
   width: 100%;

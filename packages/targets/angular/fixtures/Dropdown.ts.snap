@@ -32,6 +32,7 @@ interface DefaultCtx {
 
   `,
   styles: [`
+    :host(rozie-dropdown) { display: contents; }
     .dropdown { position: relative; display: inline-block; }
     .dropdown-panel {
       position: fixed;

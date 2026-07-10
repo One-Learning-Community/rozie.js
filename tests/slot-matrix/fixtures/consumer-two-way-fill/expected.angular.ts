@@ -15,6 +15,9 @@ import { Inner } from './producer';
       </ng-template></rozie-producer>
 
   `,
+  styles: [`
+    :host(rozie-consumer) { display: contents; }
+  `],
 })
 export class Consumer {
   outerOpen = signal(true);

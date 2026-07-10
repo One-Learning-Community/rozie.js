@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-prop-docs')
 export default class PropDocs extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .prop-docs[data-rozie-s-727424de] { display: inline-flex; gap: 0.5rem; align-items: center; }
 .label[data-rozie-s-727424de] { font-weight: 600; }
 .count[data-rozie-s-727424de] { font-variant-numeric: tabular-nums; }

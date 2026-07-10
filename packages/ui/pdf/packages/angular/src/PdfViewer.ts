@@ -10,6 +10,7 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
   `,
   styles: [`
+    :host(rozie-pdf-viewer) { display: contents; }
     .rozie-pdf {
       width: 100%;
       height: 100%;

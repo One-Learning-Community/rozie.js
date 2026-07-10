@@ -14,6 +14,7 @@ interface RozieTooltipSlotCtx {
 @customElement('rozie-scatter')
 export default class Scatter extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-chart[data-rozie-s-e7b1d9e8] {
   position: relative;
   width: 100%;

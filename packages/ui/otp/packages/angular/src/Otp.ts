@@ -36,6 +36,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-otp) { display: contents; }
     .rozie-otp {
       display: inline-flex;
       gap: var(--rozie-otp-gap, 0.5rem);

@@ -77,6 +77,7 @@ interface NoEventsContentCtx {
     <ng-container #rozie_portalAnchor></ng-container>
   `,
   styles: [`
+    :host(rozie-full-calendar) { display: contents; }
     .rozie-fullcalendar {
       width: 100%;
       font-size: 0.875rem;

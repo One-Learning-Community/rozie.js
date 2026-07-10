@@ -6,6 +6,7 @@ import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-clone-probe')
 export default class CloneProbe extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .probe[data-rozie-s-67c332fe] {
   display: block;
   padding: 0.5rem;

@@ -12,6 +12,7 @@ import { clampPercent, percentFromPointer, nudge } from './internal/resizeMath';
 @customElement('rozie-resizable')
 export default class Resizable extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-resizable[data-rozie-s-8330bc5a] {
   display: flex;
   position: relative;

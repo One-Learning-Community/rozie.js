@@ -14,6 +14,7 @@ interface RozieTooltipSlotCtx {
 @customElement('rozie-polar-area')
 export default class PolarArea extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-chart[data-rozie-s-52afe0aa] {
   position: relative;
   width: 100%;

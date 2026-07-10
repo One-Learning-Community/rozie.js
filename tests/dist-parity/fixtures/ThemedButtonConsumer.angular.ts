@@ -23,6 +23,7 @@ import { ThemedButtonAllManual } from './ThemedButtonAllManual';
 
   `,
   styles: [`
+    :host(rozie-themed-button-consumer) { display: contents; }
     .themed-button-consumer {
       display: inline-flex;
       gap: 0.75rem;

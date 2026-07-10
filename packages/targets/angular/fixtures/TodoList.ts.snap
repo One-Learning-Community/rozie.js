@@ -88,6 +88,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-todo-list) { display: contents; }
     .todo-list { font-family: system-ui, sans-serif; }
     ul { list-style: none; padding: 0; }
     li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }

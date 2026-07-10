@@ -1,10 +1,14 @@
-import { LitElement, html, nothing } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-presence-check-fixture')
 export default class PresenceCheckFixture extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @state() private _hasSlotAside = false;
   @queryAssignedElements({ slot: 'aside', flatten: true }) private _slotAsideElements!: Element[];
 

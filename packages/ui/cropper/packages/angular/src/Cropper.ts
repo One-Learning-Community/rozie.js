@@ -26,6 +26,7 @@ import CropperEngine from 'cropperjs';
 
   `,
   styles: [`
+    :host(rozie-cropper) { display: contents; }
     .rozie-cropper {
       max-width: 100%;
     }

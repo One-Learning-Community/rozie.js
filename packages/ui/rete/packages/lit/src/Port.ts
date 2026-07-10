@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { ContextConsumer, createContext } from '@lit/context';
@@ -7,6 +7,10 @@ const __rozieCtx_rete_nodeType = createContext(Symbol.for("rozie:rete:nodeType")
 
 @customElement('rozie-port')
 export default class Port extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * Declares an OUTPUT port and names its key — set this (not `input`) so the port direction resolves to `output`. The attribute is `output`, not `out`: `out`/`in` are awkward bare identifiers, so `output`/`input` are used across all six targets.
    * @example

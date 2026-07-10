@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-r-model-lazy')
 export default class RModelLazy extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rmodel-lazy[data-rozie-s-34fe9f5a] { display: inline-flex; flex-direction: column; gap: 0.25rem; }
 .echo[data-rozie-s-34fe9f5a] { color: rgba(0, 0, 0, 0.55); font-size: 0.85em; }
 `;

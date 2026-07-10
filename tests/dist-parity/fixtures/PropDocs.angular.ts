@@ -12,6 +12,7 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
 
   `,
   styles: [`
+    :host(rozie-prop-docs) { display: contents; }
     .prop-docs { display: inline-flex; gap: 0.5rem; align-items: center; }
     .label { font-weight: 600; }
     .count { font-variant-numeric: tabular-nums; }

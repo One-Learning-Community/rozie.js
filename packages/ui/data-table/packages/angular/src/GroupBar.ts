@@ -53,6 +53,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-group-bar) { display: contents; }
     .rdt-group-drop-zone {
       display: inline-flex;
       flex-wrap: wrap;

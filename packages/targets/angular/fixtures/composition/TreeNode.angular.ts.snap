@@ -32,6 +32,9 @@ function __rozieAttr(v: unknown): string | null {
       </li>
 
   `,
+  styles: [`
+    :host(rozie-tree-node) { display: contents; }
+  `],
 })
 export class TreeNode {
 

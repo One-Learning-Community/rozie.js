@@ -32,6 +32,9 @@ function __rozieAttr(v: unknown): string | null {
     </span>
 
   `,
+  styles: [`
+    :host(rozie-filter-number-range) { display: contents; }
+  `],
 })
 export class FilterNumberRange {
   /**

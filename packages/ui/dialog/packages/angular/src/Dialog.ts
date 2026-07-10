@@ -19,6 +19,7 @@ interface DefaultCtx {}
 
   `,
   styles: [`
+    :host(rozie-dialog) { display: contents; }
     @media (prefers-reduced-motion: no-preference) {
       .rozie-dialog {
         transition: opacity var(--rozie-dialog-transition, 0.15s ease), transform var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;

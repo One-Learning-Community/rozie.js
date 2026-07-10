@@ -6,6 +6,7 @@ import { createLitControllableProperty, rozieListeners, rozieSpread } from '@roz
 @customElement('rozie-dialog')
 export default class Dialog extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 @media (prefers-reduced-motion: no-preference) {
   .rozie-dialog[data-rozie-s-2a679072] {
     transition: opacity var(--rozie-dialog-transition, 0.15s ease), transform var(--rozie-dialog-transition, 0.15s ease), overlay 0.15s ease allow-discrete, display 0.15s ease allow-discrete;

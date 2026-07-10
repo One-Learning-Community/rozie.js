@@ -10,6 +10,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     </div>
 
   `,
+  styles: [`
+    :host(rozie-bare-attr-child) { display: contents; }
+  `],
 })
 export class BareAttrChild {
   combobox = input<boolean>(false);

@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieAttr } from '@rozie/runtime-lit';
 
 @customElement('rozie-filter-number-range')
 export default class FilterNumberRange extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * The column id (mirrors the `#filter` slot scope) — used as the filter key and the input `aria-label` base.
    */

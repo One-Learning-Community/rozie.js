@@ -26,6 +26,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
 
   `,
+  styles: [`
+    :host(rozie-source) { display: contents; }
+  `],
   providers: [
     {
       provide: rozieToken('maplibre:source'),

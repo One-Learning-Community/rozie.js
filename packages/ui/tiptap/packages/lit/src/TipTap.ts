@@ -48,6 +48,7 @@ interface RozieNodeViewSlotCtx {
 @customElement('rozie-tip-tap')
 export default class TipTap extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-tiptap[data-rozie-s-2aeee876] {
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 6px;

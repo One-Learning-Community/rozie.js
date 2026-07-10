@@ -6,6 +6,7 @@ import { rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-class-selector-probe')
 export default class ClassSelectorProbe extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .panel[data-rozie-s-899140be] {
   display: block;
   padding: 0.5rem;

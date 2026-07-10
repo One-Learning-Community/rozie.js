@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-lit';
@@ -6,6 +6,10 @@ import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-editor-select')
 export default class EditorSelect extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * The column id (mirrors the `#editor` slot scope). Used as the select `aria-label`.
    */

@@ -19,6 +19,7 @@ import CropperEngine from 'cropperjs';
 @customElement('rozie-cropper')
 export default class Cropper extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-cropper[data-rozie-s-cddf3b42] {
   max-width: 100%;
 }

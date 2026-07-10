@@ -14,6 +14,7 @@ interface RozieTooltipSlotCtx {
 @customElement('rozie-bubble')
 export default class Bubble extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-chart[data-rozie-s-da10bb9e] {
   position: relative;
   width: 100%;

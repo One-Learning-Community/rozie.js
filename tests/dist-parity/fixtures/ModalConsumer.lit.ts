@@ -9,6 +9,7 @@ import './WrapperModal.rozie';
 @customElement('rozie-modal-consumer')
 export default class ModalConsumer extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .modal-consumer[data-rozie-s-5d081d3a] { display: flex; flex-direction: column; gap: 1rem; }
 .close[data-rozie-s-5d081d3a] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
 .dynamic-fill[data-rozie-s-5d081d3a] { font-weight: bold; }

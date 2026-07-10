@@ -23,6 +23,7 @@ import RegionsPlugin from 'wavesurfer.js/plugins/regions';
 
   `,
   styles: [`
+    :host(rozie-waveform) { display: contents; }
     .rozie-waveform {
       width: 100%;
     }

@@ -134,6 +134,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-listbox) { display: contents; }
     .rozie-listbox {
       position: relative;
       display: inline-block;

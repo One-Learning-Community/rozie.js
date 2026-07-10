@@ -54,6 +54,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <ng-container #rozie_portalAnchor></ng-container>
   `,
   styles: [`
+    :host(rozie-map-libre) { display: contents; }
     .rozie-maplibre {
       width: 100%;
       height: 100%;

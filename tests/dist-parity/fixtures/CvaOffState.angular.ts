@@ -12,6 +12,7 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
 
   `,
   styles: [`
+    :host(rozie-cva-off-state) { display: contents; }
     .cva-off-state { display: inline-flex; align-items: center; gap: 0.5rem; }
     input { padding: 0.25rem 0.5rem; }
     .echo { color: rgba(0, 0, 0, 0.6); }

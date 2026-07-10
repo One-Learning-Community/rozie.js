@@ -8,6 +8,9 @@ import { Component, ViewEncapsulation, input, signal } from '@angular/core';
     <input class="rdt-col-filter" part="col-filter" type="text" [attr.aria-label]="columnId()" [value]="draft()" (input)="onInput($event)" (keydown)="onKeydown($event)" (blur)="onBlur()" />
 
   `,
+  styles: [`
+    :host(rozie-filter-text) { display: contents; }
+  `],
 })
 export class FilterText {
   /**

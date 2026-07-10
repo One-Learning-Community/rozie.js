@@ -43,6 +43,21 @@ import { rewriteAllPortalBlocks } from '../../../../core/src/codegen/portalCss.j
  */
 const PORTAL_SCOPE_REPEAT = 1;
 
+/**
+ * Emitter-owned host-display parity default (quick 260710-fjj).
+ *
+ * Lit emits a persistent custom-element host the four hostless targets
+ * (React/Vue/Svelte/Solid) don't. With no `:host { display }` rule that host
+ * defaults to `display: inline`, so a baseline-aligned root picks up a
+ * descender/half-leading gap (@rozie-ui/switch: 24px button → 25.5px host) and
+ * a block root shrinks-to-content instead of filling width. `display: contents`
+ * makes the host layout-transparent → byte-exact parity with the hostless
+ * targets (every Rozie host is purely structural; role/semantics live on the
+ * inner root). Prepended BEFORE author rules so an explicit `:host{display:X}`
+ * wins via the CSS cascade (same specificity, later source order).
+ */
+const HOST_DISPLAY_DEFAULT = ':host{display:contents}';
+
 export interface EmitStyleOpts {
   componentName: string;
   lit: LitImportCollector;
@@ -137,18 +152,21 @@ export function emitStyle(
   // engine rules go in UNSCOPED/bare (NO scopeCss rewrite) — engine DOM inside
   // the shadow tree (e.g. TipTap placeholder) carries no `[data-rozie-s-*]`
   // attr, so the rule must be bare to match (D-04 in-shadow arm).
-  const combinedScoped = [scopedCss, portalCss, engineCss]
+  // HOST_DISPLAY_DEFAULT is prepended so an author `:host{display:X}` (carried in
+  // scopedCss, later in the sheet) overrides it via the cascade. It is NOT run
+  // through scopeCss (host selectors are exempt anyway) and is always present, so
+  // even a style-LESS component emits the host rule (its host would otherwise
+  // default to display:inline).
+  const combinedScoped = [HOST_DISPLAY_DEFAULT, scopedCss, portalCss, engineCss]
     .filter((s) => s.length > 0)
     .join('\n');
 
-  let staticStylesField = '';
   let globalStyleCall = '';
 
-  if (combinedScoped.length > 0) {
-    opts.lit.add('css');
-    const escaped = escapeCssForTemplateLiteral(combinedScoped);
-    staticStylesField = `  static styles = css\`\n${escaped}\n\`;`;
-  }
+  // combinedScoped always carries the host default → the css field is always emitted.
+  opts.lit.add('css');
+  const escaped = escapeCssForTemplateLiteral(combinedScoped);
+  const staticStylesField = `  static styles = css\`\n${escaped}\n\`;`;
 
   if (globalCss.length > 0) {
     opts.runtime.add('injectGlobalStyles');

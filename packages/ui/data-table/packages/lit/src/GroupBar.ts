@@ -7,6 +7,7 @@ import { repeat } from 'lit/directives/repeat.js';
 @customElement('rozie-group-bar')
 export default class GroupBar extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rdt-group-drop-zone[data-rozie-s-546c469a] {
   display: inline-flex;
   flex-wrap: wrap;

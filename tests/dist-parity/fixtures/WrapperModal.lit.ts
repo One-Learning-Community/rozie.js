@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { createLitControllableProperty } from '@rozie/runtime-lit';
@@ -6,6 +6,10 @@ import './Modal.rozie';
 
 @customElement('rozie-wrapper-modal')
 export default class WrapperModal extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @property({ type: String, reflect: true }) title: string = 'Wrapped';
   @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
   private _openControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'open-change', defaultValue: false, initialControlledValue: undefined });

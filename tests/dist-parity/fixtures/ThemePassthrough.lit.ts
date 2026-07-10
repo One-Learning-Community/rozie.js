@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-theme-passthrough')
 export default class ThemePassthrough extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .theme-passthrough[data-rozie-s-515c25a2] {
   display: block;
   padding: 0.5rem;

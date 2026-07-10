@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-model-param-shadow')
 export default class ModelParamShadow extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @property({ type: String, attribute: 'token' }) _token_attr: string = '';
   private _tokenControllable = createLitControllableProperty<string>({ host: this, eventName: 'token-change', defaultValue: '', initialControlledValue: undefined });
   private _status = signal('');

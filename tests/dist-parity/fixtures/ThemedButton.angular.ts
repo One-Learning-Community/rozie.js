@@ -13,6 +13,7 @@ import { NgClass } from '@angular/common';
 
   `,
   styles: [`
+    :host(rozie-themed-button) { display: contents; }
     .btn {
       display: inline-flex;
       align-items: center;

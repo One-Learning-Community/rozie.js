@@ -40,6 +40,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-tree-node) { display: contents; }
     .tree-node { font-family: system-ui; padding-left: 0.5rem; }
     .tree-node__label { display: inline-block; }
     .tree-node__children { list-style: none; margin: 0.25rem 0 0 0; padding-left: 1rem; border-left: 1px dashed currentColor; }

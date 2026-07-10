@@ -24,6 +24,9 @@ interface InnerCtx {}
     </div>
 
   `,
+  styles: [`
+    :host(rozie-nested-slots-fixture) { display: contents; }
+  `],
 })
 export class NestedSlotsFixture {
   @ContentChild('wrapper', { read: TemplateRef }) wrapperTpl?: TemplateRef<WrapperCtx>;

@@ -10,6 +10,7 @@ interface RozieItemSlotCtx {
 @customElement('rozie-portal-list-styled')
 export default class PortalListStyled extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-portal-list[data-rozie-s-18e5aac6] {
   display: block;
   font-family: system-ui, -apple-system, sans-serif;

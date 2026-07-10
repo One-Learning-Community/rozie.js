@@ -56,7 +56,7 @@ describe('emitStyle — D-LIT-15 / D-LIT-16 split', () => {
     expect(code).not.toContain('injectGlobalStyles');
   });
 
-  it('emitStyle() unit: empty styles produce empty result', () => {
+  it('emitStyle() unit: empty styles still emit the host-display parity default', () => {
     const result = emitStyle(
       { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
       '',
@@ -66,7 +66,12 @@ describe('emitStyle — D-LIT-15 / D-LIT-16 split', () => {
         runtime: new RuntimeLitImportCollector(),
       },
     );
-    expect(result.staticStylesField).toBe('');
+    // Even a style-less component normalizes its custom-element host so it lays
+    // out like the 4 hostless targets (quick 260710-fjj): the `static styles`
+    // field is always emitted carrying at least `:host{display:contents}`. No
+    // author rules → no injectGlobalStyles.
+    expect(result.staticStylesField).toContain('static styles = css`');
+    expect(result.staticStylesField).toContain(':host{display:contents}');
     expect(result.globalStyleCall).toBe('');
   });
 });

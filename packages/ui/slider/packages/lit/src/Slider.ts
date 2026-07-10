@@ -18,6 +18,7 @@ interface RozieBubbleSlotCtx {
 @customElement('rozie-slider')
 export default class Slider extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-slider[data-rozie-s-4e6f0be6] {
   position: relative;
   display: block;

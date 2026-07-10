@@ -43,6 +43,7 @@ interface RozieToolbarSlotCtx {
 @customElement('rozie-flow-canvas')
 export default class FlowCanvas extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 @media (prefers-color-scheme: dark) {
   .rozie-flow-canvas[data-rozie-s-cd396d6a] {
     --rozie-flow-accent: #60a5fa;

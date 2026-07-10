@@ -50,6 +50,7 @@ interface RozieNoEventsContentSlotCtx {
 @customElement('rozie-full-calendar')
 export default class FullCalendar extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-fullcalendar[data-rozie-s-5589629a] {
   width: 100%;
   font-size: 0.875rem;

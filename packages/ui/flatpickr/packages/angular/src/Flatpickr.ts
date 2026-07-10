@@ -12,6 +12,7 @@ import flatpickr from 'flatpickr';
 
   `,
   styles: [`
+    :host(rozie-flatpickr) { display: contents; }
     .rozie-flatpickr {
       padding: 0.375rem 0.5rem;
       border: 1px solid rgba(0, 0, 0, 0.15);

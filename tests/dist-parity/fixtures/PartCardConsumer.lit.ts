@@ -7,6 +7,7 @@ import './PartCard.rozie';
 @customElement('rozie-part-card-consumer')
 export default class PartCardConsumer extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .part-card-consumer[data-rozie-s-7f4fb92a] {
   display: inline-flex;
   padding: 0.5rem;

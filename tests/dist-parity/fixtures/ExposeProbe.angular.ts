@@ -14,6 +14,7 @@ import { FormsModule } from '@angular/forms';
 
   `,
   styles: [`
+    :host(rozie-expose-probe) { display: contents; }
     .expose-probe { display: inline-flex; align-items: center; gap: 0.5rem; }
     input { padding: 0.25rem 0.5rem; }
     .echo { font-variant-numeric: tabular-nums; color: rgba(0, 0, 0, 0.6); }

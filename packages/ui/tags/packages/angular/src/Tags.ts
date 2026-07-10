@@ -59,6 +59,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-tags) { display: contents; }
     .rozie-tags {
       display: inline-flex;
       flex-wrap: wrap;

@@ -7,6 +7,7 @@ import { repeat } from 'lit/directives/repeat.js';
 @customElement('rozie-tree-node')
 export default class TreeNode extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .tree-node[data-rozie-s-a7176a6e] { font-family: system-ui; padding-left: 0.5rem; }
 .tree-node__label[data-rozie-s-a7176a6e] { display: inline-block; }
 .tree-node__children[data-rozie-s-a7176a6e] { list-style: none; margin: 0.25rem 0 0 0; padding-left: 1rem; border-left: 1px dashed currentColor; }

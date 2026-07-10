@@ -26,6 +26,9 @@ interface DefaultCtx {}
     }</ng-template></rozie-inner>
 
   `,
+  styles: [`
+    :host(rozie-wrapper) { display: contents; }
+  `],
 })
 export class Wrapper {
   @ContentChild('title', { read: TemplateRef }) titleTpl?: TemplateRef<TitleCtx>;

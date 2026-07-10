@@ -31,6 +31,7 @@ interface RozieEmptySlotCtx {
 @customElement('rozie-command-palette')
 export default class CommandPalette extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-command-palette[data-rozie-s-768cad96] {
   position: fixed;
   inset: 0;

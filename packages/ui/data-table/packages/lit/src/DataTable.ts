@@ -96,6 +96,7 @@ interface RozieDetailSlotCtx {
 @customElement('rozie-data-table')
 export default class DataTable extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-data-table[data-rozie-s-d5dcab4c] {
   border-collapse: collapse;
   width: 100%;

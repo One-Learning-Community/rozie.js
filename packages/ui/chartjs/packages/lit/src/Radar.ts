@@ -14,6 +14,7 @@ interface RozieTooltipSlotCtx {
 @customElement('rozie-radar')
 export default class Radar extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-chart[data-rozie-s-6680f000] {
   position: relative;
   width: 100%;

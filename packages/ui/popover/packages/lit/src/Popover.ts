@@ -41,6 +41,7 @@ interface RozieAnchorSlotCtx {
 @customElement('rozie-popover')
 export default class Popover extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-popover[data-rozie-s-c6cf02ea] {
   display: contents;
 }

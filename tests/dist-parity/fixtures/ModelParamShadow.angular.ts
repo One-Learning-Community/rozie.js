@@ -14,6 +14,9 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
     </div>
 
   `,
+  styles: [`
+    :host(rozie-model-param-shadow) { display: contents; }
+  `],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,

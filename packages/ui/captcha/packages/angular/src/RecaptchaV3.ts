@@ -23,6 +23,9 @@ import { loadRecaptchaV3, execute as v3Execute } from './internal/loadRecaptchaV
     <div class="rozie-recaptcha-v3" style="display:none" #rozieSpread_0 #rozieListenersTarget_1></div>
 
   `,
+  styles: [`
+    :host(rozie-recaptcha-v3) { display: contents; }
+  `],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,

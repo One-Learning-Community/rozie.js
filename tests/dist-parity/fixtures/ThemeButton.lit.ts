@@ -9,6 +9,7 @@ const __rozieCtx_theme = createContext(Symbol.for("rozie:theme"));
 @customElement('rozie-theme-button')
 export default class ThemeButton extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .theme-button[data-rozie-s-9f40a7ea] {
   font-family: system-ui, -apple-system, sans-serif;
   padding: 0.375rem 0.75rem;

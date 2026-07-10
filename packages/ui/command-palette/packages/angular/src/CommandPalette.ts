@@ -92,6 +92,7 @@ function __rozieAttr(v: unknown): string | null {
     }
   `,
   styles: [`
+    :host(rozie-command-palette) { display: contents; }
     .rozie-command-palette {
       position: fixed;
       inset: 0;

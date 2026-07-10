@@ -6,6 +6,7 @@ import { createLitControllableProperty, rozieListeners, rozieSpread } from '@roz
 @customElement('rozie-counter')
 export default class Counter extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .counter[data-rozie-s-c72e01d0] { display: inline-flex; gap: 0.5rem; align-items: center; }
 .counter.hovering[data-rozie-s-c72e01d0] { background: rgba(0, 0, 0, 0.04); }
 .value[data-rozie-s-c72e01d0] { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }

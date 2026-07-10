@@ -38,6 +38,7 @@ import { WrapperModal } from './WrapperModal';
 
   `,
   styles: [`
+    :host(rozie-modal-consumer) { display: contents; }
     .modal-consumer { display: flex; flex-direction: column; gap: 1rem; }
     .close { background: none; border: none; cursor: pointer; font-size: 1.25rem; }
     .dynamic-fill { font-weight: bold; }

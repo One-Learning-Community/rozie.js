@@ -6,6 +6,7 @@ import { debounce, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-search-input')
 export default class SearchInput extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .search-input[data-rozie-s-8bbc4a60] { display: inline-flex; align-items: center; gap: 0.25rem; }
 input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
 .clear-btn[data-rozie-s-8bbc4a60] { background: none; border: none; cursor: pointer; font-size: 1.25rem; }

@@ -29,6 +29,7 @@ class MiniEngine {
 
   `,
   styles: [`
+    :host(rozie-engine-dom-escape) { display: contents; }
     .rozie-engine-host {
       display: block;
       position: relative;

@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { ContextConsumer, createContext } from '@lit/context';
@@ -7,6 +7,10 @@ const __rozieCtx_data_table_columns = createContext(Symbol.for("rozie:data-table
 
 @customElement('rozie-column')
 export default class Column extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * The column id. Optional — defaults to `field` when omitted. Used as the key in the id-keyed registry union and in the `#cell` / `#colHeader` slot dispatch.
    */

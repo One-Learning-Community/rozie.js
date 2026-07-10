@@ -9,6 +9,7 @@ const __rozieCtx_theme = createContext(Symbol.for("rozie:theme"));
 @customElement('rozie-theme-provider')
 export default class ThemeProvider extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .theme-provider[data-rozie-s-00821bac] {
   display: block;
 }

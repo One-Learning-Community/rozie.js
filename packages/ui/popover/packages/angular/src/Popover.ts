@@ -85,6 +85,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-popover) { display: contents; }
     .rozie-popover {
       display: contents;
     }

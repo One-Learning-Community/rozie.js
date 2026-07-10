@@ -11,6 +11,9 @@ import { Wrapper } from './wrapper';
     <rozie-wrapper><ng-template #title>Hello from consumer</ng-template></rozie-wrapper>
 
   `,
+  styles: [`
+    :host(rozie-consumer) { display: contents; }
+  `],
 })
 export class Consumer {
 

@@ -20,6 +20,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
   template: `
 
   `,
+  styles: [`
+    :host(rozie-layer) { display: contents; }
+  `],
 })
 export class Layer {
   /**

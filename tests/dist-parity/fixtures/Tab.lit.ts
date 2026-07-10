@@ -9,6 +9,7 @@ const __rozieCtx_tabs = createContext(Symbol.for("rozie:tabs"));
 @customElement('rozie-tab')
 export default class Tab extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .tab[data-rozie-s-18645a16] {
   font-family: system-ui, -apple-system, sans-serif;
   padding: 0.375rem 0.75rem;

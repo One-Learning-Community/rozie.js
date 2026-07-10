@@ -55,6 +55,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-sortable-list) { display: contents; }
     .rozie-sortable-wrap { display: block; }
     .rozie-sortable-list { display: block; }
     .rozie-sortable-item { display: block; outline: none; }

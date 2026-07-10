@@ -33,6 +33,9 @@ function __rozieAttr(v: unknown): string | null {
     </div>
 
   `,
+  styles: [`
+    :host(rozie-inline-equiv-host-h) { display: contents; }
+  `],
 })
 export class InlineEquivHostH {
   base = input<number>(1);

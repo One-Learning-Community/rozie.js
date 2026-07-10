@@ -14,6 +14,7 @@ interface RozieDefaultSlotCtx {
 @customElement('rozie-sortable-list')
 export default class SortableList extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-sortable-wrap[data-rozie-s-0af24eae] { display: block; }
 .rozie-sortable-list[data-rozie-s-0af24eae] { display: block; }
 .rozie-sortable-item[data-rozie-s-0af24eae] { display: block; outline: none; }

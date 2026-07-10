@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-attr-nullish-drop')
 export default class AttrNullishDrop extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   private _cond = signal(false);
   private _maybeNull = signal<any>(null);
 

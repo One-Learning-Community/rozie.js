@@ -29,6 +29,9 @@ interface ActionsCtx {}
       </ng-template><ng-template #defaultSlot><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></ng-template></rozie-modal>
 
   `,
+  styles: [`
+    :host(rozie-wrapper-modal) { display: contents; }
+  `],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,

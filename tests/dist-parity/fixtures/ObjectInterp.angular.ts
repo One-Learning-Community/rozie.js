@@ -30,6 +30,9 @@ function __rozieAttr(v: unknown): string | null {
     </div>
 
   `,
+  styles: [`
+    :host(rozie-object-interp) { display: contents; }
+  `],
 })
 export class ObjectInterp {
   obj = signal({

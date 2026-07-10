@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
@@ -18,6 +18,10 @@ import { loadRecaptchaV3, execute as v3Execute } from './internal/loadRecaptchaV
 
 @customElement('rozie-recaptcha-v3')
 export default class RecaptchaV3 extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * Required. The public reCAPTCHA v3 site key from your Google admin console.
    */

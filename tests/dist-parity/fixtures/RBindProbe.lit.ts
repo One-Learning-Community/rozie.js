@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-r-bind-probe')
 export default class RBindProbe extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rbind-probe[data-rozie-s-8e2458d6] {
   display: inline-flex;
   gap: 0.5rem;

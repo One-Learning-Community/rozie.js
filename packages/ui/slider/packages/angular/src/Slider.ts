@@ -105,6 +105,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-slider) { display: contents; }
     .rozie-slider {
       position: relative;
       display: block;

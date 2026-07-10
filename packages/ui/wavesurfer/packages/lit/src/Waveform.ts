@@ -19,6 +19,7 @@ import RegionsPlugin from 'wavesurfer.js/plugins/regions';
 @customElement('rozie-waveform')
 export default class Waveform extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-waveform[data-rozie-s-0b6fbb3a] {
   width: 100%;
 }

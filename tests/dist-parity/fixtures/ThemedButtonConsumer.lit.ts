@@ -10,6 +10,7 @@ import './ThemedButtonAllManual.rozie';
 @customElement('rozie-themed-button-consumer')
 export default class ThemedButtonConsumer extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .themed-button-consumer[data-rozie-s-14b8cbaa] {
   display: inline-flex;
   gap: 0.75rem;

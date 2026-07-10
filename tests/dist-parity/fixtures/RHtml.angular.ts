@@ -9,6 +9,7 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
 
   `,
   styles: [`
+    :host(rozie-rhtml) { display: contents; }
     .rhtml { font: 1rem/1.4 system-ui; }
   `],
 })

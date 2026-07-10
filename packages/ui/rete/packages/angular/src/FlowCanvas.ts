@@ -107,6 +107,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <ng-container #rozie_portalAnchor></ng-container>
   `,
   styles: [`
+    :host(rozie-flow-canvas) { display: contents; }
     @media (prefers-color-scheme: dark) {
       .rozie-flow-canvas {
         --rozie-flow-accent: #60a5fa;

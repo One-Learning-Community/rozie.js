@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-lit';
@@ -6,6 +6,10 @@ import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-filter-select')
 export default class FilterSelect extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * The column id (mirrors the `#filter` slot scope) — used as the filter key and the select `aria-label`.
    */

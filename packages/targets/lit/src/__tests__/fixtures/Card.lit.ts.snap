@@ -7,6 +7,7 @@ import './CardHeader.rozie';
 @customElement('rozie-card')
 export default class Card extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .card[data-rozie-s-a88c221e] { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff; }
 .card__body[data-rozie-s-a88c221e] { padding: 1rem; }
 `;

@@ -1,4 +1,4 @@
-import { LitElement, html, nothing, render } from 'lit';
+import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { ContextConsumer, ContextProvider, createContext } from '@lit/context';
@@ -15,6 +15,10 @@ interface RozieBodySlotCtx {
 
 @customElement('rozie-node-type')
 export default class NodeType extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * The node TYPE id (required). Every graph node whose `type` matches renders this template and uses this type's `<Port>` schema. There is no id/x/y here — this is a render-by-type TEMPLATE, not an instance; instance identity and position live in the bound `graph` model.
    * @example

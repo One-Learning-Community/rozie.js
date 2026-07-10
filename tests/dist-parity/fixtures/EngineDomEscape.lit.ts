@@ -6,6 +6,7 @@ import { injectGlobalStyles, rozieListeners, rozieSpread } from '@rozie/runtime-
 @customElement('rozie-engine-dom-escape')
 export default class EngineDomEscape extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-engine-host[data-rozie-s-701c687a] {
   display: block;
   position: relative;

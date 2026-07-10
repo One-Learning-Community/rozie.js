@@ -11,6 +11,7 @@ interface RozieTriggerSlotCtx {
 @customElement('rozie-dropdown')
 export default class Dropdown extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .dropdown[data-rozie-s-6d6bd882] { position: relative; display: inline-block; }
 .dropdown-panel[data-rozie-s-6d6bd882] {
   position: fixed;

@@ -36,6 +36,9 @@ function __rozieAttr(v: unknown): string | null {
     </div>
 
   `,
+  styles: [`
+    :host(rozie-partial-inline-host-multi) { display: contents; }
+  `],
 })
 export class PartialInlineHostMulti {
   base = input<number>(1);

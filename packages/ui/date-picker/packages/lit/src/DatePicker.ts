@@ -30,6 +30,7 @@ interface RoziePresetsSlotCtx {
 @customElement('rozie-date-picker')
 export default class DatePicker extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rozie-datepicker[data-rozie-s-6800c7a2] {
   display: inline-block;
   font: var(--rozie-datepicker-font, inherit);

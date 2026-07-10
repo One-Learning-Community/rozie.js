@@ -13,6 +13,9 @@ import { Counter } from './Counter';
       </div>
 
   `,
+  styles: [`
+    :host(rozie-modal) { display: contents; }
+  `],
 })
 export class Modal {
 

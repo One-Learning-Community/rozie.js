@@ -72,6 +72,7 @@ function __rozieAttr(v: unknown): string | null {
     }
   `,
   styles: [`
+    :host(rozie-modal) { display: contents; }
     .modal-backdrop {
       position: fixed; inset: 0;
       background: rgba(0, 0, 0, 0.4);

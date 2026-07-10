@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieAttr, rozieDisplay } from '@rozie/runtime-lit';
@@ -6,6 +6,10 @@ import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-detail-panel')
 export default class DetailPanel extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   /**
    * The raw row object (the `#detail` slot scope `row` = `row.original`). This drop-in walks its own enumerable keys and String-coerces each value into a key/value definition list; a null row renders an empty list.
    */

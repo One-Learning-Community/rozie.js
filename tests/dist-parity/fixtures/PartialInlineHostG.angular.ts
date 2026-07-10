@@ -34,6 +34,9 @@ function __rozieAttr(v: unknown): string | null {
     </div>
 
   `,
+  styles: [`
+    :host(rozie-partial-inline-host-g) { display: contents; }
+  `],
 })
 export class PartialInlineHostG {
   base = input<number>(1);

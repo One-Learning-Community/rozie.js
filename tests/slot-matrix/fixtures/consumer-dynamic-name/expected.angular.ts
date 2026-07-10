@@ -12,6 +12,9 @@ import { Producer } from './producer';
     <rozie-producer [templates]="templates"><ng-template #__dynSlot_0>Dynamic fill</ng-template></rozie-producer>
 
   `,
+  styles: [`
+    :host(rozie-consumer) { display: contents; }
+  `],
 })
 export class Consumer {
   slotName = signal('a');

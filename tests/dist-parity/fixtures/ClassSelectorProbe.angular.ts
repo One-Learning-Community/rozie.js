@@ -33,6 +33,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-class-selector-probe) { display: contents; }
     .panel {
       display: block;
       padding: 0.5rem;
