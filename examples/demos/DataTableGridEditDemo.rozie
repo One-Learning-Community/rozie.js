@@ -183,8 +183,10 @@ const toggleSingleClickEdit = (): void => { $data.singleClickEdit = !$data.singl
 
       <!-- Custom #editor drop-in (B26): the `note` column renders an EditorText drop-in
            that commits on its own blur; every other editable column uses its built-in
-           editor. The slot receives { value, columnId, commit, cancel }. -->
-      <template #editor="{ columnId, value, commit, cancel }">
+           editor. The slot receives { value, columnId, commit, cancel, autofocus } — the
+           `autofocus` scope prop (quick 260711-i5m, editor-owns-focus contract) is forwarded
+           so EditorText self-focuses instead of relying on a host DOM reach-in. -->
+      <template #editor="{ columnId, value, commit, cancel, autofocus }">
         <EditorText
           r-if="columnId === 'note'"
           data-testid="note-dropin"
@@ -192,6 +194,7 @@ const toggleSingleClickEdit = (): void => { $data.singleClickEdit = !$data.singl
           :columnId="columnId"
           :commit="commit"
           :cancel="cancel"
+          :autofocus="autofocus"
         />
       </template>
     </DataTable>

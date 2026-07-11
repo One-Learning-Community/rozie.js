@@ -117,11 +117,12 @@ const callEditRow = (): void => {
         <span data-testid="cell-display">{{ value }}</span>
       </template>
 
-      <!-- Custom #editor drop-in: the `note` column renders an EditorText drop-in. Task 2
-           adds the `autofocus` destructure + `:autofocus` forward here (in the same edit
-           that binds `:autofocus` on the producer's <slot name="editor"> — see the header
-           comment DEVIATION note; destructuring it now would be a ROZ947 compile error). -->
-      <template #editor="{ columnId, value, commit, cancel }">
+      <!-- Custom #editor drop-in: the `note` column renders an EditorText drop-in.
+           Destructures + forwards `autofocus` (the editor-owns-focus contract, quick
+           260711-i5m) — the producer's <slot name="editor"> now binds :autofocus, so this
+           is compilable (see the header comment DEVIATION note for why it was NOT wired in
+           the RED-first commit). -->
+      <template #editor="{ columnId, value, commit, cancel, autofocus }">
         <EditorText
           r-if="columnId === 'note'"
           data-testid="note-dropin"
@@ -129,6 +130,7 @@ const callEditRow = (): void => {
           :columnId="columnId"
           :commit="commit"
           :cancel="cancel"
+          :autofocus="autofocus"
         />
       </template>
     </DataTable>

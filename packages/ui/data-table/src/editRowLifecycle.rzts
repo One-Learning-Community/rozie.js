@@ -79,6 +79,11 @@ const beginRowEdit = (row) => {
   $data.editingRowIndex = rowIndex
   $data.activeInControl = true
   $data.editVer = $data.editVer + 1
+  // Editor-owns-focus contract (quick 260711-i5m): the row's FIRST editable column is the
+  // initial focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope
+  // prop from it (a built-in column is also host-focused below via focusEditorWhenReady; a
+  // drop-in column self-focuses via its own $onMount, gated off the host reach-in in Task 3).
+  $data.editFocusColId = editable[0].colId
   focusEditorWhenReady()
 }
 
@@ -108,9 +113,18 @@ const commitRow = () => {
     const err = runValidator(ec.colId, coerceCellValue(ec.colId, draft[ec.colId]), rowOriginal)
     if (err !== true) {
       setInvalid(err)
+      // Editor-owns-focus contract (quick 260711-i5m): the OFFENDING column becomes the new
+      // reactive focus target BEFORE the host-focus call below — a #editor drop-in already
+      // mounted (full-row edit opens every editable cell at once) picks this up via its own
+      // lazy $watch on the `autofocus` scope prop flipping false→true. Bump editVer so the
+      // coarse-render targets (React/Vue/Angular/Svelte) re-derive the slot binding (Solid's
+      // fine-grained accessor re-runs without the bump, but the bump keeps all 6 in lockstep).
+      $data.editFocusColId = ec.colId
+      $data.editVer = $data.editVer + 1
       // B22: focus the OFFENDING column's editor (the one whose validator rejected), NOT
       // unconditionally the first editor (focusEditorWhenReady resolves the first
       // [data-editing-cell] in DOM order). ec.colIndex is the offending cell's visible col.
+      // Gated (Task 3) so a #editor drop-in self-focuses instead of a host DOM reach-in.
       focusRowEditorAt(rowIndex, ec.colIndex)
       return false
     }

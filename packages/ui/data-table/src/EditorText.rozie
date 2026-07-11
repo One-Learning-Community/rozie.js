@@ -6,9 +6,10 @@
   Consumers fill the parent's #editor scoped slot with it:
 
     <DataTable …>
-      <template #editor="{ value, commit, cancel, column, row, columnId }">
+      <template #editor="{ value, commit, cancel, column, row, columnId, autofocus }">
         <EditorText :value="value" :commit="commit" :cancel="cancel"
-                    :column="column" :row="row" :columnId="columnId" />
+                    :column="column" :row="row" :columnId="columnId"
+                    :autofocus="autofocus" />
       </template>
     </DataTable>
 
@@ -16,6 +17,12 @@
   the slot scope props (value + the commit/cancel function props) and calls them.
   Because the drop-in lives in the consumer's slot OUTSIDE the parent's
   onEditorKeyDown path, it owns its OWN Enter/Escape keymap.
+
+  Editor-owns-focus contract (quick 260711-i5m): the `autofocus` slot-scope prop is REACTIVE
+  — the host flips it for exactly the editor that should currently hold focus. Forward it to
+  focus this drop-in's OWN input ($onMount for the initial open, a lazy $watch for a
+  post-mount reactive refocus, e.g. a row-mode validation failure) instead of relying on the
+  host reaching into this component's DOM (which cannot cross a Lit shadow boundary).
 
   Behavior: local draft in $data, seeded from $props.value in setup-once <script>;
   @input updates the draft; Enter → commit(draft); blur → commit(draft);
@@ -85,6 +92,18 @@
         '`() => void` — revert the edit and close the editor (from the `#editor` slot scope). Null-guarded at call sites.',
     },
   },
+  // Editor-owns-focus contract (quick 260711-i5m): the HOST sets this reactively for the
+  // ONE editor that should currently hold focus — the drop-in focuses its OWN input in
+  // response (mount-time via $onMount, post-mount via a lazy $watch). No shadow-piercing,
+  // no host DOM reach-in.
+  autofocus: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        "Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.",
+    },
+  },
 }
 </props>
 
@@ -127,10 +146,23 @@ const onKeydown = (e) => {
 const onBlur = () => {
   doCommit()
 }
+
+// Editor-owns-focus contract: focus OUR OWN input when the host says we should hold focus.
+// $onMount covers the initial open (autofocus already true on first render); the LAZY $watch
+// (NOT { immediate: true } — an immediate watch fires PRE-mount, null ref on Lit/Solid) covers
+// a REACTIVE refocus while already mounted (e.g. a row-mode validation failure that flips
+// autofocus back onto this already-open drop-in).
+$onMount(() => {
+  if ($props.autofocus) $refs.inputEl?.focus()
+})
+$watch(() => $props.autofocus, (v) => {
+  if (v) $refs.inputEl?.focus()
+})
 </script>
 
 <template>
 <input
+  ref="inputEl"
   class="rdt-cell-editor"
   type="text"
   data-editing-cell

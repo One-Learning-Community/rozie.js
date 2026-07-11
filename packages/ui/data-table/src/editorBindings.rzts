@@ -58,6 +58,11 @@ const rowEditTab = (target, backward) => {
   if (pos < 0) pos = 0
   const len = cols.length
   const nextPos = backward ? (pos - 1 + len) % len : (pos + 1) % len
+  // Editor-owns-focus contract (quick 260711-i5m): the Tab target becomes the new reactive
+  // focus target BEFORE the host-focus call below, so Tab onto an already-mounted #editor
+  // drop-in (row mode) also refocuses it via its own lazy $watch.
+  $data.editFocusColId = editable[nextPos].colId
+  $data.editVer = $data.editVer + 1
   focusRowEditorAt(rowIndex, cols[nextPos])
 }
 

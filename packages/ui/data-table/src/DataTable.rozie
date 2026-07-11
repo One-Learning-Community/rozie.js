@@ -627,6 +627,12 @@
   // the windowed slice + cell loop use. Without it, a commit fired from the #editor slot's
   // `commit` prop left the editor mounted on Svelte (the {#each} branch didn't re-derive).
   editVer: 0,
+  // Editor-owns-focus contract (quick 260711-i5m): the column id of the editor that should
+  // CURRENTLY hold focus, reactively — editorAutofocusFor(colId, rowIndex) derives the
+  // `autofocus` #editor scope prop from it. Set by beginEdit/beginRowEdit/commitRow's B22
+  // reject/rowEditTab; cleared by endEdit/endRowEdit. null = no focus target (nothing editing,
+  // or the byte-identical-off baseline).
+  editFocusColId: null,
 
   // ── Full-row edit state (phase 51 req-6 / D-06) ────────────────────────────────────
   // editingRowIndex: the row in FULL-ROW edit, as a body-row index in the SAME index space
@@ -1459,7 +1465,7 @@ let rangeDragUp = null
 let rangeDragMoved = false
 import { teardownRangeDrag, beginRangeDrag } from './dragSelect.rzts'
 
-import { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit } from './editCellLifecycle.rzts'
+import { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, editorAutofocusFor, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit } from './editCellLifecycle.rzts'
 
 import { editableColumnsForRow, focusRowEditorAt, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell, prevEditableCell } from './editRowLifecycle.rzts'
 
@@ -1981,6 +1987,7 @@ $expose({
               :value="editorValueFor(cell.column.id)"
               :commit="editorCommitFor(cell.column.id)"
               :cancel="editorCancelFor()"
+              :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)"
             />
           </span>
           <input
@@ -2410,6 +2417,7 @@ $expose({
               :value="editorValueFor(cell.column.id)"
               :commit="editorCommitFor(cell.column.id)"
               :cancel="editorCancelFor()"
+              :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))"
             />
           </span>
           <input

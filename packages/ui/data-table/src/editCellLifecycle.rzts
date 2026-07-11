@@ -248,6 +248,10 @@ const beginEdit = (rowIndex, colIndex, seed) => {
   $data.draftValue = seed != null ? seed : cellValueAt(rowIndex, colIndex)
   $data.activeInControl = true
   $data.editVer = $data.editVer + 1
+  // Editor-owns-focus contract (quick 260711-i5m): THIS cell's column is the current
+  // focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope prop
+  // from it. Cleared on endEdit.
+  $data.editFocusColId = colId
   // B2: a seeded (type-to-edit) entry must NOT select-all — keep the caret after the
   // seeded char so subsequent typing appends instead of replacing it.
   focusEditorWhenReady(seed == null)
@@ -301,6 +305,7 @@ const endEdit = () => {
   $data.invalidMsg = ''
   $data.activeInControl = false
   $data.editVer = $data.editVer + 1
+  $data.editFocusColId = null
 }
 
 // endRowEdit: tear down full-row edit (shared by commitRow/cancelRow). Clears the row
@@ -312,6 +317,23 @@ const endRowEdit = () => {
   $data.invalidMsg = ''
   $data.activeInControl = false
   $data.editVer = $data.editVer + 1
+  $data.editFocusColId = null
+}
+
+// editorAutofocusFor (quick 260711-i5m, editor-owns-focus contract): the reactive `autofocus`
+// #editor scope prop for a given (colId, rowIndex) — true for EXACTLY the current focus-
+// target cell, re-deriving on every editVer bump (mirrors isEditing's reactive gate so
+// Svelte/Solid re-run this per-cell on a foreign-slot-callback state mutation). Works for
+// BOTH single-cell ($data.editingRow) and row mode ($data.editingRowIndex) since
+// $data.editFocusColId is set by both beginEdit and beginRowEdit/commitRow/rowEditTab.
+const editorAutofocusFor = (colId, rowIndex) => {
+  if ($data.editVer < 0) return false
+  if ($data.editingRowIndex != null) {
+    if ($data.editingRowIndex !== rowIndex) return false
+  } else {
+    if ($data.editingRow !== rowIndex) return false
+  }
+  return $data.editFocusColId != null && $data.editFocusColId === colId
 }
 
 // B3: coerce the committed value by the column's built-in editor type at the single
@@ -470,4 +492,4 @@ const cancelEdit = () => {
   focusCellWhenReady(focusRow, focusCol)
 }
 
-export { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit }
+export { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, editorAutofocusFor, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit }
