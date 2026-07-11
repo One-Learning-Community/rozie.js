@@ -35,6 +35,16 @@ function renderBranchBody(
 /**
  * Build a <Show> element for a single branch. The `fallback` prop is
  * optional — omit when no else branch.
+ *
+ * R10-1 fix (260710-uwr): `fallbackJsx` splices into the `fallback={…}`
+ * JSX-ATTRIBUTE position. When it is a single balanced `{...}` mustache (a
+ * `<slot>` or interpolation in the r-else arm), the doubled braces
+ * (`fallback={{resolved()}}`) are an object-literal inside a JSX-attribute
+ * expression — invalid. Strip the outer pair; `fallback={ }` already
+ * supplies the delimiter parens so no re-wrap is needed. A nested `<Show …>`
+ * element or `<>…</>` fragment (starts with `<`) is left untouched — it's
+ * valid JSX there. `bodyJsx` (JSX-CHILDREN position, `>…</Show>`) is NOT
+ * touched — a `{...}` mustache is a valid JSX child.
  */
 function buildShow(
   testCode: string,
@@ -42,7 +52,11 @@ function buildShow(
   fallbackJsx: string | null,
 ): string {
   if (fallbackJsx !== null) {
-    return `<Show when={${testCode}} fallback={${fallbackJsx}}>${bodyJsx}</Show>`;
+    const fallbackAttr =
+      fallbackJsx.startsWith('{') && fallbackJsx.endsWith('}') && fallbackJsx.length > 2
+        ? fallbackJsx.slice(1, -1)
+        : fallbackJsx;
+    return `<Show when={${testCode}} fallback={${fallbackAttr}}>${bodyJsx}</Show>`;
   }
   return `<Show when={${testCode}}>${bodyJsx}</Show>`;
 }

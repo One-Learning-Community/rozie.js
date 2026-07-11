@@ -21,6 +21,19 @@ import type { EmitNodeCtx } from './emitTemplateNode.js';
 /**
  * Render a branch's body as a single JSX expression. Multiple children
  * become a fragment `<>...</>`.
+ *
+ * R10-1 fix (260710-uwr): a single-child body that emits as a bare `{...}`
+ * mustache (a `<slot>` or interpolation) is un-wrapped and re-parenthesized
+ * before being handed to the caller. Every composition site below (the
+ * short-circuit `&&`, the ternary consequent/alternate, and the base-case
+ * r-else wrapped by the outer `{...}` at the bottom of emitConditional)
+ * splices renderBranchBody's return value into JS-EXPRESSION position — a
+ * `{...}` mustache there collapses into a block/object-literal
+ * (`{cond && {expr}}`), which is invalid JSX. Fragment/element bodies start
+ * with `<` and are left byte-identical. Parens are required, not optional:
+ * some slot returns are unparenthesized (`typeof x === 'function' ? … : …`)
+ * and both `&&`/`??` mixing and ternary precedence need them — mirrors the
+ * existing un-wrap precedent in emitSlotInvocation.ts's renderInvocationFallback.
  */
 function renderBranchBody(
   body: TemplateNode[],
@@ -29,7 +42,11 @@ function renderBranchBody(
 ): string {
   if (body.length === 0) return 'null';
   if (body.length === 1) {
-    return emitNodeFn(body[0]!, ctx);
+    const rendered = emitNodeFn(body[0]!, ctx);
+    if (rendered.startsWith('{') && rendered.endsWith('}') && rendered.length > 2) {
+      return `(${rendered.slice(1, -1)})`;
+    }
+    return rendered;
   }
   // Wrap multiple children in a fragment.
   const parts = body.map((c) => emitNodeFn(c, ctx)).join('');
