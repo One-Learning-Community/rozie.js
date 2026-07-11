@@ -17,6 +17,7 @@
 import type { TemplateConditionalIR, TemplateNode } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
+import { stripBalancedMustache } from './unwrapMustache.js';
 
 /**
  * Render a branch's body as a single JSX expression. Multiple children
@@ -34,6 +35,11 @@ import type { EmitNodeCtx } from './emitTemplateNode.js';
  * some slot returns are unparenthesized (`typeof x === 'function' ? … : …`)
  * and both `&&`/`??` mixing and ternary precedence need them — mirrors the
  * existing un-wrap precedent in emitSlotInvocation.ts's renderInvocationFallback.
+ *
+ * 260711-ad5 — routed through the shared `stripBalancedMustache` primitive
+ * (also used by `emitLoop`'s R11-1 fix). Byte-identical to the original
+ * inline `startsWith/endsWith/length` check — same heuristic, same `(inner)`
+ * wrap.
  */
 function renderBranchBody(
   body: TemplateNode[],
@@ -43,8 +49,9 @@ function renderBranchBody(
   if (body.length === 0) return 'null';
   if (body.length === 1) {
     const rendered = emitNodeFn(body[0]!, ctx);
-    if (rendered.startsWith('{') && rendered.endsWith('}') && rendered.length > 2) {
-      return `(${rendered.slice(1, -1)})`;
+    const inner = stripBalancedMustache(rendered);
+    if (inner !== null) {
+      return `(${inner})`;
     }
     return rendered;
   }

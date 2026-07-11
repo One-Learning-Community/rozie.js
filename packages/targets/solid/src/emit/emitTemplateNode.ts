@@ -65,6 +65,7 @@ import {
   stripKeynavCommitEvent,
   type KeynavEmitPlan,
 } from './emitKeynav.js';
+import { stripBalancedMustache } from './unwrapMustache.js';
 
 const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
@@ -342,6 +343,21 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   let bodyJsx: string;
   if (node.body.length === 1) {
     bodyJsx = emitNode(node.body[0]!, childCtx);
+    // R11-1 fix (260711-ad5) — loop twin of R10-1's `buildShow` fallback fix.
+    // A single-child body that emits as a bare `{...}` mustache (a `<slot>`,
+    // a lone interpolation, or a nested conditional-slot) splices directly
+    // into the render-callback arrow below, at BOTH composition sites that
+    // read this same `bodyJsx` — the keyless `<For>` return just below AND
+    // the keyed `<Key>` return further down. Left as-is, `item => {expr}`
+    // parses as an ARROW BLOCK BODY with no `return` — valid JS, but the
+    // callback silently yields `undefined` and the loop renders NOTHING.
+    // Strip the outer braces and re-splice as a parenthesized arrow-
+    // EXPRESSION body. Element/fragment bodies start with `<`
+    // (stripBalancedMustache returns null) and are left untouched.
+    const inner = stripBalancedMustache(bodyJsx);
+    if (inner !== null) {
+      bodyJsx = `(${inner})`;
+    }
   } else {
     const parts = emitChildren(node.body, childCtx);
     bodyJsx = `<>${parts}</>`;

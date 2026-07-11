@@ -14,6 +14,7 @@
 import type { TemplateConditionalIR, TemplateNode } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
+import { stripBalancedMustache } from './unwrapMustache.js';
 
 /**
  * Render a branch's body as a single JSX expression. Multiple children
@@ -45,6 +46,12 @@ function renderBranchBody(
  * element or `<>…</>` fragment (starts with `<`) is left untouched — it's
  * valid JSX there. `bodyJsx` (JSX-CHILDREN position, `>…</Show>`) is NOT
  * touched — a `{...}` mustache is a valid JSX child.
+ *
+ * 260711-ad5 — routed through the shared `stripBalancedMustache` primitive
+ * (also used by `emitLoop`'s R11-1 fix). Byte-identical to the original
+ * inline `startsWith/endsWith/length` check — same heuristic, still BARE
+ * (no re-wrap) since the `fallback={ }` attribute already supplies the
+ * delimiters.
  */
 function buildShow(
   testCode: string,
@@ -52,10 +59,8 @@ function buildShow(
   fallbackJsx: string | null,
 ): string {
   if (fallbackJsx !== null) {
-    const fallbackAttr =
-      fallbackJsx.startsWith('{') && fallbackJsx.endsWith('}') && fallbackJsx.length > 2
-        ? fallbackJsx.slice(1, -1)
-        : fallbackJsx;
+    const inner = stripBalancedMustache(fallbackJsx);
+    const fallbackAttr = inner !== null ? inner : fallbackJsx;
     return `<Show when={${testCode}} fallback={${fallbackAttr}}>${bodyJsx}</Show>`;
   }
   return `<Show when={${testCode}}>${bodyJsx}</Show>`;
