@@ -87,6 +87,7 @@ interface RozieEditorSlotCtx {
   value: unknown;
   commit: unknown;
   cancel: unknown;
+  autofocus: unknown;
 }
 
 interface RozieDetailSlotCtx {
@@ -605,6 +606,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _draftValue = signal<any>(null);
   private _invalidMsg = signal('');
   private _editVer = signal(0);
+  private _editFocusColId = signal<any>(null);
   private _editingRowIndex = signal<any>(null);
   private _rowDraft = signal<any>({});
   private _rangeAnchor = signal<any>(null);
@@ -656,7 +658,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @property({ attribute: false }) cell?: (scope: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => unknown;
   @state() private _hasSlotEditor = false;
   @queryAssignedElements({ slot: 'editor', flatten: true }) private _slotEditorElements!: Element[];
-  @property({ attribute: false }) editor?: (scope: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown }) => unknown;
+  @property({ attribute: false }) editor?: (scope: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown; autofocus: unknown }) => unknown;
   @state() private _hasSlotDetail = false;
   @queryAssignedElements({ slot: 'detail', flatten: true }) private _slotDetailElements!: Element[];
   @property({ attribute: false }) detail?: (scope: { row: unknown }) => unknown;
@@ -1229,7 +1231,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
           <span class="rdt-group-count" data-rozie-s-d5dcab4c>${rozieDisplay('(' + this.groupSubRowCount(wr.row) + ')')}</span>
         </span>` : this.isEditing(wr.vi.index, this.colIndexOf(wr.row, cell)) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.hasEditorSlot(cell.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: wr.row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor()}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: wr.row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor()}); } catch { return '{}'; } })()}></slot>`}
+            ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: wr.row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: wr.row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, wr.vi.index)}); } catch { return '{}'; } })()}></slot>`}
           </span>` : this.editorTypeOf(cell.column.id) === 'number' ? html`<input class="rdt-cell-editor" type="number" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cell.column.id) === 'select' ? html`<select class="rdt-cell-editor" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c>
             ${repeat<any>(this.editorOptionsOf(cell.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option key=${rozieAttr(opt.value)} value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
           </select>` : this.editorTypeOf(cell.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${this.editorCheckedFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorCheckbox(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : this.cellIsPlaceholder(cell) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
@@ -1309,7 +1311,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
           <span class="rdt-group-count" data-rozie-s-d5dcab4c>${rozieDisplay('(' + this.groupSubRowCount(row) + ')')}</span>
         </span>` : this.isEditing(this.rowIndexOf(row), this.colIndexOf(row, cell)) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
           ${this.hasEditorSlot(cell.column.id) ? html`<span style="display:contents" data-rozie-s-d5dcab4c>
-            ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor()}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor()}); } catch { return '{}'; } })()}></slot>`}
+            ${this.editor !== undefined ? this.editor({columnId: cell.column.id, column: cell.column, row: row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}) : html`<slot name="editor" data-rozie-params=${(() => { try { return JSON.stringify({columnId: cell.column.id, column: cell.column, row: row.original, value: this.editorValueFor(cell.column.id), commit: this.editorCommitFor(cell.column.id), cancel: this.editorCancelFor(), autofocus: this.editorAutofocusFor(cell.column.id, this.rowIndexOf(row))}); } catch { return '{}'; } })()}></slot>`}
           </span>` : this.editorTypeOf(cell.column.id) === 'number' ? html`<input class="rdt-cell-editor" type="number" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : this.editorTypeOf(cell.column.id) === 'select' ? html`<select class="rdt-cell-editor" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c>
             ${repeat<any>(this.editorOptionsOf(cell.column.id), (opt, _idx) => opt.value, (opt, _idx) => html`<option key=${rozieAttr(opt.value)} value=${rozieAttr(opt.value)} data-rozie-s-d5dcab4c>${rozieDisplay(opt.label)}</option>`)}
           </select>` : this.editorTypeOf(cell.column.id) === 'checkbox' ? html`<input class="rdt-cell-editor" type="checkbox" data-editing-cell="" ?checked=${this.editorCheckedFor(cell.column.id)} @change=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorCheckbox(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />` : html`<input class="rdt-cell-editor" type="text" data-editing-cell="" .value=${this.editorValueFor(cell.column.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onCellEditorInput(cell.column.id, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorKeyDown($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onEditorBlur($event); }} data-rozie-s-d5dcab4c />`}</span>` : this.cellIsPlaceholder(cell) ? html`<span style="display:contents" data-rozie-s-d5dcab4c></span>` : html`<span class="rdt-cell-value" data-rozie-s-d5dcab4c>
@@ -4505,26 +4507,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return row ? row.id : null;
 };
 
-  resolveEditingEl = (root: any): any => {
-  if (!root || !root.querySelector) return null;
-  const direct = root.querySelector('[data-editing-cell]');
-  if (direct) return direct;
-  const all = root.querySelectorAll ? root.querySelectorAll('*') : [];
-  for (let i = 0; i < all.length; i++) {
-    const host = all[i];
-    if (host && host.shadowRoot) {
-      const found = this.resolveEditingEl(host.shadowRoot);
-      if (found) return found;
-    }
-  }
-  return null;
-};
-
   focusEditorWhenReady = (selectAll = true) => {
   if (!this.gridRoot) return;
+  // Editor-owns-focus contract: when the CURRENT focus target is a #editor drop-in, the host
+  // does NOT reach into its DOM — the drop-in self-focuses via its own autofocus prop.
+  if (this._editFocusColId.value != null && this.hasEditorSlot(this._editFocusColId.value)) return;
   let attempts = 0;
   const tryFocus = () => {
-    const el = this.gridRoot ? this.resolveEditingEl(this.gridRoot) : null;
+    const el = this.gridRoot ? this.gridRoot.querySelector('[data-editing-cell]') : null;
     // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
     // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
     // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it
@@ -4590,6 +4580,10 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._draftValue.value = seed != null ? seed : this.cellValueAt(rowIndex, colIndex);
   this._activeInControl.value = true;
   this._editVer.value = this._editVer.value + 1;
+  // Editor-owns-focus contract (quick 260711-i5m): THIS cell's column is the current
+  // focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope prop
+  // from it. Cleared on endEdit.
+  this._editFocusColId.value = colId;
   // B2: a seeded (type-to-edit) entry must NOT select-all — keep the caret after the
   // seeded char so subsequent typing appends instead of replacing it.
   this.focusEditorWhenReady(seed == null);
@@ -4629,6 +4623,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._invalidMsg.value = '';
   this._activeInControl.value = false;
   this._editVer.value = this._editVer.value + 1;
+  this._editFocusColId.value = null;
 };
 
   endRowEdit = () => {
@@ -4637,6 +4632,17 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._invalidMsg.value = '';
   this._activeInControl.value = false;
   this._editVer.value = this._editVer.value + 1;
+  this._editFocusColId.value = null;
+};
+
+  editorAutofocusFor = (colId: any, rowIndex: any) => {
+  if (this._editVer.value < 0) return false;
+  if (this._editingRowIndex.value != null) {
+    if (this._editingRowIndex.value !== rowIndex) return false;
+  } else {
+    if (this._editingRow.value !== rowIndex) return false;
+  }
+  return this._editFocusColId.value != null && this._editFocusColId.value === colId;
 };
 
   coerceCellValue = (colId: any, raw: any) => {
@@ -4826,6 +4832,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
 
   focusRowEditorAt = (rowIndex: any, colIndex: any) => {
   if (!this.gridRoot) return;
+  const colId = this.columnIdAt(rowIndex, colIndex);
+  if (colId != null && this.hasEditorSlot(colId)) return;
   let attempts = 0;
   const tryFocus = () => {
     const cellEl = this.resolveCellEl(String(rowIndex), colIndex);
@@ -4871,6 +4879,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._editingRowIndex.value = rowIndex;
   this._activeInControl.value = true;
   this._editVer.value = this._editVer.value + 1;
+  // Editor-owns-focus contract (quick 260711-i5m): the row's FIRST editable column is the
+  // initial focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope
+  // prop from it (a built-in column is also host-focused below via focusEditorWhenReady; a
+  // drop-in column self-focuses via its own $onMount, gated off the host reach-in in Task 3).
+  this._editFocusColId.value = editable[0].colId;
   this.focusEditorWhenReady();
 };
 
@@ -4898,9 +4911,18 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     const err = this.runValidator(ec.colId, this.coerceCellValue(ec.colId, draft[ec.colId]), rowOriginal);
     if (err !== true) {
       this.setInvalid(err);
+      // Editor-owns-focus contract (quick 260711-i5m): the OFFENDING column becomes the new
+      // reactive focus target BEFORE the host-focus call below — a #editor drop-in already
+      // mounted (full-row edit opens every editable cell at once) picks this up via its own
+      // lazy $watch on the `autofocus` scope prop flipping false→true. Bump editVer so the
+      // coarse-render targets (React/Vue/Angular/Svelte) re-derive the slot binding (Solid's
+      // fine-grained accessor re-runs without the bump, but the bump keeps all 6 in lockstep).
+      this._editFocusColId.value = ec.colId;
+      this._editVer.value = this._editVer.value + 1;
       // B22: focus the OFFENDING column's editor (the one whose validator rejected), NOT
       // unconditionally the first editor (focusEditorWhenReady resolves the first
       // [data-editing-cell] in DOM order). ec.colIndex is the offending cell's visible col.
+      // Gated (Task 3) so a #editor drop-in self-focuses instead of a host DOM reach-in.
       this.focusRowEditorAt(rowIndex, ec.colIndex);
       return false;
     }
@@ -5123,6 +5145,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (pos < 0) pos = 0;
   const len = cols.length;
   const nextPos = backward ? (pos - 1 + len) % len : (pos + 1) % len;
+  // Editor-owns-focus contract (quick 260711-i5m): the Tab target becomes the new reactive
+  // focus target BEFORE the host-focus call below, so Tab onto an already-mounted #editor
+  // drop-in (row mode) also refocuses it via its own lazy $watch.
+  this._editFocusColId.value = editable[nextPos].colId;
+  this._editVer.value = this._editVer.value + 1;
   this.focusRowEditorAt(rowIndex, cols[nextPos]);
 };
 

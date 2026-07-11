@@ -48,7 +48,7 @@ interface SelectCellCtx { row: any; checked: any; toggle: any; }
 
 interface CellCtx { columnId: any; column: any; row: any; value: any; }
 
-interface EditorCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; }
+interface EditorCtx { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any; }
 
 interface DetailCtx { row: any; }
 
@@ -424,6 +424,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const [draftValue, setDraftValue] = useState<any>(null);
   const [invalidMsg, setInvalidMsg] = useState('');
   const [editVer, setEditVer] = useState(0);
+  const [editFocusColId, setEditFocusColId] = useState<any>(null);
   const [editingRowIndex, setEditingRowIndex] = useState<any>(null);
   const [rowDraft, setRowDraft] = useState<Record<string, any>>({});
   const [rangeAnchor, setRangeAnchor] = useState<any>(null);
@@ -3434,25 +3435,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const row = rowList[editingRow];
     return row ? row.id : null;
   }
-  function resolveEditingEl(root: any): any {
-    if (!root || !root.querySelector) return null;
-    const direct = root.querySelector('[data-editing-cell]');
-    if (direct) return direct;
-    const all = root.querySelectorAll ? root.querySelectorAll('*') : [];
-    for (let i = 0; i < all.length; i++) {
-      const host = all[i];
-      if (host && host.shadowRoot) {
-        const found = resolveEditingEl(host.shadowRoot);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
   function focusEditorWhenReady(selectAll = true) {
     if (!gridRoot.current) return;
+    // Editor-owns-focus contract: when the CURRENT focus target is a #editor drop-in, the host
+    // does NOT reach into its DOM — the drop-in self-focuses via its own autofocus prop.
+    if (editFocusColId != null && hasEditorSlot(editFocusColId)) return;
     let attempts = 0;
     const tryFocus = () => {
-      const el = gridRoot.current ? resolveEditingEl(gridRoot.current) : null;
+      const el = gridRoot.current ? gridRoot.current.querySelector('[data-editing-cell]') : null;
       // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
       // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
       // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it
@@ -3515,6 +3505,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setDraftValue(seed != null ? seed : cellValueAt(rowIndex, colIndex));
     setActiveInControl(true);
     setEditVer(prev => prev + 1);
+    // Editor-owns-focus contract (quick 260711-i5m): THIS cell's column is the current
+    // focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope prop
+    // from it. Cleared on endEdit.
+    setEditFocusColId(colId);
     // B2: a seeded (type-to-edit) entry must NOT select-all — keep the caret after the
     // seeded char so subsequent typing appends instead of replacing it.
     focusEditorWhenReady(seed == null);
@@ -3551,6 +3545,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setInvalidMsg('');
     setActiveInControl(false);
     setEditVer(prev => prev + 1);
+    setEditFocusColId(null);
   }
   function endRowEdit() {
     setEditingRowIndex(null);
@@ -3558,6 +3553,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setInvalidMsg('');
     setActiveInControl(false);
     setEditVer(prev => prev + 1);
+    setEditFocusColId(null);
+  }
+  function editorAutofocusFor(colId: any, rowIndex: any) {
+    if (editVer < 0) return false;
+    if (editingRowIndex != null) {
+      if (editingRowIndex !== rowIndex) return false;
+    } else {
+      if (editingRow !== rowIndex) return false;
+    }
+    return editFocusColId != null && editFocusColId === colId;
   }
   function coerceCellValue(colId: any, raw: any) {
     if (editorTypeOf(colId) !== 'number') return raw;
@@ -3733,6 +3738,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   }
   function focusRowEditorAt(rowIndex: any, colIndex: any) {
     if (!gridRoot.current) return;
+    const colId = columnIdAt(rowIndex, colIndex);
+    if (colId != null && hasEditorSlot(colId)) return;
     let attempts = 0;
     const tryFocus = () => {
       const cellEl = resolveCellEl(String(rowIndex), colIndex);
@@ -3777,6 +3784,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setEditingRowIndex(rowIndex);
     setActiveInControl(true);
     setEditVer(prev => prev + 1);
+    // Editor-owns-focus contract (quick 260711-i5m): the row's FIRST editable column is the
+    // initial focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope
+    // prop from it (a built-in column is also host-focused below via focusEditorWhenReady; a
+    // drop-in column self-focuses via its own $onMount, gated off the host reach-in in Task 3).
+    setEditFocusColId(editable[0].colId);
     focusEditorWhenReady();
   }
   function commitRow() {
@@ -3803,9 +3815,18 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       const err = runValidator(ec.colId, coerceCellValue(ec.colId, draft[ec.colId]), rowOriginal);
       if (err !== true) {
         setInvalid(err);
+        // Editor-owns-focus contract (quick 260711-i5m): the OFFENDING column becomes the new
+        // reactive focus target BEFORE the host-focus call below — a #editor drop-in already
+        // mounted (full-row edit opens every editable cell at once) picks this up via its own
+        // lazy $watch on the `autofocus` scope prop flipping false→true. Bump editVer so the
+        // coarse-render targets (React/Vue/Angular/Svelte) re-derive the slot binding (Solid's
+        // fine-grained accessor re-runs without the bump, but the bump keeps all 6 in lockstep).
+        setEditFocusColId(ec.colId);
+        setEditVer(prev => prev + 1);
         // B22: focus the OFFENDING column's editor (the one whose validator rejected), NOT
         // unconditionally the first editor (focusEditorWhenReady resolves the first
         // [data-editing-cell] in DOM order). ec.colIndex is the offending cell's visible col.
+        // Gated (Task 3) so a #editor drop-in self-focuses instead of a host DOM reach-in.
         focusRowEditorAt(rowIndex, ec.colIndex);
         return false;
       }
@@ -4015,6 +4036,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (pos < 0) pos = 0;
     const len = cols.length;
     const nextPos = backward ? (pos - 1 + len) % len : (pos + 1) % len;
+    // Editor-owns-focus contract (quick 260711-i5m): the Tab target becomes the new reactive
+    // focus target BEFORE the host-focus call below, so Tab onto an already-mounted #editor
+    // drop-in (row mode) also refocuses it via its own lazy $watch.
+    setEditFocusColId(editable[nextPos].colId);
+    setEditVer(prev => prev + 1);
     focusRowEditorAt(rowIndex, cols[nextPos]);
   }
   const onEditorKeyDown = useCallback((e: any) => {
@@ -4718,7 +4744,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
               <span className={"rdt-group-count"} data-rozie-s-d5dcab4c="">{rozieDisplay('(' + groupSubRowCount(wr.row) + ')')}</span>
             </span> : (isEditing(wr.vi.index, colIndexOf(wr.row, cell))) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(hasEditorSlot(cell.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(props.renderEditor ?? props.slots?.['editor'])?.({ columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() })}
+                {(props.renderEditor ?? props.slots?.['editor'])?.({ columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) })}
               </span> : (editorTypeOf(cell.column.id) === 'number') ? <input className={"rdt-cell-editor"} type="number" data-editing-cell="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'select') ? <select className={"rdt-cell-editor"} data-editing-cell="" value={editorValueFor(cell.column.id)} onChange={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 {editorOptionsOf(cell.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
               </select> : (editorTypeOf(cell.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" checked={editorCheckedFor(cell.column.id)} onChange={($event) => { onCellEditorCheckbox(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : (cellIsPlaceholder(cell)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
@@ -4796,7 +4822,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
               <span className={"rdt-group-count"} data-rozie-s-d5dcab4c="">{rozieDisplay('(' + groupSubRowCount(row) + ')')}</span>
             </span> : (isEditing(rowIndexOf(row), colIndexOf(row, cell))) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {(hasEditorSlot(cell.column.id)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
-                {(props.renderEditor ?? props.slots?.['editor'])?.({ columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() })}
+                {(props.renderEditor ?? props.slots?.['editor'])?.({ columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) })}
               </span> : (editorTypeOf(cell.column.id) === 'number') ? <input className={"rdt-cell-editor"} type="number" data-editing-cell="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'select') ? <select className={"rdt-cell-editor"} data-editing-cell="" value={editorValueFor(cell.column.id)} onChange={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 {editorOptionsOf(cell.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
               </select> : (editorTypeOf(cell.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" checked={editorCheckedFor(cell.column.id)} onChange={($event) => { onCellEditorCheckbox(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : (cellIsPlaceholder(cell)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">

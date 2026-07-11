@@ -1,11 +1,11 @@
 <template>
 
-<input class="rdt-cell-editor" type="text" data-editing-cell="" :aria-label="props.columnId" :value="draft" @input="onInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
+<input ref="inputElRef" class="rdt-cell-editor" type="text" data-editing-cell="" :aria-label="props.columnId" :value="draft" @input="onInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
 
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -33,11 +33,17 @@ const props = withDefaults(
      * `() => void` — revert the edit and close the editor (from the `#editor` slot scope). Null-guarded at call sites.
      */
     cancel?: ((...args: any[]) => any) | null;
+    /**
+     * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
+     */
+    autofocus?: boolean;
   }>(),
-  { columnId: '', column: null, row: null, value: null, commit: null, cancel: null }
+  { columnId: '', column: null, row: null, value: null, commit: null, cancel: null, autofocus: false }
 );
 
 const draft = ref('');
+
+const inputElRef = ref<HTMLInputElement>();
 
 // Seed the draft once at setup from the incoming value (setup-once, NOT in the
 // template). Normalize null/undefined to '' so the input value binds to a string.
@@ -71,4 +77,18 @@ const onKeydown = (e: any) => {
 const onBlur = () => {
   doCommit();
 };
+
+// Editor-owns-focus contract: focus OUR OWN input when the host says we should hold focus.
+// $onMount covers the initial open (autofocus already true on first render); the LAZY $watch
+// (NOT { immediate: true } — an immediate watch fires PRE-mount, null ref on Lit/Solid) covers
+// a REACTIVE refocus while already mounted (e.g. a row-mode validation failure that flips
+// autofocus back onto this already-open drop-in).
+
+onMounted(() => {
+  if (props.autofocus) inputElRef.value?.focus();
+});
+
+watch(() => props.autofocus, (v: any) => {
+  if (v) inputElRef.value?.focus();
+});
 </script>

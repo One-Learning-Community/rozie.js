@@ -529,5 +529,5 @@ The `detail` (expandable rows), `groupBar` (grouping) and `filter` (faceted filt
 | filter | columnId, value, uniqueValues, minMax, setFilter |
 | selectCell | row, checked, toggle |
 | cell | columnId, column, row, value |
-| editor | columnId, column, row, value, commit, cancel |
+| editor | columnId, column, row, value, commit, cancel, autofocus |
 | detail | row |

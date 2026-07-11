@@ -164,7 +164,7 @@ export interface DataTableProps {
   renderFilter?: (params: { columnId: unknown; value: unknown; uniqueValues: unknown; minMax: unknown; setFilter: () => void }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
-  renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown }) => ReactNode;
+  renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown; autofocus: unknown }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
   renderDetail?: (params: { row: unknown }) => ReactNode;
   renderSelectAll?: (params: { checked: unknown; indeterminate: unknown; toggle: () => void }) => ReactNode;
@@ -173,7 +173,7 @@ export interface DataTableProps {
   renderFilter?: (params: { columnId: unknown; value: unknown; uniqueValues: unknown; minMax: unknown; setFilter: () => void }) => ReactNode;
   renderSelectCell?: (params: { row: unknown; checked: unknown; toggle: unknown }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
-  renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown }) => ReactNode;
+  renderEditor?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown; autofocus: unknown }) => ReactNode;
   renderCell?: (params: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => ReactNode;
   renderDetail?: (params: { row: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;

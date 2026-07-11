@@ -85,13 +85,14 @@ interface CellCtx {
 }
 
 interface EditorCtx {
-  $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any };
+  $implicit: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any };
   columnId: any;
   column: any;
   row: any;
   value: any;
   commit: any;
   cancel: any;
+  autofocus: any;
 }
 
 interface DetailCtx {
@@ -305,7 +306,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <span style="display:contents">
               @if (hasEditorSlot(cell.column.id)) {
     <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(editorTpl ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() }" />
+                <ng-container *ngTemplateOutlet="(editorTpl ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
               </span>
     } @else if (editorTypeOf(cell.column.id) === 'number') {
     <input class="rdt-cell-editor" type="number" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
@@ -477,7 +478,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <span style="display:contents">
               @if (hasEditorSlot(cell.column.id)) {
     <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(editorTpl ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() }, columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor() }" />
+                <ng-container *ngTemplateOutlet="(editorTpl ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
               </span>
     } @else if (editorTypeOf(cell.column.id) === 'number') {
     <input class="rdt-cell-editor" type="number" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
@@ -1031,6 +1032,7 @@ export class DataTable {
   draftValue = signal<any>(null);
   invalidMsg = signal('');
   editVer = signal(0);
+  editFocusColId = signal<any>(null);
   editingRowIndex = signal<any>(null);
   rowDraft = signal({});
   rangeAnchor = signal<any>(null);
@@ -4251,25 +4253,15 @@ export class DataTable {
     const row = rowList[this.editingRow()];
     return row ? row.id : null;
   };
-  resolveEditingEl = (root: any): any => {
-    if (!root || !root.querySelector) return null;
-    const direct = root.querySelector('[data-editing-cell]');
-    if (direct) return direct;
-    const all = root.querySelectorAll ? root.querySelectorAll('*') : [];
-    for (let i = 0; i < all.length; i++) {
-      const host = all[i];
-      if (host && host.shadowRoot) {
-        const found = this.resolveEditingEl(host.shadowRoot);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
   focusEditorWhenReady = (selectAll: any = true) => {
+    const __editFocusColId = this.editFocusColId();
     if (!this.gridRoot) return;
+    // Editor-owns-focus contract: when the CURRENT focus target is a #editor drop-in, the host
+    // does NOT reach into its DOM — the drop-in self-focuses via its own autofocus prop.
+    if (__editFocusColId != null && this.hasEditorSlot(__editFocusColId)) return;
     let attempts = 0;
     const tryFocus = () => {
-      const el = this.gridRoot ? this.resolveEditingEl(this.gridRoot) : null;
+      const el = this.gridRoot ? this.gridRoot.querySelector('[data-editing-cell]') : null;
       // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
       // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
       // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it
@@ -4332,6 +4324,10 @@ export class DataTable {
     this.draftValue.set(seed != null ? seed : this.cellValueAt(rowIndex, colIndex));
     this.activeInControl.set(true);
     this.editVer.set(this.editVer() + 1);
+    // Editor-owns-focus contract (quick 260711-i5m): THIS cell's column is the current
+    // focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope prop
+    // from it. Cleared on endEdit.
+    this.editFocusColId.set(colId);
     // B2: a seeded (type-to-edit) entry must NOT select-all — keep the caret after the
     // seeded char so subsequent typing appends instead of replacing it.
     this.focusEditorWhenReady(seed == null);
@@ -4368,6 +4364,7 @@ export class DataTable {
     this.invalidMsg.set('');
     this.activeInControl.set(false);
     this.editVer.set(this.editVer() + 1);
+    this.editFocusColId.set(null);
   };
   endRowEdit = () => {
     this.editingRowIndex.set(null);
@@ -4375,6 +4372,18 @@ export class DataTable {
     this.invalidMsg.set('');
     this.activeInControl.set(false);
     this.editVer.set(this.editVer() + 1);
+    this.editFocusColId.set(null);
+  };
+  editorAutofocusFor = (colId: any, rowIndex: any) => {
+    const __editingRowIndex = this.editingRowIndex();
+    const __editFocusColId = this.editFocusColId();
+    if (this.editVer() < 0) return false;
+    if (__editingRowIndex != null) {
+      if (__editingRowIndex !== rowIndex) return false;
+    } else {
+      if (this.editingRow() !== rowIndex) return false;
+    }
+    return __editFocusColId != null && __editFocusColId === colId;
   };
   coerceCellValue = (colId: any, raw: any) => {
     if (this.editorTypeOf(colId) !== 'number') return raw;
@@ -4554,6 +4563,8 @@ export class DataTable {
   };
   focusRowEditorAt = (rowIndex: any, colIndex: any) => {
     if (!this.gridRoot) return;
+    const colId = this.columnIdAt(rowIndex, colIndex);
+    if (colId != null && this.hasEditorSlot(colId)) return;
     let attempts = 0;
     const tryFocus = () => {
       const cellEl = this.resolveCellEl(String(rowIndex), colIndex);
@@ -4598,6 +4609,11 @@ export class DataTable {
     this.editingRowIndex.set(rowIndex);
     this.activeInControl.set(true);
     this.editVer.set(this.editVer() + 1);
+    // Editor-owns-focus contract (quick 260711-i5m): the row's FIRST editable column is the
+    // initial focus target — editorAutofocusFor derives the reactive `autofocus` #editor scope
+    // prop from it (a built-in column is also host-focused below via focusEditorWhenReady; a
+    // drop-in column self-focuses via its own $onMount, gated off the host reach-in in Task 3).
+    this.editFocusColId.set(editable[0].colId);
     this.focusEditorWhenReady();
   };
   commitRow = () => {
@@ -4625,9 +4641,18 @@ export class DataTable {
       const err = this.runValidator(ec.colId, this.coerceCellValue(ec.colId, draft[ec.colId]), rowOriginal);
       if (err !== true) {
         this.setInvalid(err);
+        // Editor-owns-focus contract (quick 260711-i5m): the OFFENDING column becomes the new
+        // reactive focus target BEFORE the host-focus call below — a #editor drop-in already
+        // mounted (full-row edit opens every editable cell at once) picks this up via its own
+        // lazy $watch on the `autofocus` scope prop flipping false→true. Bump editVer so the
+        // coarse-render targets (React/Vue/Angular/Svelte) re-derive the slot binding (Solid's
+        // fine-grained accessor re-runs without the bump, but the bump keeps all 6 in lockstep).
+        this.editFocusColId.set(ec.colId);
+        this.editVer.set(this.editVer() + 1);
         // B22: focus the OFFENDING column's editor (the one whose validator rejected), NOT
         // unconditionally the first editor (focusEditorWhenReady resolves the first
         // [data-editing-cell] in DOM order). ec.colIndex is the offending cell's visible col.
+        // Gated (Task 3) so a #editor drop-in self-focuses instead of a host DOM reach-in.
         this.focusRowEditorAt(rowIndex, ec.colIndex);
         return false;
       }
@@ -4830,6 +4855,11 @@ export class DataTable {
     if (pos < 0) pos = 0;
     const len = cols.length;
     const nextPos = backward ? (pos - 1 + len) % len : (pos + 1) % len;
+    // Editor-owns-focus contract (quick 260711-i5m): the Tab target becomes the new reactive
+    // focus target BEFORE the host-focus call below, so Tab onto an already-mounted #editor
+    // drop-in (row mode) also refocuses it via its own lazy $watch.
+    this.editFocusColId.set(editable[nextPos].colId);
+    this.editVer.set(this.editVer() + 1);
     this.focusRowEditorAt(rowIndex, cols[nextPos]);
   };
   onEditorKeyDown = (e: any) => {

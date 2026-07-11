@@ -25,6 +25,10 @@ export interface EditorTextProps {
    * `() => void` — revert the edit and close the editor (from the `#editor` slot scope). Null-guarded at call sites.
    */
   cancel?: ((...args: unknown[]) => unknown) | null;
+  /**
+   * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
+   */
+  autofocus?: boolean;
 }
 
 declare function EditorText(props: EditorTextProps): JSX.Element;
