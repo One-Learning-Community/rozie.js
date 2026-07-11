@@ -26,6 +26,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <div class="r" #rozieSpread_0 #rozieListenersTarget_1><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></div>
 
   `,
+  styles: [`
+    :host(rozie-provide-as-cast) { display: contents; }
+  `],
   providers: [
     {
       provide: rozieToken('theme'),

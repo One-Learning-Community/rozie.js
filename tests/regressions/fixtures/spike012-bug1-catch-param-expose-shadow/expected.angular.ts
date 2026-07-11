@@ -8,6 +8,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     <div class="n" #rozieSpread_0 #rozieListenersTarget_1>{{ n() }}</div>
 
   `,
+  styles: [`
+    :host(rozie-catch-param-expose-shadow) { display: contents; }
+  `],
 })
 export class CatchParamExposeShadow {
   n = signal(0);

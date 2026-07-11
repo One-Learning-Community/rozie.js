@@ -18,6 +18,9 @@ import { NgClass } from '@angular/common';
       </div>
 
   `,
+  styles: [`
+    :host(rozie-class-norm-shapes) { display: contents; }
+  `],
 })
 export class ClassNormShapes {
   variant = input<string>('primary');

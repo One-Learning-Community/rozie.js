@@ -5,6 +5,7 @@ import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 @customElement('rozie-comma-alternatives')
 export default class CommaAlternatives extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .extremum[data-rozie-s-65af5512] { font-weight: 600; }
 .middle[data-rozie-s-65af5512] { opacity: 0.8; }
 .other[data-rozie-s-65af5512] { opacity: 0.5; }

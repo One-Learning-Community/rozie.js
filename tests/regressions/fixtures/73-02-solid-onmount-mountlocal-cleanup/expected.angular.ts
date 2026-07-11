@@ -9,6 +9,7 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
 
   `,
   styles: [`
+    :host(rozie-on-mount-mount-local-cleanup) { display: contents; }
     .ticks { font-variant-numeric: tabular-nums; }
   `],
 })

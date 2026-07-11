@@ -15,6 +15,7 @@ import { FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
 
   `,
   styles: [`
+    :host(rozie-checkbox-rmodel) { display: contents; }
     .toggle { display: inline-flex; gap: 0.25rem; align-items: center; }
   `],
   providers: [

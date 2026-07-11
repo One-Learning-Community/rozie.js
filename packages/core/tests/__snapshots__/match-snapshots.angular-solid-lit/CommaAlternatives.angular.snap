@@ -15,6 +15,7 @@ import { Component, ViewEncapsulation, signal } from '@angular/core';
 
   `,
   styles: [`
+    :host(rozie-comma-alternatives) { display: contents; }
     .extremum { font-weight: 600; }
     .middle { opacity: 0.8; }
     .other { opacity: 0.5; }

@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, debounce, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-spike012-r5-c3')
 export default class Spike012R5C3 extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @property({ type: String, attribute: 'value' }) _value_attr: string = '';
   private _valueControllable = createLitControllableProperty<string>({ host: this, eventName: 'value-change', defaultValue: '', initialControlledValue: undefined });
   private _n = signal(0);

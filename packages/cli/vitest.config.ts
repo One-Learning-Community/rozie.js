@@ -15,8 +15,10 @@ export default defineConfig({
     // The build/multi-target suites spawn full CLI compile passes (real .rozie
     // → multi-framework emit). Under `turbo run test` parallel CPU starvation
     // those can exceed vitest's 5s default and flake only in full batteries
-    // (passes standalone). A 30s ceiling is a load-tolerant FAILSAFE, not an
-    // assertion — same philosophy as tests/cli-smoke + tests/timing.
-    testTimeout: 30000,
+    // (passes standalone). The heaviest (M2: 5 examples × 4 targets = 20 compiles)
+    // was observed at ~34s under full-suite contention, so the ceiling is 60s —
+    // a load-tolerant FAILSAFE, not an assertion — same philosophy as
+    // tests/cli-smoke + tests/timing.
+    testTimeout: 60000,
   },
 });

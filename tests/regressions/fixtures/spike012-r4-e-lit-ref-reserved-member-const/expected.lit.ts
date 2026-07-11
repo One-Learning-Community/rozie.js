@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, query } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-ref-reserved-member-const')
 export default class RefReservedMemberConst extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   private _n = signal(0);
   @query('[data-rozie-ref="title"]') private _refTitle!: HTMLElement;
 

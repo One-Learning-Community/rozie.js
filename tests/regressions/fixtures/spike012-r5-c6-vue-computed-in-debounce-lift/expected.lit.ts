@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { debounce, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-computed-in-debounce-lift')
 export default class ComputedInDebounceLift extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   private _q = signal('');
 
   private _tw0 = debounce(($event: Event) => ((($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this._q.value = this.label; }) as (...args: any[]) => any)($event), 300);

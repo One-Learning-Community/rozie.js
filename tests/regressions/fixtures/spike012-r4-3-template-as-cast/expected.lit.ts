@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-template-as-cast')
 export default class TemplateAsCast extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   private _q = signal('');
   private _n = signal(0);
 

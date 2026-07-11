@@ -30,6 +30,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-polymorphic-model-guard-narrow) { display: contents; }
     .selected { font-variant-numeric: tabular-nums; }
   `],
   providers: [

@@ -1809,6 +1809,10 @@ const rowIsOutsideWindow = (r: any) => {
 // setup once), so it PERSISTS across renders — unlike a top-level `let`, which React resets per
 // render. Seeded from the initial state in $onMount so the first (post-mount) change compares
 // against the true starting values, not a null sentinel.
+// Typed as `unknown` members: these hold opaque last-seen references compared only by
+// identity (!==) below, never read in a typed context — the annotation keeps the null seed
+// from narrowing the members to `null` (which would reject the real reassignments under
+// strictNullChecks in the emitted leaves).
 // ── Sort/filter live-announcement (#14) ─────────────────────────────────────────────
 // A polite aria-live announcement whenever the consumer changes sorting or filtering, so a
 // screen-reader user hears that the rows were reordered / narrowed (which is otherwise silent).
@@ -1818,7 +1822,15 @@ const rowIsOutsideWindow = (r: any) => {
 // setup once), so it PERSISTS across renders — unlike a top-level `let`, which React resets per
 // render. Seeded from the initial state in $onMount so the first (post-mount) change compares
 // against the true starting values, not a null sentinel.
-const announceState = {
+// Typed as `unknown` members: these hold opaque last-seen references compared only by
+// identity (!==) below, never read in a typed context — the annotation keeps the null seed
+// from narrowing the members to `null` (which would reject the real reassignments under
+// strictNullChecks in the emitted leaves).
+const announceState: {
+  sorting: unknown;
+  columnFilters: unknown;
+  globalFilter: unknown;
+} = {
   sorting: null,
   columnFilters: null,
   globalFilter: null

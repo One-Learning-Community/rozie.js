@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
@@ -8,6 +8,10 @@ const __rozieCtx_theme = createContext(Symbol.for("rozie:theme"));
 
 @customElement('rozie-inject-as-cast')
 export default class InjectAsCast extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
 private __rozieCtxConsumer_theme = new ContextConsumer(this, { context: __rozieCtx_theme, subscribe: true });
 private get theme() { return (this.__rozieCtxConsumer_theme.value) as {
   color: string;

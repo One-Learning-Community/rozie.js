@@ -10,6 +10,7 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
   `,
   styles: [`
+    :host(rozie-counter) { display: contents; }
     .counter { font-variant-numeric: tabular-nums; }
   `],
   providers: [

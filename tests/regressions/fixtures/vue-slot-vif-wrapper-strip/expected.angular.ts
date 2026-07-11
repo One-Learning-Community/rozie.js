@@ -28,6 +28,7 @@ interface DefaultCtx {}
 
   `,
   styles: [`
+    :host(rozie-presence-slot-fallback) { display: contents; }
     .panel { border: 1px solid rgba(0, 0, 0, 0.1); }
   `],
 })

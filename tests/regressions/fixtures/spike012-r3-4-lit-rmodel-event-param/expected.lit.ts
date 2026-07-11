@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-lit-rmodel-checkbox')
 export default class LitRModelCheckbox extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @property({ type: Boolean, attribute: 'checked' }) _checked_attr: boolean = false;
   private _checkedControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'checked-change', defaultValue: false, initialControlledValue: undefined });
   @property({ type: String, attribute: 'text' }) _text_attr: string = '';

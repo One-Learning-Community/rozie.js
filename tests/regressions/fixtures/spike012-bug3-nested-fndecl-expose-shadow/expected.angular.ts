@@ -8,6 +8,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     <div class="n" #rozieSpread_0 #rozieListenersTarget_1>{{ n() }}</div>
 
   `,
+  styles: [`
+    :host(rozie-nested-fn-decl-expose-shadow) { display: contents; }
+  `],
 })
 export class NestedFnDeclExposeShadow {
   n = signal(0);

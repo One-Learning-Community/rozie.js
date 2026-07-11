@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
@@ -8,6 +8,10 @@ const __rozieCtx_theme = createContext(Symbol.for("rozie:theme"));
 
 @customElement('rozie-provide-as-cast')
 export default class ProvideAsCast extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   private _color = signal('red');
 private __rozieCtxProvider_theme = new ContextProvider(this, { context: __rozieCtx_theme, initialValue: ((__rozieCtxHost) => ({
   get color(): string {

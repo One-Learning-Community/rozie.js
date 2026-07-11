@@ -11,6 +11,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     </div>
 
   `,
+  styles: [`
+    :host(rozie-debounce-inline-call) { display: contents; }
+  `],
 })
 export class DebounceInlineCall {
   n = signal(0);

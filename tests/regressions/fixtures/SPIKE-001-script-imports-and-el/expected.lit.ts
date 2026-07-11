@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
@@ -6,6 +6,10 @@ import DummyEngine from 'dummy-engine';
 
 @customElement('rozie-spike-import-el')
 export default class SpikeImportEl extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 
   @state() private _hasSlotDefault = false;

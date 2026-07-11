@@ -8,6 +8,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     <div class="r" #rozieSpread_0 #rozieListenersTarget_1><div #box>x</div></div>
 
   `,
+  styles: [`
+    :host(rozie-ref-suffix-collision) { display: contents; }
+  `],
 })
 export class RefSuffixCollision {
   n = signal(0);

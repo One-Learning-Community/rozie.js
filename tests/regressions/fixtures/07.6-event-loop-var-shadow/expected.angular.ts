@@ -36,6 +36,9 @@ function __rozieAttr(v: unknown): string | null {
     </ul>
 
   `,
+  styles: [`
+    :host(rozie-event-loop-var-shadow) { display: contents; }
+  `],
 })
 export class EventLoopVarShadow {
   items = signal([{

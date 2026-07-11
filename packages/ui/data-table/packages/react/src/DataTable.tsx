@@ -1164,7 +1164,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     for (const it of items as any) if (it.index === r) return false;
     return true;
   }
-  const announceState = useMemo(() => ({
+  const announceState: {
+    sorting: unknown;
+    columnFilters: unknown;
+    globalFilter: unknown;
+  } = useMemo(() => ({
     sorting: null,
     columnFilters: null,
     globalFilter: null

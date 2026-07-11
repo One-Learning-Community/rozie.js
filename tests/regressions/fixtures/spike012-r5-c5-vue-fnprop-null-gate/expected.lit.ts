@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-fn-prop-null-gate')
 export default class FnPropNullGate extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @property({ type: Function }) onSave: ((...args: unknown[]) => unknown) | null = () => {};
   @property({ type: Function }) onCancel: ((...args: unknown[]) => unknown) | null = null;
   private _n = signal(0);

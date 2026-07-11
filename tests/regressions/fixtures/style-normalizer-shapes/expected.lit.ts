@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
@@ -6,6 +6,10 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 @customElement('rozie-style-norm-shapes')
 export default class StyleNormShapes extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @property({ type: String, reflect: true }) s: string = '';
   @property({ type: Object }) obj: any = {};
 

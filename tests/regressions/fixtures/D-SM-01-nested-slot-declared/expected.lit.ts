@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-nested-slot-declared')
 export default class NestedSlotDeclared extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .outer[data-rozie-s-3bc5be6c] { display: block; }
 `;
 

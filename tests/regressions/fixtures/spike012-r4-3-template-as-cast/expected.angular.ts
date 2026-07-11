@@ -31,6 +31,9 @@ function __rozieAttr(v: unknown): string | null {
     </div>
 
   `,
+  styles: [`
+    :host(rozie-template-as-cast) { display: contents; }
+  `],
 })
 export class TemplateAsCast {
   q = signal('');

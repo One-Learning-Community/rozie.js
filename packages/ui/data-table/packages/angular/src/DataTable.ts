@@ -2058,7 +2058,11 @@ export class DataTable {
     for (const it of items as any) if (it.index === r) return false;
     return true;
   };
-  announceState = {
+  announceState: {
+    sorting: unknown;
+    columnFilters: unknown;
+    globalFilter: unknown;
+  } = {
     sorting: null,
     columnFilters: null,
     globalFilter: null

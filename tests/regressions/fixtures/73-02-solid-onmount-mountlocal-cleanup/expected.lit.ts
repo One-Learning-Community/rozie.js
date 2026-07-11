@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-on-mount-mount-local-cleanup')
 export default class OnMountMountLocalCleanup extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .ticks[data-rozie-s-c1a25008] { font-variant-numeric: tabular-nums; }
 `;
 

@@ -42,6 +42,9 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <div class="r" #rozieSpread_0 #rozieListenersTarget_1><button (click)="theme && theme.cycle()">{{ rozieDisplay(theme && theme.color) }}</button></div>
 
   `,
+  styles: [`
+    :host(rozie-inject-as-cast) { display: contents; }
+  `],
 })
 export class InjectAsCast {
   theme = (inject(rozieToken('theme'))) as {

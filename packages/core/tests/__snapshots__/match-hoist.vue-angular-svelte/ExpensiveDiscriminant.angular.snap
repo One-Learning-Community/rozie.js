@@ -27,6 +27,7 @@ import { Component, ViewEncapsulation, signal } from '@angular/core';
 
   `,
   styles: [`
+    :host(rozie-expensive-discriminant) { display: contents; }
     .passed { color: #15803d; }
     .failed { color: #b91c1c; }
     .unknown { opacity: 0.5; }

@@ -8,6 +8,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     <div class="r" #rozieSpread_0 #rozieListenersTarget_1><input (input)="debouncedHandler2_2($event)" /></div>
 
   `,
+  styles: [`
+    :host(rozie-function-prop-default-value) { display: contents; }
+  `],
 })
 export class FunctionPropDefaultValue {
   onPick = input<(...args: unknown[]) => unknown>((() => {}));

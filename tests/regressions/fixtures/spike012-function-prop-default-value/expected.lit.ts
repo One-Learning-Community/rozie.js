@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { debounce, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-function-prop-default-value')
 export default class FunctionPropDefaultValue extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @property({ type: Function }) onPick: ((...args: unknown[]) => unknown) | null = () => {};
   private _n = signal(0);
 

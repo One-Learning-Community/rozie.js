@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, query } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
@@ -6,6 +6,10 @@ import { undo as undoCmd, redo as redoCmd } from 'fake-editor-commands';
 
 @customElement('rozie-aliased-import-expose-verb')
 export default class AliasedImportExposeVerb extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @query('[data-rozie-ref="viewEl"]') private _refViewEl!: HTMLElement;
 
   private _disconnectCleanups: Array<() => void> = [];

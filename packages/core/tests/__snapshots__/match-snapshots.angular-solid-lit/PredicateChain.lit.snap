@@ -5,6 +5,7 @@ import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 @customElement('rozie-predicate-chain')
 export default class PredicateChain extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .high[data-rozie-s-e116a46e] { font-weight: 700; }
 .some[data-rozie-s-e116a46e] { opacity: 0.85; }
 .none[data-rozie-s-e116a46e] { opacity: 0.5; }

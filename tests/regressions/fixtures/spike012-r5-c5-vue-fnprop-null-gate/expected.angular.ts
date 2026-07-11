@@ -12,6 +12,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     </div>
 
   `,
+  styles: [`
+    :host(rozie-fn-prop-null-gate) { display: contents; }
+  `],
 })
 export class FnPropNullGate {
   onSave = input<(...args: unknown[]) => unknown>((() => {}));

@@ -8,6 +8,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     <input #rozieSpread_0 (input)="debouncedHandler1_1($event)" #rozieListenersTarget_2 />
 
   `,
+  styles: [`
+    :host(rozie-computed-in-debounce-lift) { display: contents; }
+  `],
 })
 export class ComputedInDebounceLift {
   q = signal('');

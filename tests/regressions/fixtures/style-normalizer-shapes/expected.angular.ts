@@ -12,6 +12,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
       </div>
 
   `,
+  styles: [`
+    :host(rozie-style-norm-shapes) { display: contents; }
+  `],
 })
 export class StyleNormShapes {
   s = input<string>('');

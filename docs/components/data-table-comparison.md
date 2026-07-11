@@ -1,5 +1,5 @@
 ---
-surface_hash: 025ab7cf7162
+surface_hash: 229892f07bc5
 ---
 
 # Data table comparison
@@ -78,7 +78,7 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 
 - **AG Grid's enterprise depth.** [AG Grid](https://www.ag-grid.com/) ships tree data, pivoting, integrated charting, and a deep server-side row model. `@rozie-ui/data-table` now covers row grouping + aggregation, expandable rows / master-detail, faceted filtering, inline editing, and cell range selection on top of the common surface (sort / filter / paginate / select / column management) plus a `manual` server-side hook — but not AG's full enterprise feature set (tree data, pivoting, integrated charting, deep server-side row model).
 - **Horizontal (column) virtualization + dynamic auto-measure.** Vertical **row** windowing ships and is GA on all six targets — set `virtual` and large datasets render only the visible slice (**tested to 100,000 rows**). What remains deferred is the orthogonal pieces: **horizontal/column virtualization** (a very wide column set still renders every column), and **dynamic auto-measurement beyond `measureElement`** — variable row heights are measured via `measureElement`, but there is no content-driven auto-sizing pass past it. Use `estimateRowHeight` to seed the row estimate for now.
-- **`@rozie-ui/data-table` is `0.1.0`.** The surface (26 props / 12 two-way slices / 15 events / 34-verb handle / declarative `<Column>` + `columnId`-dispatched cell/header slots / selection / detail / group-bar / filter / editor slots) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established libraries.
+- **`@rozie-ui/data-table` is `0.1.0`.** The surface (28 props / 12 two-way slices / 15 events / 34-verb handle / declarative `<Column>` + `columnId`-dispatched cell/header slots / selection / detail / group-bar / filter / editor slots) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established libraries.
 
 ## Try it
 

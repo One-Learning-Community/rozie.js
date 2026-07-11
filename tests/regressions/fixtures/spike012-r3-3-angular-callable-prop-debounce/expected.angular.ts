@@ -8,6 +8,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     <div class="r" #rozieSpread_0 #rozieListenersTarget_1><input (input)="debouncedHandler2_2($event)" /></div>
 
   `,
+  styles: [`
+    :host(rozie-angular-callable-prop-debounce) { display: contents; }
+  `],
 })
 export class AngularCallablePropDebounce {
   onPick = input<(...args: unknown[]) => unknown>((() => {}));

@@ -29,6 +29,9 @@ function __rozieAttr(v: unknown): string | null {
     <div class="selected" #rozieSpread_0 #rozieListenersTarget_1>{{ rozieDisplay(selected()) }}</div>
 
   `,
+  styles: [`
+    :host(rozie-nested-fn-this) { display: contents; }
+  `],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,

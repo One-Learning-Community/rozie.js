@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-inline-expr-handler')
 export default class InlineExprHandler extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .backdrop[data-rozie-s-8ec7623e] { position: fixed; inset: 0; }
 `;
 

@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-presence-slot-fallback')
 export default class PresenceSlotFallback extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .panel[data-rozie-s-224e77e7] { border: 1px solid rgba(0, 0, 0, 0.1); }
 `;
 

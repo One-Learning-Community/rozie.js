@@ -12,6 +12,9 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
     </div>
 
   `,
+  styles: [`
+    :host(rozie-spike012-r5-c3) { display: contents; }
+  `],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,

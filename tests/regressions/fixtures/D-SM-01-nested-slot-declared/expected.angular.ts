@@ -26,6 +26,7 @@ interface InnerCtx {}
 
   `,
   styles: [`
+    :host(rozie-nested-slot-declared) { display: contents; }
     .outer { display: block; }
   `],
 })

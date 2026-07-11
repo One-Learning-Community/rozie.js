@@ -10,6 +10,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     </div>
 
   `,
+  styles: [`
+    :host(rozie-ref-shadows-data-key) { display: contents; }
+  `],
 })
 export class RefShadowsDataKey {
   box = signal(0);

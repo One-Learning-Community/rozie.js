@@ -6,6 +6,7 @@ import { createLitControllableProperty, rozieListeners, rozieSpread } from '@roz
 @customElement('rozie-checkbox-rmodel')
 export default class CheckboxRModel extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .toggle[data-rozie-s-5898a126] { display: inline-flex; gap: 0.25rem; align-items: center; }
 `;
 

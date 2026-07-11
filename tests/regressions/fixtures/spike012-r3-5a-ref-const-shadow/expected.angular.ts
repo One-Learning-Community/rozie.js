@@ -8,6 +8,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     <div class="r" #rozieSpread_0 #rozieListenersTarget_1><div #boxRef>x</div></div>
 
   `,
+  styles: [`
+    :host(rozie-ref-const-shadow) { display: contents; }
+  `],
 })
 export class RefConstShadow {
   n = signal(0);

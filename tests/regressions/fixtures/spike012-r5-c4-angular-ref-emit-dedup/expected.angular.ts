@@ -11,6 +11,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     </div>
 
   `,
+  styles: [`
+    :host(rozie-ref-emit-dedup) { display: contents; }
+  `],
 })
 export class RefEmitDedup {
   n = signal(0);

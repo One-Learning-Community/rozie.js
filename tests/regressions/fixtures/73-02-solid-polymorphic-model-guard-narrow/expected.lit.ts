@@ -6,6 +6,7 @@ import { createLitControllableProperty, rozieDisplay, rozieListeners, rozieSprea
 @customElement('rozie-polymorphic-model-guard-narrow')
 export default class PolymorphicModelGuardNarrow extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .selected[data-rozie-s-afea58c3] { font-variant-numeric: tabular-nums; }
 `;
 

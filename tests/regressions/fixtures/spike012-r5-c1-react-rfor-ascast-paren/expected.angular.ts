@@ -30,6 +30,9 @@ function __rozieAttr(v: unknown): string | null {
     }</ul></div>
 
   `,
+  styles: [`
+    :host(rozie-rfor-as-cast-paren) { display: contents; }
+  `],
 })
 export class RforAsCastParen {
   items = signal([1, 2, 3]);

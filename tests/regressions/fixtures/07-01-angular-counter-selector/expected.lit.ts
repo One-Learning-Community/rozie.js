@@ -6,6 +6,7 @@ import { createLitControllableProperty, rozieListeners, rozieSpread } from '@roz
 @customElement('rozie-counter')
 export default class Counter extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .counter[data-rozie-s-80d69145] { font-variant-numeric: tabular-nums; }
 `;
 

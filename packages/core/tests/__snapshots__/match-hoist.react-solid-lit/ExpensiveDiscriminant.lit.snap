@@ -5,6 +5,7 @@ import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 @customElement('rozie-expensive-discriminant')
 export default class ExpensiveDiscriminant extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .passed[data-rozie-s-bb543ee0] { color: #15803d; }
 .failed[data-rozie-s-bb543ee0] { color: #b91c1c; }
 .unknown[data-rozie-s-bb543ee0] { opacity: 0.5; }

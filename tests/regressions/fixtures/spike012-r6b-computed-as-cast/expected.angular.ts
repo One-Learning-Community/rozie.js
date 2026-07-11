@@ -28,6 +28,9 @@ function __rozieAttr(v: unknown): string | null {
     <div class="r" #rozieSpread_0 #rozieListenersTarget_1>{{ rozieDisplay(label()) }}</div>
 
   `,
+  styles: [`
+    :host(rozie-computed-as-cast) { display: contents; }
+  `],
 })
 export class ComputedAsCast {
   raw = input<string>('');

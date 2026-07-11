@@ -6,6 +6,7 @@ import { createLitControllableProperty, rozieListeners, rozieSpread } from '@roz
 @customElement('rozie-controllable-mode-flip')
 export default class ControllableModeFlip extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .bump[data-rozie-s-bfc3e9cf] { font-variant-numeric: tabular-nums; }
 `;
 

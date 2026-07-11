@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
@@ -6,6 +6,10 @@ import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-event-loop-var-shadow')
 export default class EventLoopVarShadow extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   private _items = signal([{
   id: 'a',
   label: 'A'

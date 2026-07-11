@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-connected-rearm')
 export default class ConnectedRearm extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .rearm[data-rozie-s-453272bf] { font-variant-numeric: tabular-nums; }
 `;
 

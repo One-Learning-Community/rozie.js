@@ -51,6 +51,7 @@ function __rozieAttr(v: unknown): string | null {
 
   `,
   styles: [`
+    :host(rozie-scoped-slot-context) { display: contents; }
     .list { list-style: none; padding: 0; }
   `],
   providers: [

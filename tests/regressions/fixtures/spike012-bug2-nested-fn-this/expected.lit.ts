@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-nested-fn-this')
 export default class NestedFnThis extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @property({ type: String, attribute: 'value' }) _value_attr: string | any = '';
   private _valueControllable = createLitControllableProperty<string | any>({ host: this, eventName: 'value-change', defaultValue: '', initialControlledValue: undefined });
   private _tag = signal('x');

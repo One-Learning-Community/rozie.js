@@ -8,6 +8,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     <div class="r" #rozieSpread_0 #rozieListenersTarget_1><div #boxRef>x</div></div>
 
   `,
+  styles: [`
+    :host(rozie-ref-expose-verb-shadow) { display: contents; }
+  `],
 })
 export class RefExposeVerbShadow {
   n = signal(0);

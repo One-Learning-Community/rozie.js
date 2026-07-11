@@ -6,6 +6,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 @customElement('rozie-on-mount-arrow-cleanup')
 export default class OnMountArrowCleanup extends SignalWatcher(LitElement) {
   static styles = css`
+:host{display:contents}
 .ticker[data-rozie-s-722b58d1] { font-variant-numeric: tabular-nums; }
 `;
 

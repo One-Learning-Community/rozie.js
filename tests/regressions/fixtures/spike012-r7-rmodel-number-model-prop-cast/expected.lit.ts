@@ -1,10 +1,14 @@
-import { LitElement, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-r-model-number-model-prop')
 export default class RModelNumberModelProp extends SignalWatcher(LitElement) {
+  static styles = css`
+:host{display:contents}
+`;
+
   @property({ type: Number, attribute: 'quantity' }) _quantity_attr: number = 0;
   private _quantityControllable = createLitControllableProperty<number>({ host: this, eventName: 'quantity-change', defaultValue: 0, initialControlledValue: undefined });
 

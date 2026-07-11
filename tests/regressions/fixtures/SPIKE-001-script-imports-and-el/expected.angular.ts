@@ -16,6 +16,9 @@ interface DefaultCtx {}
     </div>
 
   `,
+  styles: [`
+    :host(rozie-spike-import-el) { display: contents; }
+  `],
 })
 export class SpikeImportEl {
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');

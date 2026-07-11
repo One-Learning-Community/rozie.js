@@ -8,6 +8,9 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
     <div #rozieSpread_0 #rozieListenersTarget_1>{{ __interp_2 }}</div>
 
   `,
+  styles: [`
+    :host(rozie-interp-arrow-as-cast) { display: contents; }
+  `],
 })
 export class InterpArrowAsCast {
   items = signal([1, 2, 3]);

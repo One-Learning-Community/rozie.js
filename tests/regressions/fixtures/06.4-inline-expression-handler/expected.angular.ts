@@ -12,6 +12,7 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
 
   `,
   styles: [`
+    :host(rozie-inline-expr-handler) { display: contents; }
     .backdrop { position: fixed; inset: 0; }
   `],
 })
