@@ -1,0 +1,9 @@
+{
+  "id": "REG-R11-1-04",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md#R11-1",
+  "sourceKind": "spike",
+  "phase": "quick-260711-ad5",
+  "desc": "a nested `<slot r-if>` inside a <template r-for> (conditional slot per item) must not splice the per-item `{…}` mustache into the render-callback arrow as a block body (react `iter.map`, solid keyless `<For>`) — would render NOTHING",
+  "targets": ["vue", "react", "svelte", "solid", "lit"],
+  "discoveredBy": "shape-matrix Round 11 — loop-mustache-body / nested-slot-rif-in-template-rfor"
+}

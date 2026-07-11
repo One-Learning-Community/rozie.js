@@ -1,0 +1,25 @@
+<rozie name="LoopMustacheInterpolationRfor">
+
+<props>
+{
+  items: { type: Array, default: () => [] },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<!--
+  R11-1 core repro: a `<template r-for>` grouping wrapper whose lone body is a
+  bare `{{ interpolation }}`. `emitLoop` splices the loop body directly into
+  the render-callback arrow: react `{iter.map(item => BODY)}`, solid keyless
+  `<For>{item => BODY}</For>`. When BODY is a `{…}` mustache, `item => {…}`
+  parses as an ARROW BLOCK BODY with no `return` — the loop renders NOTHING
+  (silent). See BUG-LEDGER.md#R11-1.
+-->
+<div class="r"><template r-for="x in $props.items">{{ x }}</template></div>
+</template>
+
+</rozie>

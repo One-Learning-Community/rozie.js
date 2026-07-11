@@ -1,0 +1,9 @@
+{
+  "id": "REG-R11-1-02",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md#R11-1",
+  "sourceKind": "spike",
+  "phase": "quick-260711-ad5",
+  "desc": "r-for directly on a <slot> (the slot IS the loop body) must not splice the slot's `{…}` mustache into the render-callback arrow as a block body (react `iter.map`, solid keyless `<For>`) — would render NOTHING",
+  "targets": ["vue", "react", "svelte", "solid", "lit"],
+  "discoveredBy": "shape-matrix Round 11 — loop-mustache-body / slot-as-rfor-body"
+}

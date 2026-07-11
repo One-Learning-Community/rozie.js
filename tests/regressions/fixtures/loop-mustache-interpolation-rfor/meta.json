@@ -1,0 +1,9 @@
+{
+  "id": "REG-R11-1-01",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md#R11-1",
+  "sourceKind": "spike",
+  "phase": "quick-260711-ad5",
+  "desc": "a `<template r-for>` whose lone body is a bare `{{ interpolation }}` must not splice a `{…}` mustache into the render-callback arrow as a block body (react `iter.map`, solid keyless `<For>`) — would render NOTHING",
+  "targets": ["vue", "react", "svelte", "solid", "lit"],
+  "discoveredBy": "shape-matrix Round 11 — loop-mustache-body / interpolation-in-template-rfor"
+}

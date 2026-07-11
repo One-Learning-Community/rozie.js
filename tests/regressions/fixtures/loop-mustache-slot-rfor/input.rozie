@@ -1,0 +1,23 @@
+<rozie name="LoopMustacheSlotRfor">
+
+<props>
+{
+  items: { type: Array, default: () => [] },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<!--
+  R11-1: r-for directly ON a <slot> (the slot IS the loop body). A <slot>
+  lowers to a bare `{expr}` mustache; `emitLoop` splices it into the
+  render-callback arrow without unwrapping — `item => {expr}` is a BLOCK body
+  with no return, so the loop renders NOTHING (silent). See BUG-LEDGER.md#R11-1.
+-->
+<div class="r"><slot r-for="x in $props.items" :name="x" /></div>
+</template>
+
+</rozie>

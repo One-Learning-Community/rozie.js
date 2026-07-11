@@ -1,0 +1,25 @@
+<rozie name="LoopMustacheNestedConditionalSlotRfor">
+
+<props>
+{
+  items: { type: Array, default: () => [] },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<!--
+  R11-1: a nested `<slot r-if>` inside a <template r-for> — a conditional
+  slot rendered per item. The already-fixed R10-1 conditional lowering
+  produces a correct `{…}` mustache for the per-item conditional-slot node,
+  but `emitLoop` still splices it into the render-callback arrow without
+  unwrapping — `item => {…}` is a BLOCK body with no return, so the loop
+  renders NOTHING (silent). See BUG-LEDGER.md#R11-1.
+-->
+<div class="r"><template r-for="x in $props.items"><slot r-if="x" :name="x" /></template></div>
+</template>
+
+</rozie>

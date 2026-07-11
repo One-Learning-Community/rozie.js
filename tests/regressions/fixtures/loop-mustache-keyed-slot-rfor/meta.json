@@ -1,0 +1,9 @@
+{
+  "id": "REG-R11-1-05",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md#R11-1",
+  "sourceKind": "spike",
+  "phase": "quick-260711-ad5",
+  "desc": "a KEYED (`:key`) <template r-for> whose body is a <slot> must not splice the slot's `{…}` mustache into the Solid `<Key>{item => BODY}</Key>` render-callback arrow as a block body — would render NOTHING",
+  "targets": ["vue", "react", "svelte", "angular", "solid", "lit"],
+  "discoveredBy": "shape-matrix Round 11 — loop-mustache-body / keyed-slot-in-template-rfor"
+}

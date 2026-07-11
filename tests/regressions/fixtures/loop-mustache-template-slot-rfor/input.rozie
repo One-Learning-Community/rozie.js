@@ -1,0 +1,23 @@
+<rozie name="LoopMustacheTemplateSlotRfor">
+
+<props>
+{
+  items: { type: Array, default: () => [] },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<!--
+  R11-1: a <slot> as the lone child of a <template r-for> grouping wrapper.
+  Same double-mustache-into-arrow hazard as loop-mustache-slot-rfor, exercised
+  through the <template r-for> wrapper shape instead of r-for directly on the
+  slot. See BUG-LEDGER.md#R11-1.
+-->
+<div class="r"><template r-for="x in $props.items"><slot :name="x" /></template></div>
+</template>
+
+</rozie>
