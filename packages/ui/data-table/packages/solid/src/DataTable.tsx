@@ -5169,11 +5169,31 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // draft (selecting the seeded char makes the next keystroke replace it: Zeta → eta).
   // beginEdit threads `seed == null` so a seeded entry skips the select and the caret sits
   // AFTER the seeded char; every other caller keeps the default select-all.
+  // resolveEditingEl: resolve [data-editing-cell] with a shadow-piercing fallback. The direct
+  // query resolves the grid's OWN shadow (Lit) plus every light-DOM target and every Lit
+  // BUILT-IN editor on attempt 1 — that fast path is a byte-no-op for all of them. The recursion
+  // is only ever entered for a Lit #editor DROP-IN (e.g. EditorText) that owns its OWN nested
+  // shadow root, which the direct query cannot cross. Mirrors the shadow-descent precedent in
+  // fillDrag.rzts (cellIndexFromPoint).
+  function resolveEditingEl(root: any): any {
+    if (!root || !root.querySelector) return null;
+    const direct = root.querySelector('[data-editing-cell]');
+    if (direct) return direct;
+    const all = root.querySelectorAll ? root.querySelectorAll('*') : [];
+    for (let i = 0; i < all.length; i++) {
+      const host = all[i];
+      if (host && host.shadowRoot) {
+        const found = resolveEditingEl(host.shadowRoot);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
   function focusEditorWhenReady(selectAll = true) {
     if (!gridRoot) return;
     let attempts = 0;
     const tryFocus = () => {
-      const el = gridRoot ? gridRoot.querySelector('[data-editing-cell]') : null;
+      const el = gridRoot ? resolveEditingEl(gridRoot) : null;
       // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
       // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
       // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it

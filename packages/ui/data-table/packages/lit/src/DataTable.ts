@@ -4505,11 +4505,26 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   return row ? row.id : null;
 };
 
+  resolveEditingEl = (root: any): any => {
+  if (!root || !root.querySelector) return null;
+  const direct = root.querySelector('[data-editing-cell]');
+  if (direct) return direct;
+  const all = root.querySelectorAll ? root.querySelectorAll('*') : [];
+  for (let i = 0; i < all.length; i++) {
+    const host = all[i];
+    if (host && host.shadowRoot) {
+      const found = this.resolveEditingEl(host.shadowRoot);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
   focusEditorWhenReady = (selectAll = true) => {
   if (!this.gridRoot) return;
   let attempts = 0;
   const tryFocus = () => {
-    const el = this.gridRoot ? this.gridRoot.querySelector('[data-editing-cell]') : null;
+    const el = this.gridRoot ? this.resolveEditingEl(this.gridRoot) : null;
     // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
     // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
     // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it

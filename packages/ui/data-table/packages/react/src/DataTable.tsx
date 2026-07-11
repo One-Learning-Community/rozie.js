@@ -3434,11 +3434,25 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const row = rowList[editingRow];
     return row ? row.id : null;
   }
+  function resolveEditingEl(root: any): any {
+    if (!root || !root.querySelector) return null;
+    const direct = root.querySelector('[data-editing-cell]');
+    if (direct) return direct;
+    const all = root.querySelectorAll ? root.querySelectorAll('*') : [];
+    for (let i = 0; i < all.length; i++) {
+      const host = all[i];
+      if (host && host.shadowRoot) {
+        const found = resolveEditingEl(host.shadowRoot);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
   function focusEditorWhenReady(selectAll = true) {
     if (!gridRoot.current) return;
     let attempts = 0;
     const tryFocus = () => {
-      const el = gridRoot.current ? gridRoot.current.querySelector('[data-editing-cell]') : null;
+      const el = gridRoot.current ? resolveEditingEl(gridRoot.current) : null;
       // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
       // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
       // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it
