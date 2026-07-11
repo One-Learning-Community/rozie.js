@@ -1,6 +1,6 @@
 {
   "name": "@rozie/runtime-lit",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Lit runtime helpers for Rozie.js-compiled components (slot projection and class-merge utilities).",
   "type": "module",
   "sideEffects": false,

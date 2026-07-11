@@ -8,6 +8,7 @@
       "@rozie/cli",
       "@rozie/unplugin",
       "@rozie/babel-plugin",
+      "@rozie/runtime-keynav-core",
       "@rozie/runtime-react",
       "@rozie/runtime-vue",
       "@rozie/runtime-svelte",

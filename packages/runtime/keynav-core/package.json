@@ -1,6 +1,6 @@
 {
   "name": "@rozie/runtime-keynav-core",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "Framework-neutral r-keynav state machine, class-token normalizer, and windower contract — the pure-TS core every per-target Rozie.js keynav controller (React/Vue/Svelte/Solid/Lit hooks + the Angular inline controller) imports.",
   "type": "module",
   "sideEffects": false,

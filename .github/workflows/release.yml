@@ -96,6 +96,7 @@ jobs:
           --filter=@rozie/cli
           --filter=@rozie/unplugin
           --filter=@rozie/babel-plugin
+          --filter=@rozie/runtime-keynav-core
           --filter=@rozie/runtime-react
           --filter=@rozie/runtime-vue
           --filter=@rozie/runtime-svelte
@@ -132,6 +133,7 @@ jobs:
           --filter=@rozie/cli
           --filter=@rozie/unplugin
           --filter=@rozie/babel-plugin
+          --filter=@rozie/runtime-keynav-core
           --filter=@rozie/runtime-react
           --filter=@rozie/runtime-vue
           --filter=@rozie/runtime-svelte
