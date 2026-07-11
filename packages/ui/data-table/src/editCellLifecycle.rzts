@@ -156,32 +156,21 @@ const editingRowId = () => {
 // draft (selecting the seeded char makes the next keystroke replace it: Zeta → eta).
 // beginEdit threads `seed == null` so a seeded entry skips the select and the caret sits
 // AFTER the seeded char; every other caller keeps the default select-all.
-// resolveEditingEl: resolve [data-editing-cell] with a shadow-piercing fallback. The direct
-// query resolves the grid's OWN shadow (Lit) plus every light-DOM target and every Lit
-// BUILT-IN editor on attempt 1 — that fast path is a byte-no-op for all of them. The recursion
-// is only ever entered for a Lit #editor DROP-IN (e.g. EditorText) that owns its OWN nested
-// shadow root, which the direct query cannot cross. Mirrors the shadow-descent precedent in
-// fillDrag.rzts (cellIndexFromPoint).
-const resolveEditingEl = (root): any => {
-  if (!root || !root.querySelector) return null
-  const direct = root.querySelector('[data-editing-cell]')
-  if (direct) return direct
-  const all = root.querySelectorAll ? root.querySelectorAll('*') : []
-  for (let i = 0; i < all.length; i++) {
-    const host = all[i]
-    if (host && host.shadowRoot) {
-      const found = resolveEditingEl(host.shadowRoot)
-      if (found) return found
-    }
-  }
-  return null
-}
-
+// Editor-owns-focus contract (quick 260711-i5m): REVERTS the g52 shadow-piercing helper
+// (commit 5fa30045) that recursed into descendant shadow roots. Built-in editors are
+// host-DOM — the plain direct query resolves them on all 6 targets (no shadow to cross). A
+// #editor DROP-IN now owns its OWN focus via the reactive `autofocus` prop (EditorText's
+// $onMount + lazy $watch), so the host never needs to reach across a Lit drop-in's nested
+// shadow root at all — see the !hasEditorSlot gate below, which skips the host focus call
+// entirely for a drop-in target.
 const focusEditorWhenReady = (selectAll = true) => {
   if (!gridRoot) return
+  // Editor-owns-focus contract: when the CURRENT focus target is a #editor drop-in, the host
+  // does NOT reach into its DOM — the drop-in self-focuses via its own autofocus prop.
+  if ($data.editFocusColId != null && hasEditorSlot($data.editFocusColId)) return
   let attempts = 0
   const tryFocus = () => {
-    const el = gridRoot ? resolveEditingEl(gridRoot) : null
+    const el = gridRoot ? gridRoot.querySelector('[data-editing-cell]') : null
     // Do NOT stomp focus a later interaction already placed in a DIFFERENT column's editor of
     // this row: focusEditorWhenReady only needs to get focus INTO the (first) freshly-mounted
     // editor; if focus already sits in another editable cell, a late rAF re-focus would steal it

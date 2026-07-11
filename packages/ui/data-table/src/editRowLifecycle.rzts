@@ -32,8 +32,15 @@ const editableColumnsForRow = (rowIndex) => {
 // focuses its [data-editing-cell] control. Bounded rAF-poll (mirrors focusEditorWhenReady)
 // so a React re-render that recreates the input across the focus call still lands it. select-
 // all on text/number editors (a no-op try/catch on select/checkbox).
+// Editor-owns-focus contract (quick 260711-i5m): when the TARGET column is a #editor
+// drop-in, the host does NOT reach into its DOM (early return, before starting the rAF poll
+// at all) — the drop-in self-focuses via its own reactive `autofocus` prop, which the caller
+// (commitRow's B22 reject path / rowEditTab) already flips via $data.editFocusColId. Built-in
+// columns are unaffected (hasEditorSlot is false for them) — unchanged host direct-focus.
 const focusRowEditorAt = (rowIndex, colIndex) => {
   if (!gridRoot) return
+  const colId = columnIdAt(rowIndex, colIndex)
+  if (colId != null && hasEditorSlot(colId)) return
   let attempts = 0
   const tryFocus = () => {
     const cellEl = resolveCellEl(String(rowIndex), colIndex)
