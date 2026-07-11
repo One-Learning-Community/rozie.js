@@ -240,8 +240,19 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     // and the loop renders NOTHING. Strip the outer braces and re-splice as
     // a parenthesized arrow-EXPRESSION body. Element/fragment bodies start
     // with `<` (stripBalancedMustache returns null) and are left untouched.
-    const inner = stripBalancedMustache(bodyJsx);
-    if (inner !== null) {
+    const rendered = bodyJsx;
+    const inner = stripBalancedMustache(rendered);
+    if (inner !== null && keyCode !== null) {
+      // 260711-cy1 fix — keyed twin of the R11-1 single-child fix above,
+      // mirroring the multi-child keyed-Fragment path below. A mustache
+      // body has no element to consume `childCtx.pendingKey`, so a keyed
+      // loop (`:key`) whose single-child body is a mustache silently
+      // dropped the key and React reconciled rows by index. Wrap the
+      // ORIGINAL mustache (not the stripped/parenthesized form) in a named
+      // `Fragment key={...}` so React reconciles by key.
+      ctx.collectors.react.add('Fragment');
+      bodyJsx = `<Fragment key={${keyCode}}>${rendered}</Fragment>`;
+    } else if (inner !== null) {
       bodyJsx = `(${inner})`;
     }
   } else {

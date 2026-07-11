@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
@@ -27,7 +27,7 @@ export default function LoopMustacheKeyedSlotRfor(_props: LoopMustacheKeyedSlotR
   return (
     <>
 
-    <div {...attrs} className={clsx("r", (attrs.className as string | undefined))} data-rozie-s-10bfe9b6="">{props.rows.map((row) => (typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ name: row }) : (props.children ?? props.slots?.[''])))}</div>
+    <div {...attrs} className={clsx("r", (attrs.className as string | undefined))} data-rozie-s-10bfe9b6="">{props.rows.map((row) => <Fragment key={row.id}>{typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ name: row }) : (props.children ?? props.slots?.[''])}</Fragment>)}</div>
     </>
   );
 }
