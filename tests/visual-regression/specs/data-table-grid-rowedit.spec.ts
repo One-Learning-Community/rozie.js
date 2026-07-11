@@ -138,6 +138,22 @@ async function focusedTag(page: Page): Promise<string | null> {
   });
 }
 
+/** Quick 260711-i5m — the deepest shadow-pierced active element's `aria-label` (EditorText
+ *  binds `:aria-label="$props.columnId"`, so this is a target-agnostic marker distinguishing
+ *  the `note` #editor drop-in's own input from the grid's built-in editors, which carry no
+ *  aria-label). Null when nothing is focused or the focused element has no aria-label. */
+async function focusedInputColumnLabel(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    let active: Element | null = document.activeElement;
+    while (active && (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot) {
+      const sr = (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot as ShadowRoot;
+      if (!sr.activeElement) break;
+      active = sr.activeElement;
+    }
+    return active ? active.getAttribute('aria-label') : null;
+  });
+}
+
 /** Focus the [data-editing-cell] editor inside the cell at (row, col) (shadow-pierced). */
 async function focusRowEditorAt(page: Page, row: number, col: number): Promise<void> {
   await page.evaluate(({ r, c }) => {
@@ -311,6 +327,19 @@ async function gotoGrid(page: Page, target: Target) {
   return mount;
 }
 
+/** Quick 260711-i5m — the DEDICATED editor-owns-focus-contract fixture (a SEPARATE demo from
+ *  DataTableGridRowEditDemo, so B21/B22/WR-01's editorCount===4/city-is-last assumptions are
+ *  never touched). Two editable columns: name(0, built-in text) note(1, #editor drop-in with
+ *  an always-rejecting validator). */
+async function gotoRowFocusGrid(page: Page, target: Target) {
+  await page.goto(`/?example=DataTableGridRowEditFocus&target=${target}`);
+  await expect(page.getByTestId('rozie-mount')).toBeVisible();
+  const mount = page.getByTestId('rozie-mount');
+  const gridTable = mount.getByTestId('grid-table').locator('table[role="grid"]');
+  await expect(gridTable).toBeVisible({ timeout: 15_000 });
+  return mount;
+}
+
 for (const target of TARGETS) {
   // ════════════════════════════════════════════════════════════════════════════════
   // B21 — in full-row edit, Tab off the LAST editable cell stays CONTAINED inside the
@@ -477,5 +506,49 @@ for (const target of TARGETS) {
     // The committed row (Gamma) carries qty 99 and now sits at display index 3.
     await expect.poll(async () => cellText(page, 3, 1), { timeout: 10_000 }).toBe('99');
     expect((await modelRows(page)).find((r) => r.name === 'Gamma')?.qty).toBe(99);
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // Quick 260711-i5m — editor-owns-focus contract, REACTIVE row-mode refocus onto an
+  //   ALREADY-MOUNTED #editor drop-in. Uses the DEDICATED DataTableGridRowEditFocus
+  //   fixture (name=built-in text, note=#editor drop-in with an always-rejecting
+  //   validator) — NOT DataTableGridRowEditDemo (B21/B22/WR-01 stay untouched).
+  //
+  //   beginRowEdit focuses the row's FIRST editable column (name, built-in, host-focused).
+  //   Committing the row (Enter in the name editor) validates every editable column; note's
+  //   validator ALWAYS rejects, so the row stays open (D-01) and the OFFENDING column's
+  //   editor (note, the drop-in — already mounted since full-row edit opens every editable
+  //   cell at once) must receive focus REACTIVELY (EditorText's lazy $watch on its
+  //   `autofocus` prop flipping false→true), NOT via $onMount (already mounted) and NOT via
+  //   a host DOM reach-in (the drop-in self-focuses; the host does not cross into its
+  //   nested shadow root on Lit).
+  //
+  //   Pre-fix (Task 1, RED): the #editor slot does not yet bind :autofocus, so the drop-in's
+  //   `autofocus` prop stays permanently undefined/false — the reject never moves focus into
+  //   the note drop-in.
+  // ════════════════════════════════════════════════════════════════════════════════
+  runnerFor(target)(`data-table-grid-rowedit [${target}]: editor-owns-focus — row validation reactively refocuses an already-mounted #editor drop-in`, async ({ page }) => {
+    const mount = await gotoRowFocusGrid(page, target);
+    await mount.getByTestId('edit-row').click();
+    // Both editable cells mount at once (full-row edit): name (built-in) + note (drop-in).
+    await expect.poll(async () => editorCount(page), { timeout: 10_000 }).toBe(2);
+    // beginRowEdit's initial autofocus target is the FIRST editable column (name, built-in,
+    // host-focused) — confirm the row opened with a real focused input before committing.
+    await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
+    const beforeRowCommits = await readoutText(page, 'row-commit-count');
+    // Commit the whole row from the name editor (Enter) — note's validator ALWAYS rejects.
+    await focusRowEditorAt(page, 0, 0);
+    await page.keyboard.press('Enter');
+    // D-01: the row stays OPEN (both editors still mounted) — the reject never commits.
+    await expect.poll(async () => editorCount(page), { timeout: 10_000 }).toBe(2);
+    await expect.poll(async () => readoutText(page, 'row-commit-count'), { timeout: 10_000 }).toBe(beforeRowCommits);
+    // The OFFENDING column's editor (note, the #editor drop-in) now holds focus — reactively,
+    // via its own lazy $watch on the autofocus prop flipping false→true (it was already
+    // mounted; this is NOT its $onMount path). Assert by aria-label (EditorText binds
+    // `:aria-label="$props.columnId"`; the built-in `name` editor carries no aria-label at
+    // all, so 'note' unambiguously identifies the drop-in's own input, target-agnostic
+    // across Lit's nested shadow root).
+    await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
+    await expect.poll(async () => focusedInputColumnLabel(page), { timeout: 10_000 }).toBe('note');
   });
 }

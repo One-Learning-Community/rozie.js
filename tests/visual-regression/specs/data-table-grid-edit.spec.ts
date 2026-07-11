@@ -488,6 +488,21 @@ for (const target of TARGETS) {
     await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
   });
 
+  // B26d (quick 260711-i5m, editor-owns-focus contract) — a BUILT-IN editor still
+  // auto-focuses its input on open, host-direct-focused, guarding against a regression from
+  // the g52 shadow-pierce revert + the new !hasEditorSlot host-focus gate (Task 3): a
+  // built-in column is never gated (hasEditorSlot is false for it), so it must keep
+  // auto-focusing exactly as before. A standalone guard, isolated from B1/B2/B4/B26's other
+  // click-away/typing assertions.
+  runnerFor(target)(`data-table-grid-edit [${target}]: B26d built-in text editor auto-focuses its input on open (host direct-focus)`, async ({ page }) => {
+    await gotoGrid(page, target);
+    await focusBodyCellStable(page, 0, 0); // name (built-in text editor, col 0)
+    await page.keyboard.press('F2');
+    await expect.poll(async () => (await openEditor(page))?.col, { timeout: 10_000 }).toBe('0');
+    // The COMPONENT must have auto-focused the built-in editor's input — no manual focus call.
+    await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
+  });
+
   // ════════════════════════════════════════════════════════════════════════════════
   // Boolean in-place toggle (design doc 2026-07-05, Change 1) — a built-in
   // editor:'checkbox' cell flips + commits INSTANTLY on Space/Enter/F2: no editor opens,

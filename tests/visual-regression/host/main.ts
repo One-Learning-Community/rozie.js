@@ -683,6 +683,18 @@ export const EXAMPLES = [
   // build-cells demos sweep already cover it, importing the data-table source pkg already
   // registered for Angular cross-tree AOT in phase 48).
   'DataTableGridRowEdit',
+  // Quick 260711-i5m (editor-owns-focus contract) — the DEDICATED row-mode reactive-refocus
+  // RED-first fixture (loader → examples/demos/DataTableGridRowEditFocusDemo.rozie, importing
+  // ../../packages/ui/data-table/src/{DataTable,Column,EditorText}.rozie). ONE grid-mode
+  // DataTable with two editable columns (a built-in `name` text editor + a custom `note`
+  // #editor drop-in whose validator ALWAYS rejects), so data-table-grid-rowedit.spec.ts can
+  // assert the row-mode validation-failure refocus lands on an ALREADY-MOUNTED drop-in (the
+  // lazy-$watch reactive autofocus path) WITHOUT touching DataTableGridRowEditDemo's B21/B22/
+  // WR-01 fixture (editorCount===4 / city-is-last assumptions). Behavioral-only; NOT in
+  // matrix.spec.ts EXAMPLES (no pixel baseline). Lives under examples/demos/ so no new
+  // Angular 3-file registration is needed (prebuildExtraRoots[examplesRoot] + the examples
+  // tsconfig include + the glob-driven build-cells demos sweep already cover it).
+  'DataTableGridRowEditFocus',
   // Phase 63 Wave-3 (grid-mode clipboard + fill correctness) — the clipboard/fill-cluster
   // RED-first fixture (loader → examples/demos/DataTableGridClipboardDemo.rozie, importing
   // ../../packages/ui/data-table/src/{DataTable,Column}.rozie). ONE grid-mode DataTable with
@@ -1235,6 +1247,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 63 grid-mode row-edit — '-demo' appended on Lit →
   // 'rozie-data-table-grid-row-edit-demo' = kebab of DataTableGridRowEditDemo.
   DataTableGridRowEdit: 'rozie-data-table-grid-row-edit',
+  // Quick 260711-i5m editor-owns-focus contract — '-demo' appended on Lit →
+  // 'rozie-data-table-grid-row-edit-focus-demo' = kebab of DataTableGridRowEditFocusDemo.
+  DataTableGridRowEditFocus: 'rozie-data-table-grid-row-edit-focus',
   // Phase 63 grid-mode clipboard/fill — '-demo' appended on Lit →
   // 'rozie-data-table-grid-clipboard-demo' = kebab of DataTableGridClipboardDemo.
   DataTableGridClipboard: 'rozie-data-table-grid-clipboard',

@@ -1,0 +1,182 @@
+<!--
+  DataTableGridRowEditFocusDemo.rozie — quick 260711-i5m (editor-owns-focus contract)
+  RED-first fixture.
+
+  DEDICATED fixture — do NOT fold this into DataTableGridRowEditDemo.rozie. That demo's
+  B21/B22/WR-01 assertions (data-table-grid-rowedit.spec.ts) hardcode editorCount===4,
+  assume `city` is the LAST editable col, and require a full-row-commit SUCCESS; adding an
+  always-rejecting validator here would break all three. This fixture's only job is to force
+  a row-mode validation-failure refocus onto an ALREADY-MOUNTED #editor drop-in.
+
+  A SINGLE DataTable in interactionMode='grid' with TWO editable columns:
+    0 name — built-in text editor (the row's FIRST editable column — the initial
+             autofocus target on beginRowEdit).
+    1 note — a CUSTOM #editor drop-in (EditorText) whose validator ALWAYS rejects
+             ('note rejected') — so a full-row commit (Enter) never succeeds and the
+             offending-column refocus (B22's treatment) always lands on `note`, the
+             mounted drop-in, exercising the REACTIVE lazy-$watch autofocus path (not
+             $onMount — the drop-in is already mounted when autofocus flips to it).
+
+  `r-model:data` binds the dataset; `editRow(0)` (the API twin of Shift+F2) enters full-row
+  edit on row 0 deterministically.
+
+  DEVIATION (Rule 1, checker-caught at build time): the plan brief described the #editor
+  template as already destructuring + forwarding `autofocus` in this Task-1 fixture (a
+  forward reference to the Task-2 contract). That is NOT compilable yet — ROZ947 (scoped-slot
+  param validation) hard-errors at compile time when a consumer destructures a scope param
+  the PRODUCER's `<slot name="editor">` tag does not yet bind (DataTable.rozie's slot only
+  binds columnId/column/row/value/commit/cancel until Task 2 adds `:autofocus=...`). A compile
+  error would fail the WHOLE target build (not just this fixture), masking B21/B22/WR-01 with
+  `test.fixme` instead of a genuine RED. So Task 1's #editor template stays on the CURRENT
+  producer contract (no `autofocus` destructure); Task 2 adds the destructure + forward here
+  (alongside DataTableGridEditDemo.rozie) in the SAME edit that binds `:autofocus` on the
+  producer slot, keeping every intermediate state compilable.
+
+  RED-first (pre-Task-2/3): row-mode's offending-column refocus (`focusRowEditorAt`,
+  editRowLifecycle.rzts) resolves the target via a PLAIN (non-shadow-piercing)
+  `cellEl.querySelector('[data-editing-cell]')` — never pierced any shadow root, even before
+  the g52 revert. On the 5 light-DOM targets this already happens to find the drop-in's
+  <input> (a real DOM descendant, no shadow to cross); on Lit the drop-in owns its OWN nested
+  shadow root, so the query returns null and NO focus lands — the deepest active element
+  stays whatever it was before the reject. RED is expected "at minimum on Lit" (per plan);
+  the fix in Task 2/3 makes it self-focus reactively on all 6, closing the Lit gap too.
+
+  Static dataset (no clock/random) for VR determinism. No loop var / slot named
+  row/cell/header (the Svelte mount-throw discipline) — the #cell slot binds value/columnId.
+-->
+
+<rozie name="DataTableGridRowEditFocusDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+  EditorText: '../../packages/ui/data-table/src/EditorText.rozie',
+}
+</components>
+
+<data>
+{
+  // Static dataset — two editable columns per row so a full-row edit mounts >1 editor and
+  // the drop-in (`note`) is unambiguously the OFFENDING one on commit.
+  rows: [
+    { id: 1, name: 'Alpha', note: 'a-note' },
+    { id: 2, name: 'Beta',  note: 'b-note' },
+  ],
+  // row-edit-commit count — MUST stay 0 across this fixture's assertions (the always-
+  // rejecting `note` validator blocks every full-row commit, D-01).
+  rowCommitCount: 0,
+}
+</data>
+
+<script lang="ts">
+// note validator (D-01 vehicle): ALWAYS rejects, regardless of the proposed value or row —
+// guarantees the row-mode commit never succeeds and the offending-column refocus always
+// targets `note`, the mounted #editor drop-in.
+const rejectNote = (): true | string => 'note rejected'
+
+// row-edit-commit readout (should never bump — the validator always rejects).
+const onRowEditCommit = (payload: { rowId: unknown; changes: { columnId: string; oldValue: unknown; newValue: unknown }[] }): void => {
+  $data.rowCommitCount = $data.rowCommitCount + 1
+}
+
+// Enter full-row edit on visible row 0 via the editRow $expose verb (the API twin of
+// Shift+F2). Resolve the handle at CALL time (never cache — the GridNavDemo lesson).
+const callEditRow = (): void => {
+  const api = $refs.dt
+  if (api && api.editRow) api.editRow(0)
+}
+</script>
+
+<template>
+<div class="dt-grid-rowfocus-demo">
+  <h3>DataTable — row-mode editor-owns-focus contract</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="edit-row" @click="callEditRow">editRow(0)</button>
+    <span class="label">row-commit-count:</span>
+    <span class="readout" data-testid="row-commit-count">{{ $data.rowCommitCount }}</span>
+  </div>
+
+  <!-- The COMMITTED model, JSON-dumped (unused by the reactive-refocus assertion itself,
+       kept for parity with sibling demos + future coverage). -->
+  <pre class="model" data-testid="model-readout">{{ JSON.stringify($data.rows) }}</pre>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      r-model:data="$data.rows"
+      @row-edit-commit="onRowEditCommit($event)"
+    >
+      <Column field="name" header="Name" :editable="true" editor="text" />
+      <Column field="note" header="Note" :editable="true" editor="custom" :validate="rejectNote" />
+
+      <!-- Read-only display slot. -->
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ value }}</span>
+      </template>
+
+      <!-- Custom #editor drop-in: the `note` column renders an EditorText drop-in. Task 2
+           adds the `autofocus` destructure + `:autofocus` forward here (in the same edit
+           that binds `:autofocus` on the producer's <slot name="editor"> — see the header
+           comment DEVIATION note; destructuring it now would be a ROZ947 compile error). -->
+      <template #editor="{ columnId, value, commit, cancel }">
+        <EditorText
+          r-if="columnId === 'note'"
+          data-testid="note-dropin"
+          :value="value"
+          :columnId="columnId"
+          :commit="commit"
+          :cancel="cancel"
+        />
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-grid-rowfocus-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 560px;
+}
+.dt-grid-rowfocus-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.model {
+  font-size: 0.6875rem;
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0 0 0.75rem;
+  color: #333;
+}
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.rdt-cell-editor { font: inherit; }
+</style>
+
+</rozie>
