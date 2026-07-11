@@ -471,6 +471,23 @@ for (const target of TARGETS) {
     await expect.poll(async () => (await modelRows(page))[0]?.note, { timeout: 10_000 }).not.toBe(beforeNote);
   });
 
+  // B26c — a #editor drop-in cell (EditorText, own nested shadow root) auto-focuses its
+  // inner <input> on open WITHOUT a manual focusEditorInput call. Pre-fix: on Lit,
+  // focusEditorWhenReady's gridRoot.querySelector('[data-editing-cell]') cannot pierce the
+  // drop-in's OWN nested shadow root, so the input never receives focus (the deepest active
+  // element stays the grid cell/body) — the light-DOM targets (react/vue/svelte/solid/
+  // angular) and Lit's built-in editors already auto-focus fine (no nested shadow to cross).
+  runnerFor(target)(`data-table-grid-edit [${target}]: B26c #editor drop-in auto-focuses its nested-shadow input on open`, async ({ page }) => {
+    const mount = await gotoGrid(page, target);
+    // Open the note (col 2) #editor drop-in via the component's own auto-focus path — do NOT
+    // call focusEditorInput (that would defeat the assertion by manually focusing it).
+    await mount.getByTestId('edit-note').click();
+    await expect.poll(async () => (await openEditor(page))?.tag, { timeout: 10_000 }).toBe('input');
+    // The COMPONENT must have auto-focused the drop-in's nested-shadow <input> — the deepest
+    // shadow-pierced active element is 'input', with no manual focus call in between.
+    await expect.poll(async () => focusedTag(page), { timeout: 10_000 }).toBe('input');
+  });
+
   // ════════════════════════════════════════════════════════════════════════════════
   // Boolean in-place toggle (design doc 2026-07-05, Change 1) — a built-in
   // editor:'checkbox' cell flips + commits INSTANTLY on Space/Enter/F2: no editor opens,
