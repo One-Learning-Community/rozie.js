@@ -219,20 +219,15 @@ for (const target of TARGETS) {
     //    adds padding-left → pre-fix the windowed expander <td> has no padding-left → RED.
     const expanderTd = depthRow.first().locator('td[data-col="__rdt_expander"]');
     await expect(expanderTd).toHaveCount(1);
-    if (target === 'solid') {
-      // Solid edge: bodyCellStyle()'s depth padding-left does NOT render on Solid in EITHER the
-      // non-virtual OR the windowed path (a pre-existing Solid `style={parseInlineStyle(...)}`
-      // gap, verified identical on the non-virtual DataTableExpand cell — style is null there
-      // too). The windowed body is therefore correctly AT PARITY with the non-virtual body on
-      // Solid (both omit the visible indent), and the emit DOES route the windowed <td> through
-      // bodyCellStyle() (grep-verified ×6). Assert the structural parity (the depth-1 expander
-      // cell renders) here; the visible-indent rendering is a separate pre-existing Solid
-      // bodyCellStyle deferral (logged in deferred-items.md), not a B13 windowed-parity gap.
-      await expect(expanderTd.first()).toBeVisible({ timeout: 10_000 });
-    } else {
-      await expect
-        .poll(async () => (await expanderTd.getAttribute('style')) ?? '', { timeout: 15_000 })
-        .toContain('padding-left');
-    }
+    // Solid parity note: prior to the runtime-solid `parseInlineStyle` fix (LB6 SEAM 3,
+    // 4d269e89), a dynamic `:style` CSS string was camelCased before being handed to Solid's
+    // `style` prop, so `padding-left:…rem` became `{ paddingLeft }` → a silent
+    // `CSSStyleDeclaration.setProperty('paddingLeft', …)` no-op (multi-word declarations
+    // dropped; single-word ones like `overflow` survived). `parseInlineStyle` now passes a CSS
+    // string through verbatim so Solid's `style()` routes it to `cssText`, where the browser
+    // parses every kebab-case declaration correctly — padding-left reaches the DOM on Solid too.
+    await expect
+      .poll(async () => (await expanderTd.getAttribute('style')) ?? '', { timeout: 15_000 })
+      .toContain('padding-left');
   });
 }
