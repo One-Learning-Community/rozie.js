@@ -1,0 +1,23 @@
+<rozie name="SlotConditionalElementRIfSlotRElse">
+
+<props>
+{
+  show: { type: Boolean, default: false },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<!--
+  R10-1: slot in the ELSE arm (element r-if, slot r-else) — the mirror
+  lowering. On Solid this slot becomes the <Show> fallback attribute,
+  doubling to `fallback={{resolved()}}` (invalid JSX-attribute expression).
+  See BUG-LEDGER.md#R10-1.
+-->
+<div class="r"><p r-if="!$props.show">nothing</p><slot r-else></slot></div>
+</template>
+
+</rozie>

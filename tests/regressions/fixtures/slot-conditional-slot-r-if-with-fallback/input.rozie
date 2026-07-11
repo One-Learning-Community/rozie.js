@@ -1,0 +1,21 @@
+<rozie name="SlotConditionalSlotRIfWithFallback">
+
+<props>
+{
+  show: { type: Boolean, default: false },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<!--
+  R10-1: r-if on a slot WITH FALLBACK content — crosses the `?? <fallback>`
+  arm with the conditional. See BUG-LEDGER.md#R10-1.
+-->
+<div class="r"><slot r-if="$props.show"><span>fallback</span></slot></div>
+</template>
+
+</rozie>

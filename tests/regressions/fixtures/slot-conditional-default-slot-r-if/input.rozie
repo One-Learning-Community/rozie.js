@@ -1,0 +1,24 @@
+<rozie name="SlotConditionalDefaultSlotRIf">
+
+<props>
+{
+  show: { type: Boolean, default: false },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<!--
+  R10-1 core repro: r-if directly on a DEFAULT slot. A <slot> lowers to a bare
+  {expr} mustache; the conditional lowering wraps its child in
+  `{cond && <child>}` — when the child is already a mustache, React
+  double-wraps into `{cond && {<slot-expr>}}`, a block/object-literal in JSX
+  logical position (invalid JSX). See BUG-LEDGER.md#R10-1.
+-->
+<div class="r"><slot r-if="$props.show"></slot></div>
+</template>
+
+</rozie>

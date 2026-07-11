@@ -1,0 +1,9 @@
+{
+  "id": "REG-R10-1-05",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md#R10-1",
+  "sourceKind": "spike",
+  "phase": "quick-260710-uwr",
+  "desc": "slot r-if paired with an element r-else (ternary lowering) must not double-wrap the slot's {expr} mustache in the ternary consequent",
+  "targets": ["vue", "react", "svelte", "angular", "solid", "lit"],
+  "discoveredBy": "shape-matrix Round 10 — r-if directly on a <slot>"
+}

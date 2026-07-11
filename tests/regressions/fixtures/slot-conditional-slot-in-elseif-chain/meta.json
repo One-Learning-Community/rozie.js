@@ -1,0 +1,9 @@
+{
+  "id": "REG-R10-1-07",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md#R10-1",
+  "sourceKind": "spike",
+  "phase": "quick-260710-uwr",
+  "desc": "slot as the middle branch of an r-if/r-else-if/r-else chain must not double-wrap the slot mustache",
+  "targets": ["vue", "react", "svelte", "angular", "solid", "lit"],
+  "discoveredBy": "shape-matrix Round 10 — r-if directly on a <slot>"
+}

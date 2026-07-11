@@ -1,0 +1,22 @@
+<rozie name="SlotConditionalScopedSlotRIf">
+
+<props>
+{
+  show: { type: Boolean, default: false },
+  title: { type: String, default: '' },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<!--
+  R10-1: r-if on a SCOPED slot (bound slot prop) — crosses the render-prop
+  path. See BUG-LEDGER.md#R10-1.
+-->
+<div class="r"><slot r-if="$props.show" :title="$props.title"></slot></div>
+</template>
+
+</rozie>

@@ -1,0 +1,9 @@
+{
+  "id": "REG-R10-1-01",
+  "source": ".planning/spikes/012-emitter-shape-matrix/BUG-LEDGER.md#R10-1",
+  "sourceKind": "spike",
+  "phase": "quick-260710-uwr",
+  "desc": "r-if directly on a DEFAULT slot must not double-wrap the slot's {expr} mustache inside the conditional's JSX-expression container",
+  "targets": ["vue", "react", "svelte", "angular", "solid", "lit"],
+  "discoveredBy": "shape-matrix Round 10 — r-if directly on a <slot>"
+}

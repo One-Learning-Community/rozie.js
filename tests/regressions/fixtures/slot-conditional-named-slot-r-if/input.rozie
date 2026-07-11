@@ -1,0 +1,21 @@
+<rozie name="SlotConditionalNamedSlotRIf">
+
+<props>
+{
+  show: { type: Boolean, default: false },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<!--
+  R10-1: r-if on a NAMED slot. Same double-brace hazard as the default-slot
+  case but through the named-slot invocation shape. See BUG-LEDGER.md#R10-1.
+-->
+<div class="r"><slot name="header" r-if="$props.show"></slot></div>
+</template>
+
+</rozie>

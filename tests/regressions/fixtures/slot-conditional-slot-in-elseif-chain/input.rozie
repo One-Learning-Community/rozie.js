@@ -1,0 +1,21 @@
+<rozie name="SlotConditionalSlotInElseifChain">
+
+<props>
+{
+  mode: { type: Number, default: 0 },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<!--
+  R10-1: slot as the MIDDLE branch of an r-if / r-else-if / r-else chain.
+  See BUG-LEDGER.md#R10-1.
+-->
+<div class="r"><span r-if="$props.mode === 0">zero</span><slot r-else-if="$props.mode === 1"></slot><span r-else>other</span></div>
+</template>
+
+</rozie>

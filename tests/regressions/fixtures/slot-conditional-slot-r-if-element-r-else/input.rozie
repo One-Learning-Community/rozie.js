@@ -1,0 +1,22 @@
+<rozie name="SlotConditionalSlotRIfElementRElse">
+
+<props>
+{
+  show: { type: Boolean, default: false },
+}
+</props>
+
+<script lang="ts">
+function noop(): void {}
+</script>
+
+<template>
+<!--
+  R10-1: slot r-if paired with an element r-else — the ternary lowering
+  `{cond ? <slot> : <p>}` double-wraps the slot mustache in the consequent
+  position. See BUG-LEDGER.md#R10-1.
+-->
+<div class="r"><slot r-if="$props.show"></slot><p r-else>nothing</p></div>
+</template>
+
+</rozie>
