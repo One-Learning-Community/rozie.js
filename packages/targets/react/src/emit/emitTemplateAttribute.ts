@@ -332,8 +332,19 @@ const BOOLEAN_HTML_ATTRS: ReadonlySet<string> = new Set([
 /**
  * Translate a bare DOM attribute name (lowercased) to its React JSX prop
  * name. For non-mapped names, returns the input unchanged.
+ *
+ * Quick 260711-i5m (editor-owns-focus contract): the alias table applies
+ * ONLY to actual DOM elements (`elementTagKind === 'html'`, the default when
+ * unset). A `<Component>` custom prop that happens to share a name with an
+ * HTML attribute (`autofocus`, `tabindex`, …) must pass through VERBATIM —
+ * React does not camelCase-alias arbitrary function-component props, so
+ * aliasing here silently breaks the binding (a `:autofocus="expr"` on a child
+ * component was emitted as `autoFocus={expr}`, which the component's
+ * declared `autofocus` prop never receives — found via EditorText's
+ * reactive-refocus VR test failing on React only).
  */
-function htmlAttrToJsxName(name: string): string {
+function htmlAttrToJsxName(name: string, elementTagKind?: 'html' | 'component' | 'self'): string {
+  if (elementTagKind === 'component' || elementTagKind === 'self') return name;
   const lower = name.toLowerCase();
   return HTML_TO_JSX_ATTR[lower] ?? name;
 }
@@ -346,9 +357,10 @@ function htmlAttrToJsxName(name: string): string {
  *
  * For DOM elements, hyphenated `aria-*` and `data-*` are preserved. For
  * everything else, the colon-prefixed form is converted to camelCase.
- * Then the HTML→JSX attribute alias map is applied for special-cased names.
+ * Then the HTML→JSX attribute alias map is applied for special-cased names
+ * (native DOM elements only — see `htmlAttrToJsxName`).
  */
-function colonPropToJsxName(name: string): string {
+function colonPropToJsxName(name: string, elementTagKind?: 'html' | 'component' | 'self'): string {
   // strip the leading ':' if present
   const bare = name.startsWith(':') ? name.slice(1) : name;
   // Preserve aria-/data- hyphenated form
@@ -358,8 +370,9 @@ function colonPropToJsxName(name: string): string {
   if (out.includes('-')) {
     out = out.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
   }
-  // Apply HTML→JSX special-case alias (tabindex → tabIndex, etc.).
-  return htmlAttrToJsxName(out);
+  // Apply HTML→JSX special-case alias (tabindex → tabIndex, etc.) — native
+  // DOM elements only.
+  return htmlAttrToJsxName(out, elementTagKind);
 }
 
 /**
@@ -1087,7 +1100,7 @@ function emitNonClassAttribute(
   }
   if (attr.kind === 'static') {
     // Apply HTML→JSX alias for special-cased names (tabindex → tabIndex, etc.)
-    const jsxName = htmlAttrToJsxName(attr.name);
+    const jsxName = htmlAttrToJsxName(attr.name, ctx.elementTagKind);
     // Valueless boolean HTML attribute (`<input multiple>`) — emit the JSX
     // boolean form `multiple={true}` (not `multiple=""`, which is a string
     // and fails React's boolean-typed JSX prop, TS2322). Quick task
@@ -1125,7 +1138,7 @@ function emitNonClassAttribute(
     // A `null`-fallback ternary (`x ? … : null`) is normalized to yield
     // `undefined` so React's `string | undefined` attr types accept it
     // (quick task 260520-w18). `style`/`class` already handled above.
-    const jsxName = colonPropToJsxName(attr.name);
+    const jsxName = colonPropToJsxName(attr.name, ctx.elementTagKind);
     const normalizedAttrExpr = normalizeNullAttrBinding(attr.expression);
     const exprCode = renderExpr(normalizedAttrExpr, ctx.ir);
     // Phase 26 (D-06/SPEC-4) — attribute-binding wrap. When the IR flags this
@@ -1212,7 +1225,7 @@ function emitNonClassAttribute(
     // propName casing is preserved (camelCase passes through colonPropToJsxName
     // unchanged when there are no hyphens / aria-/data- prefixes).
     const { local, setter } = resolveTwoWayTarget(attr.expression, ctx.ir);
-    const propName = colonPropToJsxName(attr.name);
+    const propName = colonPropToJsxName(attr.name, ctx.elementTagKind);
     const eventProp = `on${propName.charAt(0).toUpperCase()}${propName.slice(1)}Change`;
     return {
       jsx: `${propName}={${local}} ${eventProp}={${setter}}`,
@@ -1228,7 +1241,7 @@ function emitNonClassAttribute(
   }
 
   // interpolated
-  const jsxName = colonPropToJsxName(attr.name);
+  const jsxName = colonPropToJsxName(attr.name, ctx.elementTagKind);
   // Build a backtick template literal directly without class-token splitting
   let lit = '';
   for (const seg of attr.segments) {
