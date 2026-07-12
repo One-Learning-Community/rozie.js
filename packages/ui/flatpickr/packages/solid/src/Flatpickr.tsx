@@ -193,8 +193,8 @@ export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
       enableSeconds: local.enableSeconds,
       time_24hr: local.time24hr,
       noCalendar: local.noCalendar,
-      minDate: local.minDate,
-      maxDate: local.maxDate,
+      minDate: local.minDate ?? undefined,
+      maxDate: local.maxDate ?? undefined,
       defaultDate: date() || null,
       // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
       // These match flatpickr's own defaults so passing them is render-neutral.

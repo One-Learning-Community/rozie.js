@@ -1,0 +1,9 @@
+{
+  "id": "REG-260712-ig6-002",
+  "source": "260712-ig6-PLAN.md Task B",
+  "sourceKind": "deviation-log",
+  "phase": "quick-260712-ig6",
+  "desc": "a Solid null-widened (default: null) prop read spliced into an object-literal property passed to a 3rd-party-style call inside $onMount must coerce null to undefined at that splice site (TS2345/TS2322 against the 3rd-party lib's T | undefined options field)",
+  "targets": ["solid"],
+  "discoveredBy": "260712-ig6-PLAN.md"
+}

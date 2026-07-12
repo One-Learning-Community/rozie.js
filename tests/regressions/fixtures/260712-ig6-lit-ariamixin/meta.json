@@ -1,0 +1,9 @@
+{
+  "id": "REG-260712-ig6-001",
+  "source": "260712-ig6-PLAN.md Task A",
+  "sourceKind": "deviation-log",
+  "phase": "quick-260712-ig6",
+  "desc": "a Lit prop named after an ARIAMixin-reserved field (ariaLabel, role, etc.) with default: undefined must render a `| null`-compatible field, not the undefined-admitting Pattern B no-default `?:` form (TS2416/TS1240 collision with LitElement's implements ARIAMixin base field)",
+  "targets": ["lit"],
+  "discoveredBy": "260712-ig6-PLAN.md"
+}

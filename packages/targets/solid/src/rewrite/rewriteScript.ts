@@ -136,8 +136,22 @@ function buildSetterCall(
  * Distinct from Pattern D: Pattern D fires on `$refs` DOM-ref reads that are
  * THEMSELVES a direct call argument; this fires on `$props` reads nested
  * inside an object-literal call argument.
+ *
+ * `excludeCallees` DISQUALIFIES the match when the terminal call's callee is
+ * one of the emitter's OWN synthesized reactive setters (`set<Data>` /
+ * `set<ModelProp>`, minted by `buildSetterCall` for `$data.x = {...}` /
+ * `$model.x = {...}` writes). Those setter calls are Rozie-internal — the
+ * `{...}` argument feeds a Solid `createSignal` setter, not a 3rd-party lib's
+ * typed options object, so a null-widened prop spliced into one must stay
+ * `null` verbatim (the cross-target `PropDefaultCoercion` conformance probe
+ * asserts `JSON.stringify({ a: null, ... })` renders the literal `"a":null`
+ * substring on every target — `?? undefined` would DROP the key entirely,
+ * a real cross-target behavior regression, not a type-only change).
  */
-function isNullWidenedPropObjectLiteralCallArgTarget(path: NodePath): boolean {
+function isNullWidenedPropObjectLiteralCallArgTarget(
+  path: NodePath,
+  excludeCallees: Set<string>,
+): boolean {
   let cur: NodePath = path;
   for (;;) {
     const parent = cur.parentPath;
@@ -156,6 +170,8 @@ function isNullWidenedPropObjectLiteralCallArgTarget(path: NodePath): boolean {
       continue;
     }
     if (parent.isCallExpression() && parent.node.arguments.includes(cur.node as t.Node)) {
+      const callee = parent.node.callee;
+      if (t.isIdentifier(callee) && excludeCallees.has(callee.name)) return false;
       return true;
     }
     return false;
@@ -752,7 +768,7 @@ export function rewriteRozieIdentifiers(
           if (
             nonNullRefCallArgs &&
             nullWidenedNonModelProps.has(property.name) &&
-            isNullWidenedPropObjectLiteralCallArgTarget(path)
+            isNullWidenedPropObjectLiteralCallArgTarget(path, solidSetters)
           ) {
             const localRead = t.memberExpression(t.identifier('local'), t.identifier(property.name));
             path.replaceWith(t.logicalExpression('??', localRead, t.identifier('undefined')));
