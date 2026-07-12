@@ -58,6 +58,7 @@ import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import {
   rewriteRozieIdentifiers,
   hoistDoubleReadAccessors,
+  hoistPolymorphicModelGuards,
   normalizeModelAccessor,
 } from '../rewrite/rewriteScript.js';
 import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
@@ -906,6 +907,27 @@ export function emitScript(
   //     not reimplement). `$model` is model-only by contract (Wave 1) and always
   //     a member-expression object (D-03).
   normalizeModelAccessor(cloned);
+
+  // 1b-ter. Quick task 260711-v2l (project_angular_typeof_narrow_gap) — port of
+  //     Solid's `hoistPolymorphicModelGuards` (emitter-hardening backlog item
+  //     #11). A union/`unknown`-typed `model: true` prop lowers to a signal
+  //     accessor CALL (`this.X()`); TS does not narrow a `typeof`/`in` guard
+  //     across two separate calls the way it narrows a plain variable/property
+  //     read. Runs on the RAW (pre-rewrite) Program, same as
+  //     `normalizeModelAccessor` above and BEFORE `hoistDoubleReadAccessors` —
+  //     the injected `$props.X` prelude is left for the rewrite passes below to
+  //     lower to `this.X()`, and running it first means the double-read hoist
+  //     below does not also try to hoist the (now-replaced) guarded reads.
+  const polymorphicModelProps = new Set(
+    ir.props
+      .filter(
+        (p) =>
+          p.isModel &&
+          (p.typeAnnotation.kind === 'union' || renderType(p.typeAnnotation) === 'unknown'),
+      )
+      .map((p) => p.name),
+  );
+  hoistPolymorphicModelGuards(cloned, polymorphicModelProps);
 
   // 1c. Quick task 260520-w18 bug class 5 — hoist double-read $props/$data
   //     accessors to a single signal-read local. MUST run BEFORE

@@ -1,0 +1,36 @@
+<rozie name="AngularPolymorphicModelGuardNarrow">
+
+<props>
+{
+  // A polymorphic `model: true` prop (union type, mirrors DatePicker.rozie's
+  // real-world `value: [String, Object]`) — read through a `typeof` guard
+  // narrows fine on React/Vue/Svelte/Lit (variable/property reads) and on
+  // Solid (post emitter-hardening backlog item #11), but NOT on Angular
+  // before quick task 260711-v2l (a fresh `this.value()` accessor CALL each
+  // read; TS can't narrow across two separate calls) — an Angular-only
+  // TS2322 where the un-narrowed union feeds a string-typed return position.
+  value: {
+    type: [String, Object],
+    default: '',
+    model: true,
+  },
+}
+</props>
+
+<script lang="ts">
+// project_angular_typeof_narrow_gap / quick task 260711-v2l: capturing the
+// guard-and-reread pattern directly (no author-side workaround) — the
+// emitter must bind a local before the guard so the narrowing holds
+// uniformly on all six targets.
+const selected = (): string => (typeof $props.value === 'string' ? $props.value : '')
+</script>
+
+<template>
+<div class="selected">{{ selected() }}</div>
+</template>
+
+<style>
+.selected { font-variant-numeric: tabular-nums; }
+</style>
+
+</rozie>
