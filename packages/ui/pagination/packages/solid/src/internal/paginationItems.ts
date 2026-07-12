@@ -99,9 +99,10 @@ export function paginationItems(input: PaginationInput): PaginationModel {
     Math.min(page - siblingCount, totalPages - boundaryCount - siblingCount * 2 - 1),
     boundaryCount + 2,
   );
+  const endPagesFirst: number | undefined = endPages[0];
   const siblingsEnd = Math.min(
     Math.max(page + siblingCount, boundaryCount + siblingCount * 2 + 2),
-    endPages.length > 0 ? endPages[0] - 2 : totalPages - 1,
+    endPagesFirst !== undefined ? endPagesFirst - 2 : totalPages - 1,
   );
 
   const pages: PaginationItem[] = [];

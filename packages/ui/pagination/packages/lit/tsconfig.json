@@ -11,7 +11,7 @@
     "useDefineForClassFields": false,
     "noImplicitOverride": false,
     "skipLibCheck": true,
-    "strictNullChecks": false,
+    "strictNullChecks": true,
     "exactOptionalPropertyTypes": false,
     "noImplicitAny": false,
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
