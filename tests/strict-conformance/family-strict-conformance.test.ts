@@ -230,7 +230,10 @@ const FAMILIES: FamilySpec[] = [
       'DataTable.tsx': {
         // 11 → 13 (260708-ni6, grid pointer §1): the two new `isActiveCell(...)` header
         // calls mirror `cellTabindex`'s existing `level = null` inherent strict-null shape.
-        TS2345: 13,
+        // 13 → 11 (260712-kl1): `createControllableSignal<T>` now widens to `T | null`
+        // for a literal `default: null` model prop — `expanded`/`grouping` (2 sites)
+        // no longer TS2345 (`null` not assignable to `T`) under strictNullChecks.
+        TS2345: 11,
         TS2379: 1,
         TS7023: 1,
         TS7022: 1,

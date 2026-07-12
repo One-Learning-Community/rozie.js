@@ -119,7 +119,7 @@ export default function NumberField(_props: NumberFieldProps): JSX.Element {
   const [local, attrs] = splitProps(_merged, ['modelValue', 'min', 'max', 'step', 'largeStep', 'formatOptions', 'allowScrub', 'disabled', 'readonly', 'ariaLabel', 'ref']);
   onMount(() => { local.ref?.({ focus, increment, decrement, clear }); });
 
-  const [modelValue, setModelValue] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'modelValue', null);
+  const [modelValue, setModelValue] = createControllableSignal<number | null>(_props as unknown as Record<string, unknown>, 'modelValue', null);
   const [text, setText] = createSignal('');
   const [focused, setFocused] = createSignal(false);
   onMount(() => {

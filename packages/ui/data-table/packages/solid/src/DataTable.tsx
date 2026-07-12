@@ -579,8 +579,8 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     pageIndex: 0,
     pageSize: 10
   }))());
-  const [expanded, setExpanded] = createControllableSignal<Record<string, any> | boolean>(_props as unknown as Record<string, unknown>, 'expanded', null);
-  const [grouping, setGrouping] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'grouping', null);
+  const [expanded, setExpanded] = createControllableSignal<Record<string, any> | boolean | null>(_props as unknown as Record<string, unknown>, 'expanded', null);
+  const [grouping, setGrouping] = createControllableSignal<any[] | null>(_props as unknown as Record<string, unknown>, 'grouping', null);
   const [rowSelection, setRowSelection] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'rowSelection', (() => ({}))());
   const [columnVisibility, setColumnVisibility] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'columnVisibility', (() => ({}))());
   const [columnSizing, setColumnSizing] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'columnSizing', (() => ({}))());
