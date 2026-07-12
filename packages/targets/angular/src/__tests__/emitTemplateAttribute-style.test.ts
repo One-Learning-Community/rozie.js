@@ -4,9 +4,21 @@
  * Confirming test (Spike 004 Iteration-4 asymmetry): Angular's generic
  * property-binding path emits `[style]="<expr>"`, and `[style]` accepts a
  * string-or-object since Angular v9 — so a dynamic-string `:style` needs
- * NO emitter change and NO `parseInlineStyle` runtime helper. This test
- * pins that behavior so a future refactor cannot silently route Angular
- * through the React/Solid object-helper path.
+ * NO `parseInlineStyle` runtime helper. This test pins that behavior so a
+ * future refactor cannot silently route Angular through the React/Solid
+ * object-helper path.
+ *
+ * SUPERSEDED (Quick task 260711-tgk): a `:style` binding whose expression is
+ * PROVABLY a string (StringLiteral/TemplateLiteral/`+`-concat/both-provable-
+ * Conditional — see isProvablyStringStyleExpression) now emits
+ * `[attr.style]="<expr>"` instead of `[style]="<expr>"`. `[attr.style]`
+ * compiles to `ɵɵattribute`/`setAttribute`, which the browser parses with
+ * the same tolerant CSS parser the other 5 targets already rely on —
+ * `[style]="<expr>"` binds through `ɵɵstyleMap`, whose parser corrupts on an
+ * empty declaration (a `;;` produced by string concatenation), silently
+ * dropping the following declaration. This fixture's expression (a
+ * StringLiteral `+` a both-string-branch Conditional) is provably a string,
+ * so it now takes the `[attr.style]=` path — updated below to match.
  */
 import { describe, it, expect } from 'vitest';
 import { parse } from '../../../../core/src/parse.js';
@@ -24,7 +36,7 @@ function lowerInline(src: string): IRComponent {
 }
 
 describe('emitTemplateAttribute (Angular) — dynamic-string `:style` native passthrough', () => {
-  it('dynamic-string `:style` emits native `[style]="<expr>"`, no parseInlineStyle helper', () => {
+  it('provably-string `:style` emits `[attr.style]="<expr>"` (260711-tgk), no parseInlineStyle helper', () => {
     const ir = lowerInline(`<rozie name="Test">
 <data>{ cond: true }</data>
 <template>
@@ -32,9 +44,11 @@ describe('emitTemplateAttribute (Angular) — dynamic-string `:style` native pas
 </template>
 </rozie>`);
     const { template } = emitTemplate(ir, createDefaultRegistry());
-    // Angular passes a string `:style` through natively via the generic
-    // property-binding path — `[style]="<expr>"`.
-    expect(template).toMatch(/\[style\]="/);
+    // 260711-tgk — this expression is PROVABLY a string (StringLiteral `+` a
+    // both-branch-string Conditional), so it takes the `[attr.style]=` path
+    // (setAttribute, tolerant browser CSS parsing) rather than `[style]=`
+    // (ɵɵstyleMap, which corrupts on a `;;` empty declaration).
+    expect(template).toMatch(/\[attr\.style\]="/);
     expect(template).toContain("'opacity: '");
     // No React/Solid runtime helper, no PostCSS, in Angular output.
     expect(template).not.toContain('parseInlineStyle');
