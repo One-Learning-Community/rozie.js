@@ -2,12 +2,14 @@
   // experimentalDecorators/useDefineForClassFields/noImplicitOverride: the
   // documented Lit + TS decorator config (root base sets noImplicitOverride:true
   // but the generated Lit code does not emit `override`).
-  // strictNullChecks/exactOptionalPropertyTypes/noImplicitAny relaxed: the
-  // emitted Lit output is bundler-built (tsdown/oxc), not strict-tsc-authored.
-  // Emitted refs (typed string|null, null-initialized signals) are
-  // proven-correct via dist-parity but are not author-strictness-clean. This
-  // gate typechecks generated code, so it opts out of the author-strictness
-  // flags the codegen does not satisfy while keeping the rest of strict mode.
+  // exactOptionalPropertyTypes/noImplicitAny relaxed: the emitted Lit output
+  // is bundler-built (tsdown/oxc), not strict-tsc-authored. This gate
+  // typechecks generated code, so it opts out of the author-strictness flags
+  // the codegen does not satisfy while keeping the rest of strict mode.
+  // strictNullChecks: true (260712-ig6) — the last residual (the ARIAMixin
+  // `ariaLabel` field-name collision, TS2416/TS1240) is now closed at the
+  // emitter (Lit `renderFieldSuffix` ARIA_MIXIN_FIELDS gate); this leaf
+  // typechecks clean under strictNullChecks.
   //
   // No `paths` alias for `chart.js`: the published chart.js package ships real
   // types.
@@ -23,7 +25,7 @@
     "useDefineForClassFields": false,
     "noImplicitOverride": false,
     "skipLibCheck": true,
-    "strictNullChecks": false,
+    "strictNullChecks": true,
     "exactOptionalPropertyTypes": false,
     "noImplicitAny": false,
     "lib": ["ES2022", "DOM", "DOM.Iterable"]

@@ -224,6 +224,59 @@ function isUndefinedDefault(expr: t.Expression): boolean {
   );
 }
 
+/**
+ * 260712-ig6 Task A — the full ARIAMixin field-name set (lib.dom.d.ts). A
+ * prop authored with one of these names collides with LitElement's own
+ * `implements ARIAMixin` field declaration (always `<T> | null`, NEVER
+ * `undefined`-admitting) if it lands in the ordinary no-default `?:`/`!:`
+ * branch below — Pattern B's `default: undefined` routes there and would
+ * otherwise emit `ariaLabel?: string;` (`string | undefined`), which is not
+ * assignable to the base class's `string | null` field (TS2416/TS1240).
+ * Gated STRICTLY on name-set membership so every other prop name keeps its
+ * pre-existing byte-identical `?:`/`!:` output.
+ */
+const ARIA_MIXIN_FIELDS = new Set([
+  'ariaAtomic',
+  'ariaAutoComplete',
+  'ariaBusy',
+  'ariaChecked',
+  'ariaColCount',
+  'ariaColIndex',
+  'ariaColSpan',
+  'ariaCurrent',
+  'ariaDescription',
+  'ariaDisabled',
+  'ariaExpanded',
+  'ariaHasPopup',
+  'ariaHidden',
+  'ariaInvalid',
+  'ariaKeyShortcuts',
+  'ariaLabel',
+  'ariaLevel',
+  'ariaLive',
+  'ariaModal',
+  'ariaMultiLine',
+  'ariaMultiSelectable',
+  'ariaOrientation',
+  'ariaPlaceholder',
+  'ariaPosInSet',
+  'ariaPressed',
+  'ariaReadOnly',
+  'ariaRequired',
+  'ariaRoleDescription',
+  'ariaRowCount',
+  'ariaRowIndex',
+  'ariaRowSpan',
+  'ariaSelected',
+  'ariaSetSize',
+  'ariaSort',
+  'ariaValueMax',
+  'ariaValueMin',
+  'ariaValueNow',
+  'ariaValueText',
+  'role',
+]);
+
 function renderFieldSuffix(prop: PropDecl): string {
   const tsType = renderTsType(prop.typeAnnotation);
   if (prop.defaultValue != null && !isUndefinedDefault(prop.defaultValue)) {
@@ -251,6 +304,19 @@ function renderFieldSuffix(prop: PropDecl): string {
       fieldType = `${fieldType} | null`;
     }
     return `: ${fieldType} = ${renderDefault(prop.defaultValue, prop.typeAnnotation)}`;
+  }
+  // 260712-ig6 Task A — an ARIAMixin-named prop falls through to here for the
+  // `default: undefined` / no-default shapes (Pattern B's no-default branch).
+  // The ordinary `?:`/`!:` forms both admit `undefined` in the field's
+  // effective type, which collides with LitElement's `implements ARIAMixin`
+  // base field (`<T> | null`, never `undefined`). Route ONLY these names to a
+  // `| null`-compatible declared+initialized form instead — mirrors the
+  // `t.isNullLiteral` widening carve-out above, but keyed on field NAME
+  // rather than default-value shape. Every other prop name is untouched.
+  if (ARIA_MIXIN_FIELDS.has(prop.name)) {
+    const admitsNull = /\bnull\b/.test(tsType) || /(^|\|)\s*(any|unknown)\s*(\||$)/.test(tsType);
+    const nullableType = admitsNull ? tsType : `${tsType} | null`;
+    return `: ${nullableType} = null`;
   }
   return prop.required ? `!: ${tsType}` : `?: ${tsType}`;
 }

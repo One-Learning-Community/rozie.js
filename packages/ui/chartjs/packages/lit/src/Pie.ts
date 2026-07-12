@@ -71,7 +71,7 @@ export default class Pie extends SignalWatcher(LitElement) {
   /**
    * Accessible label applied to the `<canvas role="img">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.
    */
-  @property({ type: String, reflect: true }) ariaLabel?: string;
+  @property({ type: String, reflect: true }) ariaLabel: string | null = null;
   /**
    * The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the "first dataset copied over the others" hazard.
    */

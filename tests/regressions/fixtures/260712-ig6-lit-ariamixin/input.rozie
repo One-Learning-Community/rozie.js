@@ -1,0 +1,30 @@
+<rozie name="LitAriaMixin">
+
+<props>
+{
+  // 260712-ig6 Task A — a prop named after an ARIAMixin-reserved field
+  // (`ariaLabel`) with `default: undefined` routes through Pattern B's
+  // no-default `?:` branch and emits `ariaLabel?: string;` (i.e.
+  // `string | undefined`). LitElement `implements ARIAMixin`, whose
+  // `ariaLabel` field is declared `string | null` — the `undefined`-admitting
+  // field collides (TS2416/TS1240) under strictNullChecks.
+  ariaLabel: { type: String, default: undefined },
+  // Byte-identity control — NOT an ARIAMixin field name, same
+  // `default: undefined` shape. Must keep emitting the pre-existing
+  // `label?: string;` no-default form, unaffected by this fix.
+  label: { type: String, default: undefined },
+}
+</props>
+
+<template>
+<div class="lit-ariamixin">
+  <p r-if="$props.ariaLabel">{{ $props.ariaLabel }}</p>
+  <p r-if="$props.label">{{ $props.label }}</p>
+</div>
+</template>
+
+<style>
+.lit-ariamixin { display: block; }
+</style>
+
+</rozie>
