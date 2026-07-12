@@ -1,0 +1,9 @@
+{
+  "id": "QA-260711-tgk",
+  "source": "quick/260711-tgk-fix-angular-style-double-semicolon-drop-",
+  "sourceKind": "commit",
+  "phase": "quick-260711-tgk",
+  "desc": "A provably-string :style built via `+` concatenation that yields `;;` emits [attr.style]= on Angular (setAttribute, tolerant CSS parser) instead of [style]= (ɵɵstyleMap, which corrupts on the empty declaration and drops the trailing decl). A co-existing static style= forces the multi-source merge path ([ngStyle]=), which must stay unchanged.",
+  "targets": ["angular", "react", "vue", "svelte", "solid", "lit"],
+  "discoveredBy": "data-table VR filterPaginationRowChrome"
+}

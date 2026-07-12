@@ -1,0 +1,45 @@
+<rozie name="StyleDoubleSemicolon">
+
+<props>
+{
+  colId: { type: String, default: 'a' },
+}
+</props>
+
+<data>
+{
+  pad: 'padding-left:8px',
+}
+</data>
+
+<script>
+const pinStyle = (id) => `z-index:1;`
+</script>
+
+<template>
+<div>
+  <!--
+    BUG element — a provably-string `:style` built via `+` concatenation,
+    mirroring the real-world shape `pinStyle(colId) + ';' + pad`. pinStyle()
+    already ends in `;`, so concatenating another `;` literal produces a `;;`
+    double-semicolon. Angular's `[style]=` (ɵɵstyleMap) parser corrupts on
+    the empty declaration and silently DROPS the trailing padding-left decl
+    — unlike the other 5 targets, which apply the raw string via the
+    browser's tolerant CSS parser. This element must flip to
+    `[attr.style]="<expr>"` on Angular (setAttribute, tolerant parsing).
+  -->
+  <span :style="pinStyle($props.colId) + ';' + $data.pad">bug element</span>
+
+  <!--
+    MERGE-GUARD element — a co-existing static `style=` attribute PLUS a
+    provably-string `:style` binding on the SAME element. This forces
+    `counts.get('style') > 1` in emitAttributes, which MUST route through
+    Angular's existing multi-source merge path (`style="..."` + `[ngStyle]=`)
+    — NEVER `[attr.style]=`, even though the dynamic value here is also
+    provably a string. Proves the sole-style-contributor guarantee holds.
+  -->
+  <span style="color:red" :style="'font-weight:bold;'">merge-guard element</span>
+</div>
+</template>
+
+</rozie>
