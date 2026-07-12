@@ -1,0 +1,27 @@
+<rozie name="SolidControllableNullDefault">
+
+<props>
+{
+  // 260712-kl1 — a model:true prop with a literal `default: null`.
+  // `createControllableSignal<T>` is emitted with `T` = the prop's declared
+  // type (`number`), but the initial-value THIRD ARG is literally `null` —
+  // before the fix this is TS2345 (`null` not assignable to `number`) under
+  // strictNullChecks:true.
+  value: { type: Number, model: true, default: null },
+}
+</props>
+
+<script lang="ts">
+</script>
+
+<template>
+<div class="solid-controllable-null-default">
+  <span>{{ $props.value }}</span>
+</div>
+</template>
+
+<style>
+.solid-controllable-null-default { display: block; }
+</style>
+
+</rozie>

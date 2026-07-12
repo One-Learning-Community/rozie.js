@@ -1,0 +1,9 @@
+{
+  "id": "REG-260712-kl1-001",
+  "source": "260712-kb9-RESEARCH.md NEW-controllable-null-default",
+  "sourceKind": "deviation-log",
+  "phase": "quick-260712-kl1",
+  "desc": "a Solid model:true prop with a literal `default: null` emits createControllableSignal<T>(...) with a null third arg while T excludes null — widen the generic to T | null when the default is a Babel NullLiteral",
+  "targets": ["solid"],
+  "discoveredBy": "260712-kb9-RESEARCH.md"
+}
