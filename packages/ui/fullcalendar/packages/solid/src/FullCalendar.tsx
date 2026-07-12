@@ -134,11 +134,11 @@ export interface FullCalendarHandle {
 }
 
 export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
-  const _merged = mergeProps({ events: (() => [])(), weekends: true, editable: true, selectable: true, height: 480, defaultColor: '#3b82f6', locale: 'en', firstDay: 0, slotDuration: '00:30:00', nowIndicator: false, headerToolbar: (() => ({
+  const _merged = mergeProps({ events: (() => [])() as any[], weekends: true, editable: true, selectable: true, height: 480, defaultColor: '#3b82f6', locale: 'en', firstDay: 0, slotDuration: '00:30:00', nowIndicator: false, headerToolbar: (() => ({
   left: 'prev,next today',
   center: 'title',
   right: 'dayGridMonth,timeGridWeek,timeGridDay'
-}))(), options: (() => ({}))() }, _props);
+}))() as Record<string, any>, options: (() => ({}))() as Record<string, any> }, _props);
   const [local, attrs] = splitProps(_merged, ['events', 'view', 'weekends', 'editable', 'selectable', 'height', 'defaultColor', 'locale', 'firstDay', 'slotDuration', 'nowIndicator', 'headerToolbar', 'options', 'ref']);
   onMount(() => { local.ref?.({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate, getDate, getEvents, scrollToTime, updateSize, prevYear, nextYear, selectRange, clearSelection }); });
 

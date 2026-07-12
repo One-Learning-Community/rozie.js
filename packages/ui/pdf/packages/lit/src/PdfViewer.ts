@@ -63,7 +63,7 @@ export default class PdfViewer extends SignalWatcher(LitElement) {
    * @example
    * <PdfViewer :src="pdfUrl" r-model:page="page" />
    */
-  @property({ type: Object }) src: unknown = undefined;
+  @property({ type: Object }) src?: unknown;
   /**
    * The 1-based current page. The sole `model: true` prop — **two-way** (`r-model:page` / `v-model:page` / `bind:page` / `[(page)]`), so `page` also drives the Angular `ControlValueAccessor`. In single-page mode it drives which page renders; in `render-all-pages` mode it reflects the scrolled-to page (and scrolls the container when the consumer writes it). Clamped to `[1, pageCount]`.
    */
@@ -80,11 +80,11 @@ export default class PdfViewer extends SignalWatcher(LitElement) {
   /**
    * The PDF.js worker URL, set on `GlobalWorkerOptions.workerSrc` before loading. Defaults to the jsDelivr CDN copy matching the installed `pdfjs-dist`'s own `.version` (read at runtime, not a hand-typed string), so the component works with zero config and the default can't drift from the engine version your app resolves. Override for offline / a strict CSP / a bundled worker.
    */
-  @property({ type: String, reflect: true }) workerSrc: string = undefined;
+  @property({ type: String, reflect: true }) workerSrc?: string;
   /**
    * The directory of PDF.js's standard-font data so the base-14 fonts (Helvetica / Times / Courier / …) render with correct glyphs. Defaults to the jsDelivr CDN dir matching the installed `pdfjs-dist`'s own `.version` (same runtime-version rationale as `workerSrc`). Override (or pass a bundled dir) for offline / a strict CSP.
    */
-  @property({ type: String, reflect: true }) standardFontDataUrl: string = undefined;
+  @property({ type: String, reflect: true }) standardFontDataUrl?: string;
   /**
    * `false` (default) renders a single page with nav (the two-way `page` drives it). `true` renders a continuous scroll of every page; the most-visible page reflects back into `page` and the `pagechange` event via an `IntersectionObserver`.
    */
@@ -96,15 +96,15 @@ export default class PdfViewer extends SignalWatcher(LitElement) {
   /**
    * Password for an encrypted PDF. If the document is encrypted and no (or a wrong) password is set, the `passwordrequest` event fires with `{ reason }`. Changing it reloads the document.
    */
-  @property({ type: Object }) password: unknown = undefined;
+  @property({ type: Object }) password?: unknown;
   /**
    * A reactive search query — the **controlled** alternative to the imperative `find()` handle. Setting it to a non-empty string scans every page, navigates to + coarse-highlights the first match, and emits `findresult` with the total occurrence count; clearing it (empty string / `null`) clears the highlight. Reactive so it works uniformly across all six targets (an Angular child-component `ref` cannot reach the `$expose` handle from a template event handler — the same reason `page` is a two-way model rather than a handle call).
    */
-  @property({ type: Object }) query: unknown = undefined;
+  @property({ type: Object }) query?: unknown;
   /**
    * Opt-in resize-observed auto-refit: `'width'` calls the equivalent of `fitWidth()` whenever the container resizes; `'page'` calls the equivalent of `fitPage()`. Unset (default) leaves today's behavior unchanged — no automatic refit; wire your own resize sensor if you need one. **Not recommended combined with a content-driven container height** (see the no-scroll container recipe): `'page'` mode measures both width and height, and a `height: auto` container can feedback-loop with the refit. `'width'` mode has no such risk — its measurement stays layout-driven either way.
    */
-  @property({ type: Object }) autoFit: unknown = undefined;
+  @property({ type: Object }) autoFit?: unknown;
   /**
    * Raw `getDocument` `DocumentInitParameters` passthrough — spread **before** the curated keys (explicit `src` / `password` win). For `cMapUrl`, `httpHeaders`, `withCredentials`, etc.
    */

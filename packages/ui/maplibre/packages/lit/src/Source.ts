@@ -22,7 +22,7 @@ export default class Source extends SignalWatcher(LitElement) {
   /**
    * The `SourceSpecification` (geojson / vector / raster / …). Registered into the parent `<MapLibre>` on mount and reconciled via `setData` (geojson) or re-add on change, once the style has loaded.
    */
-  @property({ type: Object }) spec: unknown = undefined;
+  @property({ type: Object }) spec?: unknown;
 private __rozieWatchInitial_0 = true;
 private __rozieFirstUpdateDone = false;
 private __rozieCtxProvider_maplibre_source = new ContextProvider(this, { context: __rozieCtx_maplibre_source, initialValue: ((__rozieCtxHost) => ({

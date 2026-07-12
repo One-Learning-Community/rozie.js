@@ -198,7 +198,7 @@ export interface ListboxHandle {
 }
 
 export default function Listbox(_props: ListboxProps): JSX.Element {
-  const _merged = mergeProps({ options: (() => [])(), multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }, _props);
+  const _merged = mergeProps({ options: (() => [])() as any[], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }, _props);
   const [local, attrs] = splitProps(_merged, ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'id', 'ariaLabel', 'virtual', 'estimateRowHeight', 'maxHeight', 'ref']);
   onMount(() => { local.ref?.({ open, close, toggle, clear, focusControl }); });
 

@@ -200,7 +200,7 @@ export interface CarouselHandle {
 }
 
 export default function Carousel(_props: CarouselProps): JSX.Element {
-  const _merged = mergeProps({ slides: (() => [])(), loop: false, align: 'center', axis: 'x', slidesToScroll: 1, dragFree: false, draggable: true, containScroll: 'trimSnaps', startIndex: 0, skipSnaps: false, duration: 25, direction: 'ltr', autoplay: false, autoplayDelay: 4000, dots: false, arrows: false, thumbnails: false, plugins: (() => [])(), options: (() => ({}))() }, _props);
+  const _merged = mergeProps({ slides: (() => [])() as any[], loop: false, align: 'center', axis: 'x', slidesToScroll: 1, dragFree: false, draggable: true, containScroll: 'trimSnaps', startIndex: 0, skipSnaps: false, duration: 25, direction: 'ltr', autoplay: false, autoplayDelay: 4000, dots: false, arrows: false, thumbnails: false, plugins: (() => [])() as any[], options: (() => ({}))() as Record<string, any> }, _props);
   const [local, attrs] = splitProps(_merged, ['slides', 'loop', 'align', 'axis', 'slidesToScroll', 'dragFree', 'draggable', 'containScroll', 'startIndex', 'skipSnaps', 'duration', 'direction', 'autoplay', 'autoplayDelay', 'dots', 'arrows', 'thumbnails', 'plugins', 'options', 'selectedIndex', 'children', 'ref']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ scrollNext, scrollPrev, scrollToIndex, reInitCarousel, canScrollNext, canScrollPrev, getSelectedIndex, scrollSnapList, scrollProgress, slidesInView, slidesNotInView, previousScrollSnap, getPlugins, getInstance }); });
@@ -212,13 +212,13 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   const [canNext, setCanNext] = createSignal(false);
   onMount(() => {
     const _cleanup = (() => {
-    embla = EmblaCarousel(viewportElRef, emblaOptionsFromProps(), emblaPluginsFromProps());
+    embla = EmblaCarousel(viewportElRef!, emblaOptionsFromProps(), emblaPluginsFromProps());
 
     // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
     // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
     // only $refs-safe site). Stays null otherwise (zero overhead).
     if (local.thumbnails && thumbsViewportElRef) {
-      emblaThumbs = EmblaCarousel(thumbsViewportElRef, thumbsOptionsFromProps());
+      emblaThumbs = EmblaCarousel(thumbsViewportElRef!, thumbsOptionsFromProps());
     }
 
     // engine → consumer: on every snap change write the two-way model AND fire the

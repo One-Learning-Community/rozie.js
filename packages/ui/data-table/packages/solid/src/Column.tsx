@@ -64,7 +64,7 @@ interface ColumnProps {
 }
 
 export default function Column(_props: ColumnProps): JSX.Element {
-  const _merged = mergeProps({ id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '', expandable: false, groupable: true, aggregationFn: null, editable: false, editor: 'text', editorOptions: (() => [])(), validate: null }, _props);
+  const _merged = mergeProps({ id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '', expandable: false, groupable: true, aggregationFn: null, editable: false, editor: 'text', editorOptions: (() => [])() as any[], validate: null }, _props);
   const [local, attrs] = splitProps(_merged, ['id', 'field', 'header', 'sortable', 'filterable', 'pinned', 'width', 'expandable', 'groupable', 'aggregationFn', 'editable', 'editor', 'editorOptions', 'validate']);
 
   const registry = useContext(rozieContext("data-table:columns"));

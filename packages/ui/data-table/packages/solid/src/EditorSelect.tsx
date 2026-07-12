@@ -35,7 +35,7 @@ interface EditorSelectProps {
 }
 
 export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
-  const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null, options: (() => [])() }, _props);
+  const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null, options: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'options']);
 
   const [draft, setDraft] = createSignal('');

@@ -55,7 +55,7 @@ export default class Bubble extends SignalWatcher(LitElement) {
   /**
    * Optional fixed chart width in pixels. Omit for the default full-width responsive box.
    */
-  @property({ type: Number, reflect: true }) width: number = undefined;
+  @property({ type: Number, reflect: true }) width?: number;
   /**
    * Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.
    */
@@ -63,7 +63,7 @@ export default class Bubble extends SignalWatcher(LitElement) {
   /**
    * The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).
    */
-  @property({ type: String, reflect: true }) updateMode: string = undefined;
+  @property({ type: String, reflect: true }) updateMode?: string;
   /**
    * When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.
    */
@@ -71,7 +71,7 @@ export default class Bubble extends SignalWatcher(LitElement) {
   /**
    * Accessible label applied to the `<canvas role="img">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.
    */
-  @property({ type: String, reflect: true }) ariaLabel: string = undefined;
+  @property({ type: String, reflect: true }) ariaLabel?: string;
   /**
    * The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the "first dataset copied over the others" hazard.
    */

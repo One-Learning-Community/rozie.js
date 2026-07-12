@@ -15,7 +15,6 @@
     "useDefineForClassFields": false,
     "noImplicitOverride": false,
     "skipLibCheck": true,
-    "strictNullChecks": false,
     "exactOptionalPropertyTypes": false,
     "noImplicitAny": false,
     "lib": [

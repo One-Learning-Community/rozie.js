@@ -57,7 +57,7 @@ export interface CaptchaHandle {
 }
 
 export default function Captcha(_props: CaptchaProps): JSX.Element {
-  const _merged = mergeProps({ provider: 'recaptcha', theme: 'light', size: 'normal', tabindex: null, options: (() => ({}))() }, _props);
+  const _merged = mergeProps({ provider: 'recaptcha', theme: 'light', size: 'normal', tabindex: null, options: (() => ({}))() as Record<string, any> }, _props);
   const [local, attrs] = splitProps(_merged, ['provider', 'sitekey', 'token', 'theme', 'size', 'tabindex', 'options', 'ref']);
   onMount(() => { local.ref?.({ reset, execute, getResponse }); });
 
@@ -73,7 +73,7 @@ export default function Captcha(_props: CaptchaProps): JSX.Element {
     loadCaptchaApi(local.provider).then((a: any) => {
       if (disposed) return;
       api = a;
-      widgetId = api.render(widgetElRef, buildConfig());
+      widgetId = api.render(widgetElRef!, buildConfig());
     }).catch((err: any) => {
       _props.onError?.({
         provider: local.provider,

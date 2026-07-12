@@ -174,7 +174,7 @@ export interface CodeMirrorHandle {
 }
 
 export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
-  const _merged = mergeProps({ language: 'javascript', theme: 'light', readOnly: false, height: 240, placeholder: '', extensions: (() => [])(), basicSetup: false, gutterLines: (() => [])(), decorations: (() => [])() }, _props);
+  const _merged = mergeProps({ language: 'javascript', theme: 'light', readOnly: false, height: 240, placeholder: '', extensions: (() => [])() as any[], basicSetup: false, gutterLines: (() => [])() as any[], decorations: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['value', 'language', 'theme', 'readOnly', 'height', 'placeholder', 'extensions', 'basicSetup', 'gutterLines', 'decorations', 'ref']);
   onMount(() => { local.ref?.({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelection, setSelection, undo, redo, selectAll, scrollToPos }); });
 

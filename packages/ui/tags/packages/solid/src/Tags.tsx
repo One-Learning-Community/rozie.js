@@ -153,7 +153,7 @@ export interface TagsHandle {
 }
 
 export default function Tags(_props: TagsProps): JSX.Element {
-  const _merged = mergeProps({ delimiters: (() => [',', 'Enter'])(), allowDuplicates: false, max: null, disabled: false, readonly: false, validate: null, placeholder: '', ariaLabel: null }, _props);
+  const _merged = mergeProps({ delimiters: (() => [',', 'Enter'])() as any[], allowDuplicates: false, max: null, disabled: false, readonly: false, validate: null, placeholder: '', ariaLabel: null }, _props);
   const [local, attrs] = splitProps(_merged, ['modelValue', 'delimiters', 'allowDuplicates', 'max', 'disabled', 'readonly', 'validate', 'placeholder', 'ariaLabel', 'ref']);
   onMount(() => { local.ref?.({ clear, focus }); });
 

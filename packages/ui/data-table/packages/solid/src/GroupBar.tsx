@@ -81,7 +81,7 @@ interface GroupBarProps {
 }
 
 export default function GroupBar(_props: GroupBarProps): JSX.Element {
-  const _merged = mergeProps({ grouping: (() => [])(), groupableColumns: (() => [])(), applyGrouping: null, clearGrouping: null }, _props);
+  const _merged = mergeProps({ grouping: (() => [])() as any[], groupableColumns: (() => [])() as any[], applyGrouping: null, clearGrouping: null }, _props);
   const [local, attrs] = splitProps(_merged, ['grouping', 'groupableColumns', 'applyGrouping', 'clearGrouping']);
 
   const [draggingId, setDraggingId] = createSignal('');

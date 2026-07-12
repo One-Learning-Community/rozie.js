@@ -142,7 +142,7 @@ export interface CommandPaletteHandle {
 }
 
 export default function CommandPalette(_props: CommandPaletteProps): JSX.Element {
-  const _merged = mergeProps({ items: (() => [])(), placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette' }, _props);
+  const _merged = mergeProps({ items: (() => [])() as any[], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette' }, _props);
   const [local, attrs] = splitProps(_merged, ['open', 'query', 'items', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase', 'ref']);
   onMount(() => { local.ref?.({ show, close, toggle, focus }); });
 

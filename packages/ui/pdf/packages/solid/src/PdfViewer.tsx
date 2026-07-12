@@ -140,7 +140,7 @@ export interface PdfViewerHandle {
 }
 
 export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
-  const _merged = mergeProps({ src: undefined, scale: 1, rotation: 0, workerSrc: undefined, standardFontDataUrl: undefined, renderAllPages: false, textLayer: true, password: undefined, query: undefined, autoFit: undefined, options: (() => ({}))() }, _props);
+  const _merged = mergeProps({ src: undefined, scale: 1, rotation: 0, workerSrc: undefined, standardFontDataUrl: undefined, renderAllPages: false, textLayer: true, password: undefined, query: undefined, autoFit: undefined, options: (() => ({}))() as Record<string, any> }, _props);
   const [local, attrs] = splitProps(_merged, ['src', 'page', 'scale', 'rotation', 'workerSrc', 'standardFontDataUrl', 'renderAllPages', 'textLayer', 'password', 'query', 'autoFit', 'options', 'ref']);
   onMount(() => { local.ref?.({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, getPageElement, find, findNext, findPrev, clearFind }); });
 

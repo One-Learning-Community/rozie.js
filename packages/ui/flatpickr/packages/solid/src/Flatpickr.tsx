@@ -177,14 +177,14 @@ export interface FlatpickrHandle {
 }
 
 export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
-  const _merged = mergeProps({ mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: (() => ({}))(), name: '', inline: false, staticPosition: false, position: 'auto', appendTo: null, showMonths: 1, weekNumbers: false, monthSelectorType: 'dropdown', prevArrow: null, nextArrow: null, allowInput: false, disable: (() => [])(), enable: (() => [])(), locale: null, firstDayOfWeek: 0, parseDate: null, formatDate: null, plugins: (() => [])() }, _props);
+  const _merged = mergeProps({ mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: (() => ({}))() as Record<string, any>, name: '', inline: false, staticPosition: false, position: 'auto', appendTo: null, showMonths: 1, weekNumbers: false, monthSelectorType: 'dropdown', prevArrow: null, nextArrow: null, allowInput: false, disable: (() => [])() as any[], enable: (() => [])() as any[], locale: null, firstDayOfWeek: 0, parseDate: null, formatDate: null, plugins: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['date', 'mode', 'dateFormat', 'altInput', 'altFormat', 'enableTime', 'enableSeconds', 'time24hr', 'noCalendar', 'minDate', 'maxDate', 'placeholder', 'disabled', 'commitOn', 'options', 'name', 'inline', 'staticPosition', 'position', 'appendTo', 'showMonths', 'weekNumbers', 'monthSelectorType', 'prevArrow', 'nextArrow', 'allowInput', 'disable', 'enable', 'locale', 'firstDayOfWeek', 'parseDate', 'formatDate', 'plugins', 'ref']);
   onMount(() => { local.ref?.({ clear, openPicker, closePicker, selectDate, jumpToDate, getSelectedDates, togglePicker, changeMonth, changeYear }); });
 
   const [date, setDate] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'date', '');
   onMount(() => {
     const _cleanup = (() => {
-    instance = flatpickr(inputElRef, {
+    instance = flatpickr(inputElRef!, {
       mode: local.mode,
       dateFormat: local.dateFormat,
       altInput: local.altInput,

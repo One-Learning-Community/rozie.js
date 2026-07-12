@@ -27,7 +27,7 @@ interface FilterSelectProps {
 }
 
 export default function FilterSelect(_props: FilterSelectProps): JSX.Element {
-  const _merged = mergeProps({ columnId: '', column: null, value: null, setFilter: null, uniqueValues: (() => [])() }, _props);
+  const _merged = mergeProps({ columnId: '', column: null, value: null, setFilter: null, uniqueValues: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'value', 'setFilter', 'uniqueValues']);
 
   // The <select> value binding coerced to a string. $props.value is typed `unknown`

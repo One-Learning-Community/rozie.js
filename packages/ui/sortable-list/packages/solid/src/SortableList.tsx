@@ -129,7 +129,7 @@ export interface SortableListHandle {
 }
 
 export default function SortableList(_props: SortableListProps): JSX.Element {
-  const _merged = mergeProps({ itemKey: null, handle: null, group: null, animation: 150, disabled: false, disableKeyboard: false, options: (() => ({}))(), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '', itemStyle: null }, _props);
+  const _merged = mergeProps({ itemKey: null, handle: null, group: null, animation: 150, disabled: false, disableKeyboard: false, options: (() => ({}))() as Record<string, any>, labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '', itemStyle: null }, _props);
   const [local, attrs] = splitProps(_merged, ['items', 'itemKey', 'handle', 'group', 'animation', 'disabled', 'disableKeyboard', 'options', 'labelFor', 'ghostClass', 'chosenClass', 'dragClass', 'filter', 'easing', 'forceFallback', 'swapThreshold', 'cloneable', 'listClass', 'itemClass', 'itemStyle', 'children', 'ref']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ getInstance, toArray, sort, option }); });
@@ -141,7 +141,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     const _cleanup = (() => {
     // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
     // when the options object below references it.
-    const sortable = useSortableJS(listElRef, {
+    const sortable = useSortableJS(listElRef!, {
       items: () => items(),
       onCommit: (next: any) => {
         setItems(next);

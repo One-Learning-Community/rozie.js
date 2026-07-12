@@ -34,7 +34,7 @@ export default class Waveform extends SignalWatcher(LitElement) {
   /**
    * Pre-computed waveform peaks (an array of channel sample arrays, or a single `number[]`). Renders the waveform without downloading or decoding audio — pair with `duration`. Construction-only.
    */
-  @property({ type: Object }) peaks: unknown = undefined;
+  @property({ type: Object }) peaks?: unknown;
   /**
    * The audio duration in seconds. Required alongside `peaks` when rendering without a decodable `src` (the timeline/ruler and region positions are derived from it). Construction-only.
    */
@@ -118,7 +118,7 @@ export default class Waveform extends SignalWatcher(LitElement) {
   /**
    * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin at construction. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
    */
-  @property({ type: Object, attribute: 'regions' }) _regions_attr: unknown = undefined;
+  @property({ type: Object, attribute: 'regions' }) _regions_attr?: unknown;
   private _regionsControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'regions-change', defaultValue: undefined, initialControlledValue: undefined });
   /**
    * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Construction-only in v1.
@@ -135,7 +135,7 @@ export default class Waveform extends SignalWatcher(LitElement) {
   /**
    * The current playback position in seconds. The lone two-way `model: true` prop: playback writes the live position back on every `timeupdate` (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write seeks the engine via `setTime`.
    */
-  @property({ type: Object, attribute: 'current-time' }) _currentTime_attr: unknown = undefined;
+  @property({ type: Object, attribute: 'current-time' }) _currentTime_attr?: unknown;
   private _currentTimeControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'current-time-change', defaultValue: undefined, initialControlledValue: undefined });
   @query('[data-rozie-ref="container"]') private _refContainer!: HTMLElement;
 private __rozieWatchInitial_13 = true;

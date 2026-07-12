@@ -164,7 +164,7 @@ export interface TipTapHandle {
 }
 
 export default function TipTap(_props: TipTapProps): JSX.Element {
-  const _merged = mergeProps({ editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: (() => ({}))(), extensions: (() => [])() }, _props);
+  const _merged = mergeProps({ editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: (() => ({}))() as Record<string, any>, extensions: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['html', 'editable', 'placeholder', 'autofocus', 'editorClass', 'ariaLabel', 'editorProps', 'extensions', 'ref']);
   onMount(() => { local.ref?.({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain, isActive, can, isEmpty }); });
 
@@ -337,7 +337,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     // strict typecheck, the FullCalendar/CodeMirror pattern). The host div is
     // r-if-gated on $slots.toolbar so $refs.toolbarEl exists exactly when filled.
     if ((_props.toolbarSlot ?? _props.slots?.["toolbar"]) && toolbarElRef) {
-      toolbarDispose = portals.toolbar(toolbarElRef, {
+      toolbarDispose = portals.toolbar(toolbarElRef!, {
         editor
       });
     }

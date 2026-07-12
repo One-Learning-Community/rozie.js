@@ -226,7 +226,7 @@ export interface SliderHandle {
 }
 
 export default function Slider(_props: SliderProps): JSX.Element {
-  const _merged = mergeProps({ range: false, min: 0, max: 100, step: 1, orientation: 'horizontal', disabled: false, marks: (() => [])(), ariaLabel: null, pageStep: null, formatValue: null, showValue: false }, _props);
+  const _merged = mergeProps({ range: false, min: 0, max: 100, step: 1, orientation: 'horizontal', disabled: false, marks: (() => [])() as any[], ariaLabel: null, pageStep: null, formatValue: null, showValue: false }, _props);
   const [local, attrs] = splitProps(_merged, ['value', 'range', 'min', 'max', 'step', 'orientation', 'disabled', 'marks', 'ariaLabel', 'pageStep', 'formatValue', 'showValue', 'ref']);
   onMount(() => { local.ref?.({ focus, increment, decrement }); });
 

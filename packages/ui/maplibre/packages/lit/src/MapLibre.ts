@@ -69,7 +69,7 @@ export default class MapLibre extends SignalWatcher(LitElement) {
   /**
    * The map style — a `StyleSpecification` object **or** a style-URL string. Named `mapStyle` (not `style`) because `style` is a reserved attribute across the targets — `react-map-gl` and `vue-maplibre-gl` use the same name for the same reason. Defaults to MapLibre's official no-token demo tiles, so the component "just works" with zero config. Changing it calls `setStyle` and re-applies your `sources` / `layers` once the new style loads.
    */
-  @property({ type: Object }) mapStyle: unknown = undefined;
+  @property({ type: Object }) mapStyle?: unknown;
   /**
    * Minimum zoom level. Applied at construction and via `setMinZoom` on change.
    */
@@ -81,11 +81,11 @@ export default class MapLibre extends SignalWatcher(LitElement) {
   /**
    * A `LngLatBoundsLike` the camera is constrained to. Applied via `setMaxBounds` on change (pass `undefined` to clear).
    */
-  @property({ type: Object }) maxBounds: unknown = undefined;
+  @property({ type: Object }) maxBounds?: unknown;
   /**
    * **Construction-only** initial fit — a `LngLatBoundsLike` the map fits to on mount (overrides `center` / `zoom` when set). Pair with `fitBoundsOptions`.
    */
-  @property({ type: Object }) bounds: unknown = undefined;
+  @property({ type: Object }) bounds?: unknown;
   /**
    * **Construction-only** options for the initial `bounds` fit (padding, max-zoom, etc.).
    */

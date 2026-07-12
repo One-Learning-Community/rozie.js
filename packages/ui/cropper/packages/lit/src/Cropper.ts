@@ -38,7 +38,7 @@ export default class Cropper extends SignalWatcher(LitElement) {
   /**
    * The crop box — `{ x, y, width, height, rotate, scaleX, scaleY }`. The lone two-way `model: true` prop: dragging or resizing the crop box writes the new box back (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write `setData`s the live cropper.
    */
-  @property({ type: Object, attribute: 'data' }) _data_attr: unknown = undefined;
+  @property({ type: Object, attribute: 'data' }) _data_attr?: unknown;
   private _dataControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'data-change', defaultValue: undefined, initialControlledValue: undefined });
   /**
    * The crop box aspect ratio. `NaN` (the default) is Cropper's sentinel for a free ratio. Reconciled at runtime via `setAspectRatio`.
@@ -111,7 +111,7 @@ export default class Cropper extends SignalWatcher(LitElement) {
   /**
    * Live crop-thumbnail target(s) — a selector string or element ref(s) (`HTMLElement`, array, or `NodeList`). Construction-only (v1 has no `setPreview`). On Lit prefer an element ref: a document selector cannot cross the wrapper's shadow boundary.
    */
-  @property({ type: Object }) preview: unknown = undefined;
+  @property({ type: Object }) preview?: unknown;
   /**
    * Raw Cropper.js `Options` passthrough — spread into the constructor before the curated keys (explicit props win). Use it for any v1 option not surfaced as a first-class prop (`modal`, `restore`, `minCropBoxWidth`, `wheelZoomRatio`, …).
    */

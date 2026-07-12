@@ -22,23 +22,23 @@ export default class Layer extends SignalWatcher(LitElement) {
   /**
    * The `LayerSpecification.type` — `'circle'` / `'fill'` / `'line'` / `'symbol'` / `'raster'` / `'background'` / … A `'background'` layer needs no source; every other type requires a `source` (explicit or injected from a parent `<Source>`).
    */
-  @property({ type: String, reflect: true }) type: string = undefined;
+  @property({ type: String, reflect: true }) type?: string;
   /**
    * The layer's `paint` properties (the `LayerSpecification.paint` object, e.g. `{ 'line-color': '#e11', 'line-width': 3 }`). Changes are reconciled via `setPaintProperty` with no remount.
    */
-  @property({ type: Object }) paint: unknown = undefined;
+  @property({ type: Object }) paint?: unknown;
   /**
    * The layer's `layout` properties (the `LayerSpecification.layout` object, e.g. `{ 'line-cap': 'round' }`). Changes are reconciled via `setLayoutProperty` with no remount.
    */
-  @property({ type: Object }) layout: unknown = undefined;
+  @property({ type: Object }) layout?: unknown;
   /**
    * Explicit source id for the flat shape (a background layer needs none, or a cross-source reference). When omitted inside a `<Source>`, the injected source context supplies the id automatically.
    */
-  @property({ type: String, reflect: true }) source: string = undefined;
+  @property({ type: String, reflect: true }) source?: string;
   /**
    * Insert this layer immediately **before** the layer with this id, controlling draw order (the `addLayer` `beforeId` argument). Omit to append on top.
    */
-  @property({ type: String, reflect: true }) beforeId: string = undefined;
+  @property({ type: String, reflect: true }) beforeId?: string;
 private __rozieWatchInitial_0 = true;
 private __rozieFirstUpdateDone = false;
 private __rozieCtxConsumer_maplibre_source = new ContextConsumer(this, { context: __rozieCtx_maplibre_source, subscribe: true });
