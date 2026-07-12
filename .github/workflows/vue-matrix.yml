@@ -53,6 +53,17 @@ jobs:
       - name: Build all packages (generates .d.rozie.ts sidecars before typecheck — REQ-6)
         run: pnpm turbo run build
 
+      # Quick task 260711-v2l: cross-target strict-tsc leaf baseline. Runs here
+      # (not in a per-target matrix) because this workflow's trigger has NO path
+      # filter — it runs on EVERY PR to main, unlike the path-gated per-target
+      # matrices — making it the right home for a gate that must catch
+      # React/Solid/Lit family regressions regardless of which files changed.
+      # Placed AFTER the build above (every leaf's dist + node_modules must
+      # exist — the harness copies each leaf's committed src/ into a tmpdir with
+      # symlinked LEAF node_modules and a pinned tsc).
+      - name: Strict-conformance gate — cross-target strict-tsc leaf baseline
+        run: pnpm --filter @rozie/strict-conformance test
+
       # quick task 260623-jwh + 260629-ksp: the @rozie-ui Vue-leaf gate. Runs
       # AFTER the `pnpm turbo run build` above so every Vue leaf's compiled dist
       # (+ dist .d.ts) AND each leaf's node_modules exist before the gates run.
