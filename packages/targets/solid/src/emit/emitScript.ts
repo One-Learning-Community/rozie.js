@@ -593,12 +593,22 @@ export function emitScript(
       // types as `Record<string, any> | {}` — member/index access on the `{}`
       // alternative is TS2339/TS2345. Cast the default entry to the prop's
       // own rendered interface type (`renderType`) so mergeProps infers a
-      // single collapsed member type. Scoped to Object/Array-typed props
-      // only — every other type's default entry is untouched.
+      // single collapsed member type.
+      //
+      // Scoped to the ACTUAL Pattern F shape — a mutable-literal-factory
+      // default (`() => ({})` / `() => []`) — not merely an Object/Array
+      // TYPE. An Object/Array-typed prop can also default to `null`
+      // (`appendTo: { type: Object, default: null }`, flatpickr); casting
+      // THAT `null` default to `Record<string, any>` is a genuine TS2352
+      // (`null` doesn't sufficiently overlap the target type) — a real bug
+      // caught by the leaf-tsconfig sweep, not present in the narrower
+      // factory-default-only gate below.
       const ann = p.typeAnnotation;
-      const isObjectOrArray =
-        ann.kind === 'identifier' && (ann.name === 'Object' || ann.name === 'Array');
-      const entryVal = isObjectOrArray ? `${val} as ${renderType(ann)}` : val;
+      const isObjectOrArrayFactoryDefault =
+        isMutableLiteralFactoryDefault(dv) &&
+        ann.kind === 'identifier' &&
+        (ann.name === 'Object' || ann.name === 'Array');
+      const entryVal = isObjectOrArrayFactoryDefault ? `${val} as ${renderType(ann)}` : val;
       return `${p.name}: ${entryVal}`;
     });
     mergePropsCall = `const _merged = mergeProps({ ${defaultEntries.join(', ')} }, _props);\n`;
