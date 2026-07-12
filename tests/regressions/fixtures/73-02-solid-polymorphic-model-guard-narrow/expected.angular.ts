@@ -45,7 +45,10 @@ function __rozieAttr(v: unknown): string | null {
 export class PolymorphicModelGuardNarrow {
   value = model<string | Record<string, any>>('');
 
-  selected = (): string => typeof this.value() === 'string' ? this.value() : '';
+  selected = (): string => {
+    const v = this.value();
+    return typeof v === 'string' ? v : '';
+  };
 
   private __rozieCvaOnChange: (v: string | Record<string, any>) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};

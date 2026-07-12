@@ -334,7 +334,8 @@ export class Slider {
       end = this.pct(arr[1]);
     } else {
       start = 0;
-      end = this.pct(typeof __value === 'number' && Number.isFinite(__value) ? __value : __min);
+      const v = __value;
+      end = this.pct(typeof v === 'number' && Number.isFinite(v) ? v : __min);
     }
     return {
       '--rozie-slider-fill-start': start + '%',

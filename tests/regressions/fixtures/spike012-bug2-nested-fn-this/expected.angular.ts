@@ -48,8 +48,8 @@ export class NestedFnThis {
   selected = (): string => {
     const __rozieSelf = this;
     function inner(): string {
-      const __value = __rozieSelf.value();
-      return typeof __value === 'string' ? __value + __rozieSelf.tag() : '';
+      const v = __rozieSelf.value();
+      return typeof v === 'string' ? v + __rozieSelf.tag() : '';
     }
     return inner();
   };
