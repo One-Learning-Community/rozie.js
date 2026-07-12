@@ -664,7 +664,12 @@ export function emitScript(
     // fails TS2345 (`null` not assignable to `T`) under strictNullChecks.
     // Widen the generic to `T | null` ONLY for this exact-AST-shape (a Babel
     // `NullLiteral` default) — no other default shape is affected.
-    const genericType = isNullLiteralDefault(p.defaultValue) ? `${tsType} | null` : tsType;
+    // `tsType === 'unknown'` (an untyped model prop) is excluded: `unknown | null`
+    // collapses back to `unknown` in TS, so the widen is a pure no-op there —
+    // skipping it keeps the diff scoped to leaves that actually had the TS2345
+    // (dist-parity's zero-diff-outside-the-2-leaves gate, 260712-kl1 Task 3).
+    const genericType =
+      isNullLiteralDefault(p.defaultValue) && tsType !== 'unknown' ? `${tsType} | null` : tsType;
     hookLines.push(
       // 260521-oao — `_props as unknown as Record<string, unknown>`: a direct
       // `as Record<string, unknown>` cast fails (TS2352, missing index
