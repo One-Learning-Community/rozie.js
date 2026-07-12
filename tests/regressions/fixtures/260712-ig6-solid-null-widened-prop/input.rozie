@@ -1,0 +1,56 @@
+<rozie name="SolidNullWidenedPropObjectLiteral">
+
+<props>
+{
+  // 260712-ig6 Task B — a null-widened (`default: null`) prop whose value is
+  // spliced into an object-literal property inside a `$onMount` call to a
+  // 3rd-party-style function (mirrors the SortableJS `handle`/`group`/
+  // `ghostClass`/etc. shape in `@rozie-ui/sortable-list`). The prop's type is
+  // `string | null`; the stub 3rd-party engine's options field below is typed
+  // `string | undefined` (never `string | null`) — before the fix this is
+  // TS2345/TS2322 under strictNullChecks.
+  handle: { type: String, default: null },
+  // Byte-identity control — same `default: null` shape, but read into a plain
+  // local OUTSIDE any object-literal call argument. Must NOT be coerced.
+  label: { type: String, default: null },
+}
+</props>
+
+<script lang="ts">
+// Self-contained stand-in for a real 3rd-party engine (SortableJS-shaped):
+// its options object types `handle` as `string | undefined`, NEVER
+// `string | null` — mirrors sortablejs's real-world `Options` type.
+interface EngineOptions {
+  handle?: string;
+}
+function useEngine(el: HTMLElement, opts: EngineOptions) {
+  return { destroy() { void el; void opts; } };
+}
+
+// Byte-identity control proof: read into a local, NOT spliced into a
+// 3rd-party object-literal call argument. Must stay a bare `local.label`
+// read (no coercion).
+const labelLocal = $props.label;
+
+let engine: { destroy(): void } | undefined;
+
+// Task B proof: `$props.handle` (null-widened) spliced into an object-literal
+// property passed to a 3rd-party-style call inside $onMount. Before the fix
+// this is TS2345/TS2322 (`string | null` not assignable to `string | undefined`).
+$onMount(() => {
+  engine = useEngine($refs.container, { handle: $props.handle });
+  return () => engine?.destroy();
+});
+</script>
+
+<template>
+<div class="solid-null-widened-prop" ref="container">
+  <span>{{ labelLocal }}</span>
+</div>
+</template>
+
+<style>
+.solid-null-widened-prop { display: block; }
+</style>
+
+</rozie>

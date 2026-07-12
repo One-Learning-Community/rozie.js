@@ -115,6 +115,54 @@ function buildSetterCall(
 }
 
 /**
+ * 260712-ig6 Task B — detects the "null-widened prop spliced into a 3rd-party
+ * object-literal call argument" shape: a `$props.<name>` read (where `<name>`
+ * has `default: null`) that ultimately feeds an `ObjectProperty` VALUE inside
+ * an `ObjectExpression` that is (possibly via nested object-literal property
+ * values, e.g. `useEngine(el, { options: { group: $props.group } })`) itself
+ * a DIRECT argument of a `CallExpression` — the mount-time engine-init shape
+ * (`useSortableJS($refs.listEl, { options: { handle: $props.handle, ... } })`).
+ *
+ * Walks UP from the read, tolerating exactly two pass-through shapes on the
+ * way to an `ObjectProperty` value:
+ *   - `ConditionalExpression` consequent/alternate (the `group` prop's
+ *     `cloneable ? { ... } : $props.group` ternary)
+ *   - nested `ObjectExpression` → `ObjectProperty` value chains (an object
+ *     literal nested inside another object literal's property value)
+ *
+ * Any OTHER parent shape (binary/logical expression, array literal, bare
+ * statement, non-direct call argument, …) fails the match — this is
+ * intentionally narrow, mirroring Pattern D's `isDirectCallArg` precedent.
+ * Distinct from Pattern D: Pattern D fires on `$refs` DOM-ref reads that are
+ * THEMSELVES a direct call argument; this fires on `$props` reads nested
+ * inside an object-literal call argument.
+ */
+function isNullWidenedPropObjectLiteralCallArgTarget(path: NodePath): boolean {
+  let cur: NodePath = path;
+  for (;;) {
+    const parent = cur.parentPath;
+    if (!parent) return false;
+    if (
+      parent.isConditionalExpression() &&
+      (parent.node.consequent === cur.node || parent.node.alternate === cur.node)
+    ) {
+      cur = parent;
+      continue;
+    }
+    if (parent.isObjectProperty() && parent.node.value === cur.node) {
+      const objExpr = parent.parentPath;
+      if (!objExpr || !objExpr.isObjectExpression()) return false;
+      cur = objExpr;
+      continue;
+    }
+    if (parent.isCallExpression() && parent.node.arguments.includes(cur.node as t.Node)) {
+      return true;
+    }
+    return false;
+  }
+}
+
+/**
  * Phase 18 (Req 2) — normalize the producer-side two-way-write sigil `$model`
  * to `$props` across a cloned File, in place. See the call-site comment in
  * `rewriteRozieIdentifiers` for the full contract; `$model.X` is model-only and
@@ -399,6 +447,15 @@ export function rewriteRozieIdentifiers(
 
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
+  // 260712-ig6 Task B — non-model props authored `default: null` (the
+  // null-widening default). Feeds `isNullWidenedPropObjectLiteralCallArgTarget`
+  // below: ONLY a read of one of THESE prop names, in THAT exact shape, gets
+  // the `?? undefined` splice-site coercion.
+  const nullWidenedNonModelProps = new Set(
+    ir.props
+      .filter((p) => !p.isModel && t.isNullLiteral(p.defaultValue))
+      .map((p) => p.name),
+  );
   // Model props whose declared `type` resolves to `unknown` (i.e. `type: null`)
   // — their `createControllableSignal<unknown>` accessor returns `unknown`. A
   // member read off the accessor (`value().length`, `value()[0]`) is TS2339 on
@@ -679,6 +736,29 @@ export function rewriteRozieIdentifiers(
           return;
         }
         if (nonModelProps.has(property.name)) {
+          // 260712-ig6 Task B — a null-widened (`default: null`) prop read
+          // that splices into a 3rd-party object-literal call argument inside
+          // a `$onMount` setup body (the mount-time engine-init shape, e.g.
+          // `useSortableJS(el, { options: { handle: $props.handle, ... } })`)
+          // carries type `T | null`, but the 3rd-party lib's options field is
+          // typed `T | undefined` (never `T | null`) — TS2345/TS2322. Coerce
+          // `null` → `undefined` at THIS splice site only (`?? undefined`),
+          // mirroring Pattern F's narrow-cast-at-the-shape precedent. Distinct
+          // predicate from Pattern D's `isDirectCallArg` (which fires on
+          // `$refs` reads that are THEMSELVES a direct call argument, not
+          // `$props` reads nested inside an object-literal argument). Every
+          // other use of a null-widened prop (a local, a `| null`-accepting
+          // sink, outside a setup body, …) is UNCHANGED.
+          if (
+            nonNullRefCallArgs &&
+            nullWidenedNonModelProps.has(property.name) &&
+            isNullWidenedPropObjectLiteralCallArgTarget(path)
+          ) {
+            const localRead = t.memberExpression(t.identifier('local'), t.identifier(property.name));
+            path.replaceWith(t.logicalExpression('??', localRead, t.identifier('undefined')));
+            path.skip();
+            return;
+          }
           // Non-model prop: access via local (splitProps result)
           path.node.object = t.identifier('local');
           return;

@@ -156,18 +156,18 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
         // leave it null — a clone-mode list without a group name is not
         // meaningful (no peer list can join the cross-list flow).
         group: local.cloneable && typeof local.group === 'string' ? {
-          name: local.group,
+          name: local.group ?? undefined,
           pull: 'clone',
           put: true
-        } : local.group,
-        handle: local.handle,
-        ghostClass: local.ghostClass,
-        chosenClass: local.chosenClass,
-        dragClass: local.dragClass,
-        filter: local.filter,
+        } : local.group ?? undefined,
+        handle: local.handle ?? undefined,
+        ghostClass: local.ghostClass ?? undefined,
+        chosenClass: local.chosenClass ?? undefined,
+        dragClass: local.dragClass ?? undefined,
+        filter: local.filter ?? undefined,
         forceFallback: local.forceFallback,
         swapThreshold: local.swapThreshold,
-        easing: local.easing,
+        easing: local.easing ?? undefined,
         ...local.options
       },
       // Lit lit-html `repeat` directive caches its part array by sentinel-

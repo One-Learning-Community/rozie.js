@@ -1,10 +1,14 @@
 {
-  // strictNullChecks/exactOptionalPropertyTypes/noImplicitAny relaxed: the
-  // emitted Solid output is bundler-built (tsdown/oxc), not strict-tsc-authored.
-  // Emitted DOM refs (typed string|null) and generated IIFE defaults are
-  // proven-correct via dist-parity but are not author-strictness-clean. This
-  // gate typechecks generated code, so it opts out of the author-strictness
-  // flags the codegen does not satisfy while keeping the rest of strict mode.
+  // exactOptionalPropertyTypes/noImplicitAny relaxed: the emitted Solid
+  // output is bundler-built (tsdown/oxc), not strict-tsc-authored. This gate
+  // typechecks generated code, so it opts out of the author-strictness flags
+  // the codegen does not satisfy while keeping the rest of strict mode.
+  // strictNullChecks: true (260712-ig6) — the last residual (null-widened
+  // props spliced into the SortableJS options object literal — group,
+  // handle, ghostClass, chosenClass, dragClass, filter, easing —
+  // TS2345/TS2322) is now closed at the emitter (Solid rewriteScript's
+  // isNullWidenedPropObjectLiteralCallArgTarget `?? undefined` splice-site
+  // coercion); this leaf typechecks clean under strictNullChecks.
   "extends": "../../../../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
@@ -16,7 +20,7 @@
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
     "skipLibCheck": true,
-    "strictNullChecks": false,
+    "strictNullChecks": true,
     "exactOptionalPropertyTypes": false,
     "noImplicitAny": false,
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
