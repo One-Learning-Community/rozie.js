@@ -121,6 +121,18 @@ function capitalize(name: string): string {
 }
 
 /**
+ * 260712-kl1 — exact-AST-shape gate mirroring the `isMutableLiteralFactoryDefault`
+ * / `isNullWidenedPropObjectLiteralCallArgTarget` predicate convention. Matches
+ * ONLY a Babel `NullLiteral` prop default (`default: null`) — never `undefined`,
+ * `void 0`, or any other falsy/nullish shape. Used to widen a model prop's
+ * `createControllableSignal<T>` generic to `T | null` (see 260712-kb9's
+ * NEW-controllable-null-default catalog entry).
+ */
+function isNullLiteralDefault(dv: t.Node | null): boolean {
+  return t.isNullLiteral(dv);
+}
+
+/**
  * WR-01 fix (73-REVIEW.md, 73-10 gap-closure): collect every Identifier
  * binding name introduced by a declarator's `id` pattern — Identifier
  * directly, or recursively through ObjectPattern / ArrayPattern /
@@ -645,6 +657,14 @@ export function emitScript(
     // `never[]`, which cascades to "Property 'X' does not exist on type
     // 'never'" everywhere the signal is read.
     const tsType = renderType(p.typeAnnotation);
+    // 260712-kl1 — a literal `default: null` model prop (260712-kb9's
+    // NEW-controllable-null-default catalog entry). `dflt` above is already
+    // the string `"null"` for this shape (via `genCode`), but `tsType` alone
+    // excludes `null` — the emitted `createControllableSignal<T>(..., null)`
+    // fails TS2345 (`null` not assignable to `T`) under strictNullChecks.
+    // Widen the generic to `T | null` ONLY for this exact-AST-shape (a Babel
+    // `NullLiteral` default) — no other default shape is affected.
+    const genericType = isNullLiteralDefault(p.defaultValue) ? `${tsType} | null` : tsType;
     hookLines.push(
       // 260521-oao — `_props as unknown as Record<string, unknown>`: a direct
       // `as Record<string, unknown>` cast fails (TS2352, missing index
@@ -652,7 +672,7 @@ export function emitScript(
       // non-optional field. Routing through `unknown` is the cast TS itself
       // suggests and is sound here — `createControllableSignal` only ever does
       // string-keyed reads on the object.
-      `const [${p.name}, ${setterName}] = createControllableSignal<${tsType}>(_props as unknown as Record<string, unknown>, '${p.name}', ${dflt});`,
+      `const [${p.name}, ${setterName}] = createControllableSignal<${genericType}>(_props as unknown as Record<string, unknown>, '${p.name}', ${dflt});`,
     );
   }
 
