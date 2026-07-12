@@ -36,7 +36,7 @@ interface PortalListStyledProps {
 }
 
 export default function PortalListStyled(_props: PortalListStyledProps): JSX.Element {
-  const _merged = mergeProps({ items: (() => [])() }, _props);
+  const _merged = mergeProps({ items: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['items']);
 
   const portalDisposers = new Set<() => void>();

@@ -48,7 +48,7 @@ interface BadgeGridStyledScssProps {
 }
 
 export default function BadgeGridStyledScss(_props: BadgeGridStyledScssProps): JSX.Element {
-  const _merged = mergeProps({ badges: (() => [])() }, _props);
+  const _merged = mergeProps({ badges: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['badges']);
 
   return (

@@ -23,9 +23,9 @@ interface PropDefaultCoercionProps {
 }
 
 export default function PropDefaultCoercion(_props: PropDefaultCoercionProps): JSX.Element {
-  const _merged = mergeProps({ a: null, b: 0, c: '', d: false, e: (() => [])(), f: (() => ({
+  const _merged = mergeProps({ a: null, b: 0, c: '', d: false, e: (() => [])() as any[], f: (() => ({
   k: 1
-}))() }, _props);
+}))() as Record<string, any> }, _props);
   const [local, attrs] = splitProps(_merged, ['a', 'b', 'c', 'd', 'e', 'f']);
 
   const [observed, setObserved] = createSignal<any>(null);

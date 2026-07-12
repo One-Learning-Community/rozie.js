@@ -16,7 +16,7 @@ export default function TreeNode(_props: TreeNodeProps): JSX.Element {
   id: '',
   label: '',
   children: []
-}))() }, _props);
+}))() as Record<string, any> }, _props);
   const [local, attrs] = splitProps(_merged, ['node']);
 
   return (
