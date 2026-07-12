@@ -182,7 +182,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }
     </div>
     }@if (virtual()) {
-    <div class="rdt-scroll" [style]="__style">
+    <div class="rdt-scroll" [attr.style]="__style">
     <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rozieAttr(gridAriaRowCount())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)" (dblclick)="onGridDblClick($event)" (click)="onGridClick($event)">
       <thead class="rdt-thead" role="rowgroup">
         @for (hg of headerGroups(); track hg.id; let hgLevel = $index) {
@@ -266,7 +266,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
       <tbody class="rdt-tbody" role="rowgroup">
         
         <tr class="rdt-spacer" aria-hidden="true">
-          <td [attr.colspan]="rozieAttr(visibleColCount())" [style]="'height:' + padTop() + 'px;padding:0;border:0'"></td>
+          <td [attr.colspan]="rozieAttr(visibleColCount())" [attr.style]="'height:' + padTop() + 'px;padding:0;border:0'"></td>
         </tr>
         
         @for (wr of windowedRows(); track wr.row.id) {
@@ -347,7 +347,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }
         
         <tr class="rdt-spacer" aria-hidden="true">
-          <td [attr.colspan]="rozieAttr(visibleColCount())" [style]="'height:' + padBottom() + 'px;padding:0;border:0'"></td>
+          <td [attr.colspan]="rozieAttr(visibleColCount())" [attr.style]="'height:' + padBottom() + 'px;padding:0;border:0'"></td>
         </tr>
       </tbody>
     </table>

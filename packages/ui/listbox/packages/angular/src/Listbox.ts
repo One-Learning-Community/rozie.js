@@ -104,8 +104,8 @@ function __rozieAttr(v: unknown): string | null {
         </div>
     }</div>
     }@if (virtual()) {
-    <div #listEl class="rozie-listbox-list rozie-listbox-list--virtual" role="listbox" [attr.id]="rozieAttr(id() + '-list')" [attr.aria-label]="ariaLabel()" [attr.aria-multiselectable]="multiple()" [style]="__style">
-        <div class="rozie-listbox-spacer" aria-hidden="true" [style]="'height:' + padTop() + 'px'"></div>
+    <div #listEl class="rozie-listbox-list rozie-listbox-list--virtual" role="listbox" [attr.id]="rozieAttr(id() + '-list')" [attr.aria-label]="ariaLabel()" [attr.aria-multiselectable]="multiple()" [attr.style]="__style">
+        <div class="rozie-listbox-spacer" aria-hidden="true" [attr.style]="'height:' + padTop() + 'px'"></div>
 
         @for (wr of windowedRows(); track wr.row.id) {
     <div [attr.id]="rozieAttr(optionId(wr.vi.index))" [attr.data-index]="rozieAttr(wr.vi.index)" class="rozie-listbox-option" [ngClass]="{ 'is-active': activeIndex() === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }" role="option" [attr.aria-selected]="!!isSelected(wr.row._opt)" [attr.aria-disabled]="!!disabledOf(wr.row._opt)" (click)="select(wr.row._opt)" (mousemove)="onOptionPointerMove(wr.vi.index)">
@@ -119,7 +119,7 @@ function __rozieAttr(v: unknown): string | null {
         </div>
     }
 
-        <div class="rozie-listbox-spacer" aria-hidden="true" [style]="'height:' + padBottom() + 'px'"></div>
+        <div class="rozie-listbox-spacer" aria-hidden="true" [attr.style]="'height:' + padBottom() + 'px'"></div>
 
         @if (windowSource().length === 0) {
     <div class="rozie-listbox-empty" role="presentation">

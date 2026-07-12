@@ -78,8 +78,8 @@ function __rozieAttr(v: unknown): string | null {
         </li>
     }</ul>
     }@if (virtual()) {
-    <ul class="rozie-combobox-list rozie-combobox-list--virtual" [attr.id]="rozieAttr(listId())" role="listbox" [style]="__style">
-        <li class="rozie-combobox-spacer" aria-hidden="true" [style]="'height:' + padTop() + 'px'"></li>
+    <ul class="rozie-combobox-list rozie-combobox-list--virtual" [attr.id]="rozieAttr(listId())" role="listbox" [attr.style]="__style">
+        <li class="rozie-combobox-spacer" aria-hidden="true" [attr.style]="'height:' + padTop() + 'px'"></li>
 
         @for (wr of windowedRows(); track wr.row.id) {
     <li class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': wr.vi.index === activeIndex(), 'rozie-combobox-option--selected': wr.row.value === value(), 'rozie-combobox-option--disabled': wr.row.disabled }" [attr.id]="rozieAttr(optId(wr.vi.index))" [attr.data-index]="rozieAttr(wr.vi.index)" role="option" [attr.aria-selected]="wr.row.value === value()" [attr.aria-disabled]="!!wr.row.disabled" (mousedown)="$event.preventDefault(); selectOption(wr.row)" (mouseenter)="activeIndex.set(wr.vi.index)">
@@ -91,7 +91,7 @@ function __rozieAttr(v: unknown): string | null {
         </li>
     }
 
-        <li class="rozie-combobox-spacer" aria-hidden="true" [style]="'height:' + padBottom() + 'px'"></li>
+        <li class="rozie-combobox-spacer" aria-hidden="true" [attr.style]="'height:' + padBottom() + 'px'"></li>
 
         @if (windowSource().length === 0) {
     <li class="rozie-combobox-empty" role="presentation">
