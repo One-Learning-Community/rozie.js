@@ -585,7 +585,21 @@ export function emitScript(
       // `type: Function, default: () => {}` arrow is the default VALUE (matching
       // Vue/Angular/Lit); invoking it would pass its `void` result as the prop.
       const val = isMutableLiteralFactoryDefault(dv) ? `(${raw})()` : raw;
-      return `${p.name}: ${val}`;
+      // 260712-a09 (Pattern F) — an Object/Array-typed prop's literal default
+      // entry (`options: {}` / `xs: []`) infers its OWN narrow literal type
+      // (`{}` / `never[]`) inside the mergeProps({defaults}, _props) call.
+      // mergeProps unions that literal type with `_props`'s declared
+      // `Record<string, any>` / `any[]` type, so a read off `local.options`
+      // types as `Record<string, any> | {}` — member/index access on the `{}`
+      // alternative is TS2339/TS2345. Cast the default entry to the prop's
+      // own rendered interface type (`renderType`) so mergeProps infers a
+      // single collapsed member type. Scoped to Object/Array-typed props
+      // only — every other type's default entry is untouched.
+      const ann = p.typeAnnotation;
+      const isObjectOrArray =
+        ann.kind === 'identifier' && (ann.name === 'Object' || ann.name === 'Array');
+      const entryVal = isObjectOrArray ? `${val} as ${renderType(ann)}` : val;
+      return `${p.name}: ${entryVal}`;
     });
     mergePropsCall = `const _merged = mergeProps({ ${defaultEntries.join(', ')} }, _props);\n`;
   }
@@ -730,7 +744,9 @@ export function emitScript(
         collectors.solidImports.add('onMount');
         collectors.solidImports.add('onCleanup');
         // Rule 1 fix: rewrite $props/$data/$refs in the setup body; wrap BlockStatement in IIFE.
-        const rewrittenSetup = rewriteNode(lh.setup, ir);
+        // 260712-a09 (Pattern D) — non-null-assert a DOM ref used as a direct
+        // engine-init call argument (mount body only; see rewriteScript.ts).
+        const rewrittenSetup = rewriteNode(lh.setup, ir, { nonNullRefCallArgs: true });
         // lh.cleanup is declared `Expression` on LifecycleHook (never a
         // BlockStatement); rewriteRozieExpressionNode's signature is broader
         // (shared with the BlockStatement setup-rewrite call above), so the
@@ -786,7 +802,8 @@ export function emitScript(
         }
       } else {
         collectors.solidImports.add('onMount');
-        const rewrittenSetup = rewriteNode(lh.setup, ir);
+        // 260712-a09 (Pattern D) — see the paired-cleanup branch above.
+        const rewrittenSetup = rewriteNode(lh.setup, ir, { nonNullRefCallArgs: true });
         const arg = lifecycleArg(rewrittenSetup);
         hookLines.push(`onMount(${arg});`);
       }

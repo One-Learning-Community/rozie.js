@@ -45,6 +45,21 @@ const traverse: TraverseFn =
     ? (_traverse as TraverseFn)
     : ((_traverse as unknown as { default: TraverseFn }).default);
 
+/**
+ * 260712-a09 (Pattern D) — options threaded into `rewriteRozieIdentifiers` /
+ * `rewriteRozieExpressionNode` from a specific call site (currently: the
+ * `$onMount` setup-body rewrite in emitScript.ts). `nonNullRefCallArgs: true`
+ * scopes a non-null assertion to DOM ref reads used as a DIRECT call argument
+ * (the mount-time engine-init shape: `useSortableJS($refs.listEl, {...})`),
+ * mirroring the `__rozieRoot` rationale already applied above (a ref read
+ * inside a lifecycle hook is guaranteed assigned once mount has run). Ref
+ * reads elsewhere (member access, template bindings, non-call positions) are
+ * UNCHANGED — this is intentionally narrow, not a blanket ref-typing change.
+ */
+export interface RewriteScriptOptions {
+  nonNullRefCallArgs?: boolean;
+}
+
 export interface RewriteScriptResult {
   rewrittenProgram: File;
   diagnostics: Diagnostic[];
@@ -313,6 +328,7 @@ function hoistPolymorphicModelGuards(cloned: File, polymorphicModelProps: Set<st
 export function rewriteRozieExpressionNode(
   expr: t.Expression | t.BlockStatement,
   ir: IRComponent,
+  options?: RewriteScriptOptions,
 ): t.Expression | t.BlockStatement {
   // For BlockStatements, wrap body statements directly in the program.
   // For Expressions, wrap as an ExpressionStatement.
@@ -335,7 +351,7 @@ export function rewriteRozieExpressionNode(
     },
     comments: [],
   };
-  const result = rewriteRozieIdentifiers(wrapped, ir);
+  const result = rewriteRozieIdentifiers(wrapped, ir, options);
   const body = result.rewrittenProgram.program.body;
 
   if (isBlock) {
@@ -376,8 +392,10 @@ export function rewriteRozieExpressionNode(
 export function rewriteRozieIdentifiers(
   cloned: File,
   ir: IRComponent,
+  options?: RewriteScriptOptions,
 ): RewriteScriptResult {
   const diagnostics: Diagnostic[] = [];
+  const nonNullRefCallArgs = options?.nonNullRefCallArgs === true;
 
   const modelProps = new Set(ir.props.filter((p) => p.isModel).map((p) => p.name));
   const nonModelProps = new Set(ir.props.filter((p) => !p.isModel).map((p) => p.name));
@@ -689,7 +707,21 @@ export function rewriteRozieIdentifiers(
         // `__rozieRoot.current!`. Plain author `$refs.X` reads stay bare:
         // they can legitimately be null (r-if-gated panels etc.) and the
         // author owns that narrowing.
-        if (property.name === '__rozieRoot') {
+        // 260712-a09 (Pattern D) — a DOM ref passed as a DIRECT argument to a
+        // call inside a `$onMount` setup body (the mount-time engine-init
+        // shape, e.g. `useSortableJS($refs.listEl, {...})`) is guaranteed
+        // assigned once mount has run, same rationale as `__rozieRoot` above.
+        // The ref's DECLARATION (emitScript.ts) stays `| null` — only this
+        // specific call-argument USE gets the assertion. Scoped to direct
+        // CallExpression arguments only (not NewExpression, not nested member
+        // access, not object-literal property values like `{ parent: ... }`)
+        // to match the proven real-world shape and avoid widening the fix
+        // into a blanket ref-typing change.
+        const isDirectCallArg =
+          nonNullRefCallArgs &&
+          path.parentPath?.isCallExpression() &&
+          path.parentPath.node.arguments.includes(path.node);
+        if (property.name === '__rozieRoot' || isDirectCallArg) {
           path.replaceWith(t.tsNonNullExpression(refIdent));
         } else {
           path.replaceWith(refIdent);

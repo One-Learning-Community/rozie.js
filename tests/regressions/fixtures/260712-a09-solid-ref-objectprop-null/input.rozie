@@ -1,0 +1,47 @@
+<rozie name="SolidRefObjectPropNull">
+
+<props>
+{
+  // Pattern F (260712-a09) — an Object-typed prop with an empty-object
+  // factory default. Before the fix, `local.options` types as
+  // `Record<string, any> | {}` inside mergeProps' merged type — member
+  // access on the `{}` alternative (`.plugins`) is TS2339.
+  options: { type: Object, default: () => ({}) },
+}
+</props>
+
+<script lang="ts">
+// Pattern D (260712-a09) — a self-contained stand-in for a real engine
+// constructor (SortableJS/CodeMirror-shaped): a non-null `HTMLElement`
+// param. Mirrors `useSortableJS(el: HTMLElement, opts: ...)`'s real-world
+// signature without depending on an external package's types.
+function useEngine(el: HTMLElement, opts: Record<string, unknown>) {
+  return { destroy() { void el; void opts; } };
+}
+
+// Pattern F proof: member access on the Object-typed prop's default-widened
+// type. Before the fix this is TS2339 on the `{}` union alternative.
+const pluginNames = (): string[] => Object.keys($props.options.plugins ?? {});
+
+let engine: { destroy(): void } | undefined;
+
+// Pattern D proof: `$refs.container` passed as a DIRECT call argument to a
+// non-null-typed engine constructor inside $onMount. Before the fix this is
+// TS2345 (`HTMLElement | null` not assignable to `HTMLElement`).
+$onMount(() => {
+  engine = useEngine($refs.container, { plugins: $props.options.plugins ?? [] });
+  return () => engine?.destroy();
+});
+</script>
+
+<template>
+<div class="solid-ref-objectprop-null" ref="container">
+  <span>{{ pluginNames().length }}</span>
+</div>
+</template>
+
+<style>
+.solid-ref-objectprop-null { display: block; }
+</style>
+
+</rozie>
