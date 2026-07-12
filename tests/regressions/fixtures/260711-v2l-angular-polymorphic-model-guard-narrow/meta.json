@@ -1,0 +1,9 @@
+{
+  "id": "REG-260711-v2l-001",
+  "source": "project_angular_typeof_narrow_gap (quick task 260711-v2l)",
+  "sourceKind": "deviation-log",
+  "phase": "quick-260711-v2l",
+  "desc": "a polymorphic/union model prop read through a typeof guard must narrow on Angular (a fresh `this.value()` accessor CALL each read defeated narrowing across two reads before the hoistPolymorphicModelGuards port)",
+  "targets": ["angular"],
+  "discoveredBy": "project_angular_typeof_narrow_gap"
+}
