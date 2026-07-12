@@ -1,0 +1,36 @@
+<rozie name="LitUndefinedDefault">
+
+<props>
+{
+  // Pattern B (260712-a09) — `default: undefined` is author shorthand for
+  // "optional, no meaningful default", not a real runtime default. Before the
+  // fix `renderFieldSuffix` treated this as a real default and emitted
+  // `width: number = undefined;` — a TS2322 under strictNullChecks (a typed
+  // field can't be initialized with `undefined` unless its type admits it).
+  width: { type: Number, default: undefined },
+  // Same bug, alternate spelling (`void 0`).
+  label: { type: String, default: void 0 },
+  // Byte-identity control — required prop, NO `default:` key at all. Must
+  // keep emitting the pre-existing `!: <tsType>` definite-assignment form,
+  // unaffected by this fix.
+  title: { type: String, required: true },
+  // Byte-identity control — a genuine (non-undefined) default. Must keep
+  // emitting the pre-existing `: <tsType> = <default>` initializer form.
+  subtitle: { type: String, default: 'hello' },
+}
+</props>
+
+<template>
+<div class="lit-undefined-default">
+  <h1>{{ $props.title }}</h1>
+  <h2>{{ $props.subtitle }}</h2>
+  <p r-if="$props.label">{{ $props.label }}</p>
+  <p>{{ $props.width }}</p>
+</div>
+</template>
+
+<style>
+.lit-undefined-default { display: block; }
+</style>
+
+</rozie>

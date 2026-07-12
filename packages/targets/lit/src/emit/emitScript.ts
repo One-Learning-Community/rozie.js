@@ -206,9 +206,27 @@ function renderTsType(ann: PropTypeAnnotation): string {
  * The `!`-shape matches what Rozie already emits for Angular `@Input` and Lit
  * `@query` ref fields.
  */
+/**
+ * 260712-a09 (Pattern B) — an explicit `default: undefined` (or `default: void 0`)
+ * is authorial shorthand for "no meaningful default", not a real default value.
+ * `prop.defaultValue` is a live (non-null) AST node for either form, so the
+ * `prop.defaultValue != null` guard below would otherwise route it into the
+ * `= <default>` initializer branch and emit `foo: string = undefined` — a
+ * TS2322 under strictNullChecks (a typed field can't be initialized with
+ * `undefined` unless the type itself admits it). Detect both spellings here
+ * and treat them identically to "no default" so they fall through to the
+ * existing `?:`/`!:` branch.
+ */
+function isUndefinedDefault(expr: t.Expression): boolean {
+  return (
+    t.isIdentifier(expr, { name: 'undefined' }) ||
+    (t.isUnaryExpression(expr) && expr.operator === 'void')
+  );
+}
+
 function renderFieldSuffix(prop: PropDecl): string {
   const tsType = renderTsType(prop.typeAnnotation);
-  if (prop.defaultValue != null) {
+  if (prop.defaultValue != null && !isUndefinedDefault(prop.defaultValue)) {
     // Phase 65 (Class 1 / SC-1) — a `null` default on a non-null-admitting field
     // type (`@property() ariaLabel: string = null`) is a type/init mismatch
     // (TS2322 `'null' is not assignable to 'string'`). Widen the DECLARED type to
