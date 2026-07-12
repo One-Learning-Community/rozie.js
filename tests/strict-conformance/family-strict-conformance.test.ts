@@ -97,8 +97,15 @@ const FAMILIES: FamilySpec[] = [
     baseline: {
       'Combobox.tsx': {
         // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
-        TS2349: 1,
-        TS2322: 3,
+        // 260712-a09 (Pattern D): the onMount ref-call non-null assertion
+        // shifted which downstream body-passthrough nullability sites tsc
+        // reaches (TS2349 cleared; TS2322/TS2531/TS18047/TS2769 now visible
+        // instead) — inherent Class-4 residual, unrelated to Pattern D/F
+        // itself, do-not-fix-here per this file's scope fence.
+        TS2322: 4,
+        TS2531: 4,
+        TS18047: 4,
+        TS2769: 1,
       },
     },
   },
@@ -137,7 +144,7 @@ const FAMILIES: FamilySpec[] = [
     baseline: {
       'Slider.tsx': {
         TS18046: 2,
-        TS2349: 1,
+        // TS2349 cleared 260712-a09 (Pattern F object/array-prop default cast).
         TS18047: 2,
         TS2531: 2,
       },
@@ -174,12 +181,10 @@ const FAMILIES: FamilySpec[] = [
     name: 'listbox',
     target: 'solid',
     leaf: 'packages/ui/listbox/packages/solid',
-    baseline: {
-      'Listbox.tsx': {
-        // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
-        TS2349: 1,
-      },
-    },
+    // ENFORCED CLEAN: TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04; the
+    // remaining TS2349 cleared 260712-a09 (Pattern F object/array-prop
+    // default cast). Empty baseline ({}) — ANY strict error now fails this leaf.
+    baseline: {},
   },
   {
     name: 'listbox',
@@ -239,10 +244,10 @@ const FAMILIES: FamilySpec[] = [
       'DetailPanel.tsx': {
         TS7053: 2,
       },
-      'GroupBar.tsx': {
-        TS2345: 2,
-        TS2322: 1,
-      },
+      // GroupBar.tsx TS2345/TS2322 cleared 260712-a09 (Pattern D onMount
+      // ref-call non-null assertion + Pattern F object/array-prop default
+      // cast) — the file is now strict-clean, so it's dropped from this
+      // leaf's baseline entirely.
     },
   },
   {

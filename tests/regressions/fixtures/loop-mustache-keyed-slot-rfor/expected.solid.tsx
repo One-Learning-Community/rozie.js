@@ -10,7 +10,7 @@ interface LoopMustacheKeyedSlotRforProps {
 }
 
 export default function LoopMustacheKeyedSlotRfor(_props: LoopMustacheKeyedSlotRforProps): JSX.Element {
-  const _merged = mergeProps({ rows: (() => [])() }, _props);
+  const _merged = mergeProps({ rows: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['rows', 'children']);
   const resolved = children(() => local.children);
 

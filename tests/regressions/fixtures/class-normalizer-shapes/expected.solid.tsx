@@ -9,7 +9,7 @@ interface ClassNormShapesProps {
 }
 
 export default function ClassNormShapes(_props: ClassNormShapesProps): JSX.Element {
-  const _merged = mergeProps({ variant: 'primary', arr: (() => [])(), flags: (() => ({}))() }, _props);
+  const _merged = mergeProps({ variant: 'primary', arr: (() => [])() as any[], flags: (() => ({}))() as Record<string, any> }, _props);
   const [local, attrs] = splitProps(_merged, ['variant', 'arr', 'flags']);
 
   const [cond, setCond] = createSignal(true);

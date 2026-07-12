@@ -7,7 +7,7 @@ interface LoopMustacheInterpolationRforProps {
 }
 
 export default function LoopMustacheInterpolationRfor(_props: LoopMustacheInterpolationRforProps): JSX.Element {
-  const _merged = mergeProps({ items: (() => [])() }, _props);
+  const _merged = mergeProps({ items: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['items']);
 
   function noop(): void {}

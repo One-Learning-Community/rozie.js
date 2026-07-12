@@ -1,0 +1,9 @@
+{
+  "id": "REG-260712-a09-002",
+  "source": "260712-a09-RESEARCH.md Patterns D + F",
+  "sourceKind": "deviation-log",
+  "phase": "quick-260712-a09",
+  "desc": "a Solid DOM ref passed directly into a non-null engine-constructor call inside $onMount must carry a non-null assertion at that call site (declaration stays | null); an Object/Array-typed prop's literal-factory default must not widen to Record<string, any> | {} at read sites",
+  "targets": ["solid"],
+  "discoveredBy": "260712-a09-RESEARCH.md"
+}

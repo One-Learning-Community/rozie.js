@@ -8,7 +8,7 @@ interface StyleNormShapesProps {
 }
 
 export default function StyleNormShapes(_props: StyleNormShapesProps): JSX.Element {
-  const _merged = mergeProps({ s: '', obj: (() => ({}))() }, _props);
+  const _merged = mergeProps({ s: '', obj: (() => ({}))() as Record<string, any> }, _props);
   const [local, attrs] = splitProps(_merged, ['s', 'obj']);
 
   return (

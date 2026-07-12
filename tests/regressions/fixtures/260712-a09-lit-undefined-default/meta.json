@@ -1,0 +1,9 @@
+{
+  "id": "REG-260712-a09-001",
+  "source": "260712-a09-RESEARCH.md Pattern B",
+  "sourceKind": "deviation-log",
+  "phase": "quick-260712-a09",
+  "desc": "a Lit prop authored `default: undefined` (or `default: void 0`) must emit the no-default `?:`/`!:` field form, not a typed field initialized to `undefined` (TS2322 under strictNullChecks)",
+  "targets": ["lit"],
+  "discoveredBy": "260712-a09-RESEARCH.md"
+}

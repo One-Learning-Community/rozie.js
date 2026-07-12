@@ -9,7 +9,7 @@ interface LoopMustacheTemplateSlotRforProps {
 }
 
 export default function LoopMustacheTemplateSlotRfor(_props: LoopMustacheTemplateSlotRforProps): JSX.Element {
-  const _merged = mergeProps({ items: (() => [])() }, _props);
+  const _merged = mergeProps({ items: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['items', 'children']);
   const resolved = children(() => local.children);
 

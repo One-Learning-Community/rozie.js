@@ -9,7 +9,7 @@ interface LoopMustacheNestedConditionalSlotRforProps {
 }
 
 export default function LoopMustacheNestedConditionalSlotRfor(_props: LoopMustacheNestedConditionalSlotRforProps): JSX.Element {
-  const _merged = mergeProps({ items: (() => [])() }, _props);
+  const _merged = mergeProps({ items: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['items', 'children']);
   const resolved = children(() => local.children);
 
