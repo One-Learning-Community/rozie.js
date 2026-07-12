@@ -9,7 +9,7 @@ import { NgStyle } from '@angular/common';
 
     <div #rozieSpread_0 #rozieListenersTarget_1>
       
-      <span [style]="pinStyle(colId()) + ';' + pad()">bug element</span>
+      <span [attr.style]="pinStyle(colId()) + ';' + pad()">bug element</span>
 
       
       <span style="color:red" [ngStyle]="'font-weight:bold;'">merge-guard element</span>

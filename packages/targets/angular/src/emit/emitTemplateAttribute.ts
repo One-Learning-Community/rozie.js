@@ -576,6 +576,53 @@ function shouldWrapAttrBinding(
 }
 
 /**
+ * Quick task 260711-tgk — Angular's `[style]=` (`ɵɵstyleMap`) parses the bound
+ * value into a semicolon-delimited key:value map. Its parser corrupts on an
+ * EMPTY declaration (`;;` — e.g. `pinStyle(colId) + ';' + pad` when
+ * `pinStyle` already ends in `;`), silently DROPPING the declaration that
+ * follows the empty segment. The other 5 targets apply a `:style` STRING
+ * value via the browser's own (tolerant) CSS parser — Angular is the lone
+ * outlier because `[style]=` binds through `ɵɵstyleMap`, not `setAttribute`.
+ *
+ * Fix (see the call site in emitSingleAttr's binding branch): when a
+ * `:style` binding's expression is PROVABLY a string at compile time, emit
+ * `[attr.style]="<expr>"` instead of `[style]="<expr>"`. `[attr.style]`
+ * compiles to `ɵɵattribute` → `setAttribute('style', <string>)`, which the
+ * browser parses tolerantly — matching the other 5 targets' behavior. This
+ * is only reachable for the element's SOLE style contributor: emitAttributes'
+ * `counts.get('style') > 1` merge path (`[ngStyle]`) always intercepts
+ * multi-source style bindings (a co-existing static `style=` or a second
+ * `:style`) via its own `continue`, before emitSingleAttr is ever called for
+ * a style attribute in that case.
+ *
+ * Conservative by design: a false NEGATIVE (returning false for a value that
+ * IS always a string) just keeps the current, already-correct-for-non-`;;`
+ * `[style]=` behavior. A false POSITIVE (returning true for a value that can
+ * be an object) would break object-valued styles — so every branch below is
+ * additive-only and defaults to `false`.
+ */
+function isProvablyStringStyleExpression(expr: t.Expression): boolean {
+  if (t.isStringLiteral(expr)) return true;
+  if (t.isTemplateLiteral(expr)) return true;
+  if (t.isBinaryExpression(expr) && expr.operator === '+') {
+    // A BinaryExpression's `left` may type as PrivateName (`#x in y` shape);
+    // narrow to Expression before recursing.
+    if (!t.isExpression(expr.left)) return false;
+    return (
+      isProvablyStringStyleExpression(expr.left) ||
+      isProvablyStringStyleExpression(expr.right)
+    );
+  }
+  if (t.isConditionalExpression(expr)) {
+    return (
+      isProvablyStringStyleExpression(expr.consequent) &&
+      isProvablyStringStyleExpression(expr.alternate)
+    );
+  }
+  return false;
+}
+
+/**
  * Plan 14-05 R6 — keys that must never reach the emitted object from an
  * author-controlled `r-bind` LITERAL. Mirrors the React/Solid/Vue/Svelte
  * `FORBIDDEN_SPREAD_KEYS` set + the Phase 02 `collectPropDecls` write-time
@@ -1385,6 +1432,19 @@ export function emitSingleAttr(
         ? bindingName
         : `attr.${attr.name}`;
       return `[${attrDropName}]="rozieAttr(${expr})"`;
+    }
+    // Quick task 260711-tgk — additive carve-out: a `:style` binding whose
+    // expression is PROVABLY a string emits [attr.style]= (setAttribute, raw
+    // string, tolerant browser CSS parser) instead of [style]= (ɵɵstyleMap,
+    // which corrupts on a `;;` empty declaration). See
+    // isProvablyStringStyleExpression for the full rationale and the
+    // sole-style-contributor reachability guarantee. Object-valued and
+    // non-provably-string `:style` fall through unchanged to [style]=.
+    if (
+      attr.name === 'style' &&
+      isProvablyStringStyleExpression(attr.expression)
+    ) {
+      return `[attr.style]="${expr}"`;
     }
     return `[${bindingName}]="${expr}"`;
   }
