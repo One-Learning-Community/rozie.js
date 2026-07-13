@@ -10,7 +10,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   test: {
-    include: ['tests/**/*.test.ts', 'src/**/__tests__/*.test.ts'],
+    // Phase 75 Plan 01 — `src/manifest/*.test.ts` is colocated (no `__tests__/`
+    // subdir), unlike the rest of the package's convention. `src/**/*.test.ts`
+    // is a superset of `src/**/__tests__/*.test.ts` (kept for clarity/history).
+    include: ['tests/**/*.test.ts', 'src/**/__tests__/*.test.ts', 'src/**/*.test.ts'],
     root: __dirname,
     snapshotFormat: { printBasicPrototype: false },
   },
