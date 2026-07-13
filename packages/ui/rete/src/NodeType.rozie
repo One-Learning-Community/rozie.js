@@ -54,6 +54,48 @@
       example: '<NodeType type="source"><template #body="{ node }">{{ node.data.label }}</template></NodeType>',
     },
   },
+  // NodeResizer (D-14/D-17): opt this node TYPE into corner-handle resizing.
+  // Default OFF — zero drift for every existing <NodeType> that never declares it.
+  resizable: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt this node TYPE into corner-handle resizing (default OFF). When true, selecting a node of this type shows 4 corner drag handles (the React Flow <NodeResizer/> parity); dragging one persists an explicit node.width/node.height (a fixed box, D-07) that overrides auto-sizing for that node instance. A double-click on a handle resets the node back to auto-size.',
+    },
+  },
+  minWidth: {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'Minimum width (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.',
+    },
+  },
+  minHeight: {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'Minimum height (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.',
+    },
+  },
+  maxWidth: {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'Maximum width (px) a resize gesture may grow this type to. Unset = unbounded growth.',
+    },
+  },
+  maxHeight: {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth.',
+    },
+  },
 }
 </props>
 
@@ -125,6 +167,13 @@ const buildSpec = () => ({
     if (host && mountBody) { try { return mountBody(host, scope) } catch (e) {} }
     return null
   },
+  // NodeResizer (D-14/D-17): carried into the canvas's typeReg registry so
+  // renderNode/the resize gesture can read resizable/min/max for this type.
+  resizable: $props.resizable,
+  minWidth: $props.minWidth,
+  minHeight: $props.minHeight,
+  maxWidth: $props.maxWidth,
+  maxHeight: $props.maxHeight,
 })
 
 $onMount(() => {
