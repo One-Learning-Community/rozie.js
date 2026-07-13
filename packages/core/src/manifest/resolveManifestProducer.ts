@@ -86,11 +86,23 @@ function deriveBasePackageName(specifier: string): string | null {
 
 /**
  * Walk UP from a resolved entry-file path to the nearest ancestor directory
- * whose `package.json` `name` field equals `expectedName`. Bounded to 10
- * levels (T-75-05 — a real per-target leaf's package root sits 1-3 levels
- * above its resolved `dist/*` entry; 10 is a generous, still-finite bound
- * that can never escape into an unrelated ancestor tree undetected, since
- * EVERY level is name-verified before being accepted).
+ * whose `package.json` `name` field equals `expectedName` AND which carries a
+ * sibling `rozie-manifest.json`. Bounded to 10 levels (T-75-05 — a real
+ * per-target leaf's package root sits 1-3 levels above its resolved `dist/*`
+ * entry; 10 is a generous, still-finite bound that can never escape into an
+ * unrelated ancestor tree undetected, since EVERY level is name-verified
+ * before being accepted).
+ *
+ * Requiring the manifest sibling (not just a name match) is deliberate: some
+ * per-target build tooling generates a SECONDARY `package.json` inside the
+ * `dist/` output with the SAME `name` field as the real package root (e.g.
+ * `ng-packagr`'s Angular `Package Format v9+` legacy-entry-point convention
+ * emits `dist/package.json`). A name-only match would stop at that inner
+ * duplicate — one level too shallow — and never reach the real package root
+ * where `rozie-manifest.json` actually lives (only shipped at the root,
+ * sibling to the AUTHORED `package.json`, never duplicated into `dist/`).
+ * Continuing the walk past a name-matched-but-manifest-less directory finds
+ * the correct root for every current `@rozie-ui/*-<target>` leaf shape.
  */
 function findPackageRoot(entryFilePath: string, expectedName: string): string | null {
   let dir = dirname(entryFilePath);
@@ -102,7 +114,13 @@ function findPackageRoot(entryFilePath: string, expectedName: string): string | 
         raw !== null &&
         (raw as Record<string, unknown>).name === expectedName
       ) {
-        return dir;
+        try {
+          readFileSync(join(dir, 'rozie-manifest.json'), 'utf-8');
+          return dir;
+        } catch {
+          // Name-matched but no manifest sibling here (e.g. a build tool's
+          // nested dist/package.json duplicate) — keep walking up.
+        }
       }
     } catch {
       // No package.json at this level, or it doesn't parse — keep walking up.

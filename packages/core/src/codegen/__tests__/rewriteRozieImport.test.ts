@@ -50,4 +50,33 @@ describe('rewriteRozieImport — D-118 shared helper', () => {
   it('Test 9 (solid omit-ext): strips .rozie, no extension appended (mirrors react/angular)', () => {
     expect(rewriteRozieImport('./Counter.rozie', 'solid')).toBe('./Counter');
   });
+
+  // Phase 75 (D-08/D-09) — a PUBLISHED cross-package specifier derives the
+  // per-target package name instead of a plain extension swap.
+  it('Test 10 (published specifier, react): derives the -react package, no subpath', () => {
+    expect(rewriteRozieImport('@rozie-ui/combobox/Combobox.rozie', 'react')).toBe(
+      '@rozie-ui/combobox-react',
+    );
+  });
+
+  it('Test 11 (published specifier, vue): derives the -vue package (no .vue extension appended)', () => {
+    expect(rewriteRozieImport('@rozie-ui/combobox/Combobox.rozie', 'vue')).toBe(
+      '@rozie-ui/combobox-vue',
+    );
+  });
+
+  it('Test 12 (published specifier, all 6 targets): derives one package per target', () => {
+    const targets = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const;
+    for (const target of targets) {
+      expect(rewriteRozieImport('@rozie-ui/combobox/Combobox.rozie', target)).toBe(
+        `@rozie-ui/combobox-${target}`,
+      );
+    }
+  });
+
+  it('Test 13 (tsconfig-alias specifier stays local, extension-swap): @/ prefix is NOT published', () => {
+    expect(rewriteRozieImport('@/components/Modal.rozie', 'react')).toBe(
+      '@/components/Modal',
+    );
+  });
 });

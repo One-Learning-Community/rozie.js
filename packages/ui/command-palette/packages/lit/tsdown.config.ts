@@ -11,5 +11,16 @@ export default defineConfig({
   outputOptions(options) {
     return { ...options, exports: 'named' };
   },
-  external: ['lit', '@lit-labs/preact-signals', '@preact/signals-core', '@rozie/runtime-lit'],
+  // Phase 75 (D-11/D-12): @rozie-ui/combobox-lit is a published-package
+  // runtime peerDependency (Task 3), NOT vendored source — it MUST stay
+  // external. Inlining it would double-register the `rozie-combobox` custom
+  // element (a DOMException) the moment a consumer app also loads
+  // @rozie-ui/combobox-lit directly alongside command-palette-lit.
+  external: [
+    'lit',
+    '@lit-labs/preact-signals',
+    '@preact/signals-core',
+    '@rozie/runtime-lit',
+    '@rozie-ui/combobox-lit',
+  ],
 });

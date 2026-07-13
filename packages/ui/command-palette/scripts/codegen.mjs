@@ -29,61 +29,29 @@
  */
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { compile, createDefaultRegistry, lowerToIR, parse, ProducerResolver } from '@rozie/core';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/command-palette
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
-const COMBOBOX_ROOT = resolve(REPO_ROOT, 'packages/ui/combobox'); // canonical primitive home (D-01)
 const FILENAME = 'CommandPalette.rozie';
 
-// MULTI-COMPONENT (the data-table precedent, Phase 999.4): command-palette
-// composes the shipped <Combobox> primitive by VENDORING its `.rozie` source into
-// this family's src/ (D-03) and compiling it as a per-leaf sibling alongside the
-// parent. CommandPalette MUST be FIRST — it owns the handle-manifest +
-// docs-table validation gates. The vendored Combobox is an INTERNAL implementation
-// detail (NOT publicly re-exported — consumers use @rozie-ui/combobox directly).
+// Phase 75 (Option A — published-package composition, D-05/D-06/D-07):
+// command-palette composes the shipped @rozie-ui/combobox primitive by
+// resolving the authored STABLE package-style `<components>` specifier
+// `@rozie-ui/combobox/Combobox.rozie` to the PUBLISHED per-target
+// `@rozie-ui/combobox-<target>` package's compiled manifest, via @rozie/core's
+// compiler-level resolver (resolveManifestProducer, Plan 02) — found through
+// command-palette's own installed devDependency on that package (Plan 05).
+// There is no vendored `.rozie` sibling and no in-memory specifier remap:
+// CommandPalette is the ONLY component this codegen compiles. The published
+// combobox package resolves at compile-time for scoped-slot type threading +
+// r-model two-way validation, and is a runtime peerDependency of every
+// command-palette leaf (Task 3, D-11/D-12).
 const PARENT = 'CommandPalette';
-const COMPONENTS = [PARENT, 'Combobox'];
-
-// D-07 (LOAD-BEARING): the authored CommandPalette.rozie writes a STABLE
-// package-style `<components>` specifier `@rozie-ui/combobox/Combobox.rozie`. Under
-// Option B (vendored) the codegen rewrites that specifier to the local sibling
-// `./Combobox.rozie` BEFORE compile() so threadParamTypes resolves the vendored
-// copy on disk; the existing rewriteRozieImport then swaps `.rozie`→per-target
-// ext. The authored file is NEVER edited — only this in-memory string is — so it
-// stays byte-identical between B and a future Option A (only this remap + the
-// D-04 drift guard are B-specific, the deletable plumbing).
-const STABLE_COMBOBOX_SPECIFIER = '@rozie-ui/combobox/Combobox.rozie';
-const LOCAL_COMBOBOX_SPECIFIER = './Combobox.rozie';
-
-// D-03: the GENERATED banner prepended to the vendored copy. It sits OUTSIDE the
-// `<rozie>` envelope (a leading HTML comment is tolerated — CommandPalette.rozie
-// itself opens with one), so the D-04 drift guard hashes only the
-// `<rozie>…</rozie>` envelope span and ignores this banner.
-const BANNER =
-  `<!-- GENERATED — do not edit. Vendored from @rozie-ui/combobox by codegen.\n` +
-  `     Re-run \`pnpm --filter @rozie-ui/command-palette codegen\` to refresh.\n` +
-  `     Drift between this copy and the canonical source FAILS CI (D-04 guard). -->\n`;
-
-/**
- * D-03 / D-01 / D-07 — vendor the canonical combobox primitive `.rozie` into this
- * composite's src/ as a GENERATED, committed, overwrite-on-codegen sibling.
- *
- * ORDERING HAZARD (RESEARCH Pitfall 2): this MUST run in main() BEFORE any source
- * is read and BEFORE the compile loop. The vendored `./Combobox.rozie` is a compile
- * INPUT — threadParamTypes' producer resolution reads it on disk for slot-type
- * threading and degrades to `null` SILENTLY (untyped slot params, green-but-wrong
- * codegen) if the file is missing at compile time. Contrast copyThemes/copyInternal
- * which run AFTER write because they are leaf assets, not compile inputs.
- */
-function vendorPrimitives() {
-  const canonical = resolve(COMBOBOX_ROOT, 'src/Combobox.rozie');
-  const dest = resolve(ROOT, 'src/Combobox.rozie');
-  writeFileSync(dest, BANNER + readFileSync(canonical, 'utf8'));
-}
+const COMPONENTS = [PARENT];
 
 /** Per-target leaf dir + emitted file extension (build mode is informational). */
 const TARGETS = {
@@ -119,28 +87,33 @@ function copyInternal(leafSrc) {
 }
 
 function main() {
-  // (1) D-03/D-07 ORDERING HAZARD: vendor the canonical Combobox primitive into
-  // this composite's src/ FIRST — before any source is read, before parse/lower,
-  // before the compile loop. The vendored `./Combobox.rozie` is a compile INPUT
-  // (RESEARCH Pitfall 2).
-  vendorPrimitives();
-
-  // Read every component source once, keyed by component name (data-table shape).
+  // Read the (single) component source. CommandPalette is the only component
+  // this codegen compiles under Option A — no vendored sibling to read.
   const sources = Object.fromEntries(
     COMPONENTS.map((name) => [name, readFileSync(resolve(ROOT, 'src', `${name}.rozie`), 'utf8')]),
   );
 
-  // D-07: pre-compile remap of the CommandPalette source's stable `<components>`
-  // specifier → the local vendored sibling, so threadParamTypes resolves the copy
-  // on disk. The authored file is untouched; only this in-memory string changes.
-  const composedSource = sources[PARENT].replaceAll(STABLE_COMBOBOX_SPECIFIER, LOCAL_COMBOBOX_SPECIFIER);
+  // Phase 75 (Option A): a per-compiler-instance resolver, rooted at this
+  // package (ROOT), reused across the doc-table lowerToIR() call and every
+  // per-target compile() below — the established `resolverRoot`/`resolver`
+  // option shape (packages/ui/headless-core/scripts/compile-headless-core-check.mjs,
+  // packages/ui/data-table/scripts/probe-48-00.mjs). `resolverRoot`/
+  // `ResolverOptions.root` feeds ONLY the tsconfig-paths matcher — the
+  // published `@rozie-ui/combobox-<target>` package itself is found by
+  // walking node_modules upward from dirname(fromFile) (command-palette/src),
+  // which resolves because Plan 05 declared it as a devDependency of this
+  // package's ROOT, so pnpm symlinks it into command-palette/node_modules.
+  const resolver = new ProducerResolver({ root: ROOT });
 
-  // (2) parse + lower the PARENT ONCE for the doc tables + manifests. Use the
-  // composed (remapped) source so the IR's <components> resolves the local sibling.
-  const { ast } = parse(composedSource, { filename: resolve(ROOT, 'src', `${PARENT}.rozie`) });
+  // (1) parse + lower the PARENT ONCE for the doc tables + manifests. The
+  // RAW authored source (no specifier remap) — the stable
+  // `@rozie-ui/combobox/Combobox.rozie` specifier now resolves to the
+  // published per-target manifest via Plan 02's resolveManifestProducer.
+  const { ast } = parse(sources[PARENT], { filename: resolve(ROOT, 'src', `${PARENT}.rozie`) });
   const { ir } = lowerToIR(ast, {
     modifierRegistry: createDefaultRegistry(),
     filename: resolve(ROOT, 'src', `${PARENT}.rozie`),
+    resolver,
   });
 
   // Keep the hand-kept manifests in lockstep with the IR.
@@ -155,20 +128,19 @@ function main() {
     }
   }
 
-  // (3)(4)(5) per-target emit + vendor themes/internal + README.
+  // (2)(3)(4) per-target emit + vendor themes/internal + README.
   for (const [target, cfg] of Object.entries(TARGETS)) {
     const leafSrc = resolve(ROOT, 'packages', cfg.dir, 'src');
     mkdirSync(leafSrc, { recursive: true });
 
-    // Compile each sibling component into this leaf. The SCOPE FENCE throw is
-    // applied to EACH compile. The CommandPalette parent compiles from the D-07
-    // composed (specifier-remapped) source; the vendored Combobox sibling compiles
-    // from its verbatim vendored source. The ABSOLUTE host path keeps the two
-    // .rozie collision-safe via scopeHash basename-keying.
+    // Compile CommandPalette (the only component this codegen compiles under
+    // Option A) into this leaf. The SCOPE FENCE throw is applied to the
+    // compile. The published `@rozie-ui/combobox-<target>` package resolves
+    // via the same `resolver` instance's node_modules walk (D-10) — no
+    // vendored sibling, no in-memory specifier remap.
     for (const componentName of COMPONENTS) {
       const filename = resolve(ROOT, 'src', `${componentName}.rozie`);
-      const componentSource = componentName === PARENT ? composedSource : sources[componentName];
-      const r = compile(componentSource, { target, filename });
+      const r = compile(sources[componentName], { target, filename, resolverRoot: ROOT, resolver });
       const errs = r.diagnostics.filter((d) => d.severity === 'error');
       if (errs.length) {
         throw new Error(
@@ -177,43 +149,7 @@ function main() {
         );
       }
 
-      // D-07 (Option B, codegen-local plumbing — NOT an emitter edit): the Lit
-      // emitter emits a vendored-sibling composition import as a verbatim
-      // side-effect `import './Combobox.rozie';` (it registers the @customElement;
-      // resolved by the rozie unplugin in the consumer-coexist flow). A
-      // pre-compiled leaf package, however, is bundled standalone by tsdown
-      // (entry src/index.ts, bundler resolution) with no unplugin and no
-      // `.rozie` on disk — only the compiled sibling `Combobox.ts` — so the raw
-      // `.rozie` specifier is UNRESOLVED. Rewrite it to the extensionless sibling
-      // form (`./Combobox`), exactly what rewriteRozieImport(·,'lit') yields and
-      // what the react/solid/angular leaves already import. Lit-only; the bare
-      // side-effect form is unique to Lit composition, so this never touches
-      // binding imports or the canonical/consumer `.rozie` contract.
-      //
-      // Phase 66 (composed-component-ref → element-class typing): when the parent
-      // `ref`s the composed child, the Lit emitter ALSO emits a NAMED TYPE import
-      // `import type { Combobox } from './Combobox.rozie';` (the element-class type
-      // for the `@query` ref field). In the production unplugin flow that named
-      // import resolves against the child's `.d.rozie.ts` sidecar (emitLitTypes:
-      // `export declare class Combobox`). The STANDALONE leaf, however, has no
-      // sidecar — only the compiled sibling `Combobox.ts`, which (like every other
-      // target's compiled leaf) exports the class as `export default class Combobox`
-      // (react/solid default-import it too). So collapse the named type import to a
-      // DEFAULT type import off the extensionless sibling. Then strip any residual
-      // relative `.rozie` specifier. Still Lit-only, still sibling-relative only;
-      // leaves the canonical/consumer `.rozie` contract untouched.
-      const code =
-        target === 'lit'
-          ? r.code
-              .replace(/import '\.\/([A-Za-z0-9_]+)\.rozie';/g, "import './$1';")
-              .replace(
-                /import type \{ ([A-Za-z0-9_]+) \} from '\.\/([A-Za-z0-9_]+)\.rozie'/g,
-                "import type $1 from './$2'",
-              )
-              .replace(/from '\.\/([A-Za-z0-9_]+)\.rozie'/g, "from './$1'")
-          : r.code;
-
-      writeFileSync(resolve(leafSrc, `${componentName}.${cfg.ext}`), code);
+      writeFileSync(resolve(leafSrc, `${componentName}.${cfg.ext}`), r.code);
 
       // React-only sidecars, PER COMPONENT (data-table:199-208 shape). Both
       // CommandPalette.css/.d.ts AND Combobox.css/.d.ts are emitted.
@@ -230,9 +166,9 @@ function main() {
     }
 
     // Bundled leaves (tsdown) entry on src/index.ts. CommandPalette is the ONLY
-    // default/named export — the vendored Combobox is an INTERNAL implementation
-    // detail and is NOT re-exported (consumers use @rozie-ui/combobox directly;
-    // RESEARCH Pattern 1 / Anti-Patterns). React/Solid also emit a named
+    // default/named export — the published Combobox primitive is composed via
+    // the runtime peerDependency (Task 3) and is NOT re-exported (consumers use
+    // @rozie-ui/combobox-<target> directly). React/Solid also emit a named
     // `CommandPaletteHandle` interface (the `$expose` handle), forwarded verbatim.
     if (cfg.build === 'tsdown') {
       const barrel =

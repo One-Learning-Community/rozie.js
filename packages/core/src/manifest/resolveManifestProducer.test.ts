@@ -170,6 +170,50 @@ describe('resolveManifestProducer', () => {
     expect(result.error?.code).toBe(RozieErrorCode.CROSS_PACKAGE_LOOKUP_FAILED);
   });
 
+  it('skips a name-matched dist/package.json duplicate lacking rozie-manifest.json and finds the real root (ng-packagr shape)', () => {
+    // Mirrors packages/ui/combobox/packages/angular's real shape: ng-packagr
+    // emits a SECONDARY package.json inside dist/ with the SAME `name` as the
+    // real package root, and the resolved "." entry sits a level deeper still
+    // (dist/fesm2022/*.mjs). Only the REAL root (sibling to the AUTHORED
+    // package.json) carries rozie-manifest.json.
+    const manifestJson = buildRealComboboxManifest();
+    const pkgName = '@rozie-ui/combobox-angular';
+    const dir = path.join(tmpRoot, 'node_modules', ...pkgName.split('/'));
+    mkdirSync(path.join(dir, 'dist/fesm2022'), { recursive: true });
+    const pkgJson = {
+      name: pkgName,
+      type: 'module',
+      exports: {
+        '.': { default: './dist/fesm2022/rozie-ui-combobox-angular.mjs' },
+      },
+    };
+    writeFileSync(path.join(dir, 'package.json'), JSON.stringify(pkgJson), 'utf8');
+    // The ng-packagr dist/package.json duplicate: SAME name, NO manifest sibling.
+    writeFileSync(path.join(dir, 'dist/package.json'), JSON.stringify(pkgJson), 'utf8');
+    writeFileSync(
+      path.join(dir, 'dist/fesm2022/rozie-ui-combobox-angular.mjs'),
+      'export {};\n',
+      'utf8',
+    );
+    writeFileSync(
+      path.join(dir, 'rozie-manifest.json'),
+      JSON.stringify(manifestJson),
+      'utf8',
+    );
+    const resolver = new ProducerResolver({ root: tmpRoot });
+    const result = resolveManifestProducer({
+      specifier: '@rozie-ui/combobox/Combobox.rozie',
+      target: 'angular',
+      fromFile: consumerFile,
+      resolver,
+    });
+    expect(result.error).toBeNull();
+    expect(result.surface).not.toBeNull();
+    expect(result.surface?.props.map((p) => p.name)).toEqual(
+      manifestJson.props.map((p) => p.name),
+    );
+  });
+
   it('returns CROSS_PACKAGE_LOOKUP_FAILED when the package resolves but has no rozie-manifest.json', () => {
     const pkgName = '@rozie-ui/combobox-react';
     const dir = path.join(tmpRoot, 'node_modules', ...pkgName.split('/'));

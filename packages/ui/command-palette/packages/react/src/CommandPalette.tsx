@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import type { ReactNode } from 'react';
 import { rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './CommandPalette.css';
-import Combobox, { type ComboboxHandle } from './Combobox';
+import Combobox, { type ComboboxHandle } from '@rozie-ui/combobox-react';
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------

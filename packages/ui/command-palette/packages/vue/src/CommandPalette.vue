@@ -21,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import Combobox from './Combobox.vue';
+import Combobox from '@rozie-ui/combobox-vue';
 
 import { onMounted, ref, watch } from 'vue';
 

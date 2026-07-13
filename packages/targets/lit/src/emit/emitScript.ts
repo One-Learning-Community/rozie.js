@@ -26,6 +26,10 @@ import type {
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
+import {
+  isPublishedSpecifier,
+  rewriteRozieImport,
+} from '../../../../core/src/codegen/rewriteRozieImport.js';
 import type {
   LitImportCollector,
   LitDecoratorImportCollector,
@@ -1068,7 +1072,17 @@ export function emitScript(
   for (const typeName of composedTypeImports) {
     const decl = (ir.components ?? []).find((c) => c.localName === typeName);
     if (decl) {
-      composedTypeImportLines.push(`import type { ${typeName} } from '${decl.importPath}';`);
+      // Phase 75 (D-08/D-09): a LOCAL `.rozie` specifier stays VERBATIM
+      // (unchanged — resolved by @rozie/unplugin's `.d.rozie.ts` sidecar). A
+      // PUBLISHED cross-package specifier is rewritten to the derived
+      // per-target package (`@rozie-ui/combobox-lit`), whose barrel
+      // re-exports the class under its OWN name (`export { default as
+      // Combobox }`) — the same named-import shape, no default-import
+      // conversion needed.
+      const importPath = isPublishedSpecifier(decl.importPath)
+        ? rewriteRozieImport(decl.importPath, 'lit')
+        : decl.importPath;
+      composedTypeImportLines.push(`import type { ${typeName} } from '${importPath}';`);
     }
   }
 

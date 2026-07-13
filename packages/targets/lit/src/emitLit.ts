@@ -33,6 +33,10 @@ import {
   deconflictReservedComputedInjectNames,
   reservedClassMembers,
 } from '../../../core/src/rewrite/deconflict.js';
+import {
+  isPublishedSpecifier,
+  rewriteRozieImport,
+} from '../../../core/src/codegen/rewriteRozieImport.js';
 // NOTE: SourceMap import removed (WR-08); EmitLitResult.map is null until Phase 7.
 import {
   LitImportCollector,
@@ -789,7 +793,18 @@ function buildComponentImportsBlock(
     // Side-effect-only import: the imported module's @customElement decorator
     // runs at module load and registers `customElements.define(tag, Class)`.
     // No symbol bind — the parent template references the registered tag.
-    lines.push(`import '${decl.importPath}';`);
+    //
+    // Phase 75 (D-08/D-09): a LOCAL `.rozie` specifier is left VERBATIM
+    // (unchanged behavior — resolved by @rozie/unplugin in the
+    // consumer-coexist flow). A PUBLISHED cross-package specifier has no
+    // unplugin/`.rozie`-on-disk resolution path to rely on — it is rewritten
+    // to the derived per-target package's bare specifier
+    // (`@rozie-ui/combobox-lit`), whose own barrel re-exports the class
+    // (registering the custom element as the same side effect).
+    const importPath = isPublishedSpecifier(decl.importPath)
+      ? rewriteRozieImport(decl.importPath, 'lit')
+      : decl.importPath;
+    lines.push(`import '${importPath}';`);
   }
   if (lines.length === 0) return undefined;
   return lines.join('\n') + '\n';

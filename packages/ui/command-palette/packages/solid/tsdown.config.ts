@@ -11,5 +11,8 @@ export default defineConfig({
   outputOptions(options) {
     return { ...options, exports: 'named' };
   },
-  external: ['solid-js', '@rozie/runtime-solid'],
+  // Phase 75 (D-11/D-12): @rozie-ui/combobox-solid is a published-package
+  // runtime peerDependency (Task 3), NOT vendored source — keep it external
+  // so it is not inlined/duplicated into this leaf's bundle.
+  external: ['solid-js', '@rozie/runtime-solid', '@rozie-ui/combobox-solid'],
 });

@@ -1,5 +1,5 @@
 <script lang="ts">
-import Combobox from './Combobox.svelte';
+import Combobox from '@rozie-ui/combobox-svelte';
 import { rozieDisplay } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';

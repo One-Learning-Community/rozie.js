@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { Show, createEffect, createSignal, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal, rozieDisplay } from '@rozie/runtime-solid';
-import Combobox, { type ComboboxHandle } from './Combobox';
+import Combobox, { type ComboboxHandle } from '@rozie-ui/combobox-solid';
 import { filterCommands } from './internal/filterCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------

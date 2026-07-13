@@ -1,7 +1,7 @@
 import { Component, ContentChild, DestroyRef, ElementRef, TemplateRef, ViewEncapsulation, effect, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
-import { Combobox } from './Combobox';
+import { Combobox } from '@rozie-ui/combobox-angular';
 
 import { filterCommands } from './internal/filterCommands';
 
