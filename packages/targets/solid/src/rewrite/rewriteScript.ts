@@ -169,7 +169,7 @@ function isNullWidenedPropObjectLiteralCallArgTarget(
       cur = objExpr;
       continue;
     }
-    if (parent.isCallExpression() && parent.node.arguments.includes(cur.node as t.Node)) {
+    if (parent.isCallExpression() && parent.node.arguments.some((arg) => arg === cur.node)) {
       const callee = parent.node.callee;
       if (t.isIdentifier(callee) && excludeCallees.has(callee.name)) return false;
       return true;
