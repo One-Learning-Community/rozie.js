@@ -67,6 +67,12 @@ export function Demo() {
 
 | Event | Description |
 | --- | --- |
+| `regionCreated` | |
+| `regionUpdated` | |
+| `regionRemoved` | |
+| `regionClicked` | |
+| `regionIn` | |
+| `regionOut` | |
 | `ready` | |
 | `playing` | |
 | `paused` | |
@@ -76,12 +82,6 @@ export function Demo() {
 | `interaction` | |
 | `loading` | |
 | `error` | |
-| `regionCreated` | |
-| `regionUpdated` | |
-| `regionRemoved` | |
-| `regionClicked` | |
-| `regionIn` | |
-| `regionOut` | |
 
 ## Imperative handle
 

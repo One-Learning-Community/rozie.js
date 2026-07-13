@@ -67,6 +67,12 @@ const time = ref(0);
 
 | Event | Description |
 | --- | --- |
+| `regionCreated` | |
+| `regionUpdated` | |
+| `regionRemoved` | |
+| `regionClicked` | |
+| `regionIn` | |
+| `regionOut` | |
 | `ready` | |
 | `playing` | |
 | `paused` | |
@@ -76,12 +82,6 @@ const time = ref(0);
 | `interaction` | |
 | `loading` | |
 | `error` | |
-| `regionCreated` | |
-| `regionUpdated` | |
-| `regionRemoved` | |
-| `regionClicked` | |
-| `regionIn` | |
-| `regionOut` | |
 
 ## Imperative handle
 

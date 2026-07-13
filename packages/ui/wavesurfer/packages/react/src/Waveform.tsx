@@ -95,29 +95,29 @@ interface WaveformProps {
    */
   disableDragToSeek?: boolean;
   /**
-   * Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Construction-only in v1 — toggling after mount is a no-op.
+   * Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Live-toggleable — registers/unregisters on the running engine, no remount.
    */
   timeline?: boolean;
   /**
-   * Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Construction-only in v1 — toggling after mount is a no-op.
+   * Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Live-toggleable — registers/unregisters on the running engine, no remount.
    */
   hover?: boolean;
   /**
-   * The line color of the Hover plugin cursor (only applies when `hover` is enabled). Construction-only in v1.
+   * The line color of the Hover plugin cursor (only applies when `hover` is enabled). Read/applied when the Hover plugin is (re-)created — not live on an already-registered instance.
    */
   hoverColor?: (string) | null;
   /**
-   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin at construction. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
+   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin — at construction if it's already an array, or lazily the first time `regions` transitions from `null`/`undefined` to an array. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
    */
   regions?: unknown;
   defaultRegions?: unknown;
   onRegionsChange?: (regions: unknown) => void;
   /**
-   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Construction-only in v1.
+   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
   dragToCreateRegions?: boolean;
   /**
-   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Construction-only in v1.
+   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
   regionColor?: (string) | null;
   /**
@@ -130,6 +130,12 @@ interface WaveformProps {
   currentTime?: unknown;
   defaultCurrentTime?: unknown;
   onCurrentTimeChange?: (currentTime: unknown) => void;
+  onRegionCreated?: (...args: any[]) => void;
+  onRegionUpdated?: (...args: any[]) => void;
+  onRegionRemoved?: (...args: any[]) => void;
+  onRegionClicked?: (...args: any[]) => void;
+  onRegionIn?: (...args: any[]) => void;
+  onRegionOut?: (...args: any[]) => void;
   onReady?: (...args: any[]) => void;
   onPlaying?: (...args: any[]) => void;
   onPaused?: (...args: any[]) => void;
@@ -139,12 +145,6 @@ interface WaveformProps {
   onInteraction?: (...args: any[]) => void;
   onLoading?: (...args: any[]) => void;
   onError?: (...args: any[]) => void;
-  onRegionCreated?: (...args: any[]) => void;
-  onRegionUpdated?: (...args: any[]) => void;
-  onRegionRemoved?: (...args: any[]) => void;
-  onRegionClicked?: (...args: any[]) => void;
-  onRegionIn?: (...args: any[]) => void;
-  onRegionOut?: (...args: any[]) => void;
 }
 
 export interface WaveformHandle {
@@ -202,8 +202,11 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     void src; void peaks; void duration; void height; void waveColor; void progressColor; void cursorColor; void cursorWidth; void barWidth; void barGap; void barRadius; void minPxPerSec; void volume; void playbackRate; void autoplay; void normalizeAmplitude; void hideScrollbar; void disableInteraction; void disableDragToSeek; void timeline; void hover; void hoverColor; void regions; void dragToCreateRegions; void regionColor; void options; void currentTime; void defaultValue; void onRegionsChange; void defaultRegions; void onCurrentTimeChange; void defaultCurrentTime;
     return rest;
   })();
+  const timelinePlugin = useRef<any>(null);
+  const hoverPlugin = useRef<any>(null);
   const regionsPlugin = useRef<any>(null);
   const ws = useRef<any>(null);
+  const wsReady = useRef(false);
   const regionsReady = useRef(false);
   const reconciling = useRef(false);
   const [regions, setRegions] = useControllableState({
@@ -232,6 +235,8 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
   const _watch12First = useRef(true);
   const _watch13First = useRef(true);
   const _watch14First = useRef(true);
+  const _watch15First = useRef(true);
+  const _watch16First = useRef(true);
 
   function serializeRegion(r: any) {
     return {
@@ -299,14 +304,61 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     reconciling.current = false;
     if (addedWithoutId) writeBackRegions();
   }
-  const { onError: _rozieProp_onError, onFinished: _rozieProp_onFinished, onInteraction: _rozieProp_onInteraction, onLoading: _rozieProp_onLoading, onPaused: _rozieProp_onPaused, onPlaying: _rozieProp_onPlaying, onReady: _rozieProp_onReady, onRegionClicked: _rozieProp_onRegionClicked, onRegionCreated: _rozieProp_onRegionCreated, onRegionIn: _rozieProp_onRegionIn, onRegionOut: _rozieProp_onRegionOut, onRegionRemoved: _rozieProp_onRegionRemoved, onRegionUpdated: _rozieProp_onRegionUpdated, onSeeking: _rozieProp_onSeeking, onTimeupdate: _rozieProp_onTimeupdate } = props;
+  function wireRegionsPluginEvents(plugin: any) {
+    plugin.on('region-created', (region: any) => {
+      if (reconciling.current) return;
+      props.onRegionCreated && props.onRegionCreated(serializeRegion(region));
+      writeBackRegions();
+    });
+    plugin.on('region-updated', (region: any) => {
+      if (reconciling.current) return;
+      props.onRegionUpdated && props.onRegionUpdated(serializeRegion(region));
+      writeBackRegions();
+    });
+    plugin.on('region-removed', (region: any) => {
+      if (reconciling.current) return;
+      props.onRegionRemoved && props.onRegionRemoved(serializeRegion(region));
+      writeBackRegions();
+    });
+    plugin.on('region-clicked', (region: any) => {
+      props.onRegionClicked && props.onRegionClicked(serializeRegion(region));
+    });
+    // Playback entered/left a region — pure notifications (no writeback), so they
+    // fire regardless of the reconcile guard. The events for active-segment
+    // highlighting, transcript/karaoke sync, and loop-a-region.
+    plugin.on('region-in', (region: any) => {
+      props.onRegionIn && props.onRegionIn(serializeRegion(region));
+    });
+    plugin.on('region-out', (region: any) => {
+      props.onRegionOut && props.onRegionOut(serializeRegion(region));
+    });
+  }
+  function ensureRegionsPlugin() {
+    if (regionsPlugin.current || !ws.current) return regionsPlugin.current;
+    regionsPlugin.current = RegionsPlugin.create();
+    ws.current.registerPlugin(regionsPlugin.current);
+    wireRegionsPluginEvents(regionsPlugin.current);
+    if (props.dragToCreateRegions) {
+      regionsPlugin.current.enableDragSelection({
+        color: props.regionColor ?? undefined
+      });
+    }
+    return regionsPlugin.current;
+  }
+  const { onError: _rozieProp_onError, onFinished: _rozieProp_onFinished, onInteraction: _rozieProp_onInteraction, onLoading: _rozieProp_onLoading, onPaused: _rozieProp_onPaused, onPlaying: _rozieProp_onPlaying, onReady: _rozieProp_onReady, onSeeking: _rozieProp_onSeeking, onTimeupdate: _rozieProp_onTimeupdate } = props;
     const buildWaveSurfer = useCallback(() => {
     let plugins = [];
     plugins = [];
-    if (props.timeline) plugins.push(TimelinePlugin.create());
-    if (props.hover) plugins.push(HoverPlugin.create({
-      lineColor: props.hoverColor ?? undefined
-    }));
+    if (props.timeline) {
+      timelinePlugin.current = TimelinePlugin.create();
+      plugins.push(timelinePlugin.current);
+    }
+    if (props.hover) {
+      hoverPlugin.current = HoverPlugin.create({
+        lineColor: props.hoverColor ?? undefined
+      });
+      plugins.push(hoverPlugin.current);
+    }
     // Regions plugin is registered when `regions` is an array (even empty).
     regionsPlugin.current = null;
     if (Array.isArray(regions)) {
@@ -342,6 +394,11 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
 
     // ── engine events → emits + the two-way currentTime writeback ──────────────
     ws.current.on('ready', (duration: any) => {
+      wsReady.current = true;
+      // Rare async-window catch-up: `regions` became an array between mount and
+      // `ready` firing, before `wsReady` was true, so the $watch(regions) lazy
+      // path below couldn't gate on it yet. ensureRegionsPlugin is idempotent.
+      if (Array.isArray(regions)) ensureRegionsPlugin();
       // Regions can only be placed once the duration is known — do the initial
       // reconcile + drag-selection wiring here, then open the gate for prop-driven
       // reconciles. ($watch is lazy, so it never fires at mount; this is the only
@@ -371,40 +428,11 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     ws.current.on('loading', (percent: any) => _rozieProp_onLoading && _rozieProp_onLoading(percent));
     ws.current.on('error', (err: any) => _rozieProp_onError && _rozieProp_onError(err));
 
-    // ── regions plugin events → emits + two-way `regions` writeback ────────────
-    // Each is a no-op during a controlled reconcile (the `reconciling` guard) so a
-    // programmatic add/update/remove does not echo back or double-emit; only genuine
-    // user gestures (drag-create, drag/resize, delete) drive the model + emits.
-    if (regionsPlugin.current) {
-      regionsPlugin.current.on('region-created', (region: any) => {
-        if (reconciling.current) return;
-        _rozieProp_onRegionCreated && _rozieProp_onRegionCreated(serializeRegion(region));
-        writeBackRegions();
-      });
-      regionsPlugin.current.on('region-updated', (region: any) => {
-        if (reconciling.current) return;
-        _rozieProp_onRegionUpdated && _rozieProp_onRegionUpdated(serializeRegion(region));
-        writeBackRegions();
-      });
-      regionsPlugin.current.on('region-removed', (region: any) => {
-        if (reconciling.current) return;
-        _rozieProp_onRegionRemoved && _rozieProp_onRegionRemoved(serializeRegion(region));
-        writeBackRegions();
-      });
-      regionsPlugin.current.on('region-clicked', (region: any) => {
-        _rozieProp_onRegionClicked && _rozieProp_onRegionClicked(serializeRegion(region));
-      });
-      // Playback entered/left a region — pure notifications (no writeback), so they
-      // fire regardless of the reconcile guard. The events for active-segment
-      // highlighting, transcript/karaoke sync, and loop-a-region.
-      regionsPlugin.current.on('region-in', (region: any) => {
-        _rozieProp_onRegionIn && _rozieProp_onRegionIn(serializeRegion(region));
-      });
-      regionsPlugin.current.on('region-out', (region: any) => {
-        _rozieProp_onRegionOut && _rozieProp_onRegionOut(serializeRegion(region));
-      });
-    }
-  }, [_rozieProp_onError, _rozieProp_onFinished, _rozieProp_onInteraction, _rozieProp_onLoading, _rozieProp_onPaused, _rozieProp_onPlaying, _rozieProp_onReady, _rozieProp_onRegionClicked, _rozieProp_onRegionCreated, _rozieProp_onRegionIn, _rozieProp_onRegionOut, _rozieProp_onRegionRemoved, _rozieProp_onRegionUpdated, _rozieProp_onSeeking, _rozieProp_onTimeupdate, props.autoplay, props.barGap, props.barRadius, props.barWidth, props.cursorColor, props.cursorWidth, props.disableDragToSeek, props.disableInteraction, props.dragToCreateRegions, props.duration, props.height, props.hideScrollbar, props.hover, props.hoverColor, props.minPxPerSec, props.normalizeAmplitude, props.options, props.peaks, props.progressColor, props.regionColor, props.src, props.timeline, props.waveColor, reconcileRegions, regions, serializeRegion, setCurrentTime, writeBackRegions]);
+    // ── regions plugin events ───────────────────────────────────────────────────
+    // Shared with the lazy ensureRegionsPlugin() path so construction-time and
+    // lazy registration wire identical listener behavior through one function.
+    if (regionsPlugin.current) wireRegionsPluginEvents(regionsPlugin.current);
+  }, [_rozieProp_onError, _rozieProp_onFinished, _rozieProp_onInteraction, _rozieProp_onLoading, _rozieProp_onPaused, _rozieProp_onPlaying, _rozieProp_onReady, _rozieProp_onSeeking, _rozieProp_onTimeupdate, ensureRegionsPlugin, props.autoplay, props.barGap, props.barRadius, props.barWidth, props.cursorColor, props.cursorWidth, props.disableDragToSeek, props.disableInteraction, props.dragToCreateRegions, props.duration, props.height, props.hideScrollbar, props.hover, props.hoverColor, props.minPxPerSec, props.normalizeAmplitude, props.options, props.peaks, props.progressColor, props.regionColor, props.src, props.timeline, props.waveColor, reconcileRegions, regions, setCurrentTime, wireRegionsPluginEvents]);
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
   // Collision-clear across all six targets: canonical media verbs play/pause/
   // playPause kept (the emits were renamed playing/paused/finished to dodge ROZ121);
@@ -571,7 +599,41 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
   }, [currentTime]);
   useEffect(() => {
     if (_watch14First.current) { _watch14First.current = false; return; }
+    const v = props.timeline;
+    if (!ws.current) return;
+    if (v && !timelinePlugin.current) {
+      timelinePlugin.current = TimelinePlugin.create();
+      ws.current.registerPlugin(timelinePlugin.current);
+    } else if (!v && timelinePlugin.current) {
+      ws.current.unregisterPlugin(timelinePlugin.current);
+      timelinePlugin.current = null;
+    }
+  }, [props.timeline]);
+  useEffect(() => {
+    if (_watch15First.current) { _watch15First.current = false; return; }
+    const v = props.hover;
+    if (!ws.current) return;
+    if (v && !hoverPlugin.current) {
+      hoverPlugin.current = HoverPlugin.create({
+        lineColor: props.hoverColor ?? undefined
+      });
+      ws.current.registerPlugin(hoverPlugin.current);
+    } else if (!v && hoverPlugin.current) {
+      ws.current.unregisterPlugin(hoverPlugin.current);
+      hoverPlugin.current = null;
+    }
+  }, [props.hover]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch16First.current) { _watch16First.current = false; return; }
     const list = regions;
+    // Lazy registration: `regions` transitioned to an array after mount and the
+    // plugin doesn't exist yet — register it now. If the engine has already
+    // decoded audio (wsReady), open the reconcile gate immediately; otherwise
+    // `ready`'s own catch-up (above) opens it once duration is known.
+    if (Array.isArray(list) && !regionsPlugin.current && ws.current) {
+      ensureRegionsPlugin();
+      if (wsReady.current) regionsReady.current = true;
+    }
     // Controlled reconcile of the live regions to match the incoming list.
     // Gated on `regionsReady` (duration known) and value-equality-guarded inside
     // reconcileRegions so a writeback echo doesn't loop.

@@ -104,28 +104,28 @@ export default class Waveform extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true }) disableDragToSeek: boolean = false;
   /**
-   * Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Construction-only in v1 — toggling after mount is a no-op.
+   * Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Live-toggleable — registers/unregisters on the running engine, no remount.
    */
   @property({ type: Boolean, reflect: true }) timeline: boolean = false;
   /**
-   * Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Construction-only in v1 — toggling after mount is a no-op.
+   * Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Live-toggleable — registers/unregisters on the running engine, no remount.
    */
   @property({ type: Boolean, reflect: true }) hover: boolean = false;
   /**
-   * The line color of the Hover plugin cursor (only applies when `hover` is enabled). Construction-only in v1.
+   * The line color of the Hover plugin cursor (only applies when `hover` is enabled). Read/applied when the Hover plugin is (re-)created — not live on an already-registered instance.
    */
   @property({ type: String, reflect: true }) hoverColor: string | null = null;
   /**
-   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin at construction. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
+   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin — at construction if it's already an array, or lazily the first time `regions` transitions from `null`/`undefined` to an array. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
    */
   @property({ type: Object, attribute: 'regions' }) _regions_attr?: unknown;
   private _regionsControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'regions-change', defaultValue: undefined, initialControlledValue: undefined });
   /**
-   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Construction-only in v1.
+   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
   @property({ type: Boolean, reflect: true }) dragToCreateRegions: boolean = false;
   /**
-   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Construction-only in v1.
+   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
   @property({ type: String, reflect: true }) regionColor: string | null = null;
   /**
@@ -139,7 +139,7 @@ export default class Waveform extends SignalWatcher(LitElement) {
   private _currentTimeControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'current-time-change', defaultValue: undefined, initialControlledValue: undefined });
   @query('[data-rozie-ref="container"]') private _refContainer!: HTMLElement;
 private __rozieWatchInitial_13 = true;
-private __rozieWatchInitial_14 = true;
+private __rozieWatchInitial_16 = true;
 private __rozieFirstUpdateDone = false;
 
   private _disconnectCleanups: Array<() => void> = [];
@@ -159,7 +159,15 @@ private __rozieFirstUpdateDone = false;
       if (Math.abs(v - this.ws.getCurrentTime()) < 0.05) return;
       this.ws.setTime(v);
     })(__watchVal); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.regions)(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } ((list: any) => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.regions)(); untracked(() => { if (this.__rozieWatchInitial_16) { this.__rozieWatchInitial_16 = false; return; } ((list: any) => {
+      // Lazy registration: `regions` transitioned to an array after mount and the
+      // plugin doesn't exist yet — register it now. If the engine has already
+      // decoded audio (wsReady), open the reconcile gate immediately; otherwise
+      // `ready`'s own catch-up (above) opens it once duration is known.
+      if (Array.isArray(list) && !this.regionsPlugin && this.ws) {
+        this.ensureRegionsPlugin();
+        if (this.wsReady) this.regionsReady = true;
+      }
       // Controlled reconcile of the live regions to match the incoming list.
       // Gated on `regionsReady` (duration known) and value-equality-guarded inside
       // reconcileRegions so a writeback echo doesn't loop.
@@ -229,6 +237,28 @@ private __rozieFirstUpdateDone = false;
     if (this.__rozieFirstUpdateDone && (changedProperties.has('minPxPerSec'))) { const __watchVal = (() => this.minPxPerSec)(); ((v: any) => {
       if (this.ws && typeof v === 'number' && v > 0) this.ws.zoom(v);
     })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('timeline'))) { const __watchVal = (() => this.timeline)(); ((v: any) => {
+      if (!this.ws) return;
+      if (v && !this.timelinePlugin) {
+        this.timelinePlugin = TimelinePlugin.create();
+        this.ws.registerPlugin(this.timelinePlugin);
+      } else if (!v && this.timelinePlugin) {
+        this.ws.unregisterPlugin(this.timelinePlugin);
+        this.timelinePlugin = null;
+      }
+    })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('hover'))) { const __watchVal = (() => this.hover)(); ((v: any) => {
+      if (!this.ws) return;
+      if (v && !this.hoverPlugin) {
+        this.hoverPlugin = HoverPlugin.create({
+          lineColor: this.hoverColor ?? undefined
+        });
+        this.ws.registerPlugin(this.hoverPlugin);
+      } else if (!v && this.hoverPlugin) {
+        this.ws.unregisterPlugin(this.hoverPlugin);
+        this.hoverPlugin = null;
+      }
+    })(__watchVal); }
     this.__rozieFirstUpdateDone = true;
   }
 
@@ -261,6 +291,12 @@ private __rozieFirstUpdateDone = false;
   regionsReady = false;
 
   reconciling = false;
+
+  timelinePlugin: any = null;
+
+  hoverPlugin: any = null;
+
+  wsReady = false;
 
   serializeRegion = (r: any) => ({
   id: r.id,
@@ -330,13 +366,86 @@ private __rozieFirstUpdateDone = false;
   if (addedWithoutId) this.writeBackRegions();
 };
 
+  wireRegionsPluginEvents = (plugin: any) => {
+  plugin.on('region-created', (region: any) => {
+    if (this.reconciling) return;
+    this.dispatchEvent(new CustomEvent("regionCreated", {
+      detail: this.serializeRegion(region),
+      bubbles: true,
+      composed: true
+    }));
+    this.writeBackRegions();
+  });
+  plugin.on('region-updated', (region: any) => {
+    if (this.reconciling) return;
+    this.dispatchEvent(new CustomEvent("regionUpdated", {
+      detail: this.serializeRegion(region),
+      bubbles: true,
+      composed: true
+    }));
+    this.writeBackRegions();
+  });
+  plugin.on('region-removed', (region: any) => {
+    if (this.reconciling) return;
+    this.dispatchEvent(new CustomEvent("regionRemoved", {
+      detail: this.serializeRegion(region),
+      bubbles: true,
+      composed: true
+    }));
+    this.writeBackRegions();
+  });
+  plugin.on('region-clicked', (region: any) => {
+    this.dispatchEvent(new CustomEvent("regionClicked", {
+      detail: this.serializeRegion(region),
+      bubbles: true,
+      composed: true
+    }));
+  });
+  // Playback entered/left a region — pure notifications (no writeback), so they
+  // fire regardless of the reconcile guard. The events for active-segment
+  // highlighting, transcript/karaoke sync, and loop-a-region.
+  plugin.on('region-in', (region: any) => {
+    this.dispatchEvent(new CustomEvent("regionIn", {
+      detail: this.serializeRegion(region),
+      bubbles: true,
+      composed: true
+    }));
+  });
+  plugin.on('region-out', (region: any) => {
+    this.dispatchEvent(new CustomEvent("regionOut", {
+      detail: this.serializeRegion(region),
+      bubbles: true,
+      composed: true
+    }));
+  });
+};
+
+  ensureRegionsPlugin = () => {
+  if (this.regionsPlugin || !this.ws) return this.regionsPlugin;
+  this.regionsPlugin = RegionsPlugin.create();
+  this.ws.registerPlugin(this.regionsPlugin);
+  this.wireRegionsPluginEvents(this.regionsPlugin);
+  if (this.dragToCreateRegions) {
+    this.regionsPlugin.enableDragSelection({
+      color: this.regionColor ?? undefined
+    });
+  }
+  return this.regionsPlugin;
+};
+
   buildWaveSurfer = () => {
   let plugins = [];
   plugins = [];
-  if (this.timeline) plugins.push(TimelinePlugin.create());
-  if (this.hover) plugins.push(HoverPlugin.create({
-    lineColor: this.hoverColor ?? undefined
-  }));
+  if (this.timeline) {
+    this.timelinePlugin = TimelinePlugin.create();
+    plugins.push(this.timelinePlugin);
+  }
+  if (this.hover) {
+    this.hoverPlugin = HoverPlugin.create({
+      lineColor: this.hoverColor ?? undefined
+    });
+    plugins.push(this.hoverPlugin);
+  }
   // Regions plugin is registered when `regions` is an array (even empty).
   this.regionsPlugin = null;
   if (Array.isArray(this.regions)) {
@@ -372,6 +481,11 @@ private __rozieFirstUpdateDone = false;
 
   // ── engine events → emits + the two-way currentTime writeback ──────────────
   this.ws.on('ready', (duration: any) => {
+    this.wsReady = true;
+    // Rare async-window catch-up: `regions` became an array between mount and
+    // `ready` firing, before `wsReady` was true, so the $watch(regions) lazy
+    // path below couldn't gate on it yet. ensureRegionsPlugin is idempotent.
+    if (Array.isArray(this.regions)) this.ensureRegionsPlugin();
     // Regions can only be placed once the duration is known — do the initial
     // reconcile + drag-selection wiring here, then open the gate for prop-driven
     // reconciles. ($watch is lazy, so it never fires at mount; this is the only
@@ -437,63 +551,10 @@ private __rozieFirstUpdateDone = false;
     composed: true
   })));
 
-  // ── regions plugin events → emits + two-way `regions` writeback ────────────
-  // Each is a no-op during a controlled reconcile (the `reconciling` guard) so a
-  // programmatic add/update/remove does not echo back or double-emit; only genuine
-  // user gestures (drag-create, drag/resize, delete) drive the model + emits.
-  if (this.regionsPlugin) {
-    this.regionsPlugin.on('region-created', (region: any) => {
-      if (this.reconciling) return;
-      this.dispatchEvent(new CustomEvent("regionCreated", {
-        detail: this.serializeRegion(region),
-        bubbles: true,
-        composed: true
-      }));
-      this.writeBackRegions();
-    });
-    this.regionsPlugin.on('region-updated', (region: any) => {
-      if (this.reconciling) return;
-      this.dispatchEvent(new CustomEvent("regionUpdated", {
-        detail: this.serializeRegion(region),
-        bubbles: true,
-        composed: true
-      }));
-      this.writeBackRegions();
-    });
-    this.regionsPlugin.on('region-removed', (region: any) => {
-      if (this.reconciling) return;
-      this.dispatchEvent(new CustomEvent("regionRemoved", {
-        detail: this.serializeRegion(region),
-        bubbles: true,
-        composed: true
-      }));
-      this.writeBackRegions();
-    });
-    this.regionsPlugin.on('region-clicked', (region: any) => {
-      this.dispatchEvent(new CustomEvent("regionClicked", {
-        detail: this.serializeRegion(region),
-        bubbles: true,
-        composed: true
-      }));
-    });
-    // Playback entered/left a region — pure notifications (no writeback), so they
-    // fire regardless of the reconcile guard. The events for active-segment
-    // highlighting, transcript/karaoke sync, and loop-a-region.
-    this.regionsPlugin.on('region-in', (region: any) => {
-      this.dispatchEvent(new CustomEvent("regionIn", {
-        detail: this.serializeRegion(region),
-        bubbles: true,
-        composed: true
-      }));
-    });
-    this.regionsPlugin.on('region-out', (region: any) => {
-      this.dispatchEvent(new CustomEvent("regionOut", {
-        detail: this.serializeRegion(region),
-        bubbles: true,
-        composed: true
-      }));
-    });
-  }
+  // ── regions plugin events ───────────────────────────────────────────────────
+  // Shared with the lazy ensureRegionsPlugin() path so construction-time and
+  // lazy registration wire identical listener behavior through one function.
+  if (this.regionsPlugin) this.wireRegionsPluginEvents(this.regionsPlugin);
 };
 
   play() {

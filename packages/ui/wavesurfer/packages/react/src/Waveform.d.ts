@@ -82,29 +82,29 @@ export interface WaveformProps {
    */
   disableDragToSeek?: boolean;
   /**
-   * Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Construction-only in v1 — toggling after mount is a no-op.
+   * Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Live-toggleable — registers/unregisters on the running engine, no remount.
    */
   timeline?: boolean;
   /**
-   * Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Construction-only in v1 — toggling after mount is a no-op.
+   * Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Live-toggleable — registers/unregisters on the running engine, no remount.
    */
   hover?: boolean;
   /**
-   * The line color of the Hover plugin cursor (only applies when `hover` is enabled). Construction-only in v1.
+   * The line color of the Hover plugin cursor (only applies when `hover` is enabled). Read/applied when the Hover plugin is (re-)created — not live on an already-registered instance.
    */
   hoverColor?: (string) | null;
   /**
-   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin at construction. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
+   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin — at construction if it's already an array, or lazily the first time `regions` transitions from `null`/`undefined` to an array. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
    */
   regions?: unknown;
   defaultRegions?: unknown;
   onRegionsChange?: (next: unknown) => void;
   /**
-   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Construction-only in v1.
+   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
   dragToCreateRegions?: boolean;
   /**
-   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Construction-only in v1.
+   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
   regionColor?: (string) | null;
   /**
@@ -117,6 +117,12 @@ export interface WaveformProps {
   currentTime?: unknown;
   defaultCurrentTime?: unknown;
   onCurrentTimeChange?: (next: unknown) => void;
+  onRegionCreated?: (...args: unknown[]) => void;
+  onRegionUpdated?: (...args: unknown[]) => void;
+  onRegionRemoved?: (...args: unknown[]) => void;
+  onRegionClicked?: (...args: unknown[]) => void;
+  onRegionIn?: (...args: unknown[]) => void;
+  onRegionOut?: (...args: unknown[]) => void;
   onReady?: (...args: unknown[]) => void;
   onPlaying?: (...args: unknown[]) => void;
   onPaused?: (...args: unknown[]) => void;
@@ -126,12 +132,6 @@ export interface WaveformProps {
   onInteraction?: (...args: unknown[]) => void;
   onLoading?: (...args: unknown[]) => void;
   onError?: (...args: unknown[]) => void;
-  onRegionCreated?: (...args: unknown[]) => void;
-  onRegionUpdated?: (...args: unknown[]) => void;
-  onRegionRemoved?: (...args: unknown[]) => void;
-  onRegionClicked?: (...args: unknown[]) => void;
-  onRegionIn?: (...args: unknown[]) => void;
-  onRegionOut?: (...args: unknown[]) => void;
 }
 
 export interface WaveformHandle {

@@ -72,6 +72,12 @@ export class DemoComponent {
 
 | Event | Description |
 | --- | --- |
+| `regionCreated` | |
+| `regionUpdated` | |
+| `regionRemoved` | |
+| `regionClicked` | |
+| `regionIn` | |
+| `regionOut` | |
 | `ready` | |
 | `playing` | |
 | `paused` | |
@@ -81,12 +87,6 @@ export class DemoComponent {
 | `interaction` | |
 | `loading` | |
 | `error` | |
-| `regionCreated` | |
-| `regionUpdated` | |
-| `regionRemoved` | |
-| `regionClicked` | |
-| `regionIn` | |
-| `regionOut` | |
 
 ## Imperative handle
 

@@ -60,6 +60,12 @@ el.addEventListener('ready', (e) => console.log('duration', e.detail));
 
 | Event | Description |
 | --- | --- |
+| `regionCreated` | |
+| `regionUpdated` | |
+| `regionRemoved` | |
+| `regionClicked` | |
+| `regionIn` | |
+| `regionOut` | |
 | `ready` | |
 | `playing` | |
 | `paused` | |
@@ -69,12 +75,6 @@ el.addEventListener('ready', (e) => console.log('duration', e.detail));
 | `interaction` | |
 | `loading` | |
 | `error` | |
-| `regionCreated` | |
-| `regionUpdated` | |
-| `regionRemoved` | |
-| `regionClicked` | |
-| `regionIn` | |
-| `regionOut` | |
 
 ## Imperative handle
 

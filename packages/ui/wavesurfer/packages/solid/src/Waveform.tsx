@@ -99,29 +99,29 @@ interface WaveformProps {
    */
   disableDragToSeek?: boolean;
   /**
-   * Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Construction-only in v1 — toggling after mount is a no-op.
+   * Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Live-toggleable — registers/unregisters on the running engine, no remount.
    */
   timeline?: boolean;
   /**
-   * Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Construction-only in v1 — toggling after mount is a no-op.
+   * Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Live-toggleable — registers/unregisters on the running engine, no remount.
    */
   hover?: boolean;
   /**
-   * The line color of the Hover plugin cursor (only applies when `hover` is enabled). Construction-only in v1.
+   * The line color of the Hover plugin cursor (only applies when `hover` is enabled). Read/applied when the Hover plugin is (re-)created — not live on an already-registered instance.
    */
   hoverColor?: (string) | null;
   /**
-   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin at construction. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
+   * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin — at construction if it's already an array, or lazily the first time `regions` transitions from `null`/`undefined` to an array. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
    */
   regions?: unknown;
   defaultRegions?: unknown;
   onRegionsChange?: (regions: unknown) => void;
   /**
-   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Construction-only in v1.
+   * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
   dragToCreateRegions?: boolean;
   /**
-   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Construction-only in v1.
+   * Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
   regionColor?: (string) | null;
   /**
@@ -134,6 +134,12 @@ interface WaveformProps {
   currentTime?: unknown;
   defaultCurrentTime?: unknown;
   onCurrentTimeChange?: (currentTime: unknown) => void;
+  onRegionCreated?: (...args: unknown[]) => void;
+  onRegionUpdated?: (...args: unknown[]) => void;
+  onRegionRemoved?: (...args: unknown[]) => void;
+  onRegionClicked?: (...args: unknown[]) => void;
+  onRegionIn?: (...args: unknown[]) => void;
+  onRegionOut?: (...args: unknown[]) => void;
   onReady?: (...args: unknown[]) => void;
   onPlaying?: (...args: unknown[]) => void;
   onPaused?: (...args: unknown[]) => void;
@@ -143,12 +149,6 @@ interface WaveformProps {
   onInteraction?: (...args: unknown[]) => void;
   onLoading?: (...args: unknown[]) => void;
   onError?: (...args: unknown[]) => void;
-  onRegionCreated?: (...args: unknown[]) => void;
-  onRegionUpdated?: (...args: unknown[]) => void;
-  onRegionRemoved?: (...args: unknown[]) => void;
-  onRegionClicked?: (...args: unknown[]) => void;
-  onRegionIn?: (...args: unknown[]) => void;
-  onRegionOut?: (...args: unknown[]) => void;
   ref?: (h: WaveformHandle) => void;
 }
 
@@ -253,7 +253,37 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
     if (Math.abs(v - ws.getCurrentTime()) < 0.05) return;
     ws.setTime(v);
   })(v)), { defer: true }));
+  createEffect(on(() => (() => local.timeline)(), (v) => untrack(() => ((v: any) => {
+    if (!ws) return;
+    if (v && !timelinePlugin) {
+      timelinePlugin = TimelinePlugin.create();
+      ws.registerPlugin(timelinePlugin);
+    } else if (!v && timelinePlugin) {
+      ws.unregisterPlugin(timelinePlugin);
+      timelinePlugin = null;
+    }
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.hover)(), (v) => untrack(() => ((v: any) => {
+    if (!ws) return;
+    if (v && !hoverPlugin) {
+      hoverPlugin = HoverPlugin.create({
+        lineColor: local.hoverColor ?? undefined
+      });
+      ws.registerPlugin(hoverPlugin);
+    } else if (!v && hoverPlugin) {
+      ws.unregisterPlugin(hoverPlugin);
+      hoverPlugin = null;
+    }
+  })(v)), { defer: true }));
   createEffect(on(() => (() => regions())(), (v) => untrack(() => ((list: any) => {
+    // Lazy registration: `regions` transitioned to an array after mount and the
+    // plugin doesn't exist yet — register it now. If the engine has already
+    // decoded audio (wsReady), open the reconcile gate immediately; otherwise
+    // `ready`'s own catch-up (above) opens it once duration is known.
+    if (Array.isArray(list) && !regionsPlugin && ws) {
+      ensureRegionsPlugin();
+      if (wsReady) regionsReady = true;
+    }
     // Controlled reconcile of the live regions to match the incoming list.
     // Gated on `regionsReady` (duration known) and value-equality-guarded inside
     // reconcileRegions so a writeback echo doesn't loop.
@@ -277,6 +307,14 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
   let regionsPlugin: any = null;
   let regionsReady = false;
   let reconciling = false;
+  // timelinePlugin / hoverPlugin (live plugin-presence toggling) — top-level so
+  // the $watch(timeline)/$watch(hover) blocks below can register/unregister them
+  // on the running engine. wsReady tracks "the engine has decoded audio and
+  // fired `ready`", independent of whether a regions plugin exists — it gates
+  // the rare async-window lazy-registration case in the `ready` handler below.
+  let timelinePlugin: any = null;
+  let hoverPlugin: any = null;
+  let wsReady = false;
 
   // Serialize an engine Region to the plain descriptor shape the two-way `regions`
   // model carries. Pure (no sigils) — safe at top level.
@@ -360,16 +398,77 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
     if (addedWithoutId) writeBackRegions();
   }
 
+  // Attach the 6 region-event listeners to a live RegionsPlugin instance — shared
+  // by the construction-time path (buildWaveSurfer) and the lazy path
+  // (ensureRegionsPlugin) so both register identical behavior through one code
+  // path. Each writeback/emit is a no-op during a controlled reconcile (the
+  // `reconciling` guard) so a programmatic add/update/remove does not echo back
+  // or double-emit; only genuine user gestures (drag-create, drag/resize,
+  // delete) drive the model + emits.
+  function wireRegionsPluginEvents(plugin: any) {
+    plugin.on('region-created', (region: any) => {
+      if (reconciling) return;
+      _props.onRegionCreated?.(serializeRegion(region));
+      writeBackRegions();
+    });
+    plugin.on('region-updated', (region: any) => {
+      if (reconciling) return;
+      _props.onRegionUpdated?.(serializeRegion(region));
+      writeBackRegions();
+    });
+    plugin.on('region-removed', (region: any) => {
+      if (reconciling) return;
+      _props.onRegionRemoved?.(serializeRegion(region));
+      writeBackRegions();
+    });
+    plugin.on('region-clicked', (region: any) => {
+      _props.onRegionClicked?.(serializeRegion(region));
+    });
+    // Playback entered/left a region — pure notifications (no writeback), so they
+    // fire regardless of the reconcile guard. The events for active-segment
+    // highlighting, transcript/karaoke sync, and loop-a-region.
+    plugin.on('region-in', (region: any) => {
+      _props.onRegionIn?.(serializeRegion(region));
+    });
+    plugin.on('region-out', (region: any) => {
+      _props.onRegionOut?.(serializeRegion(region));
+    });
+  }
+
+  // Lazily register the Regions plugin on the LIVE engine (idempotent — a no-op
+  // if it already exists or the engine isn't built yet). Shared by the `ready`
+  // handler's async-window catch-up and the $watch(regions) transition-to-array
+  // path, so `regions` flipping from null/undefined to an array after mount
+  // registers the plugin without a remount.
+  function ensureRegionsPlugin() {
+    if (regionsPlugin || !ws) return regionsPlugin;
+    regionsPlugin = RegionsPlugin.create();
+    ws.registerPlugin(regionsPlugin);
+    wireRegionsPluginEvents(regionsPlugin);
+    if (local.dragToCreateRegions) {
+      regionsPlugin.enableDragSelection({
+        color: local.regionColor ?? undefined
+      });
+    }
+    return regionsPlugin;
+  }
+
   // Build the engine. The whole config object is untyped (ws is `any`) so the
   // constructor's options + event-callback params are unchecked against wavesurfer's
   // strict types (the Cropper buildCropper idiom).
   function buildWaveSurfer() {
     let plugins = [];
     plugins = [];
-    if (local.timeline) plugins.push(TimelinePlugin.create());
-    if (local.hover) plugins.push(HoverPlugin.create({
-      lineColor: local.hoverColor ?? undefined
-    }));
+    if (local.timeline) {
+      timelinePlugin = TimelinePlugin.create();
+      plugins.push(timelinePlugin);
+    }
+    if (local.hover) {
+      hoverPlugin = HoverPlugin.create({
+        lineColor: local.hoverColor ?? undefined
+      });
+      plugins.push(hoverPlugin);
+    }
     // Regions plugin is registered when `regions` is an array (even empty).
     regionsPlugin = null;
     if (Array.isArray(regions())) {
@@ -405,6 +504,11 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
 
     // ── engine events → emits + the two-way currentTime writeback ──────────────
     ws.on('ready', (duration: any) => {
+      wsReady = true;
+      // Rare async-window catch-up: `regions` became an array between mount and
+      // `ready` firing, before `wsReady` was true, so the $watch(regions) lazy
+      // path below couldn't gate on it yet. ensureRegionsPlugin is idempotent.
+      if (Array.isArray(regions())) ensureRegionsPlugin();
       // Regions can only be placed once the duration is known — do the initial
       // reconcile + drag-selection wiring here, then open the gate for prop-driven
       // reconciles. ($watch is lazy, so it never fires at mount; this is the only
@@ -434,39 +538,10 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
     ws.on('loading', (percent: any) => _props.onLoading?.(percent));
     ws.on('error', (err: any) => _props.onError?.(err));
 
-    // ── regions plugin events → emits + two-way `regions` writeback ────────────
-    // Each is a no-op during a controlled reconcile (the `reconciling` guard) so a
-    // programmatic add/update/remove does not echo back or double-emit; only genuine
-    // user gestures (drag-create, drag/resize, delete) drive the model + emits.
-    if (regionsPlugin) {
-      regionsPlugin.on('region-created', (region: any) => {
-        if (reconciling) return;
-        _props.onRegionCreated?.(serializeRegion(region));
-        writeBackRegions();
-      });
-      regionsPlugin.on('region-updated', (region: any) => {
-        if (reconciling) return;
-        _props.onRegionUpdated?.(serializeRegion(region));
-        writeBackRegions();
-      });
-      regionsPlugin.on('region-removed', (region: any) => {
-        if (reconciling) return;
-        _props.onRegionRemoved?.(serializeRegion(region));
-        writeBackRegions();
-      });
-      regionsPlugin.on('region-clicked', (region: any) => {
-        _props.onRegionClicked?.(serializeRegion(region));
-      });
-      // Playback entered/left a region — pure notifications (no writeback), so they
-      // fire regardless of the reconcile guard. The events for active-segment
-      // highlighting, transcript/karaoke sync, and loop-a-region.
-      regionsPlugin.on('region-in', (region: any) => {
-        _props.onRegionIn?.(serializeRegion(region));
-      });
-      regionsPlugin.on('region-out', (region: any) => {
-        _props.onRegionOut?.(serializeRegion(region));
-      });
-    }
+    // ── regions plugin events ───────────────────────────────────────────────────
+    // Shared with the lazy ensureRegionsPlugin() path so construction-time and
+    // lazy registration wire identical listener behavior through one function.
+    if (regionsPlugin) wireRegionsPluginEvents(regionsPlugin);
   }
   // ─── imperative handle (Phase 21 $expose) ────────────────────────────────────
   // Collision-clear across all six targets: canonical media verbs play/pause/

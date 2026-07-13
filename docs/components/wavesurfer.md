@@ -214,7 +214,7 @@ const onOut = (r: { id: string; start: number }) => {
 
 ### Props
 
-There are two **two-way** model props — `currentTime` and `regions` (bind either with `r-model` / `v-model` / `bind:` / `[(…)]` / `onCurrentTimeChange` / `onRegionsChange`). The appearance and playback props reconcile into the live engine on change (`src` via `load`, colors/bars via `setOptions`, `volume` / `playbackRate` / `minPxPerSec` via their setters). A handful are **set at construction** — `autoplay`, `hideScrollbar`, `disableInteraction`, `disableDragToSeek`, the plugin toggles (`timeline` / `hover` / `hoverColor`), and the regions-plugin registration (`regions` must be an array at first render — see [Plugins are construction-time](#plugins-are-construction-time-v1)); anything not surfaced here can be passed through the `options` bag (`peaks`, `duration`, `sampleRate`, `mediaControls`, …).
+There are two **two-way** model props — `currentTime` and `regions` (bind either with `r-model` / `v-model` / `bind:` / `[(…)]` / `onCurrentTimeChange` / `onRegionsChange`). The appearance and playback props reconcile into the live engine on change (`src` via `load`, colors/bars via `setOptions`, `volume` / `playbackRate` / `minPxPerSec` via their setters). Plugin *presence* is also live — `timeline` and `hover` register/unregister on the running engine, and the Regions plugin registers as soon as `regions` becomes an array (at construction or lazily after mount) — see [Plugin presence is live](#plugin-presence-is-live). A handful are still **set at construction (or at plugin-creation time)** — `autoplay`, `hideScrollbar`, `disableInteraction`, `disableDragToSeek`, and `hoverColor` / `dragToCreateRegions` / `regionColor` (read only when their plugin is (re-)created); anything not surfaced here can be passed through the `options` bag (`peaks`, `duration`, `sampleRate`, `mediaControls`, …).
 
 | Name | Type | Default | Two-way (model) | Runtime-updatable? | Description |
 | --- | --- | --- | :---: | :---: | --- |
@@ -237,12 +237,12 @@ There are two **two-way** model props — `currentTime` and `regions` (bind eith
 | `hideScrollbar` | `Boolean` | `false` | | | Hide the horizontal scrollbar when zoomed wider than the container. **Construction-only.** |
 | `disableInteraction` | `Boolean` | `false` | | | Disable click/seek interaction (the engine defaults to interactive). **Construction-only.** |
 | `disableDragToSeek` | `Boolean` | `false` | | | Disable drag-to-seek across the waveform. **Construction-only.** |
-| `timeline` | `Boolean` | `false` | | | Render a time-ruler beneath the waveform (Timeline plugin). **Construction-only** in v1. |
-| `hover` | `Boolean` | `false` | | | Show a hover cursor + time label (Hover plugin). **Construction-only** in v1. |
-| `hoverColor` | `String` | `null` | | | Line color of the Hover cursor (only when `hover` is on). **Construction-only** in v1. |
-| `regions` | `unknown` | `undefined` | ✓ | ✓ | Interactive regions — an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even `[]`) registers the Regions plugin at construction. Two-way: user create/drag/resize/remove writes the array back (round-trip-guarded); a consumer write reconciles the live regions by `id`. |
-| `dragToCreateRegions` | `Boolean` | `false` | | | Allow drawing new regions by dragging empty waveform space. Requires `regions` to be an array. **Construction-only** in v1. |
-| `regionColor` | `String` | `null` | | | Default fill color for drag-created regions (only when `dragToCreateRegions` is on). **Construction-only** in v1. |
+| `timeline` | `Boolean` | `false` | | ✓ | Render a time-ruler beneath the waveform (Timeline plugin). Live-toggleable — registers/unregisters on the running engine, no remount. |
+| `hover` | `Boolean` | `false` | | ✓ | Show a hover cursor + time label (Hover plugin). Live-toggleable — registers/unregisters on the running engine, no remount. |
+| `hoverColor` | `String` | `null` | | | Line color of the Hover cursor (only when `hover` is on). Read/applied when the Hover plugin is (re-)created — not live on an already-registered instance. |
+| `regions` | `unknown` | `undefined` | ✓ | ✓ | Interactive regions — an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even `[]`) registers the Regions plugin — at construction if it's already an array, or lazily the first time `regions` transitions from `null`/`undefined` to an array. Two-way: user create/drag/resize/remove writes the array back (round-trip-guarded); a consumer write reconciles the live regions by `id`. |
+| `dragToCreateRegions` | `Boolean` | `false` | | | Allow drawing new regions by dragging empty waveform space. Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance. |
+| `regionColor` | `String` | `null` | | | Default fill color for drag-created regions (only when `dragToCreateRegions` is on). Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance. |
 | `options` | `Object` | `{}` | | | Raw [wavesurfer `WaveSurferOptions`](https://wavesurfer.xyz/docs/types/wavesurfer.WaveSurferOptions) passthrough — spread into `WaveSurfer.create()` **before** the curated keys (explicit props win). Use for `peaks`, `duration`, `sampleRate`, `mediaControls`, `splitChannels`, … |
 | `currentTime` | `unknown` | `undefined` | ✓ | ✓ | The current playback position in seconds. Two-way: playback writes it back on every `timeupdate` (round-trip-guarded); a consumer write seeks via `setTime`. |
 
@@ -300,9 +300,9 @@ Grab a handle via your framework's native ref mechanism (`useRef` / template ref
 
 wavesurfer's option is `normalize`, but a reactive property named `normalize` would shadow the inherited `Node.prototype.normalize()` DOM method on the Lit custom element (a hard type error). The prop is therefore named **`normalizeAmplitude`** across all six frameworks and mapped to the engine's `normalize` option internally.
 
-### Plugins are construction-time (v1)
+### Plugin presence is live
 
-`timeline` / `hover` are read once when the engine is created, and the Regions plugin is registered only if `regions` is an array at first render. Toggling a plugin on/off after mount is a no-op in v1 — pass the desired value at first render (for regions, start with `[]` if you want them enabled but empty). Once registered, the `regions` **contents** are fully reactive; only the plugin's presence is fixed. (Live plugin toggling would re-create the engine; it's a planned follow-up.)
+`timeline` / `hover` / the Regions plugin all toggle presence **live**, via wavesurfer.js's `registerPlugin` / `unregisterPlugin` on the running engine — no remount. Flip `timeline`/`hover` on or off any time; the corresponding plugin instance is created/registered or unregistered/torn down in place. The Regions plugin registers as soon as `regions` becomes an array — at construction if it's already an array, or lazily (still no remount) the first time it transitions from `null`/`undefined` to an array later. There is **no live *un*register path for `regions`** — once the Regions plugin is registered, setting `regions` back to `null` does not tear it down. `hoverColor` / `dragToCreateRegions` / `regionColor` are read only when their plugin is (re-)created, not live on an already-registered instance.
 
 ### Give controlled regions stable ids
 
