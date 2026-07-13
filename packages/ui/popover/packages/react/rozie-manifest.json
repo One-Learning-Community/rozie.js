@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "name": "Popover",
+  "props": [
+    {
+      "name": "open",
+      "isModel": true,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "placement",
+      "isModel": false,
+      "required": false,
+      "type": "String"
+    },
+    {
+      "name": "trigger",
+      "isModel": false,
+      "required": false,
+      "type": "String"
+    },
+    {
+      "name": "offset",
+      "isModel": false,
+      "required": false,
+      "type": "Number"
+    },
+    {
+      "name": "disableFlip",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "disableShift",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "arrow",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "disabled",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "modal",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "strategy",
+      "isModel": false,
+      "required": false,
+      "type": "String"
+    }
+  ],
+  "slots": [
+    {
+      "name": "anchor",
+      "params": [
+        {
+          "name": "open"
+        },
+        {
+          "name": "toggle"
+        },
+        {
+          "name": "show"
+        },
+        {
+          "name": "hide"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
+      "name": "",
+      "params": [],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    }
+  ],
+  "emits": [
+    "change"
+  ],
+  "expose": [
+    {
+      "name": "show"
+    },
+    {
+      "name": "hide"
+    },
+    {
+      "name": "toggle"
+    },
+    {
+      "name": "reposition"
+    }
+  ]
+}
