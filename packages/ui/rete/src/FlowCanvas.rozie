@@ -206,6 +206,17 @@
       description:
         'Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction, like `pannable`/`zoomable`/`controls` — set it at mount time.',
     } },
+  // Phase 74 (D-01/D-02/D-03) — canvas background pattern. One-way, consumer-set
+  // (NOT model:true). Default 'dots' is today's radial-gradient dot grid, byte-
+  // identical to pre-phase (the FlowCanvasScreenshot baseline needs no rebless).
+  // 'lines'/'cross'/'none' are the React Flow `<Background variant>` parity — all
+  // 4 variants reuse the SAME 3 existing --rozie-flow-grid-* / --rozie-flow-bg
+  // tokens for gap/size/color (D-03: no new props for those concerns).
+  background:   { type: String, default: 'dots',
+    docs: {
+      description:
+        "Canvas background pattern — 'dots' (default, today's grid) | 'lines' | 'cross' | 'none' (the React Flow <Background variant> parity). Gap/size/color stay CSS custom properties (--rozie-flow-grid-size, --rozie-flow-grid-dot-color, --rozie-flow-bg) — not separate props.",
+    } },
   // Connection-validation predicate. Receives the normalized candidate connection
   // { source, sourceOutput, target, targetInput }; return false to REJECT (the
   // wrapper cancels Rete's connectioncreate pre-event — no edge committed, no ghost
@@ -2943,7 +2954,7 @@ $expose({
 </script>
 
 <template>
-<div class="rozie-flow-canvas" ref="canvasEl" tabindex="0">
+<div class="rozie-flow-canvas" :class="{ 'rozie-flow-canvas--lines': $props.background === 'lines', 'rozie-flow-canvas--cross': $props.background === 'cross', 'rozie-flow-canvas--none': $props.background === 'none' }" ref="canvasEl" tabindex="0">
   <!--
     built-in Controls overlay (Win 4) — zoom in / out / fit, gated on :controls
     (default ON; :controls="false" opts out). Rendered INSIDE the engine container
@@ -3081,6 +3092,33 @@ $expose({
     radial-gradient(circle, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
     var(--rozie-flow-bg, #f7f8fa);
   border: 1px solid var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
+}
+
+/* Phase 74 (D-01..D-04) — :background variant switch, the React Flow <Background
+   variant> parity. 'dots' (default, unset class, the base rule above) stays byte-
+   identical. The 3 variants below only override `background:`; width/height/border/
+   border-radius still apply via cascade from the base rule. All 3 reuse the SAME
+   --rozie-flow-grid-size / --rozie-flow-grid-dot-color / --rozie-flow-bg tokens as
+   'dots' — no new tokens introduced (D-03). */
+.rozie-flow-canvas.rozie-flow-canvas--lines {
+  background:
+    linear-gradient(to right, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    linear-gradient(to bottom, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    var(--rozie-flow-bg, #f7f8fa);
+}
+/* Small "+" marks at each grid intersection (not full lines, distinct from --lines).
+   Two elongated radial-gradient ellipses (naturally 2D-bounded, unlike linear-gradient)
+   overlap to form a plus: one wide+short (the horizontal bar), one narrow+tall (the
+   vertical bar) — the same technique the 'dots' rule already uses (radial-gradient
+   circle), just elongated into two perpendicular bars. */
+.rozie-flow-canvas.rozie-flow-canvas--cross {
+  background:
+    radial-gradient(ellipse 4px 1px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    radial-gradient(ellipse 1px 4px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    var(--rozie-flow-bg, #f7f8fa);
+}
+.rozie-flow-canvas.rozie-flow-canvas--none {
+  background: var(--rozie-flow-bg, #f7f8fa);
 }
 
 /* built-in Controls overlay (Win 4) — COMPONENT-template DOM, so plain scoped CSS
