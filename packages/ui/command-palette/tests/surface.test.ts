@@ -19,9 +19,11 @@ import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, '..', 'src', 'CommandPalette.rozie');
-// Use the ABSOLUTE source path as the compile filename so the <components>
-// producer resolution (threadParamTypes) finds the vendored ./Combobox.rozie
-// sibling on disk next to it.
+// Phase 75 (Option A): use the ABSOLUTE source path as the compile filename
+// so the <components> producer resolution (resolveManifestProducer) walks
+// node_modules upward from command-palette/src and finds the published
+// @rozie-ui/combobox-<target> package (installed as a devDependency of this
+// package's ROOT per Plan 05).
 const FILENAME = SRC;
 const source = readFileSync(SRC, 'utf8');
 
@@ -39,22 +41,20 @@ const EXPECT = {
 } as const;
 
 // D-07 (LOAD-BEARING): the authored CommandPalette.rozie must use the STABLE
-// package-style specifier (which the codegen vendor-step remaps to the local
-// sibling under Option B) and NEVER the relative form. This is the byte-identity
-// invariant — switching B→A touches only codegen + the drift guard, never the
-// authored source.
+// package-style specifier and NEVER a local relative form. This is the
+// byte-identity invariant — Phase 75 graduated this pair from Option B
+// (vendored, in-memory remap before compile) to Option A (published,
+// resolved directly by the compiler) without touching this specifier at all.
 const STABLE_COMBOBOX_SPECIFIER = '@rozie-ui/combobox/Combobox.rozie';
 const RELATIVE_COMBOBOX_SPECIFIER = './Combobox.rozie';
-
-// The compiled shape: under Option B the codegen rewrites the stable specifier to
-// the local vendored sibling BEFORE compile (so producer resolution finds it on
-// disk). The surface gate must compile the SAME remapped source the leaves do.
-const composedSource = source.replaceAll(STABLE_COMBOBOX_SPECIFIER, RELATIVE_COMBOBOX_SPECIFIER);
 
 const sorted = (a: readonly string[]) => [...a].sort();
 
 describe('CommandPalette.rozie surface gate', () => {
-  const { ast } = parse(composedSource, { filename: FILENAME });
+  // Phase 75: compile the RAW authored source directly — no in-memory
+  // specifier remap. The stable `@rozie-ui/combobox/Combobox.rozie` specifier
+  // resolves to the published per-target manifest via resolveManifestProducer.
+  const { ast } = parse(source, { filename: FILENAME });
   const { ir, diagnostics: lowerDiags = [] } = lowerToIR(ast, {
     modifierRegistry: createDefaultRegistry(),
     filename: FILENAME,
@@ -122,7 +122,7 @@ describe('CommandPalette.rozie surface gate', () => {
 
   const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const;
   it.each(TARGETS)('compile(%s) emits zero error diagnostics + non-empty code', (target) => {
-    const r = compile(composedSource, { target, filename: FILENAME });
+    const r = compile(source, { target, filename: FILENAME });
     const errs = r.diagnostics.filter((d) => d.severity === 'error');
     expect(errs).toEqual([]);
     expect(r.code.length).toBeGreaterThan(0);

@@ -21,7 +21,12 @@ import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SRC = resolve(ROOT, 'src/CommandPalette.rozie');
-const FILENAME = 'CommandPalette.rozie';
+// Phase 75 (Option A): FILENAME must be the ABSOLUTE source path (not a bare
+// relative label) so <components> producer resolution walks node_modules
+// upward from command-palette/src regardless of the invoking process's cwd —
+// resolveManifestProducer resolves from dirname(fromFile), not from cwd or
+// resolverRoot (which feeds only the tsconfig-paths matcher).
+const FILENAME = SRC;
 const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
@@ -29,7 +34,14 @@ const EXPECT = {
   props: ['open', 'query', 'items', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase'],
   models: ['open', 'query'],
   emits: ['select'],
-  slots: ['item', 'empty', 'footer'],
+  // D-05 (BREAKING): re-aligned to the combobox slot vocabulary —
+  // `#item {item,active}` → `#option {option,index,active,selected,disabled}`.
+  // (Rule 1 fix, Phase 75: this EXPECT was stale — `item` — leftover from
+  // before the slot-vocabulary rename landed; this script is not wired into
+  // any package.json script/CI job so the drift went uncaught. Corrected to
+  // match tests/surface.test.ts's already-correct EXPECT.slots and the real
+  // ir.slots the compiler emits.)
+  slots: ['option', 'empty', 'footer'],
   expose: ['show', 'close', 'toggle', 'focus'],
 };
 
@@ -72,7 +84,7 @@ if (verbSetterClash.length) fail(`expose-verb == React model-setter collision (R
 // ── 2. compile()×6 — collision gates surface here as error diagnostics ──────
 const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'];
 for (const target of TARGETS) {
-  const r = compile(source, { target, filename: FILENAME });
+  const r = compile(source, { target, filename: FILENAME, resolverRoot: ROOT });
   const errs = r.diagnostics.filter((d) => d.severity === 'error');
   if (errs.length) fail(`compile(${target}) errors:\n${errs.map((d) => `  ${d.code} ${d.message}`).join('\n')}`);
   else if (!r.code || !r.code.length) fail(`compile(${target}) produced empty output with no diagnostics`);
