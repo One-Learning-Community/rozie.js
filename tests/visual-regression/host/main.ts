@@ -450,6 +450,15 @@ export const EXAMPLES = [
   // and the node count is UNCHANGED (the canvas auto-creates nothing — consumer owns creation).
   // Behavioral-only — connect-end is a pure emit so FlowCanvasScreenshot stays byte-identical.
   'FlowCanvasConnectEnd',
+  // Phase 74 (D-01..D-04, background variant) — FlowCanvasBackground is the BEHAVIORAL cell
+  // (loader → examples/demos/FlowCanvasBackgroundDemo.rozie): a single `step` node + 4 toggle
+  // buttons (`bg-dots`/`bg-lines`/`bg-cross`/`bg-none`) driving the canvas's own local
+  // `background` state, plus a `current-background` readout. The spec (rete-flow-background)
+  // clicks each button and asserts the readout updates + the canvas's computed CSS background
+  // differs pairwise across dots/lines/cross and is flat (no gradient) for none, and that the
+  // untouched default FlowCanvas demo's computed background equals the `dots` variant's
+  // (D-02 byte-identity at the rendered-CSS level). Behavioral-only — not a screenshot cell.
+  'FlowCanvasBackground',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -1169,6 +1178,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasArrange: 'rozie-flow-canvas-arrange',
   // Phase 44 connect-end cell — '-demo' appended → 'rozie-flow-canvas-connect-end-demo'.
   FlowCanvasConnectEnd: 'rozie-flow-canvas-connect-end',
+  // Phase 74 background-variant cell — '-demo' appended → 'rozie-flow-canvas-background-demo'.
+  FlowCanvasBackground: 'rozie-flow-canvas-background',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -1556,6 +1567,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 44 — FlowCanvasConnectEndDemo is self-contained (seeds its own 1-node graph;
   // graph/zoom bound internally — the FlowCanvas precedent). No parent props.
   FlowCanvasConnectEnd: {},
+  // Phase 74 — FlowCanvasBackgroundDemo is self-contained (seeds its own 1-node graph +
+  // local `background` state toggled by its own buttons). No parent props; no MODEL_PROPS
+  // entry (`background` is one-way, driven internally, not a model).
+  FlowCanvasBackground: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not

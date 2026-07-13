@@ -80,7 +80,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <div class="rozie-flow-canvas" #canvasEl tabindex="0">
+    <div class="rozie-flow-canvas" [ngClass]="{ 'rozie-flow-canvas--lines': background() === 'lines', 'rozie-flow-canvas--cross': background() === 'cross', 'rozie-flow-canvas--none': background() === 'none' }" #canvasEl tabindex="0">
       
       @if (controls()) {
     <div class="rozie-flow-controls">
@@ -156,6 +156,21 @@ function rozieToken(key: string): InjectionToken<unknown> {
         radial-gradient(circle, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
         var(--rozie-flow-bg, #f7f8fa);
       border: 1px solid var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
+    }
+    .rozie-flow-canvas.rozie-flow-canvas--lines {
+      background:
+        linear-gradient(to right, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+        linear-gradient(to bottom, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+        var(--rozie-flow-bg, #f7f8fa);
+    }
+    .rozie-flow-canvas.rozie-flow-canvas--cross {
+      background:
+        radial-gradient(ellipse 4px 1px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+        radial-gradient(ellipse 1px 4px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+        var(--rozie-flow-bg, #f7f8fa);
+    }
+    .rozie-flow-canvas.rozie-flow-canvas--none {
+      background: var(--rozie-flow-bg, #f7f8fa);
     }
     .rozie-flow-controls {
       position: absolute;
@@ -489,6 +504,10 @@ export class FlowCanvas {
    * Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction, like `pannable`/`zoomable`/`controls` — set it at mount time.
    */
   minimap = input<boolean>(false);
+  /**
+   * Canvas background pattern — 'dots' (default, today's grid) | 'lines' | 'cross' | 'none' (the React Flow <Background variant> parity). Gap/size/color stay CSS custom properties (--rozie-flow-grid-size, --rozie-flow-grid-dot-color, --rozie-flow-bg) — not separate props.
+   */
+  background = input<string>('dots');
   /**
    * Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.
    */

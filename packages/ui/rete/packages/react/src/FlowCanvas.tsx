@@ -101,6 +101,10 @@ interface FlowCanvasProps {
    */
   minimap?: boolean;
   /**
+   * Canvas background pattern — 'dots' (default, today's grid) | 'lines' | 'cross' | 'none' (the React Flow <Background variant> parity). Gap/size/color stay CSS custom properties (--rozie-flow-grid-size, --rozie-flow-grid-dot-color, --rozie-flow-bg) — not separate props.
+   */
+  background?: string;
+  /**
    * Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.
    */
   canConnect?: ((...args: any[]) => any) | null;
@@ -172,7 +176,7 @@ export interface FlowCanvasHandle {
 const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCanvas(_props: FlowCanvasProps, ref): JSX.Element {
   const __ctx_rete_canvas = rozieContext("rete:canvas");
   const portalRoots = useRef<Set<Root>>(new Set());
-  const props: Omit<FlowCanvasProps, 'validateTypes' | 'pannable' | 'zoomable' | 'selectable' | 'readonly' | 'minZoom' | 'maxZoom' | 'snapGrid' | 'accumulateOnCtrl' | 'curvature' | 'fitOnMount' | 'controls' | 'minimap' | 'canConnect' | 'history' | 'marquee' | 'nodeToolbar'> & { validateTypes: boolean; pannable: boolean; zoomable: boolean; selectable: boolean; readonly: boolean; minZoom: number; maxZoom: number; snapGrid: number; accumulateOnCtrl: boolean; curvature: number; fitOnMount: boolean; controls: boolean; minimap: boolean; canConnect: ((...args: any[]) => any) | null; history: boolean; marquee: boolean; nodeToolbar: boolean } = {
+  const props: Omit<FlowCanvasProps, 'validateTypes' | 'pannable' | 'zoomable' | 'selectable' | 'readonly' | 'minZoom' | 'maxZoom' | 'snapGrid' | 'accumulateOnCtrl' | 'curvature' | 'fitOnMount' | 'controls' | 'minimap' | 'background' | 'canConnect' | 'history' | 'marquee' | 'nodeToolbar'> & { validateTypes: boolean; pannable: boolean; zoomable: boolean; selectable: boolean; readonly: boolean; minZoom: number; maxZoom: number; snapGrid: number; accumulateOnCtrl: boolean; curvature: number; fitOnMount: boolean; controls: boolean; minimap: boolean; background: string; canConnect: ((...args: any[]) => any) | null; history: boolean; marquee: boolean; nodeToolbar: boolean } = {
     ..._props,
     validateTypes: _props.validateTypes ?? true,
     pannable: _props.pannable ?? true,
@@ -187,6 +191,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     fitOnMount: _props.fitOnMount ?? true,
     controls: _props.controls ?? true,
     minimap: _props.minimap ?? false,
+    background: _props.background ?? 'dots',
     canConnect: _props.canConnect ?? null,
     history: _props.history ?? true,
     marquee: _props.marquee ?? false,
@@ -3102,7 +3107,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   }
 }}>
     <>
-    <div className={"rozie-flow-canvas"} ref={canvasEl} tabIndex={0} data-rozie-s-cd396d6a="">
+    <div className={clsx("rozie-flow-canvas", { "rozie-flow-canvas--lines": props.background === 'lines', "rozie-flow-canvas--cross": props.background === 'cross', "rozie-flow-canvas--none": props.background === 'none' })} ref={canvasEl} tabIndex={0} data-rozie-s-cd396d6a="">
       
       {!!(props.controls) && <div className={"rozie-flow-controls"} data-rozie-s-cd396d6a="">
         <button type="button" className={"rozie-flow-controls__btn"} data-testid="flow-zoom-in" aria-label="Zoom in" onClick={controlZoomIn} data-rozie-s-cd396d6a="">+</button>

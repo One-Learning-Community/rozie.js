@@ -93,6 +93,21 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
     var(--rozie-flow-bg, #f7f8fa);
   border: 1px solid var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
 }
+.rozie-flow-canvas.rozie-flow-canvas--lines[data-rozie-s-cd396d6a] {
+  background:
+    linear-gradient(to right, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    linear-gradient(to bottom, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    var(--rozie-flow-bg, #f7f8fa);
+}
+.rozie-flow-canvas.rozie-flow-canvas--cross[data-rozie-s-cd396d6a] {
+  background:
+    radial-gradient(ellipse 4px 1px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    radial-gradient(ellipse 1px 4px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    var(--rozie-flow-bg, #f7f8fa);
+}
+.rozie-flow-canvas.rozie-flow-canvas--none[data-rozie-s-cd396d6a] {
+  background: var(--rozie-flow-bg, #f7f8fa);
+}
 .rozie-flow-controls[data-rozie-s-cd396d6a] {
   position: absolute;
   left: 10px;
@@ -368,6 +383,10 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
    * Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction, like `pannable`/`zoomable`/`controls` — set it at mount time.
    */
   @property({ type: Boolean, reflect: true }) minimap: boolean = false;
+  /**
+   * Canvas background pattern — 'dots' (default, today's grid) | 'lines' | 'cross' | 'none' (the React Flow <Background variant> parity). Gap/size/color stay CSS custom properties (--rozie-flow-grid-size, --rozie-flow-grid-dot-color, --rozie-flow-bg) — not separate props.
+   */
+  @property({ type: String, reflect: true }) background: string = 'dots';
   /**
    * Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.
    */
@@ -2783,7 +2802,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   render() {
     return html`
-<div class="rozie-flow-canvas" tabindex="0" data-rozie-ref="canvasEl" data-rozie-s-cd396d6a>
+<div class="${Object.entries({ "rozie-flow-canvas": true, 'rozie-flow-canvas--lines': this.background === 'lines', 'rozie-flow-canvas--cross': this.background === 'cross', 'rozie-flow-canvas--none': this.background === 'none' }).filter(([, v]) => v).map(([k]) => k).join(' ')}" tabindex="0" data-rozie-ref="canvasEl" data-rozie-s-cd396d6a>
   
   ${this.controls ? html`<div class="rozie-flow-controls" data-rozie-s-cd396d6a>
     <button class="rozie-flow-controls__btn" type="button" data-testid="flow-zoom-in" aria-label="Zoom in" @click=${this.controlZoomIn} data-rozie-s-cd396d6a>+</button>

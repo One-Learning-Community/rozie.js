@@ -1,6 +1,6 @@
 <template>
 
-<div class="rozie-flow-canvas" ref="canvasElRef" tabindex="0">
+<div :class="['rozie-flow-canvas', { 'rozie-flow-canvas--lines': props.background === 'lines', 'rozie-flow-canvas--cross': props.background === 'cross', 'rozie-flow-canvas--none': props.background === 'none' }]" ref="canvasElRef" tabindex="0">
   
   <div v-if="props.controls" class="rozie-flow-controls">
     <button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-in" aria-label="Zoom in" @click="controlZoomIn">+</button>
@@ -78,6 +78,10 @@ const props = withDefaults(
      */
     minimap?: boolean;
     /**
+     * Canvas background pattern — 'dots' (default, today's grid) | 'lines' | 'cross' | 'none' (the React Flow <Background variant> parity). Gap/size/color stay CSS custom properties (--rozie-flow-grid-size, --rozie-flow-grid-dot-color, --rozie-flow-bg) — not separate props.
+     */
+    background?: string;
+    /**
      * Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.
      */
     canConnect?: ((...args: any[]) => any) | null;
@@ -94,7 +98,7 @@ const props = withDefaults(
      */
     nodeToolbar?: boolean;
   }>(),
-  { validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, canConnect: null, history: true, marquee: false, nodeToolbar: false }
+  { validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, background: 'dots', canConnect: null, history: true, marquee: false, nodeToolbar: false }
 );
 
 /**
@@ -3730,6 +3734,21 @@ defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, addConnectio
     radial-gradient(circle, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
     var(--rozie-flow-bg, #f7f8fa);
   border: 1px solid var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
+}
+.rozie-flow-canvas.rozie-flow-canvas--lines {
+  background:
+    linear-gradient(to right, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    linear-gradient(to bottom, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    var(--rozie-flow-bg, #f7f8fa);
+}
+.rozie-flow-canvas.rozie-flow-canvas--cross {
+  background:
+    radial-gradient(ellipse 4px 1px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    radial-gradient(ellipse 1px 4px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    var(--rozie-flow-bg, #f7f8fa);
+}
+.rozie-flow-canvas.rozie-flow-canvas--none {
+  background: var(--rozie-flow-bg, #f7f8fa);
 }
 .rozie-flow-controls {
   position: absolute;

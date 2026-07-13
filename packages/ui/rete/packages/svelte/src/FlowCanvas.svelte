@@ -70,6 +70,10 @@ interface Props {
    */
   minimap?: boolean;
   /**
+   * Canvas background pattern — 'dots' (default, today's grid) | 'lines' | 'cross' | 'none' (the React Flow <Background variant> parity). Gap/size/color stay CSS custom properties (--rozie-flow-grid-size, --rozie-flow-grid-dot-color, --rozie-flow-bg) — not separate props.
+   */
+  background?: string;
+  /**
    * Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.
    */
   canConnect?: ((...args: any[]) => any) | null;
@@ -126,6 +130,7 @@ let {
   fitOnMount = true,
   controls = true,
   minimap = false,
+  background = 'dots',
   canConnect = null,
   history = true,
   mode = $bindable('pan'),
@@ -3694,7 +3699,7 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
 })(__watchVal); }); });
 </script>
 
-<div class="rozie-flow-canvas" bind:this={canvasEl} tabindex="0" data-rozie-s-cd396d6a>{#if controls}<div class="rozie-flow-controls" data-rozie-s-cd396d6a><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-in" aria-label="Zoom in" onclick={controlZoomIn} data-rozie-s-cd396d6a>+</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-out" aria-label="Zoom out" onclick={controlZoomOut} data-rozie-s-cd396d6a>&#8722;</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-fit" aria-label="Fit view" onclick={controlFit} data-rozie-s-cd396d6a>&#9744;</button>{#if marquee}<button type="button" class={["rozie-flow-controls__btn", { 'is-active': mode === 'select' }]} data-testid="flow-mode" aria-label={rozieAttr(mode === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} onclick={toggleMode} data-rozie-s-cd396d6a>{rozieDisplay(mode === 'select' ? '▢' : '✥')}</button>{/if}</div>{/if}{#if minimap}<div class="rozie-flow-minimap" bind:this={minimapEl} data-testid="flow-minimap" data-rozie-s-cd396d6a></div>{/if}<div class="rozie-flow-marquee" bind:this={marqueeEl} data-testid="flow-marquee" data-rozie-s-cd396d6a></div>{#if nodeToolbar}<div class="rozie-flow-toolbar" bind:this={toolbarEl} data-testid="flow-toolbar" data-rozie-s-cd396d6a></div>{/if}</div>{@render children?.()}
+<div class={["rozie-flow-canvas", { 'rozie-flow-canvas--lines': background === 'lines', 'rozie-flow-canvas--cross': background === 'cross', 'rozie-flow-canvas--none': background === 'none' }]} bind:this={canvasEl} tabindex="0" data-rozie-s-cd396d6a>{#if controls}<div class="rozie-flow-controls" data-rozie-s-cd396d6a><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-in" aria-label="Zoom in" onclick={controlZoomIn} data-rozie-s-cd396d6a>+</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-out" aria-label="Zoom out" onclick={controlZoomOut} data-rozie-s-cd396d6a>&#8722;</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-fit" aria-label="Fit view" onclick={controlFit} data-rozie-s-cd396d6a>&#9744;</button>{#if marquee}<button type="button" class={["rozie-flow-controls__btn", { 'is-active': mode === 'select' }]} data-testid="flow-mode" aria-label={rozieAttr(mode === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} onclick={toggleMode} data-rozie-s-cd396d6a>{rozieDisplay(mode === 'select' ? '▢' : '✥')}</button>{/if}</div>{/if}{#if minimap}<div class="rozie-flow-minimap" bind:this={minimapEl} data-testid="flow-minimap" data-rozie-s-cd396d6a></div>{/if}<div class="rozie-flow-marquee" bind:this={marqueeEl} data-testid="flow-marquee" data-rozie-s-cd396d6a></div>{#if nodeToolbar}<div class="rozie-flow-toolbar" bind:this={toolbarEl} data-testid="flow-toolbar" data-rozie-s-cd396d6a></div>{/if}</div>{@render children?.()}
 
 <style>
 :global {
@@ -3746,6 +3751,21 @@ $effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWa
       radial-gradient(circle, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
       var(--rozie-flow-bg, #f7f8fa);
     border: 1px solid var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
+  }
+  .rozie-flow-canvas.rozie-flow-canvas--lines[data-rozie-s-cd396d6a] {
+    background:
+      linear-gradient(to right, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+      linear-gradient(to bottom, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+      var(--rozie-flow-bg, #f7f8fa);
+  }
+  .rozie-flow-canvas.rozie-flow-canvas--cross[data-rozie-s-cd396d6a] {
+    background:
+      radial-gradient(ellipse 4px 1px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+      radial-gradient(ellipse 1px 4px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+      var(--rozie-flow-bg, #f7f8fa);
+  }
+  .rozie-flow-canvas.rozie-flow-canvas--none[data-rozie-s-cd396d6a] {
+    background: var(--rozie-flow-bg, #f7f8fa);
   }
   .rozie-flow-controls[data-rozie-s-cd396d6a] {
     position: absolute;

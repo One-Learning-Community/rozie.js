@@ -47,6 +47,21 @@
     var(--rozie-flow-bg, #f7f8fa);
   border: 1px solid var(--rozie-flow-border-color, rgba(0, 0, 0, 0.1));
 }
+.rozie-flow-canvas.rozie-flow-canvas--lines[data-rozie-s-cd396d6a] {
+  background:
+    linear-gradient(to right, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    linear-gradient(to bottom, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 1px, transparent 1px) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    var(--rozie-flow-bg, #f7f8fa);
+}
+.rozie-flow-canvas.rozie-flow-canvas--cross[data-rozie-s-cd396d6a] {
+  background:
+    radial-gradient(ellipse 4px 1px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    radial-gradient(ellipse 1px 4px at center, var(--rozie-flow-grid-dot-color, rgba(0, 0, 0, 0.08)) 100%, transparent 100%) 0 0 / var(--rozie-flow-grid-size, 20px) var(--rozie-flow-grid-size, 20px),
+    var(--rozie-flow-bg, #f7f8fa);
+}
+.rozie-flow-canvas.rozie-flow-canvas--none[data-rozie-s-cd396d6a] {
+  background: var(--rozie-flow-bg, #f7f8fa);
+}
 .rozie-flow-controls[data-rozie-s-cd396d6a] {
   position: absolute;
   left: 10px;

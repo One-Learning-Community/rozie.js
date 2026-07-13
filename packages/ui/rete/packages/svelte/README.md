@@ -56,6 +56,7 @@ Rete ships no stylesheet — all node / socket / connection chrome is styled by 
 | `fitOnMount` | `Boolean` | `true` |  |  |
 | `controls` | `Boolean` | `true` |  |  |
 | `minimap` | `Boolean` | `false` |  |  |
+| `background` | `String` | `"dots"` |  |  |
 | `canConnect` | `Function` | `null` |  |  |
 | `history` | `Boolean` | `true` |  |  |
 | `mode` | `String` | `"pan"` | ✓ |  |

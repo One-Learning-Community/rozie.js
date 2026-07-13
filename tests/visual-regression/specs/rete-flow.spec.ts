@@ -2074,3 +2074,84 @@ for (const target of TARGETS) {
     await expect(page.locator('.rozie-flow-toolbar')).toHaveCount(0);
   });
 }
+
+/**
+ * rete-flow-background — Phase 74 (D-01..D-04): the `:background` variant switch
+ * (dots | lines | cross | none), the React Flow `<Background variant>` parity.
+ *
+ * Loader → examples/demos/FlowCanvasBackgroundDemo.rozie: a single `step` node + 4
+ * toggle buttons (`bg-dots`/`bg-lines`/`bg-cross`/`bg-none`) driving the canvas's own
+ * local `background` state, plus a `current-background` readout.
+ *
+ * Asserts:
+ *   1. clicking each of the 4 buttons updates the `current-background` readout.
+ *   2. the canvas's COMPUTED `background-image` is pairwise DISTINCT across
+ *      dots/lines/cross (a real rendered-CSS change, not just a class toggle).
+ *   3. `none` has NO gradient image in its computed `background-image` (accepts the
+ *      literal `'none'` keyword or an empty/gradient-free value).
+ *   4. D-02 BYTE-IDENTITY — the EXISTING unmodified `FlowCanvas` demo (no `:background`
+ *      prop set) computes the SAME `background-image` as the `dots` variant here,
+ *      proving the untouched default is unchanged at the rendered-CSS level (not just
+ *      source-level).
+ *
+ * Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-background [${target}]: :background switches dots/lines/cross/none; default stays byte-identical`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasBackground&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+
+    const readout = page.getByTestId('current-background');
+    const bgImage = () => canvas.evaluate((el) => getComputedStyle(el).backgroundImage);
+
+    // ---- 1. dots (initial state) ----
+    await expect(readout).toHaveText('dots');
+    const dotsBg = await bgImage();
+    expect(dotsBg.length).toBeGreaterThan(0);
+
+    // ---- lines ----
+    await page.getByTestId('bg-lines').click();
+    await expect(readout).toHaveText('lines');
+    const linesBg = await bgImage();
+    expect(linesBg).not.toBe(dotsBg);
+
+    // ---- cross ----
+    await page.getByTestId('bg-cross').click();
+    await expect(readout).toHaveText('cross');
+    const crossBg = await bgImage();
+    expect(crossBg).not.toBe(dotsBg);
+    expect(crossBg).not.toBe(linesBg);
+
+    // ---- none — no gradient image at all ----
+    await page.getByTestId('bg-none').click();
+    await expect(readout).toHaveText('none');
+    const noneBg = await bgImage();
+    expect(noneBg).not.toContain('radial-gradient');
+    expect(noneBg).not.toContain('linear-gradient');
+
+    // ---- back to dots, re-confirm ----
+    await page.getByTestId('bg-dots').click();
+    await expect(readout).toHaveText('dots');
+    expect(await bgImage()).toBe(dotsBg);
+
+    // ---- 4. D-02 byte-identity — the untouched default FlowCanvas demo (no
+    // :background prop) computes the SAME background-image as `dots` here. ----
+    await page.goto(`/?example=FlowCanvas&target=${target}`);
+    const mount2 = page.getByTestId('rozie-mount');
+    await expect(mount2).toBeVisible();
+    const canvas2 = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas2).toBeVisible({ timeout: 15_000 });
+    const defaultBg = await canvas2.evaluate((el) => getComputedStyle(el).backgroundImage);
+    expect(defaultBg).toBe(dotsBg);
+  });
+}
