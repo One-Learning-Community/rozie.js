@@ -9,10 +9,16 @@
     "test": "vitest run",
     "typecheck": "echo 'meta-pkg: pure-Rozie source; the emitted leaves typecheck individually, the surface gate runs under vitest'"
   },
-  "comment:combobox-devdep": "D-07/Option B (P3): command-palette VENDORS @rozie-ui/combobox's .rozie source at codegen time (vendorPrimitives reads it via filesystem path, and the shipped leaves embed the compiled copy — so this is NOT a runtime dependency). It is a devDependency because the authoring/dev surface — the VR harness, the surface test, and the IDE LSP — compiles CommandPalette.rozie from raw source and must resolve the stable `<components>` specifier `@rozie-ui/combobox/Combobox.rozie` via node resolution against the primitive's `exports` map. Forward-compatible to Option A, where it graduates to a real dependency.",
+  "comment:combobox-devdep": "D-07/Option A (P75): the 6 @rozie-ui/combobox-<target> published per-target packages are now REAL devDependencies — this is the graduation the prior Option-B note anticipated. Declaring them here makes pnpm symlink them into command-palette/node_modules, which is exactly the surface Plan 02's resolveManifestProducer walks (node_modules UPWARD from dirname(fromFile) = command-palette/src, NOT from resolverRoot). So the authoring/codegen surface — the VR harness, the surface test, and the IDE LSP — now resolves the stable `<components>` specifier `@rozie-ui/combobox/Combobox.rozie` to the PUBLISHED per-target package rather than a vendored sibling (D-05/D-09/D-10). The plain `@rozie-ui/combobox` devDependency is kept alongside for now — Plan 04 removes vendoring, but the raw `.rozie` authoring surface may still transitively need it until that lands.",
   "comment:headless-core-devdep": "P3/D-06: the vendored Combobox imports @rozie-ui/headless-core/listCore.rzts (the shared resolver spine). That bare specifier must resolve from this package's location when codegen + the VR harness compile the vendored sibling, so headless-core is a devDependency too (the partial dissolves at compile — zero runtime dep).",
   "devDependencies": {
     "@rozie-ui/combobox": "workspace:*",
+    "@rozie-ui/combobox-react": "workspace:*",
+    "@rozie-ui/combobox-vue": "workspace:*",
+    "@rozie-ui/combobox-svelte": "workspace:*",
+    "@rozie-ui/combobox-angular": "workspace:*",
+    "@rozie-ui/combobox-solid": "workspace:*",
+    "@rozie-ui/combobox-lit": "workspace:*",
     "@rozie-ui/headless-core": "workspace:*",
     "@rozie/core": "workspace:*",
     "typescript": "~5.6.0",
