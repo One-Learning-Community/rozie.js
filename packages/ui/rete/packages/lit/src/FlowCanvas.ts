@@ -3234,7 +3234,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   resizerTrackRaf = 0;
 
-  lastHandlePointerUpAt = 0;
+  lastHandlePointerUpAt = -Infinity;
 
   onResizeNwDown: any = null;
 

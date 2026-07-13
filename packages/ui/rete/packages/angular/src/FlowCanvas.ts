@@ -3091,7 +3091,7 @@ export class FlowCanvas {
   resizeHandleSe: any = null;
   resizerTrackedId: any = null;
   resizerTrackRaf = 0;
-  lastHandlePointerUpAt = 0;
+  lastHandlePointerUpAt = -Infinity;
   onResizeNwDown: any = null;
   onResizeNeDown: any = null;
   onResizeSwDown: any = null;

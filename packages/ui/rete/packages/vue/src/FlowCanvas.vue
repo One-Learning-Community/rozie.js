@@ -322,6 +322,14 @@ let onToolbarDup: any = null;
 // entry. `lastHandlePointerUpAt` is a module-scope timestamp for double-click-via-
 // pointerup-timing detection (Rete swallows real clicks during node interaction — the
 // file's existing pointerup-not-click discipline, e.g. the NodeToolbar buttons above).
+// Initialized to -Infinity (NOT 0): `performance.now()` is relative to the page's
+// navigation start, so a `0` sentinel means the very FIRST-EVER pointerup on a freshly
+// mounted canvas is erroneously treated as "within 400ms of a prior click" whenever the
+// whole mount+gesture sequence itself completes within 400ms of page load — a real bug
+// (not test flakiness) found via 74-05's Task 2 Linux VR gate: the very first resize
+// gesture's pointerup was immediately undoing its own resize by misfiring
+// resetNodeSize(). -Infinity guarantees `now - lastHandlePointerUpAt` is always Infinity
+// (never < 400) until a REAL prior pointerup has actually happened.
 // Phase 74-03 — NodeResizer (D-05..D-17). Corner-anchored pointer-drag resize for a
 // SELECTED node whose TYPE was registered `resizable` (NodeType.rozie, 74-02). Follows
 // the SAME module-scope-not-$onMount-local discipline as the NodeToolbar/Marquee state
@@ -339,6 +347,14 @@ let onToolbarDup: any = null;
 // entry. `lastHandlePointerUpAt` is a module-scope timestamp for double-click-via-
 // pointerup-timing detection (Rete swallows real clicks during node interaction — the
 // file's existing pointerup-not-click discipline, e.g. the NodeToolbar buttons above).
+// Initialized to -Infinity (NOT 0): `performance.now()` is relative to the page's
+// navigation start, so a `0` sentinel means the very FIRST-EVER pointerup on a freshly
+// mounted canvas is erroneously treated as "within 400ms of a prior click" whenever the
+// whole mount+gesture sequence itself completes within 400ms of page load — a real bug
+// (not test flakiness) found via 74-05's Task 2 Linux VR gate: the very first resize
+// gesture's pointerup was immediately undoing its own resize by misfiring
+// resetNodeSize(). -Infinity guarantees `now - lastHandlePointerUpAt` is always Infinity
+// (never < 400) until a REAL prior pointerup has actually happened.
 const pendingResizeSizes = new Map(); // id → { width, height, x?, y? } (latest during a resize)
 // id → { width, height, x?, y? } (latest during a resize)
 let resizeFlushRaf = 0;
@@ -350,7 +366,7 @@ let resizeHandleSw: any = null;
 let resizeHandleSe: any = null;
 let resizerTrackedId: any = null;
 let resizerTrackRaf = 0;
-let lastHandlePointerUpAt = 0;
+let lastHandlePointerUpAt = -Infinity;
 // Persistent (never-removed-mid-gesture) pointerdown listener refs on each handle, kept so
 // teardown can removeEventListener them (the toolbarDeleteBtn/onToolbarDelete discipline).
 // Only ONE resize gesture is ever in flight at a time (a user drags one corner), so a
