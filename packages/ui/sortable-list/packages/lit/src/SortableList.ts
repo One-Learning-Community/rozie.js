@@ -100,11 +100,11 @@ export default class SortableList extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true }) forceFallback: boolean = false;
   /**
-   * SortableJS swap threshold (0..1) — a lower value makes rows swap earlier as the dragged item overlaps a neighbor. **Construction-time only**: re-key the `<SortableList>` to change it at runtime.
+   * SortableJS swap threshold (0..1) — a lower value makes rows swap earlier as the dragged item overlaps a neighbor. Reapplied live via `instance.option('swapThreshold', v)` — SortableJS reads it on every dragover, so no remount is needed.
    */
   @property({ type: Number, reflect: true }) swapThreshold: number = 1;
   /**
-   * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). **Construction-time only**: re-key the `<SortableList>` to change it at runtime.
+   * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.
    */
   @property({ type: Boolean, reflect: true }) cloneable: boolean = false;
   /**
@@ -199,17 +199,7 @@ private __rozieFirstUpdateDone = false;
       options: {
         animation: this.animation,
         disabled: this.disabled,
-        // `cloneable` is a high-level Rozie prop that REPLACES a string
-        // `group` with SortableJS's `{ name, pull: 'clone', put: true }`
-        // object form. When `cloneable:false`, pass `$props.group` through
-        // verbatim. When `cloneable:true` AND `$props.group` is null,
-        // leave it null — a clone-mode list without a group name is not
-        // meaningful (no peer list can join the cross-list flow).
-        group: this.cloneable && typeof this.group === 'string' ? {
-          name: this.group,
-          pull: 'clone',
-          put: true
-        } : this.group,
+        group: this.resolveGroup(),
         handle: this.handle,
         ghostClass: this.ghostClass,
         chosenClass: this.chosenClass,
@@ -275,7 +265,9 @@ private __rozieFirstUpdateDone = false;
 
   updated(changedProperties: Map<string, unknown>): void {
     if (this.__rozieFirstUpdateDone && (changedProperties.has('disabled'))) { const __watchVal = (() => this.disabled)(); ((v: any) => this.instance?.option('disabled', v))(__watchVal); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('group'))) { const __watchVal = (() => this.group)(); ((v: any) => this.instance?.option('group', v))(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('group'))) { const __watchVal = (() => this.group)(); (() => this.instance?.option('group', this.resolveGroup()))(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('cloneable'))) { const __watchVal = (() => this.cloneable)(); (() => this.instance?.option('group', this.resolveGroup()))(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('swapThreshold'))) { const __watchVal = (() => this.swapThreshold)(); ((v: any) => this.instance?.option('swapThreshold', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('handle'))) { const __watchVal = (() => this.handle)(); ((v: any) => this.instance?.option('handle', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('ghostClass'))) { const __watchVal = (() => this.ghostClass)(); ((v: any) => this.instance?.option('ghostClass', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('chosenClass'))) { const __watchVal = (() => this.chosenClass)(); ((v: any) => this.instance?.option('chosenClass', v))(__watchVal); }
@@ -342,6 +334,12 @@ private __rozieFirstUpdateDone = false;
   //     unsafe to reorder this way — pass a function itemKey for those.
   return index;
 };
+
+  resolveGroup = () => this.cloneable && typeof this.group === 'string' ? {
+  name: this.group,
+  pull: 'clone',
+  put: true
+} : this.group;
 
   itemClassFor = (item: any, index: any) => {
   const v = this.itemClass;

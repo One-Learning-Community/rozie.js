@@ -89,11 +89,11 @@ interface SortableListProps {
    */
   forceFallback?: boolean;
   /**
-   * SortableJS swap threshold (0..1) — a lower value makes rows swap earlier as the dragged item overlaps a neighbor. **Construction-time only**: re-key the `<SortableList>` to change it at runtime.
+   * SortableJS swap threshold (0..1) — a lower value makes rows swap earlier as the dragged item overlaps a neighbor. Reapplied live via `instance.option('swapThreshold', v)` — SortableJS reads it on every dragover, so no remount is needed.
    */
   swapThreshold?: number;
   /**
-   * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). **Construction-time only**: re-key the `<SortableList>` to change it at runtime.
+   * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.
    */
   cloneable?: boolean;
   /**
@@ -149,17 +149,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
       options: {
         animation: local.animation,
         disabled: local.disabled,
-        // `cloneable` is a high-level Rozie prop that REPLACES a string
-        // `group` with SortableJS's `{ name, pull: 'clone', put: true }`
-        // object form. When `cloneable:false`, pass `$props.group` through
-        // verbatim. When `cloneable:true` AND `$props.group` is null,
-        // leave it null — a clone-mode list without a group name is not
-        // meaningful (no peer list can join the cross-list flow).
-        group: local.cloneable && typeof local.group === 'string' ? {
-          name: local.group ?? undefined,
-          pull: 'clone',
-          put: true
-        } : local.group ?? undefined,
+        group: resolveGroup(),
         handle: local.handle ?? undefined,
         ghostClass: local.ghostClass ?? undefined,
         chosenClass: local.chosenClass ?? undefined,
@@ -206,7 +196,9 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     onCleanup(() => instance?.destroy());
   });
   createEffect(on(() => (() => local.disabled)(), (v) => untrack(() => ((v: any) => instance?.option('disabled', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.group)(), (v) => untrack(() => ((v: any) => instance?.option('group', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.group)(), (v) => untrack(() => (() => instance?.option('group', resolveGroup()))()), { defer: true }));
+  createEffect(on(() => (() => local.cloneable)(), (v) => untrack(() => (() => instance?.option('group', resolveGroup()))()), { defer: true }));
+  createEffect(on(() => (() => local.swapThreshold)(), (v) => untrack(() => ((v: any) => instance?.option('swapThreshold', v))(v)), { defer: true }));
   createEffect(on(() => (() => local.handle)(), (v) => untrack(() => ((v: any) => instance?.option('handle', v))(v)), { defer: true }));
   createEffect(on(() => (() => local.ghostClass)(), (v) => untrack(() => ((v: any) => instance?.option('ghostClass', v))(v)), { defer: true }));
   createEffect(on(() => (() => local.chosenClass)(), (v) => untrack(() => ((v: any) => instance?.option('chosenClass', v))(v)), { defer: true }));
@@ -253,6 +245,22 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     // (d) primitive item: fall back to index. NOTE: duplicate primitives are
     //     unsafe to reorder this way — pass a function itemKey for those.
     return index;
+  }
+
+  // Resolve the SortableJS `group` option: `cloneable` is a high-level Rozie
+  // prop that REPLACES a string `group` with SortableJS's
+  // `{ name, pull: 'clone', put: true }` clone-mode object form. When
+  // `cloneable:false`, pass `$props.group` through verbatim. When
+  // `cloneable:true` AND `$props.group` is null, leave it null — a clone-mode
+  // list without a group name is not meaningful (no peer list can join the
+  // cross-list flow). Shared by $onMount construction AND the group/cloneable
+  // $watch reconcile below — single source of truth, no duplicated ternary.
+  function resolveGroup() {
+    return local.cloneable && typeof local.group === 'string' ? {
+      name: local.group,
+      pull: 'clone',
+      put: true
+    } : local.group;
   }
 
   // Resolve itemClass for a row: a static value (string | array | object) OR a

@@ -72,11 +72,11 @@ interface SortableListProps {
    */
   forceFallback?: boolean;
   /**
-   * SortableJS swap threshold (0..1) — a lower value makes rows swap earlier as the dragged item overlaps a neighbor. **Construction-time only**: re-key the `<SortableList>` to change it at runtime.
+   * SortableJS swap threshold (0..1) — a lower value makes rows swap earlier as the dragged item overlaps a neighbor. Reapplied live via `instance.option('swapThreshold', v)` — SortableJS reads it on every dragover, so no remount is needed.
    */
   swapThreshold?: number;
   /**
-   * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). **Construction-time only**: re-key the `<SortableList>` to change it at runtime.
+   * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.
    */
   cloneable?: boolean;
   /**
@@ -157,10 +157,10 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   _filterRef.current = props.filter;
   const _ghostClassRef = useRef(props.ghostClass);
   _ghostClassRef.current = props.ghostClass;
-  const _groupRef = useRef(props.group);
-  _groupRef.current = props.group;
   const _handleRef = useRef(props.handle);
   _handleRef.current = props.handle;
+  const _swapThresholdRef = useRef(props.swapThreshold);
+  _swapThresholdRef.current = props.swapThreshold;
   const _itemsRef = useRef(items);
   _itemsRef.current = items;
   const [liftedIndex, setLiftedIndex] = useState<any>(null);
@@ -175,6 +175,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   const _watch5First = useRef(true);
   const _watch6First = useRef(true);
   const _watch7First = useRef(true);
+  const _watch8First = useRef(true);
+  const _watch9First = useRef(true);
 
   const __rowKeyMap = useMemo(() => new WeakMap(), []);
   function keyFor(item: any, index: any) {
@@ -198,6 +200,11 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     //     unsafe to reorder this way — pass a function itemKey for those.
     return index;
   }
+  const resolveGroup = useCallback(() => props.cloneable && typeof props.group === 'string' ? {
+    name: props.group,
+    pull: 'clone',
+    put: true
+  } : props.group, [props.cloneable, props.group]);
   function itemClassFor(item: any, index: any) {
     const v = props.itemClass;
     return typeof v === 'function' ? v(item, index) : v;
@@ -312,24 +319,14 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       options: {
         animation: props.animation,
         disabled: _disabledRef.current,
-        // `cloneable` is a high-level Rozie prop that REPLACES a string
-        // `group` with SortableJS's `{ name, pull: 'clone', put: true }`
-        // object form. When `cloneable:false`, pass `$props.group` through
-        // verbatim. When `cloneable:true` AND `$props.group` is null,
-        // leave it null — a clone-mode list without a group name is not
-        // meaningful (no peer list can join the cross-list flow).
-        group: props.cloneable && typeof _groupRef.current === 'string' ? {
-          name: _groupRef.current,
-          pull: 'clone',
-          put: true
-        } : _groupRef.current,
+        group: resolveGroup(),
         handle: _handleRef.current,
         ghostClass: _ghostClassRef.current,
         chosenClass: _chosenClassRef.current,
         dragClass: _dragClassRef.current,
         filter: _filterRef.current,
         forceFallback: props.forceFallback,
-        swapThreshold: props.swapThreshold,
+        swapThreshold: _swapThresholdRef.current,
         easing: _easingRef.current,
         ...props.options
       },
@@ -373,36 +370,44 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   }, [props.disabled]);
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
-    const v = props.group;
-    instance.current?.option('group', v);
-  }, [props.group]);
+    instance.current?.option('group', resolveGroup());
+  }, [props.group]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
+    instance.current?.option('group', resolveGroup());
+  }, [props.cloneable]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch3First.current) { _watch3First.current = false; return; }
+    const v = props.swapThreshold;
+    instance.current?.option('swapThreshold', v);
+  }, [props.swapThreshold]);
+  useEffect(() => {
+    if (_watch4First.current) { _watch4First.current = false; return; }
     const v = props.handle;
     instance.current?.option('handle', v);
   }, [props.handle]);
   useEffect(() => {
-    if (_watch3First.current) { _watch3First.current = false; return; }
+    if (_watch5First.current) { _watch5First.current = false; return; }
     const v = props.ghostClass;
     instance.current?.option('ghostClass', v);
   }, [props.ghostClass]);
   useEffect(() => {
-    if (_watch4First.current) { _watch4First.current = false; return; }
+    if (_watch6First.current) { _watch6First.current = false; return; }
     const v = props.chosenClass;
     instance.current?.option('chosenClass', v);
   }, [props.chosenClass]);
   useEffect(() => {
-    if (_watch5First.current) { _watch5First.current = false; return; }
+    if (_watch7First.current) { _watch7First.current = false; return; }
     const v = props.dragClass;
     instance.current?.option('dragClass', v);
   }, [props.dragClass]);
   useEffect(() => {
-    if (_watch6First.current) { _watch6First.current = false; return; }
+    if (_watch8First.current) { _watch8First.current = false; return; }
     const v = props.filter;
     instance.current?.option('filter', v);
   }, [props.filter]);
   useEffect(() => {
-    if (_watch7First.current) { _watch7First.current = false; return; }
+    if (_watch9First.current) { _watch9First.current = false; return; }
     const v = props.easing;
     instance.current?.option('easing', v);
   }, [props.easing]);

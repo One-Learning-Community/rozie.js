@@ -81,8 +81,8 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `filter` | `String` | `null` | yes | CSS selector that prevents drag initiation on matching rows. See [Filter — locked items](#filter-—-locked-items). |
 | `easing` | `String` | `null` | yes | CSS easing function for the animation (e.g. `'ease-in'`, `'cubic-bezier(0.4, 0, 0.2, 1)'`). |
 | `forceFallback` | `Boolean` | `false` | **NO** | Force SortableJS's mouse-event drag path (over HTML5 DnD). Useful for touch testing and consistent cross-browser behavior. **Construction-time only** — see [Remount on construction-time-only changes](#remount-on-construction-time-only-changes). |
-| `swapThreshold` | `Number` | `1` | **NO** | SortableJS swap-threshold (0..1). Lower = swap earlier. **Construction-time only**. |
-| `cloneable` | `Boolean` | `false` | **NO** | High-level prop that replaces a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` object form. See [Clone mode](#clone-mode). **Construction-time only**. |
+| `swapThreshold` | `Number` | `1` | yes | SortableJS swap-threshold (0..1). Lower = swap earlier. Reapplied live via `instance.option('swapThreshold', v)` — SortableJS reads it on every dragover, so no remount is needed. |
+| `cloneable` | `Boolean` | `false` | yes | High-level prop that replaces a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` object form. See [Clone mode](#clone-mode). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount. |
 | `options` | `Object` | `{}` | partial | Verbatim SortableJS options pass-through for anything not covered by the named props above. The named props win on key conflict, but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. |
 | `labelFor` | `Function` | `null` | yes | Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer (keyboard-drag accessibility). |
 | `listClass` | `String \| Array \| Object` | `""` | yes | Extra class(es) merged onto the list container (the SortableJS root). Accepts a string, an array, or an object (Vue-style class binding), normalized via the cross-target class normalizer. Bridges `.list-group`, a flex/grid parent, or `:nth-child` styling. |
@@ -379,21 +379,21 @@ Each target normalizes the returned shape natively — React/Solid via `parseInl
 
 ## Remount on construction-time-only changes
 
-`forceFallback`, `swapThreshold`, and `cloneable` are baked into the SortableJS instance at construction time — SortableJS exposes no `option()` path for them. To make them runtime-tunable from the consumer side, re-key the `<SortableList>` on a string built from the values:
+`forceFallback` is the one remaining knob SortableJS bakes into the instance at construction time — SortableJS exposes no `option()` path for it. To make it runtime-tunable from the consumer side, re-key the `<SortableList>` on its value:
 
 ```rozie
 <SortableList
-  :key="`${$data.forceFallback}-${$data.cloneable}-${$data.swapThreshold}`"
+  :key="$data.forceFallback ? 'fb' : 'native'"
   :forceFallback="$data.forceFallback"
-  :cloneable="$data.cloneable"
-  :swapThreshold="Number($data.swapThreshold)"
   …
 />
 ```
 
-When any of those values change, the framework reconciler unmounts the old `<SortableList>` and mounts a fresh one. The bound `items` array survives across the remount (it's bound to the parent's `$data`), so the user-visible content is preserved — only the engine instance is rebuilt.
+When it changes, the framework reconciler unmounts the old `<SortableList>` and mounts a fresh one. The bound `items` array survives across the remount (it's bound to the parent's `$data`), so the user-visible content is preserved — only the engine instance is rebuilt.
 
-`SortableListShowcaseDemo` demonstrates this pattern. It exposes every prop including the three construction-time-only ones and uses exactly this `:key` strategy.
+`swapThreshold` and `cloneable` no longer need this pattern; both are live-reconciled via `instance.option()` — see the [Props table](#props) above.
+
+`SortableListShowcaseDemo` still folds `cloneable`/`swapThreshold` into its `:key` alongside `forceFallback` (a harmless superset re-key, exercised by the visual-regression pipeline) — even though only `forceFallback` requires it now.
 
 ## Gotchas
 

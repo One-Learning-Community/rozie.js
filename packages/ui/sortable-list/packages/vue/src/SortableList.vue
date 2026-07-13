@@ -75,11 +75,11 @@ const props = withDefaults(
      */
     forceFallback?: boolean;
     /**
-     * SortableJS swap threshold (0..1) — a lower value makes rows swap earlier as the dragged item overlaps a neighbor. **Construction-time only**: re-key the `<SortableList>` to change it at runtime.
+     * SortableJS swap threshold (0..1) — a lower value makes rows swap earlier as the dragged item overlaps a neighbor. Reapplied live via `instance.option('swapThreshold', v)` — SortableJS reads it on every dragover, so no remount is needed.
      */
     swapThreshold?: number;
     /**
-     * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). **Construction-time only**: re-key the `<SortableList>` to change it at runtime.
+     * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.
      */
     cloneable?: boolean;
     /**
@@ -176,6 +176,28 @@ const keyFor = (item: any, index: any) => {
   //     unsafe to reorder this way — pass a function itemKey for those.
   return index;
 };
+
+// Resolve the SortableJS `group` option: `cloneable` is a high-level Rozie
+// prop that REPLACES a string `group` with SortableJS's
+// `{ name, pull: 'clone', put: true }` clone-mode object form. When
+// `cloneable:false`, pass `$props.group` through verbatim. When
+// `cloneable:true` AND `$props.group` is null, leave it null — a clone-mode
+// list without a group name is not meaningful (no peer list can join the
+// cross-list flow). Shared by $onMount construction AND the group/cloneable
+// $watch reconcile below — single source of truth, no duplicated ternary.
+// Resolve the SortableJS `group` option: `cloneable` is a high-level Rozie
+// prop that REPLACES a string `group` with SortableJS's
+// `{ name, pull: 'clone', put: true }` clone-mode object form. When
+// `cloneable:false`, pass `$props.group` through verbatim. When
+// `cloneable:true` AND `$props.group` is null, leave it null — a clone-mode
+// list without a group name is not meaningful (no peer list can join the
+// cross-list flow). Shared by $onMount construction AND the group/cloneable
+// $watch reconcile below — single source of truth, no duplicated ternary.
+const resolveGroup = () => props.cloneable && typeof props.group === 'string' ? {
+  name: props.group,
+  pull: 'clone',
+  put: true
+} : props.group;
 
 // Resolve itemClass for a row: a static value (string | array | object) OR a
 // per-row (item, index) => class function. The result is fed into the :class
@@ -352,17 +374,7 @@ onMounted(() => {
     options: {
       animation: props.animation,
       disabled: props.disabled,
-      // `cloneable` is a high-level Rozie prop that REPLACES a string
-      // `group` with SortableJS's `{ name, pull: 'clone', put: true }`
-      // object form. When `cloneable:false`, pass `$props.group` through
-      // verbatim. When `cloneable:true` AND `$props.group` is null,
-      // leave it null — a clone-mode list without a group name is not
-      // meaningful (no peer list can join the cross-list flow).
-      group: props.cloneable && typeof props.group === 'string' ? {
-        name: props.group,
-        pull: 'clone',
-        put: true
-      } : props.group,
+      group: resolveGroup(),
       handle: props.handle,
       ghostClass: props.ghostClass,
       chosenClass: props.chosenClass,
@@ -409,7 +421,9 @@ onMounted(() => {
 onBeforeUnmount(() => { _cleanup_0?.(); });
 
 watch(() => props.disabled, (v: any) => instance?.option('disabled', v));
-watch(() => props.group, (v: any) => instance?.option('group', v));
+watch(() => props.group, () => instance?.option('group', resolveGroup()));
+watch(() => props.cloneable, () => instance?.option('group', resolveGroup()));
+watch(() => props.swapThreshold, (v: any) => instance?.option('swapThreshold', v));
 watch(() => props.handle, (v: any) => instance?.option('handle', v));
 watch(() => props.ghostClass, (v: any) => instance?.option('ghostClass', v));
 watch(() => props.chosenClass, (v: any) => instance?.option('chosenClass', v));
