@@ -51,6 +51,25 @@ import { RozieErrorCode } from '../diagnostics/codes.js';
 import type { IRCache } from './cache.js';
 import type { ProducerResolver } from '../resolver/index.js';
 import { isWritableLValue } from '../semantic/lvalue.js';
+import type { RozieTarget } from '../codegen/rewriteRozieImport.js';
+// Phase 75 Plan 02 (COMP-04 bounded exception) — for a PUBLISHED cross-package
+// specifier, validate against the compiled rozie-manifest.json's props (D-09)
+// instead of resolveProducerPath + IRCache. Local `.rozie` specifiers are
+// UNCHANGED — see the isPublishedSpecifier branch below.
+import { isPublishedSpecifier, resolveManifestProducer } from '../manifest/index.js';
+
+/**
+ * The producer prop shape `resolveProducerProps` reads from. A LOCAL producer
+ * yields real `PropDecl[]` (full `sourceLoc` into the producer's own `.rozie`
+ * source). A PUBLISHED (manifest-backed) producer yields only
+ * `{ name, isModel }` — the manifest carries no source location, since the
+ * primitive's `.rozie` source is not present in this compile pass (COMP-04).
+ * `sourceLoc` is therefore optional here; the ROZ949 `related[]` secondary
+ * frame is only attached when a real one is available.
+ */
+type ProducerPropLike = Pick<PropDecl, 'name' | 'isModel'> & {
+  sourceLoc?: PropDecl['sourceLoc'];
+};
 
 /**
  * Recursive template walker — mirrors threadParamTypes.walkTemplate so the
@@ -100,6 +119,8 @@ function walkTemplate(
  * @param cache         - per-compiler-instance IRCache (D-01) — shared with
  *   threadParamTypes so producers parsed once during threading are reused here
  * @param resolver      - per-compiler-instance ProducerResolver (D-02 / D-12)
+ * @param target        - the per-call compile target (Phase 75 Plan 02 —
+ *   selects the derived per-target package for a PUBLISHED specifier; D-09)
  * @param diagnostics   - accumulator (mutated in place; ROZ949/950/951/945 pushed)
  */
 export function validateTwoWayBindings(
@@ -107,6 +128,7 @@ export function validateTwoWayBindings(
   consumerPath: string,
   cache: IRCache,
   resolver: ProducerResolver,
+  target: RozieTarget,
   diagnostics: Diagnostic[],
 ): void {
   walkTemplate(ir.template, (node) => {
@@ -123,10 +145,10 @@ export function validateTwoWayBindings(
     // Use null sentinel for "not yet attempted"; another null sentinel
     // (producerProps === null after lookup attempted) means lookup failed
     // and ROZ949 silently degrades.
-    let producerProps: readonly PropDecl[] | null = null;
+    let producerProps: readonly ProducerPropLike[] | null = null;
     let producerLookupAttempted = false;
 
-    const resolveProducerProps = (): readonly PropDecl[] | null => {
+    const resolveProducerProps = (): readonly ProducerPropLike[] | null => {
       if (producerLookupAttempted) return producerProps;
       producerLookupAttempted = true;
 
@@ -142,6 +164,31 @@ export function validateTwoWayBindings(
         // we never even attempt producer lookup. Returning null here means
         // ROZ949 silently degrades (the shape error covers the case).
         return null;
+      }
+
+      // Phase 75 Plan 02 (COMP-04 bounded exception) — PUBLISHED cross-package
+      // specifier: validate against the compiled rozie-manifest.json's props
+      // (D-08/D-09/D-10) instead of resolveProducerPath + IRCache.
+      if (isPublishedSpecifier(node.componentRef.importPath)) {
+        const { surface, error } = resolveManifestProducer({
+          specifier: node.componentRef.importPath,
+          target,
+          fromFile: consumerPath,
+          resolver,
+        });
+        if (error !== null) {
+          diagnostics.push({
+            code: error.code,
+            severity: 'error',
+            message: error.message,
+            loc: node.componentRef.sourceLoc,
+            hint: 'Verify the per-target package is installed as a dependency and ships a compatible rozie-manifest.json.',
+          });
+          return null;
+        }
+        if (surface === null) return null;
+        producerProps = surface.props;
+        return producerProps;
       }
 
       const resolvedPath = resolver.resolveProducerPath(
@@ -239,11 +286,16 @@ export function validateTwoWayBindings(
 
       if (!producerProp.isModel) {
         // Dual-frame ROZ949 — primary frame at the consumer site, secondary
-        // frame at the producer's prop declaration. Mirrors ROZ947.
+        // frame at the producer's prop declaration. Mirrors ROZ947. A
+        // manifest-backed (published) producer carries no real sourceLoc
+        // (COMP-04 — its `.rozie` source is not present in this compile
+        // pass), so the secondary frame falls back to the consumer's own
+        // `<components>` declaration site rather than a fabricated location.
         const producerImportPath =
           node.tagKind === 'self'
             ? '(self-reference)'
             : (node.componentRef?.importPath ?? '(unknown)');
+        const relatedLoc = producerProp.sourceLoc ?? node.componentRef?.sourceLoc ?? attr.sourceLoc;
         diagnostics.push({
           code: RozieErrorCode.TWO_WAY_PROP_NOT_MODEL,
           severity: 'error',
@@ -253,7 +305,7 @@ export function validateTwoWayBindings(
           related: [
             {
               message: `'${attr.name}' declared here without model: true`,
-              loc: producerProp.sourceLoc,
+              loc: relatedLoc,
             },
           ],
         });

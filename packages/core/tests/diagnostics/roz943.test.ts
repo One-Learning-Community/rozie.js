@@ -135,7 +135,7 @@ describe('ROZ943 REPROJECTION_UNDECLARED_WRAPPER_SLOT — Phase 07.2 Plan 05 (R6
       const cache = new IRCache({ modifierRegistry });
       const resolver = new ProducerResolver({ root: dir });
 
-      threadParamTypes(ir, join(dir, 'wrapper.rozie'), cache, resolver, diagnostics);
+      threadParamTypes(ir, join(dir, 'wrapper.rozie'), cache, resolver, 'react', diagnostics);
 
       const roz943 = diagnostics.find((d) => d.code === 'ROZ943');
       expect(roz943).toBeDefined();

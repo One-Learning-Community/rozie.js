@@ -54,6 +54,12 @@ import type { BlockMap } from '../../core/src/ast/types.js';
 // would then fail on every consumer-scoped-fill cell.
 import { threadParamTypes } from '../../core/src/ir/threadParamTypes.js';
 import { validateTwoWayBindings } from '../../core/src/ir/validateTwoWayBindings.js';
+// Phase 75 Plan 02 — threadParamTypes/validateTwoWayBindings now require the
+// per-call compile target (D-09, selects the derived per-target package for a
+// PUBLISHED <components> specifier). Each per-target pipeline below threads
+// its own literal target through threadParamTypesForPipeline/
+// validateTwoWayBindingsForPipeline, mirroring compile.ts's opts.target.
+import type { RozieTarget } from '../../core/src/codegen/rewriteRozieImport.js';
 // Phase 38 — ROZ088 portal-scoped-style Lit diagnostic. `@rozie/unplugin` does
 // NOT call `compile()`; each per-target pipeline threads + validates inline, so
 // this pass must be invoked at every pipeline site (mirrors how compile.ts wires
@@ -792,6 +798,7 @@ function threadParamTypesForPipeline(
   ir: import('../../core/src/ir/types.js').IRComponent,
   filePath: string,
   registry: ModifierRegistry,
+  target: RozieTarget,
   acc: Diagnostic[],
 ): void {
   // Shared build-scoped cache + per-root resolver (see block above). The same
@@ -799,7 +806,7 @@ function threadParamTypesForPipeline(
   // matching compile.ts, which threads ONE cache through both passes.
   const cache = getSharedIRCache(registry);
   const resolver = getResolverForRoot(dirname(filePath));
-  threadParamTypes(ir, filePath, cache, resolver, acc);
+  threadParamTypes(ir, filePath, cache, resolver, target, acc);
 }
 
 /**
@@ -838,6 +845,7 @@ function validateTwoWayBindingsForPipeline(
   ir: import('../../core/src/ir/types.js').IRComponent,
   filePath: string,
   registry: ModifierRegistry,
+  target: RozieTarget,
   acc: Diagnostic[],
 ): void {
   // Same shared build-scoped cache + per-root resolver as
@@ -845,7 +853,7 @@ function validateTwoWayBindingsForPipeline(
   // reused here for free, mirroring compile.ts's single-cache-both-passes flow.
   const cache = getSharedIRCache(registry);
   const resolver = getResolverForRoot(dirname(filePath));
-  validateTwoWayBindings(ir, filePath, cache, resolver, acc);
+  validateTwoWayBindings(ir, filePath, cache, resolver, target, acc);
 }
 
 /**
@@ -922,8 +930,8 @@ function runRoziePipeline(
   // (with paramTypes missing → degraded type-flow) rather than blocking
   // the build.
   const threadDiags: Diagnostic[] = [];
-  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
-  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  threadParamTypesForPipeline(ir, filePath, registry, 'vue', threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, 'vue', threadDiags);
   // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
   // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
   // so `filler.isPortal` is populated; reads no cache/resolver.
@@ -1006,8 +1014,8 @@ function runReactPipeline(
   // (with paramTypes missing → degraded type-flow) rather than blocking
   // the build.
   const threadDiags: Diagnostic[] = [];
-  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
-  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  threadParamTypesForPipeline(ir, filePath, registry, 'react', threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, 'react', threadDiags);
   // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
   // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
   // so `filler.isPortal` is populated; reads no cache/resolver.
@@ -1087,8 +1095,8 @@ function runSveltePipeline(
   // (with paramTypes missing → degraded type-flow) rather than blocking
   // the build.
   const threadDiags: Diagnostic[] = [];
-  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
-  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  threadParamTypesForPipeline(ir, filePath, registry, 'svelte', threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, 'svelte', threadDiags);
   // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
   // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
   // so `filler.isPortal` is populated; reads no cache/resolver.
@@ -1170,8 +1178,8 @@ function runSolidPipeline(
   // (with paramTypes missing → degraded type-flow) rather than blocking
   // the build.
   const threadDiags: Diagnostic[] = [];
-  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
-  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  threadParamTypesForPipeline(ir, filePath, registry, 'solid', threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, 'solid', threadDiags);
   // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
   // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
   // so `filler.isPortal` is populated; reads no cache/resolver.
@@ -1252,8 +1260,8 @@ function runLitPipeline(
   // (with paramTypes missing → degraded type-flow) rather than blocking
   // the build.
   const threadDiags: Diagnostic[] = [];
-  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
-  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  threadParamTypesForPipeline(ir, filePath, registry, 'lit', threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, 'lit', threadDiags);
   // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
   // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
   // so `filler.isPortal` is populated; reads no cache/resolver.
@@ -1345,8 +1353,8 @@ function runAngularPipeline(
   // (with paramTypes missing → degraded type-flow) rather than blocking
   // the build.
   const threadDiags: Diagnostic[] = [];
-  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
-  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  threadParamTypesForPipeline(ir, filePath, registry, 'angular', threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, 'angular', threadDiags);
   // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
   // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
   // so `filler.isPortal` is populated; reads no cache/resolver.
@@ -1666,8 +1674,8 @@ function runAngularEmitForDisk(
   }
   // Phase 07.2 Plan 03 — thread producer paramTypes onto consumer SlotFillerDecl.
   const threadDiags: Diagnostic[] = [];
-  threadParamTypesForPipeline(ir, filePath, registry, threadDiags);
-  validateTwoWayBindingsForPipeline(ir, filePath, registry, threadDiags);
+  threadParamTypesForPipeline(ir, filePath, registry, 'angular', threadDiags);
+  validateTwoWayBindingsForPipeline(ir, filePath, registry, 'angular', threadDiags);
   // Phase 38 — ROZ088: flag scoped `<style>` rules whose subject is used only in
   // portal-fill content (silent Lit shadow-DOM regression). Runs after threading
   // so `filler.isPortal` is populated; reads no cache/resolver.

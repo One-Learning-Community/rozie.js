@@ -317,7 +317,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   // resolver also feeds Phase 54 partial inlining in lowerToIR). Output is a
   // pure function of (consumerSource, producerSource), not of cache-fill order
   // (RESEARCH Pitfall 2 — cache iteration order MUST NEVER drive emit decisions).
-  threadParamTypes(ir, filename ?? '<anonymous>', cache, resolver, acc);
+  threadParamTypes(ir, filename ?? '<anonymous>', cache, resolver, opts.target, acc);
 
   // 2.55. Phase 38 — flag scoped <style> rules whose subject class/tag is used
   // EXCLUSIVELY in portal-fill content (ROZ088, collected warning). MUST run
@@ -334,7 +334,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   // ROZ949 (dual-frame producer prop lacks model:true), ROZ950 (shape error
   // — empty propName or non-component target), ROZ951 (RHS not a writable
   // lvalue per D-03), and ROZ945 (cross-package resolver miss) when needed.
-  validateTwoWayBindings(ir, filename ?? '<anonymous>', cache, resolver, acc);
+  validateTwoWayBindings(ir, filename ?? '<anonymous>', cache, resolver, opts.target, acc);
 
   // Backfill `filename` on every pre-emit diagnostic that doesn't already
   // carry one (threadParamTypes/validatePortalScopedStyle/validateTwoWayBindings

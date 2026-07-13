@@ -34,6 +34,12 @@ import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
 import type { IRCache } from './cache.js';
 import type { ProducerResolver } from '../resolver/index.js';
+import type { RozieTarget } from '../codegen/rewriteRozieImport.js';
+// Phase 75 Plan 02 (COMP-04 bounded exception) — for a PUBLISHED cross-package
+// specifier, thread producer slots/props from the compiled rozie-manifest.json
+// (D-09) instead of resolveProducerPath + IRCache. Local `.rozie` specifiers
+// are UNCHANGED — see the isPublishedSpecifier branch below.
+import { isPublishedSpecifier, resolveManifestProducer } from '../manifest/index.js';
 
 /**
  * Recursive template walker: visit every TemplateNode in source order.
@@ -143,6 +149,8 @@ function bodyContainsReprojection(body: readonly TemplateNode[]): boolean {
  *   the cache reverse-dep edge + resolver `fromFile` argument)
  * @param cache         - per-compiler-instance IRCache (D-01)
  * @param resolver      - per-compiler-instance ProducerResolver (D-02 / D-12)
+ * @param target        - the per-call compile target (Phase 75 Plan 02 —
+ *   selects the derived per-target package for a PUBLISHED specifier; D-09)
  * @param diagnostics   - accumulator
  */
 export function threadParamTypes(
@@ -150,6 +158,7 @@ export function threadParamTypes(
   consumerPath: string,
   cache: IRCache,
   resolver: ProducerResolver,
+  target: RozieTarget,
   diagnostics: Diagnostic[],
 ): void {
   // Phase 07.2 Plan 05 — ROZ943 REPROJECTION_UNDECLARED_WRAPPER_SLOT.
@@ -203,6 +212,32 @@ export function threadParamTypes(
     if (node.tagKind === 'self') {
       producerSlots = ir.slots;
       producerProps = ir.props;
+    } else if (isPublishedSpecifier(node.componentRef.importPath)) {
+      // Phase 75 Plan 02 (COMP-04 bounded exception) — PUBLISHED cross-package
+      // specifier: thread producer slots/props from the compiled
+      // rozie-manifest.json (D-08/D-09/D-10) instead of resolveProducerPath +
+      // IRCache. No `.rozie` producer source is read for this branch.
+      const { surface, error } = resolveManifestProducer({
+        specifier: node.componentRef.importPath,
+        target,
+        fromFile: consumerPath,
+        resolver,
+      });
+      if (error !== null) {
+        diagnostics.push({
+          code: error.code,
+          severity: 'error',
+          message: error.message,
+          loc: node.componentRef.sourceLoc,
+          hint: 'Verify the per-target package is installed as a dependency and ships a compatible rozie-manifest.json.',
+        });
+        return;
+      }
+      // parseManifest never returns { surface: null, error: null } — but
+      // narrow defensively rather than assert, per D-08 collected-not-thrown.
+      if (surface === null) return;
+      producerSlots = surface.slots;
+      producerProps = surface.props;
     } else {
       const resolvedPath = resolver.resolveProducerPath(
         node.componentRef.importPath,
