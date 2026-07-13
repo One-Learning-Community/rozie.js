@@ -12,5 +12,10 @@ export default defineConfig({
   outputOptions(options) {
     return { ...options, exports: 'named' };
   },
-  external: ['solid-js', '@rozie/runtime-solid', '@tanstack/table-core'],
+  // @rozie-ui/popover-solid is a published-package runtime peerDependency (the
+  // Option-A composition, quick 260713-iiy), NOT vendored source — it MUST stay
+  // external so it is not inlined/duplicated into this leaf's bundle (an inlined
+  // copy would defeat the peerDependency and double-load the primitive's own
+  // module-scope state alongside any copy the consumer's app separately imports).
+  external: ['solid-js', '@rozie/runtime-solid', '@rozie-ui/popover-solid', '@tanstack/table-core'],
 });

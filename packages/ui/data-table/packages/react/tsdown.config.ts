@@ -19,6 +19,11 @@ export default defineConfig({
   // specifiers verbatim, then `copy` the file(s) into `dist/` so the relative
   // import resolves at the consumer's bundler. (The leaf also ships `src` in
   // `files`, so the source-side import resolves too.)
-  external: ['react', 'react-dom', '@rozie/runtime-react', '@tanstack/table-core', /\.css$/],
+  // @rozie-ui/popover-react is a published-package runtime peerDependency (the
+  // Option-A composition, quick 260713-iiy), NOT vendored source — it MUST stay
+  // external so it is not inlined/duplicated into this leaf's bundle (an inlined
+  // copy would defeat the peerDependency and double-load the primitive's own
+  // module-scope state alongside any copy the consumer's app separately imports).
+  external: ['react', 'react-dom', '@rozie/runtime-react', '@rozie-ui/popover-react', '@tanstack/table-core', /\.css$/],
   copy: [{ from: 'src/DataTable.css', to: 'dist', flatten: true }],
 });
