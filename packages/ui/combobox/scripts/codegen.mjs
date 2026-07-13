@@ -38,7 +38,7 @@
  */
 import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { buildManifest, compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -78,6 +78,12 @@ function main() {
   const { ast } = parse(source, { filename: FILENAME });
   const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
 
+  // (2b) derive the published-primitive contract manifest (D-01/D-02/D-03) from
+  // the SAME single lowered IR — the same bytes are written into all 6 leaves
+  // below since the contract itself is target-agnostic.
+  const manifest = buildManifest(ir);
+  const manifestJson = JSON.stringify(manifest, null, 2) + '\n';
+
   // Keep the hand-kept manifests in lockstep with the IR.
   for (const ev of ir.emits) {
     if (!eventManifest[ev]) {
@@ -104,6 +110,11 @@ function main() {
     const leafSrc = resolve(ROOT, 'packages', cfg.dir, 'src');
     mkdirSync(leafSrc, { recursive: true });
     writeFileSync(resolve(leafSrc, cfg.file), r.code);
+
+    // (D-02) write the published-primitive contract manifest to the LEAF
+    // PACKAGE ROOT (sibling to package.json, NOT under src/) — the same
+    // target-agnostic manifest bytes into every leaf.
+    writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'rozie-manifest.json'), manifestJson);
 
     // Bundled leaves (tsdown) entry on src/index.ts. The emitted component is a
     // DEFAULT export, so the barrel re-exports the default under the named `Combobox`
@@ -141,7 +152,7 @@ function main() {
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ themes/)`);
+    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ themes/, + rozie-manifest.json)`);
   }
 
   // (6) ENFORCE docs props-table validation.

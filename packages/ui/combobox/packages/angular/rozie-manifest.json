@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "name": "Combobox",
+  "props": [
+    {
+      "name": "value",
+      "isModel": true,
+      "required": false,
+      "type": "unknown"
+    },
+    {
+      "name": "options",
+      "isModel": false,
+      "required": false,
+      "type": "Array"
+    },
+    {
+      "name": "placeholder",
+      "isModel": false,
+      "required": false,
+      "type": "String"
+    },
+    {
+      "name": "disabled",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "disableFilter",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "ariaLabel",
+      "isModel": false,
+      "required": false,
+      "type": "String"
+    },
+    {
+      "name": "idBase",
+      "isModel": false,
+      "required": false,
+      "type": "String"
+    },
+    {
+      "name": "inline",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "closeOnSelect",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "optionLabel",
+      "isModel": false,
+      "required": false,
+      "type": "Function"
+    },
+    {
+      "name": "optionValue",
+      "isModel": false,
+      "required": false,
+      "type": "Function"
+    },
+    {
+      "name": "optionDisabled",
+      "isModel": false,
+      "required": false,
+      "type": "Function"
+    },
+    {
+      "name": "virtual",
+      "isModel": false,
+      "required": false,
+      "type": "Boolean"
+    },
+    {
+      "name": "estimateRowHeight",
+      "isModel": false,
+      "required": false,
+      "type": "Number"
+    },
+    {
+      "name": "maxHeight",
+      "isModel": false,
+      "required": false,
+      "type": "String"
+    }
+  ],
+  "slots": [
+    {
+      "name": "option",
+      "params": [
+        {
+          "name": "option"
+        },
+        {
+          "name": "index"
+        },
+        {
+          "name": "active"
+        },
+        {
+          "name": "selected"
+        },
+        {
+          "name": "disabled"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
+      "name": "empty",
+      "params": [
+        {
+          "name": "query"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
+      "name": "option",
+      "params": [
+        {
+          "name": "option"
+        },
+        {
+          "name": "index"
+        },
+        {
+          "name": "active"
+        },
+        {
+          "name": "selected"
+        },
+        {
+          "name": "disabled"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
+      "name": "empty",
+      "params": [
+        {
+          "name": "query"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    }
+  ],
+  "emits": [
+    "change",
+    "search"
+  ],
+  "expose": [
+    {
+      "name": "focus"
+    },
+    {
+      "name": "clear"
+    }
+  ]
+}
