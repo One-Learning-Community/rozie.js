@@ -203,3 +203,23 @@ export {
 // @experimental — shape may change before v1.0
 export { loadSass } from './parsers/resolveSass.js';
 export type { SassModule } from './parsers/resolveSass.js';
+
+// Published-primitive manifest contract — Phase 75 Plan 01 (D-01..D-04).
+// buildManifest(ir) is a pure IR→manifest serializer (D-03); parseManifest(json)
+// validates schemaVersion FIRST and fails closed on any mismatch or malformed
+// input (D-04), deserializing into a threadParamTypes/validateTwoWayBindings-
+// consumable producer surface. Consumed by the cross-package resolution wiring
+// (Plan 02) and the combobox published-composition emission (Plan 03).
+// @experimental — shape may change before v1.0
+export { buildManifest, parseManifest, MANIFEST_SCHEMA_VERSION } from './manifest/index.js';
+export type {
+  ManifestError,
+  ParseManifestOptions,
+  ParseManifestResult,
+  ProducerSurface,
+  RozieManifest,
+  RozieManifestExposeMember,
+  RozieManifestProp,
+  RozieManifestSlot,
+  RozieManifestSlotParam,
+} from './manifest/index.js';
