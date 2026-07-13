@@ -1,5 +1,5 @@
 <script lang="ts">
-import Popover from './Popover.svelte';
+import Popover from '@rozie-ui/popover-svelte';
 import { rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';

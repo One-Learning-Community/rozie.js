@@ -198,7 +198,7 @@
 </template>
 
 <script setup lang="ts">
-import Popover from './Popover.vue';
+import Popover from '@rozie-ui/popover-vue';
 
 import { onBeforeUnmount, onMounted, onUpdated, provide, ref, useSlots, watch } from 'vue';
 

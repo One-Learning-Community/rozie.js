@@ -2080,11 +2080,11 @@ render(html\`
 // The README "Peer dependencies:" install line is DERIVED from each leaf's
 // actual `peerDependencies` (passed in from codegen, read from the leaf
 // package.json) rather than a hand-kept per-target string — a curated list
-// silently drifted from reality (it omitted `@tanstack/virtual-core` and
-// `@floating-ui/dom`, both imported UNCONDITIONALLY at module top of the
-// emitted code, so a reader who `npm i`-ed only the listed peers hit an
-// unresolved-module build failure). Deriving from the manifest makes that
-// class of drift impossible.
+// silently drifted from reality (it omitted `@tanstack/virtual-core` and the
+// composed `@rozie-ui/popover-<target>` peer, both imported UNCONDITIONALLY at
+// module top of the emitted code, so a reader who `npm i`-ed only the listed
+// peers hit an unresolved-module build failure). Deriving from the manifest
+// makes that class of drift impossible.
 //
 // Ordering is the package.json key order, which is authored framework
 // runtime dep(s) → `@tanstack/table-core` engine → the rest. Only

@@ -80,13 +80,16 @@
 <rozie name="DataTable" inherit-attrs="false" inherit-listeners="false">
 
 <!--
-  D-07 (LOAD-BEARING): the STABLE package-style specifier ending in `.rozie`. The
-  codegen vendor-step (Option B, 72-02) remaps this to `./Popover.rozie` in-memory
-  before compile; the authored value here NEVER changes — it is byte-identical to a
-  future Option A (published-package) form. Do NOT hand-write the relative
-  `./Popover.rozie`. Popover composes into every per-column ⋯ menu below (phase 72,
-  D-01/D-05); it compiles into all 6 leaves but is NOT publicly re-exported
-  (childExports excludes it, per 72-02) — consumers use `@rozie-ui/popover` directly.
+  D-05/D-07 (LOAD-BEARING): the STABLE package-style specifier ending in `.rozie`.
+  Under Option A (published-package composition) @rozie/core's resolver
+  (resolveManifestProducer) resolves this specifier to the PUBLISHED per-target
+  `@rozie-ui/popover-<target>` package's compiled manifest at compile time — the
+  IDENTICAL mechanism command-palette uses for `@rozie-ui/combobox/Combobox.rozie`
+  after P75. There is NO vendored sibling and NO in-memory remap. Do NOT hand-write
+  the relative `./Popover.rozie`. Popover composes into every per-column ⋯ menu
+  below (phase 72, D-01/D-05); the composed `@rozie-ui/popover-<target>` package is
+  a runtime peerDependency of each leaf and is NOT publicly re-exported — consumers
+  use `@rozie-ui/popover-<target>` directly.
 -->
 <components>{ Popover: '@rozie-ui/popover/Popover.rozie' }</components>
 
@@ -1751,8 +1754,9 @@ $expose({
               >{{ headerLabel(header.column.id) }}</slot>
             </span>
           </span>
-          <!-- Header ⋯ menu (phase 72, D-01/D-05/D-06): the vendored composed Popover replaces
-               the old always-visible three-button pin cluster with ONE per-column menu. Popover
+          <!-- Header ⋯ menu (phase 72, D-01/D-05/D-06): the composed Popover (Option A — the
+               published `@rozie-ui/popover-<target>` package) replaces the old always-visible
+               three-button pin cluster with ONE per-column menu. Popover
                self-manages its own open state (uncontrolled) — DataTable tracks NO per-column
                open state. trigger=click / placement=bottom-end right-aligns the panel under the
                ⋯ button; strategy=fixed escapes the table's scroll/sticky overflow ancestor. The
@@ -2188,8 +2192,9 @@ $expose({
               >{{ headerLabel(header.column.id) }}</slot>
             </span>
           </span>
-          <!-- Header ⋯ menu (phase 72, D-01/D-05/D-06): the vendored composed Popover replaces
-               the old always-visible three-button pin cluster with ONE per-column menu. Popover
+          <!-- Header ⋯ menu (phase 72, D-01/D-05/D-06): the composed Popover (Option A — the
+               published `@rozie-ui/popover-<target>` package) replaces the old always-visible
+               three-button pin cluster with ONE per-column menu. Popover
                self-manages its own open state (uncontrolled) — DataTable tracks NO per-column
                open state. trigger=click / placement=bottom-end right-aligns the panel under the
                ⋯ button; strategy=fixed escapes the table's scroll/sticky overflow ancestor. The
@@ -2829,8 +2834,8 @@ $expose({
    button-group styling is repurposed here: the ⋯ trigger replaces the button-group host,
    and the menuitem rows reuse the old active-pin token (--rdt-pin-btn-active-bg). The
    floating PANEL box (bg/border/radius/shadow/padding) is Popover's own concern via its
-   --rozie-popover-* tokens (Popover.rozie) — this only styles the trigger + the menu's
-   internal item list, never re-implementing the panel chrome. */
+   --rozie-popover-* tokens (the composed @rozie-ui/popover-<target>) — this only styles the
+   trigger + the menu's internal item list, never re-implementing the panel chrome. */
 .rozie-data-table .rdt-col-menu-trigger {
   font: inherit;
   font-size: var(--rdt-col-menu-trigger-size, 0.9em);
