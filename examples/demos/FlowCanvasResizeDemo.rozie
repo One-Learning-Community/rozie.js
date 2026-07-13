@@ -1,0 +1,111 @@
+<!--
+  FlowCanvasResizeDemo.rozie — BEHAVIORAL consumer for Phase 74 (D-05/D-08/D-09/D-10/
+  D-15/D-16): the NodeResizer corner-handle interaction. A single `resizable` `<NodeType>`
+  (`min-width="80"` / `min-height="60"` / `max-width="400"` / `max-height="300"`) exposes 4
+  corner drag handles once selected; dragging the `se` handle persists an explicit
+  `node.width`/`node.height` (a fixed box overriding auto-sizing, D-15/D-16) through the
+  SAME rAF-coalesced fresh-graph write-back + one-history-entry-per-gesture path as every
+  other FlowCanvas gesture in this file (D-09/D-10); a handle double-click resets back to
+  auto-size (D-08).
+
+  `data-testid="node-width"`/`"node-height"` read `$data.graph.nodes[0].width`/`.height`
+  DIRECTLY (the bound-model discipline every other `rete-flow-*` demo in this family
+  follows — see FlowCanvasToolbarDemo's `node-count`), defaulting to the literal string
+  `'auto'` when unset — so the spec (`rete-flow-resize`) can assert BOTH the resized
+  numeric value AND the post-reset `'auto'` string from the true bound model, never a
+  derived script variable. `undo-btn` mirrors FlowCanvasUndoDemo's `ref="canvas"` +
+  `doUndo()` shape verbatim. Behavioral-only; NOT a screenshot cell.
+-->
+
+<rozie name="FlowCanvasResizeDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+}
+</components>
+
+<data>
+{
+  zoom: 1,
+  graph: {
+    nodes: [
+      { id: 'a', type: 'note', x: 60, y: 60, data: { label: 'Resize me' } },
+    ],
+    connections: [],
+  },
+}
+</data>
+
+<script>
+// Grab the FlowCanvas imperative handle ($refs.canvas) to drive undo() — read in the
+// button handler (post-mount), never eagerly (ROZ123-safe).
+const doUndo = () => { const c = $refs.canvas; if (c && c.undo) c.undo() }
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — NodeResizer (behavioral)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="undo-btn" @click="doUndo">undo</button>
+    <span class="readout">width: <b data-testid="node-width">{{ $data.graph.nodes[0].width != null ? $data.graph.nodes[0].width : 'auto' }}</b></span>
+    <span class="readout">height: <b data-testid="node-height">{{ $data.graph.nodes[0].height != null ? $data.graph.nodes[0].height : 'auto' }}</b></span>
+  </div>
+
+  <div class="flow-wrap" style="height: 320px; width: 620px">
+    <FlowCanvas
+      ref="canvas"
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :fit-on-mount="false"
+    >
+      <NodeType type="note" resizable :min-width="80" :min-height="60" :max-width="400" :max-height="300">
+        <template #body="{ node }">
+          <div class="rozie-demo-node"><strong>{{ node.data.label }}</strong></div>
+        </template>
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 660px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+.controls button {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  background: #f8fafc;
+  cursor: pointer;
+}
+.controls .readout { font-size: 0.875rem; }
+.controls .readout b { font-variant-numeric: tabular-nums; }
+
+:root {
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+    min-width: 100px;
+    min-height: 60px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+</style>
+
+</rozie>
