@@ -2661,7 +2661,7 @@ $onMount(() => {
         // Opposite-corner-anchored resize (React Flow NodeResizer semantics, D-15/D-16):
         // a west corner (nw/sw) also shifts x so the EAST edge stays put; a north corner
         // (nw/ne) also shifts y so the SOUTH edge stays put. `se` never touches x/y.
-        const next = { width: clamped.width, height: clamped.height }
+        const next = { width: clamped.width, height: clamped.height, x: startX, y: startY }
         if (corner === 'nw' || corner === 'sw') next.x = startX + (startW - clamped.width)
         if (corner === 'nw' || corner === 'ne') next.y = startY + (startH - clamped.height)
         pendingResizeSizes.set(id, next)

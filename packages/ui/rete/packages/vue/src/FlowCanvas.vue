@@ -3716,7 +3716,9 @@ onMounted(() => {
         // (nw/ne) also shifts y so the SOUTH edge stays put. `se` never touches x/y.
         const next = {
           width: clamped.width,
-          height: clamped.height
+          height: clamped.height,
+          x: startX,
+          y: startY
         };
         if (corner === 'nw' || corner === 'sw') next.x = startX + (startW - clamped.width);
         if (corner === 'nw' || corner === 'ne') next.y = startY + (startH - clamped.height);
