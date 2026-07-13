@@ -337,9 +337,9 @@ private __rozieFirstUpdateDone = false;
 
   resolveGroup = () => this.cloneable && typeof this.group === 'string' ? {
   name: this.group,
-  pull: 'clone',
-  put: true
-} : this.group;
+  pull: 'clone' as const,
+  put: true as const
+} : this.group ?? undefined;
 
   itemClassFor = (item: any, index: any) => {
   const v = this.itemClass;

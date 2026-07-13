@@ -195,9 +195,9 @@ const keyFor = (item: any, index: any) => {
 // $watch reconcile below — single source of truth, no duplicated ternary.
 const resolveGroup = () => props.cloneable && typeof props.group === 'string' ? {
   name: props.group,
-  pull: 'clone',
-  put: true
-} : props.group;
+  pull: 'clone' as const,
+  put: true as const
+} : props.group ?? undefined;
 
 // Resolve itemClass for a row: a static value (string | array | object) OR a
 // per-row (item, index) => class function. The result is fed into the :class

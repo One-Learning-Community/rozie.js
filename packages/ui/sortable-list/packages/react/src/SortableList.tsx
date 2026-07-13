@@ -202,9 +202,9 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   }
   const resolveGroup = useCallback(() => props.cloneable && typeof props.group === 'string' ? {
     name: props.group,
-    pull: 'clone',
-    put: true
-  } : props.group, [props.cloneable, props.group]);
+    pull: 'clone' as const,
+    put: true as const
+  } : props.group ?? undefined, [props.cloneable, props.group]);
   function itemClassFor(item: any, index: any) {
     const v = props.itemClass;
     return typeof v === 'function' ? v(item, index) : v;

@@ -258,9 +258,9 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   function resolveGroup() {
     return local.cloneable && typeof local.group === 'string' ? {
       name: local.group,
-      pull: 'clone',
-      put: true
-    } : local.group;
+      pull: 'clone' as const,
+      put: true as const
+    } : local.group ?? undefined;
   }
 
   // Resolve itemClass for a row: a static value (string | array | object) OR a
