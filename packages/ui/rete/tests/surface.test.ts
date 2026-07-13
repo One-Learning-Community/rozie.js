@@ -40,11 +40,14 @@ const EXPECT = {
   // `nodeToolbar` (Phase 44 T2.8, D-06) = the opt-in floating per-node toolbar (Boolean,
   // default OFF → existing demos + FlowCanvasScreenshot pixel-identical; selecting a node
   // pops nothing unless enabled).
+  // `background` (Phase 74, D-01..D-04) = the canvas background pattern variant
+  // switch (String, default 'dots'; one-way, NOT model:true) — the React Flow
+  // `<Background variant>` parity (dots/lines/cross/none).
   props: [
     'graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable',
     'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl',
     'curvature', 'fitOnMount', 'controls', 'minimap', 'canConnect', 'history',
-    'mode', 'marquee', 'nodeToolbar',
+    'mode', 'marquee', 'nodeToolbar', 'background',
   ],
   // `graph` + `zoom` + `mode` are two-way (the bound graph is the source of truth +
   // write-back target; zoom is the viewport binding; mode is the pan↔select toggle).
@@ -108,7 +111,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (20 props)', () => {
+  it('props surface matches (21 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
