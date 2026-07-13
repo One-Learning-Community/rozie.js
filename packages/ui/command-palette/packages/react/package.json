@@ -51,13 +51,17 @@
   },
   "peerDependencies": {
     "react": "^18.2 || ^19",
-    "react-dom": "^18.2 || ^19"
+    "react-dom": "^18.2 || ^19",
+    "@rozie-ui/combobox-react": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": false
     },
     "react-dom": {
+      "optional": false
+    },
+    "@rozie-ui/combobox-react": {
       "optional": false
     }
   },

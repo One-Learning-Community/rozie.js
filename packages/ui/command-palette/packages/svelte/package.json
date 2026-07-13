@@ -50,10 +50,14 @@
     "@rozie/runtime-svelte": "workspace:^"
   },
   "peerDependencies": {
-    "svelte": "^5"
+    "svelte": "^5",
+    "@rozie-ui/combobox-svelte": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "svelte": {
+      "optional": false
+    },
+    "@rozie-ui/combobox-svelte": {
       "optional": false
     }
   },

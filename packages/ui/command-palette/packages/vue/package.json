@@ -51,10 +51,14 @@
     "@rozie/runtime-vue": "workspace:^"
   },
   "peerDependencies": {
-    "vue": "^3.4"
+    "vue": "^3.4",
+    "@rozie-ui/combobox-vue": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "vue": {
+      "optional": false
+    },
+    "@rozie-ui/combobox-vue": {
       "optional": false
     }
   },

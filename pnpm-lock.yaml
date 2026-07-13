@@ -2542,6 +2542,9 @@ importers:
 
   packages/ui/command-palette/packages/angular:
     dependencies:
+      '@rozie-ui/combobox-angular':
+        specifier: ^0.1.0
+        version: link:../../../combobox/packages/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -2576,6 +2579,9 @@ importers:
       '@preact/signals-core':
         specifier: ^1.3.0
         version: 1.14.2
+      '@rozie-ui/combobox-lit':
+        specifier: ^0.1.0
+        version: link:../../../combobox/packages/lit
       '@rozie/runtime-lit':
         specifier: workspace:*
         version: link:../../../../runtime/lit
@@ -2585,6 +2591,9 @@ importers:
 
   packages/ui/command-palette/packages/react:
     dependencies:
+      '@rozie-ui/combobox-react':
+        specifier: ^0.1.0
+        version: link:../../../combobox/packages/react
       '@rozie/runtime-react':
         specifier: workspace:*
         version: link:../../../../runtime/react
@@ -2604,6 +2613,9 @@ importers:
 
   packages/ui/command-palette/packages/solid:
     dependencies:
+      '@rozie-ui/combobox-solid':
+        specifier: ^0.1.0
+        version: link:../../../combobox/packages/solid
       '@rozie/runtime-solid':
         specifier: workspace:*
         version: link:../../../../runtime/solid
@@ -2616,6 +2628,9 @@ importers:
 
   packages/ui/command-palette/packages/svelte:
     dependencies:
+      '@rozie-ui/combobox-svelte':
+        specifier: ^0.1.0
+        version: link:../../../combobox/packages/svelte
       '@rozie/runtime-svelte':
         specifier: workspace:^
         version: link:../../../../runtime/svelte
@@ -2638,6 +2653,9 @@ importers:
 
   packages/ui/command-palette/packages/vue:
     dependencies:
+      '@rozie-ui/combobox-vue':
+        specifier: ^0.1.0
+        version: link:../../../combobox/packages/vue
       '@rozie/runtime-vue':
         specifier: workspace:^
         version: link:../../../../runtime/vue
