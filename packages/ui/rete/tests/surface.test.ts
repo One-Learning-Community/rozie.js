@@ -169,11 +169,13 @@ describe('NodeType.rozie + Port.rozie surface gate', () => {
   const NODE_TYPE_SRC = readFileSync(resolve(HERE, '..', 'src', 'NodeType.rozie'), 'utf8');
   const PORT_SRC = readFileSync(resolve(HERE, '..', 'src', 'Port.rozie'), 'utf8');
 
-  it('NodeType has a single required `type` prop (no id/x/y) + provides rete:nodeType', () => {
+  it('NodeType has type + resizable/min/max props + provides rete:nodeType', () => {
     const { ast } = parse(NODE_TYPE_SRC, { filename: 'NodeType.rozie' });
     const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
     expect(ir.name).toBe('NodeType');
-    expect(ir.props.map((p: { name: string }) => p.name)).toEqual(['type']);
+    expect(ir.props.map((p: { name: string }) => p.name)).toEqual([
+      'type', 'resizable', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
+    ]);
     expect(NODE_TYPE_SRC).toContain("$provide('rete:nodeType'");
     expect(NODE_TYPE_SRC).toContain('registerType');
   });

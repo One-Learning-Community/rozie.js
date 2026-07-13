@@ -1486,6 +1486,12 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       if (existing && existing.element === element) {
         // in-place update — refresh chrome + reactive portal scope, leave sockets.
         existing.box.classList.toggle('is-selected', selected);
+        // NodeResizer (D-06/D-07): re-apply an explicit width/height as a fixed CSS
+        // box on every re-render; clear back to '' (auto-size) when meta no longer
+        // carries a size, so a double-click-reset (74-03) reverts a previously
+        // sized box on the very next render.
+        existing.box.style.width = meta.width != null ? meta.width + 'px' : '';
+        existing.box.style.height = meta.height != null ? meta.height + 'px' : '';
         if (existing.handle) {
           existing.handle.update({
             node: meta,
@@ -1502,6 +1508,12 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       element.innerHTML = '';
       const box = document.createElement('div');
       box.className = 'rozie-flow-node' + (selected ? ' is-selected' : '');
+      // NodeResizer (D-06/D-07): a graph node with an explicit width/height renders
+      // at that EXACT fixed CSS box size instead of auto-sizing from #body content.
+      // undefined/null (the default, never-resized state) skips the assignment
+      // entirely — CSS width/height stay `auto`, today's behavior unchanged.
+      if (meta.width != null) box.style.width = meta.width + 'px';
+      if (meta.height != null) box.style.height = meta.height + 'px';
       const body = document.createElement('div');
       body.className = 'rozie-flow-node__body';
 

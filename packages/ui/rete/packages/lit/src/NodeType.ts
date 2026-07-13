@@ -25,6 +25,26 @@ export default class NodeType extends SignalWatcher(LitElement) {
    * <NodeType type="source"><template #body="{ node }">{{ node.data.label }}</template></NodeType>
    */
   @property({ type: String, reflect: true }) type!: string;
+  /**
+   * Opt this node TYPE into corner-handle resizing (default OFF). When true, selecting a node of this type shows 4 corner drag handles (the React Flow <NodeResizer/> parity); dragging one persists an explicit node.width/node.height (a fixed box, D-07) that overrides auto-sizing for that node instance. A double-click on a handle resets the node back to auto-size.
+   */
+  @property({ type: Boolean, reflect: true }) resizable: boolean = false;
+  /**
+   * Minimum width (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
+   */
+  @property({ type: Number, reflect: true }) minWidth: number | null = null;
+  /**
+   * Minimum height (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
+   */
+  @property({ type: Number, reflect: true }) minHeight: number | null = null;
+  /**
+   * Maximum width (px) a resize gesture may grow this type to. Unset = unbounded growth.
+   */
+  @property({ type: Number, reflect: true }) maxWidth: number | null = null;
+  /**
+   * Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth.
+   */
+  @property({ type: Number, reflect: true }) maxHeight: number | null = null;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
 private __rozieCtxProvider_rete_nodeType = new ContextProvider(this, { context: __rozieCtx_rete_nodeType, initialValue: ((__rozieCtxHost) => ({
@@ -263,6 +283,13 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
       } catch (e: any) {}
     }
     return null;
-  }
+  },
+  // NodeResizer (D-14/D-17): carried into the canvas's typeReg registry so
+  // renderNode/the resize gesture can read resizable/min/max for this type.
+  resizable: this.resizable,
+  minWidth: this.minWidth,
+  minHeight: this.minHeight,
+  maxWidth: this.maxWidth,
+  maxHeight: this.maxHeight
 });
 }

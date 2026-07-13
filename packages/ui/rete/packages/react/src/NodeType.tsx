@@ -13,15 +13,43 @@ interface NodeTypeProps {
    * <NodeType type="source"><template #body="{ node }">{{ node.data.label }}</template></NodeType>
    */
   type: string;
+  /**
+   * Opt this node TYPE into corner-handle resizing (default OFF). When true, selecting a node of this type shows 4 corner drag handles (the React Flow <NodeResizer/> parity); dragging one persists an explicit node.width/node.height (a fixed box, D-07) that overrides auto-sizing for that node instance. A double-click on a handle resets the node back to auto-size.
+   */
+  resizable?: boolean;
+  /**
+   * Minimum width (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
+   */
+  minWidth?: (number) | null;
+  /**
+   * Minimum height (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
+   */
+  minHeight?: (number) | null;
+  /**
+   * Maximum width (px) a resize gesture may grow this type to. Unset = unbounded growth.
+   */
+  maxWidth?: (number) | null;
+  /**
+   * Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth.
+   */
+  maxHeight?: (number) | null;
   renderBody?: (ctx: BodyCtx) => ReactNode;
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
-export default function NodeType(props: NodeTypeProps): JSX.Element {
+export default function NodeType(_props: NodeTypeProps): JSX.Element {
   const canvas = useContext(rozieContext("rete:canvas"));
   const __ctx_rete_nodeType = rozieContext("rete:nodeType");
   const portalRoots = useRef<Set<Root>>(new Set());
+  const props: Omit<NodeTypeProps, 'resizable' | 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight'> & { resizable: boolean; minWidth: (number) | null; minHeight: (number) | null; maxWidth: (number) | null; maxHeight: (number) | null } = {
+    ..._props,
+    resizable: _props.resizable ?? false,
+    minWidth: _props.minWidth ?? null,
+    minHeight: _props.minHeight ?? null,
+    maxWidth: _props.maxWidth ?? null,
+    maxHeight: _props.maxHeight ?? null,
+  };
   const _renderBodyRef = useRef(props.renderBody);
   _renderBodyRef.current = props.renderBody;
   const mountBody = useRef<any>(null);
@@ -75,8 +103,15 @@ export default function NodeType(props: NodeTypeProps): JSX.Element {
         } catch (e: any) {}
       }
       return null;
-    }
-  }), [props.type]);
+    },
+    // NodeResizer (D-14/D-17): carried into the canvas's typeReg registry so
+    // renderNode/the resize gesture can read resizable/min/max for this type.
+    resizable: props.resizable,
+    minWidth: props.minWidth,
+    minHeight: props.minHeight,
+    maxWidth: props.maxWidth,
+    maxHeight: props.maxHeight
+  }), [props.maxHeight, props.maxWidth, props.minHeight, props.minWidth, props.resizable, props.type]);
 
   useEffect(() => {
     interface ReactivePortalHandle {

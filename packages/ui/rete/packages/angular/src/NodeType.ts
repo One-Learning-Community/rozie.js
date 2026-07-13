@@ -60,6 +60,26 @@ export class NodeType {
    * <NodeType type="source"><template #body="{ node }">{{ node.data.label }}</template></NodeType>
    */
   type = input.required<string>();
+  /**
+   * Opt this node TYPE into corner-handle resizing (default OFF). When true, selecting a node of this type shows 4 corner drag handles (the React Flow <NodeResizer/> parity); dragging one persists an explicit node.width/node.height (a fixed box, D-07) that overrides auto-sizing for that node instance. A double-click on a handle resets the node back to auto-size.
+   */
+  resizable = input<boolean>(false);
+  /**
+   * Minimum width (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
+   */
+  minWidth = input<(number) | null>(null);
+  /**
+   * Minimum height (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.
+   */
+  minHeight = input<(number) | null>(null);
+  /**
+   * Maximum width (px) a resize gesture may grow this type to. Unset = unbounded growth.
+   */
+  maxWidth = input<(number) | null>(null);
+  /**
+   * Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth.
+   */
+  maxHeight = input<(number) | null>(null);
   @ContentChild('body', { read: TemplateRef }) bodyTpl?: TemplateRef<BodyCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
@@ -229,7 +249,14 @@ export class NodeType {
         } catch (e: any) {}
       }
       return null;
-    }
+    },
+    // NodeResizer (D-14/D-17): carried into the canvas's typeReg registry so
+    // renderNode/the resize gesture can read resizable/min/max for this type.
+    resizable: this.resizable(),
+    minWidth: this.minWidth(),
+    minHeight: this.minHeight(),
+    maxWidth: this.maxWidth(),
+    maxHeight: this.maxHeight()
   });
 
   static ngTemplateContextGuard(
