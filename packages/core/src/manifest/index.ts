@@ -19,3 +19,9 @@ export type {
   RozieManifestSlot,
   RozieManifestSlotParam,
 } from './schema.js';
+// Phase 75 Plan 02 — the manifest-first producer-resolution seam (D-08/D-09/D-10).
+export { isPublishedSpecifier, resolveManifestProducer } from './resolveManifestProducer.js';
+export type {
+  ResolveManifestProducerArgs,
+  ResolveManifestProducerResult,
+} from './resolveManifestProducer.js';
