@@ -253,9 +253,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const resizeHandleSw = useRef<any>(null);
   const resizeHandleSe = useRef<any>(null);
   const syncResizerSelection = useRef<any>(null);
+  const resizeActiveHandleEl = useRef<any>(null);
   const pendingResizeSnapshot = useRef<any>(null);
   const resizeGestureActive = useRef(false);
-  const resizeActiveHandleEl = useRef<any>(null);
   const onResizeHandleMove = useRef<any>(null);
   const onResizeHandleUp = useRef<any>(null);
   const lastHandlePointerUpAt = useRef(-Infinity);
@@ -2928,6 +2928,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       const beginResize = (corner: any, handleEl: any) => (e: any) => {
         const id = resizerTrackedId.current;
         if (id == null) return;
+        // Re-entrancy guard (WR-01): a gesture is already in flight (a second pointerdown
+        // landed on another corner handle before the first gesture's pointerup) — ignore it
+        // rather than clobbering the shared onResizeHandleMove/onResizeHandleUp/
+        // resizeActiveHandleEl module-scope state and leaking the first handle's listeners.
+        if (resizeActiveHandleEl.current) return;
         const meta = nodeMeta.get(id);
         if (!meta) return;
         e.preventDefault();

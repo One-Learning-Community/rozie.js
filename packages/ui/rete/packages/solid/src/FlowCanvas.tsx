@@ -2196,6 +2196,11 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       const beginResize = (corner: any, handleEl: any) => (e: any) => {
         const id = resizerTrackedId;
         if (id == null) return;
+        // Re-entrancy guard (WR-01): a gesture is already in flight (a second pointerdown
+        // landed on another corner handle before the first gesture's pointerup) — ignore it
+        // rather than clobbering the shared onResizeHandleMove/onResizeHandleUp/
+        // resizeActiveHandleEl module-scope state and leaking the first handle's listeners.
+        if (resizeActiveHandleEl) return;
         const meta = nodeMeta.get(id);
         if (!meta) return;
         e.preventDefault();

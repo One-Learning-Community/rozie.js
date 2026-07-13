@@ -2585,6 +2585,11 @@ export class FlowCanvas {
       const beginResize = (corner: any, handleEl: any) => (e: any) => {
         const id = this.resizerTrackedId;
         if (id == null) return;
+        // Re-entrancy guard (WR-01): a gesture is already in flight (a second pointerdown
+        // landed on another corner handle before the first gesture's pointerup) — ignore it
+        // rather than clobbering the shared onResizeHandleMove/onResizeHandleUp/
+        // resizeActiveHandleEl module-scope state and leaking the first handle's listeners.
+        if (this.resizeActiveHandleEl) return;
         const meta = this.nodeMeta.get(id);
         if (!meta) return;
         e.preventDefault();
