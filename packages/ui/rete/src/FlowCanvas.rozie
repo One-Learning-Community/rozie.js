@@ -408,6 +408,41 @@ let toolbarDuplicateBtn = null
 let onToolbarDelete = null
 let onToolbarDup = null
 
+// Phase 74-03 — NodeResizer (D-05..D-17). Corner-anchored pointer-drag resize for a
+// SELECTED node whose TYPE was registered `resizable` (NodeType.rozie, 74-02). Follows
+// the SAME module-scope-not-$onMount-local discipline as the NodeToolbar/Marquee state
+// above (the Solid-hoisted teardown must still see these after $onMount returns).
+// `pendingResizeSizes` is the resize analog of `pendingDragPositions` — id → the latest
+// clamped `{ width, height, x?, y? }` during a gesture (`x`/`y` are set ONLY for a
+// west/north-anchored corner — nw/ne/sw — per the opposite-corner-anchored resize
+// semantics; `se` never touches position). `resizerTrackedId` is the SINGLE
+// selected+resizable node id the 4 handles currently track (the resize analog of
+// `toolbarSelectedId`) — null when nothing/multiple is selected or the selected node's
+// type isn't resizable. `resizeHandle{Nw,Ne,Sw,Se}` are the 4 overlay div refs.
+// `pendingResizeSnapshot` stashes the pre-gesture history snapshot on pointerdown
+// (mirrors `pendingDragSnapshot`) — committed on the FIRST clamp-changed pointermove,
+// not on pointerdown itself, so a pointerdown+pointerup with no move creates no history
+// entry. `lastHandlePointerUpAt` is a module-scope timestamp for double-click-via-
+// pointerup-timing detection (Rete swallows real clicks during node interaction — the
+// file's existing pointerup-not-click discipline, e.g. the NodeToolbar buttons above).
+const pendingResizeSizes = new Map()  // id → { width, height, x?, y? } (latest during a resize)
+let resizeFlushRaf = 0
+let resizeGestureActive = false
+let pendingResizeSnapshot = null
+let resizeHandleNw = null
+let resizeHandleNe = null
+let resizeHandleSw = null
+let resizeHandleSe = null
+let resizerTrackedId = null
+let resizerTrackRaf = 0
+let lastHandlePointerUpAt = 0
+// component-scope bridges to the $onMount-local trackResizer/syncResizerSelection,
+// mirroring scheduleToolbarTrack/syncToolbarSelection — called from
+// maybeEmitSelectionChange + the 3 area pipes (nodetranslated/translated/zoomed) so a
+// pick/unpick / pan / zoom / drag re-tracks the resize handles over the selected node.
+let scheduleResizerTrack = null
+let syncResizerSelection = null
+
 // MiniMap geometry (px) — MUST match the .rozie-flow-minimap CSS box below.
 const MINIMAP_W = 200
 const MINIMAP_H = 150
@@ -415,6 +450,10 @@ const MINIMAP_H = 150
 // first paint, REQ-30) — re-measured on the next render (the render pipe re-schedules).
 const MINIMAP_DEFAULT_NODE_W = 140
 const MINIMAP_DEFAULT_NODE_H = 52
+// Phase 74-03 (D-17) — the resize floor when a resizable NodeType declares no
+// minWidth/minHeight: a small sane default so an unconstrained drag can't shrink a
+// node to 0px (belt-and-suspenders with the double-click-to-auto-size reset, D-08).
+const RESIZE_MIN_FALLBACK = 40
 const SVGNS = 'http://www.w3.org/2000/svg'
 
 // One Socket shared by every port (Rete sockets gate compatibility by identity;
@@ -733,6 +772,62 @@ const scheduleDragFlush = () => {
     dragFlushRaf = 1
     Promise.resolve().then(flushDragWriteBack)
   }
+}
+
+// Phase 74-03 (D-09) — resize write-back triad, copying flushDragWriteBack/
+// scheduleDragFlush's Map-accumulate → one commitGraph per rAF frame → clear-map shape
+// verbatim (renamed drag→resize). `x`/`y` on a pending entry are OPTIONAL — present only
+// for a west/north-anchored corner (Task 2's pointermove handler), omitted for `se` — so
+// an `se`-only resize never touches the node's position.
+const flushResizeWriteBack = () => {
+  resizeFlushRaf = 0
+  if (programmatic) { pendingResizeSizes.clear(); return }
+  if (pendingResizeSizes.size === 0) return
+  const g = baseGraph()
+  const nodes = (g.nodes || []).map((n) => {
+    const p = n && n.id != null ? pendingResizeSizes.get(n.id) : null
+    if (!p) return n
+    const next = { ...n, width: p.width, height: p.height }
+    if (p.x != null) next.x = p.x
+    if (p.y != null) next.y = p.y
+    return next
+  })
+  pendingResizeSizes.clear()
+  commitGraph({ ...g, nodes })
+}
+
+const scheduleResizeFlush = () => {
+  if (resizeFlushRaf) return
+  if (typeof requestAnimationFrame === 'function') {
+    resizeFlushRaf = requestAnimationFrame(flushResizeWriteBack)
+  } else {
+    resizeFlushRaf = 1
+    Promise.resolve().then(flushResizeWriteBack)
+  }
+}
+
+// Phase 74-03 (D-16/D-17) — clamp a live resize delta to the type's declared
+// minWidth/minHeight/maxWidth/maxHeight, falling back to RESIZE_MIN_FALLBACK (40px)
+// when a bound isn't declared. Pure — reads only its own arguments.
+const clampResizeSize = (typeSpec, w, h) => {
+  const minW = (typeSpec && typeSpec.minWidth != null) ? typeSpec.minWidth : RESIZE_MIN_FALLBACK
+  const minH = (typeSpec && typeSpec.minHeight != null) ? typeSpec.minHeight : RESIZE_MIN_FALLBACK
+  const maxW = typeSpec && typeSpec.maxWidth != null ? typeSpec.maxWidth : Infinity
+  const maxH = typeSpec && typeSpec.maxHeight != null ? typeSpec.maxHeight : Infinity
+  return { width: Math.min(maxW, Math.max(minW, w)), height: Math.min(maxH, Math.max(minH, h)) }
+}
+
+// Phase 74-03 (D-08) — double-click-a-handle reset: clear a node's explicit
+// width/height back to undefined (auto-size), through the SAME pushHistory/baseGraph/
+// commitGraph path as every other write-back (one history entry, gated !readonly, D-10)
+// — never a special-cased direct $model.graph write.
+const resetNodeSize = (id) => {
+  if (programmatic) return
+  if (!$props.selectable || $props.readonly) return
+  pushHistory()
+  const g = baseGraph()
+  const nodes = (g.nodes || []).map((n) => (n && n.id === id ? { ...n, width: undefined, height: undefined } : n))
+  commitGraph({ ...g, nodes })
 }
 
 // CONNECT — append a fresh connection into a fresh graph object. Echo-guarded.
