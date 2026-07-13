@@ -57,7 +57,7 @@ with `$data.graph = { nodes: [{ id, type, x, y, data }], connections: [{ id?, so
 
 ### Node TYPE templates
 
-- **`<NodeType type="…">`** — declares a node TYPE **once**: its visible body (a named `#body` slot, scoped `{ node, selected, emit }`) plus its port schema (nested `<Port>` children). **Every** graph node whose `type` matches renders this template (render-by-type) and uses its ports. A `<NodeType>` carries **no** `id`/`x`/`y` — instance identity and position live in the bound `graph`, not on the tag.
+- **`<NodeType type="…">`** — declares a node TYPE **once**: its visible body (a named `#body` slot, scoped `{ node, selected, emit }`) plus its port schema (nested `<Port>` children). **Every** graph node whose `type` matches renders this template (render-by-type) and uses its ports. A `<NodeType>` carries **no** `id`/`x`/`y` — instance identity and position live in the bound `graph`, not on the tag. It also carries the opt-in `resizable` / `minWidth` / `minHeight` / `maxWidth` / `maxHeight` props that drive the [Node resizer](#node-resizer) corner handles.
 - **`<Port output="KEY" type="T" [multiple] [position]>` / `<Port input="KEY" type="T" [multiple] [position]>`** — declares one typed directional port on its enclosing `<NodeType>`. The **direction is derived from which attribute is set** (`output` ⇒ output port, `input` ⇒ input port), the key is its value, and `type` drives `:validate-types` (a type-mismatched connection is auto-rejected). Optional `label` / `multiple`. **`position="left|right|top|bottom"`** places the socket on that edge (default `input` → left, `output` → right); **`top`/`bottom` enable vertical flows** (decision trees, top-down pipelines) — the connection anchor tracks the chosen edge. Nests inside its `<NodeType>` and auto-binds via injected context (no type to wire by hand). _(The attrs are `input`/`output`, not `in`/`out` — `in` is a JS reserved word that Svelte's `$props()` destructure rejects.)_
 
 **Why the node body is a named `#body` slot, not bare children.** A node body has to *teleport* into the node element the Rete engine creates — it does not render in the normal component tree. Rozie mounts it through a portal, which gives it a fresh render-root inside the engine-owned host. A portal render-root has no tree ancestor, so context-consuming children placed inside it would not resolve their `$inject` on five of six targets (context is tree-scoped on React/Vue/Svelte/Solid/Lit). Separating the teleported body (`<template #body>`) from the context-consuming `<Port>` children (which stay in the normal child position) is therefore the correct cross-framework shape — so the body must be the `#body` slot, not a bare default-slot child.
@@ -277,6 +277,42 @@ Set **`:node-toolbar="true"`** to float a small toolbar over the single selected
     <button @click="emit('delete')">✕</button>
   </template>
 </FlowCanvas>
+```
+
+### Node resizer
+
+Opt a node **TYPE** into corner-handle resizing (the React Flow `<NodeResizer/>` parity) with **`<NodeType resizable>`**:
+
+```html
+<FlowCanvas r-model:graph="$data.graph">
+  <NodeType type="card" resizable :min-width="160" :min-height="80" :max-width="480">
+    <template #body="{ node }">{{ node.data.label }}</template>
+    <Port output="out" type="any" />
+  </NodeType>
+</FlowCanvas>
+```
+
+Selecting a node of a `resizable` type shows **4 corner drag handles**. Dragging one persists an explicit `node.width` / `node.height` (a fixed box that overrides the node's normal auto-sizing) back through the two-way `graph` model, coalesced through the same `rAF`-batched write-back path as everything else. Each corner resizes **anchored on the opposite corner** — dragging `se` (bottom-right) grows the node while the top-left corner stays put; dragging `nw` grows it while the bottom-right corner stays put (and so on for `ne` / `sw`), matching the React Flow `NodeResizer` semantics.
+
+`<NodeType>` accepts four optional bound props to constrain the drag:
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `resizable` | `Boolean` | `false` | Opt this node TYPE into corner-handle resizing. Default OFF — zero drift for every existing `<NodeType>` that never declares it. |
+| `minWidth` | `Number` | `null` | Minimum width (px) a resize gesture may shrink this type to. Falls back to a small sane default (**40px**) when `resizable` is true and this is unset, so a node can never be dragged to 0px. |
+| `minHeight` | `Number` | `null` | Minimum height (px) a resize gesture may shrink this type to. Same 40px fallback. |
+| `maxWidth` | `Number` | `null` | Maximum width (px) a resize gesture may grow this type to. Unset = unbounded growth. |
+| `maxHeight` | `Number` | `null` | Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth. |
+
+A misconfigured `maxWidth` / `maxHeight` **below** the effective `minWidth` / `minHeight` never wins silently — the min bound always takes precedence, and the component logs a one-time `console.warn` per type so the misconfiguration is visible during development.
+
+**Double-click a handle to reset** a node back to auto-size, clearing its explicit `width` / `height` so the node returns to its natural content-driven size on the next render. (Rete swallows native `click`/`dblclick` events during node interaction, so this is detected by timing two stationary handle releases within 400ms — a genuine drag never counts as a "click".) Like every other edit, the reset goes through the same controlled-graph write-back path and is one undoable gesture (`:history`-gated).
+
+```js
+$data.graph = {
+  nodes: [{ id: 'n1', type: 'card', x: 0, y: 0, width: 320, height: 180, data: { label: 'Card' } }],
+  connections: [],
+}
 ```
 
 ### Auto-layout
