@@ -38,11 +38,13 @@
       "require": "./dist/index.cjs"
     },
     "./source": "./src/Combobox.ts",
-    "./themes/*": "./src/themes/*"
+    "./themes/*": "./src/themes/*",
+    "./rozie-manifest.json": "./rozie-manifest.json"
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "rozie-manifest.json"
   ],
   "dependencies": {
     "@rozie/runtime-lit": "workspace:*"

@@ -37,11 +37,13 @@
     "./source": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
-    }
+    },
+    "./rozie-manifest.json": "./rozie-manifest.json"
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "rozie-manifest.json"
   ],
   "module": "./dist/fesm2022/rozie-ui-combobox-angular.mjs",
   "types": "./dist/index.d.ts",

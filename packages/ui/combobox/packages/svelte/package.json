@@ -38,11 +38,13 @@
     "./source": {
       "svelte": "./src/Combobox.svelte",
       "default": "./src/Combobox.svelte"
-    }
+    },
+    "./rozie-manifest.json": "./rozie-manifest.json"
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "rozie-manifest.json"
   ],
   "dependencies": {
     "@rozie/runtime-svelte": "workspace:^"

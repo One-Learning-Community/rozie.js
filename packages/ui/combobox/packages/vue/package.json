@@ -38,11 +38,13 @@
     "./source": {
       "vue": "./src/Combobox.vue",
       "default": "./src/Combobox.vue"
-    }
+    },
+    "./rozie-manifest.json": "./rozie-manifest.json"
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "rozie-manifest.json"
   ],
   "sideEffects": false,
   "dependencies": {
