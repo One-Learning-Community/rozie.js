@@ -2155,3 +2155,163 @@ for (const target of TARGETS) {
     expect(defaultBg).toBe(dotsBg);
   });
 }
+
+/**
+ * rete-flow-resize — Phase 74 (D-05/D-08/D-09/D-10/D-15/D-16): the NodeResizer
+ * corner-handle interaction (the React Flow `<NodeResizer/>` parity).
+ *
+ * Loader → examples/demos/FlowCanvasResizeDemo.rozie: a single `resizable` `note` node
+ * (`min-width="80"` / `min-height="60"` / `max-width="400"` / `max-height="300"`) + an
+ * `undo-btn`, plus bound-model `node-width`/`node-height` readouts (default the literal
+ * string `'auto'` when the node has no explicit size).
+ *
+ * Proves on all 6:
+ *
+ *   1. SELECTION-GATED VISIBILITY — the 4 corner handles (`flow-resize-handle-{nw,ne,
+ *      sw,se}`) are HIDDEN before any node is selected; selecting the node makes all 4
+ *      VISIBLE, with the `se` handle sitting at the node's bottom-right corner.
+ *   2. DRAG-TO-RESIZE WRITE-BACK — dragging the `se` handle outward changes the BOUND
+ *      `node-width`/`node-height` readouts from `'auto'` to specific larger numbers
+ *      (SETTLED — the write-back is rAF-coalesced, D-09).
+ *   3. UNDO — clicking `undo-btn` reverts both readouts back to `'auto'` (D-10, one
+ *      resize gesture = one undo step).
+ *   4. DOUBLE-CLICK RESET — re-resizing the node then double-clicking (two rapid
+ *      pointerup cycles within the handle's timing-window double-click detection) the
+ *      `se` handle ALSO reverts both readouts to `'auto'` (D-08) — a SECOND, independent
+ *      proof of the reset path, distinct from the undo assertion above.
+ *
+ * Asserts the SETTLED readouts only. Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-resize [${target}]: selection-gated corner handles drag-resize the bound graph; undo and double-click both reset to auto`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasResize&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(1);
+
+    const widthReadout = page.getByTestId('node-width');
+    const heightReadout = page.getByTestId('node-height');
+    const readWidth = async (): Promise<string> => (await widthReadout.textContent())?.trim() ?? '';
+    const readHeight = async (): Promise<string> => (await heightReadout.textContent())?.trim() ?? '';
+    await expect(widthReadout).toHaveText('auto');
+    await expect(heightReadout).toHaveText('auto');
+
+    const nwHandle = page.getByTestId('flow-resize-handle-nw');
+    const neHandle = page.getByTestId('flow-resize-handle-ne');
+    const swHandle = page.getByTestId('flow-resize-handle-sw');
+    const seHandle = page.getByTestId('flow-resize-handle-se');
+
+    // ---- 1a. HIDDEN before any node is selected ----
+    await expect(nwHandle).toBeHidden();
+    await expect(neHandle).toBeHidden();
+    await expect(swHandle).toBeHidden();
+    await expect(seHandle).toBeHidden();
+
+    // ---- select the node (click near its center, away from any edge) ----
+    const node = page.locator('.rozie-flow-node').first();
+    await expect(node).toBeVisible({ timeout: 10_000 });
+    const nb0 = await node.boundingBox();
+    if (!nb0) throw new Error('node bounding box unavailable');
+    await page.mouse.click(nb0.x + nb0.width / 2, nb0.y + nb0.height / 2);
+    await expect(page.locator('.rozie-flow-node.is-selected')).toHaveCount(1, { timeout: 5_000 });
+
+    // ---- 1b. VISIBLE post-selection; se sits at the node's bottom-right corner ----
+    await expect(seHandle).toBeVisible({ timeout: 5_000 });
+    await expect(nwHandle).toBeVisible();
+    await expect(neHandle).toBeVisible();
+    await expect(swHandle).toBeVisible();
+
+    const nb1 = await node.boundingBox();
+    const seBox1 = await seHandle.boundingBox();
+    if (!nb1 || !seBox1) throw new Error('node / se-handle bounding box unavailable');
+    const seCx1 = seBox1.x + seBox1.width / 2;
+    const seCy1 = seBox1.y + seBox1.height / 2;
+    expect(Math.abs(seCx1 - (nb1.x + nb1.width)), 'se handle x not at the node right edge').toBeLessThan(20);
+    expect(Math.abs(seCy1 - (nb1.y + nb1.height)), 'se handle y not at the node bottom edge').toBeLessThan(20);
+
+    // ---- 2. DRAG-TO-RESIZE: drag the se handle outward → bound width/height change ----
+    const DX = 60;
+    const DY = 40;
+    await page.mouse.move(seCx1, seCy1);
+    await page.mouse.down();
+    await page.mouse.move(seCx1 + DX / 2, seCy1 + DY / 2, { steps: 6 });
+    await page.mouse.move(seCx1 + DX, seCy1 + DY, { steps: 6 });
+    await page.mouse.up();
+
+    await expect
+      .poll(readWidth, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .not.toBe('auto');
+    await expect
+      .poll(readHeight, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .not.toBe('auto');
+
+    // settle, then capture the resized values.
+    await page.waitForTimeout(400);
+    const resizedWidth = Number(await readWidth());
+    const resizedHeight = Number(await readHeight());
+    expect(resizedWidth).toBeGreaterThan(80);
+    expect(resizedHeight).toBeGreaterThan(60);
+    await page.waitForTimeout(300);
+    expect(await readWidth(), 'width readout must be settled (no echo loop)').toBe(String(resizedWidth));
+    expect(await readHeight(), 'height readout must be settled (no echo loop)').toBe(String(resizedHeight));
+
+    // ---- 3. UNDO: one click reverts BOTH readouts back to 'auto' ----
+    await page.getByTestId('undo-btn').click();
+    await expect
+      .poll(readWidth, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('auto');
+    await expect
+      .poll(readHeight, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('auto');
+    await page.waitForTimeout(300);
+    expect(await readWidth(), 'undo must hold at auto (no oscillation)').toBe('auto');
+    expect(await readHeight(), 'undo must hold at auto (no oscillation)').toBe('auto');
+
+    // ---- 4. DOUBLE-CLICK RESET: re-drag to re-establish a size, then double-click se ----
+    // (re-read the handle's live position — undo may have reverted the box size).
+    const seBox2 = await seHandle.boundingBox();
+    if (!seBox2) throw new Error('se-handle bounding box unavailable (post-undo)');
+    const seCx2 = seBox2.x + seBox2.width / 2;
+    const seCy2 = seBox2.y + seBox2.height / 2;
+    await page.mouse.move(seCx2, seCy2);
+    await page.mouse.down();
+    await page.mouse.move(seCx2 + DX / 2, seCy2 + DY / 2, { steps: 6 });
+    await page.mouse.move(seCx2 + DX, seCy2 + DY, { steps: 6 });
+    await page.mouse.up();
+
+    await expect
+      .poll(readWidth, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .not.toBe('auto');
+    await page.waitForTimeout(400);
+
+    // double-click (via timing-window pointerup pairing — §resetNodeSize) the se handle
+    // at its NEW resized position: two rapid full down/up cycles at the same point.
+    const seBox3 = await seHandle.boundingBox();
+    if (!seBox3) throw new Error('se-handle bounding box unavailable (post re-resize)');
+    const seCx3 = seBox3.x + seBox3.width / 2;
+    const seCy3 = seBox3.y + seBox3.height / 2;
+    await page.mouse.click(seCx3, seCy3);
+    await page.mouse.click(seCx3, seCy3);
+
+    await expect
+      .poll(readWidth, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('auto');
+    await expect
+      .poll(readHeight, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('auto');
+    await page.waitForTimeout(300);
+    expect(await readWidth(), 'double-click reset must hold at auto').toBe('auto');
+    expect(await readHeight(), 'double-click reset must hold at auto').toBe('auto');
+  });
+}

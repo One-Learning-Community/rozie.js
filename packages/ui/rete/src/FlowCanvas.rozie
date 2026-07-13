@@ -2927,6 +2927,13 @@ $watch(() => $props.graph, () => {
   }
   // graph changed (nodes added/removed/moved) → refresh the minimap node rects.
   if (scheduleMinimapRedraw) scheduleMinimapRedraw()
+  // Phase 74-04 fix: a graph change can resize the tracked node's box WITHOUT going
+  // through rete's own translate/zoom pipe — the resize write-back (flushResizeWriteBack),
+  // an undo/redo restore, and an external consumer edit all land here. Without this, the 4
+  // corner handles stay stuck at their pre-change screen position (only re-tracking on the
+  // NEXT unrelated node-move/pan/zoom/selection-change) instead of following the box like
+  // the minimap rects above already do.
+  if (scheduleResizerTrack) scheduleResizerTrack()
 })
 $watch(() => $data.portReg, () => {
   if (reconcileNodes) {

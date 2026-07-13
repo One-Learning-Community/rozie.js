@@ -224,6 +224,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const pendingDragSnapshot = useRef<any>(null);
   const edgeClickGuard = useRef(false);
   const scheduleToolbarTrack = useRef<any>(null);
+  const scheduleResizerTrack = useRef<any>(null);
   const reconcileConnections = useRef<any>(null);
   const reconcileNodes = useRef<any>(null);
   const reconcileNodesRunning = useRef(false);
@@ -245,6 +246,23 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const toolbarDuplicateBtn = useRef<any>(null);
   const onToolbarDelete = useRef<any>(null);
   const onToolbarDup = useRef<any>(null);
+  const resizerTrackRaf = useRef(0);
+  const resizerTrackedId = useRef<any>(null);
+  const resizeHandleNw = useRef<any>(null);
+  const resizeHandleNe = useRef<any>(null);
+  const resizeHandleSw = useRef<any>(null);
+  const resizeHandleSe = useRef<any>(null);
+  const syncResizerSelection = useRef<any>(null);
+  const pendingResizeSnapshot = useRef<any>(null);
+  const resizeGestureActive = useRef(false);
+  const resizeActiveHandleEl = useRef<any>(null);
+  const onResizeHandleMove = useRef<any>(null);
+  const onResizeHandleUp = useRef<any>(null);
+  const lastHandlePointerUpAt = useRef(0);
+  const onResizeNwDown = useRef<any>(null);
+  const onResizeNeDown = useRef<any>(null);
+  const onResizeSwDown = useRef<any>(null);
+  const onResizeSeDown = useRef<any>(null);
   const marqueeBox = useRef<any>(null);
   const marqueeStart = useRef<any>(null);
   const marqueeCur = useRef<any>(null);
@@ -259,6 +277,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const selfWriteInFlight = useRef(false);
   const selectedPathEl = useRef<any>(null);
   const lastSelectionIds = useRef<any>(null);
+  const resizeFlushRaf = useRef(0);
   const [graph, setGraph] = useControllableState({
     value: props.graph,
     defaultValue: props.defaultGraph ?? (() => ({
@@ -292,16 +311,25 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const canvasEl = useRef<HTMLDivElement | null>(null);
   const minimapEl = useRef<HTMLDivElement | null>(null);
   const marqueeEl = useRef<HTMLDivElement | null>(null);
+  const resizeHandleNwEl = useRef<HTMLDivElement | null>(null);
+  const resizeHandleNeEl = useRef<HTMLDivElement | null>(null);
+  const resizeHandleSwEl = useRef<HTMLDivElement | null>(null);
+  const resizeHandleSeEl = useRef<HTMLDivElement | null>(null);
   const toolbarEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
   const _watch2First = useRef(true);
   const _watch3First = useRef(true);
 
+  const pendingResizeSizes = useMemo(() => new Map(), []);
   const MINIMAP_W = useMemo(() => 200, []);
   const MINIMAP_H = useMemo(() => 150, []);
   const MINIMAP_DEFAULT_NODE_W = useMemo(() => 140, []);
   const MINIMAP_DEFAULT_NODE_H = useMemo(() => 52, []);
+  // Phase 74-03 (D-17) — the resize floor when a resizable NodeType declares no
+  // minWidth/minHeight: a small sane default so an unconstrained drag can't shrink a
+  // node to 0px (belt-and-suspenders with the double-click-to-auto-size reset, D-08).
+  const RESIZE_MIN_FALLBACK = 40;
   const SVGNS = useMemo(() => 'http://www.w3.org/2000/svg', []);
   const SOCKET = useMemo(() => new ClassicPreset.Socket('flow'), []);
   const nodeInstances = useMemo(() => new Map(), []);
@@ -460,6 +488,66 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       Promise.resolve().then(flushDragWriteBack);
     }
   }, [flushDragWriteBack]);
+  function flushResizeWriteBack() {
+    resizeFlushRaf.current = 0;
+    if (programmatic.current) {
+      pendingResizeSizes.clear();
+      return;
+    }
+    if (pendingResizeSizes.size === 0) return;
+    const g = baseGraph();
+    const nodes = (g.nodes || []).map((n: any) => {
+      const p = n && n.id != null ? pendingResizeSizes.get(n.id) : null;
+      if (!p) return n;
+      const next = {
+        ...n,
+        width: p.width,
+        height: p.height
+      };
+      if (p.x != null) next.x = p.x;
+      if (p.y != null) next.y = p.y;
+      return next;
+    });
+    pendingResizeSizes.clear();
+    commitGraph({
+      ...g,
+      nodes
+    });
+  }
+  const scheduleResizeFlush = useCallback(() => {
+    if (resizeFlushRaf.current) return;
+    if (typeof requestAnimationFrame === 'function') {
+      resizeFlushRaf.current = requestAnimationFrame(flushResizeWriteBack);
+    } else {
+      resizeFlushRaf.current = 1;
+      Promise.resolve().then(flushResizeWriteBack);
+    }
+  }, [flushResizeWriteBack]);
+  const clampResizeSize = useCallback((typeSpec: any, w: any, h: any) => {
+    const minW = typeSpec && typeSpec.minWidth != null ? typeSpec.minWidth : RESIZE_MIN_FALLBACK;
+    const minH = typeSpec && typeSpec.minHeight != null ? typeSpec.minHeight : RESIZE_MIN_FALLBACK;
+    const maxW = typeSpec && typeSpec.maxWidth != null ? typeSpec.maxWidth : Infinity;
+    const maxH = typeSpec && typeSpec.maxHeight != null ? typeSpec.maxHeight : Infinity;
+    return {
+      width: Math.min(maxW, Math.max(minW, w)),
+      height: Math.min(maxH, Math.max(minH, h))
+    };
+  }, []);
+  const resetNodeSize = useCallback((id: any) => {
+    if (programmatic.current) return;
+    if (!props.selectable || props.readonly) return;
+    pushHistory();
+    const g = baseGraph();
+    const nodes = (g.nodes || []).map((n: any) => n && n.id === id ? {
+      ...n,
+      width: undefined,
+      height: undefined
+    } : n);
+    commitGraph({
+      ...g,
+      nodes
+    });
+  }, [baseGraph, commitGraph, props.readonly, props.selectable, pushHistory]);
   const writeBackConnectionCreated = useCallback((c: any) => {
     if (programmatic.current) return;
     // T1.3 — one history entry per CONNECT gesture (BEFORE the write so the snapshot is the
@@ -600,6 +688,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // T2.8 — the selection changed → re-track the NodeToolbar (it follows the single
     // selected node; hides on multi-select / empty selection). No-op when :node-toolbar off.
     if (syncToolbarSelection.current) syncToolbarSelection.current();
+    // Phase 74-03 — the selected set changed → re-track the NodeResizer handles (follows
+    // the single selected+resizable node; hides on multi-select / empty / non-resizable).
+    if (syncResizerSelection.current) syncResizerSelection.current();
   }
   const scheduleSelectionEmit = useCallback(() => {
     Promise.resolve().then(maybeEmitSelectionChange);
@@ -2157,6 +2248,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         if (scheduleMinimapRedraw.current) scheduleMinimapRedraw.current();
         // T2.8 — the selected node moved → re-track its toolbar overlay (no-op if off).
         if (scheduleToolbarTrack.current) scheduleToolbarTrack.current();
+        // Phase 74-03 — the resized/selected node moved → re-track its handles.
+        if (scheduleResizerTrack.current) scheduleResizerTrack.current();
       } else if (context.type === 'translated') {
         props.onTranslated && props.onTranslated({
           x: context.data.position.x,
@@ -2166,6 +2259,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         if (scheduleMinimapRedraw.current) scheduleMinimapRedraw.current();
         // T2.8 — a pan shifts the node's screen rect → re-track the toolbar (no-op if off).
         if (scheduleToolbarTrack.current) scheduleToolbarTrack.current();
+        // Phase 74-03 — a pan shifts the tracked node's screen rect → re-track the handles.
+        if (scheduleResizerTrack.current) scheduleResizerTrack.current();
       } else if (context.type === 'zoomed') {
         if (!programmatic.current) {
           const k = area.current.area.transform.k;
@@ -2175,6 +2270,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         if (scheduleMinimapRedraw.current) scheduleMinimapRedraw.current();
         // T2.8 — a zoom changes the node's screen rect/size → re-track the toolbar (no-op if off).
         if (scheduleToolbarTrack.current) scheduleToolbarTrack.current();
+        // Phase 74-03 — a zoom changes the tracked node's screen rect/size → re-track the handles.
+        if (scheduleResizerTrack.current) scheduleResizerTrack.current();
       } else if (context.type === 'contextmenu') {
         // suppress the native browser menu over the canvas; surface a hook instead.
         context.data.event.preventDefault();
@@ -2741,6 +2838,200 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       }
     }
 
+    // ─── Phase 74-03 NodeResizer (D-05..D-17, per-NodeType opt-in, selection-gated) ─
+    // 4 corner drag handles over the SINGLE selected node whose TYPE was registered
+    // resizable (typeReg[type].resizable, 74-02's NodeType.rozie declaration). Unlike
+    // NodeToolbar there is NO canvas-level opt-in prop (D-14) — the handles render
+    // UNCONDITIONALLY in the template (like the marquee box) and script-level
+    // display:none/block is the true gate (singleResizableSelectedId() below). Positioned
+    // from the engine node-view element's live rect exactly like trackToolbar
+    // (getBoundingClientRect() minus the container's rect — no manual transform math),
+    // just for 4 corner points instead of 1.
+
+    // Resolve the SINGLE selected+resizable node id the handles should track — the resize
+    // analog of singleSelectedNodeId, additionally gated on the type's `resizable` flag.
+    const singleResizableSelectedId = () => {
+      const id = singleSelectedNodeId();
+      if (id == null) return null;
+      const meta = nodeMeta.get(id);
+      const typeSpec = meta && meta.type != null ? _typeRegRef.current[meta.type] : null;
+      return typeSpec && typeSpec.resizable ? id : null;
+    };
+    const positionHandle = (el: any, corner: any, half: any) => {
+      el.style.left = corner[0] - half + 'px';
+      el.style.top = corner[1] - half + 'px';
+      el.style.display = 'block';
+    };
+    // Position the 4 handles over the tracked node's engine element, or hide all 4. Same
+    // getBoundingClientRect()-minus-container-rect discipline as trackToolbar.
+    const trackResizer = () => {
+      resizerTrackRaf.current = 0;
+      const id = resizerTrackedId.current;
+      const handles = [resizeHandleNw.current, resizeHandleNe.current, resizeHandleSw.current, resizeHandleSe.current];
+      if (id == null || !area.current || !container || handles.some((h: any) => !h)) {
+        for (const h of handles as any) {
+          if (h) h.style.display = 'none';
+        }
+        return;
+      }
+      const view = area.current.nodeViews ? area.current.nodeViews.get(id) : null;
+      const el = view && view.element ? view.element : null;
+      const rect = el && typeof el.getBoundingClientRect === 'function' ? el.getBoundingClientRect() : null;
+      if (!rect) {
+        for (const h of handles as any) h.style.display = 'none';
+        return;
+      }
+      const cbox = container.getBoundingClientRect();
+      const nx = rect.left - cbox.left;
+      const ny = rect.top - cbox.top;
+      const HALF = 4;
+      positionHandle(resizeHandleNw.current, [nx, ny], HALF);
+      positionHandle(resizeHandleNe.current, [nx + rect.width, ny], HALF);
+      positionHandle(resizeHandleSw.current, [nx, ny + rect.height], HALF);
+      positionHandle(resizeHandleSe.current, [nx + rect.width, ny + rect.height], HALF);
+    };
+    // NOTE (Rule-1 deviation from the plan's literal guard text): scheduleResizerTrack does
+    // NOT early-return on `resizerTrackedId == null` (unlike scheduleToolbarTrack's
+    // `!$props.nodeToolbar` prop guard) — there is no canvas-level prop to gate on here, and
+    // gating on the tracked id itself would mean a DESELECT (id -> null) never schedules
+    // trackResizer, leaving the 4 handles stuck visible at their last position. Only the
+    // in-flight-rAF guard remains; trackResizer's own id==null branch does the hiding.
+    scheduleResizerTrack.current = () => {
+      if (resizerTrackRaf.current) return;
+      if (typeof requestAnimationFrame === 'function') {
+        resizerTrackRaf.current = requestAnimationFrame(trackResizer);
+      } else {
+        resizerTrackRaf.current = 1;
+        Promise.resolve().then(trackResizer);
+      }
+    };
+    // Recompute the tracked node from the live selection (called from the selection emit).
+    syncResizerSelection.current = () => {
+      const id = singleResizableSelectedId();
+      if (id === resizerTrackedId.current) {
+        scheduleResizerTrack.current();
+        return;
+      }
+      resizerTrackedId.current = id;
+      scheduleResizerTrack.current();
+    };
+    if (props.selectable && !props.readonly && container && typeof container.addEventListener === 'function') {
+      resizeHandleNw.current = resizeHandleNwEl.current || null;
+      resizeHandleNe.current = resizeHandleNeEl.current || null;
+      resizeHandleSw.current = resizeHandleSwEl.current || null;
+      resizeHandleSe.current = resizeHandleSeEl.current || null;
+
+      // Build the pointerdown gesture-start handler for one corner. `corner` is
+      // 'nw'|'ne'|'sw'|'se'; `handleEl` is that corner's overlay div (the pointer-capture +
+      // pointermove/pointerup target — a resize handle is NOT a rete-owned element, so no
+      // capture-phase interception of rete's own pan Drag is needed, unlike the marquee).
+      const beginResize = (corner: any, handleEl: any) => (e: any) => {
+        const id = resizerTrackedId.current;
+        if (id == null) return;
+        const meta = nodeMeta.get(id);
+        if (!meta) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const startW = meta.width != null ? meta.width : measureNodeSize(id).w;
+        const startH = meta.height != null ? meta.height : measureNodeSize(id).h;
+        const startX = meta.x || 0;
+        const startY = meta.y || 0;
+        const startClientX = e.clientX;
+        const startClientY = e.clientY;
+        try {
+          if (handleEl.setPointerCapture && e.pointerId != null) handleEl.setPointerCapture(e.pointerId);
+        } catch (err: any) {}
+        // T1.3-style pre-gesture stash — NOT pushed yet (mirrors pendingDragSnapshot). The
+        // FIRST clamp-changed pointermove commits it (a pointerdown+pointerup with no move
+        // never creates a history entry).
+        if (!programmatic.current && props.history !== false) {
+          pendingResizeSnapshot.current = snapshotCurrent();
+        }
+        resizeGestureActive.current = false;
+        resizeActiveHandleEl.current = handleEl;
+        onResizeHandleMove.current = (me: any) => {
+          const k = area.current && area.current.area && area.current.area.transform && area.current.area.transform.k || 1;
+          const dx = (me.clientX - startClientX) / k;
+          const dy = (me.clientY - startClientY) / k;
+          let w = startW;
+          let h = startH;
+          if (corner === 'se') {
+            w = startW + dx;
+            h = startH + dy;
+          } else if (corner === 'sw') {
+            w = startW - dx;
+            h = startH + dy;
+          } else if (corner === 'ne') {
+            w = startW + dx;
+            h = startH - dy;
+          } else {
+            w = startW - dx;
+            h = startH - dy;
+          } // nw
+          const typeSpec = meta.type != null ? _typeRegRef.current[meta.type] : null;
+          const clamped = clampResizeSize(typeSpec, w, h);
+          const pending = pendingResizeSizes.get(id);
+          const changed = !pending || pending.width !== clamped.width || pending.height !== clamped.height;
+          if (changed && !resizeGestureActive.current) {
+            resizeGestureActive.current = true;
+            if (pendingResizeSnapshot.current) {
+              pushHistorySnapshot(pendingResizeSnapshot.current);
+              pendingResizeSnapshot.current = null;
+            }
+          }
+          // Opposite-corner-anchored resize (React Flow NodeResizer semantics, D-15/D-16):
+          // a west corner (nw/sw) also shifts x so the EAST edge stays put; a north corner
+          // (nw/ne) also shifts y so the SOUTH edge stays put. `se` never touches x/y.
+          const next = {
+            width: clamped.width,
+            height: clamped.height
+          };
+          if (corner === 'nw' || corner === 'sw') next.x = startX + (startW - clamped.width);
+          if (corner === 'nw' || corner === 'ne') next.y = startY + (startH - clamped.height);
+          pendingResizeSizes.set(id, next);
+          scheduleResizeFlush();
+        };
+        onResizeHandleUp.current = (ue: any) => {
+          try {
+            if (handleEl.releasePointerCapture && ue && ue.pointerId != null) handleEl.releasePointerCapture(ue.pointerId);
+          } catch (err: any) {}
+          if (resizeActiveHandleEl.current && onResizeHandleMove.current) {
+            try {
+              resizeActiveHandleEl.current.removeEventListener('pointermove', onResizeHandleMove.current);
+            } catch (err: any) {}
+          }
+          if (resizeActiveHandleEl.current && onResizeHandleUp.current) {
+            try {
+              resizeActiveHandleEl.current.removeEventListener('pointerup', onResizeHandleUp.current);
+            } catch (err: any) {}
+          }
+          onResizeHandleMove.current = null;
+          onResizeHandleUp.current = null;
+          resizeActiveHandleEl.current = null;
+          resizeGestureActive.current = false;
+          pendingResizeSnapshot.current = null;
+          // Double-click-via-pointerup-timing (Rete swallows real clicks during node
+          // interaction — the file's existing pointerup-not-click discipline, §6a item-7).
+          const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+          if (now - lastHandlePointerUpAt.current < 400) {
+            resetNodeSize(id);
+          } else {
+            lastHandlePointerUpAt.current = now;
+          }
+        };
+        handleEl.addEventListener('pointermove', onResizeHandleMove.current);
+        handleEl.addEventListener('pointerup', onResizeHandleUp.current);
+      };
+      onResizeNwDown.current = beginResize('nw', resizeHandleNw.current);
+      onResizeNeDown.current = beginResize('ne', resizeHandleNe.current);
+      onResizeSwDown.current = beginResize('sw', resizeHandleSw.current);
+      onResizeSeDown.current = beginResize('se', resizeHandleSe.current);
+      if (resizeHandleNw.current) resizeHandleNw.current.addEventListener('pointerdown', onResizeNwDown.current);
+      if (resizeHandleNe.current) resizeHandleNe.current.addEventListener('pointerdown', onResizeNeDown.current);
+      if (resizeHandleSw.current) resizeHandleSw.current.addEventListener('pointerdown', onResizeSwDown.current);
+      if (resizeHandleSe.current) resizeHandleSe.current.addEventListener('pointerdown', onResizeSeDown.current);
+    }
+
     // ─── T2.4 MARQUEE select (mode:'select') ─────────────────────────────────────
     // A Figma-style rubber-band box. RESTORE-PATH resolution (RESEARCH Q2/A8): rete's
     // internal `Drag` class is NOT exported, so setDragHandler(null) can't be cleanly
@@ -2974,6 +3265,59 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         } catch (e: any) {}
       }
       toolbarTrackRaf.current = 0;
+      // Phase 74-03 NodeResizer teardown — remove the 4 persistent pointerdown listeners,
+      // remove any still-attached in-flight pointermove/pointerup (a gesture was live at
+      // unmount), cancel both pending rAFs, clear the pending-size map, and reset tracking
+      // state — matching the NodeToolbar/Marquee teardown block's structure exactly.
+      if (resizeHandleNw.current && onResizeNwDown.current) {
+        try {
+          resizeHandleNw.current.removeEventListener('pointerdown', onResizeNwDown.current);
+        } catch (e: any) {}
+      }
+      if (resizeHandleNe.current && onResizeNeDown.current) {
+        try {
+          resizeHandleNe.current.removeEventListener('pointerdown', onResizeNeDown.current);
+        } catch (e: any) {}
+      }
+      if (resizeHandleSw.current && onResizeSwDown.current) {
+        try {
+          resizeHandleSw.current.removeEventListener('pointerdown', onResizeSwDown.current);
+        } catch (e: any) {}
+      }
+      if (resizeHandleSe.current && onResizeSeDown.current) {
+        try {
+          resizeHandleSe.current.removeEventListener('pointerdown', onResizeSeDown.current);
+        } catch (e: any) {}
+      }
+      if (resizeActiveHandleEl.current && onResizeHandleMove.current) {
+        try {
+          resizeActiveHandleEl.current.removeEventListener('pointermove', onResizeHandleMove.current);
+        } catch (e: any) {}
+      }
+      if (resizeActiveHandleEl.current && onResizeHandleUp.current) {
+        try {
+          resizeActiveHandleEl.current.removeEventListener('pointerup', onResizeHandleUp.current);
+        } catch (e: any) {}
+      }
+      onResizeHandleMove.current = null;
+      onResizeHandleUp.current = null;
+      resizeActiveHandleEl.current = null;
+      if (resizerTrackRaf.current && typeof cancelAnimationFrame === 'function') {
+        try {
+          cancelAnimationFrame(resizerTrackRaf.current);
+        } catch (e: any) {}
+      }
+      resizerTrackRaf.current = 0;
+      if (resizeFlushRaf.current && typeof cancelAnimationFrame === 'function') {
+        try {
+          cancelAnimationFrame(resizeFlushRaf.current);
+        } catch (e: any) {}
+      }
+      resizeFlushRaf.current = 0;
+      pendingResizeSizes.clear();
+      resizerTrackedId.current = null;
+      pendingResizeSnapshot.current = null;
+      resizeGestureActive.current = false;
       // T2.4 Marquee teardown — remove the capture-phase pointerdown guard + window listeners.
       if (keydownContainer.current) {
         if (onCanvasPointerDownCapture.current) {
@@ -3034,6 +3378,13 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     }
     // graph changed (nodes added/removed/moved) → refresh the minimap node rects.
     if (scheduleMinimapRedraw.current) scheduleMinimapRedraw.current();
+    // Phase 74-04 fix: a graph change can resize the tracked node's box WITHOUT going
+    // through rete's own translate/zoom pipe — the resize write-back (flushResizeWriteBack),
+    // an undo/redo restore, and an external consumer edit all land here. Without this, the 4
+    // corner handles stay stuck at their pre-change screen position (only re-tracking on the
+    // NEXT unrelated node-move/pan/zoom/selection-change) instead of following the box like
+    // the minimap rects above already do.
+    if (scheduleResizerTrack.current) scheduleResizerTrack.current();
   }, [graph]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
@@ -3127,6 +3478,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         <button type="button" className={"rozie-flow-controls__btn"} data-testid="flow-fit" aria-label="Fit view" onClick={controlFit} data-rozie-s-cd396d6a="">&#9744;</button>
         
         {!!(props.marquee) && <button type="button" className={clsx("rozie-flow-controls__btn", { "is-active": mode === 'select' })} data-testid="flow-mode" aria-label={rozieAttr(mode === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} onClick={toggleMode} data-rozie-s-cd396d6a="">{rozieDisplay(mode === 'select' ? '▢' : '✥')}</button>}</div>}{!!(props.minimap) && <div className={"rozie-flow-minimap"} ref={minimapEl} data-testid="flow-minimap" data-rozie-s-cd396d6a="" />}<div className={"rozie-flow-marquee"} ref={marqueeEl} data-testid="flow-marquee" data-rozie-s-cd396d6a="" />
+      
+      <div className={"rozie-flow-resize-handle rozie-flow-resize-handle--nw"} ref={resizeHandleNwEl} data-testid="flow-resize-handle-nw" data-rozie-s-cd396d6a="" />
+      <div className={"rozie-flow-resize-handle rozie-flow-resize-handle--ne"} ref={resizeHandleNeEl} data-testid="flow-resize-handle-ne" data-rozie-s-cd396d6a="" />
+      <div className={"rozie-flow-resize-handle rozie-flow-resize-handle--sw"} ref={resizeHandleSwEl} data-testid="flow-resize-handle-sw" data-rozie-s-cd396d6a="" />
+      <div className={"rozie-flow-resize-handle rozie-flow-resize-handle--se"} ref={resizeHandleSeEl} data-testid="flow-resize-handle-se" data-rozie-s-cd396d6a="" />
       
       {!!(props.nodeToolbar) && <div className={"rozie-flow-toolbar"} ref={toolbarEl} data-testid="flow-toolbar" data-rozie-s-cd396d6a="" />}</div>
 

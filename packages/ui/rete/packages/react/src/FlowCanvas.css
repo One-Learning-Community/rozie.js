@@ -26,6 +26,7 @@
     --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
     --rozie-flow-minimap-node-fill: #64748b;
     --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
+    --rozie-flow-resize-handle-bg: #1e293b;
     --rozie-flow-toolbar-bg: #1e293b;
     --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
     --rozie-flow-toolbar-btn-bg: #334155;
@@ -105,6 +106,22 @@
   border: 1px solid var(--rozie-flow-marquee-border, var(--rozie-flow-accent, #3b82f6));
   border-radius: 2px;
 }
+.rozie-flow-resize-handle[data-rozie-s-cd396d6a] {
+  position: absolute;
+  display: none;
+  z-index: 12;
+  width: var(--rozie-flow-resize-handle-size, 8px);
+  height: var(--rozie-flow-resize-handle-size, 8px);
+  background: var(--rozie-flow-resize-handle-bg, #ffffff);
+  border: 1px solid var(--rozie-flow-resize-handle-border, var(--rozie-flow-accent, #3b82f6));
+  border-radius: 2px;
+  pointer-events: auto;
+  touch-action: none;
+}
+.rozie-flow-resize-handle--nw[data-rozie-s-cd396d6a] { cursor: nwse-resize; }
+.rozie-flow-resize-handle--ne[data-rozie-s-cd396d6a] { cursor: nesw-resize; }
+.rozie-flow-resize-handle--sw[data-rozie-s-cd396d6a] { cursor: nesw-resize; }
+.rozie-flow-resize-handle--se[data-rozie-s-cd396d6a] { cursor: nwse-resize; }
 .rozie-flow-minimap[data-rozie-s-cd396d6a] {
   position: absolute;
   right: 10px;

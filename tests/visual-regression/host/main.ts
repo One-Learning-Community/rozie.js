@@ -459,6 +459,15 @@ export const EXAMPLES = [
   // untouched default FlowCanvas demo's computed background equals the `dots` variant's
   // (D-02 byte-identity at the rendered-CSS level). Behavioral-only — not a screenshot cell.
   'FlowCanvasBackground',
+  // Phase 74 (D-05/D-08/D-09/D-10/D-15/D-16, NodeResizer) — FlowCanvasResize is the
+  // BEHAVIORAL cell (loader → examples/demos/FlowCanvasResizeDemo.rozie): a single
+  // `resizable` `note` node (min 80x60 / max 400x300) + an `undo-btn`, plus bound-model
+  // `node-width`/`node-height` readouts (default `'auto'`). The spec (rete-flow-resize)
+  // asserts the 4 corner handles are hidden pre-selection and visible+positioned
+  // post-selection, a corner-drag write-back changes the readouts (settled), undo reverts
+  // them to `'auto'`, and a handle double-click on a freshly re-resized node ALSO resets to
+  // `'auto'`. Behavioral-only; NOT a screenshot cell.
+  'FlowCanvasResize',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -1180,6 +1189,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasConnectEnd: 'rozie-flow-canvas-connect-end',
   // Phase 74 background-variant cell — '-demo' appended → 'rozie-flow-canvas-background-demo'.
   FlowCanvasBackground: 'rozie-flow-canvas-background',
+  // Phase 74 NodeResizer cell — '-demo' appended → 'rozie-flow-canvas-resize-demo'.
+  FlowCanvasResize: 'rozie-flow-canvas-resize',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -1571,6 +1582,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // local `background` state toggled by its own buttons). No parent props; no MODEL_PROPS
   // entry (`background` is one-way, driven internally, not a model).
   FlowCanvasBackground: {},
+  // Phase 74 — FlowCanvasResizeDemo is self-contained (seeds its own single resizable
+  // node; graph/zoom bound internally — the FlowCanvas precedent). No parent props.
+  FlowCanvasResize: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not
