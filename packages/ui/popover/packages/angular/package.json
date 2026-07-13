@@ -36,11 +36,13 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./themes/*": "./src/themes/*"
+    "./themes/*": "./src/themes/*",
+    "./rozie-manifest.json": "./rozie-manifest.json"
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "rozie-manifest.json"
   ],
   "peerDependencies": {
     "@angular/core": "^19 || ^20 || ^21",

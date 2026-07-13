@@ -30,7 +30,7 @@
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { buildManifest, compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -177,8 +177,9 @@ export { default } from './${componentName}.vue';
       default: `./src/${componentName}.vue`,
     },
     './themes/*': './src/themes/*',
+    './rozie-manifest.json': './rozie-manifest.json',
   };
-  pkg.files = ['dist', 'src'];
+  pkg.files = ['dist', 'src', 'rozie-manifest.json'];
   pkg.sideEffects = false;
   pkg.scripts = {
     ...pkg.scripts,
@@ -213,6 +214,11 @@ function main() {
   // (2) parse + lower ONCE for the doc tables.
   const { ast } = parse(source, { filename: FILENAME });
   const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
+
+  // Published-primitive manifest — derived ONCE from the same IR. The bytes are
+  // target-agnostic, so the SAME manifestJson is written into all 6 leaf roots.
+  const manifest = buildManifest(ir);
+  const manifestJson = JSON.stringify(manifest, null, 2) + '\n';
 
   // Keep the hand-kept manifests in lockstep with the IR.
   for (const ev of ir.emits) {
@@ -289,8 +295,14 @@ function main() {
     // Vendor the repo LICENSE into each published leaf.
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
+    // Published-primitive manifest at the LEAF PACKAGE ROOT (sibling to
+    // package.json, NOT under src/) — byte-identical across all 6 leaves.
+    writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'rozie-manifest.json'), manifestJson);
+
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ internal/ + themes/)`);
+    console.log(
+      `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ internal/ + themes/ + rozie-manifest.json)`,
+    );
   }
 
   // (6) ENFORCE docs props-table validation against docs/components/popover.md.

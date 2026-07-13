@@ -36,11 +36,13 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     },
-    "./themes/*": "./src/themes/*"
+    "./themes/*": "./src/themes/*",
+    "./rozie-manifest.json": "./rozie-manifest.json"
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "rozie-manifest.json"
   ],
   "dependencies": {
     "@rozie/runtime-solid": "workspace:*"

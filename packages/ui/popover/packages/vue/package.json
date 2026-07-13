@@ -29,7 +29,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "rozie-manifest.json"
   ],
   "dependencies": {
     "@rozie/runtime-vue": "workspace:^"
@@ -63,7 +64,8 @@
       "vue": "./src/Popover.vue",
       "default": "./src/Popover.vue"
     },
-    "./themes/*": "./src/themes/*"
+    "./themes/*": "./src/themes/*",
+    "./rozie-manifest.json": "./rozie-manifest.json"
   },
   "sideEffects": false,
   "devDependencies": {

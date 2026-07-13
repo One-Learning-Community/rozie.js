@@ -37,11 +37,13 @@
       "svelte": "./src/Popover.svelte",
       "default": "./src/Popover.svelte"
     },
-    "./themes/*": "./src/themes/*"
+    "./themes/*": "./src/themes/*",
+    "./rozie-manifest.json": "./rozie-manifest.json"
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "rozie-manifest.json"
   ],
   "dependencies": {
     "@rozie/runtime-svelte": "workspace:^"
