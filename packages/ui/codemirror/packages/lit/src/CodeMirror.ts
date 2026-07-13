@@ -156,7 +156,7 @@ export default class CodeMirror extends SignalWatcher(LitElement) {
    */
   @property({ type: Array }) extensions: any[] = [];
   /**
-   * When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. **Construction-time only:** read once when the editor is built (no compartment), so toggling it at runtime requires a re-mount — set it as a fixed prop, do not flip it live.
+   * When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. Runtime-updatable via a `baselineCompartment` reconfigure — toggling it swaps the bundle live, no remount required.
    */
   @property({ type: Boolean, reflect: true }) basicSetup: boolean = false;
   /**
@@ -711,7 +711,7 @@ private _portalContainers = new Set<HTMLElement>();
     this.rebuildDecorationExt = () => makeDecorationExt(portals.decoration);
     const buildState = (doc: any) => EditorState.create({
       doc,
-      extensions: [...this.baselineExt(), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly)), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), this.topPanelCompartment.of(topPanelExt()),
+      extensions: [this.baselineCompartment.of(this.baselineExt()), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly)), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), this.topPanelCompartment.of(topPanelExt()),
       // gutter / decoration — the REACTIVE MULTI-INSTANCE portal slots (G5 wave
       // 2). Each lives in a compartment so its driving prop (gutterLines /
       // decorations) reconfigures live; the factory captures the per-target
@@ -766,6 +766,12 @@ private _portalContainers = new Set<HTMLElement>();
         effects: this.extensionsCompartment.reconfigure(v)
       });
     })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('basicSetup'))) { const __watchVal = (() => this.basicSetup)(); (() => {
+      if (!this.view) return;
+      this.view.dispatch({
+        effects: this.baselineCompartment.reconfigure(this.baselineExt())
+      });
+    })(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('gutterLines'))) { const __watchVal = (() => this.gutterLines)(); (() => {
       if (!this.view || !this.rebuildGutterExt) return;
       this.view.dispatch({
@@ -819,6 +825,8 @@ private _portalContainers = new Set<HTMLElement>();
   view: any = null;
 
   suppressEmit = false;
+
+  baselineCompartment = new Compartment();
 
   langCompartment = new Compartment();
 

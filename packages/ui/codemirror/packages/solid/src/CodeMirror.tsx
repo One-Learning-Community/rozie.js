@@ -138,7 +138,7 @@ interface CodeMirrorProps {
    */
   extensions?: any[];
   /**
-   * When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. **Construction-time only:** read once when the editor is built (no compartment), so toggling it at runtime requires a re-mount — set it as a fixed prop, do not flip it live.
+   * When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. Runtime-updatable via a `baselineCompartment` reconfigure — toggling it swaps the bundle live, no remount required.
    */
   basicSetup?: boolean;
   /**
@@ -571,7 +571,7 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
     rebuildDecorationExt = () => makeDecorationExt(portals.decoration);
     const buildState = (doc: any) => EditorState.create({
       doc,
-      extensions: [...baselineExt(), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(local.readOnly)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), topPanelCompartment.of(topPanelExt()),
+      extensions: [baselineCompartment.of(baselineExt()), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(local.readOnly)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), topPanelCompartment.of(topPanelExt()),
       // gutter / decoration — the REACTIVE MULTI-INSTANCE portal slots (G5 wave
       // 2). Each lives in a compartment so its driving prop (gutterLines /
       // decorations) reconfigures live; the factory captures the per-target
@@ -628,6 +628,12 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
       effects: extensionsCompartment.reconfigure(v)
     });
   })(v)), { defer: true }));
+  createEffect(on(() => (() => local.basicSetup)(), (v) => untrack(() => (() => {
+    if (!view) return;
+    view.dispatch({
+      effects: baselineCompartment.reconfigure(baselineExt())
+    });
+  })()), { defer: true }));
   createEffect(on(() => (() => local.gutterLines)(), (v) => untrack(() => (() => {
     if (!view || !rebuildGutterExt) return;
     view.dispatch({
@@ -654,6 +660,7 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
   // `view.dispatch({ effects: compartment.reconfigure(newExt) })` without
   // rebuilding the entire EditorState. Each runtime-updatable prop gets one so
   // prop changes don't lose cursor/history/scroll position.
+  const baselineCompartment = new Compartment();
   const langCompartment = new Compartment();
   const themeCompartment = new Compartment();
   const readOnlyCompartment = new Compartment();
@@ -727,8 +734,9 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
   // lint gutter, richer keymaps — it ALREADY includes line numbers + history, so
   // the manual trio would double those up). When off, keep the exact thin
   // baseline the wrapper shipped before G1 (line numbers + history + default/
-  // history keymaps) → existing consumers stay byte-stable. Read at buildState
-  // time only — no compartment (see the basicSetup prop note).
+  // history keymaps) → existing consumers stay byte-stable. Composed through
+  // `baselineCompartment` (see below) so the `$watch(basicSetup)` reconfigure
+  // can swap the bundle live.
   function baselineExt() {
     return local.basicSetup ? [basicSetupBundle] : [lineNumbers(), history(), keymap.of([...defaultKeymap, ...historyKeymap])];
   }

@@ -89,7 +89,7 @@ interface CodeMirrorProps {
    */
   extensions?: any[];
   /**
-   * When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. **Construction-time only:** read once when the editor is built (no compartment), so toggling it at runtime requires a re-mount — set it as a fixed prop, do not flip it live.
+   * When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. Runtime-updatable via a `baselineCompartment` reconfigure — toggling it swaps the bundle live, no remount required.
    */
   basicSetup?: boolean;
   /**
@@ -178,7 +178,9 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   const _watch5First = useRef(true);
   const _watch6First = useRef(true);
   const _watch7First = useRef(true);
+  const _watch8First = useRef(true);
 
+  const baselineCompartment = useMemo(() => new Compartment(), []);
   const langCompartment = useMemo(() => new Compartment(), []);
   const themeCompartment = useMemo(() => new Compartment(), []);
   const readOnlyCompartment = useMemo(() => new Compartment(), []);
@@ -708,7 +710,7 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
     rebuildDecorationExt.current = () => makeDecorationExt(portals.decoration);
     const buildState = (doc: any) => EditorState.create({
       doc,
-      extensions: [...baselineExt(), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(_readOnlyRef.current)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), topPanelCompartment.of(topPanelExt()),
+      extensions: [baselineCompartment.of(baselineExt()), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(_readOnlyRef.current)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), topPanelCompartment.of(topPanelExt()),
       // gutter / decoration — the REACTIVE MULTI-INSTANCE portal slots (G5 wave
       // 2). Each lives in a compartment so its driving prop (gutterLines /
       // decorations) reconfigures live; the factory captures the per-target
@@ -780,13 +782,20 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   }, [props.extensions]);
   useEffect(() => {
     if (_watch6First.current) { _watch6First.current = false; return; }
+    if (!view.current) return;
+    view.current.dispatch({
+      effects: baselineCompartment.reconfigure(baselineExt())
+    });
+  }, [props.basicSetup]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch7First.current) { _watch7First.current = false; return; }
     if (!view.current || !rebuildGutterExt.current) return;
     view.current.dispatch({
       effects: gutterCompartment.reconfigure(rebuildGutterExt.current())
     });
   }, [props.gutterLines]);
   useEffect(() => {
-    if (_watch7First.current) { _watch7First.current = false; return; }
+    if (_watch8First.current) { _watch8First.current = false; return; }
     if (!view.current || !rebuildDecorationExt.current) return;
     view.current.dispatch({
       effects: decorationCompartment.reconfigure(rebuildDecorationExt.current())

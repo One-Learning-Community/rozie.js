@@ -188,7 +188,7 @@ export class CodeMirror {
    */
   extensions = input<any[]>((() => [])());
   /**
-   * When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. **Construction-time only:** read once when the editor is built (no compartment), so toggling it at runtime requires a re-mount — set it as a fixed prop, do not flip it live.
+   * When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. Runtime-updatable via a `baselineCompartment` reconfigure — toggling it swaps the bundle live, no remount required.
    */
   basicSetup = input<boolean>(false);
   /**
@@ -222,6 +222,7 @@ export class CodeMirror {
   private __rozieWatchInitial_5 = true;
   private __rozieWatchInitial_6 = true;
   private __rozieWatchInitial_7 = true;
+  private __rozieWatchInitial_8 = true;
 
   constructor() {
     effect(() => { const __watchVal = (() => this.value())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => this.writeDoc(v))(__watchVal); }); });
@@ -255,13 +256,19 @@ export class CodeMirror {
         effects: this.extensionsCompartment.reconfigure(v)
       });
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.gutterLines())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.basicSetup())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => {
+      if (!this.view) return;
+      this.view.dispatch({
+        effects: this.baselineCompartment.reconfigure(this.baselineExt())
+      });
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.gutterLines())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => {
       if (!this.view || !this.rebuildGutterExt) return;
       this.view.dispatch({
         effects: this.gutterCompartment.reconfigure(this.rebuildGutterExt())
       });
     })(); }); });
-    effect(() => { const __watchVal = (() => this.decorations())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.decorations())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => {
       if (!this.view || !this.rebuildDecorationExt) return;
       this.view.dispatch({
         effects: this.decorationCompartment.reconfigure(this.rebuildDecorationExt())
@@ -725,7 +732,7 @@ export class CodeMirror {
     this.rebuildDecorationExt = () => makeDecorationExt(portals.decoration);
     const buildState = (doc: any) => EditorState.create({
       doc,
-      extensions: [...this.baselineExt(), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly())), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), this.topPanelCompartment.of(topPanelExt()),
+      extensions: [this.baselineCompartment.of(this.baselineExt()), this.langCompartment.of(this.langExt()), this.themeCompartment.of(this.themeExt()), this.readOnlyCompartment.of(EditorState.readOnly.of(this.readOnly())), this.placeholderCompartment.of(this.phExt()), this.panelCompartment.of(panelExt()), this.topPanelCompartment.of(topPanelExt()),
       // gutter / decoration — the REACTIVE MULTI-INSTANCE portal slots (G5 wave
       // 2). Each lives in a compartment so its driving prop (gutterLines /
       // decorations) reconfigures live; the factory captures the per-target
@@ -756,6 +763,7 @@ export class CodeMirror {
 
   view: any = null;
   suppressEmit = false;
+  baselineCompartment = new Compartment();
   langCompartment = new Compartment();
   themeCompartment = new Compartment();
   readOnlyCompartment = new Compartment();
