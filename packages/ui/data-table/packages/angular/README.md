@@ -8,7 +8,7 @@ Idiomatic **angular** `DataTable` — a headless, fully-accessible (WAI-ARIA) da
 npm i @rozie-ui/data-table-angular
 ```
 
-Peer dependencies: `@angular/core + @angular/common + @angular/forms + @tanstack/table-core + @tanstack/virtual-core + @floating-ui/dom`. Install them alongside this package.
+Peer dependencies: `@angular/core + @angular/common + @angular/forms + @tanstack/table-core + @tanstack/virtual-core + @rozie-ui/popover-angular`. Install them alongside this package.
 
 ## Usage
 

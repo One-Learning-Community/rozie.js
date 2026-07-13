@@ -52,7 +52,7 @@
     "svelte": "^5",
     "@tanstack/table-core": "^8.21",
     "@tanstack/virtual-core": "^3",
-    "@floating-ui/dom": "^1.7.2"
+    "@rozie-ui/popover-svelte": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "svelte": {
@@ -64,7 +64,7 @@
     "@tanstack/virtual-core": {
       "optional": false
     },
-    "@floating-ui/dom": {
+    "@rozie-ui/popover-svelte": {
       "optional": false
     }
   },
@@ -80,7 +80,6 @@
     "**/*.css"
   ],
   "devDependencies": {
-    "@floating-ui/dom": "^1.7.2",
     "@sveltejs/package": "^2",
     "@sveltejs/vite-plugin-svelte": "^5",
     "svelte": "^5",

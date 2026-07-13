@@ -8,7 +8,7 @@ Idiomatic **vue** `DataTable` — a headless, fully-accessible (WAI-ARIA) data t
 npm i @rozie-ui/data-table-vue
 ```
 
-Peer dependencies: `vue + @tanstack/table-core + @tanstack/virtual-core + @floating-ui/dom`. Install them alongside this package.
+Peer dependencies: `vue + @tanstack/table-core + @tanstack/virtual-core + @rozie-ui/popover-vue`. Install them alongside this package.
 
 ## Usage
 

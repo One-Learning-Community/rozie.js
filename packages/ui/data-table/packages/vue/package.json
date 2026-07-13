@@ -52,7 +52,7 @@
     "vue": "^3.4",
     "@tanstack/table-core": "^8.21",
     "@tanstack/virtual-core": "^3",
-    "@floating-ui/dom": "^1.7.2"
+    "@rozie-ui/popover-vue": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "vue": {
@@ -64,7 +64,7 @@
     "@tanstack/virtual-core": {
       "optional": false
     },
-    "@floating-ui/dom": {
+    "@rozie-ui/popover-vue": {
       "optional": false
     }
   },
@@ -82,7 +82,6 @@
   "devDependencies": {
     "@tanstack/table-core": "^8.21",
     "@tanstack/virtual-core": "^3",
-    "@floating-ui/dom": "^1.7.2",
     "@vitejs/plugin-vue": "^6",
     "vite": "^8",
     "vite-plugin-css-injected-by-js": "^5",

@@ -52,7 +52,7 @@
     "solid-js": "^1.8",
     "@tanstack/table-core": "^8.21",
     "@tanstack/virtual-core": "^3",
-    "@floating-ui/dom": "^1.7.2"
+    "@rozie-ui/popover-solid": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "solid-js": {
@@ -64,13 +64,11 @@
     "@tanstack/virtual-core": {
       "optional": false
     },
-    "@floating-ui/dom": {
+    "@rozie-ui/popover-solid": {
       "optional": false
     }
   },
-  "devDependencies": {
-    "@floating-ui/dom": "^1.7.2"
-  },
+  "devDependencies": {},
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit"

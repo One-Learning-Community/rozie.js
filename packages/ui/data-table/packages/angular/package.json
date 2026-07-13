@@ -50,7 +50,7 @@
     "@angular/forms": "^19 || ^20 || ^21",
     "@tanstack/table-core": "^8.21",
     "@tanstack/virtual-core": "^3",
-    "@floating-ui/dom": "^1.7.2"
+    "@rozie-ui/popover-angular": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@angular/core": {
@@ -68,7 +68,7 @@
     "@tanstack/virtual-core": {
       "optional": false
     },
-    "@floating-ui/dom": {
+    "@rozie-ui/popover-angular": {
       "optional": false
     }
   },
@@ -94,7 +94,6 @@
     "@angular/compiler-cli": "^19",
     "@angular/core": "^19",
     "@angular/forms": "^19",
-    "@floating-ui/dom": "^1.7.2",
     "ng-packagr": "^19",
     "typescript": "~5.6.0"
   }

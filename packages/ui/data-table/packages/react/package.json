@@ -52,7 +52,7 @@
     "react-dom": "^18.2 || ^19",
     "@tanstack/table-core": "^8.21",
     "@tanstack/virtual-core": "^3",
-    "@floating-ui/dom": "^1.7.2"
+    "@rozie-ui/popover-react": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "react": {
@@ -67,12 +67,11 @@
     "@tanstack/virtual-core": {
       "optional": false
     },
-    "@floating-ui/dom": {
+    "@rozie-ui/popover-react": {
       "optional": false
     }
   },
   "devDependencies": {
-    "@floating-ui/dom": "^1.7.2",
     "@types/react": "^18",
     "@types/react-dom": "^18"
   },

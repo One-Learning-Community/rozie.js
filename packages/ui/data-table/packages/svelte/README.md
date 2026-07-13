@@ -8,7 +8,7 @@ Idiomatic **svelte** `DataTable` — a headless, fully-accessible (WAI-ARIA) dat
 npm i @rozie-ui/data-table-svelte
 ```
 
-Peer dependencies: `svelte + @tanstack/table-core + @tanstack/virtual-core + @floating-ui/dom`. Install them alongside this package.
+Peer dependencies: `svelte + @tanstack/table-core + @tanstack/virtual-core + @rozie-ui/popover-svelte`. Install them alongside this package.
 
 ## Usage
 
