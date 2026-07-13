@@ -872,6 +872,16 @@ export const RozieErrorCode = {
   KEYNAV_BAD_FOCUS_MODEL: 'ROZ985', // error — missing/unrecognized r-keynav focus-model argument (valid: tabindex, activedescendant)
   KEYNAV_MULTIPLE_ROOTS: 'ROZ986', // error — more than one r-keynav root in one component (v1 = one group per component; named groups deferred)
   KEYNAV_SOURCE_UNRESOLVED: 'ROZ987', // error — r-keynav :source neither provided nor synthesizable from a co-located r-for
+
+  // ---- Phase 75 published-primitive manifest — ROZ988..ROZ989 ----
+  // Cross-package published-leaf composition (Option A). `buildManifest`/
+  // `parseManifest` validate the schema-versioned `rozie-manifest.json`
+  // contract an installed `@rozie-ui`-shaped package ships alongside its
+  // compiled leaf. Both codes fail closed (D-04) — parseManifest never
+  // silently degrades on a mismatched or malformed manifest. ROZ987 is the
+  // verified current highest (Phase 71 r-keynav) — these do NOT collide.
+  MANIFEST_SCHEMA_VERSION_MISMATCH: 'ROZ988', // error — installed primitive manifest schemaVersion incompatible with the compiler's MANIFEST_SCHEMA_VERSION (D-04)
+  MALFORMED_MANIFEST: 'ROZ989', // error — manifest JSON is not an object, or is missing/mistyped a required field (props/slots/emits/expose/schemaVersion)
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];
