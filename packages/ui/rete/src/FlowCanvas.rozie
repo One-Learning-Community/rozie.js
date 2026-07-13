@@ -3502,6 +3502,28 @@ $expose({
   border-radius: 2px;
 }
 
+/* Phase 74-03 (D-05..D-17) — NodeResizer's 4 corner drag handles. COMPONENT-template
+   overlay DOM (carries the [data-rozie-s-*] scope attr → plain scoped CSS, like the
+   marquee box / Controls / NodeToolbar — NOT the :root engine-DOM escape hatch).
+   Positioned imperatively (left/top) by trackResizer; hidden until a resizable node is
+   selected (opt-in is per-NodeType, D-14 — there is no canvas-level prop to r-if on). */
+.rozie-flow-resize-handle {
+  position: absolute;
+  display: none;
+  z-index: 12;
+  width: var(--rozie-flow-resize-handle-size, 8px);
+  height: var(--rozie-flow-resize-handle-size, 8px);
+  background: var(--rozie-flow-resize-handle-bg, #ffffff);
+  border: 1px solid var(--rozie-flow-resize-handle-border, var(--rozie-flow-accent, #3b82f6));
+  border-radius: 2px;
+  pointer-events: auto;
+  touch-action: none;
+}
+.rozie-flow-resize-handle--nw { cursor: nwse-resize; }
+.rozie-flow-resize-handle--ne { cursor: nesw-resize; }
+.rozie-flow-resize-handle--sw { cursor: nesw-resize; }
+.rozie-flow-resize-handle--se { cursor: nwse-resize; }
+
 /* built-in MiniMap overlay (Phase 42) — COMPONENT-template host div, so plain scoped
    CSS positions it (it carries the [data-rozie-s-*] scope attr). The inner SVG is built
    imperatively + styled with INLINE attributes (the arrowhead-marker discipline), so no
@@ -3600,6 +3622,7 @@ $expose({
     --rozie-flow-minimap-border: rgba(255, 255, 255, 0.14);
     --rozie-flow-minimap-node-fill: #64748b;
     --rozie-flow-minimap-mask: rgba(0, 0, 0, 0.35);
+    --rozie-flow-resize-handle-bg: #1e293b;
     --rozie-flow-toolbar-bg: #1e293b;
     --rozie-flow-toolbar-border: rgba(255, 255, 255, 0.14);
     --rozie-flow-toolbar-btn-bg: #334155;
