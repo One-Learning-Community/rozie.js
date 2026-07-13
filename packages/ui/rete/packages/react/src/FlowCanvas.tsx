@@ -330,6 +330,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // minWidth/minHeight: a small sane default so an unconstrained drag can't shrink a
   // node to 0px (belt-and-suspenders with the double-click-to-auto-size reset, D-08).
   const RESIZE_MIN_FALLBACK = 40;
+  // WR-02: types whose maxWidth/maxHeight has already been warned-about as inverted
+  // (below the effective minWidth/minHeight) — a one-time-per-type warning, not a
+  // per-pointermove spam during a live resize drag.
+  const clampInversionWarnedTypes = useMemo(() => new Set(), []);
   const SVGNS = useMemo(() => 'http://www.w3.org/2000/svg', []);
   const SOCKET = useMemo(() => new ClassicPreset.Socket('flow'), []);
   const nodeInstances = useMemo(() => new Map(), []);
@@ -526,8 +530,32 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const clampResizeSize = useCallback((typeSpec: any, w: any, h: any) => {
     const minW = typeSpec && typeSpec.minWidth != null ? typeSpec.minWidth : RESIZE_MIN_FALLBACK;
     const minH = typeSpec && typeSpec.minHeight != null ? typeSpec.minHeight : RESIZE_MIN_FALLBACK;
-    const maxW = typeSpec && typeSpec.maxWidth != null ? typeSpec.maxWidth : Infinity;
-    const maxH = typeSpec && typeSpec.maxHeight != null ? typeSpec.maxHeight : Infinity;
+    let maxW = typeSpec && typeSpec.maxWidth != null ? typeSpec.maxWidth : Infinity;
+    let maxH = typeSpec && typeSpec.maxHeight != null ? typeSpec.maxHeight : Infinity;
+    // WR-02: a misconfigured maxWidth/maxHeight below the effective minWidth/minHeight
+    // (e.g. a typo'd `<NodeType resizable :min-width="200" :max-width="100">`) must
+    // never silently win over the documented min floor — the min bound always wins, and
+    // the misconfiguration is surfaced via a one-time-per-type console.warn rather than
+    // silently clamping every resize below the declared minimum.
+    const typeKey = typeSpec && typeSpec.type != null ? typeSpec.type : null;
+    if (maxW < minW) {
+      if (typeKey != null && !clampInversionWarnedTypes.has(`${typeKey}:width`)) {
+        clampInversionWarnedTypes.add(`${typeKey}:width`);
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn(`[@rozie-ui/rete] NodeType "${typeKey}": maxWidth (${maxW}) is less than minWidth (${minW}); minWidth wins.`);
+        }
+      }
+      maxW = minW;
+    }
+    if (maxH < minH) {
+      if (typeKey != null && !clampInversionWarnedTypes.has(`${typeKey}:height`)) {
+        clampInversionWarnedTypes.add(`${typeKey}:height`);
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn(`[@rozie-ui/rete] NodeType "${typeKey}": maxHeight (${maxH}) is less than minHeight (${minH}); minHeight wins.`);
+        }
+      }
+      maxH = minH;
+    }
     return {
       width: Math.min(maxW, Math.max(minW, w)),
       height: Math.min(maxH, Math.max(minH, h))

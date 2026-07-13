@@ -3279,6 +3279,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   RESIZE_MIN_FALLBACK = 40;
 
+  clampInversionWarnedTypes = new Set();
+
   SVGNS = 'http://www.w3.org/2000/svg';
 
   SOCKET = new ClassicPreset.Socket('flow');
@@ -3509,8 +3511,32 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   clampResizeSize = (typeSpec: any, w: any, h: any) => {
   const minW = typeSpec && typeSpec.minWidth != null ? typeSpec.minWidth : this.RESIZE_MIN_FALLBACK;
   const minH = typeSpec && typeSpec.minHeight != null ? typeSpec.minHeight : this.RESIZE_MIN_FALLBACK;
-  const maxW = typeSpec && typeSpec.maxWidth != null ? typeSpec.maxWidth : Infinity;
-  const maxH = typeSpec && typeSpec.maxHeight != null ? typeSpec.maxHeight : Infinity;
+  let maxW = typeSpec && typeSpec.maxWidth != null ? typeSpec.maxWidth : Infinity;
+  let maxH = typeSpec && typeSpec.maxHeight != null ? typeSpec.maxHeight : Infinity;
+  // WR-02: a misconfigured maxWidth/maxHeight below the effective minWidth/minHeight
+  // (e.g. a typo'd `<NodeType resizable :min-width="200" :max-width="100">`) must
+  // never silently win over the documented min floor — the min bound always wins, and
+  // the misconfiguration is surfaced via a one-time-per-type console.warn rather than
+  // silently clamping every resize below the declared minimum.
+  const typeKey = typeSpec && typeSpec.type != null ? typeSpec.type : null;
+  if (maxW < minW) {
+    if (typeKey != null && !this.clampInversionWarnedTypes.has(`${typeKey}:width`)) {
+      this.clampInversionWarnedTypes.add(`${typeKey}:width`);
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn(`[@rozie-ui/rete] NodeType "${typeKey}": maxWidth (${maxW}) is less than minWidth (${minW}); minWidth wins.`);
+      }
+    }
+    maxW = minW;
+  }
+  if (maxH < minH) {
+    if (typeKey != null && !this.clampInversionWarnedTypes.has(`${typeKey}:height`)) {
+      this.clampInversionWarnedTypes.add(`${typeKey}:height`);
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn(`[@rozie-ui/rete] NodeType "${typeKey}": maxHeight (${maxH}) is less than minHeight (${minH}); minHeight wins.`);
+      }
+    }
+    maxH = minH;
+  }
   return {
     width: Math.min(maxW, Math.max(minW, w)),
     height: Math.min(maxH, Math.max(minH, h))
