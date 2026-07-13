@@ -3010,15 +3010,25 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           onResizeHandleMove.current = null;
           onResizeHandleUp.current = null;
           resizeActiveHandleEl.current = null;
+          // Read the "did THIS gesture actually move the node?" signal before discarding it
+          // (CR-01). A real drag — clamp-changed movement was observed — must never be
+          // mistaken for a stationary click, even if it lands within the double-click window.
+          const hadMovement = resizeGestureActive.current;
           resizeGestureActive.current = false;
           pendingResizeSnapshot.current = null;
           // Double-click-via-pointerup-timing (Rete swallows real clicks during node
           // interaction — the file's existing pointerup-not-click discipline, §6a item-7).
-          const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
-          if (now - lastHandlePointerUpAt.current < 400) {
-            resetNodeSize(id);
-          } else {
-            lastHandlePointerUpAt.current = now;
+          // Only a stationary press/release (no movement this gesture) participates in the
+          // timing-based double-click pairing; a real drag never counts as a "click", so two
+          // legitimate rapid resizes on different corners are never misread as a reset.
+          if (!hadMovement) {
+            const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+            if (now - lastHandlePointerUpAt.current < 400) {
+              resetNodeSize(id);
+              lastHandlePointerUpAt.current = -Infinity;
+            } else {
+              lastHandlePointerUpAt.current = now;
+            }
           }
         };
         handleEl.addEventListener('pointermove', onResizeHandleMove.current);
