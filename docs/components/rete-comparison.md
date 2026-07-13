@@ -52,8 +52,10 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | **Palette drag-drop** (`screenToFlowPosition`) | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | hand-roll | ✅ `screenToFlowPosition` verb |
 | **Handle positioning** (top/bottom) | ✅ `<Handle position>` | ✅ | ✅ | ⚠️ | ⚠️ | hand-roll | ✅ `<Port position="top\|bottom\|left\|right">` |
 | **Edge labels + per-edge styling** | ✅ `edge.label` / `style` | ✅ | ✅ | ⚠️ | ⚠️ | hand-roll | ✅ `connection.label` / `stroke` / `dashed` |
-| Custom edge RENDERING (step/smooth/bezier types) | ✅ `edgeTypes` | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ⚠️ bezier only (deferred) |
-| Background variants / NodeToolbar / NodeResizer | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ⚠️ deferred (see below) |
+| Custom edge RENDERING (step/smooth/bezier types) | ✅ `edgeTypes` | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ✅ `edgeTypes` (step/smoothstep/straight/bezier) |
+| **Background variants** (dots/lines/cross/none) | ✅ `<Background variant>` | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ✅ `:background` prop |
+| **NodeToolbar** (per-node contextual actions) | ✅ `<NodeToolbar/>` | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ✅ `#toolbar` slot (opt-in) |
+| **NodeResizer** (drag-to-resize) | ✅ `<NodeResizer/>` | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ✅ `<NodeType resizable>` corner handles |
 | TypeScript | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
 | Zero-config styling, re-skinnable | ⚠️ import CSS + vars | ⚠️ | ⚠️ | ⚠️ | ⚠️ | hand-roll | ✅ `--rozie-flow-*` tokens + shadcn/Material/Bootstrap bridges + zero-import dark |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -110,9 +112,9 @@ This was built by dogfooding Rozie's own cross-component context primitive (`$pr
 
 This page concedes where the standalone libraries are genuinely ahead — that's what keeps the comparison credible, and it doubles as Rozie's roadmap.
 
-- **Background variants / NodeToolbar / NodeResizer.** React Flow ships these as first-class components. `FlowCanvas` now covers the canvas + nodes + sockets + connections + a dotted background + a built-in **Controls** overlay + an opt-in **MiniMap**; the remaining second-tier chrome (background variants, node toolbar, node resizer) is on the roadmap (config-prop first, the MapLibre stance).
+- **NodeResizer aspect-ratio lock, plus assorted second-tier chrome.** NodeResizer is free-form width/height only — a `keepAspectRatio` lock is deferred out of v1. Also still deferred (unchanged from Phase 44's list): subflows/grouping, copy/paste across canvases, export-to-PNG/SVG, controlled selection (bound selected-ids), and per-node locked/draggable/deletable flags.
 - **Big-framework depth on the home framework.** React Flow (Zustand store, deep node/edge-type catalogs, helper hooks, layouting integrations) is a mature, multi-year library; on React it exposes more surface than Rozie's curated set. Rozie's value is **not** "more than React Flow on React" — it's the **same idiomatic editor on all six frameworks from one source**, with the unserved **Solid and Lit** finally covered.
-- **`@rozie-ui/rete` is `0.1.0`.** The surface (20 props / 12 events / 26-verb handle / `<NodeType>` render-by-type body portal + typed `<Port>` schema with top/bottom positioning + built-in Controls & MiniMap + labeled/styled edges + palette drag-drop) is stable and gate-verified (behavioral parity across all six targets), but it is younger than the incumbents.
+- **`@rozie-ui/rete` is `0.1.0`.** The surface (21 props / 12 events / 26-verb handle / `<NodeType>` render-by-type body portal + typed `<Port>` schema with top/bottom positioning + built-in Controls & MiniMap + labeled/styled edges + palette drag-drop) is stable and gate-verified (behavioral parity across all six targets), but it is younger than the incumbents.
 
 ## Try it
 
