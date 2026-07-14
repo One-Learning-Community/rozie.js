@@ -10,6 +10,9 @@
 //     round-trip anti-drift guard (Phase 75 Plan 03, D-03): re-derives
 //     buildManifest(lowerToIR(Combobox.rozie)) and asserts it deep-equals the
 //     committed __fixtures__/rozie-manifest.expected.json bytes.
+//   • src/internal/groupOptions.test.ts — the pure group-partition helper
+//     (combobox-native-groups) — mirrors command-palette's
+//     src/internal/**/*.test.ts include.
 //
 // The gate is pure @rozie/core (parse / lowerToIR / compile / buildManifest)
 // — no DOM, no component mount — so the default node environment is enough.
@@ -27,7 +30,7 @@ export default defineConfig({
   test: {
     globals: false,
     environment: 'node',
-    include: ['tests/**/*.test.ts', 'scripts/**/*.test.mjs'],
+    include: ['tests/**/*.test.ts', 'scripts/**/*.test.mjs', 'src/internal/**/*.test.ts'],
     root: __dirname,
     testTimeout: 30000,
   },
