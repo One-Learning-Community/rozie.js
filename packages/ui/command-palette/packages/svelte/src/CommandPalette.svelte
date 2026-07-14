@@ -13,11 +13,17 @@ interface Props {
    */
   open?: boolean;
   /**
-   * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component filters `items` by this string over each item `label` plus its `keywords`. Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
+   * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component ranks `items` by this string via `score` (fuzzy-subsequence by default, matched over each item `label` plus its `keywords`, label weighted above keywords). Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
    */
   query?: string;
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
+   * Custom ranking/exclusion hook: `(item, query) => number | null`. Return `null` to exclude an item from the results; otherwise higher numbers rank first. Leave unset (`default: null`) to use the built-in fuzzy-subsequence scorer (label weighted above keywords). A recency/frecency boost is added INSIDE `score` (e.g. `return baseScore + recencyBonus(item.id)`), not as a separate prop.
+   * @example
+   * <CommandPalette :score="(item, q) => item.label.includes(q) ? 1 : null" :items="commands" />
+   */
+  score?: ((...args: any[]) => any) | null;
+  /**
+   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
    */
   items?: any[];
   /**
@@ -40,9 +46,12 @@ interface Props {
    * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
-  option?: Snippet<[{ option: any; index: any; active: any; selected: any; disabled: any }]>;
+  option?: Snippet<[{ option: any; index: any; active: any; selected: any; disabled: any; matches: any }]>;
   empty?: Snippet<[{ query: any }]>;
   footer?: Snippet;
+  icon?: Snippet<[{ option: any }]>;
+  actions?: Snippet<[{ option: any; actions: any }]>;
+  trailing?: Snippet<[{ option: any }]>;
   snippets?: Record<string, any>;
   onselect?: (...args: unknown[]) => void;
   [key: string]: unknown;
@@ -53,6 +62,7 @@ let __defaultItems = (() => [])();
 let {
   open = $bindable(false),
   query = $bindable(''),
+  score = null,
   items = __defaultItems,
   placeholder = 'Type a command…',
   emptyText = 'No results.',
@@ -62,6 +72,9 @@ let {
   option: __optionProp,
   empty: __emptyProp,
   footer: __footerProp,
+  icon: __iconProp,
+  actions: __actionsProp,
+  trailing: __trailingProp,
   snippets,
   onselect,
   ...__rozieAttrs
@@ -70,34 +83,40 @@ let {
 const option$$slot = $derived(__optionProp ?? snippets?.option);
 const empty$$slot = $derived(__emptyProp ?? snippets?.empty);
 const footer = $derived(__footerProp ?? snippets?.footer);
+const icon = $derived(__iconProp ?? snippets?.icon);
+const actions = $derived(__actionsProp ?? snippets?.actions);
+const trailing = $derived(__trailingProp ?? snippets?.trailing);
 
 let activeValue: any = $state(null);
 
 let panel = $state<HTMLElement | undefined>(undefined);
 let combobox = $state<ReturnType<typeof Combobox> | undefined>(undefined);
 
-import { filterCommands } from './internal/filterCommands';
+import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Combobox> as its `:options`.
-// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
-// substring and would drop the keyword matching + source-order grouping. A plain
-// function (called from the template binding AND handlers) — never $computed (the
-// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
+// The ranked command list fed to the vendored <Combobox> as its `:options`.
+// command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
+// default over label+keywords, label weighted above keywords, pluggable via
+// $props.score) and runs <Combobox :disable-filter="true"> — combobox's
+// built-in filter is label-only substring and would drop keyword matching +
+// the ranked ordering. scoreCommands already normalizes non-array input, so
+// no local Array.isArray guard is needed. A plain function (called from the
+// template binding AND handlers) — never $computed (the combobox
+// value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Combobox> as its `:options`.
-// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
-// substring and would drop the keyword matching + source-order grouping. A plain
-// function (called from the template binding AND handlers) — never $computed (the
-// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
+// The ranked command list fed to the vendored <Combobox> as its `:options`.
+// command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
+// default over label+keywords, label weighted above keywords, pluggable via
+// $props.score) and runs <Combobox :disable-filter="true"> — combobox's
+// built-in filter is label-only substring and would drop keyword matching +
+// the ranked ordering. scoreCommands already normalizes non-array input, so
+// no local Array.isArray guard is needed. A plain function (called from the
+// template binding AND handlers) — never $computed (the combobox
+// value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
-const filteredItems = () => {
-  const src = Array.isArray(items) ? items : [];
-  return filterCommands(src, query);
-};
+const filteredItems = () => scoreCommands(items, query, score);
 
 // The vendored <Combobox> commits the OPTION's value; resolve each command's value
 // to its stable `id` (the key passed back on `select`). disabled is resolved off
@@ -122,6 +141,54 @@ const commandDisabled = (it: any) => !!(it && it.disabled);
 // typechecking without a per-target cast.
 const labelText = (o: any) => o && o.label !== undefined ? o.label : '';
 const groupText = (o: any) => o && o.group !== undefined ? o.group : '';
+// Display-only #actions scope resolver: the optional `actions` item field,
+// normalized to an array. Untyped param (neutralized to `any`) like the other
+// display helpers above — same cross-target slot-param-type gap.
+// Display-only #actions scope resolver: the optional `actions` item field,
+// normalized to an array. Untyped param (neutralized to `any`) like the other
+// display helpers above — same cross-target slot-param-type gap.
+const actionsList = (o: any) => o && o.actions ? o.actions : [];
+
+// Split a command's visible label into ordered { text, match } segments from
+// labelHighlight's [start,end) ranges, for the default #option fill row to
+// render as highlighted runs. Reflects the query-subsequence on the LABEL
+// regardless of which scorer produced the ranking (labelHighlight runs the
+// same fuzzyMatch primitive independent of $props.score). Untyped param
+// (neutralized to `any`) like the other display helpers above.
+// Split a command's visible label into ordered { text, match } segments from
+// labelHighlight's [start,end) ranges, for the default #option fill row to
+// render as highlighted runs. Reflects the query-subsequence on the LABEL
+// regardless of which scorer produced the ranking (labelHighlight runs the
+// same fuzzyMatch primitive independent of $props.score). Untyped param
+// (neutralized to `any`) like the other display helpers above.
+const labelSegments = (o: any) => {
+  const label = labelText(o);
+  const ranges = labelHighlight(label, query);
+  const segments = [];
+  let cursor = 0;
+  for (let i = 0; i < ranges.length; i++) {
+    const start = ranges[i][0];
+    const end = ranges[i][1];
+    if (start > cursor) segments.push({
+      text: label.slice(cursor, start),
+      match: false
+    });
+    segments.push({
+      text: label.slice(start, end),
+      match: true
+    });
+    cursor = end;
+  }
+  if (cursor < label.length) segments.push({
+    text: label.slice(cursor),
+    match: false
+  });
+  if (segments.length === 0) segments.push({
+    text: label,
+    match: false
+  });
+  return segments;
+};
 
 // ---- close funnel ------------------------------------------------------
 // ---- close funnel ------------------------------------------------------
@@ -154,11 +221,11 @@ const onComboboxChange = (e: any) => {
 
 // Combobox's `@search` fires `{ query }` as the user types in its combobox input.
 // Pipe it into command-palette's own two-way `query` model — `filteredItems()`
-// then re-filters via filterCommands (keyword-aware). Capture the fresh value
+// then re-ranks via scoreCommands (keyword-aware, fuzzy). Capture the fresh value
 // (never re-read a just-written $data/$model key on React — it is stale).
 // Combobox's `@search` fires `{ query }` as the user types in its combobox input.
 // Pipe it into command-palette's own two-way `query` model — `filteredItems()`
-// then re-filters via filterCommands (keyword-aware). Capture the fresh value
+// then re-ranks via scoreCommands (keyword-aware, fuzzy). Capture the fresh value
 // (never re-read a just-written $data/$model key on React — it is stale).
 const onComboboxSearch = (e: any) => {
   query = e && e.query !== undefined ? e.query : '';
@@ -263,7 +330,7 @@ $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWa
 })(__watchVal); }); });
 </script>
 
-{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><Combobox bind:this={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={placeholder} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled })}{:else}<div class="rozie-command-palette-option" data-rozie-s-768cad96><span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{rozieDisplay(labelText(option))}</span>{#if groupText(option)}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}</div>{/if}{/snippet}{#snippet empty({ query })}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/snippet}</Combobox>{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
+{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><Combobox bind:this={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={placeholder} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) })}{:else}<div class="rozie-command-palette-option" data-rozie-s-768cad96>{#if icon}<span class="rozie-command-palette-option-icon" data-rozie-s-768cad96>{#if icon}{@render icon({ option })}{/if}</span>{/if}<span class="rozie-command-palette-option-main" data-rozie-s-768cad96><span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{#each labelSegments(option) as segment, si (si)}<span class={{ 'rozie-command-palette-option-label-match': segment.match }} data-rozie-s-768cad96>{rozieDisplay(segment.text)}</span>{/each}</span>{#if groupText(option)}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}</span>{#if actions}<span class="rozie-command-palette-option-actions" data-rozie-s-768cad96>{#if actions}{@render actions({ option, actions: actionsList(option) })}{/if}</span>{/if}{#if trailing}<span class="rozie-command-palette-option-trailing" data-rozie-s-768cad96>{#if trailing}{@render trailing({ option })}{/if}</span>{/if}</div>{/if}{/snippet}{#snippet empty({ query })}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/snippet}</Combobox>{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
 
 <style>
 :global {
@@ -316,14 +383,46 @@ $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWa
   .rozie-command-palette-option[data-rozie-s-768cad96] {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--rozie-command-palette-option-gap, 0.75rem);
+  }
+  .rozie-command-palette-option-main[data-rozie-s-768cad96] {
+    display: flex;
+    align-items: center;
+    gap: var(--rozie-command-palette-option-gap, 0.75rem);
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .rozie-command-palette-option-icon[data-rozie-s-768cad96] {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    color: var(--rozie-command-palette-icon-color, inherit);
+    font-size: var(--rozie-command-palette-icon-size, 1rem);
+  }
+  .rozie-command-palette-option-actions[data-rozie-s-768cad96] {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: var(--rozie-command-palette-actions-gap, 0.375rem);
+    color: var(--rozie-command-palette-actions-color, rgba(0, 0, 0, 0.55));
+    font-size: var(--rozie-command-palette-actions-font-size, 0.75rem);
+  }
+  .rozie-command-palette-option-trailing[data-rozie-s-768cad96] {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    color: var(--rozie-command-palette-trailing-color, rgba(0, 0, 0, 0.5));
+    font-size: var(--rozie-command-palette-trailing-font-size, 0.75rem);
   }
   .rozie-command-palette-option-group[data-rozie-s-768cad96] {
     font-size: var(--rozie-command-palette-group-font-size, 0.75rem);
     color: var(--rozie-command-palette-group-color, rgba(0, 0, 0, 0.5));
     text-transform: var(--rozie-command-palette-group-transform, uppercase);
     letter-spacing: 0.04em;
+  }
+  .rozie-command-palette-option-label-match[data-rozie-s-768cad96] {
+    font-weight: var(--rozie-command-palette-match-weight, 600);
+    color: var(--rozie-command-palette-match-color, inherit);
   }
   .rozie-command-palette-empty[data-rozie-s-768cad96] {
     padding: var(--rozie-command-palette-empty-padding, 1.5rem);

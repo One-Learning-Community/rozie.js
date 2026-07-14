@@ -1,22 +1,31 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { rozieDisplay, useControllableState } from '@rozie/runtime-react';
+import { clsx, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './CommandPalette.css';
 import Combobox, { type ComboboxHandle } from '@rozie-ui/combobox-react';
-import { filterCommands } from './internal/filterCommands';
+import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Combobox> as its `:options`.
-// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
-// substring and would drop the keyword matching + source-order grouping. A plain
-// function (called from the template binding AND handlers) — never $computed (the
-// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
+// The ranked command list fed to the vendored <Combobox> as its `:options`.
+// command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
+// default over label+keywords, label weighted above keywords, pluggable via
+// $props.score) and runs <Combobox :disable-filter="true"> — combobox's
+// built-in filter is label-only substring and would drop keyword matching +
+// the ranked ordering. scoreCommands already normalizes non-array input, so
+// no local Array.isArray guard is needed. A plain function (called from the
+// template binding AND handlers) — never $computed (the combobox
+// value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
 
-interface OptionCtx { option: any; index: any; active: any; selected: any; disabled: any; }
+interface OptionCtx { option: any; index: any; active: any; selected: any; disabled: any; matches: any; }
 
 interface EmptyCtx { query: any; }
+
+interface IconCtx { option: any; }
+
+interface ActionsCtx { option: any; actions: any; }
+
+interface TrailingCtx { option: any; }
 
 interface CommandPaletteProps {
   /**
@@ -28,13 +37,19 @@ interface CommandPaletteProps {
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   /**
-   * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component filters `items` by this string over each item `label` plus its `keywords`. Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
+   * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component ranks `items` by this string via `score` (fuzzy-subsequence by default, matched over each item `label` plus its `keywords`, label weighted above keywords). Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
    */
   query?: string;
   defaultQuery?: string;
   onQueryChange?: (query: string) => void;
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
+   * Custom ranking/exclusion hook: `(item, query) => number | null`. Return `null` to exclude an item from the results; otherwise higher numbers rank first. Leave unset (`default: null`) to use the built-in fuzzy-subsequence scorer (label weighted above keywords). A recency/frecency boost is added INSIDE `score` (e.g. `return baseScore + recencyBonus(item.id)`), not as a separate prop.
+   * @example
+   * <CommandPalette :score="(item, q) => item.label.includes(q) ? 1 : null" :items="commands" />
+   */
+  score?: ((...args: any[]) => any) | null;
+  /**
+   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
    */
   items?: any[];
   /**
@@ -61,6 +76,9 @@ interface CommandPaletteProps {
   renderOption?: (ctx: OptionCtx) => ReactNode;
   renderEmpty?: (ctx: EmptyCtx) => ReactNode;
   renderFooter?: () => ReactNode;
+  renderIcon?: (ctx: IconCtx) => ReactNode;
+  renderActions?: (ctx: ActionsCtx) => ReactNode;
+  renderTrailing?: (ctx: TrailingCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
@@ -73,8 +91,9 @@ export interface CommandPaletteHandle {
 
 const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(function CommandPalette(_props: CommandPaletteProps, ref): JSX.Element {
   const __defaultItems = useState(() => (() => [])())[0];
-  const props: Omit<CommandPaletteProps, 'items' | 'placeholder' | 'emptyText' | 'closeOnSelect' | 'ariaLabel' | 'idBase'> & { items: any[]; placeholder: string; emptyText: string; closeOnSelect: boolean; ariaLabel: string; idBase: string } = {
+  const props: Omit<CommandPaletteProps, 'score' | 'items' | 'placeholder' | 'emptyText' | 'closeOnSelect' | 'ariaLabel' | 'idBase'> & { score: ((...args: any[]) => any) | null; items: any[]; placeholder: string; emptyText: string; closeOnSelect: boolean; ariaLabel: string; idBase: string } = {
     ..._props,
+    score: _props.score ?? null,
     items: _props.items ?? __defaultItems,
     placeholder: _props.placeholder ?? 'Type a command…',
     emptyText: _props.emptyText ?? 'No results.',
@@ -83,8 +102,8 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     idBase: _props.idBase ?? 'rozie-command-palette',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, query, items, placeholder, emptyText, closeOnSelect, ariaLabel, idBase, defaultValue, onOpenChange, defaultOpen, onQueryChange, defaultQuery, ...rest } = _props as CommandPaletteProps & Record<string, unknown>;
-    void open; void query; void items; void placeholder; void emptyText; void closeOnSelect; void ariaLabel; void idBase; void defaultValue; void onOpenChange; void defaultOpen; void onQueryChange; void defaultQuery;
+    const { open, query, score, items, placeholder, emptyText, closeOnSelect, ariaLabel, idBase, defaultValue, onOpenChange, defaultOpen, onQueryChange, defaultQuery, ...rest } = _props as CommandPaletteProps & Record<string, unknown>;
+    void open; void query; void score; void items; void placeholder; void emptyText; void closeOnSelect; void ariaLabel; void idBase; void defaultValue; void onOpenChange; void defaultOpen; void onQueryChange; void defaultQuery;
     return rest;
   })();
   const [open, setOpen] = useControllableState({
@@ -105,8 +124,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   const _watch0First = useRef(true);
 
   function filteredItems() {
-    const src = Array.isArray(props.items) ? props.items : [];
-    return filterCommands(src, query);
+    return scoreCommands(props.items, query, props.score);
   }
   function commandValue(it: any) {
     return it && it.id !== undefined ? it.id : it;
@@ -119,6 +137,37 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   }
   function groupText(o: any) {
     return o && o.group !== undefined ? o.group : '';
+  }
+  function actionsList(o: any) {
+    return o && o.actions ? o.actions : [];
+  }
+  function labelSegments(o: any) {
+    const label = labelText(o);
+    const ranges = labelHighlight(label, query);
+    const segments = [];
+    let cursor = 0;
+    for (let i = 0; i < ranges.length; i++) {
+      const start = ranges[i][0];
+      const end = ranges[i][1];
+      if (start > cursor) segments.push({
+        text: label.slice(cursor, start),
+        match: false
+      });
+      segments.push({
+        text: label.slice(start, end),
+        match: true
+      });
+      cursor = end;
+    }
+    if (cursor < label.length) segments.push({
+      text: label.slice(cursor),
+      match: false
+    });
+    if (segments.length === 0) segments.push({
+      text: label,
+      match: false
+    });
+    return segments;
   }
   function closePalette() {
     setOpen(false);
@@ -194,9 +243,19 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
       <div ref={panel} className={"rozie-command-palette-panel"} role="dialog" aria-modal="true" aria-label={props.ariaLabel} onKeyDown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
         
         <Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={props.placeholder} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
-            {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option, index, active, selected, disabled }) : <div className={"rozie-command-palette-option"} data-rozie-s-768cad96="">
-                <span className={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">{rozieDisplay(labelText(option))}</span>
-                {!!(groupText(option)) && <span className={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span>}</div>}
+            {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) }) : <div className={"rozie-command-palette-option"} data-rozie-s-768cad96="">
+                {!!((props.renderIcon ?? props.slots?.['icon'])) && <span className={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
+                  {(props.renderIcon ?? props.slots?.['icon'])?.({ option })}
+                </span>}<span className={"rozie-command-palette-option-main"} data-rozie-s-768cad96="">
+                  <span className={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">
+                    {labelSegments(option).map((segment, si) => <span key={si} className={clsx({ "rozie-command-palette-option-label-match": segment.match })} data-rozie-s-768cad96="">{rozieDisplay(segment.text)}</span>)}
+                  </span>
+                  {!!(groupText(option)) && <span className={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span>}</span>
+                {!!((props.renderActions ?? props.slots?.['actions'])) && <span className={"rozie-command-palette-option-actions"} data-rozie-s-768cad96="">
+                  {(props.renderActions ?? props.slots?.['actions'])?.({ option, actions: actionsList(option) })}
+                </span>}{!!((props.renderTrailing ?? props.slots?.['trailing'])) && <span className={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
+                  {(props.renderTrailing ?? props.slots?.['trailing'])?.({ option })}
+                </span>}</div>}
           </>)} renderEmpty={({ query }) => (<>
             {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : props.emptyText}
           </>)} />

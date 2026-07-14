@@ -52,8 +52,9 @@ import '@rozie-ui/command-palette-angular/themes/shadcn.css';    // or material.
 | Name | Type | Default | Two-way (model) | Required | Description |
 | --- | --- | --- | :---: | :---: | --- |
 | `open` | `Boolean` | `false` | ✓ |  | Whether the palette overlay is shown (two-way `r-model`). Two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`); every close path (backdrop click, Escape, selecting an item when `closeOnSelect`, the imperative `close()`) writes `open = false`. As one of two `model: true` props the component does not generate an Angular `ControlValueAccessor`. |
-| `query` | `String` | `''` | ✓ |  | The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component filters `items` by this string over each item `label` plus its `keywords`. Reset to `""` when the palette closes, so each plain open starts with a fresh search box. |
-| `items` | `Array` | `[]` |  |  | The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. |
+| `query` | `String` | `''` | ✓ |  | The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component ranks `items` by this string via `score` (fuzzy-subsequence by default, matched over each item `label` plus its `keywords`, label weighted above keywords). Reset to `""` when the palette closes, so each plain open starts with a fresh search box. |
+| `score` | `Function` | `null` |  |  | Custom ranking/exclusion hook: `(item, query) => number \| null`. Return `null` to exclude an item from the results; otherwise higher numbers rank first. Leave unset (`default: null`) to use the built-in fuzzy-subsequence scorer (label weighted above keywords). A recency/frecency boost is added INSIDE `score` (e.g. `return baseScore + recencyBonus(item.id)`), not as a separate prop. |
+| `items` | `Array` | `[]` |  |  | The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots. |
 | `placeholder` | `String` | `"Type a command…"` |  |  | Placeholder text shown in the search input while the query is empty. |
 | `emptyText` | `String` | `"No results."` |  |  | Text shown when the query matches no items. Override the whole empty state with the `empty` slot when you need richer markup. |
 | `closeOnSelect` | `Boolean` | `true` |  |  | Whether choosing an item closes the palette. Defaults to `true` (the cmdk convention); set to `false` to keep the palette open after a selection — e.g. for a multi-action menu where the user runs several commands in a row. |
@@ -90,6 +91,9 @@ export class DemoComponent {
 
 | Slot | Params |
 | --- | --- |
-| option | option, index, active, selected, disabled |
+| option | option, index, active, selected, disabled, matches |
 | empty | query |
 | footer |  |
+| icon | option |
+| actions | option, actions |
+| trailing | option |

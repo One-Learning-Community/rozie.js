@@ -1,19 +1,23 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { adoptConsumerStyles, createLitControllableProperty, rozieDisplay } from '@rozie/runtime-lit';
+import { adoptConsumerStyles, createLitControllableProperty, rozieAttr, rozieDisplay } from '@rozie/runtime-lit';
+import { repeat } from 'lit/directives/repeat.js';
 import { ref } from 'lit/directives/ref.js';
 import '@rozie-ui/combobox-lit';
 import type { Combobox } from '@rozie-ui/combobox-lit';
-import { filterCommands } from './internal/filterCommands';
+import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Combobox> as its `:options`.
-// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
-// substring and would drop the keyword matching + source-order grouping. A plain
-// function (called from the template binding AND handlers) — never $computed (the
-// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
+// The ranked command list fed to the vendored <Combobox> as its `:options`.
+// command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
+// default over label+keywords, label weighted above keywords, pluggable via
+// $props.score) and runs <Combobox :disable-filter="true"> — combobox's
+// built-in filter is label-only substring and would drop keyword matching +
+// the ranked ordering. scoreCommands already normalizes non-array input, so
+// no local Array.isArray guard is needed. A plain function (called from the
+// template binding AND handlers) — never $computed (the combobox
+// value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
 
 interface RozieOptionSlotCtx {
@@ -22,10 +26,24 @@ interface RozieOptionSlotCtx {
   active: unknown;
   selected: unknown;
   disabled: unknown;
+  matches: unknown;
 }
 
 interface RozieEmptySlotCtx {
   query: unknown;
+}
+
+interface RozieIconSlotCtx {
+  option: unknown;
+}
+
+interface RozieActionsSlotCtx {
+  option: unknown;
+  actions: unknown;
+}
+
+interface RozieTrailingSlotCtx {
+  option: unknown;
 }
 
 @customElement('rozie-command-palette')
@@ -81,14 +99,46 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
 .rozie-command-palette-option[data-rozie-s-768cad96] {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--rozie-command-palette-option-gap, 0.75rem);
+}
+.rozie-command-palette-option-main[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-option-gap, 0.75rem);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rozie-command-palette-option-icon[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-icon-color, inherit);
+  font-size: var(--rozie-command-palette-icon-size, 1rem);
+}
+.rozie-command-palette-option-actions[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--rozie-command-palette-actions-gap, 0.375rem);
+  color: var(--rozie-command-palette-actions-color, rgba(0, 0, 0, 0.55));
+  font-size: var(--rozie-command-palette-actions-font-size, 0.75rem);
+}
+.rozie-command-palette-option-trailing[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-trailing-color, rgba(0, 0, 0, 0.5));
+  font-size: var(--rozie-command-palette-trailing-font-size, 0.75rem);
 }
 .rozie-command-palette-option-group[data-rozie-s-768cad96] {
   font-size: var(--rozie-command-palette-group-font-size, 0.75rem);
   color: var(--rozie-command-palette-group-color, rgba(0, 0, 0, 0.5));
   text-transform: var(--rozie-command-palette-group-transform, uppercase);
   letter-spacing: 0.04em;
+}
+.rozie-command-palette-option-label-match[data-rozie-s-768cad96] {
+  font-weight: var(--rozie-command-palette-match-weight, 600);
+  color: var(--rozie-command-palette-match-color, inherit);
 }
 .rozie-command-palette-empty[data-rozie-s-768cad96] {
   padding: var(--rozie-command-palette-empty-padding, 1.5rem);
@@ -111,12 +161,18 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
   private _openControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'open-change', defaultValue: false, initialControlledValue: undefined });
   /**
-   * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component filters `items` by this string over each item `label` plus its `keywords`. Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
+   * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component ranks `items` by this string via `score` (fuzzy-subsequence by default, matched over each item `label` plus its `keywords`, label weighted above keywords). Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
    */
   @property({ type: String, attribute: 'query' }) _query_attr: string = '';
   private _queryControllable = createLitControllableProperty<string>({ host: this, eventName: 'query-change', defaultValue: '', initialControlledValue: undefined });
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
+   * Custom ranking/exclusion hook: `(item, query) => number | null`. Return `null` to exclude an item from the results; otherwise higher numbers rank first. Leave unset (`default: null`) to use the built-in fuzzy-subsequence scorer (label weighted above keywords). A recency/frecency boost is added INSIDE `score` (e.g. `return baseScore + recencyBonus(item.id)`), not as a separate prop.
+   * @example
+   * <CommandPalette :score="(item, q) => item.label.includes(q) ? 1 : null" :items="commands" />
+   */
+  @property({ type: Function }) score: ((...args: unknown[]) => unknown) | null = null;
+  /**
+   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
    */
   @property({ type: Array }) items: any[] = [];
   /**
@@ -146,12 +202,21 @@ private __rozieWatchInitial_0 = true;
 
   @state() private _hasSlotOption = false;
   @queryAssignedElements({ slot: 'option', flatten: true }) private _slotOptionElements!: Element[];
-  @property({ attribute: false }) option?: (scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => unknown;
+  @property({ attribute: false }) option?: (scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown; matches: unknown }) => unknown;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
   @property({ attribute: false }) empty?: (scope: { query: unknown }) => unknown;
   @state() private _hasSlotFooter = false;
   @queryAssignedElements({ slot: 'footer', flatten: true }) private _slotFooterElements!: Element[];
+  @state() private _hasSlotIcon = false;
+  @queryAssignedElements({ slot: 'icon', flatten: true }) private _slotIconElements!: Element[];
+  @property({ attribute: false }) icon?: (scope: { option: unknown }) => unknown;
+  @state() private _hasSlotActions = false;
+  @queryAssignedElements({ slot: 'actions', flatten: true }) private _slotActionsElements!: Element[];
+  @property({ attribute: false }) actions?: (scope: { option: unknown; actions: unknown }) => unknown;
+  @state() private _hasSlotTrailing = false;
+  @queryAssignedElements({ slot: 'trailing', flatten: true }) private _slotTrailingElements!: Element[];
+  @property({ attribute: false }) trailing?: (scope: { option: unknown }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -191,6 +256,39 @@ private __rozieWatchInitial_0 = true;
         update();
       }
     }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="icon"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotIcon = this._slotIconElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="actions"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotActions = this._slotActionsElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="trailing"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotTrailing = this._slotTrailingElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
   }
 
   connectedCallback(): void {
@@ -198,6 +296,9 @@ private __rozieWatchInitial_0 = true;
     this._hasSlotOption = Array.from(this.children).some((el) => el.getAttribute('slot') === 'option');
     this._hasSlotEmpty = Array.from(this.children).some((el) => el.getAttribute('slot') === 'empty');
     this._hasSlotFooter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'footer');
+    this._hasSlotIcon = Array.from(this.children).some((el) => el.getAttribute('slot') === 'icon');
+    this._hasSlotActions = Array.from(this.children).some((el) => el.getAttribute('slot') === 'actions');
+    this._hasSlotTrailing = Array.from(this.children).some((el) => el.getAttribute('slot') === 'trailing');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -234,10 +335,20 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   <div class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label=${this.ariaLabel} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPanelKeydown($event); }} data-rozie-ref="panel" data-rozie-s-768cad96>
     
     <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.filteredItems()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.placeholder} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
-        ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled}); } catch { return '{}'; } })()}>
+        ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}); } catch { return '{}'; } })()}>
           <div class="rozie-command-palette-option" data-rozie-s-768cad96>
-            <span class="rozie-command-palette-option-label" data-rozie-s-768cad96>${rozieDisplay(this.labelText(scope.option))}</span>
-            ${this.groupText(scope.option) ? html`<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>${rozieDisplay(this.groupText(scope.option))}</span>` : nothing}</div>
+            ${this._hasSlotIcon || this.icon !== undefined ? html`<span class="rozie-command-palette-option-icon" data-rozie-s-768cad96>
+              ${this.icon !== undefined ? this.icon({option: scope.option}) : html`<slot name="icon" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option}); } catch { return '{}'; } })()}></slot>`}
+            </span>` : nothing}<span class="rozie-command-palette-option-main" data-rozie-s-768cad96>
+              <span class="rozie-command-palette-option-label" data-rozie-s-768cad96>
+                ${repeat<any>(this.labelSegments(scope.option), (segment, si) => si, (segment, si) => html`<span class="${Object.entries({ 'rozie-command-palette-option-label-match': segment.match }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(si)} data-rozie-s-768cad96>${rozieDisplay(segment.text)}</span>`)}
+              </span>
+              ${this.groupText(scope.option) ? html`<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>${rozieDisplay(this.groupText(scope.option))}</span>` : nothing}</span>
+            ${this._hasSlotActions || this.actions !== undefined ? html`<span class="rozie-command-palette-option-actions" data-rozie-s-768cad96>
+              ${this.actions !== undefined ? this.actions({option: scope.option, actions: this.actionsList(scope.option)}) : html`<slot name="actions" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, actions: this.actionsList(scope.option)}); } catch { return '{}'; } })()}></slot>`}
+            </span>` : nothing}${this._hasSlotTrailing || this.trailing !== undefined ? html`<span class="rozie-command-palette-option-trailing" data-rozie-s-768cad96>
+              ${this.trailing !== undefined ? this.trailing({option: scope.option}) : html`<slot name="trailing" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option}); } catch { return '{}'; } })()}></slot>`}
+            </span>` : nothing}</div>
         </slot>`}
       `} .empty=${(scope: { query: unknown }) => html`
         ${this.empty !== undefined ? this.empty({query: scope.query}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: scope.query}); } catch { return '{}'; } })()}>${this.emptyText}</slot>`}
@@ -250,10 +361,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
 </div>` : nothing}`;
   }
 
-  filteredItems = () => {
-  const src = Array.isArray(this.items) ? this.items : [];
-  return filterCommands(src, this.query);
-};
+  filteredItems = () => scoreCommands(this.items, this.query, this.score);
 
   commandValue = (it: any) => it && it.id !== undefined ? it.id : it;
 
@@ -262,6 +370,37 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   labelText = (o: any) => o && o.label !== undefined ? o.label : '';
 
   groupText = (o: any) => o && o.group !== undefined ? o.group : '';
+
+  actionsList = (o: any) => o && o.actions ? o.actions : [];
+
+  labelSegments = (o: any) => {
+  const label = this.labelText(o);
+  const ranges = labelHighlight(label, this.query);
+  const segments = [];
+  let cursor = 0;
+  for (let i = 0; i < ranges.length; i++) {
+    const start = ranges[i][0];
+    const end = ranges[i][1];
+    if (start > cursor) segments.push({
+      text: label.slice(cursor, start),
+      match: false
+    });
+    segments.push({
+      text: label.slice(start, end),
+      match: true
+    });
+    cursor = end;
+  }
+  if (cursor < label.length) segments.push({
+    text: label.slice(cursor),
+    match: false
+  });
+  if (segments.length === 0) segments.push({
+    text: label,
+    match: false
+  });
+  return segments;
+};
 
   closePalette = () => {
   this._openControllable.write(false);

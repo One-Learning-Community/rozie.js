@@ -4,10 +4,20 @@
   <div ref="panelRef" class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="props.ariaLabel" @keydown="onPanelKeydown($event)">
     
     <Combobox ref="comboboxRef" :inline="true" :disable-filter="true" :close-on-select="false" :options="filteredItems()" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="props.placeholder" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
-        <slot name="option" :option="option" :index="index" :active="active" :selected="selected" :disabled="disabled">
+        <slot name="option" :option="option" :index="index" :active="active" :selected="selected" :disabled="disabled" :matches="labelHighlight(labelText(option), query)">
           <div class="rozie-command-palette-option">
-            <span class="rozie-command-palette-option-label">{{ labelText(option) }}</span>
-            <span v-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span></div>
+            <span v-if="$slots.icon" class="rozie-command-palette-option-icon">
+              <slot name="icon" :option="option"></slot>
+            </span><span class="rozie-command-palette-option-main">
+              <span class="rozie-command-palette-option-label">
+                <span v-for="(segment, si) in labelSegments(option)" :key="si" :class="{ 'rozie-command-palette-option-label-match': segment.match }">{{ segment.text }}</span>
+              </span>
+              <span v-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span></span>
+            <span v-if="$slots.actions" class="rozie-command-palette-option-actions">
+              <slot name="actions" :option="option" :actions="actionsList(option)"></slot>
+            </span><span v-if="$slots.trailing" class="rozie-command-palette-option-trailing">
+              <slot name="trailing" :option="option"></slot>
+            </span></div>
         </slot>
       </template><template #empty="{ query }">
         <slot name="empty" :query="query">{{ props.emptyText }}</slot>
@@ -28,7 +38,13 @@ import { onMounted, ref, watch } from 'vue';
 const props = withDefaults(
   defineProps<{
     /**
-     * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
+     * Custom ranking/exclusion hook: `(item, query) => number | null`. Return `null` to exclude an item from the results; otherwise higher numbers rank first. Leave unset (`default: null`) to use the built-in fuzzy-subsequence scorer (label weighted above keywords). A recency/frecency boost is added INSIDE `score` (e.g. `return baseScore + recencyBonus(item.id)`), not as a separate prop.
+     * @example
+     * <CommandPalette :score="(item, q) => item.label.includes(q) ? 1 : null" :items="commands" />
+     */
+    score?: ((...args: any[]) => any) | null;
+    /**
+     * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
      */
     items?: any[];
     /**
@@ -52,7 +68,7 @@ const props = withDefaults(
      */
     idBase?: string;
   }>(),
-  { items: () => [], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette' }
+  { score: null, items: () => [], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette' }
 );
 
 /**
@@ -62,7 +78,7 @@ const props = withDefaults(
  */
 const open = defineModel<boolean>('open', { default: false });
 /**
- * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component filters `items` by this string over each item `label` plus its `keywords`. Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
+ * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component ranks `items` by this string via `score` (fuzzy-subsequence by default, matched over each item `label` plus its `keywords`, label weighted above keywords). Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
  */
 const query = defineModel<string>('query', { default: '' });
 
@@ -71,9 +87,12 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
-  option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
+  option(props: { option: any; index: any; active: any; selected: any; disabled: any; matches: any }): any;
   empty(props: { query: any }): any;
   footer(props: {  }): any;
+  icon(props: { option: any }): any;
+  actions(props: { option: any; actions: any }): any;
+  trailing(props: { option: any }): any;
 }>();
 
 const activeValue = ref<any>(null);
@@ -81,28 +100,31 @@ const activeValue = ref<any>(null);
 const panelRef = ref<HTMLElement>();
 const comboboxRef = ref<InstanceType<typeof Combobox>>();
 
-import { filterCommands } from './internal/filterCommands';
+import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Combobox> as its `:options`.
-// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
-// substring and would drop the keyword matching + source-order grouping. A plain
-// function (called from the template binding AND handlers) — never $computed (the
-// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
+// The ranked command list fed to the vendored <Combobox> as its `:options`.
+// command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
+// default over label+keywords, label weighted above keywords, pluggable via
+// $props.score) and runs <Combobox :disable-filter="true"> — combobox's
+// built-in filter is label-only substring and would drop keyword matching +
+// the ranked ordering. scoreCommands already normalizes non-array input, so
+// no local Array.isArray guard is needed. A plain function (called from the
+// template binding AND handlers) — never $computed (the combobox
+// value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Combobox> as its `:options`.
-// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
-// substring and would drop the keyword matching + source-order grouping. A plain
-// function (called from the template binding AND handlers) — never $computed (the
-// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
+// The ranked command list fed to the vendored <Combobox> as its `:options`.
+// command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
+// default over label+keywords, label weighted above keywords, pluggable via
+// $props.score) and runs <Combobox :disable-filter="true"> — combobox's
+// built-in filter is label-only substring and would drop keyword matching +
+// the ranked ordering. scoreCommands already normalizes non-array input, so
+// no local Array.isArray guard is needed. A plain function (called from the
+// template binding AND handlers) — never $computed (the combobox
+// value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
-const filteredItems = () => {
-  const src = Array.isArray(props.items) ? props.items : [];
-  return filterCommands(src, query.value);
-};
+const filteredItems = () => scoreCommands(props.items, query.value, props.score);
 
 // The vendored <Combobox> commits the OPTION's value; resolve each command's value
 // to its stable `id` (the key passed back on `select`). disabled is resolved off
@@ -127,6 +149,54 @@ const commandDisabled = (it: any) => !!(it && it.disabled);
 // typechecking without a per-target cast.
 const labelText = (o: any) => o && o.label !== undefined ? o.label : '';
 const groupText = (o: any) => o && o.group !== undefined ? o.group : '';
+// Display-only #actions scope resolver: the optional `actions` item field,
+// normalized to an array. Untyped param (neutralized to `any`) like the other
+// display helpers above — same cross-target slot-param-type gap.
+// Display-only #actions scope resolver: the optional `actions` item field,
+// normalized to an array. Untyped param (neutralized to `any`) like the other
+// display helpers above — same cross-target slot-param-type gap.
+const actionsList = (o: any) => o && o.actions ? o.actions : [];
+
+// Split a command's visible label into ordered { text, match } segments from
+// labelHighlight's [start,end) ranges, for the default #option fill row to
+// render as highlighted runs. Reflects the query-subsequence on the LABEL
+// regardless of which scorer produced the ranking (labelHighlight runs the
+// same fuzzyMatch primitive independent of $props.score). Untyped param
+// (neutralized to `any`) like the other display helpers above.
+// Split a command's visible label into ordered { text, match } segments from
+// labelHighlight's [start,end) ranges, for the default #option fill row to
+// render as highlighted runs. Reflects the query-subsequence on the LABEL
+// regardless of which scorer produced the ranking (labelHighlight runs the
+// same fuzzyMatch primitive independent of $props.score). Untyped param
+// (neutralized to `any`) like the other display helpers above.
+const labelSegments = (o: any) => {
+  const label = labelText(o);
+  const ranges = labelHighlight(label, query.value);
+  const segments = [];
+  let cursor = 0;
+  for (let i = 0; i < ranges.length; i++) {
+    const start = ranges[i][0];
+    const end = ranges[i][1];
+    if (start > cursor) segments.push({
+      text: label.slice(cursor, start),
+      match: false
+    });
+    segments.push({
+      text: label.slice(start, end),
+      match: true
+    });
+    cursor = end;
+  }
+  if (cursor < label.length) segments.push({
+    text: label.slice(cursor),
+    match: false
+  });
+  if (segments.length === 0) segments.push({
+    text: label,
+    match: false
+  });
+  return segments;
+};
 
 // ---- close funnel ------------------------------------------------------
 // ---- close funnel ------------------------------------------------------
@@ -159,11 +229,11 @@ const onComboboxChange = (e: any) => {
 
 // Combobox's `@search` fires `{ query }` as the user types in its combobox input.
 // Pipe it into command-palette's own two-way `query` model — `filteredItems()`
-// then re-filters via filterCommands (keyword-aware). Capture the fresh value
+// then re-ranks via scoreCommands (keyword-aware, fuzzy). Capture the fresh value
 // (never re-read a just-written $data/$model key on React — it is stale).
 // Combobox's `@search` fires `{ query }` as the user types in its combobox input.
 // Pipe it into command-palette's own two-way `query` model — `filteredItems()`
-// then re-filters via filterCommands (keyword-aware). Capture the fresh value
+// then re-ranks via scoreCommands (keyword-aware, fuzzy). Capture the fresh value
 // (never re-read a just-written $data/$model key on React — it is stale).
 const onComboboxSearch = (e: any) => {
   query.value = e && e.query !== undefined ? e.query : '';
@@ -319,14 +389,46 @@ defineExpose({ show, close, toggle, focus });
 .rozie-command-palette-option {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--rozie-command-palette-option-gap, 0.75rem);
+}
+.rozie-command-palette-option-main {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-option-gap, 0.75rem);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rozie-command-palette-option-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-icon-color, inherit);
+  font-size: var(--rozie-command-palette-icon-size, 1rem);
+}
+.rozie-command-palette-option-actions {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--rozie-command-palette-actions-gap, 0.375rem);
+  color: var(--rozie-command-palette-actions-color, rgba(0, 0, 0, 0.55));
+  font-size: var(--rozie-command-palette-actions-font-size, 0.75rem);
+}
+.rozie-command-palette-option-trailing {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-trailing-color, rgba(0, 0, 0, 0.5));
+  font-size: var(--rozie-command-palette-trailing-font-size, 0.75rem);
 }
 .rozie-command-palette-option-group {
   font-size: var(--rozie-command-palette-group-font-size, 0.75rem);
   color: var(--rozie-command-palette-group-color, rgba(0, 0, 0, 0.5));
   text-transform: var(--rozie-command-palette-group-transform, uppercase);
   letter-spacing: 0.04em;
+}
+.rozie-command-palette-option-label-match {
+  font-weight: var(--rozie-command-palette-match-weight, 600);
+  color: var(--rozie-command-palette-match-color, inherit);
 }
 .rozie-command-palette-empty {
   padding: var(--rozie-command-palette-empty-padding, 1.5rem);
