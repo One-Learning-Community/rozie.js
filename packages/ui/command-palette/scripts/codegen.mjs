@@ -14,9 +14,10 @@
  *
  * This pure-Rozie family vendors BOTH:
  *   - src/themes/ (base / shadcn / material / bootstrap design-token presets)
- *   - src/internal/ (filterCommands.ts — the query filter; *.test.ts excluded)
+ *   - src/internal/ (scoreCommands.ts — the fuzzy scoring/ranking + highlighting
+ *     core; *.test.ts excluded)
  * into each leaf so consumers can `import '@rozie-ui/command-palette-<fw>/themes/X.css'`
- * and the compiled component's relative `./internal/filterCommands` import resolves.
+ * and the compiled component's relative `./internal/scoreCommands` import resolves.
  *
  * Steps:
  *   1. read src/CommandPalette.rozie

@@ -5,7 +5,7 @@
 //     surface gate (the same contract scripts/compile-command-palette-check.mjs
 //     checks), so a drift in the 8-prop / 2-model / 1-emit / 3-slot / 4-expose
 //     surface or a new compile() error fails the gate under `turbo run test`.
-//   • src/internal/filterCommands.test.ts — the pure query-filter helper.
+//   • src/internal/scoreCommands.test.ts — the pure fuzzy-ranking + highlight helper.
 //
 // testTimeout: 30000 — compile()×6 is a heavy module graph; under
 // `turbo run test` parallel CPU starvation can exceed vitest's 5s default and
