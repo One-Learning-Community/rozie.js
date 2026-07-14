@@ -172,6 +172,17 @@
         'Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.',
     },
   },
+
+  // Debounce (ms) for an ASYNC level's keystroke source(query) refetch (LVL-ASYNC).
+  searchDebounce: {
+    type: Number,
+    default: 150,
+    docs: {
+      description:
+        'Debounce (ms) applied to a nested level\'s ASYNC `source(query)` keystroke refetch only — sync (`children`) levels re-rank locally on every keystroke with no debounce. Defaults to ~150ms (`internal/asyncSource.ts`\'s `DEFAULT_SEARCH_DEBOUNCE`).',
+      example: '<CommandPalette :search-debounce="300" :items="commands" />',
+    },
+  },
 }
 </props>
 
@@ -192,16 +203,22 @@
 
   // Monotonic async request-token counter (LVL-ASYNC, T-cpl-01 race-drop
   // mitigation) — bumped on every push/pop/search/close so a stale in-flight
-  // `source(query)` resolution is dropped (Task 5 wires the async call sites;
-  // this plain int is threaded through internal/asyncSource.ts's
-  // nextRequestToken/isLatestRequest). NEVER $computed.
+  // `source(query)` resolution is dropped, threaded through
+  // internal/asyncSource.ts's nextRequestToken/isLatestRequest. NEVER $computed.
   requestToken: 0,
+
+  // The pending debounce timer id for an async level's keystroke source(query)
+  // refetch (LVL-ASYNC, T-cpl-02 mitigation) — cleared + replaced on every
+  // keystroke so only the LAST keystroke's refetch actually fires. Plain
+  // $data. NEVER $computed.
+  debounceTimerId: null,
 }
 </data>
 
 <script lang="ts">
 import { scoreCommands, labelHighlight } from './internal/scoreCommands'
-import { isNavigating, pushFrame, popFrame, currentFrame, depth as levelDepth } from './internal/levelStack'
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, depth as levelDepth } from './internal/levelStack'
+import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource'
 
 // ---- level-stack derived views (plain functions, uniform ×6) -----------
 // currentItems(): the ACTIVE level's items — the top frame's resolvedItems
@@ -215,6 +232,19 @@ const currentItems = () => {
 // currentDepth(): the nesting depth (0 = root). Named to avoid shadowing the
 // imported levelStack `depth` helper (aliased `levelDepth` above).
 const currentDepth = () => levelDepth($data.levelStack)
+
+// currentStatus()/currentError(): the active level's async status (LVL-ASYNC)
+// off the top frame — 'ready' at root (the implicit root frame is never
+// loading/error). Drive the #loading/#error re-projection inside combobox's
+// #empty slot (below).
+const currentStatus = () => {
+  const frame = currentFrame($data.levelStack)
+  return frame ? frame.status : 'ready'
+}
+const currentError = () => {
+  const frame = currentFrame($data.levelStack)
+  return frame ? frame.error : null
+}
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
 // The ranked command list fed to the vendored <Combobox> as its `:options`.
@@ -278,14 +308,61 @@ const closePalette = () => {
   $model.open = false
 }
 
+// ---- async source loading (LVL-ASYNC, absorbs #4) ----------------------
+// Apply an already-resolving promise's outcome to the TOP frame, guarded by
+// the race-drop token (T-cpl-01): `token` was captured by the CALLER at the
+// moment the fetch was kicked off; if a newer token has since been issued
+// (a push/pop/search/close superseded this in-flight call) the resolution is
+// dropped — settleFrame/failFrame are no-ops on drop.
+const applyAsyncResult = (token, promise) => {
+  promise.then(
+    (items) => {
+      if (!isLatestRequest(token, $data.requestToken)) return
+      $data.levelStack = settleFrame($data.levelStack, Array.isArray(items) ? items : [])
+    },
+    (error) => {
+      if (!isLatestRequest(token, $data.requestToken)) return
+      $data.levelStack = failFrame($data.levelStack, error)
+    },
+  )
+}
+
+// Resolve `item`'s child source for the CURRENT query, applied to the TOP
+// frame. A sync result (children, or a source(query) returning an array)
+// settles immediately; an async result (a Promise) bumps + captures a fresh
+// request token before awaiting (T-cpl-01). Used at push-time (initial load)
+// and by the #error slot's retry.
+const loadLevelSource = (item, query) => {
+  const resolved = resolveChildSource(item, query)
+  if (resolved.kind === 'sync') {
+    $data.levelStack = settleFrame($data.levelStack, resolved.items)
+    return
+  }
+  if (resolved.kind === 'async') {
+    $data.requestToken = nextRequestToken($data.requestToken)
+    applyAsyncResult($data.requestToken, resolved.promise)
+  }
+}
+
+// Re-invoke the CURRENT level's source at the current query (the #error
+// slot's `retry` — T-cpl-04 mitigation: an error leaves the input usable,
+// retry on next keystroke OR this explicit retry).
+const retryCurrentLevel = () => {
+  const frame = currentFrame($data.levelStack)
+  if (!frame || !frame.item) return
+  loadLevelSource(frame.item, $props.query)
+}
+
 // ---- level navigation (LVL-STACK, LVL-QUERY, LVL-NAV) -------------------
 // Push a child level for a NAVIGATING item (isNavigating — a `children`
 // array or a `source` function). pushFrame snapshots the CURRENT query into
 // the new frame's parentQuery (restored on pop, below); the child level then
-// starts with a cleared query + a cleared combobox input. `source` items
-// land 'loading' here — Task 5 resolves + settles them via asyncSource.ts.
+// starts with a cleared query + a cleared combobox input, and its source is
+// resolved at query='' (empty-vs-search #8 falls out for free — a `source`
+// branches on query==='' for its default view).
 const pushLevel = (item) => {
   $data.levelStack = pushFrame($data.levelStack, item, $props.query)
+  loadLevelSource(item, '')
   $model.query = ''
   $data.activeValue = null
   $refs.combobox?.clear()
@@ -346,8 +423,32 @@ const onComboboxChange = (e) => {
 // Pipe it into command-palette's own two-way `query` model — `filteredItems()`
 // then re-ranks via scoreCommands (keyword-aware, fuzzy). Capture the fresh value
 // (never re-read a just-written $data/$model key on React — it is stale).
+//
+// At an ASYNC level (LVL-ASYNC), ALSO bump + capture a fresh request token
+// immediately (dropping any earlier in-flight resolution, T-cpl-01) and
+// schedule a DEBOUNCED (searchDebounce, T-cpl-02) source(query) refetch — the
+// consumer source() function itself is only invoked once the debounce timer
+// fires, never eagerly. A sync (root/children) level needs no refetch —
+// filteredItems() already re-ranks currentItems() locally on every keystroke.
 const onComboboxSearch = (e) => {
-  $model.query = e && e.query !== undefined ? e.query : ''
+  const q = e && e.query !== undefined ? e.query : ''
+  $model.query = q
+  const frame = currentFrame($data.levelStack)
+  if (!frame || !isAsyncLevel(frame.item)) return
+  $data.requestToken = nextRequestToken($data.requestToken)
+  const token = $data.requestToken
+  const item = frame.item
+  if ($data.debounceTimerId != null) clearTimeout($data.debounceTimerId)
+  $data.debounceTimerId = setTimeout(() => {
+    const resolved = resolveChildSource(item, q)
+    if (resolved.kind === 'sync') {
+      if (isLatestRequest(token, $data.requestToken)) {
+        $data.levelStack = settleFrame($data.levelStack, resolved.items)
+      }
+      return
+    }
+    if (resolved.kind === 'async') applyAsyncResult(token, resolved.promise)
+  }, $props.searchDebounce)
 }
 
 // Backdrop click: a click whose target IS the backdrop (not the panel/children).
@@ -393,6 +494,12 @@ $onMount(() => {
   if ($props.open) onOpen()
 })
 
+// Cancel a pending debounced async refetch on unmount (LVL-ASYNC) — avoids a
+// stray setTimeout firing a $data write after the component is gone.
+$onUnmount(() => {
+  if ($data.debounceTimerId != null) clearTimeout($data.debounceTimerId)
+})
+
 // Lazy watch (never `immediate` — onMount seeds the initial open). Fire onOpen
 // on the false→true transition; clear the query on the true→false transition.
 // The close-time reset lives HERE (not in closePalette) so it fires for EVERY
@@ -401,15 +508,18 @@ $onMount(() => {
 // Lazy-on-mount is intentional: a pre-seeded query set alongside the initial
 // open must survive (no clear until the palette actually closes).
 // On close: ALSO reset the level stack to root (levelStack=[]) + the internal
-// selection, and bump the request token so any in-flight `source(query)`
-// resolution from Task 5 is dropped as stale — a reopen always starts at root.
+// selection, cancel any pending debounced refetch, and bump the request token
+// (T-cpl-01) so any in-flight `source(query)` resolution is dropped as stale
+// — a reopen always starts at root.
 $watch(() => $props.open, (isOpen) => {
   if (isOpen) onOpen()
   else {
     $model.query = ''
     $data.levelStack = []
     $data.activeValue = null
-    $data.requestToken = $data.requestToken + 1
+    if ($data.debounceTimerId != null) clearTimeout($data.debounceTimerId)
+    $data.debounceTimerId = null
+    $data.requestToken = nextRequestToken($data.requestToken)
   }
 })
 
@@ -536,9 +646,25 @@ $expose({ show, close, toggle, focus, goBack, openTo })
         </slot>
       </template>
 
-      <!-- Re-project #empty into combobox's #empty (additive: gains `query`). -->
+      <!--
+        Re-project #empty into combobox's #empty (additive: gains `query`).
+        combobox has no loading/error slot of its own — its #empty region (the
+        settled-but-empty case) is the natural host for status branching
+        (LVL-ASYNC): while the active level is 'loading' its resolvedItems is
+        [] (so combobox's own empty check is already true) and #loading
+        renders; 'error' renders #error with a retry; otherwise the original
+        #empty content renders unchanged.
+      -->
       <template #empty="{ query }">
-        <slot name="empty" :query="query">{{ $props.emptyText }}</slot>
+        <div r-if="currentStatus() === 'loading'" class="rozie-command-palette-loading">
+          <slot name="loading" :query="query">Loading…</slot>
+        </div>
+        <div r-else-if="currentStatus() === 'error'" class="rozie-command-palette-error">
+          <slot name="error" :query="query" :error="currentError()" :retry="retryCurrentLevel" />
+        </div>
+        <div r-else>
+          <slot name="empty" :query="query">{{ $props.emptyText }}</slot>
+        </div>
       </template>
     </Combobox>
 
@@ -676,6 +802,19 @@ $expose({ show, close, toggle, focus, goBack, openTo })
   padding: var(--rozie-command-palette-empty-padding, 1.5rem);
   text-align: center;
   color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
+}
+
+/* LVL-ASYNC status states re-projected inside combobox's #empty region. */
+.rozie-command-palette-loading {
+  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  text-align: center;
+  color: var(--rozie-command-palette-loading-color, rgba(0, 0, 0, 0.5));
+}
+
+.rozie-command-palette-error {
+  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  text-align: center;
+  color: var(--rozie-command-palette-error-color, #c0392b);
 }
 
 .rozie-command-palette-footer {
