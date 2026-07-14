@@ -145,7 +145,14 @@ export function defaultScore<T extends CommandItem>(item: T, query: string): num
 export function scoreCommands<T extends CommandItem>(
   items: T[],
   rawQuery: string,
-  scorer?: CommandScorer<T>,
+  // Accepts the strict CommandScorer AND the loosely-typed function the compiler
+  // emits for a `Function` prop, which differs per target (React lowers it to
+  // `(...args: any[]) => any`, Angular to `(...args: unknown[]) => unknown`) —
+  // neither is assignable to the strict CommandScorer, so widen to the common
+  // supertype here and coerce the result below. This is a vendored internal; the
+  // consumer-facing contract is the per-leaf `score` prop, not this param.
+  // biome-ignore lint/suspicious/noExplicitAny: cross-target Function-prop lowering
+  scorer?: CommandScorer<T> | ((...args: any[]) => unknown) | null,
 ): T[] {
   const list = Array.isArray(items) ? items : [];
   const q = String(rawQuery == null ? '' : rawQuery).trim();
@@ -155,9 +162,11 @@ export function scoreCommands<T extends CommandItem>(
 
   const decorated: Array<{ item: T; score: number; index: number }> = [];
   for (let i = 0; i < list.length; i++) {
-    const s = scoreFn(list[i], q);
-    if (s === null || s === undefined) continue;
-    decorated.push({ item: list[i], score: s, index: i });
+    const raw = scoreFn(list[i], q);
+    // A scorer returns `number | null`; coerce defensively — any non-number
+    // (null / undefined / stray value) excludes the item from the results.
+    if (typeof raw !== 'number') continue;
+    decorated.push({ item: list[i], score: raw, index: i });
   }
 
   decorated.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.index - b.index));
