@@ -29,9 +29,25 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'CommandPalette',
-  props: ['open', 'query', 'items', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase', 'score'],
+  // command-palette-levels (LVL-STACK/ASYNC): gains `searchDebounce` — the
+  // debounce (ms) applied to a nested ASYNC level's keystroke source(query)
+  // refetch (10 props total).
+  props: [
+    'open',
+    'query',
+    'items',
+    'placeholder',
+    'emptyText',
+    'closeOnSelect',
+    'ariaLabel',
+    'idBase',
+    'score',
+    'searchDebounce',
+  ],
   models: ['open', 'query'],
-  emits: ['select'],
+  // command-palette-levels: gains `navigate` (a level was pushed — payload
+  // `{ item, depth }`) and `back` (a level was popped — no payload).
+  emits: ['select', 'navigate', 'back'],
   // D-05 (BREAKING, Phase 999.4): the public slots are re-aligned to the vendored
   // listbox vocabulary — `#item {item,active}` → `#option {option,index,active,
   // selected,disabled}`; `#empty` gains `{query}`; `#footer` unchanged (a panel
@@ -39,8 +55,16 @@ const EXPECT = {
   // option-row sub-slots live INSIDE the default `#option` fill — `#icon`
   // (scope `{ option }`), `#trailing` (scope `{ option }`), `#actions` (scope
   // `{ option, actions }`) — each renders nothing when unfilled.
-  slots: ['option', 'empty', 'footer', 'icon', 'trailing', 'actions'],
-  expose: ['show', 'close', 'toggle', 'focus'],
+  // command-palette-levels: gains `loading` (scope `{ query }`), `error`
+  // (scope `{ query, error, retry }`) — re-projected inside combobox's
+  // #empty region — and `breadcrumb` (scope `{ stack, back }`) — the
+  // depth>0 header, a panel sibling OUTSIDE the combobox.
+  slots: ['option', 'empty', 'footer', 'icon', 'trailing', 'actions', 'loading', 'error', 'breadcrumb'],
+  // command-palette-levels: gains `openTo` (the ⌘P deep-link) and `goBack`
+  // (pop one level). The pop verb is `goBack`, NOT `back` — a `back()`
+  // expose verb would collide with the `back` EMIT above (ROZ121:
+  // expose∩emits must be empty) — see the dedicated assertion below.
+  expose: ['show', 'close', 'toggle', 'focus', 'openTo', 'goBack'],
 } as const;
 
 // D-07 (LOAD-BEARING): the authored CommandPalette.rozie must use the STABLE
@@ -72,7 +96,7 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (9 props)', () => {
+  it('props surface matches (10 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -84,11 +108,11 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches (select)', () => {
+  it('emits surface matches (select/navigate/back)', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
-  it('declares the option/empty/footer + icon/trailing/actions slots (additive display-only option-row sub-slots)', () => {
+  it('declares the option/empty/footer + icon/trailing/actions + loading/error/breadcrumb slots', () => {
     const slotNames = ir.slots.map((s: { name: string }) => s.name);
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
@@ -101,7 +125,7 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(source).not.toContain(`'${RELATIVE_COMBOBOX_SPECIFIER}'`);
   });
 
-  it('expose surface matches (show/close/toggle/focus)', () => {
+  it('expose surface matches (show/close/toggle/focus/openTo/goBack)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });
@@ -112,7 +136,14 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(exposeNames).toContain('show');
   });
 
-  it('no expose-verb collides with the select emit (ROZ121) or a React model setter (ROZ524)', () => {
+  it('the POP verb is `goBack`, not `back` (would collide with the `back` emit, ROZ121)', () => {
+    const exposeNames = ir.expose.map((e: { name: string }) => e.name);
+    expect(exposeNames).not.toContain('back');
+    expect(exposeNames).toContain('goBack');
+    expect(ir.emits).toContain('back');
+  });
+
+  it('no expose-verb collides with an emit (ROZ121 — proves goBack≠back) or a React model setter (ROZ524)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     const emitSet = new Set(ir.emits);
     expect(exposeNames.filter((v: string) => emitSet.has(v))).toEqual([]);

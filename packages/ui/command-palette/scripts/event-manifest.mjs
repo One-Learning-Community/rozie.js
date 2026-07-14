@@ -1,9 +1,9 @@
 /**
  * Hand-kept event-description manifest for @rozie-ui/command-palette.
  *
- * Events are derived structurally from the source via `ir.emits` (`select`), but
- * their human-readable descriptions have no first-class `<emits>` IR source — so
- * the prose lives here.
+ * Events are derived structurally from the source via `ir.emits` (`select`,
+ * `navigate`, `back`), but their human-readable descriptions have no
+ * first-class `<emits>` IR source — so the prose lives here.
  *
  * KEYS MUST stay in lockstep with `ir.emits`: codegen.mjs asserts every emitted
  * event name has an entry here and throws if one is missing.
@@ -13,7 +13,11 @@
  */
 export const eventManifest = {
   select:
-    'Fired when the user chooses a command (clicks it, or highlights it and presses Enter). Payload `{ id, label, group }` — the chosen item. If `closeOnSelect` is true (the default) the palette also closes (its `open` model is written `false`).',
+    'Fired when the user chooses a LEAF command (clicks it, or highlights it and presses Enter) — an item with no `children`/`source` (see `navigate` for a navigating item). Payload `{ id, label, group, path }` — `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). If `closeOnSelect` is true (the default) the palette also closes (its `open` model is written `false`).',
+  navigate:
+    'Fired when a nested level is PUSHED — selecting an item that carries `children` or `source` drills into it instead of emitting `select`. Payload `{ item, depth }` — the navigated-to item and the resulting nesting depth (1-based; the root is depth 0).',
+  back:
+    'Fired when a level is POPPED — via Backspace-on-empty, Escape at depth>0, the imperative `goBack()` handle, or an equivalent consumer-triggered back navigation. No payload. Does not fire at the root (popping is a no-op there).',
 };
 
 export default eventManifest;

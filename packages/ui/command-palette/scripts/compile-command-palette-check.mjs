@@ -10,9 +10,10 @@
  *   2. The IR surface matches the contract exactly.
  *   3. The OPEN verb is `show` (NOT `open`) — an `open` verb would collide with
  *      the `open` MODEL on React (both collapse onto generated open/setOpen
- *      state, the $data/model-key == $expose-verb class). `close`/`toggle`/
- *      `focus` are collision-checked against the single `select` emit + the
- *      React model setters.
+ *      state, the $data/model-key == $expose-verb class). The POP verb is
+ *      `goBack` (NOT `back`) — a `back()` expose verb would collide with the
+ *      `back` EMIT (ROZ121: expose∩emits must be empty). All expose verbs are
+ *      collision-checked against every emit + the React model setters.
  * THROWS (non-zero exit) on any drift. No compiler/emitter/IR change.
  */
 import { readFileSync } from 'node:fs';
@@ -31,18 +32,38 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'CommandPalette',
-  props: ['open', 'query', 'items', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase'],
+  // Rule 1 fix (command-palette-levels Task 7): this EXPECT was ALSO stale on
+  // `score` — leftover from before the pluggable-scorer prop landed (this
+  // script isn't wired into any package.json script/CI job so drift goes
+  // uncaught; kept in sync with tests/surface.test.ts by hand). Now gains
+  // `searchDebounce` (LVL-ASYNC — debounce ms for a nested async level's
+  // keystroke source(query) refetch).
+  props: [
+    'open',
+    'query',
+    'items',
+    'placeholder',
+    'emptyText',
+    'closeOnSelect',
+    'ariaLabel',
+    'idBase',
+    'score',
+    'searchDebounce',
+  ],
   models: ['open', 'query'],
-  emits: ['select'],
+  // command-palette-levels: gains `navigate` (a level was pushed) and `back`
+  // (a level was popped).
+  emits: ['select', 'navigate', 'back'],
   // D-05 (BREAKING): re-aligned to the combobox slot vocabulary —
   // `#item {item,active}` → `#option {option,index,active,selected,disabled}`.
-  // (Rule 1 fix, Phase 75: this EXPECT was stale — `item` — leftover from
-  // before the slot-vocabulary rename landed; this script is not wired into
-  // any package.json script/CI job so the drift went uncaught. Corrected to
-  // match tests/surface.test.ts's already-correct EXPECT.slots and the real
-  // ir.slots the compiler emits.)
-  slots: ['option', 'empty', 'footer'],
-  expose: ['show', 'close', 'toggle', 'focus'],
+  // command-palette-levels: gains `loading`/`error` (re-projected inside
+  // combobox's #empty region) and `breadcrumb` (the depth>0 header, a panel
+  // sibling OUTSIDE the combobox).
+  slots: ['option', 'empty', 'footer', 'icon', 'trailing', 'actions', 'loading', 'error', 'breadcrumb'],
+  // command-palette-levels: gains `openTo` (⌘P deep-link) + `goBack` (pop one
+  // level — NOT `back`, which would collide with the `back` EMIT above,
+  // ROZ121: expose∩emits must be empty).
+  expose: ['show', 'close', 'toggle', 'focus', 'openTo', 'goBack'],
 };
 
 const fail = (msg) => { console.error(`✗ ${msg}`); process.exitCode = 1; };
@@ -72,6 +93,10 @@ if (!setEq(exposeNames, EXPECT.expose)) fail(`expose mismatch: got [${exposeName
 
 // OPEN verb must be `show`, not `open` (the model collision).
 if (exposeNames.includes('open')) fail('expose verb `open` collides with the `open` MODEL — rename to `show`');
+
+// POP verb must be `goBack`, not `back` (would collide with the `back` EMIT, ROZ121).
+if (exposeNames.includes('back')) fail('expose verb `back` collides with the `back` EMIT — rename to `goBack`');
+if (!exposeNames.includes('goBack')) fail('expected expose verb `goBack` (the pop imperative verb) — not found');
 
 // event⇄verb (ROZ121) + model-setter (ROZ524) collision guard asserted directly.
 const emitSet = new Set(ir.emits);
