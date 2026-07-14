@@ -183,11 +183,38 @@
   // this back via `r-model:value`; selecting a command re-emits the public
   // `select` event and clears it.
   activeValue: null,
+
+  // Nested-levels stack (LVL-STACK) — an ordered array of PUSHED frames; an
+  // EMPTY stack means "at root" (root = $props.items + $props.query, kept
+  // implicit — see internal/levelStack.ts). Each frame is `{ item, title,
+  // placeholder, parentQuery, resolvedItems, status, error }`.
+  levelStack: [],
+
+  // Monotonic async request-token counter (LVL-ASYNC, T-cpl-01 race-drop
+  // mitigation) — bumped on every push/pop/search/close so a stale in-flight
+  // `source(query)` resolution is dropped (Task 5 wires the async call sites;
+  // this plain int is threaded through internal/asyncSource.ts's
+  // nextRequestToken/isLatestRequest). NEVER $computed.
+  requestToken: 0,
 }
 </data>
 
 <script lang="ts">
 import { scoreCommands, labelHighlight } from './internal/scoreCommands'
+import { isNavigating, pushFrame, popFrame, currentFrame, depth as levelDepth } from './internal/levelStack'
+
+// ---- level-stack derived views (plain functions, uniform ×6) -----------
+// currentItems(): the ACTIVE level's items — the top frame's resolvedItems
+// when nested (depth>0), else the root $props.items. Levels sit ABOVE the
+// pipeline: currentItems() → scoreCommands (below) → the vendored <Combobox>.
+const currentItems = () => {
+  const frame = currentFrame($data.levelStack)
+  return frame ? frame.resolvedItems : $props.items
+}
+
+// currentDepth(): the nesting depth (0 = root). Named to avoid shadowing the
+// imported levelStack `depth` helper (aliased `levelDepth` above).
+const currentDepth = () => levelDepth($data.levelStack)
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
 // The ranked command list fed to the vendored <Combobox> as its `:options`.
@@ -200,7 +227,9 @@ import { scoreCommands, labelHighlight } from './internal/scoreCommands'
 // template binding AND handlers) — never $computed (the combobox
 // value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
-const filteredItems = () => scoreCommands($props.items, $props.query, $props.score)
+// Levels sit ABOVE the pipeline (LVL-STACK) — currentItems() resolves the
+// active level's list (root or the top pushed frame) BEFORE ranking.
+const filteredItems = () => scoreCommands(currentItems(), $props.query, $props.score)
 
 // The vendored <Combobox> commits the OPTION's value; resolve each command's value
 // to its stable `id` (the key passed back on `select`). disabled is resolved off
@@ -249,15 +278,65 @@ const closePalette = () => {
   $model.open = false
 }
 
+// ---- level navigation (LVL-STACK, LVL-QUERY, LVL-NAV) -------------------
+// Push a child level for a NAVIGATING item (isNavigating — a `children`
+// array or a `source` function). pushFrame snapshots the CURRENT query into
+// the new frame's parentQuery (restored on pop, below); the child level then
+// starts with a cleared query + a cleared combobox input. `source` items
+// land 'loading' here — Task 5 resolves + settles them via asyncSource.ts.
+const pushLevel = (item) => {
+  $data.levelStack = pushFrame($data.levelStack, item, $props.query)
+  $model.query = ''
+  $data.activeValue = null
+  $refs.combobox?.clear()
+  focusInput()
+  $emit('navigate', { item, depth: currentDepth() })
+}
+
+// Pop one level: popFrame() → restore the query MODEL AND the vendored
+// <Combobox>'s VISIBLE input text via seedQuery(restoreQuery) (Option B — the
+// combobox seedQuery prerequisite, Combobox.rozie:663) — full query undo,
+// not just the model/list. Re-focuses afterward so the combobox popup
+// re-opens (it self-closes on the shared Escape bubbling through — see
+// onPanelKeydown). No-op at root (an empty levelStack — mirrors the spec's
+// "back() — pop one level, no-op at root").
+const goBack = () => {
+  if ($data.levelStack.length === 0) return
+  const { stack, restoreQuery } = popFrame($data.levelStack)
+  $data.levelStack = stack
+  const q = restoreQuery == null ? '' : restoreQuery
+  $model.query = q
+  $refs.combobox?.seedQuery(q)
+  $data.activeValue = null
+  focusInput()
+  $emit('back')
+}
+
+// openTo(path): stubbed here (Task 4) — Task 6 fills the async-aware
+// drill-through implementation (LVL-RENDER). Declared now so the expose
+// surface + collision gates are correct from this task onward; a call before
+// Task 6 lands is a safe no-op.
+const openTo = (_path) => {}
+
 // ---- selection ---------------------------------------------------------
-// Combobox's `@change` fires `{ value, option }` on each commit. Re-emit the
-// PUBLIC `select` event with the chosen command and (optionally) close. The
+// Combobox's `@change` fires `{ value, option }` on each commit. A NAVIGATING
+// item (isNavigating — children/source) is intercepted here and PUSHES a
+// child level instead of emitting `select` (presence of children/source is
+// the navigation signal, no separate flag). Otherwise re-emit the PUBLIC
+// `select` event with the chosen leaf command (optionally close); its
+// payload gains `path` — the id breadcrumb of levels navigated through to
+// reach it (levelStack item ids, root excluded — root carries no item). The
 // `option` IS the original command item (we feed items straight through as
 // combobox options), so read its id/label/group directly.
 const onComboboxChange = (e) => {
   const item = e ? e.option : null
   if (!item || item.disabled) return
-  $emit('select', { id: item.id, label: item.label, group: item.group })
+  if (isNavigating(item)) {
+    pushLevel(item)
+    return
+  }
+  const path = $data.levelStack.map((f) => (f.item ? f.item.id : null))
+  $emit('select', { id: item.id, label: item.label, group: item.group, path })
   // Clear the internal selection so re-selecting the same command re-fires.
   $data.activeValue = null
   if ($props.closeOnSelect) closePalette()
@@ -321,17 +400,38 @@ $onMount(() => {
 // close()/toggle(), AND a consumer writing `r-model:open = false` directly.
 // Lazy-on-mount is intentional: a pre-seeded query set alongside the initial
 // open must survive (no clear until the palette actually closes).
+// On close: ALSO reset the level stack to root (levelStack=[]) + the internal
+// selection, and bump the request token so any in-flight `source(query)`
+// resolution from Task 5 is dropped as stale — a reopen always starts at root.
 $watch(() => $props.open, (isOpen) => {
   if (isOpen) onOpen()
-  else $model.query = ''
+  else {
+    $model.query = ''
+    $data.levelStack = []
+    $data.activeValue = null
+    $data.requestToken = $data.requestToken + 1
+  }
 })
 
 // Escape closes from anywhere in the panel (the vendored <Combobox> only closes
-// its own popup on Escape; the palette overlay close is command-palette's).
+// its own popup on Escape; the palette overlay close is command-palette's) —
+// UNLESS nested (LVL-NAV): at depth>0 Escape pops ONE level instead (goBack's
+// focusInput() re-opens the combobox popup, since it self-closed on this same
+// bubbling Escape); it only closes the palette at the root.
 const onPanelKeydown = (e) => {
-  if (e && e.key === 'Escape') {
+  if (!e) return
+  if (e.key === 'Escape') {
     e.preventDefault()
-    closePalette()
+    if (currentDepth() > 0) goBack()
+    else closePalette()
+    return
+  }
+  // Backspace-on-empty pops one level (LVL-NAV) — otherwise let Backspace
+  // edit the query text normally (never intercepted at the root or with text
+  // still in the box).
+  if (e.key === 'Backspace' && $props.query === '' && currentDepth() > 0) {
+    e.preventDefault()
+    goBack()
   }
 }
 
@@ -340,7 +440,9 @@ const onPanelKeydown = (e) => {
 // `open`) — an `open` verb collides with the `open` model on React (both collapse
 // onto the generated open/setOpen state). focus() focuses the vendored combobox's
 // control via its exposed handle (accepted ROZ137 Lit override). All post-mount →
-// $refs safe.
+// $refs safe. The POP verb is `goBack` — NOT `back` (a `back()` expose verb would
+// collide with the `@back` EMIT, ROZ121: expose∩emits must be empty). `openTo` is
+// the ⌘P deep-link (stubbed above; Task 6 fills the drill-through).
 const show = () => {
   $model.open = true
 }
@@ -352,7 +454,7 @@ const toggle = () => {
 }
 const focus = () => focusInput()
 
-$expose({ show, close, toggle, focus })
+$expose({ show, close, toggle, focus, goBack, openTo })
 </script>
 
 <template>
