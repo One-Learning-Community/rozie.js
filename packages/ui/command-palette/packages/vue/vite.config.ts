@@ -16,7 +16,7 @@ export default defineConfig({
       fileName: () => 'index.mjs',
     },
     rollupOptions: {
-      external: ['vue', /^vue\//],
+      external: ['vue', /^vue\//, '@rozie/runtime-vue', '@rozie-ui/combobox-vue'],
     },
   },
 });

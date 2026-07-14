@@ -18,7 +18,7 @@ export default defineConfig({
       fileName: () => 'index.mjs',
     },
     rollupOptions: {
-      external: ['vue', '@floating-ui/dom', /^vue\//],
+      external: ['vue', '@floating-ui/dom', /^vue\//, '@rozie/runtime-vue'],
     },
   },
 });
