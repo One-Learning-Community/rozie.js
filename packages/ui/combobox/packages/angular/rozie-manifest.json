@@ -91,9 +91,60 @@
       "isModel": false,
       "required": false,
       "type": "String"
+    },
+    {
+      "name": "groups",
+      "isModel": false,
+      "required": false,
+      "type": "Array"
     }
   ],
   "slots": [
+    {
+      "name": "option",
+      "params": [
+        {
+          "name": "option"
+        },
+        {
+          "name": "index"
+        },
+        {
+          "name": "active"
+        },
+        {
+          "name": "selected"
+        },
+        {
+          "name": "disabled"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
+      "name": "empty",
+      "params": [
+        {
+          "name": "query"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
+      "name": "groupHeading",
+      "params": [
+        {
+          "name": "group"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
     {
       "name": "option",
       "params": [

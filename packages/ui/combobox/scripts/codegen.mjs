@@ -1,6 +1,6 @@
 /**
- * codegen.mjs — the single parse-once → emit-6 → copy-themes → render-READMEs
- * engine for @rozie-ui/combobox.
+ * codegen.mjs — the single parse-once → emit-6 → copy-themes → vendor-internal →
+ * render-READMEs engine for @rozie-ui/combobox.
  *
  * Pure GLUE over the `@rozie/core` public API (compile / parse / lowerToIR /
  * createDefaultRegistry) — the exact primitive docs/.vitepress/rozie-codegen.ts
@@ -15,17 +15,21 @@
  * only `error`-severity diagnostics, so the deliberate `focus` override does
  * NOT throw codegen (the slider precedent).
  *
- * This is a pure-Rozie family with NO third-party vanilla engine, so there is no
- * `src/internal/` helper to vendor. Instead it vendors the `src/themes/` design-
- * token presets (base / shadcn / material / bootstrap) into each leaf so
- * consumers can `import '@rozie-ui/combobox-<fw>/themes/X.css'`.
+ * This is a pure-Rozie family with NO third-party vanilla engine, so it vendors
+ * BOTH:
+ *   - src/themes/ (base / shadcn / material / bootstrap design-token presets)
+ *   - src/internal/ (groupOptions.ts — the pure stable-partition helper behind
+ *     the native option-grouping feature, combobox-native-groups; *.test.ts
+ *     excluded)
+ * into each leaf so consumers can `import '@rozie-ui/combobox-<fw>/themes/X.css'`
+ * and the compiled component's relative `./internal/groupOptions` import resolves.
  *
  * Steps:
  *   1. read src/Combobox.rozie
  *   2. parse() + lowerToIR() ONCE → ir (props/slots/emits/expose) for docs tables
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
  *        (React only: also write Combobox.css + Combobox.d.ts)
- *   4. copy src/themes/ → each leaf src/themes/
+ *   4. copy src/themes/ + src/internal/ → each leaf src/
  *   5. render each leaf README from the IR + the hand-kept event/handle manifests
  *   6. ENFORCE validateDocsPropsTable against docs/components/combobox.md
  *      (THROWS on drift of the IR-derivable structural columns — prop name,
@@ -33,10 +37,10 @@
  *
  * The Vue leaf is dual-packaged (compiled dist/index.mjs + raw ./source) via a
  * committed vite.config.ts / tsconfig.json / src/index.ts; codegen only writes
- * its src/Combobox.vue + themes + README (it never cleans the leaf src, so the
- * committed barrel survives).
+ * its src/Combobox.vue + themes + internal + README (it never cleans the leaf
+ * src, so the committed barrel survives).
  */
-import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { buildManifest, compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { eventManifest } from './event-manifest.mjs';
@@ -69,6 +73,26 @@ function copyThemes(leafSrc) {
   const src = resolve(ROOT, 'src/themes');
   if (!existsSync(src)) throw new Error('codegen: src/themes/ not found (token presets must exist)');
   cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
+}
+
+/**
+ * Vendor src/internal/ → leaf src/internal/ (excluding *.test.ts).
+ *
+ * Mirrors command-palette codegen's copyInternal: the destination is removed
+ * first so a rename/removal in src/internal/ doesn't leave a stale,
+ * no-longer-imported module behind — cpSync merges into an existing
+ * directory rather than mirroring it, so without this the leaf would
+ * silently accumulate orphaned files across regens.
+ */
+function copyInternal(leafSrc) {
+  const src = resolve(ROOT, 'src/internal');
+  if (!existsSync(src)) return;
+  const dest = resolve(leafSrc, 'internal');
+  rmSync(dest, { recursive: true, force: true });
+  cpSync(src, dest, {
+    recursive: true,
+    filter: (from) => !from.endsWith('.test.ts'),
+  });
 }
 
 function main() {
@@ -140,8 +164,9 @@ function main() {
       if (r.types) writeFileSync(resolve(leafSrc, 'Combobox.d.ts'), r.types);
     }
 
-    // (4) vendor the design-token presets.
+    // (4) vendor the design-token presets + the internal grouping helper.
     copyThemes(leafSrc);
+    copyInternal(leafSrc);
 
     // (5) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);

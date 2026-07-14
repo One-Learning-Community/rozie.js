@@ -80,6 +80,7 @@ import '@rozie-ui/combobox-react/themes/shadcn.css';    // or material.css, boot
 | `virtual` | `Boolean` | `false` |  |  |
 | `estimateRowHeight` | `Number` | `36` |  |  |
 | `maxHeight` | `String` | `''` |  |  |
+| `groups` | `Array` | `[]` |  |  |
 
 ## Events
 
@@ -111,6 +112,9 @@ cb.current?.clear();
 
 | Slot | Params |
 | --- | --- |
+| option | option, index, active, selected, disabled |
+| empty | query |
+| groupHeading | group |
 | option | option, index, active, selected, disabled |
 | empty | query |
 | option | option, index, active, selected, disabled |

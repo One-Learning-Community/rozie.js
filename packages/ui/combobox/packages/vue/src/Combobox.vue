@@ -4,12 +4,23 @@
   <input ref="inputElRef" class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" :aria-expanded="!!isOpen" :aria-controls="listId()" :aria-activedescendant="(activeId()) ?? undefined" :aria-label="props.ariaLabel" :value="query" :placeholder="props.placeholder" :disabled="!!props.disabled" autocomplete="off" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur()" @keydown="onKeydown($event)" />
 
   
-  <ul v-if="isOpen && !props.virtual" class="rozie-combobox-list" :id="listId()" role="listbox">
+  <ul v-if="isOpen && !props.virtual && !isGrouped()" class="rozie-combobox-list" :id="listId()" role="listbox">
     <li v-for="opt in filteredOptions()" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="opt.value === value" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
       <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="opt.value === value" :disabled="opt.disabled">{{ opt.label }}</slot>
     </li>
 
     <li v-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
+      <slot name="empty" :query="query">No results</slot>
+    </li></ul><ul v-if="isOpen && !props.virtual && isGrouped()" class="rozie-combobox-list" :id="listId()" role="listbox">
+    <li v-for="blk in groupBlocks()" :key="'grp-' + (blk.group ? blk.group.id : '_ungrouped')" class="rozie-combobox-group" role="group" :aria-label="blk.group ? blk.group.label : undefined">
+      <div v-if="blk.group" class="rozie-combobox-group-heading" role="presentation">
+        <slot name="groupHeading" :group="blk.group">{{ blk.group.label }}</slot>
+      </div><div v-for="opt in blk.items" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="opt.value === value" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
+        <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="opt.value === value" :disabled="opt.disabled">{{ opt.label }}</slot>
+      </div>
+    </li>
+
+    <li v-if="groupBlocks().length === 0" class="rozie-combobox-empty" role="presentation">
       <slot name="empty" :query="query">No results</slot>
     </li></ul><ul v-if="props.virtual" class="rozie-combobox-list rozie-combobox-list--virtual" :id="listId()" role="listbox" :style="(isOpen ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto')">
     <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></li>
@@ -32,7 +43,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 const props = withDefaults(
   defineProps<{
     /**
-     * The option list — `[{ value, label, disabled? }]`. `label` is the displayed text (and what client filtering matches against), `value` is what `r-model:value` reads and writes, and an optional `disabled` flag makes an option non-selectable.
+     * The option list — `[{ value, label, disabled?, group? }]`. `label` is the displayed text (and what client filtering matches against), `value` is what `r-model:value` reads and writes, an optional `disabled` flag makes an option non-selectable, and an optional `group` string buckets the option under a matching entry of the `groups` prop (or a first-appearance fallback section) when grouping is active.
      */
     options?: any[];
     /**
@@ -87,8 +98,12 @@ const props = withDefaults(
      * A CSS length string bounding the popup scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-combobox-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
      */
     maxHeight?: string;
+    /**
+     * Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default).
+     */
+    groups?: any[];
   }>(),
-  { options: () => [], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
+  { options: () => [], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: () => [] }
 );
 
 /**
@@ -104,6 +119,9 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
+  option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
+  empty(props: { query: any }): any;
+  groupHeading(props: { group: any }): any;
   option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
   empty(props: { query: any }): any;
   option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
@@ -458,6 +476,7 @@ const rowIsOutsideWindow = (r: any) => {
 // every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
 // the non-virtual emitted path executes none of it (byte-identical-off).
 import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
+import { groupOptions } from './internal/groupOptions';
 
 // Windowing instance state (reassigned module-`let`s → React hoists to useRef; do NOT
 // const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
@@ -518,39 +537,62 @@ const foCache = {
   optsRef: null,
   q: null,
   df: null,
+  groupsRef: null,
   val: null,
   hasVal: false
 };
 const filteredOptions = () => {
-  // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}): read ALL three reactive inputs
+  // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}): read ALL FOUR reactive inputs
   // into locals at the TOP, BEFORE any cache-hit early return — read $data.query UNCONDITIONALLY
   // (even when disableFilter is true, mirroring windowing.rzts windowedRows void-touch discipline)
-  // so the r-for accessor subscribes to them on every eval. An early return that skipped reading
-  // them would leave the accessor un-subscribed → it would never re-run on a real input change →
-  // stale/blank window.
+  // and $props.groups UNCONDITIONALLY (even when $props.virtual, so a groups change while
+  // windowed still invalidates the cache once virtual toggles off) so the r-for accessor
+  // subscribes to them on every eval. An early return that skipped reading them would leave the
+  // accessor un-subscribed → it would never re-run on a real input change → stale/blank window.
   const opts = Array.isArray(props.options) ? props.options : [];
   const df = !!props.disableFilter;
   const q = String(query.value == null ? '' : query.value);
-  // Reference-keyed cache HIT: same options reference, same query, same disableFilter → return the
-  // SAME array reference (no re-map, no new wrappers). Pure ===, NOT a reactive subscription.
-  if (foCache.hasVal && foCache.optsRef === opts && foCache.q === q && foCache.df === df) return foCache.val;
-  // MISS → run the existing filter + map, then store keyed on (opts ref, query, disableFilter).
+  const groupsProp = props.groups;
+  // Reference-keyed cache HIT: same options reference, same query, same disableFilter, same
+  // groups reference → return the SAME array reference (no re-map, no new wrappers). Pure ===,
+  // NOT a reactive subscription.
+  if (foCache.hasVal && foCache.optsRef === opts && foCache.q === q && foCache.df === df && foCache.groupsRef === groupsProp) return foCache.val;
+  // MISS → run the existing filter, then (native option grouping, combobox-native-groups) a
+  // NON-VIRTUAL-ONLY stable re-partition into group-visual order, then map + store keyed on
+  // (opts ref, query, disableFilter, groups ref).
   let list = opts;
   if (!df) {
     const ql = q.toLowerCase();
     if (ql) list = opts.filter((o: any) => String(labelOf(o)).toLowerCase().indexOf(ql) !== -1);
   }
+  // Gated to !$props.virtual (groups×virtual is deferred/unsupported per design) AND to
+  // $props.groups being a NON-EMPTY array — an explicit author opt-in. This is deliberately
+  // NOT just "!$props.virtual" (groupOptions() would otherwise also fire whenever any raw
+  // option happens to carry a `.group` field, even with `groups` absent — a real collision
+  // discovered against command-palette's CommandItem.group, which is a PRE-EXISTING,
+  // unrelated per-row-badge field, not an opt-in to combobox's native grouping. The design's
+  // "Empty/absent `groups` ⇒ today's flat behavior, byte-identical" contract is about the
+  // `groups` PROP only — never inferred from incidental option shape.
+  if (!props.virtual && Array.isArray(groupsProp) && groupsProp.length > 0) {
+    const partition = groupOptions(list, groupsProp, (o: any) => o && o.group != null ? String(o.group) : null);
+    list = partition.ordered;
+  }
+  // `_i` is assigned over the (now group-ordered) list, so the flat keyboard model
+  // (activeIndex/aria-activedescendant/nextEnabled) walks visual order unchanged.
+  // `group` carries the wrapper's normalized group id for groupBlocks() below.
   const val = list.map((o: any, i: any) => ({
     value: valueOf(o),
     label: labelOf(o),
     disabled: disabledOf(o),
     _i: i,
     id: valueOf(o),
-    option: o
+    option: o,
+    group: o && o.group != null ? String(o.group) : null
   }));
   foCache.optsRef = opts;
   foCache.q = q;
   foCache.df = df;
+  foCache.groupsRef = groupsProp;
   foCache.val = val;
   foCache.hasVal = true;
   return val;
@@ -563,6 +605,61 @@ const filteredOptions = () => {
 // list (the same wrapper rows the template iterates). Kept === $data.rows so the math's
 // rowList[vi.index] resolves to the same wrapper the count windows over.
 const windowSource = () => filteredOptions();
+
+// ---- native option grouping render helpers (combobox-native-groups) ---------------
+// groupBlocks(): re-partition the ALREADY group-ordered filteredOptions() wrappers into
+// CONTIGUOUS runs by wrapper.group (trivial + guarantees `_i` alignment, since `ordered`
+// from groupOptions() is already group-contiguous). Attaches each run's `{ id, label }`
+// from $props.groups (fallback label = the group id itself). Plain function — never
+// $computed (mirrors filteredOptions()'s convention). Non-virtual only (isGrouped() below
+// already gates the template branch that calls this).
+// ---- native option grouping render helpers (combobox-native-groups) ---------------
+// groupBlocks(): re-partition the ALREADY group-ordered filteredOptions() wrappers into
+// CONTIGUOUS runs by wrapper.group (trivial + guarantees `_i` alignment, since `ordered`
+// from groupOptions() is already group-contiguous). Attaches each run's `{ id, label }`
+// from $props.groups (fallback label = the group id itself). Plain function — never
+// $computed (mirrors filteredOptions()'s convention). Non-virtual only (isGrouped() below
+// already gates the template branch that calls this).
+const groupBlocks = () => {
+  const wrappers = filteredOptions();
+  const groupsProp = Array.isArray(props.groups) ? props.groups : [];
+  const labelFor = (gid: any) => {
+    const found = groupsProp.find((g: any) => g && g.id === gid);
+    return found ? found.label : gid;
+  };
+  const blocks = [];
+  let lastGid;
+  for (let i = 0; i < wrappers.length; i++) {
+    const w = wrappers[i];
+    if (i === 0 || w.group !== lastGid) {
+      blocks.push({
+        group: w.group == null ? null : {
+          id: w.group,
+          label: labelFor(w.group)
+        },
+        items: [w]
+      });
+    } else {
+      blocks[blocks.length - 1].items.push(w);
+    }
+    lastGid = w.group;
+  }
+  return blocks;
+};
+
+// isGrouped(): the grouped-vs-flat template branch selector. Grouping is active
+// (non-virtual only) SOLELY when the author explicitly set a non-empty `groups` prop —
+// deliberately NOT "OR any option carries a group" (a real collision discovered against
+// command-palette's pre-existing CommandItem.group per-row-badge field; see the
+// filteredOptions() comment above). Mirrors that same non-empty-`groups` gate exactly, so
+// isGrouped() and the filteredOptions() partition never disagree about which branch is active.
+// isGrouped(): the grouped-vs-flat template branch selector. Grouping is active
+// (non-virtual only) SOLELY when the author explicitly set a non-empty `groups` prop —
+// deliberately NOT "OR any option carries a group" (a real collision discovered against
+// command-palette's pre-existing CommandItem.group per-row-badge field; see the
+// filteredOptions() comment above). Mirrors that same non-empty-`groups` gate exactly, so
+// isGrouped() and the filteredOptions() partition never disagree about which branch is active.
+const isGrouped = () => !props.virtual && Array.isArray(props.groups) && props.groups.length > 0;
 
 // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
 // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
@@ -919,6 +1016,19 @@ defineExpose({ focus, clear });
   padding: var(--rozie-combobox-empty-padding, 0.5rem 0.6rem);
   color: var(--rozie-combobox-empty-color, rgba(0, 0, 0, 0.5));
   list-style: none;
+}
+.rozie-combobox-group {
+  list-style: none;
+}
+.rozie-combobox-group-heading {
+  padding: var(--rozie-combobox-group-heading-padding, 0.35rem 0.6rem 0.15rem);
+  font-size: var(--rozie-combobox-group-heading-size, 0.75rem);
+  font-weight: var(--rozie-combobox-group-heading-weight, 600);
+  text-transform: var(--rozie-combobox-group-heading-transform, uppercase);
+  letter-spacing: var(--rozie-combobox-group-heading-letter-spacing, 0.03em);
+  color: var(--rozie-combobox-group-heading-color, rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+  user-select: none;
 }
 .rozie-combobox-spacer { margin: 0; padding: 0; border: 0; list-style: none; }
 .rozie-combobox--inline {

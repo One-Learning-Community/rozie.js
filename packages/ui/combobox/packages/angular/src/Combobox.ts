@@ -7,6 +7,7 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
 // every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
 // the non-virtual emitted path executes none of it (byte-identical-off).
 import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
+import { groupOptions } from './internal/groupOptions';
 
 // Windowing instance state (reassigned module-`let`s → React hoists to useRef; do NOT
 // const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
@@ -24,6 +25,11 @@ interface OptionCtx {
 interface EmptyCtx {
   $implicit: { query: any };
   query: any;
+}
+
+interface GroupHeadingCtx {
+  $implicit: { group: any };
+  group: any;
 }
 
 function __rozieDisplay(v: unknown): string {
@@ -56,7 +62,7 @@ function __rozieAttr(v: unknown): string | null {
       <input #inputEl class="rozie-combobox-input" type="text" role="combobox" aria-autocomplete="list" [attr.aria-expanded]="!!isOpen()" [attr.aria-controls]="rozieAttr(listId())" [attr.aria-activedescendant]="rozieAttr(activeId())" [attr.aria-label]="ariaLabel()" [value]="query()" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" autocomplete="off" (input)="onInput($event)" (focus)="onFocus($event)" (blur)="onBlur()" (keydown)="onKeydown($event)" />
 
       
-      @if (isOpen() && !virtual()) {
+      @if (isOpen() && !virtual() && !isGrouped()) {
     <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
         @for (opt of filteredOptions(); track opt.value) {
     <li class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': opt.value === value(), 'rozie-combobox-option--disabled': opt.disabled }" [attr.id]="rozieAttr(optId(opt._i))" role="option" [attr.aria-selected]="opt.value === value()" [attr.aria-disabled]="!!opt.disabled" (mousedown)="$event.preventDefault(); selectOption(opt)" (mouseenter)="activeIndex.set(opt._i)">
@@ -69,6 +75,39 @@ function __rozieAttr(v: unknown): string | null {
     }
 
         @if (filteredOptions().length === 0) {
+    <li class="rozie-combobox-empty" role="presentation">
+          @if ((emptyTpl ?? templates()?.['empty'])) {
+    <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
+    } @else {
+    No results
+    }
+        </li>
+    }</ul>
+    }@if (isOpen() && !virtual() && isGrouped()) {
+    <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
+        @for (blk of groupBlocks(); track 'grp-' + (blk.group ? blk.group.id : '_ungrouped')) {
+    <li class="rozie-combobox-group" role="group" [attr.aria-label]="rozieAttr(blk.group ? blk.group.label : null)">
+          @if (blk.group) {
+    <div class="rozie-combobox-group-heading" role="presentation">
+            @if ((groupHeadingTpl ?? templates()?.['groupHeading'])) {
+    <ng-container *ngTemplateOutlet="(groupHeadingTpl ?? templates()?.['groupHeading']); context: { $implicit: { group: blk.group }, group: blk.group }" />
+    } @else {
+    {{ rozieDisplay(blk.group.label) }}
+    }
+          </div>
+    }@for (opt of blk.items; track opt.value) {
+    <div class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': opt.value === value(), 'rozie-combobox-option--disabled': opt.disabled }" [attr.id]="rozieAttr(optId(opt._i))" role="option" [attr.aria-selected]="opt.value === value()" [attr.aria-disabled]="!!opt.disabled" (mousedown)="$event.preventDefault(); selectOption(opt)" (mouseenter)="activeIndex.set(opt._i)">
+            @if ((optionTpl ?? templates()?.['option'])) {
+    <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }, option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }" />
+    } @else {
+    {{ rozieDisplay(opt.label) }}
+    }
+          </div>
+    }
+        </li>
+    }
+
+        @if (groupBlocks().length === 0) {
     <li class="rozie-combobox-empty" role="presentation">
           @if ((emptyTpl ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
@@ -172,6 +211,19 @@ function __rozieAttr(v: unknown): string | null {
       color: var(--rozie-combobox-empty-color, rgba(0, 0, 0, 0.5));
       list-style: none;
     }
+    .rozie-combobox-group {
+      list-style: none;
+    }
+    .rozie-combobox-group-heading {
+      padding: var(--rozie-combobox-group-heading-padding, 0.35rem 0.6rem 0.15rem);
+      font-size: var(--rozie-combobox-group-heading-size, 0.75rem);
+      font-weight: var(--rozie-combobox-group-heading-weight, 600);
+      text-transform: var(--rozie-combobox-group-heading-transform, uppercase);
+      letter-spacing: var(--rozie-combobox-group-heading-letter-spacing, 0.03em);
+      color: var(--rozie-combobox-group-heading-color, rgba(0, 0, 0, 0.5));
+      pointer-events: none;
+      user-select: none;
+    }
     .rozie-combobox-spacer { margin: 0; padding: 0; border: 0; list-style: none; }
     .rozie-combobox--inline {
       display: block;
@@ -202,7 +254,7 @@ export class Combobox {
    */
   value = model<(unknown) | null>(null);
   /**
-   * The option list — `[{ value, label, disabled? }]`. `label` is the displayed text (and what client filtering matches against), `value` is what `r-model:value` reads and writes, and an optional `disabled` flag makes an option non-selectable.
+   * The option list — `[{ value, label, disabled?, group? }]`. `label` is the displayed text (and what client filtering matches against), `value` is what `r-model:value` reads and writes, an optional `disabled` flag makes an option non-selectable, and an optional `group` string buckets the option under a matching entry of the `groups` prop (or a first-appearance fallback section) when grouping is active.
    */
   options = input<any[]>((() => [])());
   /**
@@ -257,6 +309,10 @@ export class Combobox {
    * A CSS length string bounding the popup scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-combobox-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
    */
   maxHeight = input<string>('');
+  /**
+   * Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default).
+   */
+  groups = input<any[]>((() => [])());
   query = signal('');
   isOpen = signal(false);
   activeIndex = signal(-1);
@@ -269,6 +325,7 @@ export class Combobox {
   search = output<unknown>();
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
+  @ContentChild('groupHeading', { read: TemplateRef }) groupHeadingTpl?: TemplateRef<GroupHeadingCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
@@ -506,46 +563,97 @@ export class Combobox {
     optsRef: null,
     q: null,
     df: null,
+    groupsRef: null,
     val: null,
     hasVal: false
   };
   filteredOptions = () => {
     const __options = this.options();
     const __query = this.query();
-    // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}): read ALL three reactive inputs
+    // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}): read ALL FOUR reactive inputs
     // into locals at the TOP, BEFORE any cache-hit early return — read $data.query UNCONDITIONALLY
     // (even when disableFilter is true, mirroring windowing.rzts windowedRows void-touch discipline)
-    // so the r-for accessor subscribes to them on every eval. An early return that skipped reading
-    // them would leave the accessor un-subscribed → it would never re-run on a real input change →
-    // stale/blank window.
+    // and $props.groups UNCONDITIONALLY (even when $props.virtual, so a groups change while
+    // windowed still invalidates the cache once virtual toggles off) so the r-for accessor
+    // subscribes to them on every eval. An early return that skipped reading them would leave the
+    // accessor un-subscribed → it would never re-run on a real input change → stale/blank window.
     const opts = Array.isArray(__options) ? __options : [];
     const df = !!this.disableFilter();
     const q = String(__query == null ? '' : __query);
-    // Reference-keyed cache HIT: same options reference, same query, same disableFilter → return the
-    // SAME array reference (no re-map, no new wrappers). Pure ===, NOT a reactive subscription.
-    if (this.foCache.hasVal && this.foCache.optsRef === opts && this.foCache.q === q && this.foCache.df === df) return this.foCache.val;
-    // MISS → run the existing filter + map, then store keyed on (opts ref, query, disableFilter).
+    const groupsProp = this.groups();
+    // Reference-keyed cache HIT: same options reference, same query, same disableFilter, same
+    // groups reference → return the SAME array reference (no re-map, no new wrappers). Pure ===,
+    // NOT a reactive subscription.
+    if (this.foCache.hasVal && this.foCache.optsRef === opts && this.foCache.q === q && this.foCache.df === df && this.foCache.groupsRef === groupsProp) return this.foCache.val;
+    // MISS → run the existing filter, then (native option grouping, combobox-native-groups) a
+    // NON-VIRTUAL-ONLY stable re-partition into group-visual order, then map + store keyed on
+    // (opts ref, query, disableFilter, groups ref).
     let list = opts;
     if (!df) {
       const ql = q.toLowerCase();
       if (ql) list = opts.filter((o: any) => String(this.labelOf(o)).toLowerCase().indexOf(ql) !== -1);
     }
+    // Gated to !$props.virtual (groups×virtual is deferred/unsupported per design) AND to
+    // $props.groups being a NON-EMPTY array — an explicit author opt-in. This is deliberately
+    // NOT just "!$props.virtual" (groupOptions() would otherwise also fire whenever any raw
+    // option happens to carry a `.group` field, even with `groups` absent — a real collision
+    // discovered against command-palette's CommandItem.group, which is a PRE-EXISTING,
+    // unrelated per-row-badge field, not an opt-in to combobox's native grouping. The design's
+    // "Empty/absent `groups` ⇒ today's flat behavior, byte-identical" contract is about the
+    // `groups` PROP only — never inferred from incidental option shape.
+    if (!this.virtual() && Array.isArray(groupsProp) && groupsProp.length > 0) {
+      const partition = groupOptions(list, groupsProp, (o: any) => o && o.group != null ? String(o.group) : null);
+      list = partition.ordered;
+    }
+    // `_i` is assigned over the (now group-ordered) list, so the flat keyboard model
+    // (activeIndex/aria-activedescendant/nextEnabled) walks visual order unchanged.
+    // `group` carries the wrapper's normalized group id for groupBlocks() below.
     const val = list.map((o: any, i: any) => ({
       value: this.valueOf$local(o),
       label: this.labelOf(o),
       disabled: this.disabledOf(o),
       _i: i,
       id: this.valueOf$local(o),
-      option: o
+      option: o,
+      group: o && o.group != null ? String(o.group) : null
     }));
     this.foCache.optsRef = opts;
     this.foCache.q = q;
     this.foCache.df = df;
+    this.foCache.groupsRef = groupsProp;
     this.foCache.val = val;
     this.foCache.hasVal = true;
     return val;
   };
   windowSource = () => this.filteredOptions();
+  groupBlocks = () => {
+    const __groups = this.groups();
+    const wrappers = this.filteredOptions();
+    const groupsProp = Array.isArray(__groups) ? __groups : [];
+    const labelFor = (gid: any) => {
+      const found = groupsProp.find((g: any) => g && g.id === gid);
+      return found ? found.label : gid;
+    };
+    const blocks = [];
+    let lastGid;
+    for (let i = 0; i < wrappers.length; i++) {
+      const w = wrappers[i];
+      if (i === 0 || w.group !== lastGid) {
+        blocks.push({
+          group: w.group == null ? null : {
+            id: w.group,
+            label: labelFor(w.group)
+          },
+          items: [w]
+        });
+      } else {
+        blocks[blocks.length - 1].items.push(w);
+      }
+      lastGid = w.group;
+    }
+    return blocks;
+  };
+  isGrouped = () => !this.virtual() && Array.isArray(this.groups()) && this.groups().length > 0;
   pinnedEditIndex = () => -1;
   pinnedMeasurement = (pin: any) => null;
   syncRows = () => {
@@ -735,7 +843,7 @@ export class Combobox {
   static ngTemplateContextGuard(
     _dir: Combobox,
     _ctx: unknown,
-  ): _ctx is OptionCtx | EmptyCtx {
+  ): _ctx is OptionCtx | EmptyCtx | GroupHeadingCtx {
     return true;
   }
 

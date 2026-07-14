@@ -67,7 +67,7 @@ const frameworks = [
 | Name | Type | Default | Runtime-updatable? | Description |
 | --- | --- | --- | :---: | --- |
 | `value` | `unknown` | `null` | yes (via `r-model`) | The selected option's value — the sole `model: true` prop, so Angular emits a `ControlValueAccessor`. `null` when nothing is selected. |
-| `options` | `Array` | `[]` | yes | The option list — `[{ value, label, disabled? }]`. `label` is the displayed text (and what client filtering matches against); `value` is what `r-model:value` reads/writes. |
+| `options` | `Array` | `[]` | yes | The option list — `[{ value, label, disabled?, group? }]`. `label` is the displayed text (and what client filtering matches against); `value` is what `r-model:value` reads/writes; an optional `group` string buckets the option under a matching entry of the `groups` prop (or a first-appearance fallback section) when grouping is active. |
 | `placeholder` | `String` | `''` | yes | Placeholder text for the empty input. |
 | `disabled` | `Boolean` | `false` | yes | Disable the control (also sets the Angular CVA disabled state). |
 | `disableFilter` | `Boolean` | `false` | yes | Opt **out** of built-in client filtering (async / server-side mode): render `options` as supplied and rely on the `search` event to refetch. Default: filter `options` by `label` against the typed query. |
@@ -81,6 +81,7 @@ const frameworks = [
 | `virtual` | `Boolean` | `false` | yes | Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling popup (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed combobox. Pair with `inline` + `maxHeight`. |
 | `estimateRowHeight` | `Number` | `36` | yes | Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on. |
 | `maxHeight` | `String` | `''` | yes | A CSS length string bounding the popup scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-combobox-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off. |
+| `groups` | `Array` | `[]` | yes | Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default). |
 
 ### Events
 
@@ -104,6 +105,29 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | --- | --- | --- |
 | `option` | `option, index, active, selected, disabled` | Custom per-option rendering. `option` is the raw source option object, `index` is its position in the filtered list, `active` is whether it is the active-descendant (keyboard-highlighted), `selected` is whether its value equals the bound `value`, `disabled` is the resolved disabled state. Omit it to render the plain resolved label. |
 | `empty` | `query` | Rendered inside the open popup when the filtered list is empty. `query` is the current input text. Omit it to render the default "No results". |
+| `groupHeading` | `group` | Custom rendering for a group's heading (only when grouping is active — see [Grouping options](#grouping-options)). `group` is `{ id, label }`. Omit it to render the plain `group.label`. |
+
+## Grouping options
+
+Pass an ordered `groups` prop and tag each option with a matching `group` id to partition the popup into semantic sections — each rendered as a `role="group"` block with an `aria-label` heading, following the [WAI-ARIA listbox-with-groups pattern](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/):
+
+```rozie
+<template>
+  <Combobox
+    r-model:value="$data.userId"
+    :options="[
+      { value: 'apple', label: 'Apple', group: 'fruit' },
+      { value: 'carrot', label: 'Carrot', group: 'veg' },
+    ]"
+    :groups="[
+      { id: 'fruit', label: 'Fruit' },
+      { id: 'veg', label: 'Vegetable' },
+    ]"
+  />
+</template>
+```
+
+`groups` sets both the section order and the heading text; a group id present on an option but absent from `groups` falls back to a section titled with the id itself, appended after the listed ones (first-appearance order). Options with no `group` render in a single leading, unheaded section. Within every section, options keep their filtered/scored order — grouping is a stable re-partition, never a re-sort. The keyboard model (`ArrowUp`/`ArrowDown`/`Home`/`End`/`Enter`, `aria-activedescendant`) is unchanged: it walks the same group-ordered flat sequence, so on-screen order always matches keyboard order, and headings are never a keyboard stop. **Leaving `groups` empty (and no option carrying `group`) is byte-identical to the ungrouped combobox** — grouping is strictly additive and opt-in. Grouping is supported only in the standard (non-`virtual`) render; `groups` × `virtual` windowing is not yet supported.
 
 ## Filtering: client vs. async
 

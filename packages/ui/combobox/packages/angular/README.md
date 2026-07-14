@@ -103,6 +103,7 @@ export class ComboboxFormComponent {
 | `virtual` | `Boolean` | `false` |  |  |
 | `estimateRowHeight` | `Number` | `36` |  |  |
 | `maxHeight` | `String` | `''` |  |  |
+| `groups` | `Array` | `[]` |  |  |
 
 ## Events
 
@@ -133,6 +134,9 @@ export class DemoComponent {
 
 | Slot | Params |
 | --- | --- |
+| option | option, index, active, selected, disabled |
+| empty | query |
+| groupHeading | group |
 | option | option, index, active, selected, disabled |
 | empty | query |
 | option | option, index, active, selected, disabled |

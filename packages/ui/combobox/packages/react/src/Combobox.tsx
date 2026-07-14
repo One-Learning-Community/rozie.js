@@ -7,6 +7,7 @@ import './Combobox.css';
 // every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
 // the non-virtual emitted path executes none of it (byte-identical-off).
 import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
+import { groupOptions } from './internal/groupOptions';
 
 // Windowing instance state (reassigned module-`let`s → React hoists to useRef; do NOT
 // const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
@@ -15,6 +16,8 @@ import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, m
 interface OptionCtx { option: any; index: any; active: any; selected: any; disabled: any; }
 
 interface EmptyCtx { query: any; }
+
+interface GroupHeadingCtx { group: any; }
 
 interface ComboboxProps {
   /**
@@ -26,7 +29,7 @@ interface ComboboxProps {
   defaultValue?: (unknown) | null;
   onValueChange?: (value: (unknown) | null) => void;
   /**
-   * The option list — `[{ value, label, disabled? }]`. `label` is the displayed text (and what client filtering matches against), `value` is what `r-model:value` reads and writes, and an optional `disabled` flag makes an option non-selectable.
+   * The option list — `[{ value, label, disabled?, group? }]`. `label` is the displayed text (and what client filtering matches against), `value` is what `r-model:value` reads and writes, an optional `disabled` flag makes an option non-selectable, and an optional `group` string buckets the option under a matching entry of the `groups` prop (or a first-appearance fallback section) when grouping is active.
    */
   options?: any[];
   /**
@@ -81,10 +84,15 @@ interface ComboboxProps {
    * A CSS length string bounding the popup scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-combobox-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
    */
   maxHeight?: string;
+  /**
+   * Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default).
+   */
+  groups?: any[];
   onChange?: (...args: any[]) => void;
   onSearch?: (...args: any[]) => void;
   renderOption?: (ctx: OptionCtx) => ReactNode;
   renderEmpty?: (ctx: EmptyCtx) => ReactNode;
+  renderGroupHeading?: (ctx: GroupHeadingCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
@@ -95,7 +103,8 @@ export interface ComboboxHandle {
 
 const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_props: ComboboxProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => [])())[0];
-  const props: Omit<ComboboxProps, 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { options: any[]; placeholder: string; disabled: boolean; disableFilter: boolean; ariaLabel: (string) | null; idBase: string; inline: boolean; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
+  const __defaultGroups = useState(() => (() => [])())[0];
+  const props: Omit<ComboboxProps, 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups'> & { options: any[]; placeholder: string; disabled: boolean; disableFilter: boolean; ariaLabel: (string) | null; idBase: string; inline: boolean; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string; groups: any[] } = {
     ..._props,
     options: _props.options ?? __defaultOptions,
     placeholder: _props.placeholder ?? '',
@@ -111,10 +120,11 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     virtual: _props.virtual ?? false,
     estimateRowHeight: _props.estimateRowHeight ?? 36,
     maxHeight: _props.maxHeight ?? '',
+    groups: _props.groups ?? __defaultGroups,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { value, options, placeholder, disabled, disableFilter, ariaLabel, idBase, inline, closeOnSelect, optionLabel, optionValue, optionDisabled, virtual, estimateRowHeight, maxHeight, defaultValue, onValueChange, ...rest } = _props as ComboboxProps & Record<string, unknown>;
-    void value; void options; void placeholder; void disabled; void disableFilter; void ariaLabel; void idBase; void inline; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void virtual; void estimateRowHeight; void maxHeight; void defaultValue; void onValueChange;
+    const { value, options, placeholder, disabled, disableFilter, ariaLabel, idBase, inline, closeOnSelect, optionLabel, optionValue, optionDisabled, virtual, estimateRowHeight, maxHeight, groups, defaultValue, onValueChange, ...rest } = _props as ComboboxProps & Record<string, unknown>;
+    void value; void options; void placeholder; void disabled; void disableFilter; void ariaLabel; void idBase; void inline; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void virtual; void estimateRowHeight; void maxHeight; void groups; void defaultValue; void onValueChange;
     return rest;
   })();
   const gridScrollEl = useRef<any>(null);
@@ -323,45 +333,97 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     optsRef: null,
     q: null,
     df: null,
+    groupsRef: null,
     val: null,
     hasVal: false
   }), []);
   function filteredOptions() {
-    // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}): read ALL three reactive inputs
+    // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}): read ALL FOUR reactive inputs
     // into locals at the TOP, BEFORE any cache-hit early return — read $data.query UNCONDITIONALLY
     // (even when disableFilter is true, mirroring windowing.rzts windowedRows void-touch discipline)
-    // so the r-for accessor subscribes to them on every eval. An early return that skipped reading
-    // them would leave the accessor un-subscribed → it would never re-run on a real input change →
-    // stale/blank window.
+    // and $props.groups UNCONDITIONALLY (even when $props.virtual, so a groups change while
+    // windowed still invalidates the cache once virtual toggles off) so the r-for accessor
+    // subscribes to them on every eval. An early return that skipped reading them would leave the
+    // accessor un-subscribed → it would never re-run on a real input change → stale/blank window.
     const opts = Array.isArray(props.options) ? props.options : [];
     const df = !!props.disableFilter;
     const q = String(query == null ? '' : query);
-    // Reference-keyed cache HIT: same options reference, same query, same disableFilter → return the
-    // SAME array reference (no re-map, no new wrappers). Pure ===, NOT a reactive subscription.
-    if (foCache.hasVal && foCache.optsRef === opts && foCache.q === q && foCache.df === df) return foCache.val;
-    // MISS → run the existing filter + map, then store keyed on (opts ref, query, disableFilter).
+    const groupsProp = props.groups;
+    // Reference-keyed cache HIT: same options reference, same query, same disableFilter, same
+    // groups reference → return the SAME array reference (no re-map, no new wrappers). Pure ===,
+    // NOT a reactive subscription.
+    if (foCache.hasVal && foCache.optsRef === opts && foCache.q === q && foCache.df === df && foCache.groupsRef === groupsProp) return foCache.val;
+    // MISS → run the existing filter, then (native option grouping, combobox-native-groups) a
+    // NON-VIRTUAL-ONLY stable re-partition into group-visual order, then map + store keyed on
+    // (opts ref, query, disableFilter, groups ref).
     let list = opts;
     if (!df) {
       const ql = q.toLowerCase();
       if (ql) list = opts.filter((o: any) => String(labelOf(o)).toLowerCase().indexOf(ql) !== -1);
     }
+    // Gated to !$props.virtual (groups×virtual is deferred/unsupported per design) AND to
+    // $props.groups being a NON-EMPTY array — an explicit author opt-in. This is deliberately
+    // NOT just "!$props.virtual" (groupOptions() would otherwise also fire whenever any raw
+    // option happens to carry a `.group` field, even with `groups` absent — a real collision
+    // discovered against command-palette's CommandItem.group, which is a PRE-EXISTING,
+    // unrelated per-row-badge field, not an opt-in to combobox's native grouping. The design's
+    // "Empty/absent `groups` ⇒ today's flat behavior, byte-identical" contract is about the
+    // `groups` PROP only — never inferred from incidental option shape.
+    if (!props.virtual && Array.isArray(groupsProp) && groupsProp.length > 0) {
+      const partition = groupOptions(list, groupsProp, (o: any) => o && o.group != null ? String(o.group) : null);
+      list = partition.ordered;
+    }
+    // `_i` is assigned over the (now group-ordered) list, so the flat keyboard model
+    // (activeIndex/aria-activedescendant/nextEnabled) walks visual order unchanged.
+    // `group` carries the wrapper's normalized group id for groupBlocks() below.
     const val = list.map((o: any, i: any) => ({
       value: valueOf(o),
       label: labelOf(o),
       disabled: disabledOf(o),
       _i: i,
       id: valueOf(o),
-      option: o
+      option: o,
+      group: o && o.group != null ? String(o.group) : null
     }));
     foCache.optsRef = opts;
     foCache.q = q;
     foCache.df = df;
+    foCache.groupsRef = groupsProp;
     foCache.val = val;
     foCache.hasVal = true;
     return val;
   }
   function windowSource() {
     return filteredOptions();
+  }
+  function groupBlocks() {
+    const wrappers = filteredOptions();
+    const groupsProp = Array.isArray(props.groups) ? props.groups : [];
+    const labelFor = (gid: any) => {
+      const found = groupsProp.find((g: any) => g && g.id === gid);
+      return found ? found.label : gid;
+    };
+    const blocks = [];
+    let lastGid;
+    for (let i = 0; i < wrappers.length; i++) {
+      const w = wrappers[i];
+      if (i === 0 || w.group !== lastGid) {
+        blocks.push({
+          group: w.group == null ? null : {
+            id: w.group,
+            label: labelFor(w.group)
+          },
+          items: [w]
+        });
+      } else {
+        blocks[blocks.length - 1].items.push(w);
+      }
+      lastGid = w.group;
+    }
+    return blocks;
+  }
+  function isGrouped() {
+    return !props.virtual && Array.isArray(props.groups) && props.groups.length > 0;
   }
   function pinnedEditIndex() {
     return -1;
@@ -586,12 +648,23 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       <input ref={inputEl} className={"rozie-combobox-input"} type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!isOpen} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(props.ariaLabel)} value={query} placeholder={props.placeholder} disabled={!!props.disabled} autoComplete="off" onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur(); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-9546115a="" />
 
       
-      {!!(isOpen && !props.virtual) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+      {!!(isOpen && !props.virtual && !isGrouped()) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
         {filteredOptions().map((opt) => <li key={opt.value} className={clsx("rozie-combobox-option", { "rozie-combobox-option--active": opt._i === activeIndex, "rozie-combobox-option--selected": opt.value === value, "rozie-combobox-option--disabled": opt.disabled })} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onMouseDown={($event) => { $event.preventDefault(); selectOption(opt); }} onMouseEnter={($event) => { setActiveIndex(opt._i); }} data-rozie-s-9546115a="">
           {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled }) : rozieDisplay(opt.label)}
         </li>)}
 
         {!!(filteredOptions().length === 0) && <li className={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+          {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No results"}
+        </li>}</ul>}{!!(isOpen && !props.virtual && isGrouped()) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+        {groupBlocks().map((blk) => <li key={'grp-' + (blk.group ? blk.group.id : '_ungrouped')} className={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk.group ? blk.group.label : undefined)} data-rozie-s-9546115a="">
+          {!!(blk.group) && <div className={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
+            {(props.renderGroupHeading ?? props.slots?.['groupHeading']) ? ((props.renderGroupHeading ?? props.slots?.['groupHeading']) as Function)({ group: blk.group }) : rozieDisplay(blk.group.label)}
+          </div>}{blk.items.map((opt) => <div key={opt.value} className={clsx("rozie-combobox-option", { "rozie-combobox-option--active": opt._i === activeIndex, "rozie-combobox-option--selected": opt.value === value, "rozie-combobox-option--disabled": opt.disabled })} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onMouseDown={($event) => { $event.preventDefault(); selectOption(opt); }} onMouseEnter={($event) => { setActiveIndex(opt._i); }} data-rozie-s-9546115a="">
+            {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled }) : rozieDisplay(opt.label)}
+          </div>)}
+        </li>)}
+
+        {!!(groupBlocks().length === 0) && <li className={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
           {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No results"}
         </li>}</ul>}{!!(props.virtual) && <ul className={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" style={parseInlineStyle((isOpen ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a="">
         <li className={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a="" />
