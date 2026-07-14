@@ -235,9 +235,11 @@ const LANG_EXTERNALS = [
  *   - `sideEffects`: scope so the languages module (and component code) stay
  *     tree-shakable WHILE genuine side-effect CSS imports survive. The React
  *     leaf has `import './CodeMirror.css'` + `'./CodeMirror.global.css'` side
- *     effects → ALLOWLIST form `["*.css", "**\/*.css"]`. Solid/Lit and the three
- *     source leaves have NO side-effect imports → plain `false`. (Per-leaf,
- *     justified — see commit.)
+ *     effects → ALLOWLIST form `["*.css", "**\/*.css"]`. The Lit leaf registers
+ *     a custom element as a load-time side effect → scoped array form
+ *     `["./dist/index.mjs", "./dist/index.cjs"]` so bare side-effect imports
+ *     survive prod tree-shaking. Solid and the three source leaves have NO
+ *     side-effect imports → plain `false`. (Per-leaf, justified — see commit.)
  *   - bundled-leaf `tsdown.config.ts`: add `src/languages.ts` to `entry` and the
  *     lang packages to `external`.
  */
@@ -257,8 +259,19 @@ function patchLeafLangPackaging(dir, cfg) {
     };
     // The React leaf ships genuine side-effect CSS imports; keep them alive via
     // an allowlist while the languages module + component stay tree-shakable.
-    // Solid/Lit have no side-effect imports → plain false.
-    pkg.sideEffects = dir === 'react' ? ['*.css', '**/*.css'] : false;
+    // The Lit leaf registers a custom element (`@customElement` →
+    // `customElements.define`) as a load-time side effect: a composing consumer
+    // imports it as a bare `import '@rozie-ui/codemirror-lit'`, and a prod
+    // bundler honoring `sideEffects:false` would tree-shake that registration
+    // away. Scope to the registering dist entries so the element still registers
+    // while unrelated modules stay tree-shakable. Solid carries no side-effect
+    // imports → plain false.
+    pkg.sideEffects =
+      dir === 'react'
+        ? ['*.css', '**/*.css']
+        : dir === 'lit'
+          ? ['./dist/index.mjs', './dist/index.cjs']
+          : false;
   } else {
     // Source-shipped leaves (vue/svelte/angular): the subpath resolves straight
     // to the committed source module. The three source leaves carry no
