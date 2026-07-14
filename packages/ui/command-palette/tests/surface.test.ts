@@ -35,8 +35,11 @@ const EXPECT = {
   // D-05 (BREAKING, Phase 999.4): the public slots are re-aligned to the vendored
   // listbox vocabulary — `#item {item,active}` → `#option {option,index,active,
   // selected,disabled}`; `#empty` gains `{query}`; `#footer` unchanged (a panel
-  // sibling outside the listbox).
-  slots: ['option', 'empty', 'footer'],
+  // sibling outside the listbox). Additive (quick 260714-dc3): three display-only
+  // option-row sub-slots live INSIDE the default `#option` fill — `#icon`
+  // (scope `{ option }`), `#trailing` (scope `{ option }`), `#actions` (scope
+  // `{ option, actions }`) — each renders nothing when unfilled.
+  slots: ['option', 'empty', 'footer', 'icon', 'trailing', 'actions'],
   expose: ['show', 'close', 'toggle', 'focus'],
 } as const;
 
@@ -85,7 +88,7 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
-  it('declares the option/empty/footer slots (D-05 re-aligned to listbox vocabulary)', () => {
+  it('declares the option/empty/footer + icon/trailing/actions slots (additive display-only option-row sub-slots)', () => {
     const slotNames = ir.slots.map((s: { name: string }) => s.name);
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });

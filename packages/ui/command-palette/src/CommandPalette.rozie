@@ -120,7 +120,7 @@
     default: () => [],
     docs: {
       description:
-        'The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.',
+        'The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.',
     },
   },
 
@@ -216,6 +216,10 @@ const commandDisabled = (it) => !!(it && it.disabled)
 // typechecking without a per-target cast.
 const labelText = (o) => (o && o.label !== undefined ? o.label : '')
 const groupText = (o) => (o && o.group !== undefined ? o.group : '')
+// Display-only #actions scope resolver: the optional `actions` item field,
+// normalized to an array. Untyped param (neutralized to `any`) like the other
+// display helpers above — same cross-target slot-param-type gap.
+const actionsList = (o) => (o && o.actions ? o.actions : [])
 
 // Split a command's visible label into ordered { text, match } segments from
 // labelHighlight's [start,end) ranges, for the default #option fill row to
@@ -407,14 +411,25 @@ $expose({ show, close, toggle, focus })
           :matches="labelHighlight(labelText(option), $props.query)"
         >
           <div class="rozie-command-palette-option">
-            <span class="rozie-command-palette-option-label">
-              <span
-                r-for="segment, si in labelSegments(option)"
-                :key="si"
-                :class="{ 'rozie-command-palette-option-label-match': segment.match }"
-              >{{ segment.text }}</span>
+            <span r-if="$slots.icon" class="rozie-command-palette-option-icon">
+              <slot name="icon" :option="option" />
             </span>
-            <span r-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span>
+            <span class="rozie-command-palette-option-main">
+              <span class="rozie-command-palette-option-label">
+                <span
+                  r-for="segment, si in labelSegments(option)"
+                  :key="si"
+                  :class="{ 'rozie-command-palette-option-label-match': segment.match }"
+                >{{ segment.text }}</span>
+              </span>
+              <span r-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span>
+            </span>
+            <span r-if="$slots.actions" class="rozie-command-palette-option-actions">
+              <slot name="actions" :option="option" :actions="actionsList(option)" />
+            </span>
+            <span r-if="$slots.trailing" class="rozie-command-palette-option-trailing">
+              <slot name="trailing" :option="option" />
+            </span>
           </div>
         </slot>
       </template>
@@ -495,17 +510,51 @@ $expose({ show, close, toggle, focus })
 }
 
 /*
-  Layout for the default `#option` row: action label on the left, category
-  pushed to the right edge (`space-between`). This wraps the two spans inside
-  combobox's own `<li class="rozie-combobox-option">`, which already supplies the
-  row's padding/cursor/active styling — so this rule is layout-only (padding /
-  radius / cursor here would double up with the combobox option and are omitted).
+  Layout for the default `#option` row: `[icon] [main: label+group] [actions]
+  [trailing]`. This wraps the spans inside combobox's own
+  `<li class="rozie-combobox-option">`, which already supplies the row's
+  padding/cursor/active styling — so this rule is layout-only (padding /
+  radius / cursor here would double up with the combobox option and are
+  omitted). The `-main` wrapper carries `flex: 1 1 auto` and acts as the
+  spacer, pushing `-actions`/`-trailing` to the right edge.
 */
 .rozie-command-palette-option {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--rozie-command-palette-option-gap, 0.75rem);
+}
+
+.rozie-command-palette-option-main {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-option-gap, 0.75rem);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rozie-command-palette-option-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-icon-color, inherit);
+  font-size: var(--rozie-command-palette-icon-size, 1rem);
+}
+
+.rozie-command-palette-option-actions {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--rozie-command-palette-actions-gap, 0.375rem);
+  color: var(--rozie-command-palette-actions-color, rgba(0, 0, 0, 0.55));
+  font-size: var(--rozie-command-palette-actions-font-size, 0.75rem);
+}
+
+.rozie-command-palette-option-trailing {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-trailing-color, rgba(0, 0, 0, 0.5));
+  font-size: var(--rozie-command-palette-trailing-font-size, 0.75rem);
 }
 
 .rozie-command-palette-option-group {

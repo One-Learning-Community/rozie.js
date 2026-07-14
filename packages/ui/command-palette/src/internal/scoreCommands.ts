@@ -35,6 +35,10 @@ export interface CommandItem {
   group?: string;
   keywords?: string[];
   disabled?: boolean;
+  // Display-only, unused by ranking — surfaced through the `#icon` / `#actions`
+  // option-row slots (consumers primarily read these off the `option` slot scope).
+  icon?: unknown;
+  actions?: unknown;
 }
 
 export interface FuzzyMatchResult {
