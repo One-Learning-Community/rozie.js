@@ -542,18 +542,9 @@ export default defineConfig(async () => {
   const datePickerSrc = resolve(__dirname, '..', '..', 'packages', 'ui', 'date-picker', 'src');
   const resizableSrc = resolve(__dirname, '..', '..', 'packages', 'ui', 'resizable', 'src');
   const commandPaletteSrc = resolve(__dirname, '..', '..', 'packages', 'ui', 'command-palette', 'src');
-  // Phase 72 / D-07 — cross-family composite #3 (after command-palette→combobox):
-  // data-table's DataTable.rozie composes the popover primitive via the STABLE
-  // D-07 specifier `@rozie-ui/popover/Popover.rozie` (compile-time type
-  // threading resolves through the primitive's `exports` map). Data-table's OWN
-  // codegen.mjs remaps that specifier to a LOCAL vendored sibling before
-  // compile, so the shipped leaf never hits this — but the VR harness compiles
-  // the RAW authored source, so we reproduce that vendoring here too: alias the
-  // emitted `@rozie-ui/popover/Popover*` import to data-table's vendored copy
-  // (byte-identical to canonical per the D-04 drift guard), NOT the canonical
-  // `@rozie-ui/popover` package. The vendored home is `data-table/src`
-  // (dataTableSrc, defined above), not `packages/ui/popover/src`.
-  const dataTablePopoverSrc = dataTableSrc;
+  // (data-table→popover composition is Option-A as of 260713-iiy; the Angular
+  // source-alias lives in `resolve.alias` below. The old vendored-copy alias +
+  // its `dataTablePopoverSrc = dataTableSrc` shim were removed with the vendoring.)
   // Phase 64 (D-08): @rozie-ui/headless-core is a SOURCE-ONLY package of shared
   // `.rzts` script-partials (smoke.rzts P0; windowing.rzts P1; listCore.rzts P2).
   // HeadlessCoreSmokeDemo (examples/demos) imports a partial via the BARE
@@ -594,41 +585,41 @@ export default defineConfig(async () => {
     dedupe: ['react', 'react-dom'],
     alias: [
       { find: /^@fullcalendar\/list$/, replacement: fullCalendarListEsm },
-      // Phase 999.4 / P3 — cross-family composition (Option B). command-palette's
-      // CommandPalette.rozie composes the combobox primitive via the STABLE D-07
-      // specifier `@rozie-ui/combobox/Combobox.rozie`. Compile-time `<components>`
-      // type-threading resolves that through the primitive's `exports` map
-      // (@rozie-ui/combobox devDep). But the EMITTED per-target import is
-      // ext-swapped to a cross-package specifier (`@rozie-ui/combobox/Combobox`,
-      // `…/Combobox.vue`, `…/Combobox.svelte`), and @rozie/unplugin's composition
-      // resolveId only routes LOCAL sibling `.rozie` imports — it has no
-      // cross-package branch. Under codegen the specifier is remapped to the
-      // LOCAL vendored sibling before compile, so the shipped leaf never hits
-      // this; the VR harness compiles the RAW authored source, so we reproduce
-      // that vendoring here by aliasing every emitted `@rozie-ui/combobox/Combobox*`
-      // import to command-palette's vendored copy (byte-identical to canonical
-      // per the D-04 drift guard). The aliased `.rozie` path then flows through
-      // the unplugin's standard `.rozie` → synthetic-id resolveId branch ×6.
-      {
-        find: /^@rozie-ui\/combobox\/Combobox(\.\w+)?$/,
-        replacement: resolve(commandPaletteSrc, 'Combobox.rozie'),
-      },
-      // Phase 72 / D-07 — cross-family composite #3: data-table's
-      // DataTable.rozie composes popover via the STABLE specifier
-      // `@rozie-ui/popover/Popover.rozie`, emitted per-target as an
-      // ext-swapped cross-package specifier (`@rozie-ui/popover/Popover`,
-      // `…/Popover.vue`, `…/Popover.svelte`). The VR harness compiles the raw
-      // authored source (data-table's own codegen.mjs vendoring remap does
-      // NOT run here), so alias the emitted specifier to data-table's
-      // VENDORED copy (byte-identical to canonical per the D-04 drift guard)
-      // — NOT the canonical `@rozie-ui/popover` package. Anchored to the
-      // `/Popover` subpath only (not a bare `@rozie-ui/popover` alias) so
-      // popover's OWN VR cells (which import it by relative path, not this
-      // bare specifier) are unaffected.
-      {
-        find: /^@rozie-ui\/popover\/Popover(\.\w+)?$/,
-        replacement: resolve(dataTablePopoverSrc, 'Popover.rozie'),
-      },
+      // Option-A cross-family composition (P75 + data-table 260713-iiy):
+      // command-palette composes @rozie-ui/combobox and data-table composes
+      // @rozie-ui/popover via the PUBLISHED per-target packages. The emitted
+      // Angular import is `@rozie-ui/<family>-angular`, which node-resolves to
+      // the leaf's PRE-COMPILED partial-ivy dist. analogjs's AOT prebuild
+      // (NgtscProgram) cannot compile a consumer whose `imports: [X]` references
+      // a pre-linked external dist through this interception path — the `imports`
+      // entry collapses to `any[]`, so the composed component's projected
+      // `<ng-content>` / `@ContentChild` slots (the popover ⋯ anchor, the combobox
+      // #option/#empty templates) render EMPTY. So for the ANGULAR sub-build ONLY,
+      // alias the published `-angular` specifier back to the canonical SOURCE
+      // `.rozie` (already a `prebuildExtraRoots` + cross-tree root, see below) so
+      // NgtscProgram compiles the composed primitive IN-PASS — restoring the
+      // pre-Option-A (Phase 72) green. Named `{ Popover }` / `{ Combobox }` resolve
+      // against the source `.rozie` (the leaf compiles to `export class X` +
+      // `export default X`). HARNESS-ONLY: the shipped leaves and real Angular
+      // consumers use the dist normally (ordinary cross-library ivy linking, like
+      // Angular Material) — verified NOT a shipped-package bug. Other targets keep
+      // their published-dist resolution (react/vue/svelte bundle it directly;
+      // lit/solid VR deliberately exercise the REAL published dist — lit for the
+      // custom-element `sideEffects` registration, solid for the JSX-dist transform).
+      // Gated to `TARGET === 'angular'` so only the angular sub-build's
+      // `@rozie-ui/*-angular` emit is redirected.
+      ...(TARGET === 'angular'
+        ? [
+            {
+              find: /^@rozie-ui\/popover-angular$/,
+              replacement: resolve(popoverSrc, 'Popover.rozie'),
+            },
+            {
+              find: /^@rozie-ui\/combobox-angular$/,
+              replacement: resolve(comboboxSrc, 'Combobox.rozie'),
+            },
+          ]
+        : []),
     ],
   },
   // Quick task 260515-1y4 — angular only: the Angular sub-build's
