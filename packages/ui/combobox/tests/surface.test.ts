@@ -30,10 +30,13 @@ const EXPECT = {
   // P3 (D-06): grown to absorb command-palette — resolver props, `inline`,
   // `closeOnSelect`, + an `empty` slot; resolvers consumed from listCore.rzts.
   // P4 (SC-5): + windowing props (virtual/estimateRowHeight/maxHeight) consuming windowing.rzts.
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight'],
+  // combobox-native-groups: + `groups` prop + `groupHeading` slot (native option grouping).
+  // NOTE: the slot is named `groupHeading` (camelCase), NOT `group-heading` — ROZ127 rejects
+  // hyphenated slot names (Vue's defineSlots<{…}>() can't emit an unquoted hyphenated key).
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups'],
   models: ['value'],
   emits: ['change', 'search'],
-  slots: ['option', 'empty'] as string[],
+  slots: ['option', 'empty', 'groupHeading'] as string[],
   expose: ['focus', 'clear'],
 } as const;
 
@@ -54,7 +57,7 @@ describe('Combobox.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (12 props)', () => {
+  it('props surface matches (16 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
