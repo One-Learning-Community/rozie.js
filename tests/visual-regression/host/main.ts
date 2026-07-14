@@ -535,6 +535,14 @@ export const EXAMPLES = [
   'DialogBehavior',
   'ComboboxBehavior',
   'ToasterBehavior',
+  // combobox-native-groups — the BEHAVIORAL cell (loader → examples/demos/
+  // ComboboxGroupsDemo.rozie, importing packages/ui/combobox/src/Combobox.rozie)
+  // proving the new opt-in `groups` prop: options render partitioned into
+  // `role="group"` sections with `aria-label` headings, the flat keyboard model
+  // (ArrowDown/Enter) walks the group-ordered sequence and never lands on a
+  // heading, and the two-way r-model:value round-trip still commits on select.
+  // See combobox-groups.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES.
+  'ComboboxGroups',
   // @rozie-ui otp/dialog/combobox/toast — the four content-STABLE SCREENSHOT cells
   // (loaders → examples/demos/{Otp,Combobox,Dialog,Toaster}ScreenshotDemo.rozie,
   // each importing packages/ui/<family>/src/<Component>.rozie). Two render
@@ -1220,6 +1228,11 @@ export const LIT_TAGS: Record<Example, string> = {
   DialogBehavior: 'rozie-dialog-behavior',
   ComboboxBehavior: 'rozie-combobox-behavior',
   ToasterBehavior: 'rozie-toaster-behavior',
+  // combobox-native-groups — '-demo' appended on Lit → tag
+  // 'rozie-combobox-groups-demo' = kebab of ComboboxGroupsDemo (the wrapper
+  // component is name="Combobox" → 'rozie-combobox', matching the *Behavior
+  // cell's base). Behavioral-only, no screenshot cell.
+  ComboboxGroups: 'rozie-combobox-groups',
   // @rozie-ui otp/dialog/combobox/toast SCREENSHOT cells — '-demo' appended on Lit
   // → tags 'rozie-otp-screenshot-demo' etc. = kebab of the full *ScreenshotDemo
   // name (mirrors CodeMirrorScreenshot / ChartScreenshot).
@@ -1616,6 +1629,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DialogBehavior: {},
   ComboboxBehavior: {},
   ToasterBehavior: {},
+  // combobox-native-groups — ComboboxGroupsDemo is self-contained: it seeds its
+  // own OPTIONS/GROUPS + <data>.value and binds r-model:value internally (not
+  // parent-supplied), so no MODEL_PROPS entry. No parent props.
+  ComboboxGroups: {},
   // @rozie-ui otp/dialog/combobox/toast SCREENSHOT cells — every *ScreenshotDemo is
   // self-contained: it seeds its own FIXED state in <data>/<script> and binds
   // r-model / drives the $expose handle internally (not parent-supplied), so no

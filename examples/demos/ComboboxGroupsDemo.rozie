@@ -1,0 +1,78 @@
+<!--
+  ComboboxGroupsDemo — VR behavioral cell for the combobox-native-groups feature
+  (@rozie-ui/combobox). Drives the SAME input + popup listbox as
+  ComboboxBehaviorDemo, but seeds options carrying `group` + an ordered `groups`
+  prop, proving the new grouped listbox restructure: options render partitioned
+  into `role="group"` sections with `aria-label` headings (Fruit before
+  Vegetable, listed-groups order), the flat keyboard model (ArrowDown/Enter)
+  walks the group-ordered sequence and never lands on a heading, and a two-way
+  r-model:value round-trips through selection. See combobox-groups.spec.ts.
+  Behavioral-only (no pixel baseline) — mirrors ComboboxBehaviorDemo.
+-->
+<rozie name="ComboboxGroupsDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  value: null,
+}
+</data>
+
+<script>
+const OPTIONS = [
+  { value: 'apple', label: 'Apple', group: 'fruit' },
+  { value: 'banana', label: 'Banana', group: 'fruit' },
+  { value: 'cherry', label: 'Cherry', group: 'fruit' },
+  { value: 'carrot', label: 'Carrot', group: 'veg' },
+  { value: 'potato', label: 'Potato', group: 'veg' },
+]
+
+const GROUPS = [
+  { id: 'fruit', label: 'Fruit' },
+  { id: 'veg', label: 'Vegetable' },
+]
+</script>
+
+<template>
+<div class="combobox-groups-demo">
+  <h3>Combobox — native groups</h3>
+
+  <div class="controls">
+    <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
+  </div>
+
+  <Combobox
+    r-model:value="$data.value"
+    :options="OPTIONS"
+    :groups="GROUPS"
+    placeholder="Search fruit or veg…"
+    ariaLabel="Fruit or vegetable"
+    idBase="demo-combobox-groups"
+  />
+</div>
+</template>
+
+<style>
+.combobox-groups-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.combobox-groups-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.combobox-groups-demo .readout {
+  min-width: 6ch;
+}
+</style>
+
+</rozie>
