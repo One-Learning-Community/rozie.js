@@ -217,7 +217,7 @@
 
 <script lang="ts">
 import { scoreCommands, labelHighlight } from './internal/scoreCommands'
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, depth as levelDepth } from './internal/levelStack'
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth } from './internal/levelStack'
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource'
 
 // ---- level-stack derived views (plain functions, uniform ×6) -----------
@@ -245,6 +245,35 @@ const currentError = () => {
   const frame = currentFrame($data.levelStack)
   return frame ? frame.error : null
 }
+
+// atDepth(): true when nested (depth>0) — gates the breadcrumb/back header
+// (LVL-RENDER). A plain function — never $computed.
+const atDepth = () => currentDepth() > 0
+
+// currentTitle(): the breadcrumb/header label for the active level — the top
+// frame's `title` (already item.title ?? item.label, captured by pushFrame
+// via levelTitle at push time). Falls back to `ariaLabel` at root (atDepth()
+// gates the header off at root anyway, but keeps this total).
+const currentTitle = () => {
+  const frame = currentFrame($data.levelStack)
+  return frame && frame.title != null ? frame.title : $props.ariaLabel
+}
+
+// currentPlaceholder(): the active level's input placeholder — the top
+// frame's `placeholder` (item.placeholder, captured at push time) falling
+// back to the component-level `placeholder` prop. Bound to the vendored
+// <Combobox>'s :placeholder so a navigating item's `placeholder` drives its
+// child level's input placeholder.
+const currentPlaceholder = () => {
+  const frame = currentFrame($data.levelStack)
+  return frame && frame.placeholder != null ? frame.placeholder : $props.placeholder
+}
+
+// breadcrumbStack(): the full root..current breadcrumb (internal/levelStack.ts
+// breadcrumb()) fed to the #breadcrumb slot's `stack` scope param — the root
+// entry's title is `ariaLabel` (the palette's own accessible name doubles as
+// the root breadcrumb label; there is no separate "root title" prop).
+const breadcrumbStack = () => breadcrumb($data.levelStack, $props.ariaLabel)
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
 // The ranked command list fed to the vendored <Combobox> as its `:options`.
@@ -313,9 +342,11 @@ const closePalette = () => {
 // the race-drop token (T-cpl-01): `token` was captured by the CALLER at the
 // moment the fetch was kicked off; if a newer token has since been issued
 // (a push/pop/search/close superseded this in-flight call) the resolution is
-// dropped — settleFrame/failFrame are no-ops on drop.
+// dropped — settleFrame/failFrame are no-ops on drop. Returns the underlying
+// promise (awaitable) so a caller that needs to SEQUENCE hops (openTo, below)
+// can wait for settlement; fire-and-forget callers simply don't await it.
 const applyAsyncResult = (token, promise) => {
-  promise.then(
+  return promise.then(
     (items) => {
       if (!isLatestRequest(token, $data.requestToken)) return
       $data.levelStack = settleFrame($data.levelStack, Array.isArray(items) ? items : [])
@@ -330,9 +361,11 @@ const applyAsyncResult = (token, promise) => {
 // Resolve `item`'s child source for the CURRENT query, applied to the TOP
 // frame. A sync result (children, or a source(query) returning an array)
 // settles immediately; an async result (a Promise) bumps + captures a fresh
-// request token before awaiting (T-cpl-01). Used at push-time (initial load)
-// and by the #error slot's retry.
-const loadLevelSource = (item, query) => {
+// request token before awaiting (T-cpl-01). Used at push-time (initial load),
+// by the #error slot's retry, and — AWAITED — by openTo's async-aware drill
+// (below), so each hop's level is fully settled before the next id is looked
+// up in it.
+const loadLevelSource = async (item, query) => {
   const resolved = resolveChildSource(item, query)
   if (resolved.kind === 'sync') {
     $data.levelStack = settleFrame($data.levelStack, resolved.items)
@@ -340,7 +373,7 @@ const loadLevelSource = (item, query) => {
   }
   if (resolved.kind === 'async') {
     $data.requestToken = nextRequestToken($data.requestToken)
-    applyAsyncResult($data.requestToken, resolved.promise)
+    await applyAsyncResult($data.requestToken, resolved.promise)
   }
 }
 
@@ -389,11 +422,43 @@ const goBack = () => {
   $emit('back')
 }
 
-// openTo(path): stubbed here (Task 4) — Task 6 fills the async-aware
-// drill-through implementation (LVL-RENDER). Declared now so the expose
-// surface + collision gates are correct from this task onward; a call before
-// Task 6 lands is a safe no-op.
-const openTo = (_path) => {}
+// openTo(path): the ⌘P deep-link (LVL-RENDER, LVL-STACK) — opens the palette,
+// resets to root, then drills through `path` (an array of item ids) one hop
+// at a time: resolve the CURRENT level's items, find the item whose `id`
+// matches the next path segment, push it, and — async-aware — AWAIT its
+// source settling (loadLevelSource) before resolving the NEXT hop (a child
+// level's items must be settled before an id can be looked up in it). Stops
+// silently (safe no-op on the unresolved remainder) at the first id that
+// doesn't match anything in the current level — mirrors goBack's no-op
+// discipline for a malformed/stale path rather than throwing.
+const openTo = async (path) => {
+  $model.open = true
+  $data.levelStack = []
+  const ids = Array.isArray(path) ? path : []
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i]
+    const list = currentItems()
+    const item = Array.isArray(list) ? list.find((it) => it && it.id === id) : null
+    if (!item) return
+    $data.levelStack = pushFrame($data.levelStack, item, $props.query)
+    $model.query = ''
+    await loadLevelSource(item, '')
+  }
+  $data.activeValue = null
+  // Defer the combobox ref touch a frame (the onOpen() precedent, above) —
+  // openTo may have just flipped `open` false→true in THIS call, and the
+  // overlay + <Combobox> may not be mounted yet on every target by the time
+  // the drill-through loop's microtask awaits resolve.
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      $refs.combobox?.clear()
+      focusInput()
+    })
+  } else {
+    $refs.combobox?.clear()
+    focusInput()
+  }
+}
 
 // ---- selection ---------------------------------------------------------
 // Combobox's `@change` fires `{ value, option }` on each commit. A NAVIGATING
@@ -582,6 +647,28 @@ $expose({ show, close, toggle, focus, goBack, openTo })
     @keydown="onPanelKeydown($event)"
   >
     <!--
+      Breadcrumb/back header (LVL-RENDER) — a command-palette-owned panel
+      sibling ABOVE the combobox input (NOT inside it — the same "outside the
+      <Combobox>" placement as #footer below). Shown only at depth>0.
+      Overridable via #breadcrumb (scope { stack, back }): `stack` is the full
+      root..current breadcrumb (breadcrumbStack(), internal/levelStack.ts
+      breadcrumb()), `back` is goBack. The DEFAULT fill is a minimal back
+      button + the current level's title (currentTitle()).
+    -->
+    <div r-if="atDepth()" class="rozie-command-palette-header">
+      <slot name="breadcrumb" :stack="breadcrumbStack()" :back="goBack">
+        <button
+          type="button"
+          class="rozie-command-palette-back"
+          aria-label="Back"
+          data-testid="command-palette-back"
+          @click="goBack()"
+        >‹</button>
+        <span class="rozie-command-palette-title" data-testid="command-palette-title">{{ currentTitle() }}</span>
+      </slot>
+    </div>
+
+    <!--
       The vendored <Combobox> owns the search input + navigable results list +
       empty state. command-palette feeds it the pre-filtered command list
       (filterCommands, keyword-aware, A1) and runs it with `:disable-filter="true"`
@@ -599,7 +686,7 @@ $expose({ show, close, toggle, focus, goBack, openTo })
       :options="filteredItems()"
       :option-value="commandValue"
       :option-disabled="commandDisabled"
-      :placeholder="$props.placeholder"
+      :placeholder="currentPlaceholder()"
       :aria-label="$props.ariaLabel"
       :id-base="$props.idBase"
       r-model:value="$data.activeValue"
@@ -715,6 +802,39 @@ $expose({ show, close, toggle, focus, goBack, openTo })
 .rozie-command-palette-search {
   padding: var(--rozie-command-palette-search-padding, 0.75rem);
   border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+}
+
+/* Breadcrumb/back header (LVL-RENDER) — shown at depth>0, above the combobox. */
+.rozie-command-palette-header {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-header-gap, 0.5rem);
+  padding: var(--rozie-command-palette-header-padding, 0.5rem 0.75rem);
+  border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+  font-size: var(--rozie-command-palette-header-font-size, 0.875rem);
+}
+
+.rozie-command-palette-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--rozie-command-palette-back-padding, 0.125rem 0.375rem);
+  font: inherit;
+  font-size: var(--rozie-command-palette-back-font-size, 1.1rem);
+  line-height: 1;
+  color: inherit;
+  background: var(--rozie-command-palette-back-bg, transparent);
+  border: var(--rozie-command-palette-back-border, none);
+  border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+  cursor: pointer;
+}
+
+.rozie-command-palette-back:hover {
+  background: var(--rozie-command-palette-back-hover-bg, rgba(0, 0, 0, 0.06));
+}
+
+.rozie-command-palette-title {
+  font-weight: var(--rozie-command-palette-title-weight, 600);
 }
 
 .rozie-command-palette-input {
