@@ -28,11 +28,19 @@
       member class — cf. otp's inputMode→cellInputMode). Option element ids are
       derived `idBase + '-opt-' + i` for aria-activedescendant.
     - The focus verb is `focus` (accepted ROZ137 Lit override, documented in every
-      leaf README — the slider/otp precedent). `clear` is collision-safe.
+      leaf README — the slider/otp precedent). `clear` and `seedQuery` are
+      collision-safe.
     - `value` is the model → Angular generates a ControlValueAccessor.writeValue;
       no helper here is named writeValue/registerOnChange/etc. (would be TS2300).
     - Handler params left UNTYPED (neutralize to `any`). `filteredOptions()` is a
       PLAIN function (called from the r-for AND handlers) — never $computed.
+    - `seedQuery(text)` is an IMPERATIVE-ONLY handle verb (added as a
+      command-palette #2 levels/restore-on-pop prerequisite): it writes
+      `$data.query` directly so both the input text AND filteredOptions() (which
+      reads `$data.query`) reflect the seeded text. It is deliberately NOT a
+      second model — combobox's sole `model: true` prop stays `value` (ROZ125: a
+      second model forfeits the Angular ControlValueAccessor). Additive +
+      render-neutral: never invoked ⇒ no default-render change.
 
   Consumer example:
 
@@ -640,7 +648,11 @@ $onUnmount(() => {
 })
 
 // focus() — focus the input (accepted ROZ137 Lit override). clear() — reset the
-// selection + query. Both post-mount → $refs safe.
+// selection + query. seedQuery(text) — imperative-only: write the input text
+// (and therefore filteredOptions()'s filter) without touching the `value`
+// model or selection state (a command-palette #2 levels/restore-on-pop
+// prerequisite — repopulating the input on back-navigation is NOT a
+// selection). All three are post-mount → $refs safe.
 const focus = () => $refs.inputEl?.focus()
 const clear = () => {
   $model.value = null
@@ -648,8 +660,11 @@ const clear = () => {
   $data.activeIndex = -1
   $emit('change', { value: null })
 }
+const seedQuery = (text) => {
+  $data.query = String(text == null ? '' : text)
+}
 
-$expose({ focus, clear })
+$expose({ focus, clear, seedQuery })
 </script>
 
 <template>

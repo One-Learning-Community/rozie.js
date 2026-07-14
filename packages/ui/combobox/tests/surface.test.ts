@@ -37,7 +37,10 @@ const EXPECT = {
   models: ['value'],
   emits: ['change', 'search'],
   slots: ['option', 'empty', 'groupHeading'] as string[],
-  expose: ['focus', 'clear'],
+  // seedQuery (command-palette #2 levels/restore-on-pop prerequisite): an
+  // imperative-only handle verb that seeds $data.query — NOT a second model
+  // (ROZ125 — combobox's sole model:true prop stays `value`).
+  expose: ['focus', 'clear', 'seedQuery'],
 } as const;
 
 const sorted = (a: readonly string[]) => [...a].sort();
