@@ -77,11 +77,21 @@ function copyThemes(leafSrc) {
   cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
 }
 
-/** Vendor src/internal/ → leaf src/internal/ (excluding *.test.ts). */
+/**
+ * Vendor src/internal/ → leaf src/internal/ (excluding *.test.ts).
+ *
+ * The destination is removed first so a rename in src/internal/ (e.g.
+ * filterCommands.ts → scoreCommands.ts) doesn't leave the OLD, no-longer-
+ * imported file behind as stale generated output — cpSync merges into an
+ * existing directory rather than mirroring it, so without this the leaf
+ * would silently accumulate orphaned modules across regens.
+ */
 function copyInternal(leafSrc) {
   const src = resolve(ROOT, 'src/internal');
   if (!existsSync(src)) return;
-  cpSync(src, resolve(leafSrc, 'internal'), {
+  const dest = resolve(leafSrc, 'internal');
+  rmSync(dest, { recursive: true, force: true });
+  cpSync(src, dest, {
     recursive: true,
     filter: (from) => !from.endsWith('.test.ts'),
   });
