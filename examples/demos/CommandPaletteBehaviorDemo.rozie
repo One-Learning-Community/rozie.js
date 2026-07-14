@@ -1,16 +1,24 @@
 <!--
   CommandPaletteBehaviorDemo — VR behavioral cell for @rozie-ui/command-palette
   (pure-Rozie, no engine). Drives the cmdk-style command menu: a two-way
-  r-model:open + r-model:query, a fixed :items list, an open button, and a @select
-  readout. The spec opens the palette, types to filter, arrow-navigates, selects an
-  item (checks the @select payload) and closes via Escape — see
-  command-palette.spec.ts (when added). Behavioral-only (no pixel baseline).
+  r-model:open + r-model:query, a mixed leaf/navigating :items list (a static
+  `children` level + an async `source` level, absorbing feature #4), an open
+  button, an openTo trigger, and @select/@navigate/@back readouts. See
+  command-palette.spec.ts for the full behavioral proof (push/pop/query
+  clear+restore/async loading+error/breadcrumb/openTo). Behavioral-only (no
+  pixel baseline).
 
   COLLISION NOTE: the open helper is `openPalette` (not `open`) — `open` is the local
   $data key AND the inner component's model, and an `open`-named helper collapses onto
   the generated `$data.open` setter on React/Solid (ROZ524). The select-readout helper
   is `onSelect` (event-handler, not a setter). The dialog/listbox `show`/`apply<X>`
   precedent.
+
+  `items` is a plain top-level `<script>` const (NOT `$data.items`) — the
+  `search-users` entry's `source` is a script-declared function, and `<data>`'s
+  object literal is parsed independently (no access to script-scope bindings);
+  a static top-level const bound via `:items="items"` is the established demo
+  pattern (CarouselDemo.rozie's `:slides="SLIDES"`).
 -->
 <rozie name="CommandPaletteBehaviorDemo">
 
@@ -25,23 +33,82 @@
   open: false,
   query: '',
   lastSelect: '',
-  items: [
-    { id: 'new', label: 'New File', group: 'File' },
-    { id: 'open', label: 'Open File', group: 'File' },
-    { id: 'save', label: 'Save', group: 'File' },
-    { id: 'cut', label: 'Cut', group: 'Edit' },
-    { id: 'copy', label: 'Copy', group: 'Edit' },
-    { id: 'paste', label: 'Paste', group: 'Edit' },
-  ],
+  lastNavigate: '',
+  lastDepth: 0,
+  backCount: 0,
 }
 </data>
 
 <script>
+// A static child level (the "Go to page…" tier — the hybrid palette backbone).
+// An async child level (`search-users`) — a Promise-returning source with a
+// deliberate ~400ms delay (long enough for the VR spec to reliably observe the
+// 'loading' state before it settles), branching on query==='' for a default
+// view vs a search-filtered view (empty-vs-search #8 falls out for free).
+// `query === 'error'` deliberately rejects, for the VR spec's deterministic
+// error-state proof.
+const ALL_USERS = [
+  { id: 'user-ada', label: 'Ada Lovelace' },
+  { id: 'user-alan', label: 'Alan Turing' },
+  { id: 'user-grace', label: 'Grace Hopper' },
+]
+
+const searchUsers = (query) => new Promise((resolve, reject) => {
+  setTimeout(() => {
+    if (query === 'error') {
+      reject(new Error('Search failed'))
+      return
+    }
+    if (!query) {
+      resolve(ALL_USERS.slice(0, 2))
+      return
+    }
+    const q = String(query).toLowerCase()
+    resolve(ALL_USERS.filter((u) => u.label.toLowerCase().includes(q)))
+  }, 500)
+})
+
+const items = [
+  { id: 'new', label: 'New File', group: 'File' },
+  { id: 'open', label: 'Open File', group: 'File' },
+  { id: 'save', label: 'Save', group: 'File' },
+  { id: 'cut', label: 'Cut', group: 'Edit' },
+  { id: 'copy', label: 'Copy', group: 'Edit' },
+  { id: 'paste', label: 'Paste', group: 'Edit' },
+  {
+    id: 'goto',
+    label: 'Go to page…',
+    title: 'Go to page',
+    children: [
+      { id: 'page-home', label: 'Home' },
+      { id: 'page-settings', label: 'Settings' },
+      { id: 'page-billing', label: 'Billing' },
+    ],
+  },
+  {
+    id: 'search-users',
+    label: 'Search users…',
+    title: 'Search users',
+    source: searchUsers,
+  },
+]
+
 const onSelect = (e) => {
   $data.lastSelect = e && e.id != null ? e.id : ''
 }
+const onNavigate = (e) => {
+  $data.lastNavigate = e && e.item && e.item.id != null ? e.item.id : ''
+  $data.lastDepth = e && typeof e.depth === 'number' ? e.depth : 0
+}
+const onBack = () => {
+  $data.backCount = $data.backCount + 1
+}
 const openPalette = () => {
   $data.open = true
+}
+// openTo trigger — the ⌘P deep-link, jumping straight into the async level.
+const openToUsers = () => {
+  $refs.palette?.openTo(['search-users'])
 }
 </script>
 
@@ -51,19 +118,34 @@ const openPalette = () => {
 
   <div class="controls">
     <button type="button" data-testid="open-palette" @click="openPalette()">Open</button>
+    <button type="button" data-testid="open-to-users" @click="openToUsers()">Open to Users</button>
     <span class="readout" data-testid="readout-open">{{ $data.open }}</span>
     <span class="readout" data-testid="readout-query">{{ $data.query }}</span>
     <span class="readout" data-testid="readout-select">{{ $data.lastSelect }}</span>
+    <span class="readout" data-testid="readout-navigate">{{ $data.lastNavigate }}</span>
+    <span class="readout" data-testid="readout-depth">{{ $data.lastDepth }}</span>
+    <span class="readout" data-testid="readout-back-count">{{ $data.backCount }}</span>
   </div>
 
   <CommandPalette
+    ref="palette"
     r-model:open="$data.open"
     r-model:query="$data.query"
-    :items="$data.items"
+    :items="items"
     placeholder="Type a command…"
     ariaLabel="Command palette"
     @select="onSelect($event)"
-  />
+    @navigate="onNavigate($event)"
+    @back="onBack()"
+  >
+    <!-- Status testids (LVL-ASYNC) — one testid, `data-status` distinguishes. -->
+    <template #loading="{ query }">
+      <div data-testid="command-palette-status" data-status="loading">Loading…</div>
+    </template>
+    <template #error="{ query, error, retry }">
+      <div data-testid="command-palette-status" data-status="error">{{ error && error.message }}</div>
+    </template>
+  </CommandPalette>
 </div>
 </template>
 
@@ -79,6 +161,7 @@ const openPalette = () => {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
 }
 .command-palette-demo .readout {
   font-variant-numeric: tabular-nums;

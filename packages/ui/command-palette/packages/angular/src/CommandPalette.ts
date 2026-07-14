@@ -4,18 +4,26 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Combobox } from '@rozie-ui/combobox-angular';
 
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack';
+import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 
-// ---- derived views (plain functions, uniform ×6) -----------------------
-// The ranked command list fed to the vendored <Combobox> as its `:options`.
-// command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
-// default over label+keywords, label weighted above keywords, pluggable via
-// $props.score) and runs <Combobox :disable-filter="true"> — combobox's
-// built-in filter is label-only substring and would drop keyword matching +
-// the ranked ordering. scoreCommands already normalizes non-array input, so
-// no local Array.isArray guard is needed. A plain function (called from the
-// template binding AND handlers) — never $computed (the combobox
-// value-vs-accessor split). Each item is passed through verbatim; combobox
-// resolves its value via `optionValue` (below) and its label via `.label`.
+// ---- async race-drop token + debounce timer (module-level lets) ---------
+// These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
+// boundaries within a single handler (bump a token, then compare it after an
+// await; clear/replace a timer id on every keystroke), which React's useState
+// ($data) binds STALE (setState is async — the pre-write value is read). As
+// module-level `let`s referenced ONLY from handlers/lifecycle (never the
+// template), the React emitter hoists them to `useRef` (persistent +
+// synchronous) via hoistModuleLet — giving a correct, target-uniform token
+// comparison. Kept out of $data specifically to dodge the documented
+// stale-read (the plan's $data placement broke the race-drop AND the navigate
+// depth on React/Solid/Lit).
+
+interface BreadcrumbCtx {
+  $implicit: { stack: any; back: any };
+  stack: any;
+  back: any;
+}
 
 interface OptionCtx {
   $implicit: { option: any; index: any; active: any; selected: any; disabled: any; matches: any };
@@ -30,6 +38,18 @@ interface OptionCtx {
 interface EmptyCtx {
   $implicit: { query: any };
   query: any;
+}
+
+interface LoadingCtx {
+  $implicit: { query: any };
+  query: any;
+}
+
+interface ErrorCtx {
+  $implicit: { query: any; error: any; retry: any };
+  query: any;
+  error: any;
+  retry: any;
 }
 
 interface FooterCtx {}
@@ -80,7 +100,18 @@ function __rozieAttr(v: unknown): string | null {
     <div class="rozie-command-palette" (click)="onBackdropClick($event)">
       <div #panel class="rozie-command-palette-panel" role="dialog" aria-modal="true" [attr.aria-label]="ariaLabel()" (keydown)="onPanelKeydown($event)">
         
-        <rozie-combobox #combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="filteredItems()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="placeholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
+        @if (atDepth()) {
+    <div class="rozie-command-palette-header">
+          @if ((breadcrumbTpl ?? templates()?.['breadcrumb'])) {
+    <ng-container *ngTemplateOutlet="(breadcrumbTpl ?? templates()?.['breadcrumb']); context: { $implicit: { stack: breadcrumbStack(), back: goBack }, stack: breadcrumbStack(), back: goBack }" />
+    } @else {
+
+            <button type="button" class="rozie-command-palette-back" aria-label="Back" data-testid="command-palette-back" (click)="goBack()">‹</button>
+            <span class="rozie-command-palette-title" data-testid="command-palette-title">{{ rozieDisplay(currentTitle()) }}</span>
+          
+    }
+        </div>
+    }<rozie-combobox #combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="filteredItems()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="currentPlaceholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
             @if ((optionTpl ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }, option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }" />
     } @else {
@@ -117,15 +148,28 @@ function __rozieAttr(v: unknown): string | null {
             
     }
           </ng-template><ng-template #empty let-query="query">
-            @if ((emptyTpl ?? templates()?.['empty'])) {
+            @if (currentStatus() === 'ready') {
+    @if ((emptyTpl ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     {{ emptyText() }}
     }
-          </ng-template></rozie-combobox>
+    }</ng-template></rozie-combobox>
 
         
-        @if ((footerTpl ?? templates()?.['footer'])) {
+        @if (currentStatus() === 'loading') {
+    <div class="rozie-command-palette-loading">
+          @if ((loadingTpl ?? templates()?.['loading'])) {
+    <ng-container *ngTemplateOutlet="(loadingTpl ?? templates()?.['loading']); context: { $implicit: { query: query() }, query: query() }" />
+    } @else {
+    Loading…
+    }
+        </div>
+    } @else if (currentStatus() === 'error') {
+    <div class="rozie-command-palette-error">
+          <ng-container *ngTemplateOutlet="(errorTpl ?? templates()?.['error']); context: { $implicit: { query: query(), error: currentError(), retry: retryCurrentLevel }, query: query(), error: currentError(), retry: retryCurrentLevel }" />
+        </div>
+    }@if ((footerTpl ?? templates()?.['footer'])) {
     <div class="rozie-command-palette-footer">
           @if ((footerTpl ?? templates()?.['footer'])) {
     <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer'])" />
@@ -164,6 +208,34 @@ function __rozieAttr(v: unknown): string | null {
     .rozie-command-palette-search {
       padding: var(--rozie-command-palette-search-padding, 0.75rem);
       border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+    }
+    .rozie-command-palette-header {
+      display: flex;
+      align-items: center;
+      gap: var(--rozie-command-palette-header-gap, 0.5rem);
+      padding: var(--rozie-command-palette-header-padding, 0.5rem 0.75rem);
+      border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+      font-size: var(--rozie-command-palette-header-font-size, 0.875rem);
+    }
+    .rozie-command-palette-back {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--rozie-command-palette-back-padding, 0.125rem 0.375rem);
+      font: inherit;
+      font-size: var(--rozie-command-palette-back-font-size, 1.1rem);
+      line-height: 1;
+      color: inherit;
+      background: var(--rozie-command-palette-back-bg, transparent);
+      border: var(--rozie-command-palette-back-border, none);
+      border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+      cursor: pointer;
+    }
+    .rozie-command-palette-back:hover {
+      background: var(--rozie-command-palette-back-hover-bg, rgba(0, 0, 0, 0.06));
+    }
+    .rozie-command-palette-title {
+      font-weight: var(--rozie-command-palette-title-weight, 600);
     }
     .rozie-command-palette-input {
       box-sizing: border-box;
@@ -232,6 +304,16 @@ function __rozieAttr(v: unknown): string | null {
       text-align: center;
       color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
     }
+    .rozie-command-palette-loading {
+      padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+      text-align: center;
+      color: var(--rozie-command-palette-loading-color, rgba(0, 0, 0, 0.5));
+    }
+    .rozie-command-palette-error {
+      padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+      text-align: center;
+      color: var(--rozie-command-palette-error-color, #c0392b);
+    }
     .rozie-command-palette-footer {
       padding: var(--rozie-command-palette-footer-padding, 0.5rem 0.75rem);
       border-top: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
@@ -281,12 +363,24 @@ export class CommandPalette {
    * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase = input<string>('rozie-command-palette');
+  /**
+   * Debounce (ms) applied to a nested level's ASYNC `source(query)` keystroke refetch only — sync (`children`) levels re-rank locally on every keystroke with no debounce. Defaults to ~150ms (`internal/asyncSource.ts`'s `DEFAULT_SEARCH_DEBOUNCE`).
+   * @example
+   * <CommandPalette :search-debounce="300" :items="commands" />
+   */
+  searchDebounce = input<number>(150);
   activeValue = signal<any>(null);
+  levelStack = signal<any[]>([]);
   panel = viewChild<ElementRef<HTMLDivElement>>('panel');
   combobox = viewChild<Combobox>('combobox');
+  navigate = output<unknown>();
+  back = output<void>();
   select = output<unknown>();
+  @ContentChild('breadcrumb', { read: TemplateRef }) breadcrumbTpl?: TemplateRef<BreadcrumbCtx>;
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
+  @ContentChild('loading', { read: TemplateRef }) loadingTpl?: TemplateRef<LoadingCtx>;
+  @ContentChild('error', { read: TemplateRef }) errorTpl?: TemplateRef<ErrorCtx>;
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
   @ContentChild('icon', { read: TemplateRef }) iconTpl?: TemplateRef<IconCtx>;
   @ContentChild('actions', { read: TemplateRef }) actionsTpl?: TemplateRef<ActionsCtx>;
@@ -295,8 +389,18 @@ export class CommandPalette {
   private __rozieWatchInitial_0 = true;
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      if (this.debounceTimerId != null) clearTimeout(this.debounceTimerId);
+    });
     effect(() => { const __watchVal = (() => this.open())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
-      if (isOpen) this.onOpen();else this.query.set('');
+      if (isOpen) this.onOpen();else {
+        this.query.set('');
+        this.levelStack.set([]);
+        this.activeValue.set(null);
+        if (this.debounceTimerId != null) clearTimeout(this.debounceTimerId);
+        this.debounceTimerId = null;
+        this.requestToken = nextRequestToken(this.requestToken);
+      }
     })(__watchVal); }); });
   }
 
@@ -304,7 +408,36 @@ export class CommandPalette {
     if (this.open()) this.onOpen();
   }
 
-  filteredItems = () => scoreCommands(this.items(), this.query(), this.score());
+  requestToken = 0;
+  debounceTimerId: any = null;
+  currentItems = () => {
+    const frame = currentFrame(this.levelStack());
+    if (frame) {
+      if (frame.status === 'loading' || frame.status === 'error') return [];
+      return frame.resolvedItems;
+    }
+    return this.items();
+  };
+  currentDepth = () => levelDepth(this.levelStack());
+  currentStatus = () => {
+    const frame = currentFrame(this.levelStack());
+    return frame ? frame.status : 'ready';
+  };
+  currentError = () => {
+    const frame = currentFrame(this.levelStack());
+    return frame ? frame.error : null;
+  };
+  atDepth = () => this.currentDepth() > 0;
+  currentTitle = () => {
+    const frame = currentFrame(this.levelStack());
+    return frame && frame.title != null ? frame.title : this.ariaLabel();
+  };
+  currentPlaceholder = () => {
+    const frame = currentFrame(this.levelStack());
+    return frame && frame.placeholder != null ? frame.placeholder : this.placeholder();
+  };
+  breadcrumbStack = () => buildBreadcrumb(this.levelStack(), this.ariaLabel());
+  filteredItems = () => scoreCommands(this.currentItems(), this.query(), this.score());
   commandValue = (it: any) => it && it.id !== undefined ? it.id : it;
   commandDisabled = (it: any) => !!(it && it.disabled);
   labelText = (o: any) => o && o.label !== undefined ? o.label : '';
@@ -341,26 +474,174 @@ export class CommandPalette {
   closePalette = () => {
     this.open.set(false);
   };
+  applyAsyncResult = (token: any, promise: any) => {
+    return promise.then((items: any) => {
+      if (!isLatestRequest(token, this.requestToken)) return;
+      this.levelStack.set(settleFrame(this.levelStack(), Array.isArray(items) ? items : []));
+    }, (error: any) => {
+      if (!isLatestRequest(token, this.requestToken)) return;
+      this.levelStack.set(failFrame(this.levelStack(), error));
+    });
+  };
+  beginLevelLoad = (item: any, query: any) => {
+    const resolved = resolveChildSource(item, query);
+    if (resolved.kind === 'async') {
+      this.requestToken = nextRequestToken(this.requestToken);
+      this.applyAsyncResult(this.requestToken, resolved.promise);
+      return;
+    }
+    if (resolved.kind === 'sync') {
+      const items = resolved.items;
+      Promise.resolve().then(() => {
+        this.levelStack.set(settleFrame(this.levelStack(), items));
+      });
+    }
+  };
+  retryCurrentLevel = () => {
+    const frame = currentFrame(this.levelStack());
+    if (!frame || !frame.item || !isAsyncLevel(frame.item)) return;
+    this.beginLevelLoad(frame.item, this.query());
+  };
+  pushLevel = (item: any) => {
+    const nextStack = pushFrame(this.levelStack(), item, this.query());
+    this.levelStack.set(nextStack);
+    this.query.set('');
+    this.activeValue.set(null);
+    this.combobox()?.clear();
+    this.focusInput();
+    this.navigate.emit({
+      item,
+      depth: nextStack.length
+    });
+    if (isAsyncLevel(item)) this.beginLevelLoad(item, '');
+  };
+  goBack = () => {
+    if (this.levelStack().length === 0) return;
+    const {
+      stack,
+      restoreQuery
+    } = popFrame(this.levelStack());
+    this.levelStack.set(stack);
+    this.requestToken = nextRequestToken(this.requestToken);
+    const q = restoreQuery == null ? '' : restoreQuery;
+    this.query.set(q);
+    this.combobox()?.seedQuery(q);
+    this.activeValue.set(null);
+    this.reopenComboboxPopup();
+    this.back.emit();
+  };
+  openTo = async (path: any) => {
+    this.open.set(true);
+    let stack = [];
+    this.levelStack.set(stack);
+    this.query.set('');
+    const ids = Array.isArray(path) ? path : [];
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const list = stack.length === 0 ? this.items() : stack[stack.length - 1].resolvedItems;
+      const item = Array.isArray(list) ? list.find((it: any) => it && it.id === id) : null;
+      if (!item) break;
+      stack = pushFrame(stack, item, '');
+      this.levelStack.set(stack);
+      const resolved = resolveChildSource(item, '');
+      if (resolved.kind === 'async') {
+        this.requestToken = nextRequestToken(this.requestToken);
+        const token = this.requestToken;
+        try {
+          const items = await resolved.promise;
+          if (isLatestRequest(token, this.requestToken)) {
+            stack = settleFrame(stack, Array.isArray(items) ? items : []);
+            this.levelStack.set(stack);
+          }
+        } catch (error: any) {
+          if (isLatestRequest(token, this.requestToken)) {
+            stack = failFrame(stack, error);
+            this.levelStack.set(stack);
+          }
+        }
+      } else if (resolved.kind === 'sync') {
+        stack = settleFrame(stack, resolved.items);
+        this.levelStack.set(stack);
+      }
+    }
+    this.activeValue.set(null);
+    // Defer the combobox ref touch a frame (the onOpen() precedent) — openTo
+    // may have just flipped `open` false→true in THIS call, so the overlay +
+    // <Combobox> may not be mounted yet on every target when the drill loop's
+    // awaits resolve.
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        this.combobox()?.clear();
+        this.focusInput();
+      });
+    } else {
+      this.combobox()?.clear();
+      this.focusInput();
+    }
+  };
   onComboboxChange = (e: any) => {
     const item = e ? e.option : null;
     if (!item || item.disabled) return;
+    if (isNavigating(item)) {
+      this.pushLevel(item);
+      return;
+    }
+    const path = this.levelStack().map((f: any) => f.item ? f.item.id : null);
     this.select.emit({
       id: item.id,
       label: item.label,
-      group: item.group
+      group: item.group,
+      path
     });
     // Clear the internal selection so re-selecting the same command re-fires.
     this.activeValue.set(null);
     if (this.closeOnSelect()) this.closePalette();
   };
   onComboboxSearch = (e: any) => {
-    this.query.set(e && e.query !== undefined ? e.query : '');
+    const q = e && e.query !== undefined ? e.query : '';
+    this.query.set(q);
+    const frame = currentFrame(this.levelStack());
+    if (!frame || !isAsyncLevel(frame.item)) return;
+    this.requestToken = nextRequestToken(this.requestToken);
+    const token = this.requestToken;
+    const item = frame.item;
+    if (this.debounceTimerId != null) clearTimeout(this.debounceTimerId);
+    this.debounceTimerId = setTimeout(() => {
+      const resolved = resolveChildSource(item, q);
+      if (resolved.kind === 'sync') {
+        if (isLatestRequest(token, this.requestToken)) {
+          this.levelStack.set(settleFrame(this.levelStack(), resolved.items));
+        }
+        return;
+      }
+      if (resolved.kind === 'async') this.applyAsyncResult(token, resolved.promise);
+    }, this.searchDebounce());
   };
   onBackdropClick = (e: any) => {
     if (e && e.target === e.currentTarget) this.closePalette();
   };
   focusInput = () => {
     this.combobox()?.focus();
+  };
+  deepActiveElement = () => {
+    let node = typeof document !== 'undefined' ? document.activeElement : null;
+    while (node && node.shadowRoot && node.shadowRoot.activeElement) {
+      node = node.shadowRoot.activeElement;
+    }
+    return node;
+  };
+  reopenComboboxPopup = () => {
+    // `any` — document.activeElement types as `Element` (no `.blur`); the deepest
+    // focused node is really an HTMLElement across all six leaves.
+    const active: any = this.deepActiveElement();
+    if (active && typeof active.blur === 'function') active.blur();
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        this.focusInput();
+      });
+    } else {
+      this.focusInput();
+    }
   };
   onOpen = () => {
     this.activeValue.set(null);
@@ -374,9 +655,15 @@ export class CommandPalette {
     }
   };
   onPanelKeydown = (e: any) => {
-    if (e && e.key === 'Escape') {
+    if (!e) return;
+    if (e.key === 'Escape') {
       e.preventDefault();
-      this.closePalette();
+      if (this.currentDepth() > 0) this.goBack();else this.closePalette();
+      return;
+    }
+    if (e.key === 'Backspace' && this.query() === '' && this.currentDepth() > 0) {
+      e.preventDefault();
+      this.goBack();
     }
   };
   show = () => {
@@ -393,7 +680,7 @@ export class CommandPalette {
   static ngTemplateContextGuard(
     _dir: CommandPalette,
     _ctx: unknown,
-  ): _ctx is OptionCtx | EmptyCtx | FooterCtx | IconCtx | ActionsCtx | TrailingCtx {
+  ): _ctx is BreadcrumbCtx | OptionCtx | EmptyCtx | LoadingCtx | ErrorCtx | FooterCtx | IconCtx | ActionsCtx | TrailingCtx {
     return true;
   }
 

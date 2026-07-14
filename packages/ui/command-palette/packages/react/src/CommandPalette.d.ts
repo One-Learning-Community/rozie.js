@@ -47,9 +47,20 @@ export interface CommandPaletteProps {
    * Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
+  /**
+   * Debounce (ms) applied to a nested level's ASYNC `source(query)` keystroke refetch only — sync (`children`) levels re-rank locally on every keystroke with no debounce. Defaults to ~150ms (`internal/asyncSource.ts`'s `DEFAULT_SEARCH_DEBOUNCE`).
+   * @example
+   * <CommandPalette :search-debounce="300" :items="commands" />
+   */
+  searchDebounce?: number;
+  onNavigate?: (...args: unknown[]) => void;
+  onBack?: (...args: unknown[]) => void;
   onSelect?: (...args: unknown[]) => void;
+  renderBreadcrumb?: (params: { stack: unknown; back: () => void }) => ReactNode;
   renderOption?: (params: { option: () => void; index: () => void; active: () => void; selected: () => void; disabled: () => void; matches: unknown }) => ReactNode;
   renderEmpty?: (params: { query: string }) => ReactNode;
+  renderLoading?: (params: { query: string }) => ReactNode;
+  renderError?: (params: { query: string; error: unknown; retry: () => void }) => ReactNode;
   renderFooter?: () => ReactNode;
   renderIcon?: (params: { option: () => void }) => ReactNode;
   renderActions?: (params: { option: () => void; actions: unknown }) => ReactNode;
@@ -62,6 +73,8 @@ export interface CommandPaletteHandle {
   close: (...args: any[]) => any;
   toggle: (...args: any[]) => any;
   focus: (...args: any[]) => any;
+  goBack: (...args: any[]) => any;
+  openTo: (...args: any[]) => any;
 }
 
 declare const CommandPalette: React.ForwardRefExoticComponent<CommandPaletteProps & React.RefAttributes<CommandPaletteHandle>>;

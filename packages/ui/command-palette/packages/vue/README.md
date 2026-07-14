@@ -57,12 +57,15 @@ import '@rozie-ui/command-palette-vue/themes/shadcn.css';    // or material.css,
 | `closeOnSelect` | `Boolean` | `true` |  |  | Whether choosing an item closes the palette. Defaults to `true` (the cmdk convention); set to `false` to keep the palette open after a selection — e.g. for a multi-action menu where the user runs several commands in a row. |
 | `ariaLabel` | `String` | `"Command palette"` |  |  | Accessible name for the dialog surface (`aria-label` on the `role="dialog"` panel). Override it to match the palette's purpose (e.g. "Search commands"). |
 | `idBase` | `String` | `"rozie-command-palette"` |  |  | Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element. |
+| `searchDebounce` | `Number` | `150` |  |  | Debounce (ms) applied to a nested level's ASYNC `source(query)` keystroke refetch only — sync (`children`) levels re-rank locally on every keystroke with no debounce. Defaults to ~150ms (`internal/asyncSource.ts`'s `DEFAULT_SEARCH_DEBOUNCE`). |
 
 ## Events
 
 | Event | Description |
 | --- | --- |
-| `select` | Fired when the user chooses a command (clicks it, or highlights it and presses Enter). Payload `{ id, label, group }` — the chosen item. If `closeOnSelect` is true (the default) the palette also closes (its `open` model is written `false`). |
+| `navigate` | Fired when a nested level is PUSHED — selecting an item that carries `children` or `source` drills into it instead of emitting `select`. Payload `{ item, depth }` — the navigated-to item and the resulting nesting depth (1-based; the root is depth 0). |
+| `back` | Fired when a level is POPPED — via Backspace-on-empty, Escape at depth>0, the imperative `goBack()` handle, or an equivalent consumer-triggered back navigation. No payload. Does not fire at the root (popping is a no-op there). |
+| `select` | Fired when the user chooses a LEAF command (clicks it, or highlights it and presses Enter) — an item with no `children`/`source` (see `navigate` for a navigating item). Payload `{ id, label, group, path }` — `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). If `closeOnSelect` is true (the default) the palette also closes (its `open` model is written `false`). |
 
 ## Imperative handle
 
@@ -71,9 +74,11 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | Method | Description |
 | --- | --- |
 | `show` | Open the palette (writes the `open` model to `true`). Resets the highlight and focuses the search input; a pre-seeded query is preserved (the query resets on close, not open). |
-| `close` | Close the palette (writes the `open` model to `false`). Resets the query to `""` so the next open starts fresh. |
+| `close` | Close the palette (writes the `open` model to `false`). Resets the query and the level stack (`levelStack`) to root, so the next open starts fresh. |
 | `toggle` | Toggle the palette open/closed (writes the `open` model to its negation). |
 | `focus` | Move DOM focus to the search input. NOTE: this deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element (ROZ137 warns, warn-only) — the public `focus()` handle is intended. |
+| `goBack` | Pop one nested level (restoring the parent query + input text, D-3 undo). A no-op at the root (an empty level stack). NOTE: named `goBack`, NOT `back` — a `back()` handle would collide with the `back` EMIT. |
+| `openTo` | Deep-link into a nested level: `openTo(path)`, where `path` is an array of item ids from the root. Opens the palette, resets to root, then drills through each id in turn — async-aware (awaits a Promise `source` before resolving the next hop). Stops silently at the first id that does not resolve in the current level. |
 
 ```vue
 <script setup>
@@ -91,8 +96,11 @@ const palette = ref();          // template ref
 
 | Slot | Params |
 | --- | --- |
+| breadcrumb | stack, back |
 | option | option, index, active, selected, disabled, matches |
 | empty | query |
+| loading | query |
+| error | query, error, retry |
 | footer |  |
 | icon | option |
 | actions | option, actions |

@@ -26,6 +26,34 @@
   padding: var(--rozie-command-palette-search-padding, 0.75rem);
   border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
 }
+.rozie-command-palette-header[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-header-gap, 0.5rem);
+  padding: var(--rozie-command-palette-header-padding, 0.5rem 0.75rem);
+  border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+  font-size: var(--rozie-command-palette-header-font-size, 0.875rem);
+}
+.rozie-command-palette-back[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--rozie-command-palette-back-padding, 0.125rem 0.375rem);
+  font: inherit;
+  font-size: var(--rozie-command-palette-back-font-size, 1.1rem);
+  line-height: 1;
+  color: inherit;
+  background: var(--rozie-command-palette-back-bg, transparent);
+  border: var(--rozie-command-palette-back-border, none);
+  border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+  cursor: pointer;
+}
+.rozie-command-palette-back[data-rozie-s-768cad96]:hover {
+  background: var(--rozie-command-palette-back-hover-bg, rgba(0, 0, 0, 0.06));
+}
+.rozie-command-palette-title[data-rozie-s-768cad96] {
+  font-weight: var(--rozie-command-palette-title-weight, 600);
+}
 .rozie-command-palette-input[data-rozie-s-768cad96] {
   box-sizing: border-box;
   width: 100%;
@@ -92,6 +120,16 @@
   padding: var(--rozie-command-palette-empty-padding, 1.5rem);
   text-align: center;
   color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
+}
+.rozie-command-palette-loading[data-rozie-s-768cad96] {
+  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  text-align: center;
+  color: var(--rozie-command-palette-loading-color, rgba(0, 0, 0, 0.5));
+}
+.rozie-command-palette-error[data-rozie-s-768cad96] {
+  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  text-align: center;
+  color: var(--rozie-command-palette-error-color, #c0392b);
 }
 .rozie-command-palette-footer[data-rozie-s-768cad96] {
   padding: var(--rozie-command-palette-footer-padding, 0.5rem 0.75rem);
