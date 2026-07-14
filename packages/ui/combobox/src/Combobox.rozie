@@ -278,11 +278,6 @@ import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pm
 // the non-virtual emitted path executes none of it (byte-identical-off).
 import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core'
 
-// ---- native option grouping (combobox-native-groups: src/internal/groupOptions.ts) ----
-// The PURE stable-partition helper is a RUNTIME import (unlike listCore/windowing
-// above, it is NOT a compile-time `.rzts` partial that dissolves at compile) —
-// codegen's `copyInternal` vendors it verbatim into each leaf at
-// `./internal/groupOptions`, mirroring command-palette's `scoreCommands.ts`.
 import { groupOptions } from './internal/groupOptions'
 
 // Windowing instance state (reassigned module-`let`s → React hoists to useRef; do NOT
@@ -340,12 +335,16 @@ const filteredOptions = () => {
     const ql = q.toLowerCase()
     if (ql) list = opts.filter((o) => String(labelOf(o)).toLowerCase().indexOf(ql) !== -1)
   }
-  // Gated to !$props.virtual — the windowed branch/perf contract stays untouched
-  // (groups×virtual is deferred/unsupported per design). groupOptions() is a
-  // no-op identity re-order when groups is empty AND no item carries a group
-  // (the byte-identical flat path), so this is safe to always call here.
-  if (!$props.virtual) {
-    const partition = groupOptions(list, Array.isArray(groupsProp) ? groupsProp : [], (o) => (o && o.group != null ? String(o.group) : null))
+  // Gated to !$props.virtual (groups×virtual is deferred/unsupported per design) AND to
+  // $props.groups being a NON-EMPTY array — an explicit author opt-in. This is deliberately
+  // NOT just "!$props.virtual" (groupOptions() would otherwise also fire whenever any raw
+  // option happens to carry a `.group` field, even with `groups` absent — a real collision
+  // discovered against command-palette's CommandItem.group, which is a PRE-EXISTING,
+  // unrelated per-row-badge field, not an opt-in to combobox's native grouping. The design's
+  // "Empty/absent `groups` ⇒ today's flat behavior, byte-identical" contract is about the
+  // `groups` PROP only — never inferred from incidental option shape.
+  if (!$props.virtual && Array.isArray(groupsProp) && groupsProp.length > 0) {
+    const partition = groupOptions(list, groupsProp, (o) => (o && o.group != null ? String(o.group) : null))
     list = partition.ordered
   }
   // `_i` is assigned over the (now group-ordered) list, so the flat keyboard model
@@ -395,8 +394,12 @@ const groupBlocks = () => {
 }
 
 // isGrouped(): the grouped-vs-flat template branch selector. Grouping is active
-// (non-virtual only) when `groups` is non-empty OR any filtered option carries a group.
-const isGrouped = () => !$props.virtual && ((Array.isArray($props.groups) && $props.groups.length > 0) || filteredOptions().some((w) => w.group != null))
+// (non-virtual only) SOLELY when the author explicitly set a non-empty `groups` prop —
+// deliberately NOT "OR any option carries a group" (a real collision discovered against
+// command-palette's pre-existing CommandItem.group per-row-badge field; see the
+// filteredOptions() comment above). Mirrors that same non-empty-`groups` gate exactly, so
+// isGrouped() and the filteredOptions() partition never disagree about which branch is active.
+const isGrouped = () => !$props.virtual && Array.isArray($props.groups) && $props.groups.length > 0
 
 // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
 // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
