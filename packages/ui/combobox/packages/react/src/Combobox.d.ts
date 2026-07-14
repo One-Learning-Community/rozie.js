@@ -86,6 +86,7 @@ export interface ComboboxProps {
 export interface ComboboxHandle {
   focus: (...args: any[]) => any;
   clear: (...args: any[]) => any;
+  seedQuery: (...args: any[]) => any;
 }
 
 declare const Combobox: React.ForwardRefExoticComponent<ComboboxProps & React.RefAttributes<ComboboxHandle>>;

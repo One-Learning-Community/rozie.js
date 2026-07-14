@@ -819,6 +819,9 @@ export class Combobox {
       value: null
     });
   };
+  seedQuery = (text: any) => {
+    this.query.set(String(text == null ? '' : text));
+  };
 
   private __rozieCvaOnChange: (v: unknown) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};

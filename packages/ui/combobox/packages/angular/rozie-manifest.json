@@ -224,6 +224,9 @@
     },
     {
       "name": "clear"
+    },
+    {
+      "name": "seedQuery"
     }
   ]
 }

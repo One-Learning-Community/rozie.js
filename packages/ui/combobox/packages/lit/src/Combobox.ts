@@ -847,6 +847,10 @@ private __rozieWatchInitial_1 = true;
   }));
 };
 
+  seedQuery = (text: any) => {
+  this._query.value = String(text == null ? '' : text);
+};
+
   get value(): unknown { return this._valueControllable.read(); }
   set value(v: unknown) { this._valueControllable.notifyPropertyWrite(v); }
 

@@ -99,6 +99,7 @@ interface ComboboxProps {
 export interface ComboboxHandle {
   focus: (...args: any[]) => any;
   clear: (...args: any[]) => any;
+  seedQuery: (...args: any[]) => any;
 }
 
 const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_props: ComboboxProps, ref): JSX.Element {
@@ -599,6 +600,9 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       value: null
     });
   }
+  function seedQuery(text: any) {
+    setQuery(String(text == null ? '' : text));
+  }
 
   useEffect(() => {
     syncQueryToValue();
@@ -638,9 +642,9 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     }
   }, [props.options, query]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const _rozieExposeRef = useRef({ focus, clear });
-  _rozieExposeRef.current = { focus, clear };
-  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args) }), []);
+  const _rozieExposeRef = useRef({ focus, clear, seedQuery });
+  _rozieExposeRef.current = { focus, clear, seedQuery };
+  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), seedQuery: (...args: Parameters<typeof seedQuery>): ReturnType<typeof seedQuery> => _rozieExposeRef.current.seedQuery(...args) }), []);
 
   return (
     <>

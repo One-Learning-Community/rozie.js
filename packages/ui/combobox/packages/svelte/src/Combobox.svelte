@@ -887,7 +887,11 @@ const kickWindow = (attempts: any) => {
   }
 };
 // focus() — focus the input (accepted ROZ137 Lit override). clear() — reset the
-// selection + query. Both post-mount → $refs safe.
+// selection + query. seedQuery(text) — imperative-only: write the input text
+// (and therefore filteredOptions()'s filter) without touching the `value`
+// model or selection state (a command-palette #2 levels/restore-on-pop
+// prerequisite — repopulating the input on back-navigation is NOT a
+// selection). All three are post-mount → $refs safe.
 export const focus = () => inputEl?.focus();
 export const clear = () => {
   value = null;
@@ -896,6 +900,9 @@ export const clear = () => {
   onchange?.({
     value: null
   });
+};
+export const seedQuery = (text: any) => {
+  query = String(text == null ? '' : text);
 };
 
 onMount(() => {

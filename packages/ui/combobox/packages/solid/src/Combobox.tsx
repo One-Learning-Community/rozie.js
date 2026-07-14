@@ -191,12 +191,13 @@ interface ComboboxProps {
 export interface ComboboxHandle {
   focus: (...args: any[]) => any;
   clear: (...args: any[]) => any;
+  seedQuery: (...args: any[]) => any;
 }
 
 export default function Combobox(_props: ComboboxProps): JSX.Element {
   const _merged = mergeProps({ options: (() => [])() as any[], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'ref']);
-  onMount(() => { local.ref?.({ focus, clear }); });
+  onMount(() => { local.ref?.({ focus, clear, seedQuery }); });
 
   const [value, setValue] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'value', null);
   const [query, setQuery] = createSignal('');
@@ -878,7 +879,11 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     }
   }
   // focus() — focus the input (accepted ROZ137 Lit override). clear() — reset the
-  // selection + query. Both post-mount → $refs safe.
+  // selection + query. seedQuery(text) — imperative-only: write the input text
+  // (and therefore filteredOptions()'s filter) without touching the `value`
+  // model or selection state (a command-palette #2 levels/restore-on-pop
+  // prerequisite — repopulating the input on back-navigation is NOT a
+  // selection). All three are post-mount → $refs safe.
   function focus() {
     return inputElRef?.focus();
   }
@@ -889,6 +894,9 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     _props.onChange?.({
       value: null
     });
+  }
+  function seedQuery(text: any) {
+    setQuery(String(text == null ? '' : text));
   }
 
   return (
