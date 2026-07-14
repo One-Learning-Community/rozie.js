@@ -33,9 +33,13 @@
   `#empty` gains `{query}`, `#footer` unchanged.
 
   Authoring notes (collision classes — see the authoring playbook §6):
-    - The filter logic lives in src/internal/filterCommands.ts (named
-      `filterCommands`, NOT `filter` — which would shadow Array.prototype.filter
-      and read like a prop). codegen vendors src/internal/ into every leaf.
+    - The scoring/ranking + highlighting logic lives in
+      src/internal/scoreCommands.ts (named `scoreCommands`, NOT `filter`/
+      `score` — either would shadow a builtin or read like a bare prop).
+      codegen vendors src/internal/ into every leaf. The public `score` prop
+      is `(item, query) => number | null`; `default: null` selects the
+      built-in fuzzy-subsequence scorer (a behavior change from 0.1.0's
+      substring filter — more permissive; see the changeset).
     - The OPEN imperative verb is `open` ONLY if it survives the surface gate
       against the `open` MODEL (the $data/model-key == $expose-verb class, combobox,
       collapses both onto React's generated `setOpen`/state). It collided, so the
@@ -95,7 +99,18 @@
     model: true,
     docs: {
       description:
-        'The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component filters `items` by this string over each item `label` plus its `keywords`. Reset to `""` when the palette closes, so each plain open starts with a fresh search box.',
+        'The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component ranks `items` by this string via `score` (fuzzy-subsequence by default, matched over each item `label` plus its `keywords`, label weighted above keywords). Reset to `""` when the palette closes, so each plain open starts with a fresh search box.',
+    },
+  },
+
+  // Custom ranking/exclusion hook (default: built-in fuzzy-subsequence scorer).
+  score: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        'Custom ranking/exclusion hook: `(item, query) => number | null`. Return `null` to exclude an item from the results; otherwise higher numbers rank first. Leave unset (`default: null`) to use the built-in fuzzy-subsequence scorer (label weighted above keywords). A recency/frecency boost is added INSIDE `score` (e.g. `return baseScore + recencyBonus(item.id)`), not as a separate prop.',
+      example: '<CommandPalette :score="(item, q) => item.label.includes(q) ? 1 : null" :items="commands" />',
     },
   },
 
@@ -172,20 +187,20 @@
 </data>
 
 <script lang="ts">
-import { filterCommands } from './internal/filterCommands'
+import { scoreCommands, labelHighlight } from './internal/scoreCommands'
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
-// The filtered command list fed to the vendored <Combobox> as its `:options`.
-// command-palette KEEPS its own label+keywords filter (filterCommands, A1) and
-// runs <Combobox :filterable="false"> — combobox's built-in filter is label-only
-// substring and would drop the keyword matching + source-order grouping. A plain
-// function (called from the template binding AND handlers) — never $computed (the
-// combobox value-vs-accessor split). Each item is passed through verbatim; combobox
+// The ranked command list fed to the vendored <Combobox> as its `:options`.
+// command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
+// default over label+keywords, label weighted above keywords, pluggable via
+// $props.score) and runs <Combobox :disable-filter="true"> — combobox's
+// built-in filter is label-only substring and would drop keyword matching +
+// the ranked ordering. scoreCommands already normalizes non-array input, so
+// no local Array.isArray guard is needed. A plain function (called from the
+// template binding AND handlers) — never $computed (the combobox
+// value-vs-accessor split). Each item is passed through verbatim; combobox
 // resolves its value via `optionValue` (below) and its label via `.label`.
-const filteredItems = () => {
-  const src = Array.isArray($props.items) ? $props.items : []
-  return filterCommands(src, $props.query)
-}
+const filteredItems = () => scoreCommands($props.items, $props.query, $props.score)
 
 // The vendored <Combobox> commits the OPTION's value; resolve each command's value
 // to its stable `id` (the key passed back on `select`). disabled is resolved off
@@ -223,7 +238,7 @@ const onComboboxChange = (e) => {
 
 // Combobox's `@search` fires `{ query }` as the user types in its combobox input.
 // Pipe it into command-palette's own two-way `query` model — `filteredItems()`
-// then re-filters via filterCommands (keyword-aware). Capture the fresh value
+// then re-ranks via scoreCommands (keyword-aware, fuzzy). Capture the fresh value
 // (never re-read a just-written $data/$model key on React — it is stale).
 const onComboboxSearch = (e) => {
   $model.query = e && e.query !== undefined ? e.query : ''

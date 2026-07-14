@@ -29,7 +29,7 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'CommandPalette',
-  props: ['open', 'query', 'items', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase'],
+  props: ['open', 'query', 'items', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase', 'score'],
   models: ['open', 'query'],
   emits: ['select'],
   // D-05 (BREAKING, Phase 999.4): the public slots are re-aligned to the vendored
@@ -69,7 +69,7 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (8 props)', () => {
+  it('props surface matches (9 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
