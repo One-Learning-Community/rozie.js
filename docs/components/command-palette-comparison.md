@@ -1,5 +1,5 @@
 ---
-surface_hash: 7efe4a816437
+surface_hash: 780be55853a9
 ---
 
 # Command palette — comparison
@@ -21,7 +21,7 @@ The "⌘K" command palette — a centered modal overlay with a search box over a
 | Angular CDK `Dialog` + `Listbox` | Angular only | ✅ primitives | Strong if assembled correctly | Yes (Angular CDK) | You assemble it — filtering/scoring is yours to write | No dominant Angular command palette; usually hand-assembled from CDK primitives. |
 | [**ninja-keys**](https://github.com/ssleptsov/ninja-keys) | Web component (HTML/Vue/React/Svelte) | ❌ styled element | Keyboard nav; not a documented APG-grade a11y story | Low activity — no GitHub releases, ~2023-era | Nested menus, hotkeys, theming, root search | Cross-framework, but a *styled* `<ninja-keys>` element you configure via a `data` array — a different authoring model. |
 | [Algolia **DocSearch**](https://docsearch.algolia.com/) | Any (drop-in widget) | ❌ hosted widget | Good, but a search box, not a command runner | Yes (v4) | Crawls + indexes your docs; instant search | Adjacent category: ⌘K *site search*, not an app *command* menu. Hosted Algolia index. |
-| **`@rozie-ui/command-palette`** | React, Vue, Svelte, Angular, Solid, Lit | ✅ headless | WAI-ARIA dialog + combobox + listbox/option, `aria-activedescendant` | New — `0.1.0` | Substring match over `label` + `keywords`, source-order; flat list | One `.rozie` source → six idiomatic packages, same API. |
+| **`@rozie-ui/command-palette`** | React, Vue, Svelte, Angular, Solid, Lit | ✅ headless | WAI-ARIA dialog + combobox + listbox/option, `aria-activedescendant` | New — `0.2.0` | Fuzzy-subsequence ranking + match highlighting (pluggable `score`), nested levels with optional async sources (loading/error), combobox groups | One `.rozie` source → six idiomatic packages, same API. |
 
 ## The honest core point
 
@@ -43,7 +43,7 @@ So a design system that ships React **and** Vue **and** Svelte **and** Angular w
 
 This comparison stays credible by saying so plainly:
 
-- **A React-only app that wants depth → use cmdk.** cmdk is mature, battle-tested, powers shadcn/ui's `Command`, and is genuinely deeper than Rozie's v1: a fully composable group/item API, sophisticated built-in fuzzy *scoring* (not just substring matching), and built-in async loading states. If you will only ever ship React, cmdk is the stronger, more proven choice — Rozie's pitch is cross-framework parity, not out-featuring cmdk on its home turf.
+- **A React-only app that wants maximum maturity → consider cmdk.** As of `0.2.0` Rozie matches cmdk on the headline features — fuzzy *scoring* (with a pluggable `score` hook), group headings, and async loading states are all built in. cmdk's remaining edge is maturity (it powers shadcn/ui's `Command` and Vercel) and a fully composable JSX group/item API. If you will only ever ship React and prize the most battle-tested option, cmdk is still a safe pick — Rozie's pitch is delivering that same feature set with cross-framework parity from one source.
 - **A Svelte-only app → use Bits UI `Command`.** With `cmdk-sv` deprecated, [Bits UI's `Command`](https://bits-ui.com/docs/components/command) is the maintained Svelte option, with a built-in scoring algorithm, `Command.Group` headings, and loading/empty states.
 - **A Vue-only app → Headless UI's combobox or `vue-command-palette`** are reasonable, framework-native picks.
 - **You only need site/docs search → use Algolia DocSearch.** DocSearch is a different category — a hosted, crawled ⌘K *search* widget — but if "⌘K" for you means "search my documentation," it is the purpose-built tool, not an app command runner.
@@ -54,9 +54,9 @@ Rozie's wedge is **consistency and coverage**, not feature maximalism: there is 
 
 Stated plainly — this doubles as the roadmap:
 
-- **It is not a fuzzy-ranking search engine.** The filter is a **case-insensitive substring match** over each item's `label` plus its optional `keywords`, **preserving source order**. cmdk and Bits UI ship real fuzzy *scoring* that reranks results by match quality; Rozie does not. For fuzzy ranking, pre-rank your `items` and feed the ordered list in — the `query` model and the `select` event give you the hook.
+- **The built-in scorer is intentionally simple.** As of `0.2.0` fuzzy-subsequence ranking + highlighting is built in (label weighted above `keywords`, ranked by match strength), but the default algorithm is deliberately lightweight — not a full fzf-grade engine. For exotic ranking, the pluggable `score` prop — <span v-pre>`(item, query) => number | null`</span> — hands you complete control (custom weighting, recency/frecency boosts, exclusion).
 - **It is a flat list, not nested groups.** Items carry an optional `group` field surfaced per-row (and in the `option` slot scope), but Rozie does **not** render sticky group *headings* automatically the way cmdk's `Command.Group` or Bits UI's `Command.Group` do. Render grouped headings yourself via the `option` slot.
-- **No built-in async / loading state.** There is no first-class "loading" affordance; drive it through your `items` array and the `empty` slot. (cmdk and Bits UI have explicit loading states.)
+- **Async data is a first-class level source (as of `0.2.0`).** A nested level's `source` may return a `Promise`: the palette shows the `loading` slot while it resolves, drops stale in-flight results (race-safe), debounces refetch via `searchDebounce`, and shows the `error` slot with a `retry` on rejection — no need to hand-drive it through `items`.
 - **It does not own a global keyboard shortcut.** Bind ⌘K / Ctrl-K yourself and call `show()` (or set the `open` model). cmdk, kbar, and ninja-keys variously help with this; Rozie stays unopinionated about how the palette is summoned.
 - **It is self-contained, not composed from the listbox family.** The results list is authored inline (scoped slots + roving nav), **not** by composing the published `@rozie-ui/listbox` package — cross-family composition of published leaves isn't expressible in the compiler today. The accessibility primitives are the same; the implementation is just not a dependency on another leaf.
 - **`@rozie-ui/command-palette` is `0.1.0`.** The surface (8 props / 1 `select` event / a 4-verb handle / `option` · `empty` · `footer` slots / two-way `open` + `query`) is stable and gate-verified across all six targets, but it is far younger and less battle-tested than cmdk.

@@ -1,5 +1,5 @@
 ---
-surface_hash: 169ce6383704
+surface_hash: e292aa77a643
 ---
 
 # Headless combobox / autocomplete comparison
@@ -75,7 +75,7 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 - **Multi-select / tags.** `@rozie-ui/combobox` is single-select (one `value` model). Tag/token multi-select inputs — `downshift`'s `useMultipleSelection`, `react-select`'s `isMulti`, `vue-select` `multiple`, Headless UI / Kobalte / Bits / Ark `multiple`, `@angular/aria/multiselect` — are not modeled today.
 - **Deep virtualization edge cases.** `@rozie-ui/combobox` ships **opt-in vertical windowing** for long option lists via `:virtual` (the same `@tanstack/virtual-core` engine `@rozie-ui/data-table` uses, wired in cross-framework so only the visible slice renders, backed by behavioral specs across all six targets). The more exotic virtualization modes (variable heights, grouped/sticky sections) that Headless UI v2 and PrimeVue expose are not built in yet.
 - **Free-text / create-on-the-fly.** The value is always one of the supplied options; there is no creatable / "allow arbitrary text as the value" mode (`react-select`'s creatable, `vue-select`'s `taggable`, React Aria's `allowsCustomValue`, Ark's `allowCustomValue`).
-- **Option groups.** Grouped headings (`<optgroup>`-style sections) are not surfaced yet.
+- **Grouped virtualization.** Native option groups shipped in `0.2.0` — ordered sections with `role="group"` headings via the `groups` prop + the `groupHeading` slot. Combining them with the `:virtual` windowed path (sticky group headers across the window) is not built in yet.
 - **`@rozie-ui/combobox` is `0.1.0`.** The surface (7 props / 2 events / 2-verb handle / `#option` slot / client + async filtering) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established per-framework libraries.
 
 ## Try it
