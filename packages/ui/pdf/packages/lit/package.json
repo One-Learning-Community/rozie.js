@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/pdf-lit",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -71,5 +71,8 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": ["./dist/index.mjs", "./dist/index.cjs"]
+  "sideEffects": [
+    "./dist/index.mjs",
+    "./dist/index.cjs"
+  ]
 }

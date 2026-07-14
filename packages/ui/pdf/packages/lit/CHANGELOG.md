@@ -1,11 +1,18 @@
 # @rozie-ui/pdf-lit
 
+## 0.2.2
+
+### Patch Changes
+
+- 1a2e30c: Fix: scope `sideEffects` so a bare side-effect import preserves the custom-element registration.
+
+  `@rozie-ui/pdf-lit` shipped `sideEffects: false`, which let production bundlers (Vite build / Rollup / webpack prod) tree-shake the bare `import '@rozie-ui/pdf-lit'` — dropping the `customElements.define(...)` call so `<rozie-pdf-*>` rendered as an inert unknown element. Dev (esbuild eager-eval) masked it. `sideEffects` is now scoped to `["./dist/index.mjs", "./dist/index.cjs"]` so the registering entry is preserved while unrelated modules still tree-shake. Consumers who bare-import for the element registration in a production build are affected; those importing a used binding were not.
+
 ## 0.2.1
 
 ### Patch Changes
 
 - Fix: in `render-all-pages` (continuous) mode, the internal scroll spy no longer fights the user's scroll. Scrolling a multi-page document previously snap-scrolled the view to whichever page had just become most-visible, so pages were skipped on momentum and the view could stick oscillating between two adjacent pages (with a secondary height jitter). The most-visible page still reflects into `page` / the `pagechange` event, but programmatic scroll-into-view now happens only on explicit navigation (`goToPage(n)` / setting `:page`), never from the observer — a timing-independent fix that is correct across all six framework targets.
-
 
 ## 0.2.0
 
