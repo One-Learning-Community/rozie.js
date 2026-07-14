@@ -172,11 +172,11 @@ export class CommandPalette {
    */
   open = model<boolean>(false);
   /**
-   * The current search text (two-way `r-model`). Two-way bind it to read or pre-seed the query; the component filters `items` by this string over each item `label` plus its `keywords`. Cleared to `""` whenever the palette opens.
+   * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component filters `items` by this string over each item `label` plus its `keywords`. Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
    */
   query = model<string>('');
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` buckets items under a heading; optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
+   * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
    */
   items = input<any[]>((() => [])());
   /**
@@ -211,7 +211,7 @@ export class CommandPalette {
 
   constructor() {
     effect(() => { const __watchVal = (() => this.open())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
-      if (isOpen) this.onOpen();
+      if (isOpen) this.onOpen();else this.query.set('');
     })(__watchVal); }); });
   }
 
@@ -253,7 +253,6 @@ export class CommandPalette {
     this.combobox()?.focus();
   };
   onOpen = () => {
-    this.query.set('');
     this.activeValue.set(null);
     // Defer a tick so the overlay + <Combobox> are mounted before focusing.
     if (typeof requestAnimationFrame !== 'undefined') {

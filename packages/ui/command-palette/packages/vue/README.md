@@ -49,8 +49,8 @@ import '@rozie-ui/command-palette-vue/themes/shadcn.css';    // or material.css,
 | Name | Type | Default | Two-way (model) | Required | Description |
 | --- | --- | --- | :---: | :---: | --- |
 | `open` | `Boolean` | `false` | ✓ |  | Whether the palette overlay is shown (two-way `r-model`). Two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`); every close path (backdrop click, Escape, selecting an item when `closeOnSelect`, the imperative `close()`) writes `open = false`. As one of two `model: true` props the component does not generate an Angular `ControlValueAccessor`. |
-| `query` | `String` | `''` | ✓ |  | The current search text (two-way `r-model`). Two-way bind it to read or pre-seed the query; the component filters `items` by this string over each item `label` plus its `keywords`. Cleared to `""` whenever the palette opens. |
-| `items` | `Array` | `[]` |  |  | The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` buckets items under a heading; optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. |
+| `query` | `String` | `''` | ✓ |  | The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component filters `items` by this string over each item `label` plus its `keywords`. Reset to `""` when the palette closes, so each plain open starts with a fresh search box. |
+| `items` | `Array` | `[]` |  |  | The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. |
 | `placeholder` | `String` | `"Type a command…"` |  |  | Placeholder text shown in the search input while the query is empty. |
 | `emptyText` | `String` | `"No results."` |  |  | Text shown when the query matches no items. Override the whole empty state with the `empty` slot when you need richer markup. |
 | `closeOnSelect` | `Boolean` | `true` |  |  | Whether choosing an item closes the palette. Defaults to `true` (the cmdk convention); set to `false` to keep the palette open after a selection — e.g. for a multi-action menu where the user runs several commands in a row. |
@@ -69,8 +69,8 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 
 | Method | Description |
 | --- | --- |
-| `show` | Open the palette (writes the `open` model to `true`). Clears the query, resets the highlight, and focuses the search input. |
-| `close` | Close the palette (writes the `open` model to `false`). |
+| `show` | Open the palette (writes the `open` model to `true`). Resets the highlight and focuses the search input; a pre-seeded query is preserved (the query resets on close, not open). |
+| `close` | Close the palette (writes the `open` model to `false`). Resets the query to `""` so the next open starts fresh. |
 | `toggle` | Toggle the palette open/closed (writes the `open` model to its negation). |
 | `focus` | Move DOM focus to the search input. NOTE: this deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element (ROZ137 warns, warn-only) — the public `focus()` handle is intended. |
 

@@ -97,13 +97,13 @@ interface CommandPaletteProps {
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   /**
-   * The current search text (two-way `r-model`). Two-way bind it to read or pre-seed the query; the component filters `items` by this string over each item `label` plus its `keywords`. Cleared to `""` whenever the palette opens.
+   * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component filters `items` by this string over each item `label` plus its `keywords`. Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
    */
   query?: string;
   defaultQuery?: string;
   onQueryChange?: (query: string) => void;
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` buckets items under a heading; optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
+   * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
    */
   items?: any[];
   /**
@@ -153,7 +153,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     if (open()) onOpen();
   });
   createEffect(on(() => (() => open())(), (v) => untrack(() => ((isOpen: any) => {
-    if (isOpen) onOpen();
+    if (isOpen) onOpen();else setQuery('');
   })(v)), { defer: true }));
   let panelRef: HTMLElement | null = null;
   let comboboxRef: ComboboxHandle | null = null;
@@ -245,10 +245,13 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     comboboxRef?.focus();
   }
 
-  // On open: clear the query + internal selection, then focus the search input.
+  // On open: clear the internal selection, then focus the search input. The query
+  // is NOT reset here — that would clobber a pre-seeded / `r-model`-bound query.
+  // The reset happens on the close transition (the $watch else-branch below), so a
+  // value set alongside `open` is honored and each plain open still starts fresh
+  // (the query was cleared at the prior close).
   // Runs from $onMount and the lazy open $watch callback, both post-mount.
   function onOpen() {
-    setQuery('');
     setActiveValue(null);
     // Defer a tick so the overlay + <Combobox> are mounted before focusing.
     if (typeof requestAnimationFrame !== 'undefined') {

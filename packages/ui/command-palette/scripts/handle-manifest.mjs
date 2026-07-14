@@ -21,8 +21,8 @@
  *     the public handle is intended — the otp/combobox/slider precedent).
  */
 export const handleManifest = {
-  show: 'Open the palette (writes the `open` model to `true`). Clears the query, resets the highlight, and focuses the search input.',
-  close: 'Close the palette (writes the `open` model to `false`).',
+  show: 'Open the palette (writes the `open` model to `true`). Resets the highlight and focuses the search input; a pre-seeded query is preserved (the query resets on close, not open).',
+  close: 'Close the palette (writes the `open` model to `false`). Resets the query to `""` so the next open starts fresh.',
   toggle: 'Toggle the palette open/closed (writes the `open` model to its negation).',
   focus:
     'Move DOM focus to the search input. NOTE: this deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element (ROZ137 warns, warn-only) — the public `focus()` handle is intended.',

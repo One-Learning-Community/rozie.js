@@ -111,12 +111,12 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
   private _openControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'open-change', defaultValue: false, initialControlledValue: undefined });
   /**
-   * The current search text (two-way `r-model`). Two-way bind it to read or pre-seed the query; the component filters `items` by this string over each item `label` plus its `keywords`. Cleared to `""` whenever the palette opens.
+   * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component filters `items` by this string over each item `label` plus its `keywords`. Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
    */
   @property({ type: String, attribute: 'query' }) _query_attr: string = '';
   private _queryControllable = createLitControllableProperty<string>({ host: this, eventName: 'query-change', defaultValue: '', initialControlledValue: undefined });
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` buckets items under a heading; optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
+   * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
    */
   @property({ type: Array }) items: any[] = [];
   /**
@@ -206,7 +206,7 @@ private __rozieWatchInitial_0 = true;
     this._armListeners();
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.open)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
-      if (isOpen) this.onOpen();
+      if (isOpen) this.onOpen();else this._queryControllable.write('');
     })(__watchVal); }); }));
 
     if (this.open) this.onOpen();
@@ -297,7 +297,6 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
 };
 
   onOpen = () => {
-  this._queryControllable.write('');
   this._activeValue.value = null;
   // Defer a tick so the overlay + <Combobox> are mounted before focusing.
   if (typeof requestAnimationFrame !== 'undefined') {

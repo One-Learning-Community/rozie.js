@@ -28,13 +28,13 @@ interface CommandPaletteProps {
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   /**
-   * The current search text (two-way `r-model`). Two-way bind it to read or pre-seed the query; the component filters `items` by this string over each item `label` plus its `keywords`. Cleared to `""` whenever the palette opens.
+   * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component filters `items` by this string over each item `label` plus its `keywords`. Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
    */
   query?: string;
   defaultQuery?: string;
   onQueryChange?: (query: string) => void;
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` buckets items under a heading; optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
+   * The command list — `[{ id, label, group?, keywords?, disabled? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation.
    */
   items?: any[];
   /**
@@ -146,7 +146,6 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     combobox.current?.focus();
   }
   const onOpen = useCallback(() => {
-    setQuery('');
     setActiveValue(null);
     // Defer a tick so the overlay + <Combobox> are mounted before focusing.
     if (typeof requestAnimationFrame !== 'undefined') {
@@ -156,7 +155,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     } else {
       focusInput();
     }
-  }, [focusInput, setQuery]);
+  }, [focusInput]);
   const onPanelKeydown = useCallback((e: any) => {
     if (e && e.key === 'Escape') {
       e.preventDefault();
@@ -182,7 +181,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     const isOpen = open;
-    if (isOpen) onOpen();
+    if (isOpen) onOpen();else setQuery('');
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieExposeRef = useRef({ show, close, toggle, focus });
