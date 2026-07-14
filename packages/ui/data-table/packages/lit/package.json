@@ -88,7 +88,7 @@
     "access": "public"
   },
   "sideEffects": [
-    "*.css",
-    "**/*.css"
+    "./dist/index.mjs",
+    "./dist/index.cjs"
   ]
 }
