@@ -24,17 +24,25 @@ name: Release (early subset)
 #     carry @rozie/runtime-<fw> and svelte carries @rozie/runtime-svelte (rewritten from
 #     `workspace:` at publish; live on npm at 0.1.3); angular carries no @rozie dep. All
 #     six take pdfjs-dist as a peer dep. 0.2.1 also ships a render-all-pages scroll-spy fix.
+#   - 6 @rozie-ui popover leaves: popover-{react,vue,solid,lit,svelte,angular}
+#     (all six aligned at 0.1.0 — the FIRST all-targets popover release line). react/solid/
+#     lit/vue carry @rozie/runtime-<fw> and svelte carries @rozie/runtime-svelte (rewritten
+#     from `workspace:` at publish; live on npm); angular carries no @rozie dep (tslib only).
+#     All six take @floating-ui/dom as a peer (plus their framework peer). This family is a
+#     hard PREREQUISITE of the data-table Option-A release below and is published first.
+#     Release-verified 2026-07-13: local `--gate` PASS (6/6 clean), all six build green.
 #   - 6 @rozie-ui data-table leaves: data-table-{react,vue,solid,lit,svelte,angular}
-#     (all six aligned at 0.1.0 — the FIRST all-targets data-table release line).
-#     react/solid/lit/vue carry @rozie/runtime-<fw> (workspace:* -> 0.1.3 exact) and
-#     svelte carries @rozie/runtime-svelte (workspace:^ -> ^0.1.3) — all live on npm at
-#     0.1.3, rewritten from `workspace:` at publish. solid also carries
-#     @solid-primitives/keyed; angular carries no @rozie dep (tslib only). All six take
-#     @tanstack/table-core + @tanstack/virtual-core + @floating-ui/dom as peer deps. The
-#     vendored @rozie-ui/popover + @rozie-ui/headless-core sources DISSOLVE into each leaf
-#     at compile (Option-B authoring-time vendoring), so there is ZERO runtime dep on
-#     either — both stay devDependencies. Release-verified 2026-07-11: local `--gate` PASS
-#     (6/6 clean), all six build green, npm-pack shape matches the pdf/sortable-list leaves.
+#     (all six bumped 0.1.1 -> 0.2.0 — the Option-A popover-peer release line).
+#     react/solid/lit/vue carry @rozie/runtime-<fw> (workspace:* -> exact) and svelte carries
+#     @rozie/runtime-svelte (workspace:^) — all live on npm, rewritten from `workspace:` at
+#     publish. solid also carries @solid-primitives/keyed; angular carries no @rozie dep
+#     (tslib only). Under Option A the header `⋯` menu resolves the PUBLISHED
+#     @rozie-ui/popover-<target> package at compile (schema-versioned manifest) instead of
+#     vendoring its source, so each leaf now declares @rozie-ui/popover-<target> (^0.1.0) as a
+#     required runtime peerDependency — hence popover MUST publish first (above), and popover
+#     MUST build before data-table. headless-core stays dissolved at compile. All six take
+#     @tanstack/table-core + @tanstack/virtual-core as peers (@floating-ui/dom graduated to
+#     popover's peer). Release-verified 2026-07-13: local `--gate` PASS (6/6 clean).
 #
 # Everything else is DELIBERATELY out of scope: the react/solid/svelte/lit/angular
 # leaves of cropper + fullcalendar are not release-verified. Do NOT widen the --filter
@@ -223,6 +231,24 @@ jobs:
           --filter=@rozie-ui/pdf-angular
           build
 
+      # Build all six popover leaves into their compiled dist/ drop-in. Mixed per-target
+      # toolchain (react/solid/lit tsdown, vue Vite lib + vue-tsc, svelte @sveltejs/package,
+      # angular ng-packagr APF). Sits AFTER the toolchain build so the local @rozie/runtime-*
+      # dist exists for the react/solid/lit/svelte/vue leaf type resolution (angular = tslib
+      # only, no @rozie dep). MUST run BEFORE the data-table build below: data-table's Option-A
+      # composition imports `@rozie-ui/popover-<target>` (a required peer, workspace-linked via
+      # auto-install-peers), so data-table's declaration emit reads popover's freshly-built dist.
+      - name: Build popover leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/popover-react
+          --filter=@rozie-ui/popover-vue
+          --filter=@rozie-ui/popover-solid
+          --filter=@rozie-ui/popover-lit
+          --filter=@rozie-ui/popover-svelte
+          --filter=@rozie-ui/popover-angular
+          build
+
       # Build all six data-table leaves into their compiled dist/ drop-in. Mixed per-target
       # toolchain (react/solid/lit tsdown, vue Vite lib + vue-tsc, svelte @sveltejs/package,
       # angular ng-packagr APF). NOTE: unlike the self-contained -vue leaves above,
@@ -230,9 +256,12 @@ jobs:
       # the toolchain build, so the local @rozie/runtime-* dist exists for the
       # react/solid/lit/svelte/vue leaf type resolution (angular = tslib only). The COMMITTED
       # leaf src/ is the build input — codegen is NOT run in CI (it only regenerates that
-      # already-committed src/). The vendored Popover + headless-core sources dissolved into
-      # src/ at authoring time, so no @rozie-ui workspace dep is needed at build; all six take
-      # @tanstack/table-core + @tanstack/virtual-core + @floating-ui/dom as peer deps.
+      # already-committed src/). Under Option A (schema-versioned manifest), the committed src/
+      # IMPORTS `@rozie-ui/popover-<target>` (a required peer, workspace-linked via
+      # auto-install-peers), so the "Build popover leaves" step above MUST run first — the
+      # data-table declaration emit reads popover's dist. headless-core stays dissolved at
+      # authoring time. All six take @tanstack/table-core + @tanstack/virtual-core +
+      # @floating-ui/dom as peer deps (@floating-ui/dom now graduates to popover's own peer).
       - name: Build data-table leaves
         run: >
           pnpm
@@ -302,6 +331,12 @@ jobs:
           --filter @rozie-ui/pdf-lit
           --filter @rozie-ui/pdf-svelte
           --filter @rozie-ui/pdf-angular
+          --filter @rozie-ui/popover-react
+          --filter @rozie-ui/popover-vue
+          --filter @rozie-ui/popover-solid
+          --filter @rozie-ui/popover-lit
+          --filter @rozie-ui/popover-svelte
+          --filter @rozie-ui/popover-angular
           --filter @rozie-ui/data-table-react
           --filter @rozie-ui/data-table-vue
           --filter @rozie-ui/data-table-solid
@@ -401,16 +436,39 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
 
-      # All six data-table leaves (all aligned at 0.1.0 — first all-targets line). pnpm
+      # All six popover leaves (first all-targets popover release line, aligned at 0.1.0). pnpm
+      # rewrites their `workspace:` deps to the concrete @rozie/runtime-* versions (live on npm)
+      # in the tarball: react/solid/lit/vue carry @rozie/runtime-<fw>, svelte carries
+      # @rozie/runtime-svelte; angular carries no @rozie dep (tslib only). All six take
+      # @floating-ui/dom as a peer (plus their framework peer). MUST publish BEFORE the
+      # data-table leaves below — every data-table leaf now declares @rozie-ui/popover-<target>
+      # as a required peer. Inherits dry_run (default TRUE) via steps.flags.outputs.extra and
+      # the skip-if-already-published behavior (no --force).
+      - name: Publish popover leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/popover-react
+          --filter=@rozie-ui/popover-vue
+          --filter=@rozie-ui/popover-solid
+          --filter=@rozie-ui/popover-lit
+          --filter=@rozie-ui/popover-svelte
+          --filter=@rozie-ui/popover-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # All six data-table leaves (aligned at 0.2.0 — Option-A popover-peer release line). pnpm
       # rewrites their `workspace:` deps to the concrete @rozie/runtime-* versions (live on
       # npm at 0.1.3) in the tarball: react/solid/lit/vue carry @rozie/runtime-<fw>
       # (workspace:* -> 0.1.3 exact), svelte carries @rozie/runtime-svelte (workspace:^ ->
       # ^0.1.3); solid also carries @solid-primitives/keyed; angular carries no @rozie dep
-      # (tslib only). The vendored Popover + headless-core dissolved at compile, so there is
-      # no @rozie-ui workspace dep to resolve. All six take @tanstack/table-core +
-      # @tanstack/virtual-core + @floating-ui/dom as peer deps. Inherits dry_run (default
-      # TRUE) via steps.flags.outputs.extra and the skip-if-already-published behavior (no
-      # --force).
+      # (tslib only). Under Option A each leaf declares @rozie-ui/popover-<target> (^0.1.0) as a
+      # required peer — published in the "Publish popover leaves" step above, so the peer
+      # resolves for consumers. headless-core stays dissolved at compile. All six take
+      # @tanstack/table-core + @tanstack/virtual-core as peer deps (@floating-ui/dom graduated to
+      # popover's own peer). Inherits dry_run (default TRUE) via steps.flags.outputs.extra and
+      # the skip-if-already-published behavior (no --force).
       - name: Publish data-table leaves (@rozie-ui/*)
         run: >
           pnpm
