@@ -43,6 +43,20 @@ name: Release (early subset)
 #     MUST build before data-table. headless-core stays dissolved at compile. All six take
 #     @tanstack/table-core + @tanstack/virtual-core as peers (@floating-ui/dom graduated to
 #     popover's peer). Release-verified 2026-07-13: local `--gate` PASS (6/6 clean).
+#   - 6 @rozie-ui combobox leaves: combobox-{react,vue,solid,lit,svelte,angular}
+#     (all six aligned at 0.1.0 — the FIRST all-targets combobox release line). react/solid/
+#     lit/vue carry @rozie/runtime-<fw> and svelte carries @rozie/runtime-svelte (rewritten from
+#     `workspace:` at publish; live on npm); angular carries no @rozie dep (tslib only).
+#     Self-contained — no @rozie-ui workspace dep (vendors the listbox spine at authoring time).
+#     Hard PREREQUISITE of the command-palette debut below; published first, built first.
+#   - 6 @rozie-ui command-palette leaves: command-palette-{react,vue,solid,lit,svelte,angular}
+#     (all six aligned at 0.1.0 — the DEBUT all-targets command-palette release line). The
+#     earlier `major`/breaking `command-palette-listbox-slots` changeset was DROPPED: the family
+#     was never published, so the slot re-align breaks no consumer and a 1.0.0 debut would be
+#     wrong. Under Phase 999.4 Option B composition each leaf imports + declares
+#     @rozie-ui/combobox-<target> (^0.1.0) as a required peer — hence combobox MUST publish first
+#     (above) and build before command-palette. angular = tslib only; the rest carry
+#     @rozie/runtime-<fw>. Release-verified 2026-07-13: local `--gate` PASS (12/12 with combobox).
 #
 # Everything else is DELIBERATELY out of scope: the react/solid/svelte/lit/angular
 # leaves of cropper + fullcalendar are not release-verified. Do NOT widen the --filter
@@ -273,6 +287,41 @@ jobs:
           --filter=@rozie-ui/data-table-angular
           build
 
+      # Build all six combobox leaves into their compiled dist/ drop-in. Mixed per-target
+      # toolchain (react/solid/lit tsdown, vue Vite lib + vue-tsc, svelte @sveltejs/package,
+      # angular ng-packagr APF). Sits AFTER the toolchain build so the local @rozie/runtime-*
+      # dist exists for the react/solid/lit/svelte/vue leaf type resolution (angular = tslib
+      # only). Self-contained: no @rozie-ui workspace dep (it vendors the listbox spine at
+      # authoring time). MUST run BEFORE the command-palette build below — command-palette's
+      # composition imports `@rozie-ui/combobox-<target>` (a required peer, workspace-linked via
+      # auto-install-peers), so command-palette's declaration emit reads combobox's built dist.
+      - name: Build combobox leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/combobox-react
+          --filter=@rozie-ui/combobox-vue
+          --filter=@rozie-ui/combobox-solid
+          --filter=@rozie-ui/combobox-lit
+          --filter=@rozie-ui/combobox-svelte
+          --filter=@rozie-ui/combobox-angular
+          build
+
+      # Build all six command-palette leaves into their compiled dist/ drop-in. Same mixed
+      # per-target toolchain. The committed leaf src/ imports `@rozie-ui/combobox-<target>`
+      # (Phase 999.4 Option B composition), a required peer resolved from the combobox dist
+      # built in the step above — so this MUST run after "Build combobox leaves". angular =
+      # tslib only; react/solid/lit/vue carry @rozie/runtime-<fw>, svelte @rozie/runtime-svelte.
+      - name: Build command-palette leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/command-palette-react
+          --filter=@rozie-ui/command-palette-vue
+          --filter=@rozie-ui/command-palette-solid
+          --filter=@rozie-ui/command-palette-lit
+          --filter=@rozie-ui/command-palette-svelte
+          --filter=@rozie-ui/command-palette-angular
+          build
+
       # ADVISORY structural pre-check. Runs AFTER every leaf dist exists (the
       # toolchain already published at the earlier "Publish toolchain" step; the
       # Vue + non-vue leaves were just built above) and BEFORE the first leaf
@@ -343,6 +392,18 @@ jobs:
           --filter @rozie-ui/data-table-lit
           --filter @rozie-ui/data-table-svelte
           --filter @rozie-ui/data-table-angular
+          --filter @rozie-ui/combobox-react
+          --filter @rozie-ui/combobox-vue
+          --filter @rozie-ui/combobox-solid
+          --filter @rozie-ui/combobox-lit
+          --filter @rozie-ui/combobox-svelte
+          --filter @rozie-ui/combobox-angular
+          --filter @rozie-ui/command-palette-react
+          --filter @rozie-ui/command-palette-vue
+          --filter @rozie-ui/command-palette-solid
+          --filter @rozie-ui/command-palette-lit
+          --filter @rozie-ui/command-palette-svelte
+          --filter @rozie-ui/command-palette-angular
 
       # Then the 6 Vue leaves. They carry zero @rozie/* deps so they don't
       # actually depend on the step above — ordering just keeps the log readable.
@@ -478,6 +539,47 @@ jobs:
           --filter=@rozie-ui/data-table-lit
           --filter=@rozie-ui/data-table-svelte
           --filter=@rozie-ui/data-table-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # All six combobox leaves (first all-targets combobox release line, aligned at 0.1.0). pnpm
+      # rewrites their `workspace:` deps to the concrete @rozie/runtime-* versions (live on npm)
+      # in the tarball: react/solid/lit/vue carry @rozie/runtime-<fw>, svelte carries
+      # @rozie/runtime-svelte; angular carries no @rozie dep (tslib only). Self-contained — no
+      # @rozie-ui workspace dep. MUST publish BEFORE the command-palette leaves below —
+      # command-palette declares @rozie-ui/combobox-<target> as a required peer. Inherits dry_run
+      # (default TRUE) via steps.flags.outputs.extra and the skip-if-already-published (no --force).
+      - name: Publish combobox leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/combobox-react
+          --filter=@rozie-ui/combobox-vue
+          --filter=@rozie-ui/combobox-solid
+          --filter=@rozie-ui/combobox-lit
+          --filter=@rozie-ui/combobox-svelte
+          --filter=@rozie-ui/combobox-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # All six command-palette leaves (first all-targets command-palette release line, aligned at
+      # 0.1.0 — the DEBUT; the earlier `major`/breaking changeset was dropped since the family was
+      # never published). pnpm rewrites their `workspace:` deps to the concrete @rozie/runtime-*
+      # versions in the tarball (angular = tslib only). Each leaf declares @rozie-ui/combobox-<target>
+      # (^0.1.0) as a required peer — published in the "Publish combobox leaves" step above, so the
+      # peer resolves for consumers. Inherits dry_run (default TRUE) and skip-if-already-published.
+      - name: Publish command-palette leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/command-palette-react
+          --filter=@rozie-ui/command-palette-vue
+          --filter=@rozie-ui/command-palette-solid
+          --filter=@rozie-ui/command-palette-lit
+          --filter=@rozie-ui/command-palette-svelte
+          --filter=@rozie-ui/command-palette-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
