@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/command-palette-react",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -52,7 +52,7 @@
   "peerDependencies": {
     "react": "^18.2 || ^19",
     "react-dom": "^18.2 || ^19",
-    "@rozie-ui/combobox-react": "^0.1.0"
+    "@rozie-ui/combobox-react": "^0.2.0"
   },
   "peerDependenciesMeta": {
     "react": {

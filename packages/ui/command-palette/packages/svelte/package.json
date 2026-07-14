@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/command-palette-svelte",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -51,7 +51,7 @@
   },
   "peerDependencies": {
     "svelte": "^5",
-    "@rozie-ui/combobox-svelte": "^0.1.0"
+    "@rozie-ui/combobox-svelte": "^0.2.0"
   },
   "peerDependenciesMeta": {
     "svelte": {

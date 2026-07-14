@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/command-palette-solid",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -52,7 +52,7 @@
   },
   "peerDependencies": {
     "solid-js": "^1.8",
-    "@rozie-ui/combobox-solid": "^0.1.0"
+    "@rozie-ui/combobox-solid": "^0.2.0"
   },
   "peerDependenciesMeta": {
     "solid-js": {

@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/command-palette-angular",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -51,7 +51,7 @@
     "@angular/core": "^19",
     "@angular/common": "^19",
     "@angular/forms": "^19",
-    "@rozie-ui/combobox-angular": "^0.1.0"
+    "@rozie-ui/combobox-angular": "^0.2.0"
   },
   "peerDependenciesMeta": {
     "@angular/core": {
