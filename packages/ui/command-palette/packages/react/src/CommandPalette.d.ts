@@ -22,7 +22,7 @@ export interface CommandPaletteProps {
    * @example
    * <CommandPalette :score="(item, q) => item.label.includes(q) ? 1 : null" :items="commands" />
    */
-  score?: ((...args: unknown[]) => unknown) | null;
+  score?: ((...args: any[]) => any) | null;
   /**
    * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
    */
