@@ -489,6 +489,11 @@ let virtualizer: any = null;
 let virtualizerCleanup: any = null;
 let gridScrollEl: any = null;
 let remeasurePending = false;
+// Non-reactive per-instance flag (never rendered — combobox-keepopen phase): written by
+// pinOpen(v), read by onBlur() to suppress the close-on-blur while a host sub-surface
+// (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
+// write-in-$onMount/read-in-several-others cross-function access pattern above.
+let pinned = false;
 // ---- derived view (plain functions, uniform ×6) ------------------------
 // The filtered option list, each carrying its filtered-list index `_i`, a stable
 // windowing key `id`, and the RAW source option (`option`) so `@change` + the
@@ -733,7 +738,11 @@ const onFocus = (e: any) => {
 };
 // @blur closes the popup. Option selection uses @mousedown.prevent, which keeps
 // focus on the input, so a click on an option does NOT blur-close before select.
+// While `pinned` (pinOpen(true)), early-return BEFORE the isOpen write — a host
+// sub-surface (e.g. command-palette's action flyout) is holding focus and the
+// popup must stay open until the host calls pinOpen(false) itself.
 const onBlur = () => {
+  if (pinned) return;
   isOpen.value = false;
 };
 const onKeydown = (e: any) => {
@@ -815,7 +824,11 @@ const kickWindow = (attempts: any) => {
 // (and therefore filteredOptions()'s filter) without touching the `value`
 // model or selection state (a command-palette #2 levels/restore-on-pop
 // prerequisite — repopulating the input on back-navigation is NOT a
-// selection). All three are post-mount → $refs safe.
+// selection). pinOpen(v) — imperative-only: pin (or unpin) the popup open so
+// onBlur() does not collapse it while a host sub-surface holds focus
+// (command-palette-sub-actions prerequisite). pinOpen(false) ONLY unpins — it
+// does NOT itself close the popup or move focus; that is the host's job.
+// Render-neutral when never called. All four are post-mount → $refs safe.
 const focus = () => inputElRef.value?.focus();
 const clear = () => {
   value.value = null;
@@ -827,6 +840,9 @@ const clear = () => {
 };
 const seedQuery = (text: any) => {
   query.value = String(text == null ? '' : text);
+};
+const pinOpen = (v: any) => {
+  pinned = !!v;
 };
 
 onMounted(() => {
@@ -864,7 +880,7 @@ watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () =
   }
 });
 
-defineExpose({ focus, clear, seedQuery });
+defineExpose({ focus, clear, seedQuery, pinOpen });
 </script>
 
 <style scoped>

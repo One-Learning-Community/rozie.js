@@ -565,6 +565,7 @@ export class Combobox {
   virtualizerCleanup: any = null;
   gridScrollEl: any = null;
   remeasurePending = false;
+  pinned = false;
   foCache = {
     optsRef: null,
     q: null,
@@ -749,6 +750,7 @@ export class Combobox {
     if (e && e.target && e.target.select) e.target.select();
   };
   onBlur = () => {
+    if (this.pinned) return;
     this.isOpen.set(false);
   };
   onKeydown = (e: any) => {
@@ -827,6 +829,9 @@ export class Combobox {
   };
   seedQuery = (text: any) => {
     this.query.set(String(text == null ? '' : text));
+  };
+  pinOpen = (v: any) => {
+    this.pinned = !!v;
   };
 
   private __rozieCvaOnChange: (v: unknown) => void = () => {};

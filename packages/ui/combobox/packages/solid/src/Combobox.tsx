@@ -198,12 +198,13 @@ export interface ComboboxHandle {
   focus: (...args: any[]) => any;
   clear: (...args: any[]) => any;
   seedQuery: (...args: any[]) => any;
+  pinOpen: (...args: any[]) => any;
 }
 
 export default function Combobox(_props: ComboboxProps): JSX.Element {
   const _merged = mergeProps({ options: (() => [])() as any[], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'ref']);
-  onMount(() => { local.ref?.({ focus, clear, seedQuery }); });
+  onMount(() => { local.ref?.({ focus, clear, seedQuery, pinOpen }); });
 
   const [value, setValue] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'value', null);
   const [query, setQuery] = createSignal('');
@@ -535,6 +536,11 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   let virtualizerCleanup: any = null;
   let gridScrollEl: any = null;
   let remeasurePending = false;
+  // Non-reactive per-instance flag (never rendered — combobox-keepopen phase): written by
+  // pinOpen(v), read by onBlur() to suppress the close-on-blur while a host sub-surface
+  // (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
+  // write-in-$onMount/read-in-several-others cross-function access pattern above.
+  let pinned = false;
 
   // ---- derived view (plain functions, uniform ×6) ------------------------
   // The filtered option list, each carrying its filtered-list index `_i`, a stable
@@ -806,7 +812,11 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
 
   // @blur closes the popup. Option selection uses @mousedown.prevent, which keeps
   // focus on the input, so a click on an option does NOT blur-close before select.
+  // While `pinned` (pinOpen(true)), early-return BEFORE the isOpen write — a host
+  // sub-surface (e.g. command-palette's action flyout) is holding focus and the
+  // popup must stay open until the host calls pinOpen(false) itself.
   function onBlur() {
+    if (pinned) return;
     setIsOpen(false);
   }
   function onKeydown(e: any) {
@@ -889,7 +899,11 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   // (and therefore filteredOptions()'s filter) without touching the `value`
   // model or selection state (a command-palette #2 levels/restore-on-pop
   // prerequisite — repopulating the input on back-navigation is NOT a
-  // selection). All three are post-mount → $refs safe.
+  // selection). pinOpen(v) — imperative-only: pin (or unpin) the popup open so
+  // onBlur() does not collapse it while a host sub-surface holds focus
+  // (command-palette-sub-actions prerequisite). pinOpen(false) ONLY unpins — it
+  // does NOT itself close the popup or move focus; that is the host's job.
+  // Render-neutral when never called. All four are post-mount → $refs safe.
   function focus() {
     return inputElRef?.focus();
   }
@@ -903,6 +917,9 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   }
   function seedQuery(text: any) {
     setQuery(String(text == null ? '' : text));
+  }
+  function pinOpen(v: any) {
+    pinned = !!v;
   }
 
   return (

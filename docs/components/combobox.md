@@ -99,6 +99,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `focus` | Move DOM focus to the text input. **Deliberately named `focus`**, which overrides the inherited `HTMLElement.focus` on the Lit custom element — the public `focus()` handle is intended (an accepted, warn-only ROZ137). This mirrors the slider / otp precedent; listbox took the other branch (`focusControl`). |
 | `clear` | Reset the selection: clear `value` (emits `change` with `{ value: null }`) and empty the input text. Collision-safe — not a host-element member. |
 | `seedQuery(text)` | **Imperative only** — sets the input text (and therefore the filtered option list) without touching the `value` model or selection state. Does not open the popup, select an option, or emit `change`/`search`. Not a second model (a combobox has a single `model: true` prop, `value` — a second model would forfeit the Angular `ControlValueAccessor`). Intended for repopulating the input on programmatic restore (e.g. a consumer's back-navigation). |
+| `pinOpen(boolean)` | **Imperative only** — pin the popup open so blurring the input into a host sub-surface (e.g. an action flyout) does not collapse the list. `pinOpen(true)` pins; `pinOpen(false)` unpins. Unpinning alone does not itself close the popup or restore focus — that is the host's responsibility. Render-neutral: never calling it leaves behavior byte-identical to today. |
 
 ### Slots
 

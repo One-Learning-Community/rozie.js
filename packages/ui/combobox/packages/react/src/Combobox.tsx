@@ -106,6 +106,7 @@ export interface ComboboxHandle {
   focus: (...args: any[]) => any;
   clear: (...args: any[]) => any;
   seedQuery: (...args: any[]) => any;
+  pinOpen: (...args: any[]) => any;
 }
 
 const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_props: ComboboxProps, ref): JSX.Element {
@@ -138,6 +139,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   const virtualizer = useRef<any>(null);
   const virtualizerCleanup = useRef<any>(null);
   const remeasurePending = useRef(false);
+  const pinned = useRef(false);
   const [value, setValue] = useControllableState({
     value: props.value,
     defaultValue: props.defaultValue ?? null,
@@ -528,6 +530,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     if (e && e.target && e.target.select) e.target.select();
   }, []);
   const onBlur = useCallback(() => {
+    if (pinned.current) return;
     setIsOpen(false);
   }, []);
   const onKeydown = useCallback((e: any) => {
@@ -609,6 +612,9 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   function seedQuery(text: any) {
     setQuery(String(text == null ? '' : text));
   }
+  function pinOpen(v: any) {
+    pinned.current = !!v;
+  }
 
   useEffect(() => {
     syncQueryToValue();
@@ -648,9 +654,9 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     }
   }, [props.options, query]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const _rozieExposeRef = useRef({ focus, clear, seedQuery });
-  _rozieExposeRef.current = { focus, clear, seedQuery };
-  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), seedQuery: (...args: Parameters<typeof seedQuery>): ReturnType<typeof seedQuery> => _rozieExposeRef.current.seedQuery(...args) }), []);
+  const _rozieExposeRef = useRef({ focus, clear, seedQuery, pinOpen });
+  _rozieExposeRef.current = { focus, clear, seedQuery, pinOpen };
+  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), seedQuery: (...args: Parameters<typeof seedQuery>): ReturnType<typeof seedQuery> => _rozieExposeRef.current.seedQuery(...args), pinOpen: (...args: Parameters<typeof pinOpen>): ReturnType<typeof pinOpen> => _rozieExposeRef.current.pinOpen(...args) }), []);
 
   return (
     <>

@@ -563,6 +563,8 @@ private __rozieWatchInitial_1 = true;
 
   remeasurePending = false;
 
+  pinned = false;
+
   foCache = {
   optsRef: null,
   q: null,
@@ -768,6 +770,7 @@ private __rozieWatchInitial_1 = true;
 };
 
   onBlur = () => {
+  if (this.pinned) return;
   this._isOpen.value = false;
 };
 
@@ -855,6 +858,10 @@ private __rozieWatchInitial_1 = true;
 
   seedQuery = (text: any) => {
   this._query.value = String(text == null ? '' : text);
+};
+
+  pinOpen = (v: any) => {
+  this.pinned = !!v;
 };
 
   get value(): unknown { return this._valueControllable.read(); }
