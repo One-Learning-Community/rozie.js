@@ -50,6 +50,7 @@ const EXPECT = {
     'searchDebounce',
     'actionKey',
     'closeOnAction',
+    'groupCap',
   ],
   models: ['open', 'query'],
   // command-palette-levels: gains `navigate` (a level was pushed — payload
@@ -127,7 +128,7 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (13 props)', () => {
+  it('props surface matches (14 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

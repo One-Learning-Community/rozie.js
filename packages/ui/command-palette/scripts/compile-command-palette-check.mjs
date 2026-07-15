@@ -54,6 +54,7 @@ const EXPECT = {
     'searchDebounce',
     'actionKey',
     'closeOnAction',
+    'groupCap',
   ],
   models: ['open', 'query'],
   // command-palette-levels: gains `navigate` (a level was pushed) and `back`

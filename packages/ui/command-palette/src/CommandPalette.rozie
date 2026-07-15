@@ -237,6 +237,16 @@
         'Whether choosing an action closes the whole palette. Defaults to `true` — running an action ALWAYS closes the action menu itself; `closeOnAction` additionally decides whether the palette dismisses too (`false` returns to the result list with the palette still open, e.g. for firing several actions in a row).',
     },
   },
+
+  // Pass-through to the vendored combobox's `groupCap` (combobox-group-cap).
+  groupCap: {
+    type: Number,
+    default: 0,
+    docs: {
+      description:
+        "Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). Note: the ⌘K/Right-arrow row action menu resolves the highlighted row by section index, which assumes the uncapped section order — combining `groupCap` with per-row `actions` is not composed in this pass.",
+    },
+  },
 }
 </props>
 
@@ -1186,6 +1196,7 @@ $expose({ show, close, toggle, focus, goBack, openTo })
       :close-on-select="false"
       :options="orderedItems()"
       :groups="commandGroups()"
+      :group-cap="$props.groupCap"
       :option-value="commandValue"
       :option-disabled="commandDisabled"
       :placeholder="currentPlaceholder()"

@@ -108,6 +108,10 @@ interface CommandPaletteProps {
    * Whether choosing an action closes the whole palette. Defaults to `true` — running an action ALWAYS closes the action menu itself; `closeOnAction` additionally decides whether the palette dismisses too (`false` returns to the result list with the palette still open, e.g. for firing several actions in a row).
    */
   closeOnAction?: boolean;
+  /**
+   * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). Note: the ⌘K/Right-arrow row action menu resolves the highlighted row by section index, which assumes the uncapped section order — combining `groupCap` with per-row `actions` is not composed in this pass.
+   */
+  groupCap?: number;
   onNavigate?: (...args: any[]) => void;
   onBack?: (...args: any[]) => void;
   onSelect?: (...args: any[]) => void;
@@ -138,7 +142,7 @@ export interface CommandPaletteHandle {
 const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(function CommandPalette(_props: CommandPaletteProps, ref): JSX.Element {
   const __defaultItems = useState(() => (() => [])())[0];
   const __defaultDefaultItems = useState(() => (() => [])())[0];
-  const props: Omit<CommandPaletteProps, 'score' | 'items' | 'defaultItems' | 'placeholder' | 'emptyText' | 'closeOnSelect' | 'ariaLabel' | 'idBase' | 'searchDebounce' | 'actionKey' | 'closeOnAction'> & { score: ((...args: any[]) => any) | null; items: any[]; defaultItems: any[]; placeholder: string; emptyText: string; closeOnSelect: boolean; ariaLabel: string; idBase: string; searchDebounce: number; actionKey: string; closeOnAction: boolean } = {
+  const props: Omit<CommandPaletteProps, 'score' | 'items' | 'defaultItems' | 'placeholder' | 'emptyText' | 'closeOnSelect' | 'ariaLabel' | 'idBase' | 'searchDebounce' | 'actionKey' | 'closeOnAction' | 'groupCap'> & { score: ((...args: any[]) => any) | null; items: any[]; defaultItems: any[]; placeholder: string; emptyText: string; closeOnSelect: boolean; ariaLabel: string; idBase: string; searchDebounce: number; actionKey: string; closeOnAction: boolean; groupCap: number } = {
     ..._props,
     score: _props.score ?? null,
     items: _props.items ?? __defaultItems,
@@ -151,10 +155,11 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     searchDebounce: _props.searchDebounce ?? 150,
     actionKey: _props.actionKey ?? '$mod+k',
     closeOnAction: _props.closeOnAction ?? true,
+    groupCap: _props.groupCap ?? 0,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, query, score, items, defaultItems, placeholder, emptyText, closeOnSelect, ariaLabel, idBase, searchDebounce, actionKey, closeOnAction, defaultValue, onOpenChange, defaultOpen, onQueryChange, defaultQuery, ...rest } = _props as CommandPaletteProps & Record<string, unknown>;
-    void open; void query; void score; void items; void defaultItems; void placeholder; void emptyText; void closeOnSelect; void ariaLabel; void idBase; void searchDebounce; void actionKey; void closeOnAction; void defaultValue; void onOpenChange; void defaultOpen; void onQueryChange; void defaultQuery;
+    const { open, query, score, items, defaultItems, placeholder, emptyText, closeOnSelect, ariaLabel, idBase, searchDebounce, actionKey, closeOnAction, groupCap, defaultValue, onOpenChange, defaultOpen, onQueryChange, defaultQuery, ...rest } = _props as CommandPaletteProps & Record<string, unknown>;
+    void open; void query; void score; void items; void defaultItems; void placeholder; void emptyText; void closeOnSelect; void ariaLabel; void idBase; void searchDebounce; void actionKey; void closeOnAction; void groupCap; void defaultValue; void onOpenChange; void defaultOpen; void onQueryChange; void defaultQuery;
     return rest;
   })();
   const debounceTimerId = useRef<any>(null);
@@ -725,7 +730,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
         
         {!!(atDepth()) && <div className={"rozie-command-palette-header"} data-rozie-s-768cad96="">
           {(props.renderBreadcrumb ?? props.slots?.['breadcrumb']) ? ((props.renderBreadcrumb ?? props.slots?.['breadcrumb']) as Function)({ stack: breadcrumbStack(), back: goBack }) : <><button type="button" className={"rozie-command-palette-back"} aria-label="Back" data-testid="command-palette-back" onClick={($event) => { goBack(); }} data-rozie-s-768cad96="">‹</button><span className={"rozie-command-palette-title"} data-testid="command-palette-title" data-rozie-s-768cad96="">{rozieDisplay(currentTitle())}</span></>}
-        </div>}<Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
+        </div>}<Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={props.groupCap} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
             {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) }) : <div className={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {!!((props.renderIcon ?? props.slots?.['icon'])) && <span className={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
                   {(props.renderIcon ?? props.slots?.['icon'])?.({ option })}

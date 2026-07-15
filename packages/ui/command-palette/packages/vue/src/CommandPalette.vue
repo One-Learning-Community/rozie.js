@@ -8,7 +8,7 @@
         <button type="button" class="rozie-command-palette-back" aria-label="Back" data-testid="command-palette-back" @click="goBack()">‹</button>
         <span class="rozie-command-palette-title" data-testid="command-palette-title">{{ currentTitle() }}</span>
       </slot>
-    </div><Combobox ref="comboboxRef" :inline="true" :disable-filter="true" :close-on-select="false" :options="orderedItems()" :groups="commandGroups()" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="currentPlaceholder()" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
+    </div><Combobox ref="comboboxRef" :inline="true" :disable-filter="true" :close-on-select="false" :options="orderedItems()" :groups="commandGroups()" :group-cap="props.groupCap" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="currentPlaceholder()" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
         <slot name="option" :option="option" :index="index" :active="active" :selected="selected" :disabled="disabled" :matches="labelHighlight(labelText(option), query)">
           <div class="rozie-command-palette-option">
             <span v-if="$slots.icon" class="rozie-command-palette-option-icon">
@@ -107,8 +107,12 @@ const props = withDefaults(
      * Whether choosing an action closes the whole palette. Defaults to `true` — running an action ALWAYS closes the action menu itself; `closeOnAction` additionally decides whether the palette dismisses too (`false` returns to the result list with the palette still open, e.g. for firing several actions in a row).
      */
     closeOnAction?: boolean;
+    /**
+     * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). Note: the ⌘K/Right-arrow row action menu resolves the highlighted row by section index, which assumes the uncapped section order — combining `groupCap` with per-row `actions` is not composed in this pass.
+     */
+    groupCap?: number;
   }>(),
-  { score: null, items: () => [], defaultItems: () => [], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true }
+  { score: null, items: () => [], defaultItems: () => [], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0 }
 );
 
 /**
