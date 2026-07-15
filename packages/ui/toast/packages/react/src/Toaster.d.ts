@@ -32,6 +32,8 @@ export interface ToasterHandle {
   show: (...args: any[]) => any;
   dismiss: (...args: any[]) => any;
   clear: (...args: any[]) => any;
+  patch: (...args: any[]) => any;
+  promise: (...args: any[]) => any;
 }
 
 declare const Toaster: React.ForwardRefExoticComponent<ToasterProps & React.RefAttributes<ToasterHandle>>;

@@ -1,4 +1,4 @@
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { rozieAttr, rozieClass, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
@@ -87,6 +87,16 @@ from[data-rozie-s-12d4265c] { opacity: 0; }
 to[data-rozie-s-12d4265c] { opacity: 1; }
 from[data-rozie-s-12d4265c] { opacity: 1; }
 to[data-rozie-s-12d4265c] { opacity: 0; }
+.rozie-toast-spinner[data-rozie-s-12d4265c] {
+  flex: 0 0 auto;
+  width: var(--rozie-toast-spinner-size, 1em);
+  height: var(--rozie-toast-spinner-size, 1em);
+  border: 2px solid color-mix(in srgb, var(--rozie-toast-spinner-color, currentColor) 25%, transparent);
+  border-top-color: var(--rozie-toast-spinner-color, currentColor);
+  border-radius: 50%;
+  animation: rozie-toast-spin 0.75s linear infinite;
+}
+to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 .rozie-toast-message[data-rozie-s-12d4265c] {
   flex: 1 1 auto;
   font-size: var(--rozie-toast-font-size, 0.9rem);
@@ -175,6 +185,7 @@ to[data-rozie-s-12d4265c] { opacity: 0; }
       if (this.isConnected || this._rozieTornDown) return;
       this._rozieTornDown = true;
       () => {
+        this.unmounted = true;
         this.teardownTimers();
       };
       for (const fn of this._disconnectCleanups) fn();
@@ -188,7 +199,7 @@ to[data-rozie-s-12d4265c] { opacity: 0; }
   
   ${repeat<any>(this._toasts.value, (t, _idx) => t.id, (t, _idx) => html`<div class="rozie-toast ${(rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '')))}" key=${rozieAttr(t.id)} role="status" aria-live=${rozieAttr(this.liveFor(t.type))} @animationend=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { t.exiting && this.removeToast(t.id); }} data-rozie-s-12d4265c>
     ${this.toast !== undefined ? this.toast({toast: t, dismiss: this.dismiss}) : html`<slot name="toast" data-rozie-params=${(() => { try { return JSON.stringify({toast: t}); } catch { return '{}'; } })()} @rozie-toast-dismiss=${($event: CustomEvent) => ((this.dismiss) as (...args: any[]) => any)($event.detail)}>
-      <span class="rozie-toast-message" data-rozie-s-12d4265c>${rozieDisplay(t.message)}</span>
+      ${t.type === 'loading' ? html`<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>` : nothing}<span class="rozie-toast-message" data-rozie-s-12d4265c>${rozieDisplay(t.message)}</span>
       <button class="rozie-toast-close" type="button" aria-label="Dismiss" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>
     </slot>`}
   </div>`)}
@@ -197,6 +208,8 @@ to[data-rozie-s-12d4265c] { opacity: 0; }
   }
 
   timers = {};
+
+  unmounted = false;
 
   startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
@@ -317,6 +330,55 @@ to[data-rozie-s-12d4265c] { opacity: 0; }
   clear = () => {
   this.teardownTimers();
   this._toasts.value = [];
+};
+
+  patch = (id: any, changes: any) => {
+  const c = changes || {};
+  let existed = false;
+  const next = this._toasts.value.map((t: any) => {
+    if (t.id !== id) return t;
+    existed = true;
+    const merged = {
+      ...t
+    };
+    if (c.message !== undefined) merged.message = c.message;
+    if (c.type !== undefined) merged.type = c.type;
+    if (c.duration !== undefined) merged.duration = c.duration;
+    return merged;
+  });
+  if (!existed) return false;
+  this._toasts.value = next;
+  if (c.duration !== undefined) {
+    this.clearTimer(id);
+    const patched = next.find((t: any) => t.id === id);
+    this.startTimer(patched);
+  }
+  return true;
+};
+
+  settlePromise = (id: any, type: any, messageOrFn: any, value: any) => {
+  if (this.unmounted) return;
+  const stillThere = this._toasts.value.some((t: any) => t.id === id);
+  if (!stillThere) return;
+  const message = typeof messageOrFn === 'function' ? messageOrFn(value) : messageOrFn;
+  this.patch(id, {
+    type,
+    message,
+    duration: this.duration
+  });
+};
+
+  promise = (p: any, opts: any) => {
+  const o = opts || {};
+  const id = this.show({
+    type: 'loading',
+    duration: 0,
+    message: o.loading
+  });
+  if (p && typeof p.then === 'function') {
+    p.then((value: any) => this.settlePromise(id, 'success', o.success, value)).catch((err: any) => this.settlePromise(id, 'error', o.error, err));
+  }
+  return id;
 };
 
   onMouseEnter = () => {

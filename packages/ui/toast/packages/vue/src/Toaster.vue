@@ -4,7 +4,7 @@
   
   <div v-for="t in toasts" :key="t.id" :class="['rozie-toast', 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '')]" role="status" :aria-live="liveFor(t.type)" @animationend="t.exiting && removeToast(t.id)">
     <slot name="toast" :toast="t" :dismiss="dismiss">
-      <span class="rozie-toast-message">{{ t.message }}</span>
+      <span v-if="t.type === 'loading'" class="rozie-toast-spinner" aria-hidden="true"></span><span class="rozie-toast-message">{{ t.message }}</span>
       <button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismissBegin(t.id, 'close')">×</button>
     </slot>
   </div>
@@ -63,6 +63,10 @@ const seq = ref(0);
 // remainder. `clearTimer`/the full-teardown helper below are the only ways an
 // entry is actually removed from the map.
 let timers = {};
+// Set true in $onUnmount; read by promise()'s settle guard (never-resurrect
+// a toast after the host itself is gone). A top-level `let` → React useRef
+// (it escapes into $onUnmount's effect).
+let unmounted = false;
 // ---- timers ------------------------------------------------------------
 const startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
@@ -197,6 +201,65 @@ const clear = () => {
   teardownTimers();
   toasts.value = [];
 };
+// ---- patch / promise ------------------------------------------------------
+// Update-in-place primitive: merges ONLY the present `{message,type,duration}`
+// keys into the matching entry via a fresh-array map (never in-place
+// mutation). Returns whether the id existed. A `duration` key clears+restarts
+// the timer (0 → sticky/no-arm; positive → arm); any other key leaves a
+// running timer untouched.
+const patch = (id: any, changes: any) => {
+  const c = changes || {};
+  let existed = false;
+  const next = toasts.value.map((t: any) => {
+    if (t.id !== id) return t;
+    existed = true;
+    const merged = {
+      ...t
+    };
+    if (c.message !== undefined) merged.message = c.message;
+    if (c.type !== undefined) merged.type = c.type;
+    if (c.duration !== undefined) merged.duration = c.duration;
+    return merged;
+  });
+  if (!existed) return false;
+  toasts.value = next;
+  if (c.duration !== undefined) {
+    clearTimer(id);
+    const patched = next.find((t: any) => t.id === id);
+    startTimer(patched);
+  }
+  return true;
+};
+// The settle guard: a no-op if the host unmounted OR the toast was already
+// dismissed while the promise was still pending (never-resurrect).
+const settlePromise = (id: any, type: any, messageOrFn: any, value: any) => {
+  if (unmounted) return;
+  const stillThere = toasts.value.some((t: any) => t.id === id);
+  if (!stillThere) return;
+  const message = typeof messageOrFn === 'function' ? messageOrFn(value) : messageOrFn;
+  patch(id, {
+    type,
+    message,
+    duration: props.duration
+  });
+};
+// Sugar over show()+patch(): shows a sticky loading toast synchronously
+// (returns its id immediately — the consumer already holds `p`), then patches
+// the SAME entry to success/error on settle (the auto-dismiss timer starts AT
+// SETTLE, via patch's duration-key restart). Never returns/derives a new
+// promise — `p`'s own .then/.catch still fire for the consumer untouched.
+const promise = (p: any, opts: any) => {
+  const o = opts || {};
+  const id = show({
+    type: 'loading',
+    duration: 0,
+    message: o.loading
+  });
+  if (p && typeof p.then === 'function') {
+    p.then((value: any) => settlePromise(id, 'success', o.success, value)).catch((err: any) => settlePromise(id, 'error', o.error, err));
+  }
+  return id;
+};
 // ---- hover pause -------------------------------------------------------
 const onMouseEnter = () => {
   if (props.disablePauseOnHover) return;
@@ -208,15 +271,18 @@ const onMouseLeave = () => {
 };
 // ---- helpers -----------------------------------------------------------
 const regionLabel = () => props.ariaLabel != null ? props.ariaLabel : 'Notifications';
+// Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
+// error/warning interrupt (assertive); loading (like info/success) is polite.
 const liveFor = (type: any) => type === 'error' || type === 'warning' ? 'assertive' : 'polite';
 
 // ---- lifecycle + handle ------------------------------------------------
 
 onBeforeUnmount(() => {
+  unmounted = true;
   teardownTimers();
 });
 
-defineExpose({ show, dismiss, clear });
+defineExpose({ show, dismiss, clear, patch, promise });
 </script>
 
 <style scoped>
@@ -294,6 +360,16 @@ from { opacity: 0; }
 to { opacity: 1; }
 from { opacity: 1; }
 to { opacity: 0; }
+.rozie-toast-spinner {
+  flex: 0 0 auto;
+  width: var(--rozie-toast-spinner-size, 1em);
+  height: var(--rozie-toast-spinner-size, 1em);
+  border: 2px solid color-mix(in srgb, var(--rozie-toast-spinner-color, currentColor) 25%, transparent);
+  border-top-color: var(--rozie-toast-spinner-color, currentColor);
+  border-radius: 50%;
+  animation: rozie-toast-spin 0.75s linear infinite;
+}
+to { transform: rotate(360deg); }
 .rozie-toast-message {
   flex: 1 1 auto;
   font-size: var(--rozie-toast-font-size, 0.9rem);

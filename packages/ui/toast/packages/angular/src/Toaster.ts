@@ -41,7 +41,9 @@ function __rozieAttr(v: unknown): string | null {
     <ng-container *ngTemplateOutlet="(toastTpl ?? templates()?.['toast']); context: { $implicit: { toast: t, dismiss: dismiss }, toast: t, dismiss: dismiss }" />
     } @else {
 
-          <span class="rozie-toast-message">{{ rozieDisplay(t.message) }}</span>
+          @if (t.type === 'loading') {
+    <span class="rozie-toast-spinner" aria-hidden="true"></span>
+    }<span class="rozie-toast-message">{{ rozieDisplay(t.message) }}</span>
           <button type="button" class="rozie-toast-close" aria-label="Dismiss" (click)="dismissBegin(t.id, 'close')">×</button>
         
     }
@@ -126,6 +128,16 @@ function __rozieAttr(v: unknown): string | null {
     to { opacity: 1; }
     from { opacity: 1; }
     to { opacity: 0; }
+    .rozie-toast-spinner {
+      flex: 0 0 auto;
+      width: var(--rozie-toast-spinner-size, 1em);
+      height: var(--rozie-toast-spinner-size, 1em);
+      border: 2px solid color-mix(in srgb, var(--rozie-toast-spinner-color, currentColor) 25%, transparent);
+      border-top-color: var(--rozie-toast-spinner-color, currentColor);
+      border-radius: 50%;
+      animation: rozie-toast-spin 0.75s linear infinite;
+    }
+    to { transform: rotate(360deg); }
     .rozie-toast-message {
       flex: 1 1 auto;
       font-size: var(--rozie-toast-font-size, 0.9rem);
@@ -181,11 +193,13 @@ export class Toaster {
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
+      this.unmounted = true;
       this.teardownTimers();
     });
   }
 
   timers = {};
+  unmounted = false;
   startTimer = (toast: any) => {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
@@ -291,6 +305,52 @@ export class Toaster {
   clear = () => {
     this.teardownTimers();
     this.toasts.set([]);
+  };
+  patch = (id: any, changes: any) => {
+    const c = changes || {};
+    let existed = false;
+    const next = this.toasts().map((t: any) => {
+      if (t.id !== id) return t;
+      existed = true;
+      const merged = {
+        ...t
+      };
+      if (c.message !== undefined) merged.message = c.message;
+      if (c.type !== undefined) merged.type = c.type;
+      if (c.duration !== undefined) merged.duration = c.duration;
+      return merged;
+    });
+    if (!existed) return false;
+    this.toasts.set(next);
+    if (c.duration !== undefined) {
+      this.clearTimer(id);
+      const patched = next.find((t: any) => t.id === id);
+      this.startTimer(patched);
+    }
+    return true;
+  };
+  settlePromise = (id: any, type: any, messageOrFn: any, value: any) => {
+    if (this.unmounted) return;
+    const stillThere = this.toasts().some((t: any) => t.id === id);
+    if (!stillThere) return;
+    const message = typeof messageOrFn === 'function' ? messageOrFn(value) : messageOrFn;
+    this.patch(id, {
+      type,
+      message,
+      duration: this.duration()
+    });
+  };
+  promise = (p: any, opts: any) => {
+    const o = opts || {};
+    const id = this.show({
+      type: 'loading',
+      duration: 0,
+      message: o.loading
+    });
+    if (p && typeof p.then === 'function') {
+      p.then((value: any) => this.settlePromise(id, 'success', o.success, value)).catch((err: any) => this.settlePromise(id, 'error', o.error, err));
+    }
+    return id;
   };
   onMouseEnter = () => {
     if (this.disablePauseOnHover()) return;

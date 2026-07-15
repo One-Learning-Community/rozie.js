@@ -31,7 +31,7 @@ const EXPECT = {
   models: [] as string[],
   emits: ['dismissed'] as string[],
   slots: ['toast'],
-  expose: ['show', 'dismiss', 'clear'],
+  expose: ['show', 'dismiss', 'clear', 'patch', 'promise'],
 } as const;
 
 const sorted = (a: readonly string[]) => [...a].sort();
@@ -73,7 +73,7 @@ describe('Toaster.rozie surface gate', () => {
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 
-  it('expose surface matches (show/dismiss/clear)', () => {
+  it('expose surface matches (show/dismiss/clear/patch/promise)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

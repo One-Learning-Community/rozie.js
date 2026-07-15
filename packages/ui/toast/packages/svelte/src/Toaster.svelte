@@ -59,6 +59,10 @@ let seq = $state(0);
 // remainder. `clearTimer`/the full-teardown helper below are the only ways an
 // entry is actually removed from the map.
 let timers = {};
+// Set true in $onUnmount; read by promise()'s settle guard (never-resurrect
+// a toast after the host itself is gone). A top-level `let` → React useRef
+// (it escapes into $onUnmount's effect).
+let unmounted = false;
 // ---- timers ------------------------------------------------------------
 const startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
@@ -193,6 +197,65 @@ export const clear = () => {
   teardownTimers();
   toasts = [];
 };
+// ---- patch / promise ------------------------------------------------------
+// Update-in-place primitive: merges ONLY the present `{message,type,duration}`
+// keys into the matching entry via a fresh-array map (never in-place
+// mutation). Returns whether the id existed. A `duration` key clears+restarts
+// the timer (0 → sticky/no-arm; positive → arm); any other key leaves a
+// running timer untouched.
+export const patch = (id: any, changes: any) => {
+  const c = changes || {};
+  let existed = false;
+  const next = toasts.map((t: any) => {
+    if (t.id !== id) return t;
+    existed = true;
+    const merged = {
+      ...t
+    };
+    if (c.message !== undefined) merged.message = c.message;
+    if (c.type !== undefined) merged.type = c.type;
+    if (c.duration !== undefined) merged.duration = c.duration;
+    return merged;
+  });
+  if (!existed) return false;
+  toasts = next;
+  if (c.duration !== undefined) {
+    clearTimer(id);
+    const patched = next.find((t: any) => t.id === id);
+    startTimer(patched);
+  }
+  return true;
+};
+// The settle guard: a no-op if the host unmounted OR the toast was already
+// dismissed while the promise was still pending (never-resurrect).
+const settlePromise = (id: any, type: any, messageOrFn: any, value: any) => {
+  if (unmounted) return;
+  const stillThere = toasts.some((t: any) => t.id === id);
+  if (!stillThere) return;
+  const message = typeof messageOrFn === 'function' ? messageOrFn(value) : messageOrFn;
+  patch(id, {
+    type,
+    message,
+    duration: duration
+  });
+};
+// Sugar over show()+patch(): shows a sticky loading toast synchronously
+// (returns its id immediately — the consumer already holds `p`), then patches
+// the SAME entry to success/error on settle (the auto-dismiss timer starts AT
+// SETTLE, via patch's duration-key restart). Never returns/derives a new
+// promise — `p`'s own .then/.catch still fire for the consumer untouched.
+export const promise = (p: any, opts: any) => {
+  const o = opts || {};
+  const id = show({
+    type: 'loading',
+    duration: 0,
+    message: o.loading
+  });
+  if (p && typeof p.then === 'function') {
+    p.then((value: any) => settlePromise(id, 'success', o.success, value)).catch((err: any) => settlePromise(id, 'error', o.error, err));
+  }
+  return id;
+};
 // ---- hover pause -------------------------------------------------------
 const onMouseEnter = () => {
   if (disablePauseOnHover) return;
@@ -204,16 +267,19 @@ const onMouseLeave = () => {
 };
 // ---- helpers -----------------------------------------------------------
 const regionLabel = () => ariaLabel != null ? ariaLabel : 'Notifications';
+// Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
+// error/warning interrupt (assertive); loading (like info/success) is polite.
 const liveFor = (type: any) => type === 'error' || type === 'warning' ? 'assertive' : 'polite';
 
 // ---- lifecycle + handle ------------------------------------------------
 
 onDestroy(() => (() => {
+  unmounted = true;
   teardownTimers();
 })());
 </script>
 
-<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : ''))]} role="status" aria-live={rozieAttr(liveFor(t.type))} onanimationend={($event) => { t.exiting && removeToast(t.id); }} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span><button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
+<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : ''))]} role="status" aria-live={rozieAttr(liveFor(t.type))} onanimationend={($event) => { t.exiting && removeToast(t.id); }} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}{#if t.type === 'loading'}<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>{/if}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span><button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
 
 <style>
 :global {
@@ -291,6 +357,16 @@ onDestroy(() => (() => {
   to[data-rozie-s-12d4265c] { opacity: 1; }
   from[data-rozie-s-12d4265c] { opacity: 1; }
   to[data-rozie-s-12d4265c] { opacity: 0; }
+  .rozie-toast-spinner[data-rozie-s-12d4265c] {
+    flex: 0 0 auto;
+    width: var(--rozie-toast-spinner-size, 1em);
+    height: var(--rozie-toast-spinner-size, 1em);
+    border: 2px solid color-mix(in srgb, var(--rozie-toast-spinner-color, currentColor) 25%, transparent);
+    border-top-color: var(--rozie-toast-spinner-color, currentColor);
+    border-radius: 50%;
+    animation: rozie-toast-spin 0.75s linear infinite;
+  }
+  to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   .rozie-toast-message[data-rozie-s-12d4265c] {
     flex: 1 1 auto;
     font-size: var(--rozie-toast-font-size, 0.9rem);

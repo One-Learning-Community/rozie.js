@@ -72,6 +72,16 @@ from[data-rozie-s-12d4265c] { opacity: 0; }
 to[data-rozie-s-12d4265c] { opacity: 1; }
 from[data-rozie-s-12d4265c] { opacity: 1; }
 to[data-rozie-s-12d4265c] { opacity: 0; }
+.rozie-toast-spinner[data-rozie-s-12d4265c] {
+  flex: 0 0 auto;
+  width: var(--rozie-toast-spinner-size, 1em);
+  height: var(--rozie-toast-spinner-size, 1em);
+  border: 2px solid color-mix(in srgb, var(--rozie-toast-spinner-color, currentColor) 25%, transparent);
+  border-top-color: var(--rozie-toast-spinner-color, currentColor);
+  border-radius: 50%;
+  animation: rozie-toast-spin 0.75s linear infinite;
+}
+to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 .rozie-toast-message[data-rozie-s-12d4265c] {
   flex: 1 1 auto;
   font-size: var(--rozie-toast-font-size, 0.9rem);

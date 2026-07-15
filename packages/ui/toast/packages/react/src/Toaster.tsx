@@ -35,6 +35,8 @@ export interface ToasterHandle {
   show: (...args: any[]) => any;
   dismiss: (...args: any[]) => any;
   clear: (...args: any[]) => any;
+  patch: (...args: any[]) => any;
+  promise: (...args: any[]) => any;
 }
 
 const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props: ToasterProps, ref): JSX.Element {
@@ -51,6 +53,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     void position; void duration; void max; void disablePauseOnHover; void ariaLabel;
     return rest;
   })();
+  const unmounted = useRef(false);
   const timers = useRef({});
   const [toasts, setToasts] = useState<any[]>([]);
   const [seq, setSeq] = useState(0);
@@ -170,6 +173,52 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     teardownTimers();
     setToasts([]);
   }
+  function patch(id: any, changes: any) {
+    const c = changes || {};
+    let existed = false;
+    const next = toasts.map((t: any) => {
+      if (t.id !== id) return t;
+      existed = true;
+      const merged = {
+        ...t
+      };
+      if (c.message !== undefined) merged.message = c.message;
+      if (c.type !== undefined) merged.type = c.type;
+      if (c.duration !== undefined) merged.duration = c.duration;
+      return merged;
+    });
+    if (!existed) return false;
+    setToasts(next);
+    if (c.duration !== undefined) {
+      clearTimer(id);
+      const patched = next.find((t: any) => t.id === id);
+      startTimer(patched);
+    }
+    return true;
+  }
+  function settlePromise(id: any, type: any, messageOrFn: any, value: any) {
+    if (unmounted.current) return;
+    const stillThere = toasts.some((t: any) => t.id === id);
+    if (!stillThere) return;
+    const message = typeof messageOrFn === 'function' ? messageOrFn(value) : messageOrFn;
+    patch(id, {
+      type,
+      message,
+      duration: props.duration
+    });
+  }
+  function promise(p: any, opts: any) {
+    const o = opts || {};
+    const id = show({
+      type: 'loading',
+      duration: 0,
+      message: o.loading
+    });
+    if (p && typeof p.then === 'function') {
+      p.then((value: any) => settlePromise(id, 'success', o.success, value)).catch((err: any) => settlePromise(id, 'error', o.error, err));
+    }
+    return id;
+  }
   const onMouseEnter = useCallback(() => {
     if (props.disablePauseOnHover) return;
     pauseTimers();
@@ -187,20 +236,21 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
 
   useEffect(() => {
     return () => {
+      unmounted.current = true;
       teardownTimers();
     };
   }, []);
 
-  const _rozieExposeRef = useRef({ show, dismiss, clear });
-  _rozieExposeRef.current = { show, dismiss, clear };
-  useImperativeHandle(ref, () => ({ show: (...args: Parameters<typeof show>): ReturnType<typeof show> => _rozieExposeRef.current.show(...args), dismiss: (...args: Parameters<typeof dismiss>): ReturnType<typeof dismiss> => _rozieExposeRef.current.dismiss(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args) }), []);
+  const _rozieExposeRef = useRef({ show, dismiss, clear, patch, promise });
+  _rozieExposeRef.current = { show, dismiss, clear, patch, promise };
+  useImperativeHandle(ref, () => ({ show: (...args: Parameters<typeof show>): ReturnType<typeof show> => _rozieExposeRef.current.show(...args), dismiss: (...args: Parameters<typeof dismiss>): ReturnType<typeof dismiss> => _rozieExposeRef.current.dismiss(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), patch: (...args: Parameters<typeof patch>): ReturnType<typeof patch> => _rozieExposeRef.current.patch(...args), promise: (...args: Parameters<typeof promise>): ReturnType<typeof promise> => _rozieExposeRef.current.promise(...args) }), []);
 
   return (
     <>
     <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} className={clsx(clsx("rozie-toaster", 'rozie-toaster--' + props.position), (attrs.className as string | undefined))} onMouseEnter={($event) => { onMouseEnter(); }} onMouseLeave={($event) => { onMouseLeave(); }} data-rozie-s-12d4265c="">
       
       {toasts.map((t) => <div key={t.id} className={clsx("rozie-toast", 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : ''))} role="status" aria-live={rozieAttr(liveFor(t.type))} onAnimationEnd={($event) => { t.exiting && removeToast(t.id); }} data-rozie-s-12d4265c="">
-        {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast: t, dismiss }) : <><span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span><button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
+        {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast: t, dismiss }) : <>{!!(t.type === 'loading') && <span className={"rozie-toast-spinner"} aria-hidden="true" data-rozie-s-12d4265c="" />}<span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span><button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
       </div>)}
     </div>
     </>

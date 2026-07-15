@@ -28,7 +28,7 @@ const EXPECT = {
   models: [],
   emits: ['dismissed'],
   slots: ['toast'],
-  expose: ['show', 'dismiss', 'clear'],
+  expose: ['show', 'dismiss', 'clear', 'patch', 'promise'],
 };
 
 const fail = (msg) => { console.error(`✗ ${msg}`); process.exitCode = 1; };

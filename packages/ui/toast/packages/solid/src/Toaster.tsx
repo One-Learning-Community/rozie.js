@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { createSignal, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
+import { Show, createSignal, mergeProps, onCleanup, onMount, splitProps } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, mergeListeners, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 
@@ -77,6 +77,16 @@ from[data-rozie-s-12d4265c] { opacity: 0; }
 to[data-rozie-s-12d4265c] { opacity: 1; }
 from[data-rozie-s-12d4265c] { opacity: 1; }
 to[data-rozie-s-12d4265c] { opacity: 0; }
+.rozie-toast-spinner[data-rozie-s-12d4265c] {
+  flex: 0 0 auto;
+  width: var(--rozie-toast-spinner-size, 1em);
+  height: var(--rozie-toast-spinner-size, 1em);
+  border: 2px solid color-mix(in srgb, var(--rozie-toast-spinner-color, currentColor) 25%, transparent);
+  border-top-color: var(--rozie-toast-spinner-color, currentColor);
+  border-radius: 50%;
+  animation: rozie-toast-spin 0.75s linear infinite;
+}
+to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 .rozie-toast-message[data-rozie-s-12d4265c] {
   flex: 1 1 auto;
   font-size: var(--rozie-toast-font-size, 0.9rem);
@@ -135,16 +145,19 @@ export interface ToasterHandle {
   show: (...args: any[]) => any;
   dismiss: (...args: any[]) => any;
   clear: (...args: any[]) => any;
+  patch: (...args: any[]) => any;
+  promise: (...args: any[]) => any;
 }
 
 export default function Toaster(_props: ToasterProps): JSX.Element {
   const _merged = mergeProps({ position: 'bottom-right', duration: 4000, max: 0, disablePauseOnHover: false, ariaLabel: null }, _props);
   const [local, attrs] = splitProps(_merged, ['position', 'duration', 'max', 'disablePauseOnHover', 'ariaLabel', 'ref']);
-  onMount(() => { local.ref?.({ show, dismiss, clear }); });
+  onMount(() => { local.ref?.({ show, dismiss, clear, patch, promise }); });
 
   const [toasts, setToasts] = createSignal<any[]>([]);
   const [seq, setSeq] = createSignal(0);
   onCleanup(() => {
+    unmounted = true;
     teardownTimers();
   });
 
@@ -159,6 +172,11 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   // remainder. `clearTimer`/the full-teardown helper below are the only ways an
   // entry is actually removed from the map.
   let timers = {};
+
+  // Set true in $onUnmount; read by promise()'s settle guard (never-resurrect
+  // a toast after the host itself is gone). A top-level `let` → React useRef
+  // (it escapes into $onUnmount's effect).
+  let unmounted = false;
 
   // ---- timers ------------------------------------------------------------
   function startTimer(toast: any) {
@@ -303,6 +321,68 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
     setToasts([]);
   }
 
+  // ---- patch / promise ------------------------------------------------------
+  // Update-in-place primitive: merges ONLY the present `{message,type,duration}`
+  // keys into the matching entry via a fresh-array map (never in-place
+  // mutation). Returns whether the id existed. A `duration` key clears+restarts
+  // the timer (0 → sticky/no-arm; positive → arm); any other key leaves a
+  // running timer untouched.
+  function patch(id: any, changes: any) {
+    const c = changes || {};
+    let existed = false;
+    const next = toasts().map((t: any) => {
+      if (t.id !== id) return t;
+      existed = true;
+      const merged = {
+        ...t
+      };
+      if (c.message !== undefined) merged.message = c.message;
+      if (c.type !== undefined) merged.type = c.type;
+      if (c.duration !== undefined) merged.duration = c.duration;
+      return merged;
+    });
+    if (!existed) return false;
+    setToasts(next);
+    if (c.duration !== undefined) {
+      clearTimer(id);
+      const patched = next.find((t: any) => t.id === id);
+      startTimer(patched);
+    }
+    return true;
+  }
+
+  // The settle guard: a no-op if the host unmounted OR the toast was already
+  // dismissed while the promise was still pending (never-resurrect).
+  function settlePromise(id: any, type: any, messageOrFn: any, value: any) {
+    if (unmounted) return;
+    const stillThere = toasts().some((t: any) => t.id === id);
+    if (!stillThere) return;
+    const message = typeof messageOrFn === 'function' ? messageOrFn(value) : messageOrFn;
+    patch(id, {
+      type,
+      message,
+      duration: local.duration
+    });
+  }
+
+  // Sugar over show()+patch(): shows a sticky loading toast synchronously
+  // (returns its id immediately — the consumer already holds `p`), then patches
+  // the SAME entry to success/error on settle (the auto-dismiss timer starts AT
+  // SETTLE, via patch's duration-key restart). Never returns/derives a new
+  // promise — `p`'s own .then/.catch still fire for the consumer untouched.
+  function promise(p: any, opts: any) {
+    const o = opts || {};
+    const id = show({
+      type: 'loading',
+      duration: 0,
+      message: o.loading
+    });
+    if (p && typeof p.then === 'function') {
+      p.then((value: any) => settlePromise(id, 'success', o.success, value)).catch((err: any) => settlePromise(id, 'error', o.error, err));
+    }
+    return id;
+  }
+
   // ---- hover pause -------------------------------------------------------
   function onMouseEnter() {
     if (local.disablePauseOnHover) return;
@@ -317,6 +397,8 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   function regionLabel() {
     return local.ariaLabel != null ? local.ariaLabel : 'Notifications';
   }
+  // Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
+  // error/warning interrupt (assertive); loading (like info/success) is polite.
   function liveFor(type: any) {
     return type === 'error' || type === 'warning' ? 'assertive' : 'polite';
   }
@@ -328,7 +410,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
     <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} class={"rozie-toaster" + " " + rozieClass('rozie-toaster--' + local.position) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onMouseEnter: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseEnter(); }, onMouseLeave: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseLeave(); } }, attrs)} data-rozie-s-12d4265c="">
       
       <Key each={toasts() as readonly any[]} by={(t) => t.id}>{(t) => <div role="status" aria-live={rozieAttr(liveFor(t().type))} class={"rozie-toast" + " " + rozieClass('rozie-toast--' + t().type + (t().exiting ? ' rozie-toast--exiting' : ''))} onAnimationEnd={($event: AnimationEvent & { currentTarget: HTMLDivElement; target: Element }) => { t().exiting && removeToast(t().id); }} data-rozie-s-12d4265c="">
-        {(_props.toastSlot ?? _props.slots?.['toast'])?.({ toast: t(), dismiss }) ?? <><span class={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t().message)}</span><button type="button" aria-label="Dismiss" class={"rozie-toast-close"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { dismissBegin(t().id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
+        {(_props.toastSlot ?? _props.slots?.['toast'])?.({ toast: t(), dismiss }) ?? <>{<Show when={t().type === 'loading'}><span class={"rozie-toast-spinner"} aria-hidden="true" data-rozie-s-12d4265c="" /></Show>}<span class={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t().message)}</span><button type="button" aria-label="Dismiss" class={"rozie-toast-close"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { dismissBegin(t().id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
       </div>}</Key>
     </div>
     </>

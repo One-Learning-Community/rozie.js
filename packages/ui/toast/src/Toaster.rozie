@@ -27,6 +27,16 @@
   `exiting` flag makes the second call a no-op. `clear()` stays bulk: full
   teardown, no per-toast emit.
 
+  patch/promise: `patch(id, changes)` merges `{message,type,duration}` into
+  the matching queue entry via a fresh-array map; a `duration` key
+  clears+restarts the timer (0 → sticky, sticky → positive arms it), any
+  other key leaves a running timer alone. `promise(p, {loading,success,error})`
+  shows a `{type:'loading',duration:0}` toast synchronously, then patches the
+  SAME entry to success/error on settle (the auto-dismiss timer starts AT
+  settle) — guarded by `unmounted` + a live-queue check so a toast dismissed
+  while pending is never resurrected. `promise()` never returns/derives a new
+  promise; the consumer's own `.then`/`.catch` on `p` still fire normally.
+
   Authoring notes (collision classes — see the authoring playbook):
     - Imperative verbs `show` / `dismiss` / `clear` are NOT inherited HTMLElement
       members (no ROZ137). The single `dismissed` event does not collide with
@@ -128,6 +138,11 @@
 // remainder. `clearTimer`/the full-teardown helper below are the only ways an
 // entry is actually removed from the map.
 let timers = {}
+
+// Set true in $onUnmount; read by promise()'s settle guard (never-resurrect
+// a toast after the host itself is gone). A top-level `let` → React useRef
+// (it escapes into $onUnmount's effect).
+let unmounted = false
 
 // ---- timers ------------------------------------------------------------
 const startTimer = (toast) => {
@@ -256,6 +271,60 @@ const clear = () => {
   $data.toasts = []
 }
 
+// ---- patch / promise ------------------------------------------------------
+// Update-in-place primitive: merges ONLY the present `{message,type,duration}`
+// keys into the matching entry via a fresh-array map (never in-place
+// mutation). Returns whether the id existed. A `duration` key clears+restarts
+// the timer (0 → sticky/no-arm; positive → arm); any other key leaves a
+// running timer untouched.
+const patch = (id, changes) => {
+  const c = changes || {}
+  let existed = false
+  const next = $data.toasts.map((t) => {
+    if (t.id !== id) return t
+    existed = true
+    const merged = { ...t }
+    if (c.message !== undefined) merged.message = c.message
+    if (c.type !== undefined) merged.type = c.type
+    if (c.duration !== undefined) merged.duration = c.duration
+    return merged
+  })
+  if (!existed) return false
+  $data.toasts = next
+  if (c.duration !== undefined) {
+    clearTimer(id)
+    const patched = next.find((t) => t.id === id)
+    startTimer(patched)
+  }
+  return true
+}
+
+// The settle guard: a no-op if the host unmounted OR the toast was already
+// dismissed while the promise was still pending (never-resurrect).
+const settlePromise = (id, type, messageOrFn, value) => {
+  if (unmounted) return
+  const stillThere = $data.toasts.some((t) => t.id === id)
+  if (!stillThere) return
+  const message = typeof messageOrFn === 'function' ? messageOrFn(value) : messageOrFn
+  patch(id, { type, message, duration: $props.duration })
+}
+
+// Sugar over show()+patch(): shows a sticky loading toast synchronously
+// (returns its id immediately — the consumer already holds `p`), then patches
+// the SAME entry to success/error on settle (the auto-dismiss timer starts AT
+// SETTLE, via patch's duration-key restart). Never returns/derives a new
+// promise — `p`'s own .then/.catch still fire for the consumer untouched.
+const promise = (p, opts) => {
+  const o = opts || {}
+  const id = show({ type: 'loading', duration: 0, message: o.loading })
+  if (p && typeof p.then === 'function') {
+    p.then((value) => settlePromise(id, 'success', o.success, value)).catch((err) =>
+      settlePromise(id, 'error', o.error, err),
+    )
+  }
+  return id
+}
+
 // ---- hover pause -------------------------------------------------------
 const onMouseEnter = () => {
   if ($props.disablePauseOnHover) return
@@ -268,14 +337,17 @@ const onMouseLeave = () => {
 
 // ---- helpers -----------------------------------------------------------
 const regionLabel = () => ($props.ariaLabel != null ? $props.ariaLabel : 'Notifications')
+// Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
+// error/warning interrupt (assertive); loading (like info/success) is polite.
 const liveFor = (type) => (type === 'error' || type === 'warning' ? 'assertive' : 'polite')
 
 // ---- lifecycle + handle ------------------------------------------------
 $onUnmount(() => {
+  unmounted = true
   teardownTimers()
 })
 
-$expose({ show, dismiss, clear })
+$expose({ show, dismiss, clear, patch, promise })
 </script>
 
 <template>
@@ -302,6 +374,7 @@ $expose({ show, dismiss, clear })
     @animationend="t.exiting && removeToast(t.id)"
   >
     <slot name="toast" :toast="t" :dismiss="dismiss">
+      <span r-if="t.type === 'loading'" class="rozie-toast-spinner" aria-hidden="true"></span>
       <span class="rozie-toast-message">{{ t.message }}</span>
       <button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismissBegin(t.id, 'close')">×</button>
     </slot>
@@ -415,6 +488,20 @@ $expose({ show, dismiss, clear })
 @keyframes rozie-toast-fade-out {
   from { opacity: 1; }
   to { opacity: 0; }
+}
+
+/* Decorative — the message text carries the meaning (aria-hidden). */
+.rozie-toast-spinner {
+  flex: 0 0 auto;
+  width: var(--rozie-toast-spinner-size, 1em);
+  height: var(--rozie-toast-spinner-size, 1em);
+  border: 2px solid color-mix(in srgb, var(--rozie-toast-spinner-color, currentColor) 25%, transparent);
+  border-top-color: var(--rozie-toast-spinner-color, currentColor);
+  border-radius: 50%;
+  animation: rozie-toast-spin 0.75s linear infinite;
+}
+@keyframes rozie-toast-spin {
+  to { transform: rotate(360deg); }
 }
 
 .rozie-toast-message {
