@@ -40,7 +40,12 @@ const EXPECT = {
   // seedQuery (command-palette #2 levels/restore-on-pop prerequisite): an
   // imperative-only handle verb that seeds $data.query — NOT a second model
   // (ROZ125 — combobox's sole model:true prop stays `value`).
-  expose: ['focus', 'clear', 'seedQuery'],
+  // pinOpen (command-palette-sub-actions prerequisite, combobox-keepopen
+  // phase): an imperative-only handle verb that pins the popup open so
+  // onBlur() does not collapse it while a host sub-surface (e.g. an action
+  // flyout) holds focus. Additive + render-neutral — never called ⇒ behavior
+  // byte-identical to today.
+  expose: ['focus', 'clear', 'seedQuery', 'pinOpen'],
 } as const;
 
 const sorted = (a: readonly string[]) => [...a].sort();
@@ -83,7 +88,7 @@ describe('Combobox.rozie surface gate', () => {
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 
-  it('expose surface matches (focus/clear)', () => {
+  it('expose surface matches (focus/clear/seedQuery/pinOpen)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

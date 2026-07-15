@@ -17,7 +17,8 @@
  *     the slider/otp precedent (listbox took the other branch, `focusControl`).
  *     codegen's severity filter keeps only `error` diagnostics, so the
  *     deliberate ROZ137 `focus` warn never throws codegen.
- *   - `clear` and `seedQuery` are collision-safe (NOT host-element members).
+ *   - `clear`, `seedQuery`, and `pinOpen` are collision-safe (NOT host-element
+ *     members).
  */
 export const handleManifest = {
   focus:
@@ -26,6 +27,8 @@ export const handleManifest = {
     'Reset the selection: clear `value` (emits `change` with `{ value: null }`) and empty the input text.',
   seedQuery:
     'Imperative-only: set the input text (`text ?? \'\'`, coerced to a string) without touching the `value` model or selection state — the typed query AND the filtered option list reflect it. Does not open the popup or emit `change`/`search`.',
+  pinOpen:
+    'Imperative-only: pin (or unpin) the popup open, coercing its argument to a boolean. While pinned, onBlur() early-returns so the popup does NOT collapse when a host sub-surface (e.g. an action flyout) moves DOM focus out of the input. pinOpen(false) only unpins — it does not itself close the popup or restore focus (the host does that). Render-neutral when never called.',
 };
 
 export default handleManifest;
