@@ -52,7 +52,7 @@
   "peerDependencies": {
     "react": "^18.2 || ^19",
     "react-dom": "^18.2 || ^19",
-    "@rozie-ui/combobox-react": "^0.2.0"
+    "@rozie-ui/combobox-react": "^0.3.0"
   },
   "peerDependenciesMeta": {
     "react": {

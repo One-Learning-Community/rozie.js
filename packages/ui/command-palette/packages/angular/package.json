@@ -51,7 +51,7 @@
     "@angular/core": "^19",
     "@angular/common": "^19",
     "@angular/forms": "^19",
-    "@rozie-ui/combobox-angular": "^0.2.0"
+    "@rozie-ui/combobox-angular": "^0.3.0"
   },
   "peerDependenciesMeta": {
     "@angular/core": {
