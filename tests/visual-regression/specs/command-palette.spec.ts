@@ -181,6 +181,46 @@ async function countByClass(page: Page, className: string): Promise<number> {
 }
 
 /**
+ * Non-clip hit-test (finding 1, 260715-50l): true iff the LAST `[role="menuitem"]`
+ * (RECURSIVELY collected across every open shadow root, mirroring the
+ * `deepActiveElement`/`deepQuerySelector` shadow-piercing precedents in
+ * CommandPalette.rozie) is fully within the viewport AND is actually hittable
+ * at its own center — a shadow-piercing `elementFromPoint` walk, because a
+ * CLIPPED element still reports a full, non-zero bounding box (a plain box
+ * assertion alone would pass even when the row is invisible under
+ * `overflow: hidden`). This is the real regression guard for the
+ * NON-CLIPPING `.rozie-command-palette-frame` anchor (finding 1) — the
+ * single-result ⌘K scenario opens a 3-item menu against a 1-row-tall panel,
+ * which a naive `position: relative` panel would CLIP.
+ */
+async function deepHitAtLastMenuItem(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const collect = (root: Document | ShadowRoot, acc: Element[]): Element[] => {
+      root.querySelectorAll('[role="menuitem"]').forEach((e) => acc.push(e));
+      root.querySelectorAll('*').forEach((e) => {
+        const sr = (e as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) collect(sr, acc);
+      });
+      return acc;
+    };
+    const items = collect(document, []);
+    const last = items[items.length - 1];
+    if (!last) return false;
+    const r = last.getBoundingClientRect();
+    if (r.bottom > window.innerHeight || r.right > window.innerWidth || r.top < 0) return false;
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    let el: Element | null = document.elementFromPoint(x, y);
+    while (el && (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot) {
+      const inner = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot!.elementFromPoint(x, y);
+      if (!inner || inner === el) break;
+      el = inner;
+    }
+    return !!el && (el === last || last.contains(el));
+  });
+}
+
+/**
  * The trimmed text content of every combobox group-heading element
  * (`.rozie-combobox-group-heading`), in DOM order, RECURSIVELY piercing
  * every open shadow root — cp-adopts-combobox-groups' section-heading proof.
@@ -438,6 +478,27 @@ for (const target of TARGETS) {
     //         real-focus guarantee AND ACT-KEEPOPEN in one assertion.
     await page.keyboard.press('ControlOrMeta+k');
     await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 10_000 }).toBe(3);
+
+    // ---- finding-1 (260715-50l): the flyout is anchored to the palette, ----
+    //         NEVER clipped — this is Dan's single-result-row scenario (the
+    //         list is already filtered to 1 result above), so a naive
+    //         `position: relative` PANEL (content-height, overflow:hidden)
+    //         would CLIP a 3-item menu; the NON-CLIPPING `.rozie-command-
+    //         palette-frame` wrapper must instead let it extend past the
+    //         panel while staying anchored (never escaping to the viewport
+    //         edge). Deep elementFromPoint hit-test at the LAST menuitem's
+    //         center is the real non-clip guard (a bounding-box check alone
+    //         cannot distinguish clipped-but-sized from visible).
+    await expect.poll(async () => deepHitAtLastMenuItem(page), { timeout: 10_000 }).toBe(true);
+    // Horizontal anchoring to the frame (NOT vertical containment — the menu
+    // may legitimately extend below a short panel).
+    const menuBox = await page.getByTestId('command-palette-actions-menu').boundingBox();
+    const frameBox = await page.getByTestId('command-palette-frame').boundingBox();
+    expect(menuBox).not.toBeNull();
+    expect(frameBox).not.toBeNull();
+    expect(menuBox!.x).toBeGreaterThanOrEqual(frameBox!.x - 1);
+    expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(frameBox!.x + frameBox!.width + 1);
+
     await expect
       .poll(async () => activeMenuItemInfo(page), { timeout: 10_000 })
       .toEqual({ role: 'menuitem', disabled: false });

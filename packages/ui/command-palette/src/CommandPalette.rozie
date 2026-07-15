@@ -884,11 +884,15 @@ const searchInputEl = () => {
 
 // focusFirstMenuItem(): move real DOM focus into the first enabled menuitem —
 // the ACT-ARBITRATION "real focus" guarantee. Deferred a frame by the caller
-// (openActionMenu) so the flyout has mounted first.
+// (openActionMenu) so the flyout has mounted first. The flyout is now a
+// FRAME child (sibling of the panel, finding 1), so this queries
+// `$refs.frame` — a light-DOM ancestor sharing the palette's OWN shadow
+// root as the flyout (no nested shadow between frame and flyout), so a
+// plain `querySelector` resolves it on all six.
 const focusFirstMenuItem = () => {
-  const panel = $refs.panel
-  if (!panel) return
-  const el: any = panel.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])')
+  const frame = $refs.frame
+  if (!frame) return
+  const el: any = frame.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])')
   if (el && typeof el.focus === 'function') el.focus()
 }
 
@@ -912,12 +916,38 @@ const openActionMenu = (item) => {
   $data.actionIndex = firstEnabledActionIndex(actions)
   $data.activeSurface = 'actions'
   const panel = $refs.panel
+  const frame = $refs.frame
   const activeRow: any = panel ? deepQuerySelector(panel, '.rozie-combobox-option--active') : null
-  $data.actionMenuTop = activeRow ? activeRow.offsetTop : 0
+  // Frame-relative getBoundingClientRect delta (finding 1) — NOT
+  // `activeRow.offsetTop`, which is relative to the row's offsetParent (the
+  // `position: relative` `.rozie-combobox` root, Combobox.rozie) and so
+  // omits the header height + the combobox's own top (would float the
+  // flyout above its row at depth>0). A getBoundingClientRect delta is
+  // viewport-relative on BOTH sides of the Lit nested-shadow boundary
+  // (panel/combobox are separate shadow roots there) so it is correct ×6
+  // AND correct when the combobox list is scrolled (offsetTop ignores
+  // scroll). The frame wraps the panel tightly (no padding), so
+  // frame-top ≈ panel-top and the flyout still aligns to its row.
+  // `frame.scrollTop` is 0 — the frame does not scroll.
+  $data.actionMenuTop = (activeRow && frame)
+    ? (activeRow.getBoundingClientRect().top - frame.getBoundingClientRect().top + frame.scrollTop)
+    : 0
   $refs.combobox?.pinOpen(true)
   if (typeof requestAnimationFrame !== 'undefined') {
     requestAnimationFrame(() => {
       focusFirstMenuItem()
+      // Viewport clamp (finding 1) — a menu opening on a 1-row panel must
+      // never run off the viewport bottom. Reads DOM post-mount (rAF), so
+      // the flyout has laid out. Shifts the menu UP only; never above the
+      // frame top.
+      const menuEl: any = frame ? frame.querySelector('[data-command-palette-menu]') : null
+      if (menuEl && frame) {
+        const frameTop = frame.getBoundingClientRect().top
+        const menuH = menuEl.getBoundingClientRect().height
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 0
+        const maxTop = Math.max(0, vh - 8 - frameTop - menuH)
+        if ($data.actionMenuTop > maxTop) $data.actionMenuTop = maxTop
+      }
     })
   } else {
     focusFirstMenuItem()
@@ -944,9 +974,11 @@ const roveAction = (dir) => {
   if (!anchor) return
   const idx = rovingActionIndex(anchor.actions, $data.actionIndex, dir)
   $data.actionIndex = idx
-  const panel = $refs.panel
-  if (!panel) return
-  const items: any = panel.querySelectorAll('[data-command-palette-menu] [role="menuitem"]')
+  // Re-rooted to $refs.frame (finding 1) — the flyout moved out of the
+  // panel to be a frame child; see focusFirstMenuItem's comment.
+  const frame = $refs.frame
+  if (!frame) return
+  const items: any = frame.querySelectorAll('[data-command-palette-menu] [role="menuitem"]')
   const el: any = items[idx]
   if (el && typeof el.focus === 'function') el.focus()
 }
@@ -1149,13 +1181,28 @@ $expose({ show, close, toggle, focus, goBack, openTo })
   class="rozie-command-palette"
   @click="onBackdropClick($event)"
 >
+  <!--
+    NON-CLIPPING frame (finding 1) — wraps the overflow:hidden panel so the
+    action-menu flyout (moved below, a FRAME child / panel sibling) can
+    extend beyond a short panel without ever being clipped OR escaping to
+    the viewport (the overlay above is `position: fixed`, so an
+    absolutely-positioned flyout parented there pins to the VIEWPORT right
+    edge — the bug). The frame also owns width (moved off the panel) and the
+    Escape funnel (onPanelKeydown) since the funnel's own common ancestor
+    with the flyout must sit outside the clipping panel.
+  -->
+  <div
+    ref="frame"
+    class="rozie-command-palette-frame"
+    data-testid="command-palette-frame"
+    @keydown="onPanelKeydown($event)"
+  >
   <div
     ref="panel"
     class="rozie-command-palette-panel"
     role="dialog"
     aria-modal="true"
     :aria-label="$props.ariaLabel"
-    @keydown="onPanelKeydown($event)"
   >
     <!--
       Breadcrumb/back header (LVL-RENDER) — a command-palette-owned panel
@@ -1301,63 +1348,6 @@ $expose({ show, close, toggle, focus, goBack, openTo })
     </Combobox>
 
     <!--
-      Action menu flyout (ACT-SEAM/ACT-ARBITRATION/ACT-RENDER) — a panel-
-      INTERNAL sibling of the combobox (so it portals WITH the palette when
-      #11 lands), gated by atActions(). Its OWN keydown owns arrows/Enter/←
-      while open (onActionMenuKeydown) — Escape deliberately is NOT bound here,
-      it bubbles to onPanelKeydown's single funnel. `tabindex="-1"` on each row
-      makes the JS `.focus()` calls in openActionMenu/roveAction actually move
-      real DOM focus (a plain `<div>` is not focusable without it). Labelled by
-      the anchor row's own label (`:aria-label`). Each row re-projects
-      `#actionItem` (scope `{ action, item, active, disabled }` — camelCase,
-      NOT `#action-item`: a hyphenated slot name fails ROZ127, since Vue's
-      `defineSlots<{…}>()` can't emit an unquoted hyphenated object key;
-      mirroring how `#option` re-projects); the default fill is icon (if
-      present) + label +
-      a right-aligned shortcut hint, read through UNTYPED resolvers
-      (actionIcon/actionLabel/actionShortcut — the cross-target slot-param-type
-      gap, same pattern as labelText/groupText above). Selection uses
-      `@mousedown.prevent` ONLY (the combobox option-row convention — NOT also
-      `@click`, which would double-fire selectAction after closeActionMenu has
-      already cleared the anchor).
-    -->
-    <div
-      r-if="atActions()"
-      data-command-palette-menu
-      data-testid="command-palette-actions-menu"
-      class="rozie-command-palette-actions-menu"
-      role="menu"
-      :aria-label="$data.actionAnchor ? $data.actionAnchor.label : null"
-      :style="'top:' + $data.actionMenuTop + 'px'"
-      @keydown="onActionMenuKeydown($event)"
-    >
-      <div
-        r-for="action, ai in ($data.actionAnchor ? $data.actionAnchor.actions : [])"
-        :key="action.id"
-        class="rozie-command-palette-actions-menu-item"
-        :class="{ 'rozie-command-palette-actions-menu-item--active': ai === $data.actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }"
-        role="menuitem"
-        data-testid="command-palette-action-item"
-        :aria-disabled="!!action.disabled"
-        tabindex="-1"
-        @mouseenter="$data.actionIndex = Number(ai)"
-        @mousedown.prevent="selectAction(action)"
-      >
-        <slot
-          name="actionItem"
-          :action="action"
-          :item="$data.actionAnchor ? $data.actionAnchor.item : null"
-          :active="ai === $data.actionIndex"
-          :disabled="!!action.disabled"
-        >
-          <span r-if="actionIcon(action)" class="rozie-command-palette-actions-menu-item-icon">{{ actionIcon(action) }}</span>
-          <span class="rozie-command-palette-actions-menu-item-label">{{ actionLabel(action) }}</span>
-          <span r-if="actionShortcut(action)" class="rozie-command-palette-actions-menu-item-shortcut">{{ actionShortcut(action) }}</span>
-        </slot>
-      </div>
-    </div>
-
-    <!--
       Async status region (LVL-ASYNC) — command-palette-OWNED panel markup (a
       sibling below the combobox, like #footer/#breadcrumb), so it reacts under
       every target's change detection incl. Angular (unlike a slot projected
@@ -1377,6 +1367,68 @@ $expose({ show, close, toggle, focus, goBack, openTo })
       <slot name="footer" />
     </div>
   </div>
+
+  <!--
+    Action menu flyout (ACT-SEAM/ACT-ARBITRATION/ACT-RENDER) — a FRAME child
+    (sibling of the overflow:hidden panel above, NOT nested inside it) so it
+    can extend beyond a short panel without being clipped, while the frame's
+    non-clipping `position: relative` keeps it anchored to the palette
+    instead of escaping to the viewport (finding 1). Gated by atActions().
+    Its OWN keydown owns arrows/Enter/← while open (onActionMenuKeydown) —
+    Escape deliberately is NOT bound here, it bubbles to the FRAME's single
+    onPanelKeydown funnel (the frame is the common ancestor of both this
+    flyout and the panel subtree). `tabindex="-1"` on each row makes the JS
+    `.focus()` calls in openActionMenu/roveAction actually move real DOM
+    focus (a plain `<div>` is not focusable without it). Labelled by the
+    anchor row's own label (`:aria-label`). Each row re-projects
+    `#actionItem` (scope `{ action, item, active, disabled }` — camelCase,
+    NOT `#action-item`: a hyphenated slot name fails ROZ127, since Vue's
+    `defineSlots<{…}>()` can't emit an unquoted hyphenated object key;
+    mirroring how `#option` re-projects); the default fill is icon (if
+    present) + label +
+    a right-aligned shortcut hint, read through UNTYPED resolvers
+    (actionIcon/actionLabel/actionShortcut — the cross-target slot-param-type
+    gap, same pattern as labelText/groupText above). Selection uses
+    `@mousedown.prevent` ONLY (the combobox option-row convention — NOT also
+    `@click`, which would double-fire selectAction after closeActionMenu has
+    already cleared the anchor).
+  -->
+  <div
+    r-if="atActions()"
+    data-command-palette-menu
+    data-testid="command-palette-actions-menu"
+    class="rozie-command-palette-actions-menu"
+    role="menu"
+    :aria-label="$data.actionAnchor ? $data.actionAnchor.label : null"
+    :style="'top:' + $data.actionMenuTop + 'px'"
+    @keydown="onActionMenuKeydown($event)"
+  >
+    <div
+      r-for="action, ai in ($data.actionAnchor ? $data.actionAnchor.actions : [])"
+      :key="action.id"
+      class="rozie-command-palette-actions-menu-item"
+      :class="{ 'rozie-command-palette-actions-menu-item--active': ai === $data.actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }"
+      role="menuitem"
+      data-testid="command-palette-action-item"
+      :aria-disabled="!!action.disabled"
+      tabindex="-1"
+      @mouseenter="$data.actionIndex = Number(ai)"
+      @mousedown.prevent="selectAction(action)"
+    >
+      <slot
+        name="actionItem"
+        :action="action"
+        :item="$data.actionAnchor ? $data.actionAnchor.item : null"
+        :active="ai === $data.actionIndex"
+        :disabled="!!action.disabled"
+      >
+        <span r-if="actionIcon(action)" class="rozie-command-palette-actions-menu-item-icon">{{ actionIcon(action) }}</span>
+        <span class="rozie-command-palette-actions-menu-item-label">{{ actionLabel(action) }}</span>
+        <span r-if="actionShortcut(action)" class="rozie-command-palette-actions-menu-item-shortcut">{{ actionShortcut(action) }}</span>
+      </slot>
+    </div>
+  </div>
+</div>
 </div>
 </template>
 
@@ -1401,11 +1453,25 @@ $expose({ show, close, toggle, focus, goBack, openTo })
   backdrop-filter: var(--rozie-command-palette-backdrop-filter, none);
 }
 
+/*
+  NON-CLIPPING frame (finding 1) — wraps the overflow:hidden panel below and
+  owns width + positioning, so an absolutely-positioned flyout parented here
+  (a frame child, sibling of the panel) is anchored to the palette (never the
+  viewport) and is never clipped by the panel's own `overflow: hidden`.
+*/
+.rozie-command-palette-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--rozie-command-palette-width, min(40rem, 100%));
+  max-width: 100%;
+}
+
 /* The centered dialog box. */
 .rozie-command-palette-panel {
   display: flex;
   flex-direction: column;
-  width: var(--rozie-command-palette-width, min(40rem, 100%));
+  width: 100%;
   max-height: var(--rozie-command-palette-max-height, 70vh);
   overflow: hidden;
   font: var(--rozie-command-palette-font, inherit);
