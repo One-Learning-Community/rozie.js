@@ -830,6 +830,14 @@ private __rozieWatchInitial_1 = true;
 };
 
   scrollActiveIntoView = () => {
+  if (!this.virtual && this._isOpen.value && this._activeIndex.value >= 0) {
+    const list = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rozie-combobox-list') : null;
+    const opt = list ? list.querySelector('#' + this.optId(this._activeIndex.value)) : null;
+    if (opt) opt.scrollIntoView({
+      block: 'nearest'
+    });
+    return;
+  }
   if (!this.virtual || !this.virtualizer || this._activeIndex.value < 0) return;
   // 'center' (not 'auto'): keep the active option well inside the rendered slice — 'auto'
   // lands it at the viewport edge where the overscan band can leave it just-unrendered for
@@ -958,7 +966,8 @@ private __rozieWatchInitial_1 = true;
       this._activeIndex.value = this.nextEnabled(list, list.length, -1);
     }
   }
-  // Keep the (new) active option in view when windowing — no-op when not virtual.
+  // Keep the (new) active option in view — routes through the virtualizer when
+  // windowing, direct scrollIntoView otherwise.
   this.scrollActiveIntoView();
 };
 

@@ -741,11 +741,21 @@ const remeasureWindow = () => {
   const els = gridScrollEl.querySelectorAll('.rozie-combobox-option[data-index]');
   for (const el of els as any) virtualizer.measureElement(el);
 };
-// Keep the active option visible inside the windowed popup. When windowing, route
-// through the virtualizer (scrollToIndex) so an active option OUTSIDE the rendered
-// window scrolls into view (the windowed-arrow-nav seam). No-op when not virtual (the
-// non-virtual combobox popup is short enough not to need it — unchanged behavior).
+// Keep the active option visible inside the popup. When windowing, route through the
+// virtualizer (scrollToIndex) so an active option OUTSIDE the rendered window scrolls
+// into view (the windowed-arrow-nav seam). When NOT windowing, resolve the active
+// option element directly (a within-own-shadow query, Lit-safe) and scrollIntoView it
+// with 'nearest' block alignment — a plain long list taller than the popup's
+// max-height must also keep the active option visible during arrow navigation.
 const scrollActiveIntoView = () => {
+  if (!virtual && isOpen && activeIndex >= 0) {
+    const list = __rozieRoot ? __rozieRoot!.querySelector('.rozie-combobox-list') : null;
+    const opt = list ? list.querySelector('#' + optId(activeIndex)) : null;
+    if (opt) opt.scrollIntoView({
+      block: 'nearest'
+    });
+    return;
+  }
   if (!virtual || !virtualizer || activeIndex < 0) return;
   // 'center' (not 'auto'): keep the active option well inside the rendered slice — 'auto'
   // lands it at the viewport edge where the overscan band can leave it just-unrendered for
@@ -870,7 +880,8 @@ const onKeydown = (e: any) => {
       activeIndex = nextEnabled(list, list.length, -1);
     }
   }
-  // Keep the (new) active option in view when windowing — no-op when not virtual.
+  // Keep the (new) active option in view — routes through the virtualizer when
+  // windowing, direct scrollIntoView otherwise.
   scrollActiveIntoView();
 };
 // ---- lifecycle + imperative handle -------------------------------------

@@ -832,8 +832,17 @@ export class Combobox {
     for (const el of els as any) this.virtualizer.measureElement(el);
   };
   scrollActiveIntoView = () => {
+    const __virtual = this.virtual();
     const __activeIndex = this.activeIndex();
-    if (!this.virtual() || !this.virtualizer || __activeIndex < 0) return;
+    if (!__virtual && this.isOpen() && __activeIndex >= 0) {
+      const list = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-combobox-list') : null;
+      const opt = list ? list.querySelector('#' + this.optId(__activeIndex)) : null;
+      if (opt) opt.scrollIntoView({
+        block: 'nearest'
+      });
+      return;
+    }
+    if (!__virtual || !this.virtualizer || __activeIndex < 0) return;
     // 'center' (not 'auto'): keep the active option well inside the rendered slice — 'auto'
     // lands it at the viewport edge where the overscan band can leave it just-unrendered for
     // a frame on the fine-grained targets (Solid).
@@ -945,7 +954,8 @@ export class Combobox {
         this.activeIndex.set(this.nextEnabled(list, list.length, -1));
       }
     }
-    // Keep the (new) active option in view when windowing — no-op when not virtual.
+    // Keep the (new) active option in view — routes through the virtualizer when
+    // windowing, direct scrollIntoView otherwise.
     this.scrollActiveIntoView();
   };
   kickWindow = (attempts: any) => {
