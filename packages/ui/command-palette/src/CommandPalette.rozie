@@ -200,6 +200,28 @@
       example: '<CommandPalette :search-debounce="300" :items="commands" />',
     },
   },
+
+  // Opens the highlighted row's action menu (ACT-TRIGGER). A portable
+  // `$mod+<letter>`-style token — default `$mod+k` (⌘K/Ctrl+K).
+  actionKey: {
+    type: String,
+    default: '$mod+k',
+    docs: {
+      description:
+        'The keyboard shortcut that opens the highlighted row\'s action menu — a portable `$mod+<letter>` token (default `"$mod+k"`, i.e. ⌘K/Ctrl+K) matched via `(event.metaKey || event.ctrlKey) && event.key === <letter>`. A bare single-letter token (e.g. `"k"`) matches with no modifier required. Pressing it (or caret-at-end Right-arrow, or clicking the row\'s actions affordance) on a row with no `actions` is a no-op — the menu only opens for a row that has them.',
+      example: '<CommandPalette action-key="$mod+j" :items="commands" />',
+    },
+  },
+
+  // Whether running an action also closes the palette (default: yes).
+  closeOnAction: {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Whether choosing an action closes the whole palette. Defaults to `true` — running an action ALWAYS closes the action menu itself; `closeOnAction` additionally decides whether the palette dismisses too (`false` returns to the result list with the palette still open, e.g. for firing several actions in a row).',
+    },
+  },
 }
 </props>
 
@@ -222,6 +244,22 @@
   // timer live as module-level lets (script top) — NOT $data — because they
   // need synchronous read-after-write across awaits.
   levelStack: [],
+
+  // ---- action menu (ACT-SEAM/ACT-ARBITRATION) --------------------------
+  // The single source of truth for keyboard ownership (internal/actionMenu.ts
+  // ActionSurface): 'list' (default — the vendored <Combobox> owns arrows/
+  // Enter) or 'actions' (the flyout holds real focus and owns them instead).
+  activeSurface: 'list',
+  // The roving index into actionAnchor.actions while activeSurface==='actions'.
+  // -1 when no menu is open.
+  actionIndex: -1,
+  // The anchored row + its resolved actions while the menu is open — { item,
+  // actions } — or null when closed. Widened to `any` by the emitter (a
+  // null-initialized $data field, the rangeAnchor/rangeFocus precedent).
+  actionAnchor: null,
+  // The flyout's px vertical offset, read once (openActionMenu) from the
+  // anchored row's offsetTop and bound to the flyout's :style.
+  actionMenuTop: 0,
 }
 </data>
 
@@ -229,6 +267,7 @@
 import { scoreCommands, labelHighlight } from './internal/scoreCommands'
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack'
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource'
+import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu'
 
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
@@ -281,6 +320,11 @@ const currentError = () => {
 // atDepth(): true when nested (depth>0) — gates the breadcrumb/back header
 // (LVL-RENDER). A plain function — never $computed.
 const atDepth = () => currentDepth() > 0
+
+// atActions(): true while the action menu owns the keyboard (ACT-SEAM). Gates
+// the flyout r-if AND the combobox keepOpen consumption — a plain function,
+// never $computed.
+const atActions = () => $data.activeSurface === 'actions'
 
 // currentTitle(): the breadcrumb/header label for the active level — the top
 // frame's `title` (already item.title ?? item.label, captured by pushFrame
@@ -440,6 +484,10 @@ const retryCurrentLevel = () => {
 // currentDepth() — re-reading $data.levelStack right after writing it binds
 // the pre-write (0) value on React (setState is async).
 const pushLevel = (item) => {
+  // Level nav always resets to the list surface (spec §Composition) — a
+  // navigating item's own action menu, if somehow open, must not survive
+  // the push.
+  if ($data.activeSurface !== 'list') closeActionMenu()
   const nextStack = pushFrame($data.levelStack, item, $props.query)
   $data.levelStack = nextStack
   $model.query = ''
@@ -460,6 +508,9 @@ const pushLevel = (item) => {
 // root (an empty levelStack — mirrors the spec's "back() — no-op at root").
 const goBack = () => {
   if ($data.levelStack.length === 0) return
+  // Level nav always resets to the list surface (spec §Composition) — pop
+  // closes an open action menu FIRST.
+  if ($data.activeSurface !== 'list') closeActionMenu()
   const { stack, restoreQuery } = popFrame($data.levelStack)
   $data.levelStack = stack
   requestToken = nextRequestToken(requestToken)
@@ -641,6 +692,160 @@ const reopenComboboxPopup = () => {
   }
 }
 
+// ---- action menu (ACT-SEAM/ACT-ARBITRATION/ACT-TRIGGER/ACT-KEEPOPEN) ---
+// The single reusable seam: open a focus-owning sub-surface over the list,
+// route Escape back to it, restore focus + reopen the list on close. Written
+// once (activeSurface: 'list' | 'actions') so #12 (inline command arguments)
+// reuses the identical transition shape for a future 'args' surface.
+
+// highlightedItem(): resolve the combobox's currently-highlighted row back to
+// its command object. Combobox owns `activeIndex` internally (no public model
+// for it), so this reads the ACTIVE option element's id — `idBase + '-opt-' +
+// i`, where `i` is its position in filteredItems() (the exact list combobox
+// was fed as `:options`) — off the DOM, via `$el.querySelector` (the
+// $el.querySelector precedent, ROZ123-safe: called only from post-mount
+// handlers, never eagerly). Returns null when nothing is highlighted or the
+// id can't be parsed.
+const highlightedItem = () => {
+  const root: any = $el
+  if (!root) return null
+  const activeEl = root.querySelector('.rozie-combobox-option--active')
+  if (!activeEl) return null
+  const prefix = $props.idBase + '-opt-'
+  const id = String(activeEl.id || activeEl.getAttribute('id') || '')
+  if (id.indexOf(prefix) !== 0) return null
+  const idx = parseInt(id.slice(prefix.length), 10)
+  if (Number.isNaN(idx)) return null
+  const list = filteredItems()
+  return idx >= 0 && idx < list.length ? list[idx] : null
+}
+
+// searchInputEl(): the vendored combobox's underlying `<input role="combobox">`
+// — needed for the caret-at-end Right-arrow trigger gate (selectionStart/End
+// are not surfaced through the child's $expose handle). $el.querySelector,
+// ROZ123-safe (called only from the post-mount panel keydown handler).
+const searchInputEl = () => {
+  const root: any = $el
+  return root ? root.querySelector('input[role="combobox"]') : null
+}
+
+// focusFirstMenuItem(): move real DOM focus into the first enabled menuitem —
+// the ACT-ARBITRATION "real focus" guarantee. Deferred a frame by the caller
+// (openActionMenu) so the flyout has mounted first.
+const focusFirstMenuItem = () => {
+  const root: any = $el
+  if (!root) return
+  const el = root.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])')
+  if (el && typeof el.focus === 'function') el.focus()
+}
+
+// openActionMenu(item): guarded no-op unless canOpenActions(item). Anchors
+// the item + its resolved actions, lands actionIndex on the first ENABLED
+// action, reads the flyout's vertical offset off the highlighted row's
+// offsetTop, tells the vendored combobox to keepOpen (ACT-KEEPOPEN —
+// pinOpen(true), so blurring the input into the flyout does not collapse the
+// list), then moves real focus into the first enabled menuitem next frame.
+const openActionMenu = (item) => {
+  if (!canOpenActions(item)) return
+  const actions = actionsOf(item)
+  $data.actionAnchor = { item, actions }
+  $data.actionIndex = firstEnabledActionIndex(actions)
+  $data.activeSurface = 'actions'
+  const root: any = $el
+  const activeRow: any = root ? root.querySelector('.rozie-combobox-option--active') : null
+  $data.actionMenuTop = activeRow ? activeRow.offsetTop : 0
+  $refs.combobox?.pinOpen(true)
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      focusFirstMenuItem()
+    })
+  } else {
+    focusFirstMenuItem()
+  }
+}
+
+// closeActionMenu(): the focus-restore invariant — ALWAYS returns to the
+// list surface, releases keepOpen (pinOpen(false)), and reopens the combobox
+// popup with focus back on the search input (reopenComboboxPopup — the
+// existing level-pop blur/refocus primitive, reused verbatim here).
+const closeActionMenu = () => {
+  $data.activeSurface = 'list'
+  $data.actionIndex = -1
+  $data.actionAnchor = null
+  $refs.combobox?.pinOpen(false)
+  reopenComboboxPopup()
+}
+
+// roveAction(dir): disabled-skip clamped roving (internal/actionMenu.ts
+// rovingActionIndex — the combobox nextEnabled convention) over the anchored
+// item's actions, then moves real focus to the new index's menuitem.
+const roveAction = (dir) => {
+  const anchor = $data.actionAnchor
+  if (!anchor) return
+  const idx = rovingActionIndex(anchor.actions, $data.actionIndex, dir)
+  $data.actionIndex = idx
+  const root: any = $el
+  if (!root) return
+  const items = root.querySelectorAll('[data-command-palette-menu] [role="menuitem"]')
+  const el: any = items[idx]
+  if (el && typeof el.focus === 'function') el.focus()
+}
+
+// selectAction(action): a disabled action is a no-op. Captures the anchored
+// item into a LOCAL first (React stale-read guard — closeActionMenu clears
+// $data.actionAnchor right after), fires the public `action-select` event,
+// ALWAYS closes the menu, then closes the palette too IFF closeOnAction.
+const selectAction = (action) => {
+  if (!action || action.disabled) return
+  const anchor = $data.actionAnchor
+  const item = anchor ? anchor.item : null
+  $emit('action-select', { item, action })
+  closeActionMenu()
+  if ($props.closeOnAction) closePalette()
+}
+
+// onActionMenuKeydown(e): the flyout's OWN keydown — focus is inside the
+// menu while this fires, so the vendored combobox never sees these keys.
+// Escape is DELIBERATELY not handled here — it bubbles up to onPanelKeydown's
+// single Escape funnel below. Every other handled key stops propagation so a
+// stale-but-now-'list'-surface bubble (e.g. the actionKey toggle-close,
+// which flips activeSurface to 'list' BEFORE the event finishes bubbling)
+// can't be re-interpreted as a fresh open-menu trigger by onPanelKeydown.
+const onActionMenuKeydown = (e) => {
+  if (!e) return
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    e.stopPropagation()
+    roveAction(1)
+    return
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    e.stopPropagation()
+    roveAction(-1)
+    return
+  }
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    e.stopPropagation()
+    const anchor = $data.actionAnchor
+    const action = anchor && Array.isArray(anchor.actions) ? anchor.actions[$data.actionIndex] : null
+    if (action) selectAction(action)
+    return
+  }
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    e.stopPropagation()
+    closeActionMenu()
+    return
+  }
+  if (matchesActionKey(e, $props.actionKey)) {
+    e.preventDefault()
+    e.stopPropagation()
+    closeActionMenu()
+  }
+}
+
 // On open: clear the internal selection, then focus the search input. The query
 // is NOT reset here — that would clobber a pre-seeded / `r-model`-bound query.
 // The reset happens on the close transition (the $watch else-branch below), so a
@@ -687,31 +892,70 @@ $watch(() => $props.open, (isOpen) => {
     $model.query = ''
     $data.levelStack = []
     $data.activeValue = null
+    // Reset the action surface directly (NOT closeActionMenu — the palette is
+    // closing, so there is no combobox popup left to reopen/keepOpen-release;
+    // a plain reset keeps a reopen starting clean, per spec §Composition).
+    $data.activeSurface = 'list'
+    $data.actionIndex = -1
+    $data.actionAnchor = null
     if (debounceTimerId != null) clearTimeout(debounceTimerId)
     debounceTimerId = null
     requestToken = nextRequestToken(requestToken)
   }
 })
 
-// Bubble-phase panel keydown (LVL-NAV):
-//   - Escape at depth>0 → pop one level (does NOT close the palette); at
-//     depth 0 → close the palette. The vendored <Combobox> (a child) sees the
-//     Escape FIRST on the bubble path and closes its OWN popup (Combobox.rozie
-//     onKeydown → isOpen=false); goBack()'s reopenComboboxPopup() re-opens it
-//     afterward so the restored parent level's list is visible.
-//   - Backspace on an empty query at depth>0 → pop one level (Backspace does
-//     NOT close the combobox popup — its onKeydown ignores it — so the reopen
-//     is a harmless no-op cycle there). Otherwise Backspace edits the query
-//     text normally (never intercepted at the root or with text in the box).
+// Bubble-phase panel keydown (LVL-NAV, ACT-ARBITRATION, ACT-TRIGGER):
+//   - Escape: routed through resolveEscape(activeSurface, currentDepth()) —
+//     the SINGLE precedence oracle (menu-close > level-pop > palette-close-
+//     at-root). A sub-surface open (activeSurface!=='list') ALWAYS wins —
+//     closeActionMenu() and STOP; only once the menu is closed does Escape
+//     fall through to level-pop or root-close on a LATER keypress. The
+//     vendored <Combobox> (a child) sees the Escape FIRST on the bubble path
+//     and closes its OWN popup (Combobox.rozie onKeydown → isOpen=false);
+//     goBack()'s reopenComboboxPopup() re-opens it afterward so the restored
+//     parent level's list is visible.
+//   - actionKey (⌘K) / caret-at-end Right-arrow (ACT-TRIGGER): open the
+//     action menu for the highlighted row, but ONLY while activeSurface is
+//     'list' (the menu owns these keys itself once open, via
+//     onActionMenuKeydown) and the row canOpenActions — a no-op otherwise
+//     (an action-less row, or no highlighted row).
+//   - Backspace on an empty query at depth>0 → pop one level, but ONLY while
+//     activeSurface==='list' (Backspace must never pop a level while the menu
+//     owns focus). Backspace does NOT close the combobox popup — its
+//     onKeydown ignores it — so the reopen is a harmless no-op cycle there.
+//     Otherwise Backspace edits the query text normally (never intercepted
+//     at the root or with text in the box).
 const onPanelKeydown = (e) => {
   if (!e) return
   if (e.key === 'Escape') {
     e.preventDefault()
-    if (currentDepth() > 0) goBack()
+    const route = resolveEscape($data.activeSurface, currentDepth())
+    if (route === 'close-surface') closeActionMenu()
+    else if (route === 'pop-level') goBack()
     else closePalette()
     return
   }
-  if (e.key === 'Backspace' && $props.query === '' && currentDepth() > 0) {
+  if ($data.activeSurface === 'list') {
+    if (matchesActionKey(e, $props.actionKey)) {
+      const item = highlightedItem()
+      if (canOpenActions(item)) {
+        e.preventDefault()
+        openActionMenu(item)
+      }
+      return
+    }
+    if (e.key === 'ArrowRight') {
+      const input: any = searchInputEl()
+      const item = highlightedItem()
+      const value = input && input.value != null ? String(input.value) : ''
+      if (input && caretAtEnd(input.selectionStart, input.selectionEnd, value.length) && canOpenActions(item)) {
+        e.preventDefault()
+        openActionMenu(item)
+        return
+      }
+    }
+  }
+  if (e.key === 'Backspace' && $props.query === '' && currentDepth() > 0 && $data.activeSurface === 'list') {
     e.preventDefault()
     goBack()
   }
@@ -856,6 +1100,38 @@ $expose({ show, close, toggle, focus, goBack, openTo })
         <slot name="empty" :query="query" r-if="currentStatus() === 'ready'">{{ $props.emptyText }}</slot>
       </template>
     </Combobox>
+
+    <!--
+      Action menu flyout (ACT-SEAM/ACT-ARBITRATION/ACT-RENDER) — a panel-
+      INTERNAL sibling of the combobox (so it portals WITH the palette when
+      #11 lands), gated by atActions(). Its OWN keydown owns arrows/Enter/←
+      while open (onActionMenuKeydown) — Escape deliberately is NOT bound here,
+      it bubbles to onPanelKeydown's single funnel. `tabindex="-1"` on each row
+      makes the JS `.focus()` calls in openActionMenu/roveAction actually move
+      real DOM focus (a plain `<div>` is not focusable without it).
+      Task 4 fills in the `#action-item` slot re-projection, the icon/shortcut
+      default fill, a11y labelling, and the token-themed CSS — this is the
+      MINIMAL functional shape so menuitems render + take real focus.
+    -->
+    <div
+      r-if="atActions()"
+      data-command-palette-menu
+      class="rozie-command-palette-actions-menu"
+      role="menu"
+      :style="'top:' + $data.actionMenuTop + 'px'"
+      @keydown="onActionMenuKeydown($event)"
+    >
+      <div
+        r-for="action, ai in ($data.actionAnchor ? $data.actionAnchor.actions : [])"
+        :key="action.id"
+        class="rozie-command-palette-actions-menu-item"
+        :class="{ 'rozie-command-palette-actions-menu-item--active': ai === $data.actionIndex }"
+        role="menuitem"
+        :aria-disabled="!!action.disabled"
+        tabindex="-1"
+        @mouseenter="$data.actionIndex = ai"
+      >{{ action.label }}</div>
+    </div>
 
     <!--
       Async status region (LVL-ASYNC) — command-palette-OWNED panel markup (a
