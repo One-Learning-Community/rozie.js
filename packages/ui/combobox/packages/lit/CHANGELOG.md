@@ -1,5 +1,67 @@
 # @rozie-ui/combobox-lit
 
+## 0.3.0
+
+### Minor Changes
+
+- 564ed59: Per-group result cap with an expand-in-place "+N more" affordance — new
+  `groupCap` prop + `#groupMore` slot.
+
+  Set `groupCap` alongside `groups` to cap each native section to its first
+  `groupCap` options; an overflowing section renders a keyboard-reachable
+  "+N more" row after its capped options. Activating the row (Enter while it
+  is the active-descendant, or a click) expands **that section only**, in
+  place — the remaining options render inline and the row disappears. It never
+  writes the `value` model or fires `change`; expansion is purely a reveal.
+  `ArrowDown`/`ArrowUp` rove onto the more-row like any option and, once
+  expanded, continue into the newly-revealed options — `aria-activedescendant`
+  always resolves to a rendered row. Expansion state resets whenever the
+  option set or the typed query changes.
+
+  New slot `groupMore` (scope `{ group, hidden, expand }`) customizes the
+  more-row's markup; the default fill renders `+{hidden} more`.
+
+  `0`/absent (default) is uncapped and byte-identical to plain grouping.
+  `groupCap` only applies to the standard (non-`virtual`) grouped render, same
+  as `groups` itself.
+
+- 99fee43: Added a `pinOpen(boolean)` imperative handle verb. While pinned, blurring the
+  input (e.g. because a host sub-surface like an action flyout took real DOM
+  focus) no longer collapses the result popup — `onBlur()` early-returns while
+  pinned. `pinOpen(false)` only unpins; it does not itself close the popup or
+  restore focus, which stays the host's responsibility.
+
+  Additive and render-neutral: never calling `pinOpen` leaves behavior
+  byte-identical to before this release.
+
+### Patch Changes
+
+- d3782ef: Three additive, render-neutral tokens (every fallback replicates today's
+  rendered value, so a consumer who never sets these sees no change):
+  - `--rozie-combobox-focus-border-color` — the input's `:focus` border color,
+    decoupled from `--rozie-combobox-accent` (which also colors the selected
+    option), so a host can neutralize the focus border independently.
+  - `--rozie-combobox-input-underline` — a bottom-border longhand that
+    survives the `:focus` `border-color` override, letting a host render a
+    persistent bottom divider (blurred and focused) without a full border.
+  - `--rozie-combobox-group-heading-margin-top` — top margin above each group
+    heading, for separating the leading ungrouped block from the first
+    labeled section.
+
+  Landed alongside `@rozie-ui/command-palette`'s style polish, which drives
+  these tokens from its panel scope for a clean, borderless, ring-free input.
+
+- f3e1bdf: fix: keep the active option scrolled into view during keyboard navigation in non-virtual lists
+
+  Arrow-key navigation in a plain (non-`virtual`) popup previously moved
+  `activeIndex`/`aria-activedescendant` but never scrolled the option list
+  container, so the active option could walk out of view in a long list
+  taller than the popup's max-height (visible in `@rozie-ui/command-palette`'s
+  longer command lists). `scrollActiveIntoView()` now also resolves the active
+  option element and calls `scrollIntoView({ block: 'nearest' })` on it when
+  not windowing. The `virtual` (windowed) path is unchanged — it still routes
+  through the virtualizer's `scrollToIndex`.
+
 ## 0.2.0
 
 ### Minor Changes
