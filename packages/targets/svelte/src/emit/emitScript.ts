@@ -269,6 +269,27 @@ function arrowBody(body: t.Expression | t.BlockStatement): string {
  * `normalizeSplicedEmitLines` (core) has already anchored the seam spacing, so the
  * mirrored trailing copy spaces correctly.
  */
+/**
+ * Quick task 260714-orv — compare two Babel comment nodes by SOURCE POSITION
+ * (type + starting line/column) rather than object reference. A comment
+ * shared between two adjacent statements' trailing/leading arrays sometimes
+ * IS the exact same object, but an earlier pipeline pass (hoistModuleLet /
+ * rewriteRozieIdentifiers / etc.) may clone an individual statement, minting
+ * a content-identical comment object at a different reference. Two distinct,
+ * independently-authored comments can never share a starting source
+ * position, so this is a safe substitute for `===` this late in the
+ * pipeline.
+ */
+function isSameSourceComment(a: t.Comment, b: t.Comment): boolean {
+  if (a === b) return true;
+  if (!a.loc || !b.loc) return false;
+  return (
+    a.type === b.type &&
+    a.loc.start.line === b.loc.start.line &&
+    a.loc.start.column === b.loc.start.column
+  );
+}
+
 function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
   for (let i = 1; i < stmts.length; i++) {
     const cur = stmts[i]!;
@@ -281,24 +302,27 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
     // (neither node spliced) are left exactly as authored — EXCEPT for the
     // de-dup below (quick task 260714-orv).
     if (!curSpliced && !prevSpliced) {
-      // Quick task 260714-orv — a HOST-authored comment sitting BETWEEN two
-      // adjacent statements is attached by @babel/parser to BOTH neighbours as
-      // the SAME comment object (`prev.trailingComments[last] ===
-      // cur.leadingComments[0]`). The residual body is generated one statement
-      // at a time (`stmts.map(genCode).join('\n')`), so each `genCode` call
-      // carries its own comment-dedup set and the shared object prints TWICE.
-      // Strip the shared object from PREV's trailing side only — CUR's
-      // leading side still prints it once. Gated STRICTLY to the host-only,
-      // same-object case so splice-boundary pairs (handled below) and
-      // independently-authored adjacent comments are untouched.
-      const hostPrevTrail = prev.trailingComments;
-      const hostCurLead = cur.leadingComments;
-      if (
-        hostPrevTrail && hostPrevTrail.length > 0 &&
-        hostCurLead && hostCurLead.length > 0 &&
-        hostPrevTrail[hostPrevTrail.length - 1] === hostCurLead[0]
-      ) {
-        prev.trailingComments = hostPrevTrail.slice(0, -1);
+      // Quick task 260714-orv — @babel/parser attaches a HOST-authored comment
+      // block sitting BETWEEN two adjacent statements to BOTH neighbours (the
+      // earlier statement's trailingComments AND the later statement's
+      // leadingComments cover the SAME source comment run — sometimes even the
+      // exact same array object, but earlier rewrite passes in this pipeline
+      // (hoistModuleLet / rewriteRozieIdentifiers / etc.) may individually
+      // clone a statement, producing content-identical comment objects that no
+      // longer share a reference. Compare by SOURCE POSITION (`isSameSourceComment`)
+      // rather than `===` so the de-dup survives that cloning. Strip any
+      // trailing comment of PREV that source-matches a leading comment of CUR
+      // — CUR's leading side still prints each one once. Gated STRICTLY to
+      // this host-only pair (no splice involved) so splice-boundary pairs
+      // (handled below) and independently-authored adjacent comments (no
+      // source-position match) are untouched.
+      const prevTrail = prev.trailingComments;
+      const curLead = cur.leadingComments;
+      if (prevTrail && prevTrail.length > 0 && curLead && curLead.length > 0) {
+        const deduped = prevTrail.filter(
+          (c) => !curLead.some((lc) => isSameSourceComment(c, lc)),
+        );
+        prev.trailingComments = deduped.length > 0 ? deduped : null;
       }
       continue;
     }
