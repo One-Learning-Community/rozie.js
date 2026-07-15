@@ -49,7 +49,11 @@ const TARGETS = {
     dir: 'vue',
     file: 'Popover.vue',
     build: 'source',
-    externals: ['vue', ENGINE, /^vue\//],
+    // `@rozie/runtime-vue` MUST be externalized — the emitted Popover.vue imports
+    // `useOutsideClick` from it (workspace:^ peer). Omitting it inlines the runtime
+    // into the leaf's dist bundle (the vue-leaf external-drift class). Kept LAST to
+    // match the committed vite.config.ts byte-for-byte (fix bc557392).
+    externals: ['vue', ENGINE, /^vue\//, '@rozie/runtime-vue'],
     engineDevDeps: { [ENGINE]: ENGINE_VERSION },
   },
   svelte: { dir: 'svelte', file: 'Popover.svelte', build: 'source' },
