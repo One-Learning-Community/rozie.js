@@ -543,6 +543,14 @@ export const EXAMPLES = [
   // heading, and the two-way r-model:value round-trip still commits on select.
   // See combobox-groups.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES.
   'ComboboxGroups',
+  // combobox-group-cap — the BEHAVIORAL cell (loader → examples/demos/
+  // ComboboxGroupCapDemo.rozie, importing packages/ui/combobox/src/Combobox.rozie)
+  // proving the new opt-in `groupCap` prop: an overflowing section renders `cap`
+  // options + one keyboard-reachable "+N more" row, ArrowDown roves onto it and
+  // Enter/click expands that section in place with no value change, and the
+  // two-way r-model:value round-trip still commits on a real-option select. See
+  // combobox-group-cap.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES.
+  'ComboboxGroupCap',
   // @rozie-ui otp/dialog/combobox/toast — the four content-STABLE SCREENSHOT cells
   // (loaders → examples/demos/{Otp,Combobox,Dialog,Toaster}ScreenshotDemo.rozie,
   // each importing packages/ui/<family>/src/<Component>.rozie). Two render
@@ -1233,6 +1241,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // component is name="Combobox" → 'rozie-combobox', matching the *Behavior
   // cell's base). Behavioral-only, no screenshot cell.
   ComboboxGroups: 'rozie-combobox-groups',
+  // combobox-group-cap — '-demo' appended on Lit → tag
+  // 'rozie-combobox-group-cap-demo' = kebab of ComboboxGroupCapDemo (the wrapper
+  // component is name="Combobox" → 'rozie-combobox', matching the *Groups cell's
+  // base). Behavioral-only, no screenshot cell.
+  ComboboxGroupCap: 'rozie-combobox-group-cap',
   // @rozie-ui otp/dialog/combobox/toast SCREENSHOT cells — '-demo' appended on Lit
   // → tags 'rozie-otp-screenshot-demo' etc. = kebab of the full *ScreenshotDemo
   // name (mirrors CodeMirrorScreenshot / ChartScreenshot).
@@ -1633,6 +1646,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // own OPTIONS/GROUPS + <data>.value and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props.
   ComboboxGroups: {},
+  // combobox-group-cap — ComboboxGroupCapDemo is self-contained: it seeds its
+  // own OPTIONS/GROUPS + <data>.value and binds r-model:value internally (not
+  // parent-supplied), so no MODEL_PROPS entry. No parent props.
+  ComboboxGroupCap: {},
   // @rozie-ui otp/dialog/combobox/toast SCREENSHOT cells — every *ScreenshotDemo is
   // self-contained: it seeds its own FIXED state in <data>/<script> and binds
   // r-model / drives the $expose handle internally (not parent-supplied), so no

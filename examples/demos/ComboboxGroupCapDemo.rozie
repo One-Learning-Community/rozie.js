@@ -1,0 +1,81 @@
+<!--
+  ComboboxGroupCapDemo — VR behavioral cell for the combobox-group-cap feature
+  (@rozie-ui/combobox). Drives the SAME input + popup listbox as
+  ComboboxGroupsDemo, but additionally passes `:group-cap="2"` so the Fruit
+  section (4 options) overflows the cap: it renders its first 2 options plus a
+  keyboard-reachable "+2 more" row. Activating that row (Enter or click)
+  expands the Fruit section in place, revealing the remaining options with NO
+  value change; the Veg section (2 options, at the cap) renders no more-row. A
+  two-way r-model:value still round-trips through a real-option selection. See
+  combobox-group-cap.spec.ts. Behavioral-only (no pixel baseline) — mirrors
+  ComboboxGroupsDemo.
+-->
+<rozie name="ComboboxGroupCapDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  value: null,
+}
+</data>
+
+<script>
+const OPTIONS = [
+  { value: 'apple', label: 'Apple', group: 'fruit' },
+  { value: 'banana', label: 'Banana', group: 'fruit' },
+  { value: 'cherry', label: 'Cherry', group: 'fruit' },
+  { value: 'date', label: 'Date', group: 'fruit' },
+  { value: 'carrot', label: 'Carrot', group: 'veg' },
+  { value: 'potato', label: 'Potato', group: 'veg' },
+]
+
+const GROUPS = [
+  { id: 'fruit', label: 'Fruit' },
+  { id: 'veg', label: 'Vegetable' },
+]
+</script>
+
+<template>
+<div class="combobox-group-cap-demo">
+  <h3>Combobox — per-group cap</h3>
+
+  <div class="controls">
+    <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
+  </div>
+
+  <Combobox
+    r-model:value="$data.value"
+    :options="OPTIONS"
+    :groups="GROUPS"
+    :group-cap="2"
+    placeholder="Search fruit or veg…"
+    ariaLabel="Fruit or vegetable"
+    idBase="demo-combobox-group-cap"
+  />
+</div>
+</template>
+
+<style>
+.combobox-group-cap-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.combobox-group-cap-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.combobox-group-cap-demo .readout {
+  min-width: 6ch;
+}
+</style>
+
+</rozie>

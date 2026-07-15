@@ -40,6 +40,12 @@ Commands sharing the same `items[].group` string render as labeled sections — 
 
 Override the section heading's markup with the `groupHeading` slot (see below); the default fill renders the group string as-is.
 
+## Capping groups
+
+`groupCap` is a straight pass-through to the vendored combobox's `groupCap` (see [Capping groups](/components/combobox#capping-groups) on the Combobox API page): set it to cap each command section to its first `groupCap` results, adding a keyboard-reachable "+N more" row that expands that section in place when activated (Enter or click). `0`/absent = uncapped (default), byte-identical to today. The palette adds no new prop/slot/emit/expose of its own — the default "+N more" fill renders exactly as the vendored combobox renders it; override it via the combobox's `groupMore` slot semantics if you compose the palette directly.
+
+**Caveat:** the ⌘K/Right-arrow row action menu (see [Interactive sub-actions](#interactive-sub-actions) below) resolves the highlighted row by section index, which assumes the uncapped section order. Combining `groupCap` with per-row `actions` is not composed in this pass.
+
 ## Interactive sub-actions
 
 Each result row may carry its own `actions?: [{ id, label, icon?, shortcut?, disabled? }]` array — a per-row action menu (the "⌘K-within-the-palette" pattern), reached separately from the row's primary `select`/`navigate`. Three triggers open it for the currently highlighted row, and each is a no-op on a row with no `actions`:

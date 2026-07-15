@@ -109,6 +109,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `option` | `option, index, active, selected, disabled` | Custom per-option rendering. `option` is the raw source option object, `index` is its position in the filtered list, `active` is whether it is the active-descendant (keyboard-highlighted), `selected` is whether its value equals the bound `value`, `disabled` is the resolved disabled state. Omit it to render the plain resolved label. |
 | `empty` | `query` | Rendered inside the open popup when the filtered list is empty. `query` is the current input text. Omit it to render the default "No results". |
 | `groupHeading` | `group` | Custom rendering for a group's heading (only when grouping is active — see [Grouping options](#grouping-options)). `group` is `{ id, label }`. Omit it to render the plain `group.label`. |
+| `groupMore` | `group, hidden, expand` | Custom rendering for a capped group's "+N more" row (only when `groupCap` is set — see [Capping groups](#capping-groups)). `group` is `{ id, label }` (or `null` for the leading ungrouped section), `hidden` is the count of not-yet-shown options, `expand` is a zero-arg closure that expands the group in place. Omit it to render the default `+{hidden} more` text. |
 
 ## Grouping options
 
@@ -131,6 +132,23 @@ Pass an ordered `groups` prop and tag each option with a matching `group` id to 
 ```
 
 `groups` sets both the section order and the heading text; a group id present on an option but absent from `groups` falls back to a section titled with the id itself, appended after the listed ones (first-appearance order). Options with no `group` render in a single leading, unheaded section. Within every section, options keep their filtered/scored order — grouping is a stable re-partition, never a re-sort. The keyboard model (`ArrowUp`/`ArrowDown`/`Home`/`End`/`Enter`, `aria-activedescendant`) is unchanged: it walks the same group-ordered flat sequence, so on-screen order always matches keyboard order, and headings are never a keyboard stop. **Leaving `groups` empty (and no option carrying `group`) is byte-identical to the ungrouped combobox** — grouping is strictly additive and opt-in. Grouping is supported only in the standard (non-`virtual`) render; `groups` × `virtual` windowing is not yet supported.
+
+### Capping groups
+
+Pass `groupCap` alongside `groups` to cap each section to its first `groupCap` options, adding a keyboard-reachable "+N more" row when a section overflows the cap:
+
+```rozie
+<template>
+  <Combobox
+    r-model:value="$data.userId"
+    :options="OPTIONS"
+    :groups="GROUPS"
+    :group-cap="5"
+  />
+</template>
+```
+
+Activating the "+N more" row — `Enter` while it is the active-descendant, or a click/tap — expands **that section only**, in place: the rest of its options render inline and the more-row disappears. Expanding never writes the `value` model or fires `change`; it is purely a reveal. `ArrowDown`/`ArrowUp` rove onto the more-row like any other option and, once expanded, continue into the newly-revealed options — `aria-activedescendant` always resolves to a rendered option or more-row id. A section with `groupCap` or fewer options renders in full with no more-row. Expansion state resets whenever the option set or the typed query changes (a new result set invalidates any prior expansion). Customize the row's markup with the `groupMore` slot; the default reads `+{hidden} more`. `0`/absent (default) is uncapped — byte-identical to plain grouping. `groupCap` only applies to the standard (non-`virtual`) grouped render, same as `groups` itself.
 
 ## Filtering: client vs. async
 
