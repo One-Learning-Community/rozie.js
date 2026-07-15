@@ -214,7 +214,7 @@ Focus the input, then type to filter and drive the popup from the keyboard:
 | Key | Action |
 | --- | --- |
 | typing | Filters `options` by `label` (unless `disableFilter`), opens the popup, and emits `search`. |
-| `↓` / `↑` | Open the popup (if closed) and move the active option down / up, skipping disabled options and clamping at the ends. |
+| `↓` / `↑` | Open the popup (if closed) and move the active option down / up, skipping disabled options and clamping at the ends. The active option is kept scrolled into view when the list overflows the popup. |
 | `Home` / `End` | Move the active option to the first / last selectable option. |
 | `Enter` | Commit the active option (writes `value`, fires `change`, closes the popup). |
 | `Escape` | Close the popup without changing the selection. |

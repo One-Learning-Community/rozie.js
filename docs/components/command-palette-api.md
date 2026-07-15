@@ -1,6 +1,6 @@
 # API reference
 
-The full `CommandPalette` surface: props, the two-way `open` + `query` models, the `select` event, the imperative handle, and the slots. For the per-framework consumption code see the [usage page](/components/command-palette-usage).
+The full `CommandPalette` surface: props, the two-way `open` + `query` models, the `select` / `navigate` / `back` / `action-select` events, the imperative handle, and the slots. For the per-framework consumption code see the [usage page](/components/command-palette-usage).
 
 ## Props
 
@@ -108,7 +108,7 @@ The palette also drives several of the vendored `@rozie-ui/combobox` primitive's
 }
 ```
 
-New in 260715-50l (style polish for nested levels + sub-actions):
+New in `0.3.0` (style polish for nested levels + sub-actions):
 
 | Token | Fallback | Description |
 | --- | --- | --- |
