@@ -391,6 +391,26 @@ const groupText = (o) => (o && o.group !== undefined ? o.group : '')
 // display helpers above — same cross-target slot-param-type gap.
 const actionsList = (o) => (o && o.actions ? o.actions : [])
 
+// Untyped #actionItem display resolvers (ACT-RENDER) — the re-projected
+// `action` scope param threads as `unknown` on the Lit leaf (the same
+// cross-target slot-param-type gap as labelText/groupText/actionsList
+// above), so the default fill reads label/shortcut/icon through these
+// rather than `action.label` directly.
+const actionLabel = (a) => (a && a.label !== undefined ? a.label : '')
+const actionShortcut = (a) => (a && a.shortcut !== undefined ? a.shortcut : undefined)
+const actionIcon = (a) => (a && a.icon !== undefined ? a.icon : undefined)
+
+// actionKeyHint(): a short display string for the actionKey prop, for the
+// #actions row affordance's default (unfilled) hint — "$mod+k" → "⌘K",
+// any other "$mod+<letter>" → "⌘<LETTER>", a bare-letter token passes
+// through uppercased.
+const actionKeyHint = () => {
+  const k = $props.actionKey
+  if (typeof k !== 'string') return ''
+  if (k.indexOf('$mod+') === 0) return '⌘' + k.slice('$mod+'.length).toUpperCase()
+  return k.toUpperCase()
+}
+
 // Split a command's visible label into ordered { text, match } segments from
 // labelHighlight's [start,end) ranges, for the default #option fill row to
 // render as highlighted runs. Reflects the query-subsequence on the LABEL
@@ -1074,8 +1094,32 @@ $expose({ show, close, toggle, focus, goBack, openTo })
               </span>
               <span r-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span>
             </span>
-            <span r-if="$slots.actions" class="rozie-command-palette-option-actions">
-              <slot name="actions" :option="option" :actions="actionsList(option)" />
+            <!--
+              ACT-TRIGGER: the #actions row region is now the INTERACTIVE
+              open-the-menu affordance (was display-only) — renders whenever
+              the row carries actions OR the consumer fills #actions
+              (back-compat). @click.stop/@mousedown.stop keep the gesture from
+              bubbling to the combobox row's OWN @mousedown.prevent=
+              selectOption (the confirmed combobox-row collision — without
+              stopping, clicking the affordance would ALSO commit the option
+              underneath it). The default fill (unfilled #actions) is a small
+              actionKey hint (e.g. "⌘K") so a row with actions visibly reads
+              as actionable.
+            -->
+            <span
+              r-if="$slots.actions || actionsList(option).length > 0"
+              class="rozie-command-palette-option-actions"
+              data-testid="command-palette-actions-affordance"
+              @click.stop="openActionMenu(option)"
+              @mousedown.stop="openActionMenu(option)"
+            >
+              <slot name="actions" :option="option" :actions="actionsList(option)">
+                <span
+                  r-if="actionsList(option).length > 0"
+                  class="rozie-command-palette-option-actions-hint"
+                  aria-hidden="true"
+                >{{ actionKeyHint() }}</span>
+              </slot>
             </span>
             <span r-if="$slots.trailing" class="rozie-command-palette-option-trailing">
               <slot name="trailing" :option="option" />
@@ -1108,16 +1152,27 @@ $expose({ show, close, toggle, focus, goBack, openTo })
       while open (onActionMenuKeydown) — Escape deliberately is NOT bound here,
       it bubbles to onPanelKeydown's single funnel. `tabindex="-1"` on each row
       makes the JS `.focus()` calls in openActionMenu/roveAction actually move
-      real DOM focus (a plain `<div>` is not focusable without it).
-      Task 4 fills in the `#action-item` slot re-projection, the icon/shortcut
-      default fill, a11y labelling, and the token-themed CSS — this is the
-      MINIMAL functional shape so menuitems render + take real focus.
+      real DOM focus (a plain `<div>` is not focusable without it). Labelled by
+      the anchor row's own label (`:aria-label`). Each row re-projects
+      `#actionItem` (scope `{ action, item, active, disabled }` — camelCase,
+      NOT `#action-item`: a hyphenated slot name fails ROZ127, since Vue's
+      `defineSlots<{…}>()` can't emit an unquoted hyphenated object key;
+      mirroring how `#option` re-projects); the default fill is icon (if
+      present) + label +
+      a right-aligned shortcut hint, read through UNTYPED resolvers
+      (actionIcon/actionLabel/actionShortcut — the cross-target slot-param-type
+      gap, same pattern as labelText/groupText above). Selection uses
+      `@mousedown.prevent` ONLY (the combobox option-row convention — NOT also
+      `@click`, which would double-fire selectAction after closeActionMenu has
+      already cleared the anchor).
     -->
     <div
       r-if="atActions()"
       data-command-palette-menu
+      data-testid="command-palette-actions-menu"
       class="rozie-command-palette-actions-menu"
       role="menu"
+      :aria-label="$data.actionAnchor ? labelText($data.actionAnchor.item) : null"
       :style="'top:' + $data.actionMenuTop + 'px'"
       @keydown="onActionMenuKeydown($event)"
     >
@@ -1125,12 +1180,26 @@ $expose({ show, close, toggle, focus, goBack, openTo })
         r-for="action, ai in ($data.actionAnchor ? $data.actionAnchor.actions : [])"
         :key="action.id"
         class="rozie-command-palette-actions-menu-item"
-        :class="{ 'rozie-command-palette-actions-menu-item--active': ai === $data.actionIndex }"
+        :class="{ 'rozie-command-palette-actions-menu-item--active': ai === $data.actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }"
         role="menuitem"
+        data-testid="command-palette-action-item"
         :aria-disabled="!!action.disabled"
         tabindex="-1"
         @mouseenter="$data.actionIndex = ai"
-      >{{ action.label }}</div>
+        @mousedown.prevent="selectAction(action)"
+      >
+        <slot
+          name="actionItem"
+          :action="action"
+          :item="$data.actionAnchor ? $data.actionAnchor.item : null"
+          :active="ai === $data.actionIndex"
+          :disabled="!!action.disabled"
+        >
+          <span r-if="actionIcon(action)" class="rozie-command-palette-actions-menu-item-icon">{{ actionIcon(action) }}</span>
+          <span class="rozie-command-palette-actions-menu-item-label">{{ actionLabel(action) }}</span>
+          <span r-if="actionShortcut(action)" class="rozie-command-palette-actions-menu-item-shortcut">{{ actionShortcut(action) }}</span>
+        </slot>
+      </div>
     </div>
 
     <!--
@@ -1281,6 +1350,8 @@ $expose({ show, close, toggle, focus, goBack, openTo })
   font-size: var(--rozie-command-palette-icon-size, 1rem);
 }
 
+/* ACT-TRIGGER: now the interactive open-the-menu affordance (was
+   display-only), so it gets a pointer cursor + a hover affordance. */
 .rozie-command-palette-option-actions {
   display: inline-flex;
   align-items: center;
@@ -1288,6 +1359,80 @@ $expose({ show, close, toggle, focus, goBack, openTo })
   gap: var(--rozie-command-palette-actions-gap, 0.375rem);
   color: var(--rozie-command-palette-actions-color, rgba(0, 0, 0, 0.55));
   font-size: var(--rozie-command-palette-actions-font-size, 0.75rem);
+  cursor: pointer;
+  border-radius: var(--rozie-command-palette-actions-radius, 0.25rem);
+}
+
+.rozie-command-palette-option-actions:hover {
+  color: var(--rozie-command-palette-actions-hover-color, rgba(0, 0, 0, 0.85));
+  background: var(--rozie-command-palette-actions-hover-bg, rgba(0, 0, 0, 0.06));
+}
+
+/* The default (unfilled #actions) hint — e.g. "⌘K" — signalling a row is actionable. */
+.rozie-command-palette-option-actions-hint {
+  padding: var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem);
+  font-size: var(--rozie-command-palette-actions-hint-font-size, 0.6875rem);
+  color: var(--rozie-command-palette-actions-hint-color, inherit);
+  background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
+  border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+}
+
+/*
+  Action menu flyout (ACT-RENDER) — a right-side, panel-internal box anchored
+  to the highlighted row via $data.actionMenuTop. Structural layout (absolute
+  positioning / the right-side anchor / the offset) is NOT tokenized; every
+  visual value is a var(--rozie-command-palette-action-*, <fallback>),
+  mirroring the option/footer/breadcrumb token conventions above.
+*/
+.rozie-command-palette-actions-menu {
+  position: absolute;
+  right: var(--rozie-command-palette-action-right, 0.5rem);
+  z-index: var(--rozie-command-palette-action-z, 10);
+  min-width: var(--rozie-command-palette-action-min-width, 10rem);
+  max-width: var(--rozie-command-palette-action-max-width, 16rem);
+  padding: var(--rozie-command-palette-action-padding, 0.25rem);
+  background: var(--rozie-command-palette-action-bg, #fff);
+  border: var(--rozie-command-palette-action-border, 1px solid rgba(0, 0, 0, 0.1));
+  border-radius: var(--rozie-command-palette-action-radius, 0.5rem);
+  box-shadow: var(--rozie-command-palette-action-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+}
+
+.rozie-command-palette-actions-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-action-gap, 0.5rem);
+  padding: var(--rozie-command-palette-action-item-padding, 0.375rem 0.5rem);
+  border-radius: var(--rozie-command-palette-action-item-radius, 0.375rem);
+  cursor: pointer;
+  outline: none;
+}
+
+.rozie-command-palette-actions-menu-item--active,
+.rozie-command-palette-actions-menu-item:focus {
+  background: var(--rozie-command-palette-action-active-bg, rgba(0, 0, 0, 0.08));
+}
+
+.rozie-command-palette-actions-menu-item--disabled {
+  opacity: var(--rozie-command-palette-action-disabled-opacity, 0.5);
+  cursor: default;
+}
+
+.rozie-command-palette-actions-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-action-icon-color, inherit);
+}
+
+.rozie-command-palette-actions-menu-item-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rozie-command-palette-actions-menu-item-shortcut {
+  flex: 0 0 auto;
+  font-size: var(--rozie-command-palette-action-shortcut-font-size, 0.75rem);
+  color: var(--rozie-command-palette-action-shortcut-color, rgba(0, 0, 0, 0.5));
 }
 
 .rozie-command-palette-option-trailing {
