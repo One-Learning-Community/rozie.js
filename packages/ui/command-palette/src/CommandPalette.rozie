@@ -294,6 +294,7 @@ import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource'
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu'
 import { deriveCommandGroups } from './internal/commandGroups'
+import { formatKeyToken } from './internal/formatKeyToken'
 
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
@@ -481,16 +482,14 @@ const isApplePlatform = () => {
 
 // actionKeyHint(): a short display string for the actionKey prop, for the
 // #actions row affordance's default (unfilled) hint — "$mod+k" → "⌘K" on
-// Apple platforms / "Ctrl+K" elsewhere; any other "$mod+<letter>" follows
-// the same rule; a bare-letter token passes through uppercased.
+// Apple platforms / "Ctrl+K" elsewhere; delegates the full modifier grammar
+// onto the shared formatKeyToken() helper (also used by the per-item hotKey
+// badge below) — see internal/formatKeyToken.ts for the grammar. Keeps the
+// existing typeof guard; '$mod+k' stays byte-identical (⌘K / Ctrl+K).
 const actionKeyHint = () => {
   const k = $props.actionKey
   if (typeof k !== 'string') return ''
-  if (k.indexOf('$mod+') === 0) {
-    const letter = k.slice('$mod+'.length).toUpperCase()
-    return isApplePlatform() ? '⌘' + letter : 'Ctrl+' + letter
-  }
-  return k.toUpperCase()
+  return formatKeyToken(k, isApplePlatform())
 }
 
 // Split a command's visible label into ordered { text, match } segments from
