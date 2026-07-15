@@ -142,7 +142,7 @@ export class Toaster {
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
-      this.pauseTimers();
+      this.teardownTimers();
     });
   }
 
@@ -150,15 +150,53 @@ export class Toaster {
   startTimer = (toast: any) => {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
-    this.timers[toast.id] = window.setTimeout(() => this.dismiss(toast.id), toast.duration);
+    const remaining = toast.duration;
+    const handle = window.setTimeout(() => this.dismiss(toast.id), remaining);
+    this.timers[toast.id] = {
+      handle,
+      startedAt: Date.now(),
+      remaining
+    };
   };
   clearTimer = (id: any) => {
-    if (this.timers[id] && typeof window !== 'undefined') window.clearTimeout(this.timers[id]);
+    const entry = this.timers[id];
+    if (entry && entry.handle != null && typeof window !== 'undefined') window.clearTimeout(entry.handle);
     delete this.timers[id];
   };
   pauseTimers = () => {
     if (typeof window === 'undefined') return;
-    for (const k in this.timers) window.clearTimeout(this.timers[k]);
+    for (const id in this.timers) {
+      const entry = this.timers[id];
+      window.clearTimeout(entry.handle);
+      const elapsed = Date.now() - entry.startedAt;
+      this.timers[id] = {
+        handle: null,
+        startedAt: entry.startedAt,
+        remaining: entry.remaining - elapsed
+      };
+    }
+  };
+  resumeTimers = () => {
+    if (typeof window === 'undefined') return;
+    for (const id in this.timers) {
+      const entry = this.timers[id];
+      if (entry.remaining == null || entry.remaining <= 0) continue;
+      const remaining = entry.remaining;
+      const handle = window.setTimeout(() => this.dismiss(id), remaining);
+      this.timers[id] = {
+        handle,
+        startedAt: Date.now(),
+        remaining
+      };
+    }
+  };
+  teardownTimers = () => {
+    if (typeof window !== 'undefined') {
+      for (const id in this.timers) {
+        const entry = this.timers[id];
+        if (entry.handle != null) window.clearTimeout(entry.handle);
+      }
+    }
     this.timers = {};
   };
   show = (input: any) => {
@@ -191,7 +229,7 @@ export class Toaster {
     this.toasts.set(this.toasts().filter((t: any) => t.id !== id));
   };
   clear = () => {
-    this.pauseTimers();
+    this.teardownTimers();
     this.toasts.set([]);
   };
   onMouseEnter = () => {
@@ -200,7 +238,7 @@ export class Toaster {
   };
   onMouseLeave = () => {
     if (this.disablePauseOnHover()) return;
-    for (const t of this.toasts() as any) this.startTimer(t);
+    this.resumeTimers();
   };
   regionLabel = () => this.ariaLabel() != null ? this.ariaLabel() : 'Notifications';
   liveFor = (type: any) => type === 'error' || type === 'warning' ? 'assertive' : 'polite';

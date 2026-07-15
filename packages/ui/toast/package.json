@@ -9,9 +9,13 @@
     "test": "vitest run",
     "typecheck": "echo 'meta-pkg: pure-Rozie source; the emitted leaves typecheck individually, the surface gate runs under vitest'"
   },
+  "comment:vue-mount-devdeps": "timers.behavior.test.ts / dismissed.behavior.test.ts / patch-promise.behavior.test.ts (mount-and-drive, the combobox seed-query.behavior.test.ts precedent): import the committed leaf packages/vue/src/Toaster.vue and mount it via plain `vue` createApp/h — @vitejs/plugin-vue transforms the SFC, happy-dom supplies the DOM. Versions mirror @rozie-ui/combobox's devDependencies exactly (already-resolved workspace versions, not new packages).",
   "devDependencies": {
     "@rozie/core": "workspace:*",
+    "@vitejs/plugin-vue": "^6",
+    "happy-dom": "^15.0.0",
     "typescript": "~5.6.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.0",
+    "vue": "^3.5"
   }
 }

@@ -57,15 +57,53 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   function startTimer(toast: any) {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
-    timers.current[toast.id] = window.setTimeout(() => dismiss(toast.id), toast.duration);
+    const remaining = toast.duration;
+    const handle = window.setTimeout(() => dismiss(toast.id), remaining);
+    timers.current[toast.id] = {
+      handle,
+      startedAt: Date.now(),
+      remaining
+    };
   }
   function clearTimer(id: any) {
-    if (timers.current[id] && typeof window !== 'undefined') window.clearTimeout(timers.current[id]);
+    const entry = timers.current[id];
+    if (entry && entry.handle != null && typeof window !== 'undefined') window.clearTimeout(entry.handle);
     delete timers.current[id];
   }
-  const pauseTimers = useCallback(() => {
+  function pauseTimers() {
     if (typeof window === 'undefined') return;
-    for (const k in timers.current) window.clearTimeout(timers.current[k]);
+    for (const id in timers.current) {
+      const entry = timers.current[id];
+      window.clearTimeout(entry.handle);
+      const elapsed = Date.now() - entry.startedAt;
+      timers.current[id] = {
+        handle: null,
+        startedAt: entry.startedAt,
+        remaining: entry.remaining - elapsed
+      };
+    }
+  }
+  function resumeTimers() {
+    if (typeof window === 'undefined') return;
+    for (const id in timers.current) {
+      const entry = timers.current[id];
+      if (entry.remaining == null || entry.remaining <= 0) continue;
+      const remaining = entry.remaining;
+      const handle = window.setTimeout(() => dismiss(id), remaining);
+      timers.current[id] = {
+        handle,
+        startedAt: Date.now(),
+        remaining
+      };
+    }
+  }
+  const teardownTimers = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      for (const id in timers.current) {
+        const entry = timers.current[id];
+        if (entry.handle != null) window.clearTimeout(entry.handle);
+      }
+    }
     timers.current = {};
   }, []);
   function show(input: any) {
@@ -98,7 +136,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     setToasts(prev => prev.filter((t: any) => t.id !== id));
   }, [clearTimer]);
   function clear() {
-    pauseTimers();
+    teardownTimers();
     setToasts([]);
   }
   const onMouseEnter = useCallback(() => {
@@ -107,8 +145,8 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   }, [pauseTimers, props.disablePauseOnHover]);
   const onMouseLeave = useCallback(() => {
     if (props.disablePauseOnHover) return;
-    for (const t of toasts as any) startTimer(t);
-  }, [props.disablePauseOnHover, startTimer, toasts]);
+    resumeTimers();
+  }, [props.disablePauseOnHover, resumeTimers]);
   function regionLabel() {
     return props.ariaLabel != null ? props.ariaLabel : 'Notifications';
   }
@@ -118,7 +156,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
 
   useEffect(() => {
     return () => {
-      pauseTimers();
+      teardownTimers();
     };
   }, []);
 

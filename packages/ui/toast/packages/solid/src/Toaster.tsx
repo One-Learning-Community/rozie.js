@@ -106,27 +106,86 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   const [toasts, setToasts] = createSignal<any[]>([]);
   const [seq, setSeq] = createSignal(0);
   onCleanup(() => {
-    pauseTimers();
+    teardownTimers();
   });
 
-  // Mutable cross-render scratch (NOT reactive): the per-id timeout handles. A
+  // Mutable cross-render scratch (NOT reactive): per-id timer bookkeeping. A
   // top-level `let` → React useRef (it escapes into $onUnmount's effect, so the
   // emitter hoists it). The id counter lives in $data.seq instead (see <data>).
+  //
+  // Shape: { [id]: { handle, startedAt, remaining } }. `pauseTimers` clears the
+  // live setTimeout handle but KEEPS the entry with a decremented `remaining` —
+  // the remainder IS the state (this is what makes the hover pause PRECISE
+  // instead of a full restart). `resumeTimers` re-arms with exactly that
+  // remainder. `clearTimer`/the full-teardown helper below are the only ways an
+  // entry is actually removed from the map.
   let timers = {};
 
   // ---- timers ------------------------------------------------------------
   function startTimer(toast: any) {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
-    timers[toast.id] = window.setTimeout(() => dismiss(toast.id), toast.duration);
+    const remaining = toast.duration;
+    const handle = window.setTimeout(() => dismiss(toast.id), remaining);
+    timers[toast.id] = {
+      handle,
+      startedAt: Date.now(),
+      remaining
+    };
   }
   function clearTimer(id: any) {
-    if (timers[id] && typeof window !== 'undefined') window.clearTimeout(timers[id]);
+    const entry = timers[id];
+    if (entry && entry.handle != null && typeof window !== 'undefined') window.clearTimeout(entry.handle);
     delete timers[id];
   }
+
+  // Pauses every live timer WITHOUT losing the remainder: clears the handle,
+  // decrements `remaining` by the elapsed time, and KEEPS the entry (does NOT
+  // delete it — the old v1 shortcut deleted entries here, which is why leave
+  // had to do a full restart).
   function pauseTimers() {
     if (typeof window === 'undefined') return;
-    for (const k in timers) window.clearTimeout(timers[k]);
+    for (const id in timers) {
+      const entry = timers[id];
+      window.clearTimeout(entry.handle);
+      const elapsed = Date.now() - entry.startedAt;
+      timers[id] = {
+        handle: null,
+        startedAt: entry.startedAt,
+        remaining: entry.remaining - elapsed
+      };
+    }
+  }
+
+  // Re-arms every paused timer with EXACTLY its stored remainder (called on
+  // mouse leave). An entry with a non-positive remainder is left un-armed
+  // (it will be cleaned up by the next dismiss/clear pass) rather than firing
+  // immediately from inside this loop.
+  function resumeTimers() {
+    if (typeof window === 'undefined') return;
+    for (const id in timers) {
+      const entry = timers[id];
+      if (entry.remaining == null || entry.remaining <= 0) continue;
+      const remaining = entry.remaining;
+      const handle = window.setTimeout(() => dismiss(id), remaining);
+      timers[id] = {
+        handle,
+        startedAt: Date.now(),
+        remaining
+      };
+    }
+  }
+
+  // FULL teardown: clears every live handle AND drops every entry (unlike
+  // pauseTimers, which deliberately keeps entries to hold their remainders).
+  // clear() and $onUnmount can no longer reuse pauseTimers for this reason.
+  function teardownTimers() {
+    if (typeof window !== 'undefined') {
+      for (const id in timers) {
+        const entry = timers[id];
+        if (entry.handle != null) window.clearTimeout(entry.handle);
+      }
+    }
     timers = {};
   }
 
@@ -161,7 +220,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
     setToasts(toasts().filter((t: any) => t.id !== id));
   }
   function clear() {
-    pauseTimers();
+    teardownTimers();
     setToasts([]);
   }
 
@@ -172,7 +231,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   }
   function onMouseLeave() {
     if (local.disablePauseOnHover) return;
-    for (const t of toasts() as any) startTimer(t);
+    resumeTimers();
   }
 
   // ---- helpers -----------------------------------------------------------

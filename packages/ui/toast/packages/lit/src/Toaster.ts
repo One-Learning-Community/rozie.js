@@ -137,7 +137,7 @@ export default class Toaster extends SignalWatcher(LitElement) {
       if (this.isConnected || this._rozieTornDown) return;
       this._rozieTornDown = true;
       () => {
-        this.pauseTimers();
+        this.teardownTimers();
       };
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
@@ -163,17 +163,57 @@ export default class Toaster extends SignalWatcher(LitElement) {
   startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
   if (typeof window === 'undefined') return;
-  this.timers[toast.id] = window.setTimeout(() => this.dismiss(toast.id), toast.duration);
+  const remaining = toast.duration;
+  const handle = window.setTimeout(() => this.dismiss(toast.id), remaining);
+  this.timers[toast.id] = {
+    handle,
+    startedAt: Date.now(),
+    remaining
+  };
 };
 
   clearTimer = (id: any) => {
-  if (this.timers[id] && typeof window !== 'undefined') window.clearTimeout(this.timers[id]);
+  const entry = this.timers[id];
+  if (entry && entry.handle != null && typeof window !== 'undefined') window.clearTimeout(entry.handle);
   delete this.timers[id];
 };
 
   pauseTimers = () => {
   if (typeof window === 'undefined') return;
-  for (const k in this.timers) window.clearTimeout(this.timers[k]);
+  for (const id in this.timers) {
+    const entry = this.timers[id];
+    window.clearTimeout(entry.handle);
+    const elapsed = Date.now() - entry.startedAt;
+    this.timers[id] = {
+      handle: null,
+      startedAt: entry.startedAt,
+      remaining: entry.remaining - elapsed
+    };
+  }
+};
+
+  resumeTimers = () => {
+  if (typeof window === 'undefined') return;
+  for (const id in this.timers) {
+    const entry = this.timers[id];
+    if (entry.remaining == null || entry.remaining <= 0) continue;
+    const remaining = entry.remaining;
+    const handle = window.setTimeout(() => this.dismiss(id), remaining);
+    this.timers[id] = {
+      handle,
+      startedAt: Date.now(),
+      remaining
+    };
+  }
+};
+
+  teardownTimers = () => {
+  if (typeof window !== 'undefined') {
+    for (const id in this.timers) {
+      const entry = this.timers[id];
+      if (entry.handle != null) window.clearTimeout(entry.handle);
+    }
+  }
   this.timers = {};
 };
 
@@ -209,7 +249,7 @@ export default class Toaster extends SignalWatcher(LitElement) {
 };
 
   clear = () => {
-  this.pauseTimers();
+  this.teardownTimers();
   this._toasts.value = [];
 };
 
@@ -220,7 +260,7 @@ export default class Toaster extends SignalWatcher(LitElement) {
 
   onMouseLeave = () => {
   if (this.disablePauseOnHover) return;
-  for (const t of this._toasts.value as any) this.startTimer(t);
+  this.resumeTimers();
 };
 
   regionLabel = () => this.ariaLabel != null ? this.ariaLabel : 'Notifications';
