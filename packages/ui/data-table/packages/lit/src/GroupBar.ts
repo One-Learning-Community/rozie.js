@@ -78,11 +78,11 @@ export default class GroupBar extends SignalWatcher(LitElement) {
   /**
    * `(cols: string[]) => void` — the only add/reorder writer for the grouping order. Null-guarded at call sites.
    */
-  @property({ type: Function }) applyGrouping: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) applyGrouping: ((...args: any[]) => any) | null = null;
   /**
    * `() => void` — the only clear writer; resets grouping to empty. Null-guarded at call sites.
    */
-  @property({ type: Function }) clearGrouping: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) clearGrouping: ((...args: any[]) => any) | null = null;
   private _draggingId = signal('');
   private _isOver = signal(false);
   private _dragKind = signal('');

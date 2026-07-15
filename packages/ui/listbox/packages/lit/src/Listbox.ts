@@ -166,15 +166,15 @@ export default class Listbox extends SignalWatcher(LitElement) {
   /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
-  @property({ type: Function }) optionLabel: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) optionLabel: ((...args: any[]) => any) | null = null;
   /**
    * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
    */
-  @property({ type: Function }) optionValue: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) optionValue: ((...args: any[]) => any) | null = null;
   /**
    * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
    */
-  @property({ type: Function }) optionDisabled: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) optionDisabled: ((...args: any[]) => any) | null = null;
   /**
    * Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Give each instance on a page a distinct id so these references stay unique.
    */

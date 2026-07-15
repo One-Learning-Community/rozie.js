@@ -13,7 +13,7 @@ export default class Card extends SignalWatcher(LitElement) {
 `;
 
   @property({ type: String, reflect: true }) title: string = '';
-  @property({ type: Function }) onClose: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) onClose: ((...args: any[]) => any) | null = null;
 
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];

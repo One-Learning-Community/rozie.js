@@ -2,8 +2,8 @@ import type { JSX } from 'solid-js';
 import { createSignal, mergeProps, splitProps } from 'solid-js';
 
 interface FnPropNullGateProps {
-  onSave?: (...args: unknown[]) => unknown;
-  onCancel?: ((...args: unknown[]) => unknown) | null;
+  onSave?: (...args: any[]) => any;
+  onCancel?: ((...args: any[]) => any) | null;
 }
 
 export default function FnPropNullGate(_props: FnPropNullGateProps): JSX.Element {

@@ -492,7 +492,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
   /**
    * Table-level child-row accessor `(originalRow, index) => TData[] | undefined` that drives nested sub-rows. When supplied (with `expandable`), table-core flattens the hierarchy and the expand seam reveals depth-indented child rows. Null → the `#detail` scoped slot is the expand mode.
    */
-  @property({ type: Function }) getSubRows: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) getSubRows: ((...args: any[]) => any) | null = null;
   /**
    * Opt-in gate for the **headless `#groupBar`** host region. Default `false` is byte-identical-off. `getGroupedRowModel` is wired unconditionally (inert when `grouping` is empty), so grouping is driven by the `grouping` model; this flag only gates the consumer-facing group-bar surface (the component ships **no** built-in drag UI).
    */

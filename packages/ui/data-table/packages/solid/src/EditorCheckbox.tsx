@@ -21,11 +21,11 @@ interface EditorCheckboxProps {
   /**
    * `(value) => void` — commit the cell. This editor immediately commits the boolean checked state on `@change`. Null-guarded at call sites.
    */
-  commit?: ((...args: unknown[]) => unknown) | null;
+  commit?: ((...args: any[]) => any) | null;
   /**
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
-  cancel?: ((...args: unknown[]) => unknown) | null;
+  cancel?: ((...args: any[]) => any) | null;
 }
 
 export default function EditorCheckbox(_props: EditorCheckboxProps): JSX.Element {

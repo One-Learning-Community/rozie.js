@@ -21,11 +21,11 @@ interface EditorNumberProps {
   /**
    * `(value) => void` — commit the cell. The draft is coerced with `Number()` at commit time; an empty/whitespace or non-numeric draft commits `null` (never `NaN`). Null-guarded at call sites.
    */
-  commit?: ((...args: unknown[]) => unknown) | null;
+  commit?: ((...args: any[]) => any) | null;
   /**
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
-  cancel?: ((...args: unknown[]) => unknown) | null;
+  cancel?: ((...args: any[]) => any) | null;
 }
 
 export default function EditorNumber(_props: EditorNumberProps): JSX.Element {

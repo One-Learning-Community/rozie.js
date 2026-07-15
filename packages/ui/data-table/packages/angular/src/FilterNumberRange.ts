@@ -52,7 +52,7 @@ export class FilterNumberRange {
   /**
    * `(columnId, value) => void` — apply the column filter as a `[min, max]` tuple (each side coerced to a Number or `undefined`, so a one-sided range works); both empty clears the filter. Null-guarded at call sites.
    */
-  setFilter = input<((...args: unknown[]) => unknown) | null>(null);
+  setFilter = input<((...args: any[]) => any) | null>(null);
   /**
    * The faceted `[min, max]` bounds for this column (`[number, number]` or null) — drives the input placeholders only.
    */

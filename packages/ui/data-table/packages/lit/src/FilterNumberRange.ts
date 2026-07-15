@@ -24,7 +24,7 @@ export default class FilterNumberRange extends SignalWatcher(LitElement) {
   /**
    * `(columnId, value) => void` — apply the column filter as a `[min, max]` tuple (each side coerced to a Number or `undefined`, so a one-sided range works); both empty clears the filter. Null-guarded at call sites.
    */
-  @property({ type: Function }) setFilter: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) setFilter: ((...args: any[]) => any) | null = null;
   /**
    * The faceted `[min, max]` bounds for this column (`[number, number]` or null) — drives the input placeholders only.
    */

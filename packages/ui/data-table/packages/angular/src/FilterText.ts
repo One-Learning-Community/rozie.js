@@ -28,7 +28,7 @@ export class FilterText {
   /**
    * `(columnId, value) => void` — apply the column filter (Enter / blur applies, Escape clears). Null-guarded at call sites.
    */
-  setFilter = input<((...args: unknown[]) => unknown) | null>(null);
+  setFilter = input<((...args: any[]) => any) | null>(null);
   draft = signal('');
 
   constructor() {

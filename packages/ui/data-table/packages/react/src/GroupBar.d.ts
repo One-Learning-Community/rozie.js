@@ -12,11 +12,11 @@ export interface GroupBarProps {
   /**
    * `(cols: string[]) => void` — the only add/reorder writer for the grouping order. Null-guarded at call sites.
    */
-  applyGrouping?: ((...args: unknown[]) => unknown) | null;
+  applyGrouping?: ((...args: any[]) => any) | null;
   /**
    * `() => void` — the only clear writer; resets grouping to empty. Null-guarded at call sites.
    */
-  clearGrouping?: ((...args: unknown[]) => unknown) | null;
+  clearGrouping?: ((...args: any[]) => any) | null;
 }
 
 declare function GroupBar(props: GroupBarProps): JSX.Element;

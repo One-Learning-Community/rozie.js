@@ -148,11 +148,11 @@ export default class Flatpickr extends SignalWatcher(LitElement) {
   /**
    * Custom parser `(dateStr: string, format: string) => Date` for input formats flatpickr's token grammar cannot express. **Construction-time only** — re-key the component to change it live.
    */
-  @property({ type: Function }) parseDate: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) parseDate: ((...args: any[]) => any) | null = null;
   /**
    * Custom formatter `(date: Date, format: string, locale) => string` for output formats flatpickr's token grammar cannot express. **Construction-time only** — re-key the component to change it live.
    */
-  @property({ type: Function }) formatDate: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) formatDate: ((...args: any[]) => any) | null = null;
   /**
    * An array of flatpickr plugin instances (imported from `flatpickr/dist/plugins/…`); the headline use is `rangePlugin` for two-input ranges. **Construction-time only** — re-key the component to swap plugins live.
    */

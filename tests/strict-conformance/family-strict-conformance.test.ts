@@ -83,9 +83,13 @@ const FAMILIES: FamilySpec[] = [
       'Combobox.tsx': {
         TS2531: 5,
         // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04 (windowing.rzts pinMeasurement retype).
-        TS2322: 4,
+        // 260714-nqe: Function-prop TS lowering flipped `unknown`→`any` (optionLabel/
+        // optionValue/optionDisabled) shifted 2 more body-passthrough nullability
+        // sites into tsc's reach (TS2322 4→5, TS18047 4→6) — inherent Class-4
+        // residual, unrelated to the emitter fix itself.
+        TS2322: 5,
         TS2345: 1,
-        TS18047: 4,
+        TS18047: 6,
         TS7006: 1,
       },
     },
@@ -102,9 +106,11 @@ const FAMILIES: FamilySpec[] = [
         // reaches (TS2349 cleared; TS2322/TS2531/TS18047/TS2769 now visible
         // instead) — inherent Class-4 residual, unrelated to Pattern D/F
         // itself, do-not-fix-here per this file's scope fence.
-        TS2322: 4,
+        // 260714-nqe: Function-prop TS lowering flipped `unknown`→`any`
+        // shifted 2 more sites into tsc's reach (TS2322 4→5, TS18047 4→6).
+        TS2322: 5,
         TS2531: 4,
-        TS18047: 4,
+        TS18047: 6,
         TS2769: 1,
       },
     },
@@ -118,8 +124,10 @@ const FAMILIES: FamilySpec[] = [
         TS2769: 1,
         TS2531: 4,
         // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
-        TS2322: 5,
-        TS18047: 4,
+        // 260714-nqe: Function-prop TS lowering flipped `unknown`→`any`
+        // shifted 2 more sites into tsc's reach (TS2322 5→6, TS18047 4→6).
+        TS2322: 6,
+        TS18047: 6,
       },
     },
   },

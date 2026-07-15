@@ -13,7 +13,7 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
   `],
 })
 export class AngularCallablePropDebounce {
-  onPick = input<(...args: unknown[]) => unknown>((() => {}));
+  onPick = input<(...args: any[]) => any>((() => {}));
   n = signal(0);
 
   bump = (): void => {

@@ -509,7 +509,7 @@ export class DatePicker {
   /**
    * A consumer predicate `(iso: string) => boolean` — return `true` to disable the given ISO `YYYY-MM-DD` date (e.g. custom holiday / blackout rules beyond `disabledDates`/`min`/`max`). Threaded through the single gating funnel so day cells, drill enablement, and focus all agree. **Lit caveat:** pass via a *property* binding (`.isDateDisabled=${fn}`), never a string attribute — a function cannot survive attribute serialization, the same rule already in force for `disabledDates`/`presetRanges`.
    */
-  isDateDisabled = input<((...args: unknown[]) => unknown) | null>(null);
+  isDateDisabled = input<((...args: any[]) => any) | null>(null);
   viewIso = signal('');
   hoverIso = signal('');
   viewMode = signal('days');

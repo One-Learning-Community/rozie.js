@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 export interface CardProps {
   title?: string;
-  onClose?: ((...args: unknown[]) => unknown) | null;
+  onClose?: ((...args: any[]) => any) | null;
   children?: ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

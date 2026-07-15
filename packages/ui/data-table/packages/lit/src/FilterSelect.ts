@@ -25,7 +25,7 @@ export default class FilterSelect extends SignalWatcher(LitElement) {
   /**
    * `(columnId, value) => void` — apply the column filter on change; the leading empty "All" option clears it. Null-guarded at call sites.
    */
-  @property({ type: Function }) setFilter: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) setFilter: ((...args: any[]) => any) | null = null;
   /**
    * The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.
    */

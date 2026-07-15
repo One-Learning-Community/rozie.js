@@ -62,7 +62,7 @@ export interface DatePickerProps {
   /**
    * A consumer predicate `(iso: string) => boolean` — return `true` to disable the given ISO `YYYY-MM-DD` date (e.g. custom holiday / blackout rules beyond `disabledDates`/`min`/`max`). Threaded through the single gating funnel so day cells, drill enablement, and focus all agree. **Lit caveat:** pass via a *property* binding (`.isDateDisabled=${fn}`), never a string attribute — a function cannot survive attribute serialization, the same rule already in force for `disabledDates`/`presetRanges`.
    */
-  isDateDisabled?: ((...args: unknown[]) => unknown) | null;
+  isDateDisabled?: ((...args: any[]) => any) | null;
   onChange?: (...args: unknown[]) => void;
   onRangeComplete?: (...args: unknown[]) => void;
   renderHeader?: (params: { label: unknown; prev: () => void; next: () => void; disabled: unknown }) => ReactNode;

@@ -52,7 +52,7 @@ export default class Column extends SignalWatcher(LitElement) {
   /**
    * The table-core aggregation for this column inside a group-header cell. Either a built-in name string — `'sum'` | `'min'` | `'max'` | `'extent'` | `'mean'` | `'median'` | `'unique'` | `'uniqueCount'` | `'count'` — or a custom function `(columnId, leafRows, childRows) => any` (defensively wrapped by the parent so a throw cannot crash grouping). Null → no aggregation (the group-header cell renders as a placeholder).
    */
-  @property({ type: String }) aggregationFn: string | (((...args: unknown[]) => unknown) | null) = null;
+  @property({ type: String }) aggregationFn: string | (((...args: any[]) => any) | null) = null;
   /**
    * Whether this column's cells are editable (opt-in). Default `false` → the column is read-only and the display↔editor branch never mounts an editor. Bind `:editable="true"` (a bare attr only coerces on Vue+Lit).
    */
@@ -68,7 +68,7 @@ export default class Column extends SignalWatcher(LitElement) {
   /**
    * Synchronous per-column validator `(value, row) => true | string`. A string return is the error message (the editor stays open and the aria-live region announces it). Null → no validation. The parent wraps it defensively against a thrown/non-bool/non-string return.
    */
-  @property({ type: Function }) validate: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) validate: ((...args: any[]) => any) | null = null;
 private __rozieFirstUpdateDone = false;
 private __rozieCtxConsumer_data_table_columns = new ContextConsumer(this, { context: __rozieCtx_data_table_columns, subscribe: true });
 private get registry() { return this.__rozieCtxConsumer_data_table_columns.value; }

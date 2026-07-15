@@ -313,7 +313,7 @@ export class Slider {
   /**
    * A `(value) => string` formatter for the value shown in the `bubble` slot and surfaced as `aria-valuetext`. Receives the numeric value and returns a string; `null` uses the raw value.
    */
-  formatValue = input<((...args: unknown[]) => unknown) | null>(null);
+  formatValue = input<((...args: any[]) => any) | null>(null);
   /**
    * Render the value-bubble overlay (one bubble per thumb in range mode). Headless and opt-in — there is no default-styled bubble; supply the `bubble` slot to control its appearance.
    */

@@ -9,8 +9,8 @@ export default class FnPropNullGate extends SignalWatcher(LitElement) {
 :host{display:contents}
 `;
 
-  @property({ type: Function }) onSave: ((...args: unknown[]) => unknown) | null = () => {};
-  @property({ type: Function }) onCancel: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) onSave: ((...args: any[]) => any) | null = () => {};
+  @property({ type: Function }) onCancel: ((...args: any[]) => any) | null = null;
   private _n = signal(0);
 
   private _disconnectCleanups: Array<() => void> = [];

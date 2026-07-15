@@ -125,11 +125,11 @@ export class GroupBar {
   /**
    * `(cols: string[]) => void` — the only add/reorder writer for the grouping order. Null-guarded at call sites.
    */
-  applyGrouping = input<((...args: unknown[]) => unknown) | null>(null);
+  applyGrouping = input<((...args: any[]) => any) | null>(null);
   /**
    * `() => void` — the only clear writer; resets grouping to empty. Null-guarded at call sites.
    */
-  clearGrouping = input<((...args: unknown[]) => unknown) | null>(null);
+  clearGrouping = input<((...args: any[]) => any) | null>(null);
   draggingId = signal('');
   isOver = signal(false);
   dragKind = signal('');

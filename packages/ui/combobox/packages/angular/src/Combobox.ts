@@ -288,15 +288,15 @@ export class Combobox {
   /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
-  optionLabel = input<((...args: unknown[]) => unknown) | null>(null);
+  optionLabel = input<((...args: any[]) => any) | null>(null);
   /**
    * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
    */
-  optionValue = input<((...args: unknown[]) => unknown) | null>(null);
+  optionValue = input<((...args: any[]) => any) | null>(null);
   /**
    * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
    */
-  optionDisabled = input<((...args: unknown[]) => unknown) | null>(null);
+  optionDisabled = input<((...args: any[]) => any) | null>(null);
   /**
    * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling popup (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed combobox. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.
    */

@@ -9,7 +9,7 @@ export default class FunctionPropDefaultValue extends SignalWatcher(LitElement) 
 :host{display:contents}
 `;
 
-  @property({ type: Function }) onPick: ((...args: unknown[]) => unknown) | null = () => {};
+  @property({ type: Function }) onPick: ((...args: any[]) => any) | null = () => {};
   private _n = signal(0);
 
   private _tw0 = debounce(($event: Event) => ((this.onPick) as (...args: any[]) => any)($event), 300);

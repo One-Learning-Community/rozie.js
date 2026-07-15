@@ -192,7 +192,7 @@ export class Tags {
    * @example
    * validate: (v) => (v.length >= 2 ? v.trim() : false)
    */
-  validate = input<((...args: unknown[]) => unknown) | null>(null);
+  validate = input<((...args: any[]) => any) | null>(null);
   /**
    * Placeholder text for the inline text input (e.g. `"Add a tag…"`).
    */

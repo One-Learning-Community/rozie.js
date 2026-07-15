@@ -32,11 +32,11 @@ export class EditorDate {
   /**
    * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur). Null-guarded at call sites.
    */
-  commit = input<((...args: unknown[]) => unknown) | null>(null);
+  commit = input<((...args: any[]) => any) | null>(null);
   /**
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
-  cancel = input<((...args: unknown[]) => unknown) | null>(null);
+  cancel = input<((...args: any[]) => any) | null>(null);
   draft = signal('');
 
   constructor() {

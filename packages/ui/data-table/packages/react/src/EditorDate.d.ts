@@ -20,11 +20,11 @@ export interface EditorDateProps {
   /**
    * `(value) => void` — commit the cell with the ISO `YYYY-MM-DD` string (Enter / blur). Null-guarded at call sites.
    */
-  commit?: ((...args: unknown[]) => unknown) | null;
+  commit?: ((...args: any[]) => any) | null;
   /**
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
-  cancel?: ((...args: unknown[]) => unknown) | null;
+  cancel?: ((...args: any[]) => any) | null;
 }
 
 declare function EditorDate(props: EditorDateProps): JSX.Element;

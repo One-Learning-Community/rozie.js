@@ -27,11 +27,11 @@ export default class EditorText extends SignalWatcher(LitElement) {
   /**
    * `(value) => void` — commit the edited cell value (from the `#editor` slot scope). Null-guarded at call sites.
    */
-  @property({ type: Function }) commit: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) commit: ((...args: any[]) => any) | null = null;
   /**
    * `() => void` — revert the edit and close the editor (from the `#editor` slot scope). Null-guarded at call sites.
    */
-  @property({ type: Function }) cancel: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) cancel: ((...args: any[]) => any) | null = null;
   /**
    * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
    */

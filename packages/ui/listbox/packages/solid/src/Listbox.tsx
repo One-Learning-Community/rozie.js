@@ -151,15 +151,15 @@ interface ListboxProps {
   /**
    * Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.
    */
-  optionLabel?: ((...args: unknown[]) => unknown) | null;
+  optionLabel?: ((...args: any[]) => any) | null;
   /**
    * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
    */
-  optionValue?: ((...args: unknown[]) => unknown) | null;
+  optionValue?: ((...args: any[]) => any) | null;
   /**
    * Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property.
    */
-  optionDisabled?: ((...args: unknown[]) => unknown) | null;
+  optionDisabled?: ((...args: any[]) => any) | null;
   /**
    * Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Give each instance on a page a distinct id so these references stay unique.
    */

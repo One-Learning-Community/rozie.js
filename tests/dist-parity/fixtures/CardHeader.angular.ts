@@ -21,7 +21,7 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
 })
 export class CardHeader {
   title = input<string>('');
-  onClose = input<((...args: unknown[]) => unknown) | null>(null);
+  onClose = input<((...args: any[]) => any) | null>(null);
 
   private __rozieDestroyRef = inject(DestroyRef);
 

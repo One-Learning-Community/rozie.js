@@ -20,11 +20,11 @@ export interface EditorSelectProps {
   /**
    * `(value) => void` — commit the cell with the selected value (Enter / blur). Null-guarded at call sites.
    */
-  commit?: ((...args: unknown[]) => unknown) | null;
+  commit?: ((...args: any[]) => any) | null;
   /**
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
-  cancel?: ((...args: unknown[]) => unknown) | null;
+  cancel?: ((...args: any[]) => any) | null;
   /**
    * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
    */

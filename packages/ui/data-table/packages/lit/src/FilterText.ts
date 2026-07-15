@@ -23,7 +23,7 @@ export default class FilterText extends SignalWatcher(LitElement) {
   /**
    * `(columnId, value) => void` — apply the column filter (Enter / blur applies, Escape clears). Null-guarded at call sites.
    */
-  @property({ type: Function }) setFilter: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) setFilter: ((...args: any[]) => any) | null = null;
   private _draft = signal('');
 
   private _disconnectCleanups: Array<() => void> = [];

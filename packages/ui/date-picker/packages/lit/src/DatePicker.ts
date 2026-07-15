@@ -386,7 +386,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   /**
    * A consumer predicate `(iso: string) => boolean` — return `true` to disable the given ISO `YYYY-MM-DD` date (e.g. custom holiday / blackout rules beyond `disabledDates`/`min`/`max`). Threaded through the single gating funnel so day cells, drill enablement, and focus all agree. **Lit caveat:** pass via a *property* binding (`.isDateDisabled=${fn}`), never a string attribute — a function cannot survive attribute serialization, the same rule already in force for `disabledDates`/`presetRanges`.
    */
-  @property({ type: Function }) isDateDisabled: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) isDateDisabled: ((...args: any[]) => any) | null = null;
   private _viewIso = signal('');
   private _hoverIso = signal('');
   private _viewMode = signal('days');

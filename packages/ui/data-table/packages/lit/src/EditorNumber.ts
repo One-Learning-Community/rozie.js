@@ -27,11 +27,11 @@ export default class EditorNumber extends SignalWatcher(LitElement) {
   /**
    * `(value) => void` — commit the cell. The draft is coerced with `Number()` at commit time; an empty/whitespace or non-numeric draft commits `null` (never `NaN`). Null-guarded at call sites.
    */
-  @property({ type: Function }) commit: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) commit: ((...args: any[]) => any) | null = null;
   /**
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
-  @property({ type: Function }) cancel: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) cancel: ((...args: any[]) => any) | null = null;
   private _draft = signal('');
 
   private _disconnectCleanups: Array<() => void> = [];

@@ -17,8 +17,8 @@ import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterR
   `],
 })
 export class FnPropNullGate {
-  onSave = input<(...args: unknown[]) => unknown>((() => {}));
-  onCancel = input<((...args: unknown[]) => unknown) | null>(null);
+  onSave = input<(...args: any[]) => any>((() => {}));
+  onCancel = input<((...args: any[]) => any) | null>(null);
   n = signal(0);
 
   private __rozieDestroyRef = inject(DestroyRef);

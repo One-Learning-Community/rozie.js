@@ -13,7 +13,7 @@ export default class CardHeader extends SignalWatcher(LitElement) {
 `;
 
   @property({ type: String, reflect: true }) title: string = '';
-  @property({ type: Function }) onClose: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) onClose: ((...args: any[]) => any) | null = null;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

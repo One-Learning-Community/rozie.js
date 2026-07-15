@@ -17,7 +17,7 @@ interface FilterTextProps {
   /**
    * `(columnId, value) => void` — apply the column filter (Enter / blur applies, Escape clears). Null-guarded at call sites.
    */
-  setFilter?: ((...args: unknown[]) => unknown) | null;
+  setFilter?: ((...args: any[]) => any) | null;
 }
 
 export default function FilterText(_props: FilterTextProps): JSX.Element {

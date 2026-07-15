@@ -27,7 +27,7 @@ interface DefaultCtx {}
 })
 export class Card {
   title = input<string>('');
-  onClose = input<((...args: unknown[]) => unknown) | null>(null);
+  onClose = input<((...args: any[]) => any) | null>(null);
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 

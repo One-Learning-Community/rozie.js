@@ -56,11 +56,11 @@ export class EditorSelect {
   /**
    * `(value) => void` — commit the cell with the selected value (Enter / blur). Null-guarded at call sites.
    */
-  commit = input<((...args: unknown[]) => unknown) | null>(null);
+  commit = input<((...args: any[]) => any) | null>(null);
   /**
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
-  cancel = input<((...args: unknown[]) => unknown) | null>(null);
+  cancel = input<((...args: any[]) => any) | null>(null);
   /**
    * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
    */

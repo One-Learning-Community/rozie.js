@@ -46,7 +46,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
   /**
    * The per-row key the framework reconciler tracks each item by across a reorder — either a property name (e.g. `itemKey="id"` reads `item.id`) or an `(item, index) => key` function. With neither, id-less object items get a stable synthetic key via an internal `WeakMap` (survives reorder by object identity); primitive items fall back to index — pass a function for reorderable duplicate primitives.
    */
-  @property({ type: String }) itemKey: string | (((...args: unknown[]) => unknown) | null) = null;
+  @property({ type: String }) itemKey: string | (((...args: any[]) => any) | null) = null;
   /**
    * CSS selector identifying the per-row drag handle, so a drag starts only from that element rather than anywhere in the row. Authored class names render literally on every target (React included), so a plain `.grip` works; `$classSelector('grip')` is an optional, typo-checked way to author it.
    */
@@ -74,7 +74,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
   /**
    * Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer during keyboard drag. Defaults to `item.label` (or `String(item)` when no `label` field exists).
    */
-  @property({ type: Function }) labelFor: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) labelFor: ((...args: any[]) => any) | null = null;
   /**
    * Class name applied to the drop-placeholder (ghost) element while dragging. Forwarded live via `instance.option`, so toggling it at runtime takes effect without a remount.
    */
@@ -114,11 +114,11 @@ export default class SortableList extends SignalWatcher(LitElement) {
   /**
    * Extra class(es) merged onto every item row alongside the base `rozie-sortable-item` class. Accepts a `String`, `Array`, or `Object` (Vue-style class binding) applied uniformly, OR an `(item, index) => class` function for per-row classes evaluated at render time. Normalized identically across all six targets.
    */
-  @property({ type: String }) itemClass: string | any[] | any | (((...args: unknown[]) => unknown) | null) = '';
+  @property({ type: String }) itemClass: string | any[] | any | (((...args: any[]) => any) | null) = '';
   /**
    * Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.
    */
-  @property({ type: String }) itemStyle: string | any | (((...args: unknown[]) => unknown) | null) = null;
+  @property({ type: String }) itemStyle: string | any | (((...args: any[]) => any) | null) = null;
   private _liftedIndex = signal<any>(null);
   private _ariaLiveText = signal('');
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;

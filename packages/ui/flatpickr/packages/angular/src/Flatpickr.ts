@@ -161,11 +161,11 @@ export class Flatpickr {
   /**
    * Custom parser `(dateStr: string, format: string) => Date` for input formats flatpickr's token grammar cannot express. **Construction-time only** — re-key the component to change it live.
    */
-  parseDate = input<((...args: unknown[]) => unknown) | null>(null);
+  parseDate = input<((...args: any[]) => any) | null>(null);
   /**
    * Custom formatter `(date: Date, format: string, locale) => string` for output formats flatpickr's token grammar cannot express. **Construction-time only** — re-key the component to change it live.
    */
-  formatDate = input<((...args: unknown[]) => unknown) | null>(null);
+  formatDate = input<((...args: any[]) => any) | null>(null);
   /**
    * An array of flatpickr plugin instances (imported from `flatpickr/dist/plugins/…`); the headline use is `rangePlugin` for two-input ranges. **Construction-time only** — re-key the component to swap plugins live.
    */

@@ -3,7 +3,7 @@ import { createSignal, mergeProps, splitProps } from 'solid-js';
 import { createDebouncedHandler } from '@rozie/runtime-solid';
 
 interface FunctionPropDefaultValueProps {
-  onPick?: (...args: unknown[]) => unknown;
+  onPick?: (...args: any[]) => any;
 }
 
 export default function FunctionPropDefaultValue(_props: FunctionPropDefaultValueProps): JSX.Element {

@@ -27,11 +27,11 @@ export default class EditorCheckbox extends SignalWatcher(LitElement) {
   /**
    * `(value) => void` — commit the cell. This editor immediately commits the boolean checked state on `@change`. Null-guarded at call sites.
    */
-  @property({ type: Function }) commit: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) commit: ((...args: any[]) => any) | null = null;
   /**
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
-  @property({ type: Function }) cancel: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) cancel: ((...args: any[]) => any) | null = null;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

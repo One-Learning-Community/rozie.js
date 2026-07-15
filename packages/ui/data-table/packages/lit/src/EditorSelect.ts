@@ -29,11 +29,11 @@ export default class EditorSelect extends SignalWatcher(LitElement) {
   /**
    * `(value) => void` — commit the cell with the selected value (Enter / blur). Null-guarded at call sites.
    */
-  @property({ type: Function }) commit: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) commit: ((...args: any[]) => any) | null = null;
   /**
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
-  @property({ type: Function }) cancel: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) cancel: ((...args: any[]) => any) | null = null;
   /**
    * The select options — `[{ value, label }]`. Mirrors `<Column editorOptions>`.
    */

@@ -32,11 +32,11 @@ export class EditorNumber {
   /**
    * `(value) => void` — commit the cell. The draft is coerced with `Number()` at commit time; an empty/whitespace or non-numeric draft commits `null` (never `NaN`). Null-guarded at call sites.
    */
-  commit = input<((...args: unknown[]) => unknown) | null>(null);
+  commit = input<((...args: any[]) => any) | null>(null);
   /**
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
-  cancel = input<((...args: unknown[]) => unknown) | null>(null);
+  cancel = input<((...args: any[]) => any) | null>(null);
   draft = signal('');
 
   constructor() {

@@ -20,11 +20,11 @@ export interface EditorTextProps {
   /**
    * `(value) => void` — commit the edited cell value (from the `#editor` slot scope). Null-guarded at call sites.
    */
-  commit?: ((...args: unknown[]) => unknown) | null;
+  commit?: ((...args: any[]) => any) | null;
   /**
    * `() => void` — revert the edit and close the editor (from the `#editor` slot scope). Null-guarded at call sites.
    */
-  cancel?: ((...args: unknown[]) => unknown) | null;
+  cancel?: ((...args: any[]) => any) | null;
   /**
    * Focus this editor's primary input when true — the host sets it for the one editor that should hold focus; reactive.
    */

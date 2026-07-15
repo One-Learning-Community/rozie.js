@@ -407,7 +407,7 @@ export default class FlowCanvas extends SignalWatcher(LitElement) {
   /**
    * Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.
    */
-  @property({ type: Function }) canConnect: ((...args: unknown[]) => unknown) | null = null;
+  @property({ type: Function }) canConnect: ((...args: any[]) => any) | null = null;
   /**
    * Undo/redo, on by default. Every gesture (drag, connect, disconnect, delete) pushes ONE capped (~100) snapshot of the bound graph (nodes incl. x/y + connections; not the viewport), and `undo()`/`redo()` plus Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, and Ctrl/Cmd+Y restore it through the two-way `graph` model (echo-guarded). One gesture = one undo step; a fresh edit after an undo discards the redo branch. Opt out with `:history="false"` (the snapshot stack stays empty and the verbs no-op).
    */

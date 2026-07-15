@@ -19,7 +19,7 @@ interface FilterSelectProps {
   /**
    * `(columnId, value) => void` — apply the column filter on change; the leading empty "All" option clears it. Null-guarded at call sites.
    */
-  setFilter?: ((...args: unknown[]) => unknown) | null;
+  setFilter?: ((...args: any[]) => any) | null;
   /**
    * The faceted distinct keys for this column (cross-filtered, keys only — no occurrence counts) used to build the `<option>` list.
    */

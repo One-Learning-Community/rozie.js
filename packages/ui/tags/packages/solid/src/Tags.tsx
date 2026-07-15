@@ -130,7 +130,7 @@ interface TagsProps {
    * @example
    * validate: (v) => (v.length >= 2 ? v.trim() : false)
    */
-  validate?: ((...args: unknown[]) => unknown) | null;
+  validate?: ((...args: any[]) => any) | null;
   /**
    * Placeholder text for the inline text input (e.g. `"Add a tag…"`).
    */

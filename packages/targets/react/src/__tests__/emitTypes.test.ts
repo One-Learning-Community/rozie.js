@@ -189,7 +189,7 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
     expect(out).toContain(`c: boolean;`);
     expect(out).toContain(`d: unknown[];`);
     expect(out).toContain(`e: Record<string, unknown>;`);
-    expect(out).toContain(`f: (...args: unknown[]) => unknown;`);
+    expect(out).toContain(`f: (...args: any[]) => any;`);
     expect(out).toContain(`g: MyType;`);
   });
 

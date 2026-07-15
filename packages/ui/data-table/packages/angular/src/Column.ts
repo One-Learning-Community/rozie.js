@@ -69,7 +69,7 @@ export class Column {
   /**
    * The table-core aggregation for this column inside a group-header cell. Either a built-in name string — `'sum'` | `'min'` | `'max'` | `'extent'` | `'mean'` | `'median'` | `'unique'` | `'uniqueCount'` | `'count'` — or a custom function `(columnId, leafRows, childRows) => any` (defensively wrapped by the parent so a throw cannot crash grouping). Null → no aggregation (the group-header cell renders as a placeholder).
    */
-  aggregationFn = input<(string | ((...args: unknown[]) => unknown)) | null>(null);
+  aggregationFn = input<(string | ((...args: any[]) => any)) | null>(null);
   /**
    * Whether this column's cells are editable (opt-in). Default `false` → the column is read-only and the display↔editor branch never mounts an editor. Bind `:editable="true"` (a bare attr only coerces on Vue+Lit).
    */
@@ -85,7 +85,7 @@ export class Column {
   /**
    * Synchronous per-column validator `(value, row) => true | string`. A string return is the error message (the editor stays open and the aria-live region announces it). Null → no validation. The parent wraps it defensively against a thrown/non-bool/non-string return.
    */
-  validate = input<((...args: unknown[]) => unknown) | null>(null);
+  validate = input<((...args: any[]) => any) | null>(null);
   registry = inject(rozieToken('data-table:columns'));
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;

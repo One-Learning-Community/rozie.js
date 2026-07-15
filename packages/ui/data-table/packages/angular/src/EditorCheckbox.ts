@@ -32,11 +32,11 @@ export class EditorCheckbox {
   /**
    * `(value) => void` — commit the cell. This editor immediately commits the boolean checked state on `@change`. Null-guarded at call sites.
    */
-  commit = input<((...args: unknown[]) => unknown) | null>(null);
+  commit = input<((...args: any[]) => any) | null>(null);
   /**
    * `() => void` — revert the edit (Escape). Null-guarded at call sites.
    */
-  cancel = input<((...args: unknown[]) => unknown) | null>(null);
+  cancel = input<((...args: any[]) => any) | null>(null);
 
   onChange = (e: any) => {
     const __commit = this.commit();
