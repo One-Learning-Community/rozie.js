@@ -58,6 +58,8 @@ import '@rozie-ui/command-palette-vue/themes/shadcn.css';    // or material.css,
 | `ariaLabel` | `String` | `"Command palette"` |  |  | Accessible name for the dialog surface (`aria-label` on the `role="dialog"` panel). Override it to match the palette's purpose (e.g. "Search commands"). |
 | `idBase` | `String` | `"rozie-command-palette"` |  |  | Id base for the combobox and option elements — `aria-activedescendant` needs real ids. Option ids are derived as `idBase + "-opt-" + i`. Set a **distinct** value per instance when more than one palette shares a page. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element. |
 | `searchDebounce` | `Number` | `150` |  |  | Debounce (ms) applied to a nested level's ASYNC `source(query)` keystroke refetch only — sync (`children`) levels re-rank locally on every keystroke with no debounce. Defaults to ~150ms (`internal/asyncSource.ts`'s `DEFAULT_SEARCH_DEBOUNCE`). |
+| `actionKey` | `String` | `"$mod+k"` |  |  | The keyboard shortcut that opens the highlighted row's action menu — a portable `$mod+<letter>` token (default `"$mod+k"`, i.e. ⌘K/Ctrl+K) matched via `(event.metaKey \|\| event.ctrlKey) && event.key === <letter>`. A bare single-letter token (e.g. `"k"`) matches with no modifier required. Pressing it (or caret-at-end Right-arrow, or clicking the row's actions affordance) on a row with no `actions` is a no-op — the menu only opens for a row that has them. |
+| `closeOnAction` | `Boolean` | `true` |  |  | Whether choosing an action closes the whole palette. Defaults to `true` — running an action ALWAYS closes the action menu itself; `closeOnAction` additionally decides whether the palette dismisses too (`false` returns to the result list with the palette still open, e.g. for firing several actions in a row). |
 
 ## Events
 
@@ -66,6 +68,7 @@ import '@rozie-ui/command-palette-vue/themes/shadcn.css';    // or material.css,
 | `navigate` | Fired when a nested level is PUSHED — selecting an item that carries `children` or `source` drills into it instead of emitting `select`. Payload `{ item, depth }` — the navigated-to item and the resulting nesting depth (1-based; the root is depth 0). |
 | `back` | Fired when a level is POPPED — via Backspace-on-empty, Escape at depth>0, the imperative `goBack()` handle, or an equivalent consumer-triggered back navigation. No payload. Does not fire at the root (popping is a no-op there). |
 | `select` | Fired when the user chooses a LEAF command (clicks it, or highlights it and presses Enter) — an item with no `children`/`source` (see `navigate` for a navigating item). Payload `{ item, path }` — `item` is the full chosen command object, `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). If `closeOnSelect` is true (the default) the palette also closes (its `open` model is written `false`). |
+| `action-select` | Fired when the user chooses a row ACTION from its action menu (⌘K / caret-at-end Right-arrow / clicking the row's actions affordance, then Enter/Space/click on a menu item). Payload `{ item, action }` — `item` is the full anchored command object (the row the menu was opened for) and `action` is the chosen entry from that row's `actions[]`. The action menu ALWAYS closes on selection; if `closeOnAction` is true (the default) the palette also closes (its `open` model is written `false`). |
 
 ## Imperative handle
 
@@ -99,6 +102,7 @@ const palette = ref();          // template ref
 | breadcrumb | stack, back |
 | option | option, index, active, selected, disabled, matches |
 | empty | query |
+| actionItem | action, item, active, disabled |
 | loading | query |
 | error | query, error, retry |
 | footer |  |

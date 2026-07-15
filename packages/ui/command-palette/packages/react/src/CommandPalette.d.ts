@@ -53,12 +53,24 @@ export interface CommandPaletteProps {
    * <CommandPalette :search-debounce="300" :items="commands" />
    */
   searchDebounce?: number;
+  /**
+   * The keyboard shortcut that opens the highlighted row's action menu — a portable `$mod+<letter>` token (default `"$mod+k"`, i.e. ⌘K/Ctrl+K) matched via `(event.metaKey || event.ctrlKey) && event.key === <letter>`. A bare single-letter token (e.g. `"k"`) matches with no modifier required. Pressing it (or caret-at-end Right-arrow, or clicking the row's actions affordance) on a row with no `actions` is a no-op — the menu only opens for a row that has them.
+   * @example
+   * <CommandPalette action-key="$mod+j" :items="commands" />
+   */
+  actionKey?: string;
+  /**
+   * Whether choosing an action closes the whole palette. Defaults to `true` — running an action ALWAYS closes the action menu itself; `closeOnAction` additionally decides whether the palette dismisses too (`false` returns to the result list with the palette still open, e.g. for firing several actions in a row).
+   */
+  closeOnAction?: boolean;
   onNavigate?: (...args: unknown[]) => void;
   onBack?: (...args: unknown[]) => void;
   onSelect?: (...args: unknown[]) => void;
+  onActionSelect?: (...args: unknown[]) => void;
   renderBreadcrumb?: (params: { stack: unknown; back: () => void }) => ReactNode;
   renderOption?: (params: { option: () => void; index: () => void; active: () => void; selected: () => void; disabled: () => void; matches: unknown }) => ReactNode;
   renderEmpty?: (params: { query: string }) => ReactNode;
+  renderActionItem?: (params: { action: () => void; item: unknown; active: unknown; disabled: unknown }) => ReactNode;
   renderLoading?: (params: { query: string }) => ReactNode;
   renderError?: (params: { query: string; error: unknown; retry: () => void }) => ReactNode;
   renderFooter?: () => ReactNode;

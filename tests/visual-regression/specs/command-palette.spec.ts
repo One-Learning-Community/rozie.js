@@ -30,6 +30,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * via combobox's seedQuery), async loading→settled→error/empty (race-drop +
  * debounce), the breadcrumb header, and openTo(path) deep-linking.
  *
+ * A THIRD suite below (command-palette-sub-actions, feature #5) proves the
+ * interactive sub-actions state machine: ⌘K / caret-at-end Right-arrow / the
+ * `#actions` row affordance click all open a per-row action menu (a no-op on
+ * an action-less row); real DOM focus moves into the menu while the result
+ * list stays visibly open (the combobox `keepOpen`/`pinOpen` primitive);
+ * disabled-skip clamped roving; Enter fires `@action-select` and closes the
+ * menu (+ palette when `closeOnAction`); Escape/← close the menu and restore
+ * focus + the list WITHOUT popping a level or closing the palette. This is
+ * ALSO the behavioral proof that `keepOpen` (landed in the `combobox-keepopen`
+ * phase) doesn't regress its OTHER consumer — see the separately-gated
+ * `data-table` VR cell in the same `vr.sh -g` run.
+ *
  * `examples/demos/CommandPaletteBehaviorDemo.rozie` drives a two-way
  * r-model:open + r-model:query, a mixed 8-item list (6 leaves, a static
  * `children` level, and an async `source` level), an open button, an openTo
@@ -74,10 +86,19 @@ const KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set<
  * Lit shadow-pierce proof (data-table-virtual.spec.ts:73-89 pattern).
  */
 async function countOptions(page: Page): Promise<number> {
-  return page.evaluate(() => {
+  return countByRole(page, 'option');
+}
+
+/**
+ * Count `[role="<role>"]` elements, RECURSIVELY piercing every open shadow
+ * root — the generalized form of `countOptions`, reused for
+ * `[role="menuitem"]` (the action menu flyout, command-palette-sub-actions).
+ */
+async function countByRole(page: Page, role: string): Promise<number> {
+  return page.evaluate((r) => {
     let total = 0;
     const walk = (root: Document | ShadowRoot): void => {
-      total += root.querySelectorAll('[role="option"]').length;
+      total += root.querySelectorAll(`[role="${r}"]`).length;
       for (const el of Array.from(root.querySelectorAll('*'))) {
         const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
         if (sr) walk(sr);
@@ -85,6 +106,36 @@ async function countOptions(page: Page): Promise<number> {
     };
     walk(document);
     return total;
+  }, role);
+}
+
+/**
+ * The deepest REAL `document.activeElement`, recursively walking open shadow
+ * roots (the CommandPalette.rozie `deepActiveElement` precedent, mirrored
+ * here for the spec) — `{ role, disabled }` off it, or null when nothing is
+ * focused. Used to prove real-focus arbitration (ACT-ARBITRATION): the
+ * action menu takes ACTUAL DOM focus, not just an `aria-activedescendant`
+ * pointer.
+ */
+async function activeMenuItemInfo(page: Page): Promise<{ role: string | null; disabled: boolean } | null> {
+  return page.evaluate(() => {
+    let node: (Element & { shadowRoot?: ShadowRoot | null }) | null = document.activeElement as Element | null;
+    while (node && node.shadowRoot && node.shadowRoot.activeElement) {
+      node = node.shadowRoot.activeElement as Element & { shadowRoot?: ShadowRoot | null };
+    }
+    if (!node) return null;
+    return { role: node.getAttribute('role'), disabled: node.getAttribute('aria-disabled') === 'true' };
+  });
+}
+
+/** The deepest REAL active element's trimmed text content (shadow-piercing). */
+async function activeElementText(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    let node: (Element & { shadowRoot?: ShadowRoot | null }) | null = document.activeElement as Element | null;
+    while (node && node.shadowRoot && node.shadowRoot.activeElement) {
+      node = node.shadowRoot.activeElement as Element & { shadowRoot?: ShadowRoot | null };
+    }
+    return node ? (node.textContent || '').trim() : '';
   });
 }
 
@@ -281,5 +332,156 @@ for (const target of TARGETS) {
     await openToUsersBtn.click();
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(2);
     await expect(breadcrumbTitle).toHaveText('Search users');
+  });
+}
+
+/**
+ * command-palette-sub-actions — the interactive sub-actions state machine
+ * (ACT-SEAM/ACT-MODEL/ACT-TRIGGER/ACT-ARBITRATION/ACT-KEEPOPEN/ACT-RENDER,
+ * feature #5). Drives the demo's `new` ("New File") item, which carries
+ * `actions: [rename, delete(disabled), duplicate]`, and its action-less
+ * `open` ("Open File") sibling.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`command-palette-sub-actions [${target}]: open/rove/select/escape-returns-to-list/click-affordance/keepOpen`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const openBtn = page.getByTestId('open-palette');
+    const readoutActionItem = page.getByTestId('readout-action-item');
+    const readoutAction = page.getByTestId('readout-action');
+    const readoutSelect = page.getByTestId('readout-select');
+
+    // ---- open + isolate the `new` row (carries actions) via the query ----
+    await openBtn.click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(8);
+    await input.pressSequentially('new', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await expect(page.locator('[role="option"]').first()).toContainText('New File');
+
+    // ---- 1. ⌘K opens the menu on the highlighted row (which HAS actions): ----
+    //         real focus moves into the first ENABLED menuitem ("Rename" — index 0,
+    //         "Delete" at index 1 is disabled); the result list STAYS VISIBLE
+    //         (keepOpen/pinOpen) the whole time — proving both ACT-ARBITRATION's
+    //         real-focus guarantee AND ACT-KEEPOPEN in one assertion.
+    await page.keyboard.press('ControlOrMeta+k');
+    await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 10_000 }).toBe(3);
+    await expect
+      .poll(async () => activeMenuItemInfo(page), { timeout: 10_000 })
+      .toEqual({ role: 'menuitem', disabled: false });
+    // keepOpen: the result list is STILL visible while the menu holds focus.
+    await expect(countOptions(page)).resolves.toBe(1);
+
+    // ---- 2. ↑/↓ roving SKIPS the disabled "Delete" action (index 1) ----
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(async () => activeElementText(page), { timeout: 10_000 }).toContain('Duplicate');
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(async () => activeElementText(page), { timeout: 10_000 }).toContain('Rename');
+
+    // ---- 3. Enter fires @action-select AND closes the menu + palette ----
+    //         (closeOnAction defaults true) — focused item is "Rename" (id 'rename')
+    //         on the anchored "New File" item (id 'new').
+    await page.keyboard.press('Enter');
+    await expect.poll(async () => (await readoutActionItem.textContent())?.trim() ?? '', {
+      timeout: 10_000,
+    }).toBe('new');
+    await expect.poll(async () => (await readoutAction.textContent())?.trim() ?? '', {
+      timeout: 10_000,
+    }).toBe('rename');
+    await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 10_000 }).toBe(0);
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+
+    // ---- 4. caret-at-end Right-arrow ALSO opens the menu ----
+    await openBtn.click();
+    const input2 = page.locator('input[role="combobox"]').first();
+    await expect(input2).toBeVisible({ timeout: 15_000 });
+    await input2.focus();
+    await input2.pressSequentially('new', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 10_000 }).toBe(3);
+    // Real focus must land on the menuitem BEFORE the next menu-scoped key — the
+    // menu's OWN keydown handler only sees keys while focus is actually inside it
+    // (onActionMenuKeydown is bound on the flyout container, not delegated).
+    await expect
+      .poll(async () => activeMenuItemInfo(page), { timeout: 10_000 })
+      .toEqual({ role: 'menuitem', disabled: false });
+
+    // ---- 5. Escape closes the menu, restores focus to the input, and REOPENS ----
+    //         the list — it does NOT pop a level or close the palette (menu-close
+    //         precedes level-pop precedes root-close).
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 10_000 }).toBe(0);
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    // Focus-restore invariant: wait for it to actually land back on the input
+    // (reopenComboboxPopup's blur-then-rAF-refocus) before the NEXT keydown —
+    // a keydown dispatched into the gap between blur and refocus never reaches
+    // any component listener at all (it lands on document.body).
+    await expect.poll(async () => activeMenuItemInfo(page), { timeout: 10_000 }).toEqual({
+      role: 'combobox',
+      disabled: false,
+    });
+
+    // ---- 6. ← ALSO closes the menu (re-open via ⌘K, then ←) ----
+    await page.keyboard.press('ControlOrMeta+k');
+    await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 10_000 }).toBe(3);
+    await expect
+      .poll(async () => activeMenuItemInfo(page), { timeout: 10_000 })
+      .toEqual({ role: 'menuitem', disabled: false });
+    await page.keyboard.press('ArrowLeft');
+    await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 10_000 }).toBe(0);
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await expect.poll(async () => activeMenuItemInfo(page), { timeout: 10_000 }).toEqual({
+      role: 'combobox',
+      disabled: false,
+    });
+
+    // ---- 7. ⌘K on an action-less row ("Open File") is a NO-OP — no menu opens ----
+    await input2.fill('');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(8);
+    await input2.pressSequentially('open file', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await expect(page.locator('[role="option"]').first()).toContainText('Open File');
+    await page.keyboard.press('ControlOrMeta+k');
+    await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 5_000 }).toBe(0);
+
+    // ---- 8. the `#actions` affordance CLICK opens the menu WITHOUT committing ----
+    //         the option underneath it (the confirmed combobox-row collision — the
+    //         option count must stay 1, the palette must stay open, and the select
+    //         readout must stay untouched by this click).
+    await input2.fill('');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(8);
+    await input2.pressSequentially('new', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    const selectBefore = (await readoutSelect.textContent())?.trim() ?? '';
+    await page.locator('[data-testid="command-palette-actions-affordance"]').first().click();
+    await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 10_000 }).toBe(3);
+    // The list is STILL open (the option was not committed) — keepOpen proof #2.
+    await expect(countOptions(page)).resolves.toBe(1);
+    await expect(readoutSelect).toHaveText(selectBefore);
+    // Wait for real focus to land inside the menu (see step 4's note) before
+    // the next keydown.
+    await expect
+      .poll(async () => activeMenuItemInfo(page), { timeout: 10_000 })
+      .toEqual({ role: 'menuitem', disabled: false });
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 10_000 }).toBe(0);
+    await expect.poll(async () => activeMenuItemInfo(page), { timeout: 10_000 }).toEqual({
+      role: 'combobox',
+      disabled: false,
+    });
+
+    // ---- cleanup: close the palette ----
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
 }

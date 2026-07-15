@@ -717,19 +717,61 @@ const reopenComboboxPopup = () => {
 // route Escape back to it, restore focus + reopen the list on close. Written
 // once (activeSurface: 'list' | 'actions') so #12 (inline command arguments)
 // reuses the identical transition shape for a future 'args' surface.
+//
+// $refs/$el usage note: bindings below use `$refs.panel` (the modal panel
+// div's existing `ref="panel"`), NOT the `$el` sigil — a directly-typed bare
+// assignment of `$el`/`$refs.<name>` (`const root: any = $el`, or even
+// `const panel: any = $refs.panel`) compiles to a LITERAL, un-lowered
+// `$refs.__rozieRoot` (or `$refs.panel`) on the Svelte target — a real
+// Svelte-only emitter gap where the `: any` type annotation on the bare
+// `$el`/`$refs.X` declarator suppresses the deconflict/lowering pass that
+// otherwise correctly rewrites `const panel = $refs.panel` (UNTYPED) to
+// Svelte's real `panel$local` binding (`deconflictAccessorShadows`, the
+// same-name-as-accessor self-shadow guard — proven ×N in date-picker/
+// dialog/pagination/tags/otp/resizable, none of which type-annotate the
+// bare assignment). Workaround (source-only, not an emitter edit): keep the
+// `$refs.panel` assignment BARE/untyped; only the DOWNSTREAM `.querySelector`
+// RESULT gets `: any` (a separate declarator, unaffected by the gap).
+
+// deepQuerySelector(root, selector): a shadow-piercing querySelector — the
+// vendored <Combobox> renders its OWN internal shadow root on the Lit
+// target, so a query rooted at `$refs.panel` (a light-DOM ancestor OUTSIDE
+// that boundary) cannot reach `.rozie-combobox-option--active` /
+// `input[role="combobox"]` via a plain `.querySelector` (it never pierces
+// shadow roots) — it silently returns null there ONLY (menu never opens on
+// Lit, the confirmed live-browser gap; the other 5 targets render combobox
+// inline so a plain query already reaches it, which is why this only shows
+// up under the REAL Lit custom-element build, never under compile()x6).
+// Mirrors the existing `deepActiveElement` shadow-walk already in this file.
+// Direct match first (the fast path, and what the other 5 targets hit
+// immediately); falls back to recursing into every descendant's
+// `.shadowRoot` only when nothing matched directly.
+const deepQuerySelector = (root, selector) => {
+  if (!root || typeof root.querySelector !== 'function') return null
+  const direct = root.querySelector(selector)
+  if (direct) return direct
+  const all = root.querySelectorAll ? root.querySelectorAll('*') : []
+  for (let i = 0; i < all.length; i++) {
+    const sr = all[i].shadowRoot
+    if (sr) {
+      const found = deepQuerySelector(sr, selector)
+      if (found) return found
+    }
+  }
+  return null
+}
 
 // highlightedItem(): resolve the combobox's currently-highlighted row back to
 // its command object. Combobox owns `activeIndex` internally (no public model
 // for it), so this reads the ACTIVE option element's id — `idBase + '-opt-' +
 // i`, where `i` is its position in filteredItems() (the exact list combobox
-// was fed as `:options`) — off the DOM, via `$el.querySelector` (the
-// $el.querySelector precedent, ROZ123-safe: called only from post-mount
-// handlers, never eagerly). Returns null when nothing is highlighted or the
-// id can't be parsed.
+// was fed as `:options`) — off the DOM, via `deepQuerySelector` (ROZ123-safe:
+// called only from post-mount handlers, never eagerly). Returns null when
+// nothing is highlighted or the id can't be parsed.
 const highlightedItem = () => {
-  const root: any = $el
-  if (!root) return null
-  const activeEl = root.querySelector('.rozie-combobox-option--active')
+  const panel = $refs.panel
+  if (!panel) return null
+  const activeEl: any = deepQuerySelector(panel, '.rozie-combobox-option--active')
   if (!activeEl) return null
   const prefix = $props.idBase + '-opt-'
   const id = String(activeEl.id || activeEl.getAttribute('id') || '')
@@ -742,20 +784,20 @@ const highlightedItem = () => {
 
 // searchInputEl(): the vendored combobox's underlying `<input role="combobox">`
 // — needed for the caret-at-end Right-arrow trigger gate (selectionStart/End
-// are not surfaced through the child's $expose handle). $el.querySelector,
+// are not surfaced through the child's $expose handle). deepQuerySelector,
 // ROZ123-safe (called only from the post-mount panel keydown handler).
 const searchInputEl = () => {
-  const root: any = $el
-  return root ? root.querySelector('input[role="combobox"]') : null
+  const panel = $refs.panel
+  return panel ? deepQuerySelector(panel, 'input[role="combobox"]') : null
 }
 
 // focusFirstMenuItem(): move real DOM focus into the first enabled menuitem —
 // the ACT-ARBITRATION "real focus" guarantee. Deferred a frame by the caller
 // (openActionMenu) so the flyout has mounted first.
 const focusFirstMenuItem = () => {
-  const root: any = $el
-  if (!root) return
-  const el = root.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])')
+  const panel = $refs.panel
+  if (!panel) return
+  const el: any = panel.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])')
   if (el && typeof el.focus === 'function') el.focus()
 }
 
@@ -768,11 +810,18 @@ const focusFirstMenuItem = () => {
 const openActionMenu = (item) => {
   if (!canOpenActions(item)) return
   const actions = actionsOf(item)
-  $data.actionAnchor = { item, actions }
+  // The flyout's `:aria-label` reads `$data.actionAnchor.label` (a plain
+  // PROPERTY read, computed here in script) rather than calling
+  // `labelText(item)` directly from the template attribute binding — a bare
+  // top-level-helper CALL inside a plain (non-slot-scoped) `:attr` binding
+  // throws `labelText is not defined` on the Angular target specifically
+  // (the emitter's `this.`-qualification pass doesn't reach that binding
+  // shape) — a source-level workaround, not an emitter change.
+  $data.actionAnchor = { item, actions, label: labelText(item) }
   $data.actionIndex = firstEnabledActionIndex(actions)
   $data.activeSurface = 'actions'
-  const root: any = $el
-  const activeRow: any = root ? root.querySelector('.rozie-combobox-option--active') : null
+  const panel = $refs.panel
+  const activeRow: any = panel ? deepQuerySelector(panel, '.rozie-combobox-option--active') : null
   $data.actionMenuTop = activeRow ? activeRow.offsetTop : 0
   $refs.combobox?.pinOpen(true)
   if (typeof requestAnimationFrame !== 'undefined') {
@@ -804,9 +853,9 @@ const roveAction = (dir) => {
   if (!anchor) return
   const idx = rovingActionIndex(anchor.actions, $data.actionIndex, dir)
   $data.actionIndex = idx
-  const root: any = $el
-  if (!root) return
-  const items = root.querySelectorAll('[data-command-palette-menu] [role="menuitem"]')
+  const panel = $refs.panel
+  if (!panel) return
+  const items: any = panel.querySelectorAll('[data-command-palette-menu] [role="menuitem"]')
   const el: any = items[idx]
   if (el && typeof el.focus === 'function') el.focus()
 }
@@ -1098,19 +1147,20 @@ $expose({ show, close, toggle, focus, goBack, openTo })
               ACT-TRIGGER: the #actions row region is now the INTERACTIVE
               open-the-menu affordance (was display-only) — renders whenever
               the row carries actions OR the consumer fills #actions
-              (back-compat). @click.stop/@mousedown.stop keep the gesture from
-              bubbling to the combobox row's OWN @mousedown.prevent=
-              selectOption (the confirmed combobox-row collision — without
-              stopping, clicking the affordance would ALSO commit the option
-              underneath it). The default fill (unfilled #actions) is a small
-              actionKey hint (e.g. "⌘K") so a row with actions visibly reads
-              as actionable.
+              (back-compat). `@mousedown.stop` ONLY (mirrors the combobox
+              option-row `@mousedown.prevent=selectOption` convention — NOT
+              also `@click`, which would double-fire openActionMenu for one
+              gesture) keeps the gesture from bubbling to the combobox row's
+              OWN `@mousedown.prevent=selectOption` (the confirmed
+              combobox-row collision — without stopping, clicking the
+              affordance would ALSO commit the option underneath it). The
+              default fill (unfilled #actions) is a small actionKey hint
+              (e.g. "⌘K") so a row with actions visibly reads as actionable.
             -->
             <span
               r-if="$slots.actions || actionsList(option).length > 0"
               class="rozie-command-palette-option-actions"
               data-testid="command-palette-actions-affordance"
-              @click.stop="openActionMenu(option)"
               @mousedown.stop="openActionMenu(option)"
             >
               <slot name="actions" :option="option" :actions="actionsList(option)">
@@ -1172,7 +1222,7 @@ $expose({ show, close, toggle, focus, goBack, openTo })
       data-testid="command-palette-actions-menu"
       class="rozie-command-palette-actions-menu"
       role="menu"
-      :aria-label="$data.actionAnchor ? labelText($data.actionAnchor.item) : null"
+      :aria-label="$data.actionAnchor ? $data.actionAnchor.label : null"
       :style="'top:' + $data.actionMenuTop + 'px'"
       @keydown="onActionMenuKeydown($event)"
     >

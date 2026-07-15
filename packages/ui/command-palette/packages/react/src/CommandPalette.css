@@ -98,6 +98,63 @@
   gap: var(--rozie-command-palette-actions-gap, 0.375rem);
   color: var(--rozie-command-palette-actions-color, rgba(0, 0, 0, 0.55));
   font-size: var(--rozie-command-palette-actions-font-size, 0.75rem);
+  cursor: pointer;
+  border-radius: var(--rozie-command-palette-actions-radius, 0.25rem);
+}
+.rozie-command-palette-option-actions[data-rozie-s-768cad96]:hover {
+  color: var(--rozie-command-palette-actions-hover-color, rgba(0, 0, 0, 0.85));
+  background: var(--rozie-command-palette-actions-hover-bg, rgba(0, 0, 0, 0.06));
+}
+.rozie-command-palette-option-actions-hint[data-rozie-s-768cad96] {
+  padding: var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem);
+  font-size: var(--rozie-command-palette-actions-hint-font-size, 0.6875rem);
+  color: var(--rozie-command-palette-actions-hint-color, inherit);
+  background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
+  border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+}
+.rozie-command-palette-actions-menu[data-rozie-s-768cad96] {
+  position: absolute;
+  right: var(--rozie-command-palette-action-right, 0.5rem);
+  z-index: var(--rozie-command-palette-action-z, 10);
+  min-width: var(--rozie-command-palette-action-min-width, 10rem);
+  max-width: var(--rozie-command-palette-action-max-width, 16rem);
+  padding: var(--rozie-command-palette-action-padding, 0.25rem);
+  background: var(--rozie-command-palette-action-bg, #fff);
+  border: var(--rozie-command-palette-action-border, 1px solid rgba(0, 0, 0, 0.1));
+  border-radius: var(--rozie-command-palette-action-radius, 0.5rem);
+  box-shadow: var(--rozie-command-palette-action-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+}
+.rozie-command-palette-actions-menu-item[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-action-gap, 0.5rem);
+  padding: var(--rozie-command-palette-action-item-padding, 0.375rem 0.5rem);
+  border-radius: var(--rozie-command-palette-action-item-radius, 0.375rem);
+  cursor: pointer;
+  outline: none;
+}
+.rozie-command-palette-actions-menu-item--active[data-rozie-s-768cad96],
+.rozie-command-palette-actions-menu-item[data-rozie-s-768cad96]:focus {
+  background: var(--rozie-command-palette-action-active-bg, rgba(0, 0, 0, 0.08));
+}
+.rozie-command-palette-actions-menu-item--disabled[data-rozie-s-768cad96] {
+  opacity: var(--rozie-command-palette-action-disabled-opacity, 0.5);
+  cursor: default;
+}
+.rozie-command-palette-actions-menu-item-icon[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-action-icon-color, inherit);
+}
+.rozie-command-palette-actions-menu-item-label[data-rozie-s-768cad96] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rozie-command-palette-actions-menu-item-shortcut[data-rozie-s-768cad96] {
+  flex: 0 0 auto;
+  font-size: var(--rozie-command-palette-action-shortcut-font-size, 0.75rem);
+  color: var(--rozie-command-palette-action-shortcut-color, rgba(0, 0, 0, 0.5));
 }
 .rozie-command-palette-option-trailing[data-rozie-s-768cad96] {
   display: inline-flex;

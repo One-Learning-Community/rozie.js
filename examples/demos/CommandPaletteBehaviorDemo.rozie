@@ -14,6 +14,11 @@
   is `onSelect` (event-handler, not a setter). The dialog/listbox `show`/`apply<X>`
   precedent.
 
+  command-palette-sub-actions: the `new` ("New File") item carries `actions` (a
+  DISABLED "Delete" entry in the middle, exercising disabled-skip roving); `open`
+  ("Open File") deliberately carries NO `actions` — the ⌘K/→ no-op-on-action-less-row
+  proof. `onActionSelect` is the `@action-select` readout helper.
+
   `items` is a plain top-level `<script>` const (NOT `$data.items`) — the
   `search-users` entry's `source` is a script-declared function, and `<data>`'s
   object literal is parsed independently (no access to script-scope bindings);
@@ -36,6 +41,8 @@
   lastNavigate: '',
   lastDepth: 0,
   backCount: 0,
+  lastActionItem: '',
+  lastAction: '',
 }
 </data>
 
@@ -69,7 +76,19 @@ const searchUsers = (query) => new Promise((resolve, reject) => {
 })
 
 const items = [
-  { id: 'new', label: 'New File', group: 'File' },
+  {
+    id: 'new',
+    label: 'New File',
+    group: 'File',
+    // command-palette-sub-actions (ACT-MODEL/ACT-TRIGGER): the DISABLED
+    // middle entry exercises the flyout's disabled-skip clamped roving.
+    actions: [
+      { id: 'rename', label: 'Rename', shortcut: 'F2' },
+      { id: 'delete', label: 'Delete', shortcut: 'Del', disabled: true },
+      { id: 'duplicate', label: 'Duplicate' },
+    ],
+  },
+  // Deliberately carries NO `actions` — the ⌘K/→/click no-op-on-action-less-row proof.
   { id: 'open', label: 'Open File', group: 'File' },
   { id: 'save', label: 'Save', group: 'File' },
   { id: 'cut', label: 'Cut', group: 'Edit' },
@@ -103,6 +122,12 @@ const onNavigate = (e) => {
 const onBack = () => {
   $data.backCount = $data.backCount + 1
 }
+// command-palette-sub-actions (ACT-MODEL) readout: @action-select fires
+// { item, action } — record both ids for the VR spec to assert on.
+const onActionSelect = (e) => {
+  $data.lastActionItem = e && e.item && e.item.id != null ? e.item.id : ''
+  $data.lastAction = e && e.action && e.action.id != null ? e.action.id : ''
+}
 const openPalette = () => {
   $data.open = true
 }
@@ -125,6 +150,8 @@ const openToUsers = () => {
     <span class="readout" data-testid="readout-navigate">{{ $data.lastNavigate }}</span>
     <span class="readout" data-testid="readout-depth">{{ $data.lastDepth }}</span>
     <span class="readout" data-testid="readout-back-count">{{ $data.backCount }}</span>
+    <span class="readout" data-testid="readout-action-item">{{ $data.lastActionItem }}</span>
+    <span class="readout" data-testid="readout-action">{{ $data.lastAction }}</span>
   </div>
 
   <CommandPalette
@@ -137,6 +164,7 @@ const openToUsers = () => {
     @select="onSelect($event)"
     @navigate="onNavigate($event)"
     @back="onBack()"
+    @action-select="onActionSelect($event)"
   >
     <!-- Status testids (LVL-ASYNC) — one testid, `data-status` distinguishes. -->
     <template #loading="{ query }">

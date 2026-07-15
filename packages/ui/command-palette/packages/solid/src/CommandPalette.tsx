@@ -1,10 +1,12 @@
 import type { JSX } from 'solid-js';
 import { For, Show, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
-import { __rozieInjectStyle, createControllableSignal, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
+import { Key } from '@solid-primitives/keyed';
+import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 import Combobox, { type ComboboxHandle } from '@rozie-ui/combobox-solid';
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
+import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
@@ -118,6 +120,63 @@ __rozieInjectStyle('CommandPalette-768cad96', `.rozie-command-palette[data-rozie
   gap: var(--rozie-command-palette-actions-gap, 0.375rem);
   color: var(--rozie-command-palette-actions-color, rgba(0, 0, 0, 0.55));
   font-size: var(--rozie-command-palette-actions-font-size, 0.75rem);
+  cursor: pointer;
+  border-radius: var(--rozie-command-palette-actions-radius, 0.25rem);
+}
+.rozie-command-palette-option-actions[data-rozie-s-768cad96]:hover {
+  color: var(--rozie-command-palette-actions-hover-color, rgba(0, 0, 0, 0.85));
+  background: var(--rozie-command-palette-actions-hover-bg, rgba(0, 0, 0, 0.06));
+}
+.rozie-command-palette-option-actions-hint[data-rozie-s-768cad96] {
+  padding: var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem);
+  font-size: var(--rozie-command-palette-actions-hint-font-size, 0.6875rem);
+  color: var(--rozie-command-palette-actions-hint-color, inherit);
+  background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
+  border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+}
+.rozie-command-palette-actions-menu[data-rozie-s-768cad96] {
+  position: absolute;
+  right: var(--rozie-command-palette-action-right, 0.5rem);
+  z-index: var(--rozie-command-palette-action-z, 10);
+  min-width: var(--rozie-command-palette-action-min-width, 10rem);
+  max-width: var(--rozie-command-palette-action-max-width, 16rem);
+  padding: var(--rozie-command-palette-action-padding, 0.25rem);
+  background: var(--rozie-command-palette-action-bg, #fff);
+  border: var(--rozie-command-palette-action-border, 1px solid rgba(0, 0, 0, 0.1));
+  border-radius: var(--rozie-command-palette-action-radius, 0.5rem);
+  box-shadow: var(--rozie-command-palette-action-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+}
+.rozie-command-palette-actions-menu-item[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-action-gap, 0.5rem);
+  padding: var(--rozie-command-palette-action-item-padding, 0.375rem 0.5rem);
+  border-radius: var(--rozie-command-palette-action-item-radius, 0.375rem);
+  cursor: pointer;
+  outline: none;
+}
+.rozie-command-palette-actions-menu-item--active[data-rozie-s-768cad96],
+.rozie-command-palette-actions-menu-item[data-rozie-s-768cad96]:focus {
+  background: var(--rozie-command-palette-action-active-bg, rgba(0, 0, 0, 0.08));
+}
+.rozie-command-palette-actions-menu-item--disabled[data-rozie-s-768cad96] {
+  opacity: var(--rozie-command-palette-action-disabled-opacity, 0.5);
+  cursor: default;
+}
+.rozie-command-palette-actions-menu-item-icon[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-action-icon-color, inherit);
+}
+.rozie-command-palette-actions-menu-item-label[data-rozie-s-768cad96] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rozie-command-palette-actions-menu-item-shortcut[data-rozie-s-768cad96] {
+  flex: 0 0 auto;
+  font-size: var(--rozie-command-palette-action-shortcut-font-size, 0.75rem);
+  color: var(--rozie-command-palette-action-shortcut-color, rgba(0, 0, 0, 0.5));
 }
 .rozie-command-palette-option-trailing[data-rozie-s-768cad96] {
   display: inline-flex;
@@ -163,6 +222,8 @@ interface BreadcrumbSlotCtx { stack: any; back: any; }
 interface OptionSlotCtx { option: any; index: any; active: any; selected: any; disabled: any; matches: any; }
 
 interface EmptySlotCtx { query: any; }
+
+interface ActionItemSlotCtx { action: any; item: any; active: any; disabled: any; }
 
 interface LoadingSlotCtx { query: any; }
 
@@ -225,12 +286,24 @@ interface CommandPaletteProps {
    * <CommandPalette :search-debounce="300" :items="commands" />
    */
   searchDebounce?: number;
+  /**
+   * The keyboard shortcut that opens the highlighted row's action menu — a portable `$mod+<letter>` token (default `"$mod+k"`, i.e. ⌘K/Ctrl+K) matched via `(event.metaKey || event.ctrlKey) && event.key === <letter>`. A bare single-letter token (e.g. `"k"`) matches with no modifier required. Pressing it (or caret-at-end Right-arrow, or clicking the row's actions affordance) on a row with no `actions` is a no-op — the menu only opens for a row that has them.
+   * @example
+   * <CommandPalette action-key="$mod+j" :items="commands" />
+   */
+  actionKey?: string;
+  /**
+   * Whether choosing an action closes the whole palette. Defaults to `true` — running an action ALWAYS closes the action menu itself; `closeOnAction` additionally decides whether the palette dismisses too (`false` returns to the result list with the palette still open, e.g. for firing several actions in a row).
+   */
+  closeOnAction?: boolean;
   onNavigate?: (...args: unknown[]) => void;
   onBack?: (...args: unknown[]) => void;
   onSelect?: (...args: unknown[]) => void;
+  onActionSelect?: (...args: unknown[]) => void;
   breadcrumbSlot?: (ctx: BreadcrumbSlotCtx) => JSX.Element;
   optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
   emptySlot?: (ctx: EmptySlotCtx) => JSX.Element;
+  actionItemSlot?: (ctx: ActionItemSlotCtx) => JSX.Element;
   loadingSlot?: (ctx: LoadingSlotCtx) => JSX.Element;
   errorSlot?: (ctx: ErrorSlotCtx) => JSX.Element;
   footerSlot?: JSX.Element;
@@ -251,14 +324,18 @@ export interface CommandPaletteHandle {
 }
 
 export default function CommandPalette(_props: CommandPaletteProps): JSX.Element {
-  const _merged = mergeProps({ score: null, items: (() => [])() as any[], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150 }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'query', 'score', 'items', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase', 'searchDebounce', 'ref']);
+  const _merged = mergeProps({ score: null, items: (() => [])() as any[], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true }, _props);
+  const [local, attrs] = splitProps(_merged, ['open', 'query', 'score', 'items', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase', 'searchDebounce', 'actionKey', 'closeOnAction', 'ref']);
   onMount(() => { local.ref?.({ show, close, toggle, focus, goBack, openTo }); });
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
   const [query, setQuery] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'query', '');
   const [activeValue, setActiveValue] = createSignal<any>(null);
   const [levelStack, setLevelStack] = createSignal<any[]>([]);
+  const [activeSurface, setActiveSurface] = createSignal('list');
+  const [actionIndex, setActionIndex] = createSignal(-1);
+  const [actionAnchor, setActionAnchor] = createSignal<any>(null);
+  const [actionMenuTop, setActionMenuTop] = createSignal(0);
   onMount(() => {
     if (open()) onOpen();
   });
@@ -270,6 +347,12 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
       setQuery('');
       setLevelStack([]);
       setActiveValue(null);
+      // Reset the action surface directly (NOT closeActionMenu — the palette is
+      // closing, so there is no combobox popup left to reopen/keepOpen-release;
+      // a plain reset keeps a reopen starting clean, per spec §Composition).
+      setActiveSurface('list');
+      setActionIndex(-1);
+      setActionAnchor(null);
       if (debounceTimerId != null) clearTimeout(debounceTimerId);
       debounceTimerId = null;
       requestToken = nextRequestToken(requestToken);
@@ -332,6 +415,13 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // (LVL-RENDER). A plain function — never $computed.
   function atDepth() {
     return currentDepth() > 0;
+  }
+
+  // atActions(): true while the action menu owns the keyboard (ACT-SEAM). Gates
+  // the flyout r-if AND the combobox keepOpen consumption — a plain function,
+  // never $computed.
+  function atActions() {
+    return activeSurface() === 'actions';
   }
 
   // currentTitle(): the breadcrumb/header label for the active level — the top
@@ -411,6 +501,32 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // display helpers above — same cross-target slot-param-type gap.
   function actionsList(o: any) {
     return o && o.actions ? o.actions : [];
+  }
+
+  // Untyped #actionItem display resolvers (ACT-RENDER) — the re-projected
+  // `action` scope param threads as `unknown` on the Lit leaf (the same
+  // cross-target slot-param-type gap as labelText/groupText/actionsList
+  // above), so the default fill reads label/shortcut/icon through these
+  // rather than `action.label` directly.
+  function actionLabel(a: any) {
+    return a && a.label !== undefined ? a.label : '';
+  }
+  function actionShortcut(a: any) {
+    return a && a.shortcut !== undefined ? a.shortcut : undefined;
+  }
+  function actionIcon(a: any) {
+    return a && a.icon !== undefined ? a.icon : undefined;
+  }
+
+  // actionKeyHint(): a short display string for the actionKey prop, for the
+  // #actions row affordance's default (unfilled) hint — "$mod+k" → "⌘K",
+  // any other "$mod+<letter>" → "⌘<LETTER>", a bare-letter token passes
+  // through uppercased.
+  function actionKeyHint() {
+    const k = local.actionKey;
+    if (typeof k !== 'string') return '';
+    if (k.indexOf('$mod+') === 0) return '⌘' + k.slice('$mod+'.length).toUpperCase();
+    return k.toUpperCase();
   }
 
   // Split a command's visible label into ordered { text, match } segments from
@@ -515,6 +631,10 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // currentDepth() — re-reading $data.levelStack right after writing it binds
   // the pre-write (0) value on React (setState is async).
   function pushLevel(item: any) {
+    // Level nav always resets to the list surface (spec §Composition) — a
+    // navigating item's own action menu, if somehow open, must not survive
+    // the push.
+    if (activeSurface() !== 'list') closeActionMenu();
     const nextStack = pushFrame(levelStack(), item, query());
     setLevelStack(nextStack);
     setQuery('');
@@ -538,6 +658,9 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // root (an empty levelStack — mirrors the spec's "back() — no-op at root").
   function goBack() {
     if (levelStack().length === 0) return;
+    // Level nav always resets to the list surface (spec §Composition) — pop
+    // closes an open action menu FIRST.
+    if (activeSurface() !== 'list') closeActionMenu();
     const {
       stack,
       restoreQuery
@@ -725,6 +848,216 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     }
   }
 
+  // ---- action menu (ACT-SEAM/ACT-ARBITRATION/ACT-TRIGGER/ACT-KEEPOPEN) ---
+  // The single reusable seam: open a focus-owning sub-surface over the list,
+  // route Escape back to it, restore focus + reopen the list on close. Written
+  // once (activeSurface: 'list' | 'actions') so #12 (inline command arguments)
+  // reuses the identical transition shape for a future 'args' surface.
+  //
+  // $refs/$el usage note: bindings below use `$refs.panel` (the modal panel
+  // div's existing `ref="panel"`), NOT the `$el` sigil — a directly-typed bare
+  // assignment of `$el`/`$refs.<name>` (`const root: any = $el`, or even
+  // `const panel: any = $refs.panel`) compiles to a LITERAL, un-lowered
+  // `$refs.__rozieRoot` (or `$refs.panel`) on the Svelte target — a real
+  // Svelte-only emitter gap where the `: any` type annotation on the bare
+  // `$el`/`$refs.X` declarator suppresses the deconflict/lowering pass that
+  // otherwise correctly rewrites `const panel = $refs.panel` (UNTYPED) to
+  // Svelte's real `panel$local` binding (`deconflictAccessorShadows`, the
+  // same-name-as-accessor self-shadow guard — proven ×N in date-picker/
+  // dialog/pagination/tags/otp/resizable, none of which type-annotate the
+  // bare assignment). Workaround (source-only, not an emitter edit): keep the
+  // `$refs.panel` assignment BARE/untyped; only the DOWNSTREAM `.querySelector`
+  // RESULT gets `: any` (a separate declarator, unaffected by the gap).
+
+  // deepQuerySelector(root, selector): a shadow-piercing querySelector — the
+  // vendored <Combobox> renders its OWN internal shadow root on the Lit
+  // target, so a query rooted at `$refs.panel` (a light-DOM ancestor OUTSIDE
+  // that boundary) cannot reach `.rozie-combobox-option--active` /
+  // `input[role="combobox"]` via a plain `.querySelector` (it never pierces
+  // shadow roots) — it silently returns null there ONLY (menu never opens on
+  // Lit, the confirmed live-browser gap; the other 5 targets render combobox
+  // inline so a plain query already reaches it, which is why this only shows
+  // up under the REAL Lit custom-element build, never under compile()x6).
+  // Mirrors the existing `deepActiveElement` shadow-walk already in this file.
+  // Direct match first (the fast path, and what the other 5 targets hit
+  // immediately); falls back to recursing into every descendant's
+  // `.shadowRoot` only when nothing matched directly.
+  function deepQuerySelector(root: any, selector: any) {
+    if (!root || typeof root.querySelector !== 'function') return null;
+    const direct = root.querySelector(selector);
+    if (direct) return direct;
+    const all = root.querySelectorAll ? root.querySelectorAll('*') : [];
+    for (let i = 0; i < all.length; i++) {
+      const sr = all[i].shadowRoot;
+      if (sr) {
+        const found = deepQuerySelector(sr, selector);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  // highlightedItem(): resolve the combobox's currently-highlighted row back to
+  // its command object. Combobox owns `activeIndex` internally (no public model
+  // for it), so this reads the ACTIVE option element's id — `idBase + '-opt-' +
+  // i`, where `i` is its position in filteredItems() (the exact list combobox
+  // was fed as `:options`) — off the DOM, via `deepQuerySelector` (ROZ123-safe:
+  // called only from post-mount handlers, never eagerly). Returns null when
+  // nothing is highlighted or the id can't be parsed.
+  function highlightedItem() {
+    const panel = panelRef;
+    if (!panel) return null;
+    const activeEl: any = deepQuerySelector(panel, '.rozie-combobox-option--active');
+    if (!activeEl) return null;
+    const prefix = local.idBase + '-opt-';
+    const id = String(activeEl.id || activeEl.getAttribute('id') || '');
+    if (id.indexOf(prefix) !== 0) return null;
+    const idx = parseInt(id.slice(prefix.length), 10);
+    if (Number.isNaN(idx)) return null;
+    const list = filteredItems();
+    return idx >= 0 && idx < list.length ? list[idx] : null;
+  }
+
+  // searchInputEl(): the vendored combobox's underlying `<input role="combobox">`
+  // — needed for the caret-at-end Right-arrow trigger gate (selectionStart/End
+  // are not surfaced through the child's $expose handle). deepQuerySelector,
+  // ROZ123-safe (called only from the post-mount panel keydown handler).
+  function searchInputEl() {
+    const panel = panelRef;
+    return panel ? deepQuerySelector(panel, 'input[role="combobox"]') : null;
+  }
+
+  // focusFirstMenuItem(): move real DOM focus into the first enabled menuitem —
+  // the ACT-ARBITRATION "real focus" guarantee. Deferred a frame by the caller
+  // (openActionMenu) so the flyout has mounted first.
+  function focusFirstMenuItem() {
+    const panel = panelRef;
+    if (!panel) return;
+    const el: any = panel.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])');
+    if (el && typeof el.focus === 'function') el.focus();
+  }
+
+  // openActionMenu(item): guarded no-op unless canOpenActions(item). Anchors
+  // the item + its resolved actions, lands actionIndex on the first ENABLED
+  // action, reads the flyout's vertical offset off the highlighted row's
+  // offsetTop, tells the vendored combobox to keepOpen (ACT-KEEPOPEN —
+  // pinOpen(true), so blurring the input into the flyout does not collapse the
+  // list), then moves real focus into the first enabled menuitem next frame.
+  function openActionMenu(item: any) {
+    if (!canOpenActions(item)) return;
+    const actions = actionsOf(item);
+    // The flyout's `:aria-label` reads `$data.actionAnchor.label` (a plain
+    // PROPERTY read, computed here in script) rather than calling
+    // `labelText(item)` directly from the template attribute binding — a bare
+    // top-level-helper CALL inside a plain (non-slot-scoped) `:attr` binding
+    // throws `labelText is not defined` on the Angular target specifically
+    // (the emitter's `this.`-qualification pass doesn't reach that binding
+    // shape) — a source-level workaround, not an emitter change.
+    setActionAnchor({
+      item,
+      actions,
+      label: labelText(item)
+    });
+    setActionIndex(firstEnabledActionIndex(actions));
+    setActiveSurface('actions');
+    const panel = panelRef;
+    const activeRow: any = panel ? deepQuerySelector(panel, '.rozie-combobox-option--active') : null;
+    setActionMenuTop(activeRow ? activeRow.offsetTop : 0);
+    comboboxRef?.pinOpen(true);
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        focusFirstMenuItem();
+      });
+    } else {
+      focusFirstMenuItem();
+    }
+  }
+
+  // closeActionMenu(): the focus-restore invariant — ALWAYS returns to the
+  // list surface, releases keepOpen (pinOpen(false)), and reopens the combobox
+  // popup with focus back on the search input (reopenComboboxPopup — the
+  // existing level-pop blur/refocus primitive, reused verbatim here).
+  function closeActionMenu() {
+    setActiveSurface('list');
+    setActionIndex(-1);
+    setActionAnchor(null);
+    comboboxRef?.pinOpen(false);
+    reopenComboboxPopup();
+  }
+
+  // roveAction(dir): disabled-skip clamped roving (internal/actionMenu.ts
+  // rovingActionIndex — the combobox nextEnabled convention) over the anchored
+  // item's actions, then moves real focus to the new index's menuitem.
+  function roveAction(dir: any) {
+    const anchor = actionAnchor();
+    if (!anchor) return;
+    const idx = rovingActionIndex(anchor.actions, actionIndex(), dir);
+    setActionIndex(idx);
+    const panel = panelRef;
+    if (!panel) return;
+    const items: any = panel.querySelectorAll('[data-command-palette-menu] [role="menuitem"]');
+    const el: any = items[idx];
+    if (el && typeof el.focus === 'function') el.focus();
+  }
+
+  // selectAction(action): a disabled action is a no-op. Captures the anchored
+  // item into a LOCAL first (React stale-read guard — closeActionMenu clears
+  // $data.actionAnchor right after), fires the public `action-select` event,
+  // ALWAYS closes the menu, then closes the palette too IFF closeOnAction.
+  function selectAction(action: any) {
+    if (!action || action.disabled) return;
+    const anchor = actionAnchor();
+    const item = anchor ? anchor.item : null;
+    _props.onActionSelect?.({
+      item,
+      action
+    });
+    closeActionMenu();
+    if (local.closeOnAction) closePalette();
+  }
+
+  // onActionMenuKeydown(e): the flyout's OWN keydown — focus is inside the
+  // menu while this fires, so the vendored combobox never sees these keys.
+  // Escape is DELIBERATELY not handled here — it bubbles up to onPanelKeydown's
+  // single Escape funnel below. Every other handled key stops propagation so a
+  // stale-but-now-'list'-surface bubble (e.g. the actionKey toggle-close,
+  // which flips activeSurface to 'list' BEFORE the event finishes bubbling)
+  // can't be re-interpreted as a fresh open-menu trigger by onPanelKeydown.
+  function onActionMenuKeydown(e: any) {
+    if (!e) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      e.stopPropagation();
+      roveAction(1);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+      roveAction(-1);
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      const anchor = actionAnchor();
+      const action = anchor && Array.isArray(anchor.actions) ? anchor.actions[actionIndex()] : null;
+      if (action) selectAction(action);
+      return;
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeActionMenu();
+      return;
+    }
+    if (matchesActionKey(e, local.actionKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeActionMenu();
+    }
+  }
+
   // On open: clear the internal selection, then focus the search input. The query
   // is NOT reset here — that would clobber a pre-seeded / `r-model`-bound query.
   // The reset happens on the close transition (the $watch else-branch below), so a
@@ -745,24 +1078,56 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
 
   // ---- lifecycle ---------------------------------------------------------
 
-  // Bubble-phase panel keydown (LVL-NAV):
-  //   - Escape at depth>0 → pop one level (does NOT close the palette); at
-  //     depth 0 → close the palette. The vendored <Combobox> (a child) sees the
-  //     Escape FIRST on the bubble path and closes its OWN popup (Combobox.rozie
-  //     onKeydown → isOpen=false); goBack()'s reopenComboboxPopup() re-opens it
-  //     afterward so the restored parent level's list is visible.
-  //   - Backspace on an empty query at depth>0 → pop one level (Backspace does
-  //     NOT close the combobox popup — its onKeydown ignores it — so the reopen
-  //     is a harmless no-op cycle there). Otherwise Backspace edits the query
-  //     text normally (never intercepted at the root or with text in the box).
+  // Bubble-phase panel keydown (LVL-NAV, ACT-ARBITRATION, ACT-TRIGGER):
+  //   - Escape: routed through resolveEscape(activeSurface, currentDepth()) —
+  //     the SINGLE precedence oracle (menu-close > level-pop > palette-close-
+  //     at-root). A sub-surface open (activeSurface!=='list') ALWAYS wins —
+  //     closeActionMenu() and STOP; only once the menu is closed does Escape
+  //     fall through to level-pop or root-close on a LATER keypress. The
+  //     vendored <Combobox> (a child) sees the Escape FIRST on the bubble path
+  //     and closes its OWN popup (Combobox.rozie onKeydown → isOpen=false);
+  //     goBack()'s reopenComboboxPopup() re-opens it afterward so the restored
+  //     parent level's list is visible.
+  //   - actionKey (⌘K) / caret-at-end Right-arrow (ACT-TRIGGER): open the
+  //     action menu for the highlighted row, but ONLY while activeSurface is
+  //     'list' (the menu owns these keys itself once open, via
+  //     onActionMenuKeydown) and the row canOpenActions — a no-op otherwise
+  //     (an action-less row, or no highlighted row).
+  //   - Backspace on an empty query at depth>0 → pop one level, but ONLY while
+  //     activeSurface==='list' (Backspace must never pop a level while the menu
+  //     owns focus). Backspace does NOT close the combobox popup — its
+  //     onKeydown ignores it — so the reopen is a harmless no-op cycle there.
+  //     Otherwise Backspace edits the query text normally (never intercepted
+  //     at the root or with text in the box).
   function onPanelKeydown(e: any) {
     if (!e) return;
     if (e.key === 'Escape') {
       e.preventDefault();
-      if (currentDepth() > 0) goBack();else closePalette();
+      const route = resolveEscape(activeSurface(), currentDepth());
+      if (route === 'close-surface') closeActionMenu();else if (route === 'pop-level') goBack();else closePalette();
       return;
     }
-    if (e.key === 'Backspace' && query() === '' && currentDepth() > 0) {
+    if (activeSurface() === 'list') {
+      if (matchesActionKey(e, local.actionKey)) {
+        const item = highlightedItem();
+        if (canOpenActions(item)) {
+          e.preventDefault();
+          openActionMenu(item);
+        }
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        const input: any = searchInputEl();
+        const item = highlightedItem();
+        const value = input && input.value != null ? String(input.value) : '';
+        if (input && caretAtEnd(input.selectionStart, input.selectionEnd, value.length) && canOpenActions(item)) {
+          e.preventDefault();
+          openActionMenu(item);
+          return;
+        }
+      }
+    }
+    if (e.key === 'Backspace' && query() === '' && currentDepth() > 0 && activeSurface() === 'list') {
       e.preventDefault();
       goBack();
     }
@@ -805,8 +1170,9 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
                     <For each={labelSegments(option)}>{(segment, si) => <span class={rozieClass({ 'rozie-command-palette-option-label-match': segment.match })} data-rozie-s-768cad96="">{rozieDisplay(segment.text)}</span>}</For>
                   </span>
                   {<Show when={groupText(option)}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</span>
-                {<Show when={(_props.actionsSlot ?? _props.slots?.['actions'])}><span class={"rozie-command-palette-option-actions"} data-rozie-s-768cad96="">
-                  {(_props.actionsSlot ?? _props.slots?.['actions'])?.({ option, actions: actionsList(option) })}
+                
+                {<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
+                  {(_props.actionsSlot ?? _props.slots?.['actions'])?.({ option, actions: actionsList(option) }) ?? <Show when={actionsList(option).length > 0}><span class={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span></Show>}
                 </span></Show>}{<Show when={(_props.trailingSlot ?? _props.slots?.['trailing'])}><span class={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
                   {(_props.trailingSlot ?? _props.slots?.['trailing'])?.({ option })}
                 </span></Show>}</div>}
@@ -814,7 +1180,11 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
             {<Show when={currentStatus() === 'ready'}>{(_props.emptySlot ?? _props.slots?.['empty'])?.({ query }) ?? local.emptyText}</Show>}</>)} />
 
         
-        {<Show when={currentStatus() === 'loading'} fallback={<Show when={currentStatus() === 'error'}><div class={"rozie-command-palette-error"} data-rozie-s-768cad96="">
+        {<Show when={atActions()}><div data-command-palette-menu="" data-testid="command-palette-actions-menu" role="menu" aria-label={rozieAttr(actionAnchor() ? actionAnchor().label : null)} class={"rozie-command-palette-actions-menu"} style={parseInlineStyle('top:' + actionMenuTop() + 'px')} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96="">
+          <Key each={actionAnchor() ? actionAnchor().actions : [] as readonly any[]} by={(action) => action.id}>{(action, ai) => <div role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action().disabled} class={"rozie-command-palette-actions-menu-item" + " " + rozieClass({ 'rozie-command-palette-actions-menu-item--active': ai() === actionIndex(), 'rozie-command-palette-actions-menu-item--disabled': !!action().disabled })} tabIndex={-1} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActionIndex(ai()); }} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectAction(action()); }} data-rozie-s-768cad96="">
+            {(_props.actionItemSlot ?? _props.slots?.['actionItem'])?.({ action: action(), item: actionAnchor() ? actionAnchor().item : null, active: ai() === actionIndex(), disabled: !!action().disabled }) ?? <>{<Show when={actionIcon(action())}><span class={"rozie-command-palette-actions-menu-item-icon"} data-rozie-s-768cad96="">{rozieDisplay(actionIcon(action()))}</span></Show>}<span class={"rozie-command-palette-actions-menu-item-label"} data-rozie-s-768cad96="">{rozieDisplay(actionLabel(action()))}</span>{<Show when={actionShortcut(action())}><span class={"rozie-command-palette-actions-menu-item-shortcut"} data-rozie-s-768cad96="">{rozieDisplay(actionShortcut(action()))}</span></Show>}</>}
+          </div>}</Key>
+        </div></Show>}{<Show when={currentStatus() === 'loading'} fallback={<Show when={currentStatus() === 'error'}><div class={"rozie-command-palette-error"} data-rozie-s-768cad96="">
           {(_props.errorSlot ?? _props.slots?.['error'])?.({ query: query(), error: currentError(), retry: retryCurrentLevel })}
         </div></Show>}><div class={"rozie-command-palette-loading"} data-rozie-s-768cad96="">
           {(_props.loadingSlot ?? _props.slots?.['loading'])?.({ query: query() }) ?? "Loading…"}
