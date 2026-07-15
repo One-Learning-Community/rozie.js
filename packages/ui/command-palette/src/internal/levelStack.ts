@@ -37,6 +37,12 @@ export interface NavigableItem {
   // biome-ignore lint/suspicious/noExplicitAny: consumer-supplied query→items fn, shape varies per source
   source?: (query: string) => any;
   disabled?: boolean;
+  // The item's own empty/home-view items — captured onto its pushed frame at
+  // navigation time (levelDefaultItems below). Distinct from `children`:
+  // `children` seeds resolvedItems for a static (non-async) level; a source
+  // level's `defaultItems` is a PARALLEL home-view source resolved above the
+  // scoring pipeline in the `.rozie` (currentDefaultItems/currentBaseItems).
+  defaultItems?: unknown[];
   [key: string]: unknown;
 }
 
@@ -50,6 +56,9 @@ export interface LevelFrame<TItem = NavigableItem> {
   // restored on pop (D-3 "back = undo").
   parentQuery: string;
   resolvedItems: unknown[];
+  // The item's own empty/home-view items, captured at push time exactly like
+  // title/placeholder — this level's home view when the query is empty.
+  defaultItems: unknown[];
   status: LevelStatus;
   error: unknown;
 }
@@ -93,13 +102,23 @@ export function levelPlaceholder(
   return fallback == null ? null : fallback;
 }
 
+/** The item's own empty/home-view items: item.defaultItems when it is an array, else []. */
+export function levelDefaultItems(item: NavigableItem | null | undefined): unknown[] {
+  return Array.isArray(item?.defaultItems) ? (item.defaultItems as unknown[]) : [];
+}
+
 /**
  * Push a new frame for `item` onto `stack`, snapshotting `currentQuery` as
  * the frame's `parentQuery` (restored on pop). A `children` item seeds
  * `resolvedItems` from its static children + `status: 'ready'`; a `source`
  * item seeds `resolvedItems: []` + `status: 'loading'` (settled by
- * asyncSource.ts + the `.rozie` push handler in Task 5). Returns a NEW array
- * — never mutates `stack`.
+ * asyncSource.ts + the `.rozie` push handler in Task 5) — UNLESS it also
+ * carries a non-empty `defaultItems` (the empty/home-view seam), in which
+ * case status is seeded `'ready'` immediately so the pushed home view renders
+ * with no loading flash and no `source('')` call. `defaultItems` is captured
+ * onto the frame exactly like `title`/`placeholder` — a PARALLEL home-view
+ * source, never merged into `resolvedItems`. Returns a NEW array — never
+ * mutates `stack`.
  */
 export function pushFrame<TItem extends NavigableItem = NavigableItem>(
   stack: LevelFrame<TItem>[],
@@ -107,13 +126,15 @@ export function pushFrame<TItem extends NavigableItem = NavigableItem>(
   currentQuery: string,
 ): LevelFrame<TItem>[] {
   const hasChildren = Array.isArray(item?.children) && item.children.length > 0;
+  const hasDefaults = levelDefaultItems(item).length > 0;
   const frame: LevelFrame<TItem> = {
     item,
     title: levelTitle(item),
     placeholder: levelPlaceholder(item, null),
     parentQuery: currentQuery,
     resolvedItems: hasChildren ? (item.children as unknown[]).slice() : [],
-    status: hasChildren ? 'ready' : 'loading',
+    defaultItems: levelDefaultItems(item),
+    status: hasChildren || hasDefaults ? 'ready' : 'loading',
     error: null,
   };
   return [...stack, frame];
