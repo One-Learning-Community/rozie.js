@@ -461,11 +461,12 @@ const rowIsOutsideWindow = (r: any) => {
 // every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
 // the non-virtual emitted path executes none of it (byte-identical-off).
 import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
+// ---- native option grouping (combobox-native-groups: src/internal/groupOptions.ts) ----
+// The PURE stable-partition helper is a RUNTIME import (unlike listCore/windowing
+// above, it is NOT a compile-time `.rzts` partial that dissolves at compile) —
+// codegen's `copyInternal` vendors it verbatim into each leaf at
+// `./internal/groupOptions`, mirroring command-palette's `scoreCommands.ts`.
 import { groupOptions } from './internal/groupOptions';
-
-// Windowing instance state (reassigned module-`let`s → React hoists to useRef; do NOT
-// const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
-// captured .rozie-combobox-list scroll div; remeasurePending dedupes the deferred sweep.
 // Windowing instance state (reassigned module-`let`s → React hoists to useRef; do NOT
 // const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
 // captured .rozie-combobox-list scroll div; remeasurePending dedupes the deferred sweep.
@@ -473,29 +474,6 @@ let virtualizer: any = null;
 let virtualizerCleanup: any = null;
 let gridScrollEl: any = null;
 let remeasurePending = false;
-
-// ---- derived view (plain functions, uniform ×6) ------------------------
-// The filtered option list, each carrying its filtered-list index `_i`, a stable
-// windowing key `id`, and the RAW source option (`option`) so `@change` + the
-// `#option` slot expose the original object (CP reads `e.option.id` / `option.group`).
-//
-// REFERENCE-KEYED MEMO, NOT $computed — this is load-bearing for windowed perf. TanStack
-// virtual-core calls getItemKey(i)/getMeasurements O(count) times per pass, and windowSource()
-// (below) aliases this, so without a memo every scroll re-`.map()`s ALL options into fresh
-// wrapper objects — O(N²). On vue each wrapper read trips a reactive Proxy trap (valueOf/labelOf/
-// disabledOf), so a 60-ArrowDown batch over 1,000 options cost ~16s. It is deliberately NOT a
-// $computed: a $computed would re-SUBSCRIBE to the reactive `options` Proxy and re-run on
-// unrelated reactive churn (and on vue re-trip the Proxy traps); the whole point is to AVOID
-// re-mapping when only activeIndex changed. The cache key is pure VALUE/REFERENCE comparison
-// (no reactive subscription), so it adds zero reactivity churn — it collapses virtual-core's
-// O(count) re-maps to ONE map per real (options-ref / query / disableFilter) change.
-//
-// foCache is a member-mutated FRESH-OBJECT const (NOT a reassigned `let`): the React emitter
-// lowers `const X = {…}` that is member-mutated to `useMemo(() => ({…}), [])` (per-instance,
-// stable across renders — feedback_react_const_mutinstance_not_stabilized); on the 5 setup-once
-// targets the top-level const persists for the instance lifetime naturally. A reassigned
-// `let X = null` would NOT survive React renders (filteredOptions() is reached from the TEMPLATE,
-// not a hook-root → per-render reset trap), so it MUST be a fresh-object const.
 // ---- derived view (plain functions, uniform ×6) ------------------------
 // The filtered option list, each carrying its filtered-list index `_i`, a stable
 // windowing key `id`, and the RAW source option (`option`) so `@change` + the
@@ -582,22 +560,10 @@ const filteredOptions = () => {
   foCache.hasVal = true;
   return val;
 };
-
-// windowSource(): the windowing.rzts host-contract row source — the FILTERED option
-// list (the same wrapper rows the template iterates). Kept === $data.rows so the math's
-// rowList[vi.index] resolves to the same wrapper the count windows over.
 // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
 // list (the same wrapper rows the template iterates). Kept === $data.rows so the math's
 // rowList[vi.index] resolves to the same wrapper the count windows over.
 const windowSource = () => filteredOptions();
-
-// ---- native option grouping render helpers (combobox-native-groups) ---------------
-// groupBlocks(): re-partition the ALREADY group-ordered filteredOptions() wrappers into
-// CONTIGUOUS runs by wrapper.group (trivial + guarantees `_i` alignment, since `ordered`
-// from groupOptions() is already group-contiguous). Attaches each run's `{ id, label }`
-// from $props.groups (fallback label = the group id itself). Plain function — never
-// $computed (mirrors filteredOptions()'s convention). Non-virtual only (isGrouped() below
-// already gates the template branch that calls this).
 // ---- native option grouping render helpers (combobox-native-groups) ---------------
 // groupBlocks(): re-partition the ALREADY group-ordered filteredOptions() wrappers into
 // CONTIGUOUS runs by wrapper.group (trivial + guarantees `_i` alignment, since `ordered`
@@ -631,13 +597,6 @@ const groupBlocks = () => {
   }
   return blocks;
 };
-
-// isGrouped(): the grouped-vs-flat template branch selector. Grouping is active
-// (non-virtual only) SOLELY when the author explicitly set a non-empty `groups` prop —
-// deliberately NOT "OR any option carries a group" (a real collision discovered against
-// command-palette's pre-existing CommandItem.group per-row-badge field; see the
-// filteredOptions() comment above). Mirrors that same non-empty-`groups` gate exactly, so
-// isGrouped() and the filteredOptions() partition never disagree about which branch is active.
 // isGrouped(): the grouped-vs-flat template branch selector. Grouping is active
 // (non-virtual only) SOLELY when the author explicitly set a non-empty `groups` prop —
 // deliberately NOT "OR any option carries a group" (a real collision discovered against
@@ -645,12 +604,6 @@ const groupBlocks = () => {
 // filteredOptions() comment above). Mirrors that same non-empty-`groups` gate exactly, so
 // isGrouped() and the filteredOptions() partition never disagree about which branch is active.
 const isGrouped = () => !virtual && Array.isArray(groups) && groups.length > 0;
-
-// D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
-// A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
-// pinnedMeasurement() UNGUARDED by convention; a combobox has no edit-pinning, so these
-// reduce the pin union (-1 → never unioned) and the spacer subtraction (null → identity)
-// to a no-op. They MUST exist or the by-convention call ReferenceErrors at mount.
 // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
 // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
 // pinnedMeasurement() UNGUARDED by convention; a combobox has no edit-pinning, so these
@@ -658,18 +611,10 @@ const isGrouped = () => !virtual && Array.isArray(groups) && groups.length > 0;
 // to a no-op. They MUST exist or the by-convention call ReferenceErrors at mount.
 const pinnedEditIndex = () => -1;
 const pinnedMeasurement = (pin: any) => null;
-
-// Keep $data.rows === windowSource() so the windowing math indexes the live filtered set.
 // Keep $data.rows === windowSource() so the windowing math indexes the live filtered set.
 const syncRows = () => {
   rows = windowSource();
 };
-
-// Defer remeasureWindow() until AFTER the framework commits the recycled window: TWO
-// passes (microtask THEN rAF) behind one in-flight flag (the data-table
-// virtualization.rzts pattern, copied per-consumer per D-04/D-09) — microtask catches
-// Solid's <For> / Svelte's {#each} synchronous commit (the Phase 63 Solid
-// under-convergence hazard — D-09 rAF-defer budget), rAF catches React's async commit.
 // Defer remeasureWindow() until AFTER the framework commits the recycled window: TWO
 // passes (microtask THEN rAF) behind one in-flight flag (the data-table
 // virtualization.rzts pattern, copied per-consumer per D-04/D-09) — microtask catches
@@ -692,10 +637,6 @@ const scheduleRemeasure = () => {
   }
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) remeasurePending = false;else setTimeout(rafPass, 0);
 };
-
-// measureElement sweep: hand every rendered windowed option to the virtualizer so its
-// true height is observed (virtual-core measures ONLY nodes passed to measureElement,
-// keyed by the data-index attribute). Bails during a programmatic scroll.
 // measureElement sweep: hand every rendered windowed option to the virtualizer so its
 // true height is observed (virtual-core measures ONLY nodes passed to measureElement,
 // keyed by the data-index attribute). Bails during a programmatic scroll.
@@ -705,11 +646,6 @@ const remeasureWindow = () => {
   const els = gridScrollEl.querySelectorAll('.rozie-combobox-option[data-index]');
   for (const el of els as any) virtualizer.measureElement(el);
 };
-
-// Keep the active option visible inside the windowed popup. When windowing, route
-// through the virtualizer (scrollToIndex) so an active option OUTSIDE the rendered
-// window scrolls into view (the windowed-arrow-nav seam). No-op when not virtual (the
-// non-virtual combobox popup is short enough not to need it — unchanged behavior).
 // Keep the active option visible inside the windowed popup. When windowing, route
 // through the virtualizer (scrollToIndex) so an active option OUTSIDE the rendered
 // window scrolls into view (the windowed-arrow-nav seam). No-op when not virtual (the
@@ -726,16 +662,12 @@ const scrollActiveIntoView = () => {
 };
 const optId = (i: any) => idBase + '-opt-' + i;
 const listId = () => idBase + '-list';
-
-// The active option's id for aria-activedescendant (null when none).
 // The active option's id for aria-activedescendant (null when none).
 const activeId = () => {
   const list = filteredOptions();
   if (isOpen && activeIndex >= 0 && list[activeIndex]) return optId(activeIndex);
   return null;
 };
-
-// Next selectable index in `dir` (+1/-1), skipping disabled, clamped to ends.
 // Next selectable index in `dir` (+1/-1), skipping disabled, clamped to ends.
 const nextEnabled = (list: any, from: any, dir: any) => {
   let i = from;
@@ -748,12 +680,6 @@ const nextEnabled = (list: any, from: any, dir: any) => {
   }
   return from;
 };
-
-// ---- selection (writes the model + syncs query) ------------------------
-// `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
-// `@change` with BOTH the committed value AND the raw source `option` (CP reads
-// `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
-// embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
 // ---- selection (writes the model + syncs query) ------------------------
 // `opt` is a filtered-row wrapper ({ value, label, disabled, _i, option }). Fire
 // `@change` with BOTH the committed value AND the raw source `option` (CP reads
@@ -770,16 +696,12 @@ const selectOption = (opt: any) => {
     option: opt.option
   });
 };
-
-// Reflect the externally-selected value into the input text.
 // Reflect the externally-selected value into the input text.
 const syncQueryToValue = () => {
   const opts = Array.isArray(options) ? options : [];
   const opt = opts.find((o: any) => o.value === value);
   query = opt ? String(opt.label) : '';
 };
-
-// ---- input + keyboard handlers -----------------------------------------
 // ---- input + keyboard handlers -----------------------------------------
 const onInput = (e: any) => {
   const q = e && e.target ? e.target.value : '';
@@ -794,9 +716,6 @@ const onFocus = (e: any) => {
   isOpen = true;
   if (e && e.target && e.target.select) e.target.select();
 };
-
-// @blur closes the popup. Option selection uses @mousedown.prevent, which keeps
-// focus on the input, so a click on an option does NOT blur-close before select.
 // @blur closes the popup. Option selection uses @mousedown.prevent, which keeps
 // focus on the input, so a click on an option does NOT blur-close before select.
 const onBlur = () => {
@@ -849,16 +768,6 @@ const onKeydown = (e: any) => {
   // Keep the (new) active option in view when windowing — no-op when not virtual.
   scrollActiveIntoView();
 };
-
-// ---- lifecycle + imperative handle -------------------------------------
-// kickWindow: the cross-target first-paint settle (the data-table / listbox precedent).
-// Re-captures the LIVE scroll element, re-feeds the CURRENT option count, re-attaches the
-// rect observer (_willUpdate), and bumps the windowVer signal so the windowed slice
-// re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
-// asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
-// (b) Solid/Lit recreate the list node between mount and first commit (stale scrollElement),
-// and (c) the consumer often seeds options AFTER the combobox mounts (Lit/React). Stops once
-// the window paints — idempotent + loop-free.
 // ---- lifecycle + imperative handle -------------------------------------
 // kickWindow: the cross-target first-paint settle (the data-table / listbox precedent).
 // Re-captures the LIVE scroll element, re-feeds the CURRENT option count, re-attaches the

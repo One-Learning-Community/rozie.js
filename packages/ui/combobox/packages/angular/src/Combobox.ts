@@ -7,6 +7,12 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
 // every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
 // the non-virtual emitted path executes none of it (byte-identical-off).
 import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
+
+// ---- native option grouping (combobox-native-groups: src/internal/groupOptions.ts) ----
+// The PURE stable-partition helper is a RUNTIME import (unlike listCore/windowing
+// above, it is NOT a compile-time `.rzts` partial that dissolves at compile) —
+// codegen's `copyInternal` vendors it verbatim into each leaf at
+// `./internal/groupOptions`, mirroring command-palette's `scoreCommands.ts`.
 import { groupOptions } from './internal/groupOptions';
 
 // Windowing instance state (reassigned module-`let`s → React hoists to useRef; do NOT

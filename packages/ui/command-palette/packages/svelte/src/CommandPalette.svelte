@@ -116,18 +116,6 @@ let combobox = $state<ReturnType<typeof Combobox> | undefined>(undefined);
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
-
-// ---- async race-drop token + debounce timer (module-level lets) ---------
-// These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
-// boundaries within a single handler (bump a token, then compare it after an
-// await; clear/replace a timer id on every keystroke), which React's useState
-// ($data) binds STALE (setState is async — the pre-write value is read). As
-// module-level `let`s referenced ONLY from handlers/lifecycle (never the
-// template), the React emitter hoists them to `useRef` (persistent +
-// synchronous) via hoistModuleLet — giving a correct, target-uniform token
-// comparison. Kept out of $data specifically to dodge the documented
-// stale-read (the plan's $data placement broke the race-drop AND the navigate
-// depth on React/Solid/Lit).
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
 // boundaries within a single handler (bump a token, then compare it after an
@@ -141,15 +129,6 @@ import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } f
 // depth on React/Solid/Lit).
 let requestToken = 0;
 let debounceTimerId: any = null;
-
-// ---- level-stack derived views (plain functions, uniform ×6) -----------
-// currentItems(): the ACTIVE level's items fed to the vendored <Combobox>.
-// While the active level is 'loading' or 'error' this returns [] so combobox's
-// own empty region shows (its #empty is the natural host for the re-projected
-// #loading/#error status slots — combobox exposes no loading/error slot of its
-// own). Otherwise the top frame's resolvedItems (nested) or the root
-// $props.items. Levels sit ABOVE the pipeline: currentItems() → scoreCommands
-// (below) → <Combobox>.
 // ---- level-stack derived views (plain functions, uniform ×6) -----------
 // currentItems(): the ACTIVE level's items fed to the vendored <Combobox>.
 // While the active level is 'loading' or 'error' this returns [] so combobox's
@@ -166,17 +145,9 @@ const currentItems = () => {
   }
   return items;
 };
-
-// currentDepth(): the nesting depth (0 = root). Named to avoid shadowing the
-// imported levelStack `depth` helper (aliased `levelDepth` above).
 // currentDepth(): the nesting depth (0 = root). Named to avoid shadowing the
 // imported levelStack `depth` helper (aliased `levelDepth` above).
 const currentDepth = () => levelDepth(levelStack);
-
-// currentStatus()/currentError(): the active level's async status (LVL-ASYNC)
-// off the top frame — 'ready' at root (the implicit root frame is never
-// loading/error). Drive the #loading/#error re-projection inside combobox's
-// #empty slot (below).
 // currentStatus()/currentError(): the active level's async status (LVL-ASYNC)
 // off the top frame — 'ready' at root (the implicit root frame is never
 // loading/error). Drive the #loading/#error re-projection inside combobox's
@@ -189,17 +160,9 @@ const currentError = () => {
   const frame = currentFrame(levelStack);
   return frame ? frame.error : null;
 };
-
-// atDepth(): true when nested (depth>0) — gates the breadcrumb/back header
-// (LVL-RENDER). A plain function — never $computed.
 // atDepth(): true when nested (depth>0) — gates the breadcrumb/back header
 // (LVL-RENDER). A plain function — never $computed.
 const atDepth = () => currentDepth() > 0;
-
-// currentTitle(): the breadcrumb/header label for the active level — the top
-// frame's `title` (already item.title ?? item.label, captured by pushFrame
-// via levelTitle at push time). Falls back to `ariaLabel` at root (atDepth()
-// gates the header off at root anyway, but keeps this total).
 // currentTitle(): the breadcrumb/header label for the active level — the top
 // frame's `title` (already item.title ?? item.label, captured by pushFrame
 // via levelTitle at push time). Falls back to `ariaLabel` at root (atDepth()
@@ -208,12 +171,6 @@ const currentTitle = () => {
   const frame = currentFrame(levelStack);
   return frame && frame.title != null ? frame.title : ariaLabel;
 };
-
-// currentPlaceholder(): the active level's input placeholder — the top
-// frame's `placeholder` (item.placeholder, captured at push time) falling
-// back to the component-level `placeholder` prop. Bound to the vendored
-// <Combobox>'s :placeholder so a navigating item's `placeholder` drives its
-// child level's input placeholder.
 // currentPlaceholder(): the active level's input placeholder — the top
 // frame's `placeholder` (item.placeholder, captured at push time) falling
 // back to the component-level `placeholder` prop. Bound to the vendored
@@ -223,17 +180,6 @@ const currentPlaceholder = () => {
   const frame = currentFrame(levelStack);
   return frame && frame.placeholder != null ? frame.placeholder : placeholder;
 };
-
-// breadcrumbStack(): the full root..current breadcrumb (internal/levelStack.ts
-// breadcrumb(), imported aliased `buildBreadcrumb` — the SVELTE EMITTER
-// generates a local snippet binding named after the `breadcrumb` SLOT itself,
-// which collides with a same-named top-level import on that one target only
-// (a "slot-name == script-identifier" collision, adjacent to the
-// slot==prop-name ROZ127 class but not caught by it since `breadcrumb` isn't
-// a prop) — aliasing the import sidesteps it without renaming the public
-// slot) fed to the #breadcrumb slot's `stack` scope param — the root entry's
-// title is `ariaLabel` (the palette's own accessible name doubles as the
-// root breadcrumb label; there is no separate "root title" prop).
 // breadcrumbStack(): the full root..current breadcrumb (internal/levelStack.ts
 // breadcrumb(), imported aliased `buildBreadcrumb` — the SVELTE EMITTER
 // generates a local snippet binding named after the `breadcrumb` SLOT itself,
@@ -245,20 +191,6 @@ const currentPlaceholder = () => {
 // title is `ariaLabel` (the palette's own accessible name doubles as the
 // root breadcrumb label; there is no separate "root title" prop).
 const breadcrumbStack = () => buildBreadcrumb(levelStack, ariaLabel);
-
-// ---- derived views (plain functions, uniform ×6) -----------------------
-// The ranked command list fed to the vendored <Combobox> as its `:options`.
-// command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
-// default over label+keywords, label weighted above keywords, pluggable via
-// $props.score) and runs <Combobox :disable-filter="true"> — combobox's
-// built-in filter is label-only substring and would drop keyword matching +
-// the ranked ordering. scoreCommands already normalizes non-array input, so
-// no local Array.isArray guard is needed. A plain function (called from the
-// template binding AND handlers) — never $computed (the combobox
-// value-vs-accessor split). Each item is passed through verbatim; combobox
-// resolves its value via `optionValue` (below) and its label via `.label`.
-// Levels sit ABOVE the pipeline (LVL-STACK) — currentItems() resolves the
-// active level's list (root or the top pushed frame) BEFORE ranking.
 // ---- derived views (plain functions, uniform ×6) -----------------------
 // The ranked command list fed to the vendored <Combobox> as its `:options`.
 // command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
@@ -273,23 +205,12 @@ const breadcrumbStack = () => buildBreadcrumb(levelStack, ariaLabel);
 // Levels sit ABOVE the pipeline (LVL-STACK) — currentItems() resolves the
 // active level's list (root or the top pushed frame) BEFORE ranking.
 const filteredItems = () => scoreCommands(currentItems(), query, score);
-
-// The vendored <Combobox> commits the OPTION's value; resolve each command's value
-// to its stable `id` (the key passed back on `select`). disabled is resolved off
-// the item's own `disabled` flag (combobox's default `.disabled` fallback already
-// handles it, but we pass an explicit resolver for clarity + safety on primitives).
 // The vendored <Combobox> commits the OPTION's value; resolve each command's value
 // to its stable `id` (the key passed back on `select`). disabled is resolved off
 // the item's own `disabled` flag (combobox's default `.disabled` fallback already
 // handles it, but we pass an explicit resolver for clarity + safety on primitives).
 const commandValue = (it: any) => it && it.id !== undefined ? it.id : it;
 const commandDisabled = (it: any) => !!(it && it.disabled);
-
-// Default-fill display helpers. The re-projected #option scope param `option`
-// threads as `unknown` on the Lit leaf (the cross-target slot-param-type gap), so
-// the default fill content reads its label/group through these UNTYPED helpers
-// (neutralized to `any`) rather than `option.label` directly — keeps the Lit leaf
-// typechecking without a per-target cast.
 // Default-fill display helpers. The re-projected #option scope param `option`
 // threads as `unknown` on the Lit leaf (the cross-target slot-param-type gap), so
 // the default fill content reads its label/group through these UNTYPED helpers
@@ -300,17 +221,7 @@ const groupText = (o: any) => o && o.group !== undefined ? o.group : '';
 // Display-only #actions scope resolver: the optional `actions` item field,
 // normalized to an array. Untyped param (neutralized to `any`) like the other
 // display helpers above — same cross-target slot-param-type gap.
-// Display-only #actions scope resolver: the optional `actions` item field,
-// normalized to an array. Untyped param (neutralized to `any`) like the other
-// display helpers above — same cross-target slot-param-type gap.
 const actionsList = (o: any) => o && o.actions ? o.actions : [];
-
-// Split a command's visible label into ordered { text, match } segments from
-// labelHighlight's [start,end) ranges, for the default #option fill row to
-// render as highlighted runs. Reflects the query-subsequence on the LABEL
-// regardless of which scorer produced the ranking (labelHighlight runs the
-// same fuzzyMatch primitive independent of $props.score). Untyped param
-// (neutralized to `any`) like the other display helpers above.
 // Split a command's visible label into ordered { text, match } segments from
 // labelHighlight's [start,end) ranges, for the default #option fill row to
 // render as highlighted runs. Reflects the query-subsequence on the LABEL
@@ -345,23 +256,10 @@ const labelSegments = (o: any) => {
   });
   return segments;
 };
-
-// ---- close funnel ------------------------------------------------------
 // ---- close funnel ------------------------------------------------------
 const closePalette = () => {
   open = false;
 };
-
-// ---- async source loading (LVL-ASYNC, absorbs #4) ----------------------
-// Apply an already-resolving promise's outcome to the TOP frame, guarded by
-// the race-drop token (T-cpl-01): `token` was captured by the CALLER at the
-// moment the fetch was kicked off; if a newer token has since been issued
-// (a push/pop/search/close superseded this in-flight call) the resolution is
-// dropped — settleFrame/failFrame no-op on drop. Runs in a `.then` MICROTASK,
-// so by the time it writes $data.levelStack the caller's own synchronous
-// pushFrame setState has already flushed (React) → it reads the FRESH stack.
-// `requestToken` is a module-level `let` (script top), so the comparison is
-// synchronous + current across the await on every target.
 // ---- async source loading (LVL-ASYNC, absorbs #4) ----------------------
 // Apply an already-resolving promise's outcome to the TOP frame, guarded by
 // the race-drop token (T-cpl-01): `token` was captured by the CALLER at the
@@ -381,13 +279,6 @@ const applyAsyncResult = (token: any, promise: any) => {
     levelStack = failFrame(levelStack, error);
   });
 };
-
-// Kick off (but do not await) an async level's initial/refetch load. A
-// `children` level is already seeded ready by pushFrame and never reaches
-// here; a `source` returning a Promise bumps + captures a fresh token then
-// settles in a microtask; a `source` returning a sync array settles in a
-// microtask too (deferred so React's pushFrame setState flushes first —
-// settleFrame reads $data.levelStack). The #error slot's `retry` reuses this.
 // Kick off (but do not await) an async level's initial/refetch load. A
 // `children` level is already seeded ready by pushFrame and never reaches
 // here; a `source` returning a Promise bumps + captures a fresh token then
@@ -408,10 +299,6 @@ const beginLevelLoad = (item: any, query: any) => {
     });
   }
 };
-
-// Re-invoke the CURRENT level's source at the current query (the #error
-// slot's `retry` — T-cpl-04 mitigation: an error leaves the input usable,
-// retry on next keystroke OR this explicit retry).
 // Re-invoke the CURRENT level's source at the current query (the #error
 // slot's `retry` — T-cpl-04 mitigation: an error leaves the input usable,
 // retry on next keystroke OR this explicit retry).
@@ -420,18 +307,6 @@ const retryCurrentLevel = () => {
   if (!frame || !frame.item || !isAsyncLevel(frame.item)) return;
   beginLevelLoad(frame.item, query);
 };
-
-// ---- level navigation (LVL-STACK, LVL-QUERY, LVL-NAV) -------------------
-// Push a child level for a NAVIGATING item (isNavigating — a `children`
-// array or a `source` function). pushFrame snapshots the CURRENT query into
-// the new frame's parentQuery (restored on pop, below); the child level then
-// starts with a cleared query + a cleared combobox input. A `children` level
-// is seeded ready by pushFrame; a `source` level lands 'loading' and
-// beginLevelLoad resolves it at query='' (empty-vs-search #8 falls out for
-// free — a `source` branches on query==='' for its default view).
-// The navigate `depth` reads the FRESH `nextStack` LOCAL, never
-// currentDepth() — re-reading $data.levelStack right after writing it binds
-// the pre-write (0) value on React (setState is async).
 // ---- level navigation (LVL-STACK, LVL-QUERY, LVL-NAV) -------------------
 // Push a child level for a NAVIGATING item (isNavigating — a `children`
 // array or a `source` function). pushFrame snapshots the CURRENT query into
@@ -456,15 +331,6 @@ const pushLevel = (item: any) => {
   });
   if (isAsyncLevel(item)) beginLevelLoad(item, '');
 };
-
-// Pop one level: popFrame() → restore the query MODEL AND the vendored
-// <Combobox>'s VISIBLE input text via seedQuery(restoreQuery) (Option B — the
-// combobox seedQuery prerequisite) — full query undo, not just the
-// model/list. Bumps the request token so any in-flight source resolution for
-// the popped level is dropped. reopenComboboxPopup() re-opens the combobox
-// popup (Escape closed it on the shared bubble through the combobox — see
-// onPanelKeydown) so the restored parent level's list is visible. No-op at
-// root (an empty levelStack — mirrors the spec's "back() — no-op at root").
 // Pop one level: popFrame() → restore the query MODEL AND the vendored
 // <Combobox>'s VISIBLE input text via seedQuery(restoreQuery) (Option B — the
 // combobox seedQuery prerequisite) — full query undo, not just the
@@ -488,17 +354,6 @@ export const goBack = () => {
   reopenComboboxPopup();
   onback?.();
 };
-
-// openTo(path): the ⌘P deep-link (LVL-RENDER, LVL-STACK) — opens the palette,
-// resets to root, then drills through `path` (an array of item ids) one hop
-// at a time: resolve the CURRENT level's items, find the item whose `id`
-// matches the next path segment, push it, and — async-aware — AWAIT its
-// source settling before resolving the NEXT hop (a child level's items must
-// be settled before an id can be looked up in it). Threads the stack as a
-// LOCAL (`stack`) rather than re-reading $data.levelStack between hops (the
-// React setState-is-async stale-read); the $data.levelStack writes are for
-// render reactivity. Stops silently (safe no-op on the unresolved remainder)
-// at the first id that doesn't match anything in the current level.
 // openTo(path): the ⌘P deep-link (LVL-RENDER, LVL-STACK) — opens the palette,
 // resets to root, then drills through `path` (an array of item ids) one hop
 // at a time: resolve the CURRENT level's items, find the item whose `id`
@@ -558,17 +413,6 @@ export const openTo = async (path: any) => {
     focusInput();
   }
 };
-
-// ---- selection ---------------------------------------------------------
-// Combobox's `@change` fires `{ value, option }` on each commit. A NAVIGATING
-// item (isNavigating — children/source) is intercepted here and PUSHES a
-// child level instead of emitting `select` (presence of children/source is
-// the navigation signal, no separate flag). Otherwise re-emit the PUBLIC
-// `select` event with the chosen leaf command (optionally close); its
-// payload gains `path` — the id breadcrumb of levels navigated through to
-// reach it (levelStack item ids, root excluded — root carries no item). The
-// `option` IS the original command item (we feed items straight through as
-// combobox options), so read its id/label/group directly.
 // ---- selection ---------------------------------------------------------
 // Combobox's `@change` fires `{ value, option }` on each commit. A NAVIGATING
 // item (isNavigating — children/source) is intercepted here and PUSHES a
@@ -597,18 +441,6 @@ const onComboboxChange = (e: any) => {
   activeValue = null;
   if (closeOnSelect) closePalette();
 };
-
-// Combobox's `@search` fires `{ query }` as the user types in its combobox input.
-// Pipe it into command-palette's own two-way `query` model — `filteredItems()`
-// then re-ranks via scoreCommands (keyword-aware, fuzzy). Capture the fresh value
-// (never re-read a just-written $data/$model key on React — it is stale).
-//
-// At an ASYNC level (LVL-ASYNC), ALSO bump + capture a fresh request token
-// immediately (dropping any earlier in-flight resolution, T-cpl-01) and
-// schedule a DEBOUNCED (searchDebounce, T-cpl-02) source(query) refetch — the
-// consumer source() function itself is only invoked once the debounce timer
-// fires, never eagerly. A sync (root/children) level needs no refetch —
-// filteredItems() already re-ranks currentItems() locally on every keystroke.
 // Combobox's `@search` fires `{ query }` as the user types in its combobox input.
 // Pipe it into command-palette's own two-way `query` model — `filteredItems()`
 // then re-ranks via scoreCommands (keyword-aware, fuzzy). Capture the fresh value
@@ -640,24 +472,10 @@ const onComboboxSearch = (e: any) => {
     if (resolved.kind === 'async') applyAsyncResult(token, resolved.promise);
   }, searchDebounce);
 };
-
-// Backdrop click: a click whose target IS the backdrop (not the panel/children).
 // Backdrop click: a click whose target IS the backdrop (not the panel/children).
 const onBackdropClick = (e: any) => {
   if (e && e.target === e.currentTarget) closePalette();
 };
-
-// ---- open/close reconcile ----------------------------------------------
-// Focus the vendored <Combobox>'s search <input> via its exposed `focus` handle
-// verb (Combobox.rozie:578 `$expose({ focus, clear })`). Focusing it fires the
-// combobox's `@focus="open"` → the popup opens (the screenshot demo seeds the
-// palette open, so this runs on mount). `$refs.combobox` is the composed child's
-// TYPED handle across all 6 targets (Phase 66 composed-component-ref → handle
-// typing), so `focus()` typechecks and resolves to the child's exposed verb —
-// including on Lit, where this RETIRES the former `<rozie-combobox>` open-shadow-
-// root DOM pierce that only existed because the composed ref used to type as a
-// bare HTMLElement.
-// $refs read in a post-mount callback only (ROZ123-safe).
 // ---- open/close reconcile ----------------------------------------------
 // Focus the vendored <Combobox>'s search <input> via its exposed `focus` handle
 // verb (Combobox.rozie:578 `$expose({ focus, clear })`). Focusing it fires the
@@ -672,10 +490,6 @@ const onBackdropClick = (e: any) => {
 const focusInput = () => {
   combobox?.focus();
 };
-
-// Shadow-aware deepest active element (walks open shadow roots) — so the
-// blur/refocus reopen below works through Lit's shadow boundary (where
-// document.activeElement resolves only to the outermost host).
 // Shadow-aware deepest active element (walks open shadow roots) — so the
 // blur/refocus reopen below works through Lit's shadow boundary (where
 // document.activeElement resolves only to the outermost host).
@@ -686,15 +500,6 @@ const deepActiveElement = () => {
   }
   return node;
 };
-
-// Re-open the vendored combobox popup after a level pop (LVL-NAV). The combobox
-// opens its popup on the input's `@focus`, but a plain focus() on an
-// ALREADY-focused input fires no `@focus` — and Escape leaves the input focused
-// while closing the popup (Combobox.rozie onKeydown → isOpen=false). So BLUR the
-// deepest focused element first (which also runs combobox's `@blur` → isOpen
-// stays false), then re-focus on the next frame so `@focus` fires and re-opens
-// the popup showing the restored parent level. For a Backspace pop (popup never
-// closed) this is a harmless close→reopen cycle.
 // Re-open the vendored combobox popup after a level pop (LVL-NAV). The combobox
 // opens its popup on the input's `@focus`, but a plain focus() on an
 // ALREADY-focused input fires no `@focus` — and Escape leaves the input focused
@@ -716,13 +521,6 @@ const reopenComboboxPopup = () => {
     focusInput();
   }
 };
-
-// On open: clear the internal selection, then focus the search input. The query
-// is NOT reset here — that would clobber a pre-seeded / `r-model`-bound query.
-// The reset happens on the close transition (the $watch else-branch below), so a
-// value set alongside `open` is honored and each plain open still starts fresh
-// (the query was cleared at the prior close).
-// Runs from $onMount and the lazy open $watch callback, both post-mount.
 // On open: clear the internal selection, then focus the search input. The query
 // is NOT reset here — that would clobber a pre-seeded / `r-model`-bound query.
 // The reset happens on the close transition (the $watch else-branch below), so a
@@ -764,15 +562,6 @@ const onPanelKeydown = (e: any) => {
     goBack();
   }
 };
-
-// ---- imperative handle -------------------------------------------------
-// show()/close()/toggle() drive the `open` model. The OPEN verb is `show` (NOT
-// `open`) — an `open` verb collides with the `open` model on React (both collapse
-// onto the generated open/setOpen state). focus() focuses the vendored combobox's
-// control via its exposed handle (accepted ROZ137 Lit override). All post-mount →
-// $refs safe. The POP verb is `goBack` — NOT `back` (a `back()` expose verb would
-// collide with the `@back` EMIT, ROZ121: expose∩emits must be empty). `openTo` is
-// the ⌘P deep-link (stubbed above; Task 6 fills the drill-through).
 // ---- imperative handle -------------------------------------------------
 // show()/close()/toggle() drive the `open` model. The OPEN verb is `show` (NOT
 // `open`) — an `open` verb collides with the `open` model on React (both collapse
