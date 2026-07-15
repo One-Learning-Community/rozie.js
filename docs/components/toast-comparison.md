@@ -1,5 +1,5 @@
 ---
-surface_hash: 654b8b91e617
+surface_hash: 0ec66542b9de
 ---
 
 # Headless toast / notification comparison
@@ -18,7 +18,7 @@ How `@rozie-ui/toast` compares to the existing toast / notification libraries ac
 | **Solid** | `solid-toast` | global `toast()` | A `react-hot-toast`-style port — promise, hover-pause, custom render. The de-facto single option. |
 | **Angular** | `ngx-toastr`, `@angular/material` snackbar (CDK overlay) | injected service | `ngx-toastr` (v20) is the standard: positions, progress bar, animations. Material's `MatSnackBar` shows **one** message at a time — a different shape, not a stack. |
 | **Lit / web components** | *(none mainstream)* | — | No mainstream toast component to point at — you hand-roll the queue, timers, positioning, and ARIA. |
-| **Rozie** | `@rozie-ui/toast-*` | a **component** + `ref` handle | One source → all six, same `position` / `duration` / `max` props, same `show` / `dismiss` / `clear` handle, same `#toast` scoped slot. No global singleton. |
+| **Rozie** | `@rozie-ui/toast-*` | a **component** + `ref` handle | One source → all six, same 7 props, same `show` / `dismiss` / `clear` / `patch` / `promise` handle, same `#toast` scoped slot, same `@dismissed` event. No global singleton. |
 
 These libraries are **good** — on its home framework each is a reasonable (often excellent) pick, and Rozie does not claim to out-feature `sonner` on React or `ngx-toastr` on Angular. The wedge is **consistency, coverage, and the deliberate non-singleton shape**: there is no toast component that spans all six frameworks with the *same* API; each ecosystem reimplements the queue, the auto-dismiss timers, hover-pause, and positioning from scratch (and Lit / web components have nothing mainstream at all). Rozie gives all six the *same* idiomatic `<Toaster>` from one definition.
 
@@ -31,9 +31,9 @@ The deepest decision in a toast library is **how you call `show` from anywhere**
 
 Rozie picks the owned-component camp deliberately. It is the only shape that compiles cleanly to **all six** frameworks without a per-framework global-state mechanism (a React context, a Vue plugin, a Svelte store, an Angular service, …), it keeps the dependency graph clean, and it side-steps the "context doesn't cross a portal" limitation. If you want a global `toast()` ergonomic, it is a few lines of wrapper you own — and you keep the ability to scope multiple independent hosts to different subtrees.
 
-## No events, by design
+## Imperative-first, with one lifecycle event
 
-Most toast libraries are imperative-first already, but many still surface lifecycle callbacks (`onDismiss`, `onAutoClose`). `@rozie-ui/toast` surfaces **none**: a notification host has nothing to two-way bind and nothing to emit upward. The entire write surface is the `show` / `dismiss` / `clear` handle, and the built-in close button calls `dismiss` internally. That is what keeps the same source fully consistent on all six frameworks, and it is why there is no `model: true` prop and no Angular `ControlValueAccessor` (a toast host is not a form control).
+Most toast libraries are imperative-first already; many also surface lifecycle callbacks (`onDismiss`, `onAutoClose`). `@rozie-ui/toast` stays imperative-first — the primary write surface is still the `show` / `dismiss` / `clear` / `patch` / `promise` handle, and the built-in close button calls `dismiss` internally — but it now has its **one** lifecycle event: `@dismissed { toast, reason }`, fired once per toast at dismissal initiation (`clear()` stays bulk and fires nothing). One event, not a callback-per-lifecycle-stage grab-bag, is what keeps the same source fully consistent on all six frameworks. There is still no `model: true` prop and no Angular `ControlValueAccessor` (a toast host is not a form control).
 
 ## Feature matrix
 
@@ -42,34 +42,36 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Capability | React (`sonner`) | Vue (`vue-sonner`) | Svelte (french-toast) | Solid (`solid-toast`) | Angular (`ngx-toastr`) | Lit (none) | **`@rozie-ui/toast`** |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Queue + auto-dismiss | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Hover-to-pause timers | ✅ | ✅ | ✅ | ✅ | ⚠️ `extendedTimeOut` | ❌ | ✅ (`disablePauseOnHover` opt-out) |
+| Hover-to-pause timers | ✅ | ✅ | ✅ | ✅ | ⚠️ `extendedTimeOut` | ❌ | ✅ (`disablePauseOnHover` opt-out; resumes from the exact remainder, not a full restart¹) |
 | Multiple positions | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ (6 corners) |
 | Custom toast render | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ (`#toast` slot) |
 | Accessible ARIA live region | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ (`role=region`/`status`, severity `aria-live`) |
-| Promise / loading toast | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ (deferred) |
-| Swipe-to-dismiss | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ (deferred) |
-| Animated stack / expand | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ❌ | ⚠️ (clean flex stack) |
+| Promise / loading toast | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ (`promise()` verb + `'loading'` type) |
+| Swipe-to-dismiss | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ (on by default; `disableSwipe` opt-out) |
+| Animated stack / expand | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ❌ | ✅ enter/exit animations always; opt-in `stacked` collapsed overlay |
 | Zero-config, fully re-skinnable theming | ⚠️ styled, CSS-var overrides | ⚠️ | ⚠️ | ⚠️ | ⚠️ ships CSS | ❌ | ✅ CSS-var tokens + shadcn / Material / Bootstrap bridges |
 | Ref-driven (no global singleton) | ❌ global `toast()` | ❌ | ❌ | ❌ | ❌ injected service | — | ✅ imperative `ref` handle |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
+¹ Hovering pauses every timer and stores its exact remainder; leaving resumes from that remainder — a 1000ms toast hovered ~600ms in and released dismisses ~400ms later, not after a fresh 1000ms.
+
 ## Where Rozie wins today
 
 - **One definition, six idiomatic packages** — including **Lit / web components**, which have *no* mainstream toast component at all, and **Svelte / Solid**, which lean on store / singleton patterns. All are categories the incumbents barely serve uniformly.
-- **The same component surface everywhere.** Where the ecosystem offers a different library per framework — six APIs, six queue models, six theming stories — `@rozie-ui/toast` is one `<Toaster>` with the same `position` / `duration` / `max` / `disablePauseOnHover` props, the same `show` / `dismiss` / `clear` handle, and the same `#toast` scoped slot on all six.
+- **The same component surface everywhere.** Where the ecosystem offers a different library per framework — six APIs, six queue models, six theming stories — `@rozie-ui/toast` is one `<Toaster>` with the same 7 props (`position` / `duration` / `max` / `disablePauseOnHover` / `ariaLabel` / `disableSwipe` / `stacked`), the same `show` / `dismiss` / `clear` / `patch` / `promise` handle, the same `#toast` scoped slot, and the same `@dismissed` event on all six.
 - **No imposed global state.** The host is a normal component you `ref` — no module-global singleton, no plugin install, no injected service — so it keeps the dependency graph clean, is SSR-safe (every timer is `typeof window`-guarded), and is scopable to any subtree.
-- **Accessible live region out of the box.** `role="region"` landmark, per-toast `role="status"` with `aria-live` chosen by severity (`assertive` for errors / warnings, `polite` otherwise), and a real `<button aria-label="Dismiss">`.
+- **Precise, gesture-rich dismissal — matched to the polish leaders.** Hover-to-pause resumes from the exact remainder (not a full restart); pointer swipe-to-dismiss is on by default with corner-derived direction, distance/velocity thresholds, and spring-back; every toast plays enter/exit animations, and an opt-in `stacked` mode gives you the sonner-style collapsed overlay that expands on hover/focus.
+- **`promise()` for async operations.** One call shows a loading spinner and flips to success/error at settle — with a never-resurrect guard if the toast was dismissed while pending, something not every incumbent's `toast.promise()` documents.
+- **Accessible live region out of the box.** `role="region"` landmark, per-toast `role="status"` with `aria-live` chosen by severity (`assertive` for errors / warnings, `polite` otherwise), a real `<button aria-label="Dismiss">`, a decorative (`aria-hidden`) loading spinner, and `prefers-reduced-motion` support that keeps the dismissal lifecycle intact while collapsing transforms to fades.
 - **Zero-config styling that re-skins to any design system.** Every rendered value is a `--rozie-toast-*` CSS custom property with a built-in fallback, plus ready-made token bridges for shadcn/ui, Material 3, and Bootstrap 5 — where the incumbents ship opinionated, harder-to-fully-reskin CSS.
 
 ## What Rozie defers {#what-rozie-defers}
 
-This page concedes where the incumbents are genuinely ahead — that's what keeps the comparison credible, and it doubles as Rozie's own roadmap. Be clear-eyed: `sonner` and `react-hot-toast` are extremely polished, battle-tested single-framework libraries, and on React alone they are more capable today.
+This page concedes where the incumbents are genuinely ahead — that's what keeps the comparison credible, and it doubles as Rozie's own roadmap. Be clear-eyed: `sonner` and `react-hot-toast` are extremely polished, battle-tested single-framework libraries, and on React alone they are more capable today. The toast-ux-cluster wave closed the four cells previously listed here (promise/loading, swipe-to-dismiss, animated stack, remaining-time-aware pause) — the two structural stances below remain deliberate, permanent choices, not gaps:
 
-- **The global `toast()` ergonomic.** `sonner` / `react-hot-toast` let you `import { toast } from '…'` and call it from anywhere with zero wiring. Rozie's ref-driven model is deliberately less ergonomic: you must thread the ref to call sites (or wrap it in your own app context / store). More explicit, slightly more setup.
-- **Swipe-to-dismiss and rich enter / exit + stacking animation.** `sonner` (and its Vue port) has a polished animated stack — hover to expand, momentum swipe to dismiss. `@rozie-ui/toast` ships a clean flex stack with a close button; gesture + animation choreography is not modeled in v1.
-- **Promise / loading toasts.** The `toast.promise(...)` convenience (pending → resolved / rejected in one call) that `sonner`, `react-hot-toast`, `vue-sonner`, and `svelte-french-toast` offer is a wrapper you can build on `show` / `dismiss`, not a built-in.
-- **Remaining-time-aware hover pause.** Hovering pauses the auto-dismiss timers and a full restart runs on leave; precise remaining-time tracking (resume exactly where it paused) is intentionally out of v1 scope.
-- **`@rozie-ui/toast` is `0.1.0`.** The surface (5 props / 0 events / 3-verb handle / 1 scoped slot / hover-pause / six positions) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established per-framework libraries.
+- **The global `toast()` ergonomic.** `sonner` / `react-hot-toast` let you `import { toast } from '…'` and call it from anywhere with zero wiring. Rozie's ref-driven model is deliberately less ergonomic: you must thread the ref to call sites (or wrap it in your own app context / store). More explicit, slightly more setup — see [The global-singleton question](#the-global-singleton-question) above for why this is a permanent stance, not a gap.
+- **Per-toast action-button API.** Some incumbents ship a dedicated `action: { label, onClick }` option. `@rozie-ui/toast` covers this with the `#toast` scoped slot instead (full custom chrome, not a fixed one-button shape) rather than adding a second, narrower API surface for the same job.
+- **`@rozie-ui/toast` is a MINOR (not yet 1.0).** The expanded surface (7 props / 1 event / 5-verb handle / 1 scoped slot / precise hover-pause / promise+loading / swipe / opt-in stacked mode / six positions) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established per-framework libraries.
 
 ## Try it
 
