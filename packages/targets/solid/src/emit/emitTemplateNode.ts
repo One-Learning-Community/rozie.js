@@ -390,7 +390,35 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   // (`each: T extends readonly any[]`) tolerated bare `any` implicitly; restore
   // that by casting the iterable to `readonly any[]` so `<Key>` always infers a
   // usable element type. Type-only (erased at runtime) — reactivity unchanged.
-  return `<Key each={${iterableCode} as readonly any[]} by={(${node.itemAlias}) => ${keyCode}}>{${aliasStr} => ${bodyJsx}}</Key>`;
+  //
+  // `as` binds tighter than ternary/logical/binary operators, so a low-
+  // precedence iterable (`a ? b : []`) spliced bare would leave the cast on
+  // its LAST OPERAND only (`a ? b : ([] as readonly any[])`) and `T` degrades
+  // to `unknown` again (the command-palette action-flyout regression).
+  // Parenthesize exactly those shapes; the common call/member/identifier/
+  // array iterables stay byte-identical to the pre-guard emit. The check runs
+  // on the IR's Babel node — rewriteTemplateExpression never changes a safe
+  // top-level form into a low-precedence one (identifier→call at most).
+  const AS_CAST_SAFE_TYPES = new Set([
+    'Identifier',
+    'MemberExpression',
+    'OptionalMemberExpression',
+    'CallExpression',
+    'OptionalCallExpression',
+    'NewExpression',
+    'ArrayExpression',
+    'ObjectExpression',
+    'TSNonNullExpression',
+    'TSAsExpression',
+    'ParenthesizedExpression',
+    'StringLiteral',
+    'NumericLiteral',
+    'TemplateLiteral',
+  ]);
+  const eachOperand = AS_CAST_SAFE_TYPES.has(node.iterableExpression.type)
+    ? iterableCode
+    : `(${iterableCode})`;
+  return `<Key each={${eachOperand} as readonly any[]} by={(${node.itemAlias}) => ${keyCode}}>{${aliasStr} => ${bodyJsx}}</Key>`;
 }
 
 /**

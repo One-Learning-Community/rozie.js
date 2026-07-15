@@ -50,6 +50,14 @@ const KEYED_INDEX = `<rozie name="KeyedIndexLoop">
 </rozie>
 `;
 
+const KEYED_TERNARY = `<rozie name="KeyedTernaryLoop">
+<data>{ anchor: null }</data>
+<template>
+<ul><li r-for="item in ($data.anchor ? $data.anchor.actions : [])" :key="item.id">{{ item.label }}</li></ul>
+</template>
+</rozie>
+`;
+
 describe('Solid keyed r-for → <Key> (260704-mf3)', () => {
   it('Test 1 — keyed loop emits <Key ... by={...}> with accessor-invoked item refs', () => {
     const ir = lowerInline(KEYED);
@@ -85,5 +93,26 @@ describe('Solid keyed r-for → <Key> (260704-mf3)', () => {
     // Key passes index as an ACCESSOR too — the author alias `i` must invoke.
     expect(code).toContain('i()');
     expect(code).toContain('<Key each={');
+  });
+
+  it('Test 4 — low-precedence (ternary) iterable is parenthesized before the readonly-any cast', () => {
+    // `as` binds tighter than `?:`, so an unparenthesized splice would leave
+    // the cast on the FALSE BRANCH only (`a ? b : ([] as readonly any[])`) —
+    // <Key> then infers `T = unknown` from the `any` true branch and every
+    // item member access fails under strict tsc (the command-palette action
+    // flyout regression, 2026-07 pre-publish battery).
+    const ir = lowerInline(KEYED_TERNARY);
+    const { code } = emitSolid(ir, { filename: 'KeyedTernaryLoop.rozie', source: KEYED_TERNARY });
+    expect(code).toContain('<Key each={(anchor() ? anchor().actions : []) as readonly any[]}');
+    expect(code).toContain('by={(item) => item.id}');
+  });
+
+  it('Test 5 — call-expression iterable keeps the bare (unparenthesized) cast, byte-identical', () => {
+    const ir = lowerInline(KEYED);
+    const { code } = emitSolid(ir, { filename: 'KeyedLoop.rozie', source: KEYED });
+    // The common member/call/identifier iterables must NOT gain parens (the
+    // published leaves' emit stays byte-identical to the pre-fix shape).
+    expect(code).toContain('<Key each={rows() as readonly any[]}');
+    expect(code).not.toContain('(rows()) as readonly any[]');
   });
 });
