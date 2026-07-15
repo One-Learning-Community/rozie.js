@@ -40,7 +40,10 @@ export function renderType(ann: PropTypeAnnotation): string {
         // `unknown` requires cast at every access site which the emitter doesn't produce.
         return 'Record<string, any>';
       case 'Function':
-        return '(...args: unknown[]) => unknown';
+        // Converge on React's permissive `any` precedent (see
+        // renderPropsInterface.ts core comment) — a `Function` prop is
+        // assignable to a strict typed function param (e.g. `CommandScorer<T>`).
+        return '(...args: any[]) => any';
       default:
         return ann.name;
     }
@@ -62,7 +65,7 @@ export function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'literal') {
     if (ann.value === 'array') return 'any[]';
     if (ann.value === 'object') return 'Record<string, any>';
-    if (ann.value === 'function') return '(...args: unknown[]) => unknown';
+    if (ann.value === 'function') return '(...args: any[]) => any';
     return ann.value;
   }
   return 'unknown';

@@ -161,7 +161,13 @@ function renderTsType(ann: PropTypeAnnotation): string {
       // fails. `any` keeps the iteration ergonomic.
       case 'Array': return 'any[]';
       case 'Object': return 'any';
-      case 'Function': return '((...args: unknown[]) => unknown) | null';
+      // Converge on React's permissive `any` precedent (see
+      // renderPropsInterface.ts core comment) — `unknown`'s return type is not
+      // assignable to a strict typed function param (e.g. `CommandScorer<T>`),
+      // producing TS2345. `| null` is retained: a Function prop has no
+      // synthesizable zero value (see `zeroValueFor`), so Lit's field default
+      // is `null` and the declared type must admit it.
+      case 'Function': return '((...args: any[]) => any) | null';
       // A non-builtin identifier is a bare type name referencing a type alias
       // / interface declared in the component's `<script lang="ts">` block
       // (those declarations are module-hoisted on this class-based target).
@@ -294,7 +300,7 @@ function renderFieldSuffix(prop: PropDecl): string {
     // strictNullChecks, so their field text stays byte-identical. A type admits
     // `null` when it contains a `null` union alternative — at the top level
     // (Function props render `(...) | null`) OR paren-grouped within a pure
-    // union (data-table `aggregationFn: string | (((...) => unknown) | null)`
+    // union (data-table `aggregationFn: string | (((...) => any) | null)`
     // flattens to include `null`) — or has a bare `any` / `unknown` union member
     // (`any` sentinel, `any | boolean`). A genuinely null-FAILING type
     // (`string` / `number` / `any[]` (array, not a bare `any`) / an object

@@ -219,7 +219,13 @@ export function renderPropType(ann: PropTypeAnnotation): string {
       case 'Object':
         return 'Record<string, unknown>';
       case 'Function':
-        return '(...args: unknown[]) => unknown';
+        // Converge on React's permissive precedent — `any`, not `unknown` —
+        // so a Function prop is assignable to a strict typed function param
+        // (e.g. `CommandScorer<T>`). React/Vue/Svelte already emit `any`;
+        // Angular/Lit/Solid previously diverged to `unknown`, whose `unknown`
+        // RETURN type is not assignable to a strict typed param, producing
+        // TS2345 (memory: project_function_prop_type_lowering_gap).
+        return '(...args: any[]) => any';
       default:
         // Pass through user-defined identifiers verbatim — covers generic
         // type-parameter names (e.g., 'T') and consumer-declared interfaces.
@@ -229,7 +235,8 @@ export function renderPropType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'literal') {
     switch (ann.value) {
       case 'function':
-        return '(...args: unknown[]) => unknown';
+        // See the identifier-kind `Function` case above — same `any` rationale.
+        return '(...args: any[]) => any';
       case 'object':
         return 'Record<string, unknown>';
       case 'array':

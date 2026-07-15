@@ -99,7 +99,7 @@ describe('renderPropsInterface — Task 1 behavior', () => {
       'Record<string, unknown>',
     );
     expect(renderPropType({ kind: 'identifier', name: 'Function' })).toBe(
-      '(...args: unknown[]) => unknown',
+      '(...args: any[]) => any',
     );
     expect(
       renderPropType({
@@ -227,6 +227,6 @@ describe('renderPropsInterface — Task 1 behavior', () => {
     const occurrences = out.split('\n').filter((l) => l.includes('onSelect'));
     expect(occurrences).toHaveLength(1);
     // The surviving member is the literal prop, not the emit-derived handler.
-    expect(out).toContain('  onSelect: (...args: unknown[]) => unknown;');
+    expect(out).toContain('  onSelect: (...args: any[]) => any;');
   });
 });
