@@ -34,6 +34,19 @@ This is the first-class replacement for branching on `query === ''` inside a `so
 
 A palette (or level) with no `defaultItems` set behaves exactly as before this feature — the full, unfiltered `items`/`children` list in source order.
 
+## Per-item hotKey badge
+
+Any command item may carry an optional `hotKey?: string` field — a **display-only** teaching badge advertising an app-global shortcut the CONSUMER owns (e.g. Copy `$mod+c`, Print `$mod+p`, New `$mod+n`). It uses the same portable `$mod`/`$shift`/`$alt`/`$ctrl` modifier grammar as `actionKey` (see [Interactive sub-actions](#interactive-sub-actions) above) — `$mod+p` renders `⌘P` on Apple platforms and `Ctrl+P` elsewhere.
+
+The palette **never binds or listens for this key** — there is no keydown handler wired to it. It is purely a right-aligned badge rendered on the result row (before the `#actions` affordance) whenever the item's `hotKey` is non-empty; an item with no `hotKey` renders no badge. If you consume the `#option` slot directly, the badge is not re-projected for you — read `option.hotKey` yourself and render it however fits your custom row.
+
+```ts
+const items = [
+  { id: 'print', label: 'Print', hotKey: '$mod+p' }, // renders "⌘P" / "Ctrl+P"
+  { id: 'new', label: 'New File', hotKey: '$mod+n' }, // renders "⌘N" / "Ctrl+N"
+];
+```
+
 ## Grouped commands
 
 Commands sharing the same `items[].group` string render as labeled sections — auto-derived from the existing `group` field, no separate opt-in prop. Commands with no `group` render first in a headingless block; groups then follow in first-appearance order (the order their first member appears in `items`), each labeled with its `group` string. A consumer whose items carry no `group` at all sees today's flat, unsectioned list — byte-identical to before this feature.
@@ -124,6 +137,16 @@ New in `0.3.0` (style polish for nested levels + sub-actions):
 | `--rozie-command-palette-input-focus-ring-width` | `0` | Forwarded to `--rozie-combobox-focus-ring-width` — no focus ring by default inside the palette (was the combobox's default `3px` blue ring). |
 | `--rozie-command-palette-input-underline` | `var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1))` | Forwarded to `--rozie-combobox-input-underline` — the input's bottom-border longhand, which survives the combobox's own `:focus` border-color override so the divider stays put whether the input is focused or not. |
 | `--rozie-command-palette-section-gap` | `0.375rem` | Forwarded to `--rozie-combobox-group-heading-margin-top` — top spacing above each group heading, separating the leading ungrouped block from the first labeled section. |
+
+New in a later release (per-item [hotKey badge](#per-item-hotkey-badge)) — each token falls back to the matching `--rozie-command-palette-actions-hint-*` value, so a consumer who already themed the `#actions` hint gets a matching badge for free:
+
+| Token | Fallback | Description |
+| --- | --- | --- |
+| `--rozie-command-palette-hotkey-padding` | `--rozie-command-palette-actions-hint-padding` (`0.0625rem 0.3125rem`) | The badge's padding. |
+| `--rozie-command-palette-hotkey-font-size` | `--rozie-command-palette-actions-hint-font-size` (`0.6875rem`) | The badge's font size. |
+| `--rozie-command-palette-hotkey-color` | `--rozie-command-palette-actions-hint-color` (`inherit`) | The badge's text color. |
+| `--rozie-command-palette-hotkey-bg` | `--rozie-command-palette-actions-hint-bg` (`rgba(0, 0, 0, 0.06)`) | The badge's background. |
+| `--rozie-command-palette-hotkey-radius` | `--rozie-command-palette-actions-hint-radius` (`0.25rem`) | The badge's corner radius. |
 
 The full token vocabulary — overlay/scrim, panel chrome, the flyout, the header/back button, the list/option box model, empty/loading/error states, and the footer — has documented defaults in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/command-palette/src/themes/base.css). Structural rules (the fixed overlay, the non-clipping frame's positioning, the panel's `overflow: hidden`, the flyout's `position: absolute`) compile per-leaf and are not consumer-overridable.
 
