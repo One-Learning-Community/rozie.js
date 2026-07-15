@@ -17,10 +17,9 @@
  *     author ORDER is preserved (no canonical reordering).
  *   - The FINAL segment, when it is NOT a modifier: a single character is
  *     uppercased (`p` → `P`); a multi-character token (`F5`, `enter`, `Tab`)
- *     is left verbatim on the non-Apple ('+'-joined) form, and has ONLY its
- *     first letter capitalized on the Apple (concatenated, no-separator)
- *     form — matching macOS's own key-name convention (⇧Enter, ⌘Delete) where
- *     the glyph run has no separator to lean on.
+ *     gets its first letter capitalized on BOTH platforms — the shared
+ *     key-name convention (⇧Enter / Shift+Enter, ⌘Delete / Ctrl+Delete).
+ *     Already-cased input (`F5`, `Tab`) is unaffected.
  *   - Any unrecognized NON-final segment is left verbatim (untouched case).
  *   - Join: Apple = straight concatenation (no separator); non-Apple = '+'.
  */
@@ -40,7 +39,7 @@ export const formatKeyToken = (token, isApple) => {
     if (mod) return isApple ? mod.apple : mod.other;
     if (i !== lastIndex) return segment;
     if (segment.length === 1) return segment.toUpperCase();
-    return isApple ? segment.charAt(0).toUpperCase() + segment.slice(1) : segment;
+    return segment.charAt(0).toUpperCase() + segment.slice(1);
   });
   return rendered.join(isApple ? '' : '+');
 };

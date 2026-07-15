@@ -34,9 +34,9 @@ describe('formatKeyToken', () => {
     expect(formatKeyToken('$alt+$ctrl+f', false)).toBe('Alt+Ctrl+F');
   });
 
-  it('leaves a multi-char final non-modifier segment verbatim (not uppercased)', () => {
+  it('first-letter-capitalizes a multi-char final non-modifier segment on BOTH platforms', () => {
     expect(formatKeyToken('$shift+enter', true)).toBe('⇧Enter');
-    expect(formatKeyToken('$shift+enter', false)).toBe('Shift+enter');
+    expect(formatKeyToken('$shift+enter', false)).toBe('Shift+Enter');
   });
 
   it('leaves a multi-char final token like F5 verbatim (already the desired case)', () => {
