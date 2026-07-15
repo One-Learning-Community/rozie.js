@@ -71,12 +71,20 @@ export interface ComboboxProps {
    * Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default).
    */
   groups?: unknown[];
+  /**
+   * Cap each native section group to its first `groupCap` results, adding a keyboard-reachable '+N more' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default), byte-identical to today. Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.
+   */
+  groupCap?: number;
   onChange?: (...args: unknown[]) => void;
   onSearch?: (...args: unknown[]) => void;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;
   renderGroupHeading?: (params: { group: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
+  renderEmpty?: (params: { query: unknown }) => ReactNode;
+  renderGroupHeading?: (params: { group: unknown }) => ReactNode;
+  renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
+  renderGroupMore?: (params: { group: unknown; hidden: unknown; expand: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;

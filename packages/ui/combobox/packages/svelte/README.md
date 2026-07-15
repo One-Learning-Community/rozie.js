@@ -69,6 +69,7 @@ import '@rozie-ui/combobox-svelte/themes/shadcn.css';    // or material.css, boo
 | `estimateRowHeight` | `Number` | `36` |  |  |
 | `maxHeight` | `String` | `''` |  |  |
 | `groups` | `Array` | `[]` |  |  |
+| `groupCap` | `Number` | `0` |  |  |
 
 ## Events
 
@@ -105,6 +106,10 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | empty | query |
 | groupHeading | group |
 | option | option, index, active, selected, disabled |
+| empty | query |
+| groupHeading | group |
+| option | option, index, active, selected, disabled |
+| groupMore | group, hidden, expand |
 | empty | query |
 | option | option, index, active, selected, disabled |
 | empty | query |

@@ -104,6 +104,7 @@ export class ComboboxFormComponent {
 | `estimateRowHeight` | `Number` | `36` |  |  |
 | `maxHeight` | `String` | `''` |  |  |
 | `groups` | `Array` | `[]` |  |  |
+| `groupCap` | `Number` | `0` |  |  |
 
 ## Events
 
@@ -140,6 +141,10 @@ export class DemoComponent {
 | empty | query |
 | groupHeading | group |
 | option | option, index, active, selected, disabled |
+| empty | query |
+| groupHeading | group |
+| option | option, index, active, selected, disabled |
+| groupMore | group, hidden, expand |
 | empty | query |
 | option | option, index, active, selected, disabled |
 | empty | query |

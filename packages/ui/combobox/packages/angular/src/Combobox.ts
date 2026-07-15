@@ -38,6 +38,13 @@ interface GroupHeadingCtx {
   group: any;
 }
 
+interface GroupMoreCtx {
+  $implicit: { group: any; hidden: any; expand: any };
+  group: any;
+  hidden: any;
+  expand: any;
+}
+
 function __rozieDisplay(v: unknown): string {
   if (v == null) return '';
   if (typeof v === 'string') return v;
@@ -89,7 +96,7 @@ function __rozieAttr(v: unknown): string | null {
     }
         </li>
     }</ul>
-    }@if (isOpen() && !virtual() && isGrouped()) {
+    }@if (isOpen() && !virtual() && isGrouped() && !isCapped()) {
     <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
         @for (blk of groupBlocks(); track 'grp-' + (blk.group ? blk.group.id : '_ungrouped')) {
     <li class="rozie-combobox-group" role="group" [attr.aria-label]="rozieAttr(blk.group ? blk.group.label : null)">
@@ -114,6 +121,48 @@ function __rozieAttr(v: unknown): string | null {
     }
 
         @if (groupBlocks().length === 0) {
+    <li class="rozie-combobox-empty" role="presentation">
+          @if ((emptyTpl ?? templates()?.['empty'])) {
+    <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
+    } @else {
+    No results
+    }
+        </li>
+    }</ul>
+    }@if (isOpen() && !virtual() && isCapped()) {
+    <ul class="rozie-combobox-list" [attr.id]="rozieAttr(listId())" role="listbox">
+        @for (blk of cappedBlocks(); track 'grp-' + (blk.group ? blk.group.id : '_ungrouped')) {
+    <li class="rozie-combobox-group" role="group" [attr.aria-label]="rozieAttr(blk.group ? blk.group.label : null)">
+          @if (blk.group) {
+    <div class="rozie-combobox-group-heading" role="presentation">
+            @if ((groupHeadingTpl ?? templates()?.['groupHeading'])) {
+    <ng-container *ngTemplateOutlet="(groupHeadingTpl ?? templates()?.['groupHeading']); context: { $implicit: { group: blk.group }, group: blk.group }" />
+    } @else {
+    {{ rozieDisplay(blk.group.label) }}
+    }
+          </div>
+    }@for (opt of blk.items; track opt.value) {
+    <div class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': opt._i === activeIndex(), 'rozie-combobox-option--selected': opt.value === value(), 'rozie-combobox-option--disabled': opt.disabled }" [attr.id]="rozieAttr(optId(opt._i))" role="option" [attr.aria-selected]="opt.value === value()" [attr.aria-disabled]="!!opt.disabled" (mousedown)="$event.preventDefault(); selectOption(opt)" (mouseenter)="activeIndex.set(opt._i)">
+            @if ((optionTpl ?? templates()?.['option'])) {
+    <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }, option: opt.option, index: opt._i, active: opt._i === activeIndex(), selected: opt.value === value(), disabled: opt.disabled }" />
+    } @else {
+    {{ rozieDisplay(opt.label) }}
+    }
+          </div>
+    }
+
+          @if (blk.more) {
+    <div class="rozie-combobox-option rozie-combobox-more" [ngClass]="{ 'rozie-combobox-option--active': blk.more._i === activeIndex() }" [attr.id]="rozieAttr(optId(blk.more._i))" role="option" (mousedown)="$event.preventDefault(); selectOption(blk.more)" (mouseenter)="activeIndex.set(blk.more._i)">
+            @if ((groupMoreTpl ?? templates()?.['groupMore'])) {
+    <ng-container *ngTemplateOutlet="(groupMoreTpl ?? templates()?.['groupMore']); context: { $implicit: { group: blk.group, hidden: blk.more.hidden, expand: blk.more.expand }, group: blk.group, hidden: blk.more.hidden, expand: blk.more.expand }" />
+    } @else {
+    +{{ rozieDisplay(blk.more.hidden) }} more
+    }
+          </div>
+    }</li>
+    }
+
+        @if (cappedBlocks().length === 0) {
     <li class="rozie-combobox-empty" role="presentation">
           @if ((emptyTpl ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
@@ -230,6 +279,11 @@ function __rozieAttr(v: unknown): string | null {
       pointer-events: none;
       user-select: none;
     }
+    .rozie-combobox-more {
+      cursor: pointer;
+      color: var(--rozie-combobox-more-color, rgba(0, 0, 0, 0.55));
+      font-size: var(--rozie-combobox-more-size, 0.875rem);
+    }
     .rozie-combobox-spacer { margin: 0; padding: 0; border: 0; list-style: none; }
     .rozie-combobox--inline {
       display: block;
@@ -319,12 +373,17 @@ export class Combobox {
    * Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default).
    */
   groups = input<any[]>((() => [])());
+  /**
+   * Cap each native section group to its first `groupCap` results, adding a keyboard-reachable '+N more' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default), byte-identical to today. Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.
+   */
+  groupCap = input<number>(0);
   query = signal('');
   isOpen = signal(false);
   activeIndex = signal(-1);
   rows = signal<any[]>([]);
   windowVer = signal(0);
   editVer = signal(0);
+  expandedGroups = signal({});
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   change = output<unknown>();
@@ -332,6 +391,7 @@ export class Combobox {
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
   @ContentChild('groupHeading', { read: TemplateRef }) groupHeadingTpl?: TemplateRef<GroupHeadingCtx>;
+  @ContentChild('groupMore', { read: TemplateRef }) groupMoreTpl?: TemplateRef<GroupMoreCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
@@ -344,6 +404,7 @@ export class Combobox {
       this.syncQueryToValue();
     })(); }); });
     effect(() => { const __watchVal = (() => (this.options() ? this.options().length : 0) + '|' + this.query())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+      if (this.expandedGroups() && Object.keys(this.expandedGroups()).length) this.expandedGroups.set({});
       this.syncRows();
       if (this.virtual() && this.virtualizer) {
         this.virtualizer.setOptions(this.virtualizerOptions());
@@ -661,6 +722,66 @@ export class Combobox {
     return blocks;
   };
   isGrouped = () => !this.virtual() && Array.isArray(this.groups()) && this.groups().length > 0;
+  capNum = () => {
+    const n = Number(this.groupCap());
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  };
+  isCapped = () => this.isGrouped() && this.capNum() > 0;
+  gkey = (gid: any) => gid == null ? '__ungrouped__' : String(gid);
+  isExpanded = (gid: any) => !!(this.expandedGroups() && this.expandedGroups()[this.gkey(gid)]);
+  expandGroup = (gid: any) => {
+    this.expandedGroups.set(Object.assign({}, this.expandedGroups(), {
+      [this.gkey(gid)]: true
+    }));
+  };
+  cappedBlocks = () => {
+    const blocks = this.groupBlocks();
+    const cap = this.capNum();
+    let running = 0;
+    const out = [];
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const blk = blocks[bi];
+      const gid = blk.group ? blk.group.id : null;
+      const showAll = this.isExpanded(gid) || blk.items.length <= cap;
+      const visibleSrc = showAll ? blk.items : blk.items.slice(0, cap);
+      const items = [];
+      for (let vi = 0; vi < visibleSrc.length; vi++) {
+        items.push(Object.assign({}, visibleSrc[vi], {
+          _i: running
+        }));
+        running++;
+      }
+      let more: any = null;
+      if (!showAll) {
+        more = {
+          isMore: true,
+          group: gid,
+          hidden: blk.items.length - cap,
+          disabled: false,
+          _i: running,
+          expand: () => this.expandGroup(gid)
+        };
+        running++;
+      }
+      out.push({
+        group: blk.group,
+        items,
+        more
+      });
+    }
+    return out;
+  };
+  navRows = () => {
+    if (!this.isCapped()) return this.filteredOptions();
+    const out = [];
+    const blocks = this.cappedBlocks();
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const blk = blocks[bi];
+      for (let ii = 0; ii < blk.items.length; ii++) out.push(blk.items[ii]);
+      if (blk.more) out.push(blk.more);
+    }
+    return out;
+  };
   pinnedEditIndex = () => -1;
   pinnedMeasurement = (pin: any) => null;
   syncRows = () => {
@@ -704,7 +825,7 @@ export class Combobox {
   listId = () => this.idBase() + '-list';
   activeId = () => {
     const __activeIndex = this.activeIndex();
-    const list = this.filteredOptions();
+    const list = this.navRows();
     if (this.isOpen() && __activeIndex >= 0 && list[__activeIndex]) return this.optId(__activeIndex);
     return null;
   };
@@ -720,7 +841,13 @@ export class Combobox {
     return from;
   };
   selectOption = (opt: any) => {
-    if (!opt || opt.disabled) return;
+    if (!opt) return;
+    if (opt.isMore) {
+      this.expandGroup(opt.group);
+      this.activeIndex.set(opt._i);
+      return;
+    }
+    if (opt.disabled) return;
     this.value.set(opt.value), this.__rozieCvaOnChange(opt.value);
     this.query.set(String(opt.label));
     if (this.closeOnSelect()) this.isOpen.set(false);
@@ -755,7 +882,7 @@ export class Combobox {
   };
   onKeydown = (e: any) => {
     const key = e ? e.key : '';
-    const list = this.filteredOptions();
+    const list = this.navRows();
     // Capture the reactive reads into locals BEFORE any write so React never binds
     // a pre-write value (ROZ138; the read-then-write-same-key idiom). Each branch
     // is mutually exclusive, but a flow-insensitive analysis can't see that.
@@ -857,7 +984,7 @@ export class Combobox {
   static ngTemplateContextGuard(
     _dir: Combobox,
     _ctx: unknown,
-  ): _ctx is OptionCtx | EmptyCtx | GroupHeadingCtx {
+  ): _ctx is OptionCtx | EmptyCtx | GroupHeadingCtx | GroupMoreCtx {
     return true;
   }
 

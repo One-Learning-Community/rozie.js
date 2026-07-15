@@ -33,10 +33,10 @@ const EXPECT = {
   // combobox-native-groups: + `groups` prop + `groupHeading` slot (native option grouping).
   // NOTE: the slot is named `groupHeading` (camelCase), NOT `group-heading` — ROZ127 rejects
   // hyphenated slot names (Vue's defineSlots<{…}>() can't emit an unquoted hyphenated key).
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups'],
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap'],
   models: ['value'],
   emits: ['change', 'search'],
-  slots: ['option', 'empty', 'groupHeading'] as string[],
+  slots: ['option', 'empty', 'groupHeading', 'groupMore'] as string[],
   // seedQuery (command-palette #2 levels/restore-on-pop prerequisite): an
   // imperative-only handle verb that seeds $data.query — NOT a second model
   // (ROZ125 — combobox's sole model:true prop stays `value`).
@@ -65,7 +65,7 @@ describe('Combobox.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (16 props)', () => {
+  it('props surface matches (17 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

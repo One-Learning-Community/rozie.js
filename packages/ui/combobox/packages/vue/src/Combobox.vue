@@ -11,7 +11,7 @@
 
     <li v-if="filteredOptions().length === 0" class="rozie-combobox-empty" role="presentation">
       <slot name="empty" :query="query">No results</slot>
-    </li></ul><ul v-if="isOpen && !props.virtual && isGrouped()" class="rozie-combobox-list" :id="listId()" role="listbox">
+    </li></ul><ul v-if="isOpen && !props.virtual && isGrouped() && !isCapped()" class="rozie-combobox-list" :id="listId()" role="listbox">
     <li v-for="blk in groupBlocks()" :key="'grp-' + (blk.group ? blk.group.id : '_ungrouped')" class="rozie-combobox-group" role="group" :aria-label="blk.group ? blk.group.label : undefined">
       <div v-if="blk.group" class="rozie-combobox-group-heading" role="presentation">
         <slot name="groupHeading" :group="blk.group">{{ blk.group.label }}</slot>
@@ -21,6 +21,20 @@
     </li>
 
     <li v-if="groupBlocks().length === 0" class="rozie-combobox-empty" role="presentation">
+      <slot name="empty" :query="query">No results</slot>
+    </li></ul><ul v-if="isOpen && !props.virtual && isCapped()" class="rozie-combobox-list" :id="listId()" role="listbox">
+    <li v-for="blk in cappedBlocks()" :key="'grp-' + (blk.group ? blk.group.id : '_ungrouped')" class="rozie-combobox-group" role="group" :aria-label="blk.group ? blk.group.label : undefined">
+      <div v-if="blk.group" class="rozie-combobox-group-heading" role="presentation">
+        <slot name="groupHeading" :group="blk.group">{{ blk.group.label }}</slot>
+      </div><div v-for="opt in blk.items" :key="opt.value" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': opt._i === activeIndex, 'rozie-combobox-option--selected': opt.value === value, 'rozie-combobox-option--disabled': opt.disabled }]" :id="optId(opt._i)" role="option" :aria-selected="opt.value === value" :aria-disabled="!!opt.disabled" @mousedown.prevent="selectOption(opt)" @mouseenter="activeIndex = opt._i">
+        <slot name="option" :option="opt.option" :index="opt._i" :active="opt._i === activeIndex" :selected="opt.value === value" :disabled="opt.disabled">{{ opt.label }}</slot>
+      </div>
+
+      <div v-if="blk.more" :class="['rozie-combobox-option rozie-combobox-more', { 'rozie-combobox-option--active': blk.more._i === activeIndex }]" :id="optId(blk.more._i)" role="option" @mousedown.prevent="selectOption(blk.more)" @mouseenter="activeIndex = blk.more._i">
+        <slot name="groupMore" :group="blk.group" :hidden="blk.more.hidden" :expand="blk.more.expand">+{{ blk.more.hidden }} more</slot>
+      </div></li>
+
+    <li v-if="cappedBlocks().length === 0" class="rozie-combobox-empty" role="presentation">
       <slot name="empty" :query="query">No results</slot>
     </li></ul><ul v-if="props.virtual" class="rozie-combobox-list rozie-combobox-list--virtual" :id="listId()" role="listbox" :style="(isOpen ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto')">
     <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></li>
@@ -102,8 +116,12 @@ const props = withDefaults(
      * Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default).
      */
     groups?: any[];
+    /**
+     * Cap each native section group to its first `groupCap` results, adding a keyboard-reachable '+N more' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default), byte-identical to today. Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.
+     */
+    groupCap?: number;
   }>(),
-  { options: () => [], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: () => [] }
+  { options: () => [], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: () => [], groupCap: 0 }
 );
 
 /**
@@ -124,6 +142,10 @@ defineSlots<{
   groupHeading(props: { group: any }): any;
   option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
   empty(props: { query: any }): any;
+  groupHeading(props: { group: any }): any;
+  option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
+  groupMore(props: { group: any; hidden: any; expand: any }): any;
+  empty(props: { query: any }): any;
   option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
   empty(props: { query: any }): any;
 }>();
@@ -134,6 +156,7 @@ const activeIndex = ref(-1);
 const rows = ref<any[]>([]);
 const windowVer = ref(0);
 const editVer = ref(0);
+const expandedGroups = ref({});
 
 const inputElRef = ref<HTMLInputElement>();
 const __rozieRootRef = ref<HTMLElement>();
@@ -624,6 +647,87 @@ const groupBlocks = () => {
 // filteredOptions() comment above). Mirrors that same non-empty-`groups` gate exactly, so
 // isGrouped() and the filteredOptions() partition never disagree about which branch is active.
 const isGrouped = () => !props.virtual && Array.isArray(props.groups) && props.groups.length > 0;
+// ---- per-group result cap + expand-in-place "+N more" (combobox-group-cap) --------
+// capNum(): coerce $props.groupCap to a whole, positive cap; anything else (NaN,
+// negative, absent) degrades to 0 (uncapped). Plain function — never $computed.
+const capNum = () => {
+  const n = Number(props.groupCap);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+};
+// isCapped(): the capped-render branch selector. isGrouped() already gates non-
+// virtual + non-empty `groups`, so the cap is automatically gated OUT of the
+// virtual and ungrouped paths.
+const isCapped = () => isGrouped() && capNum() > 0;
+// gkey(gid): normalize a group id (possibly null, for the leading ungrouped
+// section) into an expandedGroups map key.
+const gkey = (gid: any) => gid == null ? '__ungrouped__' : String(gid);
+// isExpanded(gid): whether the group has been expanded via its "+N more" row.
+const isExpanded = (gid: any) => !!(expandedGroups.value && expandedGroups.value[gkey(gid)]);
+// expandGroup(gid): replace $data.expandedGroups IMMUTABLY (load-bearing for
+// React re-render — feedback_react_const_mutinstance_not_stabilized / the
+// graph-writeback immutability rule).
+const expandGroup = (gid: any) => {
+  expandedGroups.value = Object.assign({}, expandedGroups.value, {
+    [gkey(gid)]: true
+  });
+};
+// cappedBlocks(): the visible-block model for the capped render — groupBlocks()
+// re-sliced to `capNum()` per group (unless expanded or non-overflowing), with a
+// trailing "+N more" row appended to any still-capped block. Re-indexes `_i` as a
+// running counter over the WHOLE visible+more sequence so option ids/aria-
+// activedescendant stay contiguous and never disagree with navRows() below.
+const cappedBlocks = () => {
+  const blocks = groupBlocks();
+  const cap = capNum();
+  let running = 0;
+  const out = [];
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const blk = blocks[bi];
+    const gid = blk.group ? blk.group.id : null;
+    const showAll = isExpanded(gid) || blk.items.length <= cap;
+    const visibleSrc = showAll ? blk.items : blk.items.slice(0, cap);
+    const items = [];
+    for (let vi = 0; vi < visibleSrc.length; vi++) {
+      items.push(Object.assign({}, visibleSrc[vi], {
+        _i: running
+      }));
+      running++;
+    }
+    let more: any = null;
+    if (!showAll) {
+      more = {
+        isMore: true,
+        group: gid,
+        hidden: blk.items.length - cap,
+        disabled: false,
+        _i: running,
+        expand: () => expandGroup(gid)
+      };
+      running++;
+    }
+    out.push({
+      group: blk.group,
+      items,
+      more
+    });
+  }
+  return out;
+};
+// navRows(): the SINGLE keyboard/aria source of truth. Returns the EXACT
+// filteredOptions() reference when not capped (byte-identical-off — untouched
+// virtual/ungrouped keyboard path); flattens cappedBlocks() into visible items +
+// more-rows, in order, when capped.
+const navRows = () => {
+  if (!isCapped()) return filteredOptions();
+  const out = [];
+  const blocks = cappedBlocks();
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const blk = blocks[bi];
+    for (let ii = 0; ii < blk.items.length; ii++) out.push(blk.items[ii]);
+    if (blk.more) out.push(blk.more);
+  }
+  return out;
+};
 // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
 // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
 // pinnedMeasurement() UNGUARDED by convention; a combobox has no edit-pinning, so these
@@ -684,7 +788,7 @@ const optId = (i: any) => props.idBase + '-opt-' + i;
 const listId = () => props.idBase + '-list';
 // The active option's id for aria-activedescendant (null when none).
 const activeId = () => {
-  const list = filteredOptions();
+  const list = navRows();
   if (isOpen.value && activeIndex.value >= 0 && list[activeIndex.value]) return optId(activeIndex.value);
   return null;
 };
@@ -706,7 +810,13 @@ const nextEnabled = (list: any, from: any, dir: any) => {
 // `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
 // embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
 const selectOption = (opt: any) => {
-  if (!opt || opt.disabled) return;
+  if (!opt) return;
+  if (opt.isMore) {
+    expandGroup(opt.group);
+    activeIndex.value = opt._i;
+    return;
+  }
+  if (opt.disabled) return;
   value.value = opt.value;
   query.value = String(opt.label);
   if (props.closeOnSelect) isOpen.value = false;
@@ -747,7 +857,7 @@ const onBlur = () => {
 };
 const onKeydown = (e: any) => {
   const key = e ? e.key : '';
-  const list = filteredOptions();
+  const list = navRows();
   // Capture the reactive reads into locals BEFORE any write so React never binds
   // a pre-write value (ROZ138; the read-then-write-same-key idiom). Each branch
   // is mutually exclusive, but a flow-insensitive analysis can't see that.
@@ -871,6 +981,7 @@ watch(() => value.value, () => {
   syncQueryToValue();
 });
 watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () => {
+  if (expandedGroups.value && Object.keys(expandedGroups.value).length) expandedGroups.value = {};
   syncRows();
   if (props.virtual && virtualizer) {
     virtualizer.setOptions(virtualizerOptions());
@@ -961,6 +1072,11 @@ defineExpose({ focus, clear, seedQuery, pinOpen });
   color: var(--rozie-combobox-group-heading-color, rgba(0, 0, 0, 0.5));
   pointer-events: none;
   user-select: none;
+}
+.rozie-combobox-more {
+  cursor: pointer;
+  color: var(--rozie-combobox-more-color, rgba(0, 0, 0, 0.55));
+  font-size: var(--rozie-combobox-more-size, 0.875rem);
 }
 .rozie-combobox-spacer { margin: 0; padding: 0; border: 0; list-style: none; }
 .rozie-combobox--inline {

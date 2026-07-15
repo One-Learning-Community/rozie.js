@@ -97,6 +97,11 @@ __rozieInjectStyle('Combobox-9546115a', `.rozie-combobox[data-rozie-s-9546115a] 
   pointer-events: none;
   user-select: none;
 }
+.rozie-combobox-more[data-rozie-s-9546115a] {
+  cursor: pointer;
+  color: var(--rozie-combobox-more-color, rgba(0, 0, 0, 0.55));
+  font-size: var(--rozie-combobox-more-size, 0.875rem);
+}
 .rozie-combobox-spacer[data-rozie-s-9546115a] { margin: 0; padding: 0; border: 0; list-style: none; }
 .rozie-combobox--inline[data-rozie-s-9546115a] {
   display: block;
@@ -115,6 +120,8 @@ interface OptionSlotCtx { option: any; index: any; active: any; selected: any; d
 interface EmptySlotCtx { query: any; }
 
 interface GroupHeadingSlotCtx { group: any; }
+
+interface GroupMoreSlotCtx { group: any; hidden: any; expand: any; }
 
 interface ComboboxProps {
   /**
@@ -185,11 +192,16 @@ interface ComboboxProps {
    * Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default).
    */
   groups?: any[];
+  /**
+   * Cap each native section group to its first `groupCap` results, adding a keyboard-reachable '+N more' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default), byte-identical to today. Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.
+   */
+  groupCap?: number;
   onChange?: (...args: unknown[]) => void;
   onSearch?: (...args: unknown[]) => void;
   optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
   emptySlot?: (ctx: EmptySlotCtx) => JSX.Element;
   groupHeadingSlot?: (ctx: GroupHeadingSlotCtx) => JSX.Element;
+  groupMoreSlot?: (ctx: GroupMoreSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: ComboboxHandle) => void;
 }
@@ -202,8 +214,8 @@ export interface ComboboxHandle {
 }
 
 export default function Combobox(_props: ComboboxProps): JSX.Element {
-  const _merged = mergeProps({ options: (() => [])() as any[], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: (() => [])() as any[] }, _props);
-  const [local, attrs] = splitProps(_merged, ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'ref']);
+  const _merged = mergeProps({ options: (() => [])() as any[], placeholder: '', disabled: false, disableFilter: false, ariaLabel: null, idBase: 'rozie-combobox', inline: false, closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, virtual: false, estimateRowHeight: 36, maxHeight: '', groups: (() => [])() as any[], groupCap: 0 }, _props);
+  const [local, attrs] = splitProps(_merged, ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap', 'ref']);
   onMount(() => { local.ref?.({ focus, clear, seedQuery, pinOpen }); });
 
   const [value, setValue] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'value', null);
@@ -213,6 +225,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   const [rows, setRows] = createSignal<any[]>([]);
   const [windowVer, setWindowVer] = createSignal(0);
   const [editVer, setEditVer] = createSignal(0);
+  const [expandedGroups, setExpandedGroups] = createSignal<Record<string, any>>({});
   onMount(() => {
     syncQueryToValue();
     syncRows();
@@ -238,6 +251,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     syncQueryToValue();
   })()), { defer: true }));
   createEffect(on(() => (() => (local.options ? local.options.length : 0) + '|' + query())(), (v) => untrack(() => (() => {
+    if (expandedGroups() && Object.keys(expandedGroups()).length) setExpandedGroups({});
     syncRows();
     if (local.virtual && virtualizer) {
       virtualizer.setOptions(virtualizerOptions());
@@ -680,6 +694,100 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
     return !local.virtual && Array.isArray(local.groups) && local.groups.length > 0;
   }
 
+  // ---- per-group result cap + expand-in-place "+N more" (combobox-group-cap) --------
+  // capNum(): coerce $props.groupCap to a whole, positive cap; anything else (NaN,
+  // negative, absent) degrades to 0 (uncapped). Plain function — never $computed.
+  function capNum() {
+    const n = Number(local.groupCap);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  }
+
+  // isCapped(): the capped-render branch selector. isGrouped() already gates non-
+  // virtual + non-empty `groups`, so the cap is automatically gated OUT of the
+  // virtual and ungrouped paths.
+  function isCapped() {
+    return isGrouped() && capNum() > 0;
+  }
+
+  // gkey(gid): normalize a group id (possibly null, for the leading ungrouped
+  // section) into an expandedGroups map key.
+  function gkey(gid: any) {
+    return gid == null ? '__ungrouped__' : String(gid);
+  }
+
+  // isExpanded(gid): whether the group has been expanded via its "+N more" row.
+  function isExpanded(gid: any) {
+    return !!(expandedGroups() && expandedGroups()[gkey(gid)]);
+  }
+
+  // expandGroup(gid): replace $data.expandedGroups IMMUTABLY (load-bearing for
+  // React re-render — feedback_react_const_mutinstance_not_stabilized / the
+  // graph-writeback immutability rule).
+  function expandGroup(gid: any) {
+    setExpandedGroups(Object.assign({}, expandedGroups(), {
+      [gkey(gid)]: true
+    }));
+  }
+
+  // cappedBlocks(): the visible-block model for the capped render — groupBlocks()
+  // re-sliced to `capNum()` per group (unless expanded or non-overflowing), with a
+  // trailing "+N more" row appended to any still-capped block. Re-indexes `_i` as a
+  // running counter over the WHOLE visible+more sequence so option ids/aria-
+  // activedescendant stay contiguous and never disagree with navRows() below.
+  function cappedBlocks() {
+    const blocks = groupBlocks();
+    const cap = capNum();
+    let running = 0;
+    const out = [];
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const blk = blocks[bi];
+      const gid = blk.group ? blk.group.id : null;
+      const showAll = isExpanded(gid) || blk.items.length <= cap;
+      const visibleSrc = showAll ? blk.items : blk.items.slice(0, cap);
+      const items = [];
+      for (let vi = 0; vi < visibleSrc.length; vi++) {
+        items.push(Object.assign({}, visibleSrc[vi], {
+          _i: running
+        }));
+        running++;
+      }
+      let more: any = null;
+      if (!showAll) {
+        more = {
+          isMore: true,
+          group: gid,
+          hidden: blk.items.length - cap,
+          disabled: false,
+          _i: running,
+          expand: () => expandGroup(gid)
+        };
+        running++;
+      }
+      out.push({
+        group: blk.group,
+        items,
+        more
+      });
+    }
+    return out;
+  }
+
+  // navRows(): the SINGLE keyboard/aria source of truth. Returns the EXACT
+  // filteredOptions() reference when not capped (byte-identical-off — untouched
+  // virtual/ungrouped keyboard path); flattens cappedBlocks() into visible items +
+  // more-rows, in order, when capped.
+  function navRows() {
+    if (!isCapped()) return filteredOptions();
+    const out = [];
+    const blocks = cappedBlocks();
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const blk = blocks[bi];
+      for (let ii = 0; ii < blk.items.length; ii++) out.push(blk.items[ii]);
+      if (blk.more) out.push(blk.more);
+    }
+    return out;
+  }
+
   // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
   // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
   // pinnedMeasurement() UNGUARDED by convention; a combobox has no edit-pinning, so these
@@ -753,7 +861,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
 
   // The active option's id for aria-activedescendant (null when none).
   function activeId() {
-    const list = filteredOptions();
+    const list = navRows();
     if (isOpen() && activeIndex() >= 0 && list[activeIndex()]) return optId(activeIndex());
     return null;
   }
@@ -777,7 +885,13 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   // `e.option`). `closeOnSelect` (default true) gates the popup close — a caller
   // embedding the combobox in a multi-action surface passes `:close-on-select="false"`.
   function selectOption(opt: any) {
-    if (!opt || opt.disabled) return;
+    if (!opt) return;
+    if (opt.isMore) {
+      expandGroup(opt.group);
+      setActiveIndex(opt._i);
+      return;
+    }
+    if (opt.disabled) return;
     setValue(opt.value);
     setQuery(String(opt.label));
     if (local.closeOnSelect) setIsOpen(false);
@@ -821,7 +935,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   }
   function onKeydown(e: any) {
     const key = e ? e.key : '';
-    const list = filteredOptions();
+    const list = navRows();
     // Capture the reactive reads into locals BEFORE any write so React never binds
     // a pre-write value (ROZ138; the read-then-write-same-key idiom). Each branch
     // is mutually exclusive, but a flow-insensitive analysis can't see that.
@@ -935,7 +1049,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
 
         {<Show when={filteredOptions().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
           {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
-        </li></Show>}</ul></Show>}{<Show when={isOpen() && !local.virtual && isGrouped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+        </li></Show>}</ul></Show>}{<Show when={isOpen() && !local.virtual && isGrouped() && !isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
         <Key each={groupBlocks() as readonly any[]} by={(blk) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped')}>{(blk) => <li class={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-9546115a="">
           {<Show when={blk().group}><div class={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
             {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ group: blk().group }) ?? rozieDisplay(blk().group.label)}
@@ -945,6 +1059,20 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
         </li>}</Key>
 
         {<Show when={groupBlocks().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+          {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
+        </li></Show>}</ul></Show>}{<Show when={isOpen() && !local.virtual && isCapped()}><ul class={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+        <Key each={cappedBlocks() as readonly any[]} by={(blk) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped')}>{(blk) => <li class={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-9546115a="">
+          {<Show when={blk().group}><div class={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
+            {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ group: blk().group }) ?? rozieDisplay(blk().group.label)}
+          </div></Show>}<Key each={blk().items as readonly any[]} by={(opt) => opt.value}>{(opt) => <div role="option" aria-selected={opt().value === value()} aria-disabled={!!opt().disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': opt()._i === activeIndex(), 'rozie-combobox-option--selected': opt().value === value(), 'rozie-combobox-option--disabled': opt().disabled })} id={rozieAttr(optId(opt()._i))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectOption(opt()); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActiveIndex(opt()._i); }} data-rozie-s-9546115a="">
+            {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: opt().option, index: opt()._i, active: opt()._i === activeIndex(), selected: opt().value === value(), disabled: opt().disabled }) ?? rozieDisplay(opt().label)}
+          </div>}</Key>
+
+          {<Show when={blk().more}><div role="option" class={"rozie-combobox-option rozie-combobox-more" + " " + rozieClass({ 'rozie-combobox-option--active': blk().more._i === activeIndex() })} id={rozieAttr(optId(blk().more._i))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectOption(blk().more); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActiveIndex(blk().more._i); }} data-rozie-s-9546115a="">
+            {(_props.groupMoreSlot ?? _props.slots?.['groupMore'])?.({ group: blk().group, hidden: blk().more.hidden, expand: blk().more.expand }) ?? <>+{rozieDisplay(blk().more.hidden)} more</>}
+          </div></Show>}</li>}</Key>
+
+        {<Show when={cappedBlocks().length === 0}><li class={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
           {(_props.emptySlot ?? _props.slots?.['empty'])?.({ query: query() }) ?? "No results"}
         </li></Show>}</ul></Show>}{<Show when={local.virtual}><ul class={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" style={parseInlineStyle((isOpen() ? '' : 'display:none;') + (local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + local.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a="">
         <li class={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a="" />

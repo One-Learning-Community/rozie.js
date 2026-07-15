@@ -97,6 +97,12 @@
       "isModel": false,
       "required": false,
       "type": "Array"
+    },
+    {
+      "name": "groupCap",
+      "isModel": false,
+      "required": false,
+      "type": "Number"
     }
   ],
   "slots": [
@@ -162,6 +168,68 @@
         },
         {
           "name": "disabled"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
+      "name": "empty",
+      "params": [
+        {
+          "name": "query"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
+      "name": "groupHeading",
+      "params": [
+        {
+          "name": "group"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
+      "name": "option",
+      "params": [
+        {
+          "name": "option"
+        },
+        {
+          "name": "index"
+        },
+        {
+          "name": "active"
+        },
+        {
+          "name": "selected"
+        },
+        {
+          "name": "disabled"
+        }
+      ],
+      "paramTypes": null,
+      "isPortal": false,
+      "isReactive": false
+    },
+    {
+      "name": "groupMore",
+      "params": [
+        {
+          "name": "group"
+        },
+        {
+          "name": "hidden"
+        },
+        {
+          "name": "expand"
         }
       ],
       "paramTypes": null,

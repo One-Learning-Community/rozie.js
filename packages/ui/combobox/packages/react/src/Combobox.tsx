@@ -25,6 +25,8 @@ interface EmptyCtx { query: any; }
 
 interface GroupHeadingCtx { group: any; }
 
+interface GroupMoreCtx { group: any; hidden: any; expand: any; }
+
 interface ComboboxProps {
   /**
    * The selected option's value (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a combobox **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `null` when nothing is selected.
@@ -94,11 +96,16 @@ interface ComboboxProps {
    * Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default).
    */
   groups?: any[];
+  /**
+   * Cap each native section group to its first `groupCap` results, adding a keyboard-reachable '+N more' row that expands that group IN PLACE when activated. `0`/absent = uncapped (default), byte-identical to today. Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on.
+   */
+  groupCap?: number;
   onChange?: (...args: any[]) => void;
   onSearch?: (...args: any[]) => void;
   renderOption?: (ctx: OptionCtx) => ReactNode;
   renderEmpty?: (ctx: EmptyCtx) => ReactNode;
   renderGroupHeading?: (ctx: GroupHeadingCtx) => ReactNode;
+  renderGroupMore?: (ctx: GroupMoreCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
 
@@ -112,7 +119,7 @@ export interface ComboboxHandle {
 const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_props: ComboboxProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => [])())[0];
   const __defaultGroups = useState(() => (() => [])())[0];
-  const props: Omit<ComboboxProps, 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups'> & { options: any[]; placeholder: string; disabled: boolean; disableFilter: boolean; ariaLabel: (string) | null; idBase: string; inline: boolean; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string; groups: any[] } = {
+  const props: Omit<ComboboxProps, 'options' | 'placeholder' | 'disabled' | 'disableFilter' | 'ariaLabel' | 'idBase' | 'inline' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'groups' | 'groupCap'> & { options: any[]; placeholder: string; disabled: boolean; disableFilter: boolean; ariaLabel: (string) | null; idBase: string; inline: boolean; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string; groups: any[]; groupCap: number } = {
     ..._props,
     options: _props.options ?? __defaultOptions,
     placeholder: _props.placeholder ?? '',
@@ -129,10 +136,11 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     estimateRowHeight: _props.estimateRowHeight ?? 36,
     maxHeight: _props.maxHeight ?? '',
     groups: _props.groups ?? __defaultGroups,
+    groupCap: _props.groupCap ?? 0,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { value, options, placeholder, disabled, disableFilter, ariaLabel, idBase, inline, closeOnSelect, optionLabel, optionValue, optionDisabled, virtual, estimateRowHeight, maxHeight, groups, defaultValue, onValueChange, ...rest } = _props as ComboboxProps & Record<string, unknown>;
-    void value; void options; void placeholder; void disabled; void disableFilter; void ariaLabel; void idBase; void inline; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void virtual; void estimateRowHeight; void maxHeight; void groups; void defaultValue; void onValueChange;
+    const { value, options, placeholder, disabled, disableFilter, ariaLabel, idBase, inline, closeOnSelect, optionLabel, optionValue, optionDisabled, virtual, estimateRowHeight, maxHeight, groups, groupCap, defaultValue, onValueChange, ...rest } = _props as ComboboxProps & Record<string, unknown>;
+    void value; void options; void placeholder; void disabled; void disableFilter; void ariaLabel; void idBase; void inline; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void virtual; void estimateRowHeight; void maxHeight; void groups; void groupCap; void defaultValue; void onValueChange;
     return rest;
   })();
   const gridScrollEl = useRef<any>(null);
@@ -151,6 +159,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   const [rows, setRows] = useState<any[]>([]);
   const [windowVer, setWindowVer] = useState(0);
   const [editVer, setEditVer] = useState(0);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, any>>({});
   const inputEl = useRef<HTMLInputElement | null>(null);
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
@@ -434,6 +443,72 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   function isGrouped() {
     return !props.virtual && Array.isArray(props.groups) && props.groups.length > 0;
   }
+  function capNum() {
+    const n = Number(props.groupCap);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  }
+  function isCapped() {
+    return isGrouped() && capNum() > 0;
+  }
+  function gkey(gid: any) {
+    return gid == null ? '__ungrouped__' : String(gid);
+  }
+  function isExpanded(gid: any) {
+    return !!(expandedGroups && expandedGroups[gkey(gid)]);
+  }
+  function expandGroup(gid: any) {
+    setExpandedGroups(prev => Object.assign({}, prev, {
+      [gkey(gid)]: true
+    }));
+  }
+  function cappedBlocks() {
+    const blocks = groupBlocks();
+    const cap = capNum();
+    let running = 0;
+    const out = [];
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const blk = blocks[bi];
+      const gid = blk.group ? blk.group.id : null;
+      const showAll = isExpanded(gid) || blk.items.length <= cap;
+      const visibleSrc = showAll ? blk.items : blk.items.slice(0, cap);
+      const items = [];
+      for (let vi = 0; vi < visibleSrc.length; vi++) {
+        items.push(Object.assign({}, visibleSrc[vi], {
+          _i: running
+        }));
+        running++;
+      }
+      let more: any = null;
+      if (!showAll) {
+        more = {
+          isMore: true,
+          group: gid,
+          hidden: blk.items.length - cap,
+          disabled: false,
+          _i: running,
+          expand: () => expandGroup(gid)
+        };
+        running++;
+      }
+      out.push({
+        group: blk.group,
+        items,
+        more
+      });
+    }
+    return out;
+  }
+  function navRows() {
+    if (!isCapped()) return filteredOptions();
+    const out = [];
+    const blocks = cappedBlocks();
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const blk = blocks[bi];
+      for (let ii = 0; ii < blk.items.length; ii++) out.push(blk.items[ii]);
+      if (blk.more) out.push(blk.more);
+    }
+    return out;
+  }
   function pinnedEditIndex() {
     return -1;
   }
@@ -483,7 +558,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     return props.idBase + '-list';
   }
   function activeId() {
-    const list = filteredOptions();
+    const list = navRows();
     if (isOpen && activeIndex >= 0 && list[activeIndex]) return optId(activeIndex);
     return null;
   }
@@ -500,7 +575,13 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   }
   const { onChange: _rozieProp_onChange } = props;
     const selectOption = useCallback((opt: any) => {
-    if (!opt || opt.disabled) return;
+    if (!opt) return;
+    if (opt.isMore) {
+      expandGroup(opt.group);
+      setActiveIndex(opt._i);
+      return;
+    }
+    if (opt.disabled) return;
     setValue(opt.value);
     setQuery(String(opt.label));
     if (props.closeOnSelect) setIsOpen(false);
@@ -509,7 +590,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       value: opt.value,
       option: opt.option
     });
-  }, [_rozieProp_onChange, props.closeOnSelect, setValue]);
+  }, [_rozieProp_onChange, expandGroup, props.closeOnSelect, setValue]);
   const syncQueryToValue = useCallback(() => {
     const opts = Array.isArray(props.options) ? props.options : [];
     const opt = opts.find((o: any) => o.value === value);
@@ -535,7 +616,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   }, []);
   const onKeydown = useCallback((e: any) => {
     const key = e ? e.key : '';
-    const list = filteredOptions();
+    const list = navRows();
     // Capture the reactive reads into locals BEFORE any write so React never binds
     // a pre-write value (ROZ138; the read-then-write-same-key idiom). Each branch
     // is mutually exclusive, but a flow-insensitive analysis can't see that.
@@ -579,7 +660,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     }
     // Keep the (new) active option in view when windowing — no-op when not virtual.
     scrollActiveIntoView();
-  }, [activeIndex, filteredOptions, isOpen, nextEnabled, scrollActiveIntoView, selectOption]);
+  }, [activeIndex, isOpen, navRows, nextEnabled, scrollActiveIntoView, selectOption]);
   const kickWindow = useCallback((attempts: any) => {
     if (!virtualizer.current) return;
     gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-combobox-list') : gridScrollEl.current;
@@ -645,6 +726,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
+    if (expandedGroups && Object.keys(expandedGroups).length) setExpandedGroups({});
     syncRows();
     if (props.virtual && virtualizer.current) {
       virtualizer.current.setOptions(virtualizerOptions());
@@ -671,7 +753,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
 
         {!!(filteredOptions().length === 0) && <li className={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
           {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No results"}
-        </li>}</ul>}{!!(isOpen && !props.virtual && isGrouped()) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+        </li>}</ul>}{!!(isOpen && !props.virtual && isGrouped() && !isCapped()) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
         {groupBlocks().map((blk) => <li key={'grp-' + (blk.group ? blk.group.id : '_ungrouped')} className={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk.group ? blk.group.label : undefined)} data-rozie-s-9546115a="">
           {!!(blk.group) && <div className={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
             {(props.renderGroupHeading ?? props.slots?.['groupHeading']) ? ((props.renderGroupHeading ?? props.slots?.['groupHeading']) as Function)({ group: blk.group }) : rozieDisplay(blk.group.label)}
@@ -681,6 +763,20 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
         </li>)}
 
         {!!(groupBlocks().length === 0) && <li className={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
+          {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No results"}
+        </li>}</ul>}{!!(isOpen && !props.virtual && isCapped()) && <ul className={"rozie-combobox-list"} id={rozieAttr(listId())} role="listbox" data-rozie-s-9546115a="">
+        {cappedBlocks().map((blk) => <li key={'grp-' + (blk.group ? blk.group.id : '_ungrouped')} className={"rozie-combobox-group"} role="group" aria-label={rozieAttr(blk.group ? blk.group.label : undefined)} data-rozie-s-9546115a="">
+          {!!(blk.group) && <div className={"rozie-combobox-group-heading"} role="presentation" data-rozie-s-9546115a="">
+            {(props.renderGroupHeading ?? props.slots?.['groupHeading']) ? ((props.renderGroupHeading ?? props.slots?.['groupHeading']) as Function)({ group: blk.group }) : rozieDisplay(blk.group.label)}
+          </div>}{blk.items.map((opt) => <div key={opt.value} className={clsx("rozie-combobox-option", { "rozie-combobox-option--active": opt._i === activeIndex, "rozie-combobox-option--selected": opt.value === value, "rozie-combobox-option--disabled": opt.disabled })} id={rozieAttr(optId(opt._i))} role="option" aria-selected={opt.value === value} aria-disabled={!!opt.disabled} onMouseDown={($event) => { $event.preventDefault(); selectOption(opt); }} onMouseEnter={($event) => { setActiveIndex(opt._i); }} data-rozie-s-9546115a="">
+            {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt.option, index: opt._i, active: opt._i === activeIndex, selected: opt.value === value, disabled: opt.disabled }) : rozieDisplay(opt.label)}
+          </div>)}
+
+          {!!(blk.more) && <div className={clsx("rozie-combobox-option", "rozie-combobox-more", { "rozie-combobox-option--active": blk.more._i === activeIndex })} id={rozieAttr(optId(blk.more._i))} role="option" onMouseDown={($event) => { $event.preventDefault(); selectOption(blk.more); }} onMouseEnter={($event) => { setActiveIndex(blk.more._i); }} data-rozie-s-9546115a="">
+            {(props.renderGroupMore ?? props.slots?.['groupMore']) ? ((props.renderGroupMore ?? props.slots?.['groupMore']) as Function)({ group: blk.group, hidden: blk.more.hidden, expand: blk.more.expand }) : <>+{rozieDisplay(blk.more.hidden)} more</>}
+          </div>}</li>)}
+
+        {!!(cappedBlocks().length === 0) && <li className={"rozie-combobox-empty"} role="presentation" data-rozie-s-9546115a="">
           {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No results"}
         </li>}</ul>}{!!(props.virtual) && <ul className={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" style={parseInlineStyle((isOpen ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a="">
         <li className={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a="" />

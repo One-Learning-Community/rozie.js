@@ -27,11 +27,15 @@ const EXPECT = {
   // plus an `empty` slot. The option resolvers are consumed from the shared
   // @rozie-ui/headless-core/listCore.rzts spine. P4 (SC-5): + windowing props
   // (virtual/estimateRowHeight/maxHeight) consuming @rozie-ui/headless-core/windowing.rzts.
-  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight'],
+  props: ['value', 'options', 'placeholder', 'disabled', 'disableFilter', 'ariaLabel', 'idBase', 'inline', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'virtual', 'estimateRowHeight', 'maxHeight', 'groups', 'groupCap'],
   models: ['value'],
   emits: ['change', 'search'],
-  slots: ['option', 'empty'],
-  expose: ['focus', 'clear'],
+  // patch-adjacent (this .mjs isn't wired into CI — see the header note — so it
+  // had drifted stale: missing `groups`/`groupHeading` from combobox-native-groups
+  // and `seedQuery`/`pinOpen` from later phases; synced to the IR here alongside
+  // the new `groupCap`/`groupMore` combobox-group-cap surface).
+  slots: ['option', 'empty', 'groupHeading', 'groupMore'],
+  expose: ['focus', 'clear', 'seedQuery', 'pinOpen'],
 };
 
 const fail = (msg) => { console.error(`✗ ${msg}`); process.exitCode = 1; };

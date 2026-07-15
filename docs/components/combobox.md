@@ -82,6 +82,7 @@ const frameworks = [
 | `estimateRowHeight` | `Number` | `36` | yes | Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on. |
 | `maxHeight` | `String` | `''` | yes | A CSS length string bounding the popup scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-combobox-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off. |
 | `groups` | `Array` | `[]` | yes | Ordered section list `[{ id, label }]` setting group order + heading text. Options are partitioned by their optional `group?` string; groups present on options but absent here fall back to first-appearance order after the listed ones. Empty/absent ⇒ flat, ungrouped rendering (default). |
+| `groupCap` | `Number` | `0` | yes | Cap each native section group to its first `groupCap` results, adding a keyboard-reachable "+N more" row that expands that group in place when activated. `0`/absent = uncapped (default), byte-identical to today. Only applies to the non-virtual grouped render (`groups` non-empty); ignored when `virtual` is on. |
 
 ### Events
 
