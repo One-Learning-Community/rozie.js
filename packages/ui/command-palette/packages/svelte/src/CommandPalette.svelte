@@ -314,14 +314,25 @@ const actionsList = (o: any) => o && o.actions ? o.actions : [];
 const actionLabel = (a: any) => a && a.label !== undefined ? a.label : '';
 const actionShortcut = (a: any) => a && a.shortcut !== undefined ? a.shortcut : undefined;
 const actionIcon = (a: any) => a && a.icon !== undefined ? a.icon : undefined;
+// Platform sniff for the DISPLAY of the `$mod` token only — matching is
+// platform-agnostic (`metaKey || ctrlKey`, see matchesActionKey). SSR-guarded
+// like every other browser-global read; defaults to the non-Apple form.
+const isApplePlatform = () => {
+  if (typeof navigator === 'undefined') return false;
+  const p = (navigator.platform || '') + ' ' + (navigator.userAgent || '');
+  return /Mac|iPhone|iPad|iPod/.test(p);
+};
 // actionKeyHint(): a short display string for the actionKey prop, for the
-// #actions row affordance's default (unfilled) hint — "$mod+k" → "⌘K",
-// any other "$mod+<letter>" → "⌘<LETTER>", a bare-letter token passes
-// through uppercased.
+// #actions row affordance's default (unfilled) hint — "$mod+k" → "⌘K" on
+// Apple platforms / "Ctrl+K" elsewhere; any other "$mod+<letter>" follows
+// the same rule; a bare-letter token passes through uppercased.
 const actionKeyHint = () => {
   const k = actionKey;
   if (typeof k !== 'string') return '';
-  if (k.indexOf('$mod+') === 0) return '⌘' + k.slice('$mod+'.length).toUpperCase();
+  if (k.indexOf('$mod+') === 0) {
+    const letter = k.slice('$mod+'.length).toUpperCase();
+    return isApplePlatform() ? '⌘' + letter : 'Ctrl+' + letter;
+  }
   return k.toUpperCase();
 };
 // Split a command's visible label into ordered { text, match } segments from

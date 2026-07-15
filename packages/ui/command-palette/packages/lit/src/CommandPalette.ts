@@ -765,10 +765,19 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
 
   actionIcon = (a: any) => a && a.icon !== undefined ? a.icon : undefined;
 
+  isApplePlatform = () => {
+  if (typeof navigator === 'undefined') return false;
+  const p = (navigator.platform || '') + ' ' + (navigator.userAgent || '');
+  return /Mac|iPhone|iPad|iPod/.test(p);
+};
+
   actionKeyHint = () => {
   const k = this.actionKey;
   if (typeof k !== 'string') return '';
-  if (k.indexOf('$mod+') === 0) return '⌘' + k.slice('$mod+'.length).toUpperCase();
+  if (k.indexOf('$mod+') === 0) {
+    const letter = k.slice('$mod+'.length).toUpperCase();
+    return this.isApplePlatform() ? '⌘' + letter : 'Ctrl+' + letter;
+  }
   return k.toUpperCase();
 };
 

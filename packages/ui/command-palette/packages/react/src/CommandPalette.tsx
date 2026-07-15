@@ -275,10 +275,18 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function actionIcon(a: any) {
     return a && a.icon !== undefined ? a.icon : undefined;
   }
+  function isApplePlatform() {
+    if (typeof navigator === 'undefined') return false;
+    const p = (navigator.platform || '') + ' ' + (navigator.userAgent || '');
+    return /Mac|iPhone|iPad|iPod/.test(p);
+  }
   function actionKeyHint() {
     const k = props.actionKey;
     if (typeof k !== 'string') return '';
-    if (k.indexOf('$mod+') === 0) return '⌘' + k.slice('$mod+'.length).toUpperCase();
+    if (k.indexOf('$mod+') === 0) {
+      const letter = k.slice('$mod+'.length).toUpperCase();
+      return isApplePlatform() ? '⌘' + letter : 'Ctrl+' + letter;
+    }
     return k.toUpperCase();
   }
   function labelSegments(o: any) {
