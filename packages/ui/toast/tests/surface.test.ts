@@ -5,8 +5,8 @@
  * Re-asserts the SAME contract the .mjs script checks:
  *   1. lowerToIR() emits ZERO error-severity diagnostics.
  *   2. The IR surface (name / props / model props / emits / slots / expose)
- *      matches the contract exactly — including the ZERO-EMITS fact (the
- *      imperative handle replaces events) and the single `toast` scoped slot.
+ *      matches the contract exactly — including the single `dismissed` emit
+ *      (the family's first event) and the single `toast` scoped slot.
  *   3. compile()×6 emits ZERO error-severity diagnostics + non-empty code
  *      (ROZ127 slot==prop, ROZ121 expose-verb==event, ROZ524 React model-setter,
  *      Lit reserved-lifecycle all surface here as compile() errors). Toaster is
@@ -29,7 +29,7 @@ const EXPECT = {
   name: 'Toaster',
   props: ['position', 'duration', 'max', 'disablePauseOnHover', 'ariaLabel'],
   models: [] as string[],
-  emits: [] as string[],
+  emits: ['dismissed'] as string[],
   slots: ['toast'],
   expose: ['show', 'dismiss', 'clear'],
 } as const;
@@ -63,9 +63,9 @@ describe('Toaster.rozie surface gate', () => {
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits NOTHING (the imperative handle replaces events)', () => {
+  it('emits exactly [\'dismissed\'] (the first family event; clear() emits nothing)', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
-    expect(ir.emits.length).toBe(0);
+    expect(ir.emits.length).toBe(1);
   });
 
   it('declares the single `toast` scoped slot', () => {

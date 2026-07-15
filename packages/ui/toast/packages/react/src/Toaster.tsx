@@ -26,6 +26,7 @@ interface ToasterProps {
    * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
   ariaLabel?: (string) | null;
+  onDismissed?: (...args: any[]) => void;
   renderToast?: (ctx: ToastCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
@@ -58,7 +59,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
     const remaining = toast.duration;
-    const handle = window.setTimeout(() => dismiss(toast.id), remaining);
+    const handle = window.setTimeout(() => dismissBegin(toast.id, 'timeout'), remaining);
     timers.current[toast.id] = {
       handle,
       startedAt: Date.now(),
@@ -89,7 +90,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       const entry = timers.current[id];
       if (entry.remaining == null || entry.remaining <= 0) continue;
       const remaining = entry.remaining;
-      const handle = window.setTimeout(() => dismiss(id), remaining);
+      const handle = window.setTimeout(() => dismissBegin(id, 'timeout'), remaining);
       timers.current[id] = {
         handle,
         startedAt: Date.now(),
@@ -131,10 +132,40 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     startTimer(toast);
     return id;
   }
-  const dismiss = useCallback((id: any) => {
-    clearTimer(id);
+  // ---- exit lifecycle ------------------------------------------------------
+  // Deliberately exceeds the 200ms default --rozie-toast-exit-duration token
+  // comfortably; a consumer overriding the exit duration beyond ~350ms gets cut
+  // short by this failsafe (documented in docs/components/toast.md).
+  const EXIT_FAILSAFE_MS = 350;
+
+  // Idempotent removal: filters the entry out of $data.toasts. Safe to call
+  // twice (from the inline @animationend binding AND the failsafe) — the
+  // second call is a harmless no-op filter over an already-absent id.
+  const removeToast = useCallback((id: any) => {
     setToasts(prev => prev.filter((t: any) => t.id !== id));
-  }, [clearTimer]);
+  }, []);
+  const { onDismissed: _rozieProp_onDismissed } = props;
+    const dismissBegin = useCallback((id: any, reason: any) => {
+    const entry = toasts.find((t: any) => t.id === id);
+    if (!entry || entry.exiting) return;
+    clearTimer(id);
+    _rozieProp_onDismissed && _rozieProp_onDismissed({
+      toast: entry,
+      reason
+    });
+    setToasts(prev => prev.map((t: any) => t.id === id ? {
+      ...t,
+      exiting: true
+    } : t));
+    if (typeof window === 'undefined') {
+      removeToast(id);
+    } else {
+      window.setTimeout(() => removeToast(id), EXIT_FAILSAFE_MS);
+    }
+  }, [_rozieProp_onDismissed, clearTimer, removeToast, toasts]);
+  function dismiss(id: any) {
+    dismissBegin(id, 'api');
+  }
   function clear() {
     teardownTimers();
     setToasts([]);
@@ -168,8 +199,8 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     <>
     <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} className={clsx(clsx("rozie-toaster", 'rozie-toaster--' + props.position), (attrs.className as string | undefined))} onMouseEnter={($event) => { onMouseEnter(); }} onMouseLeave={($event) => { onMouseLeave(); }} data-rozie-s-12d4265c="">
       
-      {toasts.map((t) => <div key={t.id} className={clsx("rozie-toast", 'rozie-toast--' + t.type)} role="status" aria-live={rozieAttr(liveFor(t.type))} data-rozie-s-12d4265c="">
-        {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast: t, dismiss }) : <><span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span><button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismiss(t.id); }} data-rozie-s-12d4265c="">×</button></>}
+      {toasts.map((t) => <div key={t.id} className={clsx("rozie-toast", 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : ''))} role="status" aria-live={rozieAttr(liveFor(t.type))} onAnimationEnd={($event) => { t.exiting && removeToast(t.id); }} data-rozie-s-12d4265c="">
+        {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast: t, dismiss }) : <><span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span><button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
       </div>)}
     </div>
     </>

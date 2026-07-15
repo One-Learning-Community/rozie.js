@@ -23,6 +23,7 @@ export interface ToasterProps {
    * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
   ariaLabel?: (string) | null;
+  onDismissed?: (...args: unknown[]) => void;
   renderToast?: (params: { toast: () => void; dismiss: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

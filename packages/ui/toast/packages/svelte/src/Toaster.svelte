@@ -27,6 +27,7 @@ interface Props {
   ariaLabel?: (string) | null;
   toast?: Snippet<[{ toast: any; dismiss: any }]>;
   snippets?: Record<string, any>;
+  ondismissed?: (...args: unknown[]) => void;
   [key: string]: unknown;
 }
 
@@ -38,6 +39,7 @@ let {
   ariaLabel = null,
   toast: __toastProp,
   snippets,
+  ondismissed,
   ...__rozieAttrs
 }: Props = $props();
 
@@ -62,7 +64,7 @@ const startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
   if (typeof window === 'undefined') return;
   const remaining = toast.duration;
-  const handle = window.setTimeout(() => dismiss(toast.id), remaining);
+  const handle = window.setTimeout(() => dismissBegin(toast.id, 'timeout'), remaining);
   timers[toast.id] = {
     handle,
     startedAt: Date.now(),
@@ -101,7 +103,7 @@ const resumeTimers = () => {
     const entry = timers[id];
     if (entry.remaining == null || entry.remaining <= 0) continue;
     const remaining = entry.remaining;
-    const handle = window.setTimeout(() => dismiss(id), remaining);
+    const handle = window.setTimeout(() => dismissBegin(id, 'timeout'), remaining);
     timers[id] = {
       handle,
       startedAt: Date.now(),
@@ -147,10 +149,46 @@ export const show = (input: any) => {
   startTimer(toast);
   return id;
 };
-export const dismiss = (id: any) => {
-  clearTimer(id);
+// ---- exit lifecycle ------------------------------------------------------
+// Deliberately exceeds the 200ms default --rozie-toast-exit-duration token
+// comfortably; a consumer overriding the exit duration beyond ~350ms gets cut
+// short by this failsafe (documented in docs/components/toast.md).
+const EXIT_FAILSAFE_MS = 350;
+// Idempotent removal: filters the entry out of $data.toasts. Safe to call
+// twice (from the inline @animationend binding AND the failsafe) — the
+// second call is a harmless no-op filter over an already-absent id.
+const removeToast = (id: any) => {
   toasts = toasts.filter((t: any) => t.id !== id);
 };
+// The single dismissal funnel every path routes through: the `dismiss(id)`
+// verb ('api'), the built-in close button ('close'), a timer expiry
+// ('timeout'), and (Task 4) a swipe past threshold ('swipe'). Idempotent via
+// the entry's `exiting` flag — a second call on an id already exiting (or
+// already gone) is a no-op, so a stray timeout firing mid-exit never
+// double-emits.
+const dismissBegin = (id: any, reason: any) => {
+  const entry = toasts.find((t: any) => t.id === id);
+  if (!entry || entry.exiting) return;
+  clearTimer(id);
+  ondismissed?.({
+    toast: entry,
+    reason
+  });
+  toasts = toasts.map((t: any) => t.id === id ? {
+    ...t,
+    exiting: true
+  } : t);
+  if (typeof window === 'undefined') {
+    removeToast(id);
+  } else {
+    window.setTimeout(() => removeToast(id), EXIT_FAILSAFE_MS);
+  }
+};
+export const dismiss = (id: any) => {
+  dismissBegin(id, 'api');
+};
+// clear() is bulk: immediate full teardown, NO per-toast exit animation and
+// NO emit (documented — see docs/components/toast.md).
 export const clear = () => {
   teardownTimers();
   toasts = [];
@@ -175,10 +213,20 @@ onDestroy(() => (() => {
 })());
 </script>
 
-<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type)]} role="status" aria-live={rozieAttr(liveFor(t.type))} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span><button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismiss(t.id); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
+<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : ''))]} role="status" aria-live={rozieAttr(liveFor(t.type))} onanimationend={($event) => { t.exiting && removeToast(t.id); }} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span><button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
 
 <style>
 :global {
+  @media (prefers-reduced-motion: reduce) {
+    .rozie-toast[data-rozie-s-12d4265c] {
+      animation-name: rozie-toast-fade-in;
+      animation-duration: 1ms;
+    }
+    .rozie-toast--exiting[data-rozie-s-12d4265c] {
+      animation-name: rozie-toast-fade-out;
+      animation-duration: 1ms;
+    }
+  }
   .rozie-toaster[data-rozie-s-12d4265c] {
     position: fixed;
     z-index: var(--rozie-toast-z, 9999);
@@ -215,6 +263,34 @@ onDestroy(() => (() => {
   .rozie-toast--error[data-rozie-s-12d4265c] { background: var(--rozie-toast-error-bg, #dc2626); }
   .rozie-toast--warning[data-rozie-s-12d4265c] { background: var(--rozie-toast-warning-bg, #ca8a04); }
   .rozie-toast--info[data-rozie-s-12d4265c] { background: var(--rozie-toast-info-bg, var(--rozie-toast-bg, #333)); }
+  from[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(-0.5rem); }
+  to[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+  from[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(0.5rem); }
+  to[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+  from[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+  to[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(-0.5rem); }
+  from[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+  to[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(0.5rem); }
+  .rozie-toast[data-rozie-s-12d4265c] {
+    animation: rozie-toast-enter var(--rozie-toast-enter-duration, 200ms) ease-out;
+  }
+  .rozie-toaster--bottom-left[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c],
+  .rozie-toaster--bottom-right[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c],
+  .rozie-toaster--bottom-center[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c] {
+    animation-name: rozie-toast-enter-from-bottom;
+  }
+  .rozie-toast--exiting[data-rozie-s-12d4265c] {
+    animation: rozie-toast-exit var(--rozie-toast-exit-duration, 200ms) ease-in forwards;
+  }
+  .rozie-toaster--bottom-left[data-rozie-s-12d4265c] .rozie-toast--exiting[data-rozie-s-12d4265c],
+  .rozie-toaster--bottom-right[data-rozie-s-12d4265c] .rozie-toast--exiting[data-rozie-s-12d4265c],
+  .rozie-toaster--bottom-center[data-rozie-s-12d4265c] .rozie-toast--exiting[data-rozie-s-12d4265c] {
+    animation-name: rozie-toast-exit-to-bottom;
+  }
+  from[data-rozie-s-12d4265c] { opacity: 0; }
+  to[data-rozie-s-12d4265c] { opacity: 1; }
+  from[data-rozie-s-12d4265c] { opacity: 1; }
+  to[data-rozie-s-12d4265c] { opacity: 0; }
   .rozie-toast-message[data-rozie-s-12d4265c] {
     flex: 1 1 auto;
     font-size: var(--rozie-toast-font-size, 0.9rem);

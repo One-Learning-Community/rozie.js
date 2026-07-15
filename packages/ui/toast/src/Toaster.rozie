@@ -17,15 +17,28 @@
   top-level `let` (mutable cross-render scratch → React hoists it to useRef;
   the engine-wrapper persistence guarantee).
 
+  Exit lifecycle: every dismissal routes through the single funnel
+  `dismissBegin(id, reason)` — idempotent via the entry's `exiting` flag,
+  emits the family's first event `@dismissed { toast, reason }` (reason
+  'timeout' | 'swipe' | 'close' | 'api'), then flips the entry to `exiting`
+  (fresh-array patch) so the template applies the exit class/animation.
+  Removal happens on the toast's inline `@animationend` (a plain DOM event,
+  works ×6) OR a ~350ms setTimeout failsafe — whichever fires first; the
+  `exiting` flag makes the second call a no-op. `clear()` stays bulk: full
+  teardown, no per-toast emit.
+
   Authoring notes (collision classes — see the authoring playbook):
     - Imperative verbs `show` / `dismiss` / `clear` are NOT inherited HTMLElement
-      members (no ROZ137) and there are no emits (so no expose==event ROZ121). A
-      per-toast close button calls the internal `dismiss`; consumers wanting an
+      members (no ROZ137). The single `dismissed` event does not collide with
+      the `dismiss` verb (ROZ121 — differently named). A per-toast close button
+      calls the internal `dismissBegin(id,'close')`; consumers wanting an
       action button / custom chrome use the #toast scoped slot.
     - Handler params left UNTYPED (neutralize to `any`). All window.* calls are
       typeof-guarded for SSR.
-    - $data.toasts is written via fresh arrays (concat/filter) — never in-place
-      mutation (dropped on React/Solid/Lit/Angular change detection).
+    - $data.toasts is written via fresh arrays (concat/filter/map) — never
+      in-place mutation (dropped on React/Solid/Lit/Angular change detection).
+      The `exiting` flag is written the same way (a fresh per-entry object via
+      map).
 
   Consumer example:
 
@@ -121,7 +134,7 @@ const startTimer = (toast) => {
   if (!toast || !toast.duration || toast.duration <= 0) return
   if (typeof window === 'undefined') return
   const remaining = toast.duration
-  const handle = window.setTimeout(() => dismiss(toast.id), remaining)
+  const handle = window.setTimeout(() => dismissBegin(toast.id, 'timeout'), remaining)
   timers[toast.id] = { handle, startedAt: Date.now(), remaining }
 }
 
@@ -155,7 +168,7 @@ const resumeTimers = () => {
     const entry = timers[id]
     if (entry.remaining == null || entry.remaining <= 0) continue
     const remaining = entry.remaining
-    const handle = window.setTimeout(() => dismiss(id), remaining)
+    const handle = window.setTimeout(() => dismissBegin(id, 'timeout'), remaining)
     timers[id] = { handle, startedAt: Date.now(), remaining }
   }
 }
@@ -200,11 +213,44 @@ const show = (input) => {
   return id
 }
 
-const dismiss = (id) => {
-  clearTimer(id)
+// ---- exit lifecycle ------------------------------------------------------
+// Deliberately exceeds the 200ms default --rozie-toast-exit-duration token
+// comfortably; a consumer overriding the exit duration beyond ~350ms gets cut
+// short by this failsafe (documented in docs/components/toast.md).
+const EXIT_FAILSAFE_MS = 350
+
+// Idempotent removal: filters the entry out of $data.toasts. Safe to call
+// twice (from the inline @animationend binding AND the failsafe) — the
+// second call is a harmless no-op filter over an already-absent id.
+const removeToast = (id) => {
   $data.toasts = $data.toasts.filter((t) => t.id !== id)
 }
 
+// The single dismissal funnel every path routes through: the `dismiss(id)`
+// verb ('api'), the built-in close button ('close'), a timer expiry
+// ('timeout'), and (Task 4) a swipe past threshold ('swipe'). Idempotent via
+// the entry's `exiting` flag — a second call on an id already exiting (or
+// already gone) is a no-op, so a stray timeout firing mid-exit never
+// double-emits.
+const dismissBegin = (id, reason) => {
+  const entry = $data.toasts.find((t) => t.id === id)
+  if (!entry || entry.exiting) return
+  clearTimer(id)
+  $emit('dismissed', { toast: entry, reason })
+  $data.toasts = $data.toasts.map((t) => (t.id === id ? { ...t, exiting: true } : t))
+  if (typeof window === 'undefined') {
+    removeToast(id)
+  } else {
+    window.setTimeout(() => removeToast(id), EXIT_FAILSAFE_MS)
+  }
+}
+
+const dismiss = (id) => {
+  dismissBegin(id, 'api')
+}
+
+// clear() is bulk: immediate full teardown, NO per-toast exit animation and
+// NO emit (documented — see docs/components/toast.md).
 const clear = () => {
   teardownTimers()
   $data.toasts = []
@@ -250,13 +296,14 @@ $expose({ show, dismiss, clear })
     r-for="t in $data.toasts"
     :key="t.id"
     class="rozie-toast"
-    :class="'rozie-toast--' + t.type"
+    :class="'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '')"
     role="status"
     :aria-live="liveFor(t.type)"
+    @animationend="t.exiting && removeToast(t.id)"
   >
     <slot name="toast" :toast="t" :dismiss="dismiss">
       <span class="rozie-toast-message">{{ t.message }}</span>
-      <button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismiss(t.id)">×</button>
+      <button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismissBegin(t.id, 'close')">×</button>
     </slot>
   </div>
 </div>
@@ -307,6 +354,68 @@ $expose({ show, dismiss, clear })
 .rozie-toast--error { background: var(--rozie-toast-error-bg, #dc2626); }
 .rozie-toast--warning { background: var(--rozie-toast-warning-bg, #ca8a04); }
 .rozie-toast--info { background: var(--rozie-toast-info-bg, var(--rozie-toast-bg, #333)); }
+
+/*
+  Enter/exit lifecycle. Enter plays on every mount (slide in from the
+  corner's edge + fade); exit plays while `exiting` is true (the
+  `rozie-toast--exiting` class), removal driven by the element's own
+  `@animationend` OR the ~350ms JS failsafe — whichever fires first
+  (state-driven, target-agnostic; see the <script> comment above).
+  `--rozie-toast-enter-duration`/`--rozie-toast-exit-duration` default to
+  200ms (documented in themes/base.css).
+*/
+@keyframes rozie-toast-enter {
+  from { opacity: 0; transform: translateY(-0.5rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes rozie-toast-enter-from-bottom {
+  from { opacity: 0; transform: translateY(0.5rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes rozie-toast-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-0.5rem); }
+}
+@keyframes rozie-toast-exit-to-bottom {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(0.5rem); }
+}
+.rozie-toast {
+  animation: rozie-toast-enter var(--rozie-toast-enter-duration, 200ms) ease-out;
+}
+.rozie-toaster--bottom-left .rozie-toast,
+.rozie-toaster--bottom-right .rozie-toast,
+.rozie-toaster--bottom-center .rozie-toast {
+  animation-name: rozie-toast-enter-from-bottom;
+}
+.rozie-toast--exiting {
+  animation: rozie-toast-exit var(--rozie-toast-exit-duration, 200ms) ease-in forwards;
+}
+.rozie-toaster--bottom-left .rozie-toast--exiting,
+.rozie-toaster--bottom-right .rozie-toast--exiting,
+.rozie-toaster--bottom-center .rozie-toast--exiting {
+  animation-name: rozie-toast-exit-to-bottom;
+}
+/* Collapse to a near-instant fade (still fires animationend — the exit
+   lifecycle is unchanged) rather than disabling animation entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .rozie-toast {
+    animation-name: rozie-toast-fade-in;
+    animation-duration: 1ms;
+  }
+  .rozie-toast--exiting {
+    animation-name: rozie-toast-fade-out;
+    animation-duration: 1ms;
+  }
+}
+@keyframes rozie-toast-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes rozie-toast-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
 
 .rozie-toast-message {
   flex: 1 1 auto;

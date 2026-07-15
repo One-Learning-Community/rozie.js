@@ -62,6 +62,12 @@ import '@rozie-ui/toast-react/themes/shadcn.css';    // or material.css, bootstr
 | `disablePauseOnHover` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 
+## Events
+
+| Event | Description |
+| --- | --- |
+| `dismissed` | Fired exactly once per toast, at dismissal initiation (before the exit animation runs). Payload is ONE object `{ toast, reason }` — `toast` is the full queue entry, `reason` is `'timeout'` (auto-dismiss), `'swipe'` (pointer swipe past threshold), `'close'` (the built-in close button), or `'api'` (the `dismiss(id)` verb). `clear()` removes every toast immediately and does NOT fire `dismissed` (documented bulk behavior). |
+
 ## Imperative handle
 
 The component has no events — its primary API is an imperative handle (declared once in the Rozie source via `$expose`). Grab a handle with the native ref mechanism and call the methods directly. None of the verbs overrides an inherited host-element member, so the Lit custom element emits no ROZ137 warning:

@@ -3,7 +3,17 @@ import { createSignal, mergeProps, onCleanup, onMount, splitProps } from 'solid-
 import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, mergeListeners, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 
-__rozieInjectStyle('Toaster-12d4265c', `.rozie-toaster[data-rozie-s-12d4265c] {
+__rozieInjectStyle('Toaster-12d4265c', `@media (prefers-reduced-motion: reduce) {
+  .rozie-toast[data-rozie-s-12d4265c] {
+    animation-name: rozie-toast-fade-in;
+    animation-duration: 1ms;
+  }
+  .rozie-toast--exiting[data-rozie-s-12d4265c] {
+    animation-name: rozie-toast-fade-out;
+    animation-duration: 1ms;
+  }
+}
+.rozie-toaster[data-rozie-s-12d4265c] {
   position: fixed;
   z-index: var(--rozie-toast-z, 9999);
   display: flex;
@@ -39,6 +49,34 @@ __rozieInjectStyle('Toaster-12d4265c', `.rozie-toaster[data-rozie-s-12d4265c] {
 .rozie-toast--error[data-rozie-s-12d4265c] { background: var(--rozie-toast-error-bg, #dc2626); }
 .rozie-toast--warning[data-rozie-s-12d4265c] { background: var(--rozie-toast-warning-bg, #ca8a04); }
 .rozie-toast--info[data-rozie-s-12d4265c] { background: var(--rozie-toast-info-bg, var(--rozie-toast-bg, #333)); }
+from[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(-0.5rem); }
+to[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+from[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(0.5rem); }
+to[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+from[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+to[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(-0.5rem); }
+from[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+to[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(0.5rem); }
+.rozie-toast[data-rozie-s-12d4265c] {
+  animation: rozie-toast-enter var(--rozie-toast-enter-duration, 200ms) ease-out;
+}
+.rozie-toaster--bottom-left[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c],
+.rozie-toaster--bottom-right[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c],
+.rozie-toaster--bottom-center[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c] {
+  animation-name: rozie-toast-enter-from-bottom;
+}
+.rozie-toast--exiting[data-rozie-s-12d4265c] {
+  animation: rozie-toast-exit var(--rozie-toast-exit-duration, 200ms) ease-in forwards;
+}
+.rozie-toaster--bottom-left[data-rozie-s-12d4265c] .rozie-toast--exiting[data-rozie-s-12d4265c],
+.rozie-toaster--bottom-right[data-rozie-s-12d4265c] .rozie-toast--exiting[data-rozie-s-12d4265c],
+.rozie-toaster--bottom-center[data-rozie-s-12d4265c] .rozie-toast--exiting[data-rozie-s-12d4265c] {
+  animation-name: rozie-toast-exit-to-bottom;
+}
+from[data-rozie-s-12d4265c] { opacity: 0; }
+to[data-rozie-s-12d4265c] { opacity: 1; }
+from[data-rozie-s-12d4265c] { opacity: 1; }
+to[data-rozie-s-12d4265c] { opacity: 0; }
 .rozie-toast-message[data-rozie-s-12d4265c] {
   flex: 1 1 auto;
   font-size: var(--rozie-toast-font-size, 0.9rem);
@@ -87,6 +125,7 @@ interface ToasterProps {
    * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
   ariaLabel?: (string) | null;
+  onDismissed?: (...args: unknown[]) => void;
   toastSlot?: (ctx: ToastSlotCtx) => JSX.Element;
   slots?: Record<string, (ctx: any) => JSX.Element>;
   ref?: (h: ToasterHandle) => void;
@@ -126,7 +165,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
     const remaining = toast.duration;
-    const handle = window.setTimeout(() => dismiss(toast.id), remaining);
+    const handle = window.setTimeout(() => dismissBegin(toast.id, 'timeout'), remaining);
     timers[toast.id] = {
       handle,
       startedAt: Date.now(),
@@ -167,7 +206,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
       const entry = timers[id];
       if (entry.remaining == null || entry.remaining <= 0) continue;
       const remaining = entry.remaining;
-      const handle = window.setTimeout(() => dismiss(id), remaining);
+      const handle = window.setTimeout(() => dismissBegin(id, 'timeout'), remaining);
       timers[id] = {
         handle,
         startedAt: Date.now(),
@@ -215,10 +254,50 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
     startTimer(toast);
     return id;
   }
-  function dismiss(id: any) {
-    clearTimer(id);
+
+  // ---- exit lifecycle ------------------------------------------------------
+  // Deliberately exceeds the 200ms default --rozie-toast-exit-duration token
+  // comfortably; a consumer overriding the exit duration beyond ~350ms gets cut
+  // short by this failsafe (documented in docs/components/toast.md).
+  const EXIT_FAILSAFE_MS = 350;
+
+  // Idempotent removal: filters the entry out of $data.toasts. Safe to call
+  // twice (from the inline @animationend binding AND the failsafe) — the
+  // second call is a harmless no-op filter over an already-absent id.
+  function removeToast(id: any) {
     setToasts(toasts().filter((t: any) => t.id !== id));
   }
+
+  // The single dismissal funnel every path routes through: the `dismiss(id)`
+  // verb ('api'), the built-in close button ('close'), a timer expiry
+  // ('timeout'), and (Task 4) a swipe past threshold ('swipe'). Idempotent via
+  // the entry's `exiting` flag — a second call on an id already exiting (or
+  // already gone) is a no-op, so a stray timeout firing mid-exit never
+  // double-emits.
+  function dismissBegin(id: any, reason: any) {
+    const entry = toasts().find((t: any) => t.id === id);
+    if (!entry || entry.exiting) return;
+    clearTimer(id);
+    _props.onDismissed?.({
+      toast: entry,
+      reason
+    });
+    setToasts(toasts().map((t: any) => t.id === id ? {
+      ...t,
+      exiting: true
+    } : t));
+    if (typeof window === 'undefined') {
+      removeToast(id);
+    } else {
+      window.setTimeout(() => removeToast(id), EXIT_FAILSAFE_MS);
+    }
+  }
+  function dismiss(id: any) {
+    dismissBegin(id, 'api');
+  }
+
+  // clear() is bulk: immediate full teardown, NO per-toast exit animation and
+  // NO emit (documented — see docs/components/toast.md).
   function clear() {
     teardownTimers();
     setToasts([]);
@@ -248,8 +327,8 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
     <>
     <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} class={"rozie-toaster" + " " + rozieClass('rozie-toaster--' + local.position) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onMouseEnter: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseEnter(); }, onMouseLeave: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseLeave(); } }, attrs)} data-rozie-s-12d4265c="">
       
-      <Key each={toasts() as readonly any[]} by={(t) => t.id}>{(t) => <div class={"rozie-toast" + " " + rozieClass('rozie-toast--' + t().type)} role="status" aria-live={rozieAttr(liveFor(t().type))} data-rozie-s-12d4265c="">
-        {(_props.toastSlot ?? _props.slots?.['toast'])?.({ toast: t(), dismiss }) ?? <><span class={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t().message)}</span><button type="button" aria-label="Dismiss" class={"rozie-toast-close"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { dismiss(t().id); }} data-rozie-s-12d4265c="">×</button></>}
+      <Key each={toasts() as readonly any[]} by={(t) => t.id}>{(t) => <div role="status" aria-live={rozieAttr(liveFor(t().type))} class={"rozie-toast" + " " + rozieClass('rozie-toast--' + t().type + (t().exiting ? ' rozie-toast--exiting' : ''))} onAnimationEnd={($event: AnimationEvent & { currentTarget: HTMLDivElement; target: Element }) => { t().exiting && removeToast(t().id); }} data-rozie-s-12d4265c="">
+        {(_props.toastSlot ?? _props.slots?.['toast'])?.({ toast: t(), dismiss }) ?? <><span class={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t().message)}</span><button type="button" aria-label="Dismiss" class={"rozie-toast-close"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { dismissBegin(t().id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
       </div>}</Key>
     </div>
     </>

@@ -6,10 +6,11 @@
  *   1. lowerToIR() + compile()×6 emit ZERO error-severity diagnostics
  *      (ROZ127 slot==prop, ROZ121 expose-verb==event, ROZ524 React model-setter,
  *      Lit reserved-lifecycle — all surface here as compile() errors). Toaster's
- *      surface is collision-free: zero emits (no ROZ121), zero models (no ROZ524),
- *      and `show`/`dismiss`/`clear` are not inherited host-element members (no
+ *      surface is collision-free: the single `dismissed` emit does not collide
+ *      with any expose verb (no ROZ121), zero models (no ROZ524), and
+ *      `show`/`dismiss`/`clear` are not inherited host-element members (no
  *      ROZ137), so compile()×6 is fully clean — zero error AND zero warning.
- *   2. The IR surface matches the contract exactly (incl. the zero-emits fact).
+ *   2. The IR surface matches the contract exactly (incl. the single-emit fact).
  * THROWS (non-zero exit) on any drift. No compiler/emitter/IR change.
  */
 import { readFileSync } from 'node:fs';
@@ -25,7 +26,7 @@ const EXPECT = {
   name: 'Toaster',
   props: ['position', 'duration', 'max', 'disablePauseOnHover', 'ariaLabel'],
   models: [],
-  emits: [],
+  emits: ['dismissed'],
   slots: ['toast'],
   expose: ['show', 'dismiss', 'clear'],
 };
@@ -48,7 +49,7 @@ const modelNames = ir.props.filter((p) => p.isModel).map((p) => p.name);
 if (!setEq(modelNames, EXPECT.models)) fail(`model:true props: got [${modelNames.sort()}], want [${[...EXPECT.models].sort()}]`);
 
 if (!setEq(ir.emits, EXPECT.emits)) fail(`emits mismatch:\n  got:  ${[...ir.emits].sort().join(', ')}\n  want: ${[...EXPECT.emits].sort().join(', ')}`);
-if (ir.emits.length !== 0) fail(`Toaster must emit NOTHING (the imperative handle replaces events); got [${[...ir.emits].join(', ')}]`);
+if (ir.emits.length !== 1) fail(`Toaster must emit exactly ['dismissed'] (the first family event; clear() emits nothing); got [${[...ir.emits].join(', ')}]`);
 
 const slotNames = ir.slots.map((s) => s.name);
 if (!setEq(slotNames, EXPECT.slots)) fail(`slots mismatch: got [${slotNames.sort()}], want [${[...EXPECT.slots].sort()}]`);
@@ -76,5 +77,5 @@ for (const target of TARGETS) {
 if (process.exitCode) {
   console.error('\n✗ compile-toast-check FAILED');
 } else {
-  console.log(`✓ Toaster surface OK: ${EXPECT.props.length} props (${EXPECT.models.length} model) / ${EXPECT.emits.length} emits / ${EXPECT.slots.length} slot / ${EXPECT.expose.length} expose; compile()×6 zero-error (zero emits → handle-only; collision-free).`);
+  console.log(`✓ Toaster surface OK: ${EXPECT.props.length} props (${EXPECT.models.length} model) / ${EXPECT.emits.length} emits / ${EXPECT.slots.length} slot / ${EXPECT.expose.length} expose; compile()×6 zero-error (collision-free — dismissed ≠ dismiss).`);
 }

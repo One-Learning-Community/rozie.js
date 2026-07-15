@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 
 interface ToastCtx {
@@ -36,13 +36,13 @@ function __rozieAttr(v: unknown): string | null {
     <div class="rozie-toaster" [ngClass]="'rozie-toaster--' + position()" role="region" [attr.aria-label]="rozieAttr(regionLabel())" #rozieSpread_0 (mouseenter)="onMouseEnter()" (mouseleave)="onMouseLeave()" #rozieListenersTarget_1>
       
       @for (t of toasts(); track t.id) {
-    <div class="rozie-toast" [ngClass]="'rozie-toast--' + t.type" role="status" [attr.aria-live]="rozieAttr(liveFor(t.type))">
+    <div class="rozie-toast" [ngClass]="'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '')" role="status" [attr.aria-live]="rozieAttr(liveFor(t.type))" (animationend)="t.exiting && removeToast(t.id)">
         @if ((toastTpl ?? templates()?.['toast'])) {
     <ng-container *ngTemplateOutlet="(toastTpl ?? templates()?.['toast']); context: { $implicit: { toast: t, dismiss: dismiss }, toast: t, dismiss: dismiss }" />
     } @else {
 
           <span class="rozie-toast-message">{{ rozieDisplay(t.message) }}</span>
-          <button type="button" class="rozie-toast-close" aria-label="Dismiss" (click)="dismiss(t.id)">×</button>
+          <button type="button" class="rozie-toast-close" aria-label="Dismiss" (click)="dismissBegin(t.id, 'close')">×</button>
         
     }
       </div>
@@ -52,6 +52,16 @@ function __rozieAttr(v: unknown): string | null {
   `,
   styles: [`
     :host(rozie-toaster) { display: contents; }
+    @media (prefers-reduced-motion: reduce) {
+      .rozie-toast {
+        animation-name: rozie-toast-fade-in;
+        animation-duration: 1ms;
+      }
+      .rozie-toast--exiting {
+        animation-name: rozie-toast-fade-out;
+        animation-duration: 1ms;
+      }
+    }
     .rozie-toaster {
       position: fixed;
       z-index: var(--rozie-toast-z, 9999);
@@ -88,6 +98,34 @@ function __rozieAttr(v: unknown): string | null {
     .rozie-toast--error { background: var(--rozie-toast-error-bg, #dc2626); }
     .rozie-toast--warning { background: var(--rozie-toast-warning-bg, #ca8a04); }
     .rozie-toast--info { background: var(--rozie-toast-info-bg, var(--rozie-toast-bg, #333)); }
+    from { opacity: 0; transform: translateY(-0.5rem); }
+    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(0.5rem); }
+    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-0.5rem); }
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(0.5rem); }
+    .rozie-toast {
+      animation: rozie-toast-enter var(--rozie-toast-enter-duration, 200ms) ease-out;
+    }
+    .rozie-toaster--bottom-left .rozie-toast,
+    .rozie-toaster--bottom-right .rozie-toast,
+    .rozie-toaster--bottom-center .rozie-toast {
+      animation-name: rozie-toast-enter-from-bottom;
+    }
+    .rozie-toast--exiting {
+      animation: rozie-toast-exit var(--rozie-toast-exit-duration, 200ms) ease-in forwards;
+    }
+    .rozie-toaster--bottom-left .rozie-toast--exiting,
+    .rozie-toaster--bottom-right .rozie-toast--exiting,
+    .rozie-toaster--bottom-center .rozie-toast--exiting {
+      animation-name: rozie-toast-exit-to-bottom;
+    }
+    from { opacity: 0; }
+    to { opacity: 1; }
+    from { opacity: 1; }
+    to { opacity: 0; }
     .rozie-toast-message {
       flex: 1 1 auto;
       font-size: var(--rozie-toast-font-size, 0.9rem);
@@ -137,6 +175,7 @@ export class Toaster {
   ariaLabel = input<(string) | null>(null);
   toasts = signal<any[]>([]);
   seq = signal(0);
+  dismissed = output<unknown>();
   @ContentChild('toast', { read: TemplateRef }) toastTpl?: TemplateRef<ToastCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
@@ -151,7 +190,7 @@ export class Toaster {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
     const remaining = toast.duration;
-    const handle = window.setTimeout(() => this.dismiss(toast.id), remaining);
+    const handle = window.setTimeout(() => this.dismissBegin(toast.id, 'timeout'), remaining);
     this.timers[toast.id] = {
       handle,
       startedAt: Date.now(),
@@ -182,7 +221,7 @@ export class Toaster {
       const entry = this.timers[id];
       if (entry.remaining == null || entry.remaining <= 0) continue;
       const remaining = entry.remaining;
-      const handle = window.setTimeout(() => this.dismiss(id), remaining);
+      const handle = window.setTimeout(() => this.dismissBegin(id, 'timeout'), remaining);
       this.timers[id] = {
         handle,
         startedAt: Date.now(),
@@ -224,9 +263,30 @@ export class Toaster {
     this.startTimer(toast);
     return id;
   };
-  dismiss = (id: any) => {
-    this.clearTimer(id);
+  EXIT_FAILSAFE_MS = 350;
+  removeToast = (id: any) => {
     this.toasts.set(this.toasts().filter((t: any) => t.id !== id));
+  };
+  dismissBegin = (id: any, reason: any) => {
+    const entry = this.toasts().find((t: any) => t.id === id);
+    if (!entry || entry.exiting) return;
+    this.clearTimer(id);
+    this.dismissed.emit({
+      toast: entry,
+      reason
+    });
+    this.toasts.set(this.toasts().map((t: any) => t.id === id ? {
+      ...t,
+      exiting: true
+    } : t));
+    if (typeof window === 'undefined') {
+      this.removeToast(id);
+    } else {
+      window.setTimeout(() => this.removeToast(id), this.EXIT_FAILSAFE_MS);
+    }
+  };
+  dismiss = (id: any) => {
+    this.dismissBegin(id, 'api');
   };
   clear = () => {
     this.teardownTimers();

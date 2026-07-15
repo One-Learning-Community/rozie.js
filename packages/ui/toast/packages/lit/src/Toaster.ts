@@ -13,6 +13,16 @@ interface RozieToastSlotCtx {
 export default class Toaster extends SignalWatcher(LitElement) {
   static styles = css`
 :host{display:contents}
+@media (prefers-reduced-motion: reduce) {
+  .rozie-toast[data-rozie-s-12d4265c] {
+    animation-name: rozie-toast-fade-in;
+    animation-duration: 1ms;
+  }
+  .rozie-toast--exiting[data-rozie-s-12d4265c] {
+    animation-name: rozie-toast-fade-out;
+    animation-duration: 1ms;
+  }
+}
 .rozie-toaster[data-rozie-s-12d4265c] {
   position: fixed;
   z-index: var(--rozie-toast-z, 9999);
@@ -49,6 +59,34 @@ export default class Toaster extends SignalWatcher(LitElement) {
 .rozie-toast--error[data-rozie-s-12d4265c] { background: var(--rozie-toast-error-bg, #dc2626); }
 .rozie-toast--warning[data-rozie-s-12d4265c] { background: var(--rozie-toast-warning-bg, #ca8a04); }
 .rozie-toast--info[data-rozie-s-12d4265c] { background: var(--rozie-toast-info-bg, var(--rozie-toast-bg, #333)); }
+from[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(-0.5rem); }
+to[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+from[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(0.5rem); }
+to[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+from[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+to[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(-0.5rem); }
+from[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+to[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(0.5rem); }
+.rozie-toast[data-rozie-s-12d4265c] {
+  animation: rozie-toast-enter var(--rozie-toast-enter-duration, 200ms) ease-out;
+}
+.rozie-toaster--bottom-left[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c],
+.rozie-toaster--bottom-right[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c],
+.rozie-toaster--bottom-center[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c] {
+  animation-name: rozie-toast-enter-from-bottom;
+}
+.rozie-toast--exiting[data-rozie-s-12d4265c] {
+  animation: rozie-toast-exit var(--rozie-toast-exit-duration, 200ms) ease-in forwards;
+}
+.rozie-toaster--bottom-left[data-rozie-s-12d4265c] .rozie-toast--exiting[data-rozie-s-12d4265c],
+.rozie-toaster--bottom-right[data-rozie-s-12d4265c] .rozie-toast--exiting[data-rozie-s-12d4265c],
+.rozie-toaster--bottom-center[data-rozie-s-12d4265c] .rozie-toast--exiting[data-rozie-s-12d4265c] {
+  animation-name: rozie-toast-exit-to-bottom;
+}
+from[data-rozie-s-12d4265c] { opacity: 0; }
+to[data-rozie-s-12d4265c] { opacity: 1; }
+from[data-rozie-s-12d4265c] { opacity: 1; }
+to[data-rozie-s-12d4265c] { opacity: 0; }
 .rozie-toast-message[data-rozie-s-12d4265c] {
   flex: 1 1 auto;
   font-size: var(--rozie-toast-font-size, 0.9rem);
@@ -148,10 +186,10 @@ export default class Toaster extends SignalWatcher(LitElement) {
     return html`
 <div class="rozie-toaster ${(rozieClass('rozie-toaster--' + this.position))}" role="region" aria-label=${rozieAttr(this.regionLabel())} ${rozieSpread(this.$attrs)} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onMouseEnter(); }} @mouseleave=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onMouseLeave(); }} ${rozieListeners(this.$listeners)} data-rozie-s-12d4265c>
   
-  ${repeat<any>(this._toasts.value, (t, _idx) => t.id, (t, _idx) => html`<div class="rozie-toast ${(rozieClass('rozie-toast--' + t.type))}" key=${rozieAttr(t.id)} role="status" aria-live=${rozieAttr(this.liveFor(t.type))} data-rozie-s-12d4265c>
+  ${repeat<any>(this._toasts.value, (t, _idx) => t.id, (t, _idx) => html`<div class="rozie-toast ${(rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '')))}" key=${rozieAttr(t.id)} role="status" aria-live=${rozieAttr(this.liveFor(t.type))} @animationend=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { t.exiting && this.removeToast(t.id); }} data-rozie-s-12d4265c>
     ${this.toast !== undefined ? this.toast({toast: t, dismiss: this.dismiss}) : html`<slot name="toast" data-rozie-params=${(() => { try { return JSON.stringify({toast: t}); } catch { return '{}'; } })()} @rozie-toast-dismiss=${($event: CustomEvent) => ((this.dismiss) as (...args: any[]) => any)($event.detail)}>
       <span class="rozie-toast-message" data-rozie-s-12d4265c>${rozieDisplay(t.message)}</span>
-      <button class="rozie-toast-close" type="button" aria-label="Dismiss" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.dismiss(t.id); }} data-rozie-s-12d4265c>×</button>
+      <button class="rozie-toast-close" type="button" aria-label="Dismiss" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>
     </slot>`}
   </div>`)}
 </div>
@@ -164,7 +202,7 @@ export default class Toaster extends SignalWatcher(LitElement) {
   if (!toast || !toast.duration || toast.duration <= 0) return;
   if (typeof window === 'undefined') return;
   const remaining = toast.duration;
-  const handle = window.setTimeout(() => this.dismiss(toast.id), remaining);
+  const handle = window.setTimeout(() => this.dismissBegin(toast.id, 'timeout'), remaining);
   this.timers[toast.id] = {
     handle,
     startedAt: Date.now(),
@@ -198,7 +236,7 @@ export default class Toaster extends SignalWatcher(LitElement) {
     const entry = this.timers[id];
     if (entry.remaining == null || entry.remaining <= 0) continue;
     const remaining = entry.remaining;
-    const handle = window.setTimeout(() => this.dismiss(id), remaining);
+    const handle = window.setTimeout(() => this.dismissBegin(id, 'timeout'), remaining);
     this.timers[id] = {
       handle,
       startedAt: Date.now(),
@@ -243,9 +281,37 @@ export default class Toaster extends SignalWatcher(LitElement) {
   return id;
 };
 
-  dismiss = (id: any) => {
-  this.clearTimer(id);
+  EXIT_FAILSAFE_MS = 350;
+
+  removeToast = (id: any) => {
   this._toasts.value = this._toasts.value.filter((t: any) => t.id !== id);
+};
+
+  dismissBegin = (id: any, reason: any) => {
+  const entry = this._toasts.value.find((t: any) => t.id === id);
+  if (!entry || entry.exiting) return;
+  this.clearTimer(id);
+  this.dispatchEvent(new CustomEvent("dismissed", {
+    detail: {
+      toast: entry,
+      reason
+    },
+    bubbles: true,
+    composed: true
+  }));
+  this._toasts.value = this._toasts.value.map((t: any) => t.id === id ? {
+    ...t,
+    exiting: true
+  } : t);
+  if (typeof window === 'undefined') {
+    this.removeToast(id);
+  } else {
+    window.setTimeout(() => this.removeToast(id), this.EXIT_FAILSAFE_MS);
+  }
+};
+
+  dismiss = (id: any) => {
+  this.dismissBegin(id, 'api');
 };
 
   clear = () => {

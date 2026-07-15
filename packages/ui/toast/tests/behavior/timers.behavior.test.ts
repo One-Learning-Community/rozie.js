@@ -96,8 +96,14 @@ describe('Toaster hover pause — precise remaining-time (behavioral)', () => {
     await vi.advanceTimersByTimeAsync(390);
     expect(statusCount(host)).toBe(1);
 
-    // Past the remainder (~400ms since leave, not ~1000ms) — dismissed.
+    // Past the remainder (~400ms since leave, not ~1000ms) — the exit
+    // lifecycle begins, then settles via the ~350ms failsafe (happy-dom never
+    // fires a real animationend). Total elapsed since leave (~770ms) stays
+    // well under what the old v1 full-restart shortcut would have needed
+    // (~1000ms + the failsafe) — proving the PRECISE remainder, not a reset.
     await vi.advanceTimersByTimeAsync(20);
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(360);
     await nextTick();
     expect(statusCount(host)).toBe(0);
 
@@ -133,8 +139,11 @@ describe('Toaster hover pause — precise remaining-time (behavioral)', () => {
     await nextTick();
 
     // disablePauseOnHover=true: hover does NOT pause — the toast still
-    // dismisses at the ORIGINAL full duration regardless of the hover.
+    // dismisses at the ORIGINAL full duration regardless of the hover, then
+    // settles via the ~350ms exit failsafe.
     await vi.advanceTimersByTimeAsync(400);
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(360);
     await nextTick();
     expect(statusCount(host)).toBe(0);
 
