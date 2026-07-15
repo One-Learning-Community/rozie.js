@@ -150,7 +150,12 @@ for (const target of TARGETS) {
     const box = await toast.boundingBox();
     if (!box) throw new Error('toast bounding box unavailable');
 
-    // A short drag — well under the 45% threshold — must spring back.
+    // A short drag — well under the 45% distance threshold. Playwright's
+    // synthetic mouse.move is near-instantaneous, so without explicit pacing
+    // even a SHORT drag's release velocity clears the 0.11px/ms threshold
+    // (dismissing via velocity instead of distance, defeating this test's
+    // purpose) — space the moves out over real wall-clock time so BOTH
+    // thresholds stay comfortably unmet.
     const startX = box.x + box.width * 0.5;
     const startY = box.y + box.height * 0.5;
     const endX = startX + box.width * 0.1;
@@ -159,6 +164,7 @@ for (const target of TARGETS) {
     await page.mouse.down();
     for (let i = 1; i <= 5; i++) {
       await page.mouse.move(startX + ((endX - startX) * i) / 5, startY, { steps: 2 });
+      await page.waitForTimeout(60);
     }
     await page.mouse.up();
 
@@ -257,13 +263,24 @@ for (const target of TARGETS) {
     await expect(oldest).toHaveCSS('opacity', '0');
     await expect(newest).toHaveCSS('opacity', '1');
 
-    // Hover the region → expands to the flex column: every toast visible.
-    await page.locator('.rozie-toaster').first().hover();
-    await expect(oldest).toHaveCSS('opacity', '1');
+    // Move keyboard focus into the region → :focus-within expands to the
+    // flex column: every toast visible. Uses locator.focus() on the newest
+    // (always-visible) toast's close button rather than a mouse hover —
+    // hovering is pointer-COORDINATE-based, and the collapse-to-expand CSS
+    // transition RELAYOUTS the region (grid → flex column), moving every
+    // toast out from under a coordinate computed before the expand; that
+    // self-defeating chase (hover lands → layout shifts → cursor no longer
+    // over any toast → hover lost → re-collapse → …) flickered observably on
+    // Lit's shadow-DOM rendering. Keyboard focus has no such geometry
+    // dependency — it is also independently documented as an equally valid
+    // way to expand a `stacked` region (a keyboard user tabbing to a close
+    // button).
+    await page.locator('.rozie-toast-close').last().focus();
+    await expect(oldest).toHaveCSS('opacity', '1', { timeout: 10_000 });
 
-    // Move away → re-collapses.
-    await page.mouse.move(10, 10);
-    await expect(oldest).toHaveCSS('opacity', '0');
+    // Blur away → re-collapses.
+    await page.locator('.rozie-toast-close').last().blur();
+    await expect(oldest).toHaveCSS('opacity', '0', { timeout: 10_000 });
   });
 
   runner(`toaster [${target}]: stacked:false (default) renders the plain flex column at all times`, async ({

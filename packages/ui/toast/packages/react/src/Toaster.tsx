@@ -68,14 +68,8 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   const [toasts, setToasts] = useState<any[]>([]);
   const [seq, setSeq] = useState(0);
   const [swipe, setSwipe] = useState<any>(null);
+  const [swipeGesture, setSwipeGesture] = useState<any>(null);
 
-  // Non-reactive per-gesture scratch for the ACTIVE swipe drag:
-  // { id, axis, sign, size, startX, startY, startTime } | null. Only the
-  // derived visual state ($data.swipe) needs to be reactive; this bookkeeping
-  // is read/written exclusively inside the @pointer* handlers below.
-  let swipeGesture: any = null;
-
-  // ---- timers ------------------------------------------------------------
   function startTimer(toast: any) {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
@@ -259,7 +253,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     const sign = swipeSignFor(props.position);
     const el = event.currentTarget;
     const size = axis === 'x' ? el.offsetWidth : el.offsetHeight;
-    swipeGesture = {
+    setSwipeGesture({
       id: t.id,
       axis,
       sign,
@@ -267,7 +261,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       startX: event.clientX,
       startY: event.clientY,
       startTime: Date.now()
-    };
+    });
     if (el && el.setPointerCapture) {
       try {
         el.setPointerCapture(event.pointerId);
@@ -291,11 +285,11 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       sign: gesture.sign,
       size: gesture.size
     });
-  }, [props.disableSwipe]);
+  }, [props.disableSwipe, swipeGesture]);
   const onToastPointerUp = useCallback((t: any, event: any) => {
     if (props.disableSwipe) return;
     const gesture = swipeGesture;
-    swipeGesture = null;
+    setSwipeGesture(null);
     // Local named `dragState`, NOT `swipe` — a local `swipe` would shadow the
     // reactive `$data.swipe` key on Svelte 5 (top-level `let swipe = $state(…)`
     // self-shadow TDZ: `const swipe = swipe` then `swipe = null` throws
@@ -312,12 +306,12 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
         swipeExitSign: gesture.sign
       });
     }
-  }, [dismissBegin, props.disableSwipe, swipe]);
+  }, [dismissBegin, props.disableSwipe, swipe, swipeGesture]);
   const onToastPointerCancel = useCallback((t: any) => {
     if (props.disableSwipe) return;
-    if (swipeGesture && swipeGesture.id === t.id) swipeGesture = null;
+    if (swipeGesture && swipeGesture.id === t.id) setSwipeGesture(null);
     if (swipe && swipe.id === t.id) setSwipe(null);
-  }, [props.disableSwipe, swipe]);
+  }, [props.disableSwipe, swipe, swipeGesture]);
   function depth(t: any) {
     const idx = toasts.findIndex((x: any) => x.id === t.id);
     return idx === -1 ? 0 : toasts.length - 1 - idx;

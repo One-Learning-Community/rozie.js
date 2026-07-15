@@ -40,12 +40,16 @@
   Swipe-to-dismiss (on by default, `disableSwipe` opts out): direction is
   derived from `position` (`*-right`→right, `*-left`→left, `top-center`→up,
   `bottom-center`→down), axis-locked, with the opposite direction rubber-
-  banded ×0.15. `swipeGesture` is a top-level `let` (non-reactive per-gesture
-  scratch: start coords/time/axis/sign/size, measured from
-  `$event.currentTarget` — NEVER `$refs`); `$data.swipe = { id, d, axis,
-  sign, size }` is the ONE reactive fresh object that drives the dragged
-  toast's string-form `:style` transform+opacity. Past 45% of the toast's own
-  size OR >0.11px/ms releases into `dismissBegin(id, 'swipe', {
+  banded ×0.15. `$data.swipeGesture` holds the ACTIVE gesture's non-visual
+  bookkeeping (start coords/time/axis/sign/size, measured from
+  `$event.currentTarget` — NEVER `$refs`); it is reactive `$data`, NOT a
+  module-level `let`, because it is referenced only from template
+  `@pointer*`-bound handlers, which `hoistModuleLet` does not treat as a
+  hoist root — a plain `let` there resets on every React render and swipe
+  silently never fires (EMITTER-BACKLOG, see the <data> comment).
+  `$data.swipe = { id, d, axis, sign, size }` is the fresh object that drives
+  the dragged toast's string-form `:style` transform+opacity. Past 45% of the
+  toast's own size OR >0.11px/ms releases into `dismissBegin(id, 'swipe', {
   swipeExitSign })` — the sign rides a string-form `--rozie-toast-swipe-exit`
   custom property so the exit keyframe leaves the same way the finger moved;
   below threshold, clearing `$data.swipe` lets the CSS transition spring the
@@ -172,9 +176,20 @@
   seq: 0,
   // The ACTIVE pointer-drag's visual state: { id, d, axis, sign, size } | null.
   // A fresh object per @pointermove (never mutated in place) so it drives the
-  // dragged toast's string-form `:style`. The gesture's non-visual bookkeeping
-  // (start coords/time) lives in the non-reactive `swipeGesture` scratch below.
+  // dragged toast's string-form `:style`.
   swipe: null,
+  // The ACTIVE gesture's non-visual bookkeeping: { id, axis, sign, size,
+  // startX, startY, startTime } | null (set on @pointerdown, read on
+  // @pointermove/@pointerup, cleared on @pointerup/@pointercancel). Kept in
+  // reactive $data — NOT a module-level `let` — because it is referenced
+  // ONLY from template `@pointer*`-bound handlers, which `hoistModuleLet`'s
+  // reachability analysis does not treat as a hoist root (unlike
+  // $onMount/$onUnmount/$watch/$expose bodies): a plain `let` here resets to
+  // `null` on every React render, so by the second @pointermove the gesture
+  // is already lost and swipe silently never fires on React. $data IS real
+  // state (React useState), so it survives the intermediate re-renders the
+  // OTHER writes in this same gesture (the `swipe` write above) trigger.
+  swipeGesture: null,
 }
 </data>
 
@@ -195,12 +210,6 @@ let timers = {}
 // a toast after the host itself is gone). A top-level `let` → React useRef
 // (it escapes into $onUnmount's effect).
 let unmounted = false
-
-// Non-reactive per-gesture scratch for the ACTIVE swipe drag:
-// { id, axis, sign, size, startX, startY, startTime } | null. Only the
-// derived visual state ($data.swipe) needs to be reactive; this bookkeeping
-// is read/written exclusively inside the @pointer* handlers below.
-let swipeGesture = null
 
 // ---- timers ------------------------------------------------------------
 const startTimer = (toast) => {
@@ -405,7 +414,7 @@ const onToastPointerDown = (t, event) => {
   const sign = swipeSignFor($props.position)
   const el = event.currentTarget
   const size = axis === 'x' ? el.offsetWidth : el.offsetHeight
-  swipeGesture = {
+  $data.swipeGesture = {
     id: t.id,
     axis,
     sign,
@@ -426,7 +435,7 @@ const onToastPointerDown = (t, event) => {
 
 const onToastPointerMove = (t, event) => {
   if ($props.disableSwipe) return
-  const gesture = swipeGesture
+  const gesture = $data.swipeGesture
   if (!gesture || gesture.id !== t.id) return
   const raw = gesture.axis === 'x' ? event.clientX - gesture.startX : event.clientY - gesture.startY
   const towardDismiss = raw * gesture.sign > 0
@@ -436,8 +445,8 @@ const onToastPointerMove = (t, event) => {
 
 const onToastPointerUp = (t, event) => {
   if ($props.disableSwipe) return
-  const gesture = swipeGesture
-  swipeGesture = null
+  const gesture = $data.swipeGesture
+  $data.swipeGesture = null
   // Local named `dragState`, NOT `swipe` — a local `swipe` would shadow the
   // reactive `$data.swipe` key on Svelte 5 (top-level `let swipe = $state(…)`
   // self-shadow TDZ: `const swipe = swipe` then `swipe = null` throws
@@ -456,7 +465,7 @@ const onToastPointerUp = (t, event) => {
 
 const onToastPointerCancel = (t) => {
   if ($props.disableSwipe) return
-  if (swipeGesture && swipeGesture.id === t.id) swipeGesture = null
+  if ($data.swipeGesture && $data.swipeGesture.id === t.id) $data.swipeGesture = null
   if ($data.swipe && $data.swipe.id === t.id) $data.swipe = null
 }
 

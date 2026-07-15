@@ -237,6 +237,7 @@ export class Toaster {
   toasts = signal<any[]>([]);
   seq = signal(0);
   swipe = signal<any>(null);
+  swipeGesture = signal<any>(null);
   dismissed = output<unknown>();
   @ContentChild('toast', { read: TemplateRef }) toastTpl?: TemplateRef<ToastCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
@@ -250,7 +251,6 @@ export class Toaster {
 
   timers = {};
   unmounted = false;
-  swipeGesture: any = null;
   startTimer = (toast: any) => {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
@@ -424,7 +424,7 @@ export class Toaster {
     const sign = this.swipeSignFor(__position);
     const el = event.currentTarget;
     const size = axis === 'x' ? el.offsetWidth : el.offsetHeight;
-    this.swipeGesture = {
+    this.swipeGesture.set({
       id: t.id,
       axis,
       sign,
@@ -432,7 +432,7 @@ export class Toaster {
       startX: event.clientX,
       startY: event.clientY,
       startTime: Date.now()
-    };
+    });
     if (el && el.setPointerCapture) {
       try {
         el.setPointerCapture(event.pointerId);
@@ -444,7 +444,7 @@ export class Toaster {
   };
   onToastPointerMove = (t: any, event: any) => {
     if (this.disableSwipe()) return;
-    const gesture = this.swipeGesture;
+    const gesture = this.swipeGesture();
     if (!gesture || gesture.id !== t.id) return;
     const raw = gesture.axis === 'x' ? event.clientX - gesture.startX : event.clientY - gesture.startY;
     const towardDismiss = raw * gesture.sign > 0;
@@ -459,8 +459,8 @@ export class Toaster {
   };
   onToastPointerUp = (t: any, event: any) => {
     if (this.disableSwipe()) return;
-    const gesture = this.swipeGesture;
-    this.swipeGesture = null;
+    const gesture = this.swipeGesture();
+    this.swipeGesture.set(null);
     // Local named `dragState`, NOT `swipe` — a local `swipe` would shadow the
     // reactive `$data.swipe` key on Svelte 5 (top-level `let swipe = $state(…)`
     // self-shadow TDZ: `const swipe = swipe` then `swipe = null` throws
@@ -480,7 +480,7 @@ export class Toaster {
   };
   onToastPointerCancel = (t: any) => {
     if (this.disableSwipe()) return;
-    if (this.swipeGesture && this.swipeGesture.id === t.id) this.swipeGesture = null;
+    if (this.swipeGesture() && this.swipeGesture().id === t.id) this.swipeGesture.set(null);
     if (this.swipe() && this.swipe().id === t.id) this.swipe.set(null);
   };
   depth = (t: any) => {

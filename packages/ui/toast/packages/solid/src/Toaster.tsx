@@ -206,6 +206,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   const [toasts, setToasts] = createSignal<any[]>([]);
   const [seq, setSeq] = createSignal(0);
   const [swipe, setSwipe] = createSignal<any>(null);
+  const [swipeGesture, setSwipeGesture] = createSignal<any>(null);
   onCleanup(() => {
     unmounted = true;
     teardownTimers();
@@ -227,12 +228,6 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   // a toast after the host itself is gone). A top-level `let` → React useRef
   // (it escapes into $onUnmount's effect).
   let unmounted = false;
-
-  // Non-reactive per-gesture scratch for the ACTIVE swipe drag:
-  // { id, axis, sign, size, startX, startY, startTime } | null. Only the
-  // derived visual state ($data.swipe) needs to be reactive; this bookkeeping
-  // is read/written exclusively inside the @pointer* handlers below.
-  let swipeGesture: any = null;
 
   // ---- timers ------------------------------------------------------------
   function startTimer(toast: any) {
@@ -465,7 +460,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
     const sign = swipeSignFor(local.position);
     const el = event.currentTarget;
     const size = axis === 'x' ? el.offsetWidth : el.offsetHeight;
-    swipeGesture = {
+    setSwipeGesture({
       id: t.id,
       axis,
       sign,
@@ -473,7 +468,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
       startX: event.clientX,
       startY: event.clientY,
       startTime: Date.now()
-    };
+    });
     if (el && el.setPointerCapture) {
       try {
         el.setPointerCapture(event.pointerId);
@@ -485,7 +480,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   }
   function onToastPointerMove(t: any, event: any) {
     if (local.disableSwipe) return;
-    const gesture = swipeGesture;
+    const gesture = swipeGesture();
     if (!gesture || gesture.id !== t.id) return;
     const raw = gesture.axis === 'x' ? event.clientX - gesture.startX : event.clientY - gesture.startY;
     const towardDismiss = raw * gesture.sign > 0;
@@ -500,8 +495,8 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   }
   function onToastPointerUp(t: any, event: any) {
     if (local.disableSwipe) return;
-    const gesture = swipeGesture;
-    swipeGesture = null;
+    const gesture = swipeGesture();
+    setSwipeGesture(null);
     // Local named `dragState`, NOT `swipe` — a local `swipe` would shadow the
     // reactive `$data.swipe` key on Svelte 5 (top-level `let swipe = $state(…)`
     // self-shadow TDZ: `const swipe = swipe` then `swipe = null` throws
@@ -521,7 +516,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   }
   function onToastPointerCancel(t: any) {
     if (local.disableSwipe) return;
-    if (swipeGesture && swipeGesture.id === t.id) swipeGesture = null;
+    if (swipeGesture() && swipeGesture().id === t.id) setSwipeGesture(null);
     if (swipe() && swipe().id === t.id) setSwipe(null);
   }
 

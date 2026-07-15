@@ -15,8 +15,29 @@
   handle from the PARENT's $onMount runs before the child's handle is
   registered on Solid — children-before-parent mount + ref-readiness timing).
   `stacked` is on and the pointer never hovers the region, so the collapsed
-  depth-driven grid overlay (newest on top, depth>=3 hidden — the 4th toast
-  fades to invisible) paints on first frame — a fixed, collapsed frame.
+  depth-driven grid overlay (newest on top, depth>=3 hidden — the FIRST-
+  shown toast, now the OLDEST, fades to invisible) paints on first frame —
+  a fixed, collapsed frame.
+
+  EACH show() call is separated by a real ~30ms macrotask gap (a chained
+  `setTimeout`), NOT four calls in the same tick — and NOT a bare
+  `setTimeout(fn, 0)` chain either (verified insufficient under Docker's
+  headless-Chromium CPU scheduling: consecutive 0ms timeouts can still fire
+  close enough together for React to coalesce their commits). React's
+  generated `show()` reads `$data.toasts` through its render-time `useState`
+  closure rather than the functional `setState(prev => …)` updater form
+  (unlike `removeToast`/`patch`, which the emitter DOES lower functionally),
+  so several `show()` calls close together each compute `next` off the SAME
+  stale array — only the LAST call's toast survives a given commit batch
+  (verified: 1 toast with a synchronous loop, 2 with a bare 0ms chain, 4 only
+  once genuinely spaced out). This is a latent React-target correctness gap
+  in Toaster's `show()` (any consumer bulk-showing toasts in a tight loop
+  would hit it, not specific to this demo) — flagged EMITTER-BACKLOG: the
+  React emitter should lower a `$data.x = $data.x.concat(...)`-shaped
+  self-referential array write (the ternary-wrapped `max`-clamp shape) to the
+  same `setX(prev => prev.concat(...))` functional form it already uses for
+  `removeToast`'s `.filter(...)`. The spaced-macrotask sequencing here is the
+  documented workaround, not a fix to the underlying gap.
 
   FIXED-POSITION NOTE: same as ToasterScreenshotDemo — the toaster region is
   `position: fixed` (top-right corner), escaping the
@@ -39,13 +60,25 @@
 </components>
 
 <script>
+// depth = toasts.length - 1 - index (newest = last shown = depth 0). The
+// FIRST toast shown becomes the OLDEST — depth 3 once all four are queued —
+// so IT is the one hidden by the depth>=3 opacity rule, not the last.
+const SEED = [
+  { message: 'First notice (hidden — depth 3)', type: 'info' },
+  { message: 'Second notice', type: 'success' },
+  { message: 'Third notice', type: 'warning' },
+  { message: 'Fourth notice (newest — depth 0)', type: 'error' },
+]
+
 $onMount(() => {
-  setTimeout(() => {
-    $refs.toaster.show({ message: 'First notice', type: 'info', duration: 0 })
-    $refs.toaster.show({ message: 'Second notice', type: 'success', duration: 0 })
-    $refs.toaster.show({ message: 'Third notice', type: 'warning', duration: 0 })
-    $refs.toaster.show({ message: 'Fourth notice (hidden — depth 3)', type: 'error', duration: 0 })
-  }, 0)
+  let i = 0
+  const showNext = () => {
+    if (i >= SEED.length) return
+    $refs.toaster.show({ ...SEED[i], duration: 0 })
+    i = i + 1
+    setTimeout(showNext, 30)
+  }
+  setTimeout(showNext, 30)
 })
 </script>
 

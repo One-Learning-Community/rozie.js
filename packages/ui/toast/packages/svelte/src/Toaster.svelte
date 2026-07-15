@@ -58,6 +58,7 @@ const toast = $derived(__toastProp ?? snippets?.toast);
 let toasts: any[] = $state([]);
 let seq = $state(0);
 let swipe: any = $state(null);
+let swipeGesture: any = $state(null);
 
 // Mutable cross-render scratch (NOT reactive): per-id timer bookkeeping. A
 // top-level `let` → React useRef (it escapes into $onUnmount's effect, so the
@@ -74,11 +75,6 @@ let timers = {};
 // a toast after the host itself is gone). A top-level `let` → React useRef
 // (it escapes into $onUnmount's effect).
 let unmounted = false;
-// Non-reactive per-gesture scratch for the ACTIVE swipe drag:
-// { id, axis, sign, size, startX, startY, startTime } | null. Only the
-// derived visual state ($data.swipe) needs to be reactive; this bookkeeping
-// is read/written exclusively inside the @pointer* handlers below.
-let swipeGesture: any = null;
 // ---- timers ------------------------------------------------------------
 const startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;

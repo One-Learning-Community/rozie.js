@@ -60,6 +60,7 @@ defineSlots<{
 const toasts = ref<any[]>([]);
 const seq = ref(0);
 const swipe = ref<any>(null);
+const swipeGesture = ref<any>(null);
 
 // Mutable cross-render scratch (NOT reactive): per-id timer bookkeeping. A
 // top-level `let` → React useRef (it escapes into $onUnmount's effect, so the
@@ -76,11 +77,6 @@ let timers = {};
 // a toast after the host itself is gone). A top-level `let` → React useRef
 // (it escapes into $onUnmount's effect).
 let unmounted = false;
-// Non-reactive per-gesture scratch for the ACTIVE swipe drag:
-// { id, axis, sign, size, startX, startY, startTime } | null. Only the
-// derived visual state ($data.swipe) needs to be reactive; this bookkeeping
-// is read/written exclusively inside the @pointer* handlers below.
-let swipeGesture: any = null;
 // ---- timers ------------------------------------------------------------
 const startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
@@ -298,7 +294,7 @@ const onToastPointerDown = (t: any, event: any) => {
   const sign = swipeSignFor(props.position);
   const el = event.currentTarget;
   const size = axis === 'x' ? el.offsetWidth : el.offsetHeight;
-  swipeGesture = {
+  swipeGesture.value = {
     id: t.id,
     axis,
     sign,
@@ -318,7 +314,7 @@ const onToastPointerDown = (t: any, event: any) => {
 };
 const onToastPointerMove = (t: any, event: any) => {
   if (props.disableSwipe) return;
-  const gesture = swipeGesture;
+  const gesture = swipeGesture.value;
   if (!gesture || gesture.id !== t.id) return;
   const raw = gesture.axis === 'x' ? event.clientX - gesture.startX : event.clientY - gesture.startY;
   const towardDismiss = raw * gesture.sign > 0;
@@ -333,8 +329,8 @@ const onToastPointerMove = (t: any, event: any) => {
 };
 const onToastPointerUp = (t: any, event: any) => {
   if (props.disableSwipe) return;
-  const gesture = swipeGesture;
-  swipeGesture = null;
+  const gesture = swipeGesture.value;
+  swipeGesture.value = null;
   // Local named `dragState`, NOT `swipe` — a local `swipe` would shadow the
   // reactive `$data.swipe` key on Svelte 5 (top-level `let swipe = $state(…)`
   // self-shadow TDZ: `const swipe = swipe` then `swipe = null` throws
@@ -354,7 +350,7 @@ const onToastPointerUp = (t: any, event: any) => {
 };
 const onToastPointerCancel = (t: any) => {
   if (props.disableSwipe) return;
-  if (swipeGesture && swipeGesture.id === t.id) swipeGesture = null;
+  if (swipeGesture.value && swipeGesture.value.id === t.id) swipeGesture.value = null;
   if (swipe.value && swipe.value.id === t.id) swipe.value = null;
 };
 // ---- stacked mode ----------------------------------------------------------
