@@ -29,9 +29,11 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'CommandPalette',
-  // command-palette-levels (LVL-STACK/ASYNC): gains `searchDebounce` — the
-  // debounce (ms) applied to a nested ASYNC level's keystroke source(query)
-  // refetch (10 props total).
+  // command-palette-levels (LVL-STACK/ASYNC): gained `searchDebounce`.
+  // command-palette-sub-actions (ACT-MODEL/ACT-TRIGGER): gains `actionKey`
+  // (the actionKey shortcut, default '$mod+k') and `closeOnAction` (default
+  // true — whether running an action also closes the palette) — 12 props
+  // total.
   props: [
     'open',
     'query',
@@ -43,11 +45,15 @@ const EXPECT = {
     'idBase',
     'score',
     'searchDebounce',
+    'actionKey',
+    'closeOnAction',
   ],
   models: ['open', 'query'],
   // command-palette-levels: gains `navigate` (a level was pushed — payload
   // `{ item, depth }`) and `back` (a level was popped — no payload).
-  emits: ['select', 'navigate', 'back'],
+  // command-palette-sub-actions (ACT-MODEL): gains `action-select` (a row
+  // action was chosen — payload `{ item, action }`).
+  emits: ['select', 'navigate', 'back', 'action-select'],
   // D-05 (BREAKING, Phase 999.4): the public slots are re-aligned to the vendored
   // listbox vocabulary — `#item {item,active}` → `#option {option,index,active,
   // selected,disabled}`; `#empty` gains `{query}`; `#footer` unchanged (a panel
@@ -59,11 +65,19 @@ const EXPECT = {
   // (scope `{ query, error, retry }`) — re-projected inside combobox's
   // #empty region — and `breadcrumb` (scope `{ stack, back }`) — the
   // depth>0 header, a panel sibling OUTSIDE the combobox.
-  slots: ['option', 'empty', 'footer', 'icon', 'trailing', 'actions', 'loading', 'error', 'breadcrumb'],
+  // command-palette-sub-actions (ACT-RENDER): gains `actionItem` (scope
+  // `{ action, item, active, disabled }`) — the per-menu-item slot. NOT
+  // `action-item` (hyphenated) — a hyphenated slot name fails ROZ127 (Vue's
+  // `defineSlots<{…}>()` can't emit an unquoted hyphenated object key); the
+  // existing `#actions` slot is KEPT unchanged (now doubles as the
+  // interactive open-the-menu affordance — see CommandPalette.rozie).
+  slots: ['option', 'empty', 'footer', 'icon', 'trailing', 'actions', 'loading', 'error', 'breadcrumb', 'actionItem'],
   // command-palette-levels: gains `openTo` (the ⌘P deep-link) and `goBack`
   // (pop one level). The pop verb is `goBack`, NOT `back` — a `back()`
   // expose verb would collide with the `back` EMIT above (ROZ121:
   // expose∩emits must be empty) — see the dedicated assertion below.
+  // command-palette-sub-actions: NO new expose verb (openActionMenu/
+  // closeActionMenu are internal-only — see the dedicated assertion below).
   expose: ['show', 'close', 'toggle', 'focus', 'openTo', 'goBack'],
 } as const;
 
@@ -96,7 +110,7 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (10 props)', () => {
+  it('props surface matches (12 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -108,11 +122,11 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches (select/navigate/back)', () => {
+  it('emits surface matches (select/navigate/back/action-select)', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
-  it('declares the option/empty/footer + icon/trailing/actions + loading/error/breadcrumb slots', () => {
+  it('declares the option/empty/footer + icon/trailing/actions + loading/error/breadcrumb/actionItem slots', () => {
     const slotNames = ir.slots.map((s: { name: string }) => s.name);
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
@@ -152,6 +166,13 @@ describe('CommandPalette.rozie surface gate', () => {
       .map((p: { name: string }) => p.name);
     const setters = new Set(modelNames.map((m: string) => `set${m[0].toUpperCase()}${m.slice(1)}`));
     expect(exposeNames.filter((v: string) => setters.has(v))).toEqual([]);
+  });
+
+  it('the new `action-select` emit does not collide with any expose verb (ACT-MODEL — emit-only, no expose verb added by sub-actions)', () => {
+    const exposeNames = ir.expose.map((e: { name: string }) => e.name);
+    expect(ir.emits).toContain('action-select');
+    expect(exposeNames).not.toContain('action-select');
+    expect(exposeNames.filter((v: string) => v === 'action-select')).toEqual([]);
   });
 
   const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const;

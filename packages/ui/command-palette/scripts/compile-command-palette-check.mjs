@@ -35,9 +35,10 @@ const EXPECT = {
   // Rule 1 fix (command-palette-levels Task 7): this EXPECT was ALSO stale on
   // `score` — leftover from before the pluggable-scorer prop landed (this
   // script isn't wired into any package.json script/CI job so drift goes
-  // uncaught; kept in sync with tests/surface.test.ts by hand). Now gains
-  // `searchDebounce` (LVL-ASYNC — debounce ms for a nested async level's
-  // keystroke source(query) refetch).
+  // uncaught; kept in sync with tests/surface.test.ts by hand). Gained
+  // `searchDebounce` (LVL-ASYNC). command-palette-sub-actions (ACT-MODEL/
+  // ACT-TRIGGER) adds `actionKey` (default '$mod+k') + `closeOnAction`
+  // (default true) — 12 props total.
   props: [
     'open',
     'query',
@@ -49,20 +50,29 @@ const EXPECT = {
     'idBase',
     'score',
     'searchDebounce',
+    'actionKey',
+    'closeOnAction',
   ],
   models: ['open', 'query'],
   // command-palette-levels: gains `navigate` (a level was pushed) and `back`
-  // (a level was popped).
-  emits: ['select', 'navigate', 'back'],
+  // (a level was popped). command-palette-sub-actions (ACT-MODEL): gains
+  // `action-select` (a row action was chosen — payload `{ item, action }`).
+  emits: ['select', 'navigate', 'back', 'action-select'],
   // D-05 (BREAKING): re-aligned to the combobox slot vocabulary —
   // `#item {item,active}` → `#option {option,index,active,selected,disabled}`.
   // command-palette-levels: gains `loading`/`error` (re-projected inside
   // combobox's #empty region) and `breadcrumb` (the depth>0 header, a panel
-  // sibling OUTSIDE the combobox).
-  slots: ['option', 'empty', 'footer', 'icon', 'trailing', 'actions', 'loading', 'error', 'breadcrumb'],
+  // sibling OUTSIDE the combobox). command-palette-sub-actions (ACT-RENDER):
+  // gains `actionItem` (scope `{ action, item, active, disabled }`) — NOT
+  // `action-item` (hyphenated), which fails ROZ127 (Vue's
+  // `defineSlots<{…}>()` can't emit an unquoted hyphenated object key). The
+  // existing `actions` slot is KEPT (now doubles as the interactive
+  // open-the-menu affordance).
+  slots: ['option', 'empty', 'footer', 'icon', 'trailing', 'actions', 'loading', 'error', 'breadcrumb', 'actionItem'],
   // command-palette-levels: gains `openTo` (⌘P deep-link) + `goBack` (pop one
   // level — NOT `back`, which would collide with the `back` EMIT above,
-  // ROZ121: expose∩emits must be empty).
+  // ROZ121: expose∩emits must be empty). command-palette-sub-actions: NO new
+  // expose verb (openActionMenu/closeActionMenu are internal-only).
   expose: ['show', 'close', 'toggle', 'focus', 'openTo', 'goBack'],
 };
 

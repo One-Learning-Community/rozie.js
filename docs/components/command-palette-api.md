@@ -24,6 +24,16 @@ Selecting an item that carries `children` (a static array) or `source` (a `(quer
 
 Backspace on an empty query pops one level; Escape pops one level at depth > 0 and only closes the palette at the root. A breadcrumb/back header renders above the input at depth > 0 (overridable via the `breadcrumb` slot). The imperative `openTo(path)` handle deep-links straight to a nested level.
 
+## Interactive sub-actions
+
+Each result row may carry its own `actions?: [{ id, label, icon?, shortcut?, disabled? }]` array — a per-row action menu (the "⌘K-within-the-palette" pattern), reached separately from the row's primary `select`/`navigate`. Three triggers open it for the currently highlighted row, and each is a no-op on a row with no `actions`:
+
+- **`actionKey`** (default `"$mod+k"`, i.e. ⌘K/Ctrl+K) — a portable `$mod+<letter>` token; a bare single-letter token (e.g. `"k"`) matches with no modifier.
+- **Caret-at-end Right-arrow** — only when the search input's text caret is collapsed at the very end (so it never hijacks normal text editing).
+- **Clicking the row's actions affordance** — the same `actions` option-row region used for the `#actions` slot; it stops the click from bubbling to the row's own selection handler, so it never accidentally commits the option underneath it.
+
+Opening the menu moves REAL DOM focus into the first enabled `role="menuitem"` — the search input's own popup stays visibly open the whole time (it does not blur-close). Inside the menu: ↑/↓ rove over enabled actions (disabled entries are skipped, clamped at the ends — never wraps); Enter/Space fires `action-select` and always closes the menu; Escape or ← closes the menu, restores focus to the search input, and reopens the result list — it does **not** pop a level or close the palette (a sub-surface being open always takes precedence over level-pop, which always takes precedence over closing at the root). Pushing or popping a level while the menu is open closes it first — level navigation always returns to the result list.
+
 ## Events
 
 | Event | Description |
@@ -31,6 +41,7 @@ Backspace on an empty query pops one level; Escape pops one level at depth > 0 a
 | `select` | Fired when the user chooses a LEAF command — one with no `children`/`source` (click, or highlight + Enter). Payload `{ item, path }` — `item` is the full chosen command object, `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). `open` / `query` are two-way **models**, not events. |
 | `navigate` | Fired when a nested level is pushed (selecting an item with `children`/`source`). Payload `{ item, depth }` — the navigated-to item and the resulting nesting depth (1-based; root is 0). |
 | `back` | Fired when a level is popped (Backspace-on-empty, Escape at depth > 0, or `goBack()`). No payload. Does not fire at the root. |
+| `action-select` | Fired when the user chooses a row action from its action menu. Payload `{ item, action }` — `item` is the full anchored command object (the row the menu was opened for), `action` is the chosen entry from that row's `actions[]`. The menu always closes on selection; the palette additionally closes when `closeOnAction` is `true` (the default). |
 
 ## Imperative handle
 
@@ -54,4 +65,5 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 | `loading` | `{ query }` | Shown while the active level's async `source` is in flight. Falls back to "Loading…". |
 | `error` | `{ query, error, retry }` | Shown when the active level's async `source` rejected. `error` is the rejection value; `retry` re-invokes the source at the current query. |
 | `breadcrumb` | `{ stack, back }` | The depth > 0 header (a panel sibling above the input, not inside the combobox). `stack` is the root..current breadcrumb (`[{ id, title }]`); `back` is the `goBack` handle. Falls back to a back button + the current level's title. |
+| `actionItem` | `{ action, item, active, disabled }` | Custom render for one row inside the action menu. `action` is the entry from the anchored row's `actions[]`; `item` is the anchored command; `active` is whether it is currently roving-highlighted; `disabled` mirrors `action.disabled`. Falls back to icon (if present) + label + a right-aligned `shortcut` hint. Named `actionItem` (camelCase) — a hyphenated slot name is not a valid identifier across all six targets. |
 | `footer` | — | A persistent footer bar below the list (e.g. keyboard hints). Rendered only when provided. |
