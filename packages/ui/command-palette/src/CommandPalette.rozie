@@ -1210,8 +1210,16 @@ $expose({ show, close, toggle, focus, goBack, openTo })
       <Combobox>" placement as #footer below). Shown only at depth>0.
       Overridable via #breadcrumb (scope { stack, back }): `stack` is the full
       root..current breadcrumb (breadcrumbStack(), internal/levelStack.ts
-      breadcrumb()), `back` is goBack. The DEFAULT fill is a minimal back
-      button + the current level's title (currentTitle()).
+      breadcrumb()), `back` is goBack. The slot API itself is UNCHANGED
+      (back-compat) — only the DEFAULT fill (finding 2, 260715-50l) changes:
+      it now renders the back button (the ONLY interactive affordance in v1)
+      followed by the FULL root..current trail (muted ancestors ›
+      emphasized-current), instead of a bare `‹` + the current title alone
+      (which read as a random bold label at depth, screenshot 02).
+      `command-palette-title` stays on the CURRENT segment only, so the
+      existing depth-1/root levels assertions keep passing.
+      deferred: trail-segment click-to-jump (only the back affordance is
+      interactive in v1).
     -->
     <div r-if="atDepth()" class="rozie-command-palette-header">
       <slot name="breadcrumb" :stack="breadcrumbStack()" :back="goBack">
@@ -1222,7 +1230,16 @@ $expose({ show, close, toggle, focus, goBack, openTo })
           data-testid="command-palette-back"
           @click="goBack()"
         >‹</button>
-        <span class="rozie-command-palette-title" data-testid="command-palette-title">{{ currentTitle() }}</span>
+        <nav class="rozie-command-palette-breadcrumb-trail" data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb">
+          <span r-for="entry, ei in breadcrumbStack()" :key="ei" class="rozie-command-palette-breadcrumb-item">
+            <span r-if="Number(ei) > 0" class="rozie-command-palette-breadcrumb-separator" aria-hidden="true">›</span>
+            <span
+              class="rozie-command-palette-breadcrumb-segment"
+              :class="{ 'rozie-command-palette-breadcrumb-segment--current': Number(ei) === breadcrumbStack().length - 1 }"
+              :data-testid="Number(ei) === breadcrumbStack().length - 1 ? 'command-palette-title' : null"
+            >{{ entry.title }}</span>
+          </span>
+        </nav>
       </slot>
     </div>
 
@@ -1518,6 +1535,41 @@ $expose({ show, close, toggle, focus, goBack, openTo })
 
 .rozie-command-palette-title {
   font-weight: var(--rozie-command-palette-title-weight, 600);
+}
+
+/*
+  Breadcrumb trail (finding 2, 260715-50l) — the default #breadcrumb fill's
+  root..current trail: muted ancestors, an emphasized current segment, ›
+  separators between segments. Token-driven, every value var()-backed.
+*/
+.rozie-command-palette-breadcrumb-trail {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+
+.rozie-command-palette-breadcrumb-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+
+.rozie-command-palette-breadcrumb-segment {
+  color: var(--rozie-command-palette-breadcrumb-color, rgba(0, 0, 0, 0.55));
+  font-weight: var(--rozie-command-palette-breadcrumb-weight, 400);
+  white-space: nowrap;
+}
+
+.rozie-command-palette-breadcrumb-segment--current {
+  color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
+  font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+}
+
+.rozie-command-palette-breadcrumb-separator {
+  color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
 }
 
 .rozie-command-palette-input {

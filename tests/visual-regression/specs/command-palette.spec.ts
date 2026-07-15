@@ -371,6 +371,19 @@ for (const target of TARGETS) {
     await expect(readoutNavigate).toHaveText('goto');
     await expect(readoutDepth).toHaveText('1');
 
+    // ---- finding-2 (260715-50l): the default #breadcrumb fill renders the ----
+    //         FULL root..current trail (root ancestor + current), not just a
+    //         bare `‹` + the current title. At depth 1, breadcrumbStack() =
+    //         [{title: ariaLabel}, {title:'Go to page'}] — 2 segments, 1
+    //         separator, current segment = 'Go to page' (mirrors
+    //         breadcrumbTitle above, which still targets the SAME element via
+    //         `command-palette-title` on the current segment only).
+    const trail = page.getByTestId('command-palette-breadcrumb-trail');
+    await expect(trail).toBeVisible();
+    await expect(trail.locator('.rozie-command-palette-breadcrumb-segment')).toHaveCount(2);
+    await expect(trail.locator('.rozie-command-palette-breadcrumb-separator')).toHaveCount(1);
+    await expect(trail.locator('.rozie-command-palette-breadcrumb-segment--current')).toHaveText('Go to page');
+
     // ---- 3. POP via Backspace-on-empty: RESTORES the parent query — BOTH the ----
     //         model (readoutQuery) AND the visible input text (seedQuery) — full undo.
     //         The restored 'go' query re-filters the ROOT list back down to the
