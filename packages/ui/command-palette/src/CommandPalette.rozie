@@ -462,6 +462,14 @@ const groupText = (o) => (o && o.group !== undefined ? o.group : '')
 // display helpers above — same cross-target slot-param-type gap.
 const actionsList = (o) => (o && o.actions ? o.actions : [])
 
+// hotKeyOf(): the optional per-item `hotKey?: string` display-only teaching
+// field — resolved off the re-projected #option scope param (untyped, same
+// cross-target slot-param-type gap as the other display helpers above). The
+// palette NEVER binds or listens for this key; it is rendered through
+// formatKeyToken() below as a right-aligned badge, purely advertising an
+// app-global shortcut the CONSUMER owns (Copy `$mod+c`, Print `$mod+p`).
+const hotKeyOf = (o) => (o && o.hotKey ? o.hotKey : '')
+
 // Untyped #actionItem display resolvers (ACT-RENDER) — the re-projected
 // `action` scope param threads as `unknown` on the Lit leaf (the same
 // cross-target slot-param-type gap as labelText/groupText/actionsList
@@ -1312,6 +1320,20 @@ $expose({ show, close, toggle, focus, goBack, openTo })
               <span r-if="groupText(option) && !grouped()" class="rozie-command-palette-option-group">{{ groupText(option) }}</span>
             </span>
             <!--
+              Display-only per-item hotKey teaching badge (item field, NOT a
+              public slot/prop — see hotKeyOf() above). Renders BEFORE the
+              #actions affordance, only when the item carries a non-empty
+              `hotKey`. Reuses the shared formatKeyToken() grammar so it
+              always agrees with actionKeyHint()'s "$mod+k"-style rendering.
+              aria-hidden — a visual teaching affordance only, never a
+              keyboard binding.
+            -->
+            <span
+              r-if="hotKeyOf(option)"
+              class="rozie-command-palette-option-hotkey"
+              aria-hidden="true"
+            >{{ formatKeyToken(hotKeyOf(option), isApplePlatform()) }}</span>
+            <!--
               ACT-TRIGGER: the #actions row region is now the INTERACTIVE
               open-the-menu affordance (was display-only) — renders whenever
               the row carries actions OR the consumer fills #actions
@@ -1675,6 +1697,21 @@ $expose({ show, close, toggle, focus, goBack, openTo })
   color: var(--rozie-command-palette-actions-hint-color, inherit);
   background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
   border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+}
+
+/*
+  Per-item hotKey teaching badge (display-only — see hotKeyOf() above). Each
+  token FALLS BACK to the existing actions-hint token, so a consumer who
+  already themed the actions hint gets a matching badge for free; a
+  dedicated --rozie-command-palette-hotkey-* override still wins.
+*/
+.rozie-command-palette-option-hotkey {
+  flex: 0 0 auto;
+  padding: var(--rozie-command-palette-hotkey-padding, var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem));
+  font-size: var(--rozie-command-palette-hotkey-font-size, var(--rozie-command-palette-actions-hint-font-size, 0.6875rem));
+  color: var(--rozie-command-palette-hotkey-color, var(--rozie-command-palette-actions-hint-color, inherit));
+  background: var(--rozie-command-palette-hotkey-bg, var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06)));
+  border-radius: var(--rozie-command-palette-hotkey-radius, var(--rozie-command-palette-actions-hint-radius, 0.25rem));
 }
 
 /*
