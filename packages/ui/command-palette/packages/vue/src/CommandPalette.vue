@@ -25,7 +25,7 @@
               </span>
               <span v-if="groupText(option) && !grouped()" class="rozie-command-palette-option-group">{{ groupText(option) }}</span></span>
             
-            <span v-if="$slots.actions || actionsList(option).length > 0" class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" @mousedown.stop="openActionMenu(option)">
+            <span v-if="hotKeyOf(option)" class="rozie-command-palette-option-hotkey" aria-hidden="true">{{ formatKeyToken(hotKeyOf(option), isApplePlatform()) }}</span><span v-if="$slots.actions || actionsList(option).length > 0" class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" @mousedown.stop="openActionMenu(option)">
               <slot name="actions" :option="option" :actions="actionsList(option)">
                 <span v-if="actionsList(option).length > 0" class="rozie-command-palette-option-actions-hint" aria-hidden="true">{{ actionKeyHint() }}</span></slot>
             </span><span v-if="$slots.trailing" class="rozie-command-palette-option-trailing">
@@ -172,6 +172,7 @@ import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { deriveCommandGroups } from './internal/commandGroups';
+import { formatKeyToken } from './internal/formatKeyToken';
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
 // boundaries within a single handler (bump a token, then compare it after an
@@ -322,6 +323,13 @@ const groupText = (o: any) => o && o.group !== undefined ? o.group : '';
 // normalized to an array. Untyped param (neutralized to `any`) like the other
 // display helpers above — same cross-target slot-param-type gap.
 const actionsList = (o: any) => o && o.actions ? o.actions : [];
+// hotKeyOf(): the optional per-item `hotKey?: string` display-only teaching
+// field — resolved off the re-projected #option scope param (untyped, same
+// cross-target slot-param-type gap as the other display helpers above). The
+// palette NEVER binds or listens for this key; it is rendered through
+// formatKeyToken() below as a right-aligned badge, purely advertising an
+// app-global shortcut the CONSUMER owns (Copy `$mod+c`, Print `$mod+p`).
+const hotKeyOf = (o: any) => o && o.hotKey ? o.hotKey : '';
 // Untyped #actionItem display resolvers (ACT-RENDER) — the re-projected
 // `action` scope param threads as `unknown` on the Lit leaf (the same
 // cross-target slot-param-type gap as labelText/groupText/actionsList
@@ -340,16 +348,14 @@ const isApplePlatform = () => {
 };
 // actionKeyHint(): a short display string for the actionKey prop, for the
 // #actions row affordance's default (unfilled) hint — "$mod+k" → "⌘K" on
-// Apple platforms / "Ctrl+K" elsewhere; any other "$mod+<letter>" follows
-// the same rule; a bare-letter token passes through uppercased.
+// Apple platforms / "Ctrl+K" elsewhere; delegates the full modifier grammar
+// onto the shared formatKeyToken() helper (also used by the per-item hotKey
+// badge below) — see internal/formatKeyToken.ts for the grammar. Keeps the
+// existing typeof guard; '$mod+k' stays byte-identical (⌘K / Ctrl+K).
 const actionKeyHint = () => {
   const k = props.actionKey;
   if (typeof k !== 'string') return '';
-  if (k.indexOf('$mod+') === 0) {
-    const letter = k.slice('$mod+'.length).toUpperCase();
-    return isApplePlatform() ? '⌘' + letter : 'Ctrl+' + letter;
-  }
-  return k.toUpperCase();
+  return formatKeyToken(k, isApplePlatform());
 };
 // Split a command's visible label into ordered { text, match } segments from
 // labelHighlight's [start,end) ranges, for the default #option fill row to
@@ -1189,6 +1195,14 @@ defineExpose({ show, close, toggle, focus, goBack, openTo });
   color: var(--rozie-command-palette-actions-hint-color, inherit);
   background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
   border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+}
+.rozie-command-palette-option-hotkey {
+  flex: 0 0 auto;
+  padding: var(--rozie-command-palette-hotkey-padding, var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem));
+  font-size: var(--rozie-command-palette-hotkey-font-size, var(--rozie-command-palette-actions-hint-font-size, 0.6875rem));
+  color: var(--rozie-command-palette-hotkey-color, var(--rozie-command-palette-actions-hint-color, inherit));
+  background: var(--rozie-command-palette-hotkey-bg, var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06)));
+  border-radius: var(--rozie-command-palette-hotkey-radius, var(--rozie-command-palette-actions-hint-radius, 0.25rem));
 }
 .rozie-command-palette-actions-menu {
   position: absolute;

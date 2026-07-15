@@ -11,6 +11,7 @@ import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { deriveCommandGroups } from './internal/commandGroups';
+import { formatKeyToken } from './internal/formatKeyToken';
 
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
@@ -241,6 +242,14 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   color: var(--rozie-command-palette-actions-hint-color, inherit);
   background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
   border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+}
+.rozie-command-palette-option-hotkey[data-rozie-s-768cad96] {
+  flex: 0 0 auto;
+  padding: var(--rozie-command-palette-hotkey-padding, var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem));
+  font-size: var(--rozie-command-palette-hotkey-font-size, var(--rozie-command-palette-actions-hint-font-size, 0.6875rem));
+  color: var(--rozie-command-palette-hotkey-color, var(--rozie-command-palette-actions-hint-color, inherit));
+  background: var(--rozie-command-palette-hotkey-bg, var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06)));
+  border-radius: var(--rozie-command-palette-hotkey-radius, var(--rozie-command-palette-actions-hint-radius, 0.25rem));
 }
 .rozie-command-palette-actions-menu[data-rozie-s-768cad96] {
   position: absolute;
@@ -652,7 +661,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
               </span>
               ${this.groupText(scope.option) && !this.grouped() ? html`<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>${rozieDisplay(this.groupText(scope.option))}</span>` : nothing}</span>
             
-            ${this._hasSlotActions || this.actions !== undefined || this.actionsList(scope.option).length > 0 ? html`<span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" @mousedown=${($event: MouseEvent & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { $event.stopPropagation(); this.openActionMenu(scope.option); }} data-rozie-s-768cad96>
+            ${this.hotKeyOf(scope.option) ? html`<span class="rozie-command-palette-option-hotkey" aria-hidden="true" data-rozie-s-768cad96>${rozieDisplay(formatKeyToken(this.hotKeyOf(scope.option), this.isApplePlatform()))}</span>` : nothing}${this._hasSlotActions || this.actions !== undefined || this.actionsList(scope.option).length > 0 ? html`<span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" @mousedown=${($event: MouseEvent & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { $event.stopPropagation(); this.openActionMenu(scope.option); }} data-rozie-s-768cad96>
               ${this.actions !== undefined ? this.actions({option: scope.option, actions: this.actionsList(scope.option)}) : html`<slot name="actions" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, actions: this.actionsList(scope.option)}); } catch { return '{}'; } })()}>
                 ${this.actionsList(scope.option).length > 0 ? html`<span class="rozie-command-palette-option-actions-hint" aria-hidden="true" data-rozie-s-768cad96>${rozieDisplay(this.actionKeyHint())}</span>` : nothing}</slot>`}
             </span>` : nothing}${this._hasSlotTrailing || this.trailing !== undefined ? html`<span class="rozie-command-palette-option-trailing" data-rozie-s-768cad96>
@@ -759,6 +768,8 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
 
   actionsList = (o: any) => o && o.actions ? o.actions : [];
 
+  hotKeyOf = (o: any) => o && o.hotKey ? o.hotKey : '';
+
   actionLabel = (a: any) => a && a.label !== undefined ? a.label : '';
 
   actionShortcut = (a: any) => a && a.shortcut !== undefined ? a.shortcut : undefined;
@@ -774,11 +785,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   actionKeyHint = () => {
   const k = this.actionKey;
   if (typeof k !== 'string') return '';
-  if (k.indexOf('$mod+') === 0) {
-    const letter = k.slice('$mod+'.length).toUpperCase();
-    return this.isApplePlatform() ? '⌘' + letter : 'Ctrl+' + letter;
-  }
-  return k.toUpperCase();
+  return formatKeyToken(k, this.isApplePlatform());
 };
 
   labelSegments = (o: any) => {

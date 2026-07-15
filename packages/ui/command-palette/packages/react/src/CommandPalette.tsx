@@ -8,6 +8,7 @@ import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { deriveCommandGroups } from './internal/commandGroups';
+import { formatKeyToken } from './internal/formatKeyToken';
 
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
@@ -266,6 +267,9 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function actionsList(o: any) {
     return o && o.actions ? o.actions : [];
   }
+  function hotKeyOf(o: any) {
+    return o && o.hotKey ? o.hotKey : '';
+  }
   function actionLabel(a: any) {
     return a && a.label !== undefined ? a.label : '';
   }
@@ -283,11 +287,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function actionKeyHint() {
     const k = props.actionKey;
     if (typeof k !== 'string') return '';
-    if (k.indexOf('$mod+') === 0) {
-      const letter = k.slice('$mod+'.length).toUpperCase();
-      return isApplePlatform() ? '⌘' + letter : 'Ctrl+' + letter;
-    }
-    return k.toUpperCase();
+    return formatKeyToken(k, isApplePlatform());
   }
   function labelSegments(o: any) {
     const label = labelText(o);
@@ -781,7 +781,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
                   </span>
                   {!!(groupText(option) && !grouped()) && <span className={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span>}</span>
                 
-                {!!((props.renderActions ?? props.slots?.['actions']) || actionsList(option).length > 0) && <span className={"rozie-command-palette-option-actions"} data-testid="command-palette-actions-affordance" onMouseDown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
+                {!!(hotKeyOf(option)) && <span className={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), isApplePlatform()))}</span>}{!!((props.renderActions ?? props.slots?.['actions']) || actionsList(option).length > 0) && <span className={"rozie-command-palette-option-actions"} data-testid="command-palette-actions-affordance" onMouseDown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
                   {(props.renderActions ?? props.slots?.['actions']) ? ((props.renderActions ?? props.slots?.['actions']) as Function)({ option, actions: actionsList(option) }) : !!(actionsList(option).length > 0) && <span className={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span>}
                 </span>}{!!((props.renderTrailing ?? props.slots?.['trailing'])) && <span className={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
                   {(props.renderTrailing ?? props.slots?.['trailing'])?.({ option })}

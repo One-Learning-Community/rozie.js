@@ -8,6 +8,7 @@ import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { deriveCommandGroups } from './internal/commandGroups';
+import { formatKeyToken } from './internal/formatKeyToken';
 
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
@@ -182,6 +183,14 @@ __rozieInjectStyle('CommandPalette-768cad96', `.rozie-command-palette[data-rozie
   color: var(--rozie-command-palette-actions-hint-color, inherit);
   background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
   border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+}
+.rozie-command-palette-option-hotkey[data-rozie-s-768cad96] {
+  flex: 0 0 auto;
+  padding: var(--rozie-command-palette-hotkey-padding, var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem));
+  font-size: var(--rozie-command-palette-hotkey-font-size, var(--rozie-command-palette-actions-hint-font-size, 0.6875rem));
+  color: var(--rozie-command-palette-hotkey-color, var(--rozie-command-palette-actions-hint-color, inherit));
+  background: var(--rozie-command-palette-hotkey-bg, var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06)));
+  border-radius: var(--rozie-command-palette-hotkey-radius, var(--rozie-command-palette-actions-hint-radius, 0.25rem));
 }
 .rozie-command-palette-actions-menu[data-rozie-s-768cad96] {
   position: absolute;
@@ -620,6 +629,16 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     return o && o.actions ? o.actions : [];
   }
 
+  // hotKeyOf(): the optional per-item `hotKey?: string` display-only teaching
+  // field — resolved off the re-projected #option scope param (untyped, same
+  // cross-target slot-param-type gap as the other display helpers above). The
+  // palette NEVER binds or listens for this key; it is rendered through
+  // formatKeyToken() below as a right-aligned badge, purely advertising an
+  // app-global shortcut the CONSUMER owns (Copy `$mod+c`, Print `$mod+p`).
+  function hotKeyOf(o: any) {
+    return o && o.hotKey ? o.hotKey : '';
+  }
+
   // Untyped #actionItem display resolvers (ACT-RENDER) — the re-projected
   // `action` scope param threads as `unknown` on the Lit leaf (the same
   // cross-target slot-param-type gap as labelText/groupText/actionsList
@@ -646,16 +665,14 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
 
   // actionKeyHint(): a short display string for the actionKey prop, for the
   // #actions row affordance's default (unfilled) hint — "$mod+k" → "⌘K" on
-  // Apple platforms / "Ctrl+K" elsewhere; any other "$mod+<letter>" follows
-  // the same rule; a bare-letter token passes through uppercased.
+  // Apple platforms / "Ctrl+K" elsewhere; delegates the full modifier grammar
+  // onto the shared formatKeyToken() helper (also used by the per-item hotKey
+  // badge below) — see internal/formatKeyToken.ts for the grammar. Keeps the
+  // existing typeof guard; '$mod+k' stays byte-identical (⌘K / Ctrl+K).
   function actionKeyHint() {
     const k = local.actionKey;
     if (typeof k !== 'string') return '';
-    if (k.indexOf('$mod+') === 0) {
-      const letter = k.slice('$mod+'.length).toUpperCase();
-      return isApplePlatform() ? '⌘' + letter : 'Ctrl+' + letter;
-    }
-    return k.toUpperCase();
+    return formatKeyToken(k, isApplePlatform());
   }
 
   // Split a command's visible label into ordered { text, match } segments from
@@ -1357,7 +1374,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
                   </span>
                   {<Show when={groupText(option) && !grouped()}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</span>
                 
-                {<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
+                {<Show when={hotKeyOf(option)}><span class={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), isApplePlatform()))}</span></Show>}{<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
                   {(_props.actionsSlot ?? _props.slots?.['actions'])?.({ option, actions: actionsList(option) }) ?? <Show when={actionsList(option).length > 0}><span class={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span></Show>}
                 </span></Show>}{<Show when={(_props.trailingSlot ?? _props.slots?.['trailing'])}><span class={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
                   {(_props.trailingSlot ?? _props.slots?.['trailing'])?.({ option })}

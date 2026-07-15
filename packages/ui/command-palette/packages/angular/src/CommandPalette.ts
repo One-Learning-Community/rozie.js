@@ -8,6 +8,7 @@ import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { deriveCommandGroups } from './internal/commandGroups';
+import { formatKeyToken } from './internal/formatKeyToken';
 
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
@@ -158,7 +159,9 @@ function __rozieAttr(v: unknown): string | null {
     <span class="rozie-command-palette-option-group">{{ rozieDisplay(groupText(option)) }}</span>
     }</span>
                 
-                @if ((actionsTpl ?? templates()?.['actions']) || actionsList(option).length > 0) {
+                @if (hotKeyOf(option)) {
+    <span class="rozie-command-palette-option-hotkey" aria-hidden="true">{{ rozieDisplay(formatKeyToken(hotKeyOf(option), isApplePlatform())) }}</span>
+    }@if ((actionsTpl ?? templates()?.['actions']) || actionsList(option).length > 0) {
     <span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" (mousedown)="$event.stopPropagation(); openActionMenu(option)">
                   @if ((actionsTpl ?? templates()?.['actions'])) {
     <ng-container *ngTemplateOutlet="(actionsTpl ?? templates()?.['actions']); context: { $implicit: { option: option, actions: actionsList(option) }, option: option, actions: actionsList(option) }" />
@@ -400,6 +403,14 @@ function __rozieAttr(v: unknown): string | null {
       color: var(--rozie-command-palette-actions-hint-color, inherit);
       background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
       border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+    }
+    .rozie-command-palette-option-hotkey {
+      flex: 0 0 auto;
+      padding: var(--rozie-command-palette-hotkey-padding, var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem));
+      font-size: var(--rozie-command-palette-hotkey-font-size, var(--rozie-command-palette-actions-hint-font-size, 0.6875rem));
+      color: var(--rozie-command-palette-hotkey-color, var(--rozie-command-palette-actions-hint-color, inherit));
+      background: var(--rozie-command-palette-hotkey-bg, var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06)));
+      border-radius: var(--rozie-command-palette-hotkey-radius, var(--rozie-command-palette-actions-hint-radius, 0.25rem));
     }
     .rozie-command-palette-actions-menu {
       position: absolute;
@@ -657,6 +668,7 @@ export class CommandPalette {
   labelText = (o: any) => o && o.label !== undefined ? o.label : '';
   groupText = (o: any) => o && o.group !== undefined ? o.group : '';
   actionsList = (o: any) => o && o.actions ? o.actions : [];
+  hotKeyOf = (o: any) => o && o.hotKey ? o.hotKey : '';
   actionLabel = (a: any) => a && a.label !== undefined ? a.label : '';
   actionShortcut = (a: any) => a && a.shortcut !== undefined ? a.shortcut : undefined;
   actionIcon = (a: any) => a && a.icon !== undefined ? a.icon : undefined;
@@ -668,11 +680,7 @@ export class CommandPalette {
   actionKeyHint = () => {
     const k = this.actionKey();
     if (typeof k !== 'string') return '';
-    if (k.indexOf('$mod+') === 0) {
-      const letter = k.slice('$mod+'.length).toUpperCase();
-      return this.isApplePlatform() ? '⌘' + letter : 'Ctrl+' + letter;
-    }
-    return k.toUpperCase();
+    return formatKeyToken(k, this.isApplePlatform());
   };
   labelSegments = (o: any) => {
     const label = this.labelText(o);
@@ -1121,6 +1129,8 @@ export class CommandPalette {
     }
 
   protected readonly Number = Number;
+
+  protected readonly formatKeyToken = formatKeyToken;
 
   protected readonly labelHighlight = labelHighlight;
 

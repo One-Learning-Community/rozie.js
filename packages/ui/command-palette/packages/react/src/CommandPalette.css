@@ -160,6 +160,14 @@
   background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
   border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
 }
+.rozie-command-palette-option-hotkey[data-rozie-s-768cad96] {
+  flex: 0 0 auto;
+  padding: var(--rozie-command-palette-hotkey-padding, var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem));
+  font-size: var(--rozie-command-palette-hotkey-font-size, var(--rozie-command-palette-actions-hint-font-size, 0.6875rem));
+  color: var(--rozie-command-palette-hotkey-color, var(--rozie-command-palette-actions-hint-color, inherit));
+  background: var(--rozie-command-palette-hotkey-bg, var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06)));
+  border-radius: var(--rozie-command-palette-hotkey-radius, var(--rozie-command-palette-actions-hint-radius, 0.25rem));
+}
 .rozie-command-palette-actions-menu[data-rozie-s-768cad96] {
   position: absolute;
   right: var(--rozie-command-palette-action-right, 0.5rem);
