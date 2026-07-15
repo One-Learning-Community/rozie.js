@@ -62,10 +62,10 @@ describe('buildManifest', () => {
     expect(manifest.emits).toEqual(['change', 'search']);
   });
 
-  it("derives expose === ['focus', 'clear', 'seedQuery'] from the real Combobox IR", () => {
+  it("derives expose === ['focus', 'clear', 'seedQuery', 'pinOpen'] from the real Combobox IR", () => {
     const ir = loadComboboxIR();
     const manifest = buildManifest(ir);
-    expect(manifest.expose.map((e) => e.name)).toEqual(['focus', 'clear', 'seedQuery']);
+    expect(manifest.expose.map((e) => e.name)).toEqual(['focus', 'clear', 'seedQuery', 'pinOpen']);
   });
 
   it('at least one slot has non-empty params for the combobox scoped slots', () => {

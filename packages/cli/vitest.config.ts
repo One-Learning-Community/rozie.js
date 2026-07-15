@@ -16,9 +16,10 @@ export default defineConfig({
     // → multi-framework emit). Under `turbo run test` parallel CPU starvation
     // those can exceed vitest's 5s default and flake only in full batteries
     // (passes standalone). The heaviest (M2: 5 examples × 4 targets = 20 compiles)
-    // was observed at ~34s under full-suite contention, so the ceiling is 60s —
-    // a load-tolerant FAILSAFE, not an assertion — same philosophy as
-    // tests/cli-smoke + tests/timing.
-    testTimeout: 60000,
+    // was observed at ~34s under full-suite contention when the ceiling was
+    // first set at 60s, then at ~84s in the 2026-07 whole-repo cold battery as
+    // the repo grew — so the ceiling is 180s: a load-tolerant FAILSAFE, not an
+    // assertion — same philosophy as tests/cli-smoke + tests/timing.
+    testTimeout: 180000,
   },
 });
