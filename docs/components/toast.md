@@ -85,7 +85,7 @@ The imperative handle is the primary write API. Declared once in the source via 
 | `dismiss` | Remove a single toast by the `id` returned from `show`. Routes through the exit lifecycle with reason `'api'` — fires `dismissed`, plays the exit animation, then removes it. |
 | `clear` | Remove every visible toast at once **immediately** (no exit animation) and clear all pending auto-dismiss timers. Does **not** fire `dismissed`. |
 | `patch` | Update an existing toast in place: `patch(id, { message, type, duration })` — only the keys you pass are merged into the matching entry. Returns `true` if the id existed, `false` otherwise (no throw). A `duration` key clears and restarts that toast's auto-dismiss timer (`0` makes it sticky; a positive value arms/re-arms it); omitting `duration` leaves a running timer untouched. |
-| `promise` | Sugar over `show`/`patch` for an async operation — see [Promise / loading toasts](#promise--loading-toasts) above. |
+| `promise` | Sugar over `show`/`patch` for an async operation — see [Promise / loading toasts](#promise-loading-toasts) above. |
 
 ### Slots
 
@@ -117,7 +117,7 @@ Every toast plays a CSS enter animation on mount (slide in from the corner's edg
 
 ## The `'loading'` toast type
 
-`show`/`promise` accept a `'loading'` toast type in addition to `'info'`/`'success'`/`'error'`/`'warning'`. It renders a small decorative `aria-hidden` CSS spinner before the message (no extra markup needed) and announces `polite`, like `'info'`/`'success'`. See [Promise / loading toasts](#promise--loading-toasts) above for the common case of driving it from an async operation.
+`show`/`promise` accept a `'loading'` toast type in addition to `'info'`/`'success'`/`'error'`/`'warning'`. It renders a small decorative `aria-hidden` CSS spinner before the message (no extra markup needed) and announces `polite`, like `'info'`/`'success'`. See [Promise / loading toasts](#promise-loading-toasts) above for the common case of driving it from an async operation.
 
 ## Theming
 

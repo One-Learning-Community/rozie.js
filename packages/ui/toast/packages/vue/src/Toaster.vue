@@ -189,7 +189,9 @@ const removeToast = (id: any) => {
 // already gone) is a no-op, so a stray timeout firing mid-exit never
 // double-emits. `extra` (swipe only) carries `{ swipeExitSign }` so the
 // template can apply the direction-matched swipe-exit animation.
-const dismissBegin = (id: any, reason: any, extra: any) => {
+const dismissBegin = (id: any, reason: any, extra?: {
+  swipeExitSign?: number;
+}) => {
   const entry = toasts.value.find((t: any) => t.id === id);
   if (!entry || entry.exiting) return;
   clearTimer(id);
@@ -333,11 +335,16 @@ const onToastPointerUp = (t: any, event: any) => {
   if (props.disableSwipe) return;
   const gesture = swipeGesture;
   swipeGesture = null;
-  const swipe$local = swipe.value;
+  // Local named `dragState`, NOT `swipe` — a local `swipe` would shadow the
+  // reactive `$data.swipe` key on Svelte 5 (top-level `let swipe = $state(…)`
+  // self-shadow TDZ: `const swipe = swipe` then `swipe = null` throws
+  // "Cannot assign to constant"). Same collision class as the documented
+  // $refs/$props self-shadow, just for a $data key.
+  const dragState = swipe.value;
   swipe.value = null;
-  if (!gesture || gesture.id !== t.id || !swipe$local) return;
+  if (!gesture || gesture.id !== t.id || !dragState) return;
   const elapsed = Math.max(1, Date.now() - gesture.startTime);
-  const magnitude = swipe$local.d * gesture.sign;
+  const magnitude = dragState.d * gesture.sign;
   const velocity = magnitude / elapsed;
   if (magnitude > 0 && (magnitude > gesture.size * 0.45 || velocity > 0.11)) {
     dismissBegin(t.id, 'swipe', {
@@ -369,11 +376,13 @@ const toastStyle = (t: any) => {
   if (t.exiting) {
     return t.swipeExitSign != null ? depthDecl + ' --rozie-toast-swipe-exit: ' + t.swipeExitSign + ';' : depthDecl;
   }
-  const swipe$local = swipe.value;
-  if (!swipe$local || swipe$local.id !== t.id) return depthDecl;
-  const translate = swipe$local.axis === 'x' ? 'translateX(' + swipe$local.d + 'px)' : 'translateY(' + swipe$local.d + 'px)';
-  const magnitude = swipe$local.d * swipe$local.sign;
-  const opacity = magnitude > 0 && swipe$local.size > 0 ? Math.max(0.3, 1 - magnitude / swipe$local.size) : 1;
+  // Local named `dragState`, NOT `swipe` — see the onToastPointerUp comment
+  // above (Svelte 5 $data-key self-shadow).
+  const dragState = swipe.value;
+  if (!dragState || dragState.id !== t.id) return depthDecl;
+  const translate = dragState.axis === 'x' ? 'translateX(' + dragState.d + 'px)' : 'translateY(' + dragState.d + 'px)';
+  const magnitude = dragState.d * dragState.sign;
+  const opacity = magnitude > 0 && dragState.size > 0 ? Math.max(0.3, 1 - magnitude / dragState.size) : 1;
   return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
 };
 // ---- hover pause -------------------------------------------------------
