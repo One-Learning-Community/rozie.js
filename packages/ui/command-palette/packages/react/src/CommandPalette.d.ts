@@ -28,6 +28,12 @@ export interface CommandPaletteProps {
    */
   items?: unknown[];
   /**
+   * Items shown when the query is empty (the empty/home state), resolved PER LEVEL. This top-level prop is the ROOT level's home view; a navigating item's own `defaultItems` field (alongside its `children`/`source`) is that CHILD level's home view. They render grouped when they carry `group` fields (composes with native sections, same as `items`), and scoring never reorders them (the empty-query short-circuit preserves author order). Typing a query switches to scored `items`/`source` results; clearing the query returns to `defaultItems`. This is the first-class replacement for branching on `query === ''` inside a `source` function — and the natural home for a recents/frecency list (composes with the `score` prop's recency boost). Leave unset (`default: () => []`) for today's behavior — no defaultItems is byte-behavior-identical to the full source-order list.
+   * @example
+   * <CommandPalette :default-items="recentCommands" :items="commands" />
+   */
+  defaultItems?: unknown[];
+  /**
    * Placeholder text shown in the search input while the query is empty.
    */
   placeholder?: string;

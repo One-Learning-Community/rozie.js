@@ -27,6 +27,12 @@ interface Props {
    */
   items?: any[];
   /**
+   * Items shown when the query is empty (the empty/home state), resolved PER LEVEL. This top-level prop is the ROOT level's home view; a navigating item's own `defaultItems` field (alongside its `children`/`source`) is that CHILD level's home view. They render grouped when they carry `group` fields (composes with native sections, same as `items`), and scoring never reorders them (the empty-query short-circuit preserves author order). Typing a query switches to scored `items`/`source` results; clearing the query returns to `defaultItems`. This is the first-class replacement for branching on `query === ''` inside a `source` function — and the natural home for a recents/frecency list (composes with the `score` prop's recency boost). Leave unset (`default: () => []`) for today's behavior — no defaultItems is byte-behavior-identical to the full source-order list.
+   * @example
+   * <CommandPalette :default-items="recentCommands" :items="commands" />
+   */
+  defaultItems?: any[];
+  /**
    * Placeholder text shown in the search input while the query is empty.
    */
   placeholder?: string;
@@ -82,12 +88,14 @@ interface Props {
 }
 
 let __defaultItems = (() => [])();
+let __defaultDefaultItems = (() => [])();
 
 let {
   open = $bindable(false),
   query = $bindable(''),
   score = null,
   items = __defaultItems,
+  defaultItems = __defaultDefaultItems,
   placeholder = 'Type a command…',
   emptyText = 'No results.',
   closeOnSelect = true,
@@ -138,7 +146,7 @@ let panel = $state<HTMLElement | undefined>(undefined);
 let combobox = $state<ReturnType<typeof Combobox> | undefined>(undefined);
 
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { deriveCommandGroups } from './internal/commandGroups';
@@ -170,6 +178,25 @@ const currentItems = () => {
     return frame.resolvedItems;
   }
   return items;
+};
+// currentDefaultItems() (command-palette-13-empty-home-view-first): the
+// ACTIVE level's empty/home-view items — the top frame's `defaultItems`
+// (captured at push time by pushFrame from the navigating item's own
+// `defaultItems` field) when nested, else the root `defaultItems` prop.
+const currentDefaultItems = () => {
+  const frame = currentFrame(levelStack);
+  return frame ? frame.defaultItems : defaultItems;
+};
+// currentBaseItems(): the pre-scoring source fed to filteredItems() below.
+// An EMPTY (trimmed) query with a non-empty currentDefaultItems() returns
+// the home view (author order — never reaches the scorer, per scoreCommands'
+// empty-query short-circuit); otherwise falls through to currentItems() —
+// today's behavior, unchanged when no defaultItems is set.
+const currentBaseItems = () => {
+  const q = String(query == null ? '' : query).trim();
+  const defaults = currentDefaultItems();
+  if (q === '' && Array.isArray(defaults) && defaults.length > 0) return defaults;
+  return currentItems();
 };
 // currentDepth(): the nesting depth (0 = root). Named to avoid shadowing the
 // imported levelStack `depth` helper (aliased `levelDepth` above).
@@ -234,7 +261,12 @@ const breadcrumbStack = () => buildBreadcrumb(levelStack, ariaLabel);
 // resolves its value via `optionValue` (below) and its label via `.label`.
 // Levels sit ABOVE the pipeline (LVL-STACK) — currentItems() resolves the
 // active level's list (root or the top pushed frame) BEFORE ranking.
-const filteredItems = () => scoreCommands(currentItems(), query, score);
+// currentBaseItems() (command-palette-13-empty-home-view-first) additionally
+// swaps in the active level's `defaultItems` on an empty query — scoring's
+// own empty-query short-circuit (scoreCommands.ts) then preserves author
+// order for free, so a non-empty query still ranks currentItems() exactly
+// as before (defaultItems is never scored/reordered).
+const filteredItems = () => scoreCommands(currentBaseItems(), query, score);
 // ---- native combobox groups (cp-adopts-combobox-groups) -----------------
 // groupedView(): derives `{ groups, ordered }` off filteredItems() via the
 // pure commandGroups.ts helper (mirrors combobox groupOptions() exactly —
@@ -397,7 +429,13 @@ const pushLevel = (item: any) => {
     item,
     depth: nextStack.length
   });
-  if (isAsyncLevel(item)) beginLevelLoad(item, '');
+  // command-palette-13-empty-home-view-first: an item carrying a non-empty
+  // defaultItems is seeded 'ready' by pushFrame — skip the initial
+  // beginLevelLoad('') kick-off entirely (no source('') call, no loading
+  // flash). Typing still triggers the debounced source(query) refetch below
+  // (onComboboxSearch); clearing back to '' returns to the home view without
+  // ever invoking source.
+  if (isAsyncLevel(item) && levelDefaultItems(item).length === 0) beginLevelLoad(item, '');
 };
 // Pop one level: popFrame() → restore the query MODEL AND the vendored
 // <Combobox>'s VISIBLE input text via seedQuery(restoreQuery) (Option B — the
@@ -527,6 +565,18 @@ const onComboboxSearch = (e: any) => {
   query = q;
   const frame = currentFrame(levelStack);
   if (!frame || !isAsyncLevel(frame.item)) return;
+  // command-palette-13-empty-home-view-first: clearing back to '' on a level
+  // that carries defaultItems must NOT refetch (no source('') call) and must
+  // NOT let a late in-flight source result stomp the restored home view —
+  // bump the token (drops any in-flight resolution), clear any pending
+  // debounce timer, and return. currentBaseItems() already swaps back to
+  // the frame's defaultItems on the next render via filteredItems().
+  if (q === '' && levelDefaultItems(frame.item).length > 0) {
+    requestToken = nextRequestToken(requestToken);
+    if (debounceTimerId != null) clearTimeout(debounceTimerId);
+    debounceTimerId = null;
+    return;
+  }
   requestToken = nextRequestToken(requestToken);
   const token = requestToken;
   const item = frame.item;

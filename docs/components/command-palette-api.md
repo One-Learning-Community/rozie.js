@@ -24,6 +24,16 @@ Selecting an item that carries `children` (a static array) or `source` (a `(quer
 
 Backspace on an empty query pops one level; Escape pops one level at depth > 0 and only closes the palette at the root. A breadcrumb/back header renders above the input at depth > 0 (overridable via the `breadcrumb` slot). The imperative `openTo(path)` handle deep-links straight to a nested level.
 
+## Default items (empty / home view)
+
+The `defaultItems` prop is what renders while the query is empty — the palette's "home" state, resolved **per level**. The top-level `defaultItems` prop is the ROOT level's home view; a navigating item's own `defaultItems` field (alongside its `children`/`source`) is that CHILD level's home view — captured onto its pushed level exactly like `title`/`placeholder` already are.
+
+Whichever `defaultItems` is active renders as soon as the query is empty (on open, and whenever the query is cleared) and switches to the scored `items`/`source` results the moment the user types. Clearing the query returns to `defaultItems` again. They compose with [grouped commands](#grouped-commands) for free — a `defaultItems` entry carrying a `group` field renders in its labeled section, same as any other command. Scoring **never** reorders `defaultItems` — they render in exactly the order given, since an empty query short-circuits before ranking runs.
+
+This is the first-class replacement for branching on `query === ''` inside a `source` function to return a "default" view — and the natural home for a recents/frecency list (it composes with the `score` prop's own recency-boost hook). Pushing a level whose item carries `defaultItems` shows that home view immediately, with no loading flash and without ever invoking `source('')`.
+
+A palette (or level) with no `defaultItems` set behaves exactly as before this feature — the full, unfiltered `items`/`children` list in source order.
+
 ## Grouped commands
 
 Commands sharing the same `items[].group` string render as labeled sections — auto-derived from the existing `group` field, no separate opt-in prop. Commands with no `group` render first in a headingless block; groups then follow in first-appearance order (the order their first member appears in `items`), each labeled with its `group` string. A consumer whose items carry no `group` at all sees today's flat, unsectioned list — byte-identical to before this feature.

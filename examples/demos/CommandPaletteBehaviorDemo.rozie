@@ -24,6 +24,14 @@
   object literal is parsed independently (no access to script-scope bindings);
   a static top-level const bound via `:items="items"` is the established demo
   pattern (CarouselDemo.rozie's `:slides="SLIDES"`).
+
+  command-palette-13-empty-home-view-first: a SECOND, self-contained
+  `<CommandPalette>` (distinct `id-base`, `ref="homePalette"`, its own
+  `homeOpen`/`homeQuery` models) proves the empty/home-view seam WITHOUT
+  touching the palette above — its `items`/`searchUsers`/testids are
+  untouched. See command-palette.spec.ts's `command-palette-default-items`
+  suite. The helper is `openHome` (not `open` — the ROZ524 collision note
+  above applies identically to a second same-shaped helper).
 -->
 <rozie name="CommandPaletteBehaviorDemo">
 
@@ -43,6 +51,9 @@
   backCount: 0,
   lastActionItem: '',
   lastAction: '',
+  // command-palette-13-empty-home-view-first: the second palette's own models.
+  homeOpen: false,
+  homeQuery: '',
 }
 </data>
 
@@ -135,6 +146,61 @@ const openPalette = () => {
 const openToUsers = () => {
   $refs.palette?.openTo(['search-users'])
 }
+
+// ---- command-palette-13-empty-home-view-first: a SECOND, self-contained --
+// palette exercising the empty/home-view seam (never touches ALL_USERS/items
+// above). HOME_RECENTS is the ROOT `defaultItems` — 2 groups ('Recent' ×2,
+// 'Suggested' ×1) proving grouped defaultItems render as sections and
+// preserve author order. HOME_ITEMS is the root `items` list — 3 plain leaf
+// commands (one, "Open folder", uniquely matching the token "folder") PLUS
+// one navigating item (`find-users`) carrying its OWN `defaultItems`
+// (HOME_USER_RECENTS) — that child level's home view.
+const HOME_RECENTS = [
+  { id: 'recent-inbox', label: 'Inbox', group: 'Recent' },
+  { id: 'recent-drafts', label: 'Drafts', group: 'Recent' },
+  { id: 'suggested-archive', label: 'Archive', group: 'Suggested' },
+]
+
+const HOME_USER_RECENTS = [
+  { id: 'user-recent-ada', label: 'Ada Lovelace' },
+  { id: 'user-recent-alan', label: 'Alan Turing' },
+]
+
+const HOME_USER_POOL = [
+  { id: 'user-recent-ada', label: 'Ada Lovelace' },
+  { id: 'user-recent-alan', label: 'Alan Turing' },
+  { id: 'user-grace-hopper', label: 'Grace Hopper' },
+]
+
+// findUsers(query): deliberately carries NO `if (!query)` branch — the whole
+// point of `defaultItems` is that the overload it used to require is gone.
+// findUsers('') WOULD return all 3 pool entries, but the empty query never
+// reaches it — pushing `find-users` short-circuits straight to its
+// `defaultItems` (HOME_USER_RECENTS, 2 entries) without calling source('').
+// The deterministic proof: the pushed level shows 2, never 3.
+const findUsers = (query) => new Promise((resolve) => {
+  setTimeout(() => {
+    const q = String(query == null ? '' : query).toLowerCase()
+    resolve(HOME_USER_POOL.filter((u) => u.label.toLowerCase().includes(q)))
+  }, 300)
+})
+
+const HOME_ITEMS = [
+  { id: 'cmd-a', label: 'Open folder', keywords: ['folder'] },
+  { id: 'cmd-b', label: 'New window' },
+  { id: 'cmd-c', label: 'Toggle theme' },
+  {
+    id: 'find-users',
+    label: 'Find users…',
+    title: 'Find users',
+    defaultItems: HOME_USER_RECENTS,
+    source: findUsers,
+  },
+]
+
+const openHome = () => {
+  $data.homeOpen = true
+}
 </script>
 
 <template>
@@ -144,6 +210,7 @@ const openToUsers = () => {
   <div class="controls">
     <button type="button" data-testid="open-palette" @click="openPalette()">Open</button>
     <button type="button" data-testid="open-to-users" @click="openToUsers()">Open to Users</button>
+    <button type="button" data-testid="open-home-palette" @click="openHome()">Open Home</button>
     <span class="readout" data-testid="readout-open">{{ $data.open }}</span>
     <span class="readout" data-testid="readout-query">{{ $data.query }}</span>
     <span class="readout" data-testid="readout-select">{{ $data.lastSelect }}</span>
@@ -174,6 +241,20 @@ const openToUsers = () => {
       <div data-testid="command-palette-status" data-status="error">{{ error && error.message }}</div>
     </template>
   </CommandPalette>
+
+  <!-- command-palette-13-empty-home-view-first: a second, self-contained
+       palette exercising the empty/home-view seam — its own models + a
+       distinct idBase so it never collides with the palette above. -->
+  <CommandPalette
+    id-base="rozie-command-palette-home"
+    ref="homePalette"
+    r-model:open="$data.homeOpen"
+    r-model:query="$data.homeQuery"
+    :default-items="HOME_RECENTS"
+    :items="HOME_ITEMS"
+    placeholder="Type a command…"
+    ariaLabel="Command palette home"
+  />
 </div>
 </template>
 

@@ -4,7 +4,7 @@ import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState }
 import './CommandPalette.css';
 import Combobox, { type ComboboxHandle } from '@rozie-ui/combobox-react';
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { deriveCommandGroups } from './internal/commandGroups';
@@ -66,6 +66,12 @@ interface CommandPaletteProps {
    * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; commands sharing an optional `group` string are bucketed under a labeled section heading (auto-derived, via the vendored combobox's native section groups) — commands with no `group` render first in a headingless block. The heading text is the `group` string itself; override its markup with the `#groupHeading` slot. Optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
    */
   items?: any[];
+  /**
+   * Items shown when the query is empty (the empty/home state), resolved PER LEVEL. This top-level prop is the ROOT level's home view; a navigating item's own `defaultItems` field (alongside its `children`/`source`) is that CHILD level's home view. They render grouped when they carry `group` fields (composes with native sections, same as `items`), and scoring never reorders them (the empty-query short-circuit preserves author order). Typing a query switches to scored `items`/`source` results; clearing the query returns to `defaultItems`. This is the first-class replacement for branching on `query === ''` inside a `source` function — and the natural home for a recents/frecency list (composes with the `score` prop's recency boost). Leave unset (`default: () => []`) for today's behavior — no defaultItems is byte-behavior-identical to the full source-order list.
+   * @example
+   * <CommandPalette :default-items="recentCommands" :items="commands" />
+   */
+  defaultItems?: any[];
   /**
    * Placeholder text shown in the search input while the query is empty.
    */
@@ -131,10 +137,12 @@ export interface CommandPaletteHandle {
 
 const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(function CommandPalette(_props: CommandPaletteProps, ref): JSX.Element {
   const __defaultItems = useState(() => (() => [])())[0];
-  const props: Omit<CommandPaletteProps, 'score' | 'items' | 'placeholder' | 'emptyText' | 'closeOnSelect' | 'ariaLabel' | 'idBase' | 'searchDebounce' | 'actionKey' | 'closeOnAction'> & { score: ((...args: any[]) => any) | null; items: any[]; placeholder: string; emptyText: string; closeOnSelect: boolean; ariaLabel: string; idBase: string; searchDebounce: number; actionKey: string; closeOnAction: boolean } = {
+  const __defaultDefaultItems = useState(() => (() => [])())[0];
+  const props: Omit<CommandPaletteProps, 'score' | 'items' | 'defaultItems' | 'placeholder' | 'emptyText' | 'closeOnSelect' | 'ariaLabel' | 'idBase' | 'searchDebounce' | 'actionKey' | 'closeOnAction'> & { score: ((...args: any[]) => any) | null; items: any[]; defaultItems: any[]; placeholder: string; emptyText: string; closeOnSelect: boolean; ariaLabel: string; idBase: string; searchDebounce: number; actionKey: string; closeOnAction: boolean } = {
     ..._props,
     score: _props.score ?? null,
     items: _props.items ?? __defaultItems,
+    defaultItems: _props.defaultItems ?? __defaultDefaultItems,
     placeholder: _props.placeholder ?? 'Type a command…',
     emptyText: _props.emptyText ?? 'No results.',
     closeOnSelect: _props.closeOnSelect ?? true,
@@ -145,8 +153,8 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     closeOnAction: _props.closeOnAction ?? true,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, query, score, items, placeholder, emptyText, closeOnSelect, ariaLabel, idBase, searchDebounce, actionKey, closeOnAction, defaultValue, onOpenChange, defaultOpen, onQueryChange, defaultQuery, ...rest } = _props as CommandPaletteProps & Record<string, unknown>;
-    void open; void query; void score; void items; void placeholder; void emptyText; void closeOnSelect; void ariaLabel; void idBase; void searchDebounce; void actionKey; void closeOnAction; void defaultValue; void onOpenChange; void defaultOpen; void onQueryChange; void defaultQuery;
+    const { open, query, score, items, defaultItems, placeholder, emptyText, closeOnSelect, ariaLabel, idBase, searchDebounce, actionKey, closeOnAction, defaultValue, onOpenChange, defaultOpen, onQueryChange, defaultQuery, ...rest } = _props as CommandPaletteProps & Record<string, unknown>;
+    void open; void query; void score; void items; void defaultItems; void placeholder; void emptyText; void closeOnSelect; void ariaLabel; void idBase; void searchDebounce; void actionKey; void closeOnAction; void defaultValue; void onOpenChange; void defaultOpen; void onQueryChange; void defaultQuery;
     return rest;
   })();
   const debounceTimerId = useRef<any>(null);
@@ -181,6 +189,16 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     }
     return props.items;
   }
+  function currentDefaultItems() {
+    const frame = currentFrame(levelStack);
+    return frame ? frame.defaultItems : props.defaultItems;
+  }
+  function currentBaseItems() {
+    const q = String(query == null ? '' : query).trim();
+    const defaults = currentDefaultItems();
+    if (q === '' && Array.isArray(defaults) && defaults.length > 0) return defaults;
+    return currentItems();
+  }
   function currentDepth() {
     return levelDepth(levelStack);
   }
@@ -210,7 +228,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     return buildBreadcrumb(levelStack, props.ariaLabel);
   }
   function filteredItems() {
-    return scoreCommands(currentItems(), query, props.score);
+    return scoreCommands(currentBaseItems(), query, props.score);
   }
   function groupedView() {
     return deriveCommandGroups(filteredItems());
@@ -331,7 +349,13 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
       item,
       depth: nextStack.length
     });
-    if (isAsyncLevel(item)) beginLevelLoad(item, '');
+    // command-palette-13-empty-home-view-first: an item carrying a non-empty
+    // defaultItems is seeded 'ready' by pushFrame — skip the initial
+    // beginLevelLoad('') kick-off entirely (no source('') call, no loading
+    // flash). Typing still triggers the debounced source(query) refetch below
+    // (onComboboxSearch); clearing back to '' returns to the home view without
+    // ever invoking source.
+    if (isAsyncLevel(item) && levelDefaultItems(item).length === 0) beginLevelLoad(item, '');
   }
   const { onBack: _rozieProp_onBack } = props;
     const goBack = useCallback(() => {
@@ -423,6 +447,18 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     setQuery(q);
     const frame = currentFrame(levelStack);
     if (!frame || !isAsyncLevel(frame.item)) return;
+    // command-palette-13-empty-home-view-first: clearing back to '' on a level
+    // that carries defaultItems must NOT refetch (no source('') call) and must
+    // NOT let a late in-flight source result stomp the restored home view —
+    // bump the token (drops any in-flight resolution), clear any pending
+    // debounce timer, and return. currentBaseItems() already swaps back to
+    // the frame's defaultItems on the next render via filteredItems().
+    if (q === '' && levelDefaultItems(frame.item).length > 0) {
+      requestToken.current = nextRequestToken(requestToken.current);
+      if (debounceTimerId.current != null) clearTimeout(debounceTimerId.current);
+      debounceTimerId.current = null;
+      return;
+    }
     requestToken.current = nextRequestToken(requestToken.current);
     const token = requestToken.current;
     const item = frame.item;

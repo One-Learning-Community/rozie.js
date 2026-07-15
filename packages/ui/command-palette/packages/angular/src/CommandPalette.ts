@@ -4,7 +4,7 @@ import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { Combobox } from '@rozie-ui/combobox-angular';
 
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { deriveCommandGroups } from './internal/commandGroups';
@@ -446,6 +446,12 @@ export class CommandPalette {
    */
   items = input<any[]>((() => [])());
   /**
+   * Items shown when the query is empty (the empty/home state), resolved PER LEVEL. This top-level prop is the ROOT level's home view; a navigating item's own `defaultItems` field (alongside its `children`/`source`) is that CHILD level's home view. They render grouped when they carry `group` fields (composes with native sections, same as `items`), and scoring never reorders them (the empty-query short-circuit preserves author order). Typing a query switches to scored `items`/`source` results; clearing the query returns to `defaultItems`. This is the first-class replacement for branching on `query === ''` inside a `source` function — and the natural home for a recents/frecency list (composes with the `score` prop's recency boost). Leave unset (`default: () => []`) for today's behavior — no defaultItems is byte-behavior-identical to the full source-order list.
+   * @example
+   * <CommandPalette :default-items="recentCommands" :items="commands" />
+   */
+  defaultItems = input<any[]>((() => [])());
+  /**
    * Placeholder text shown in the search input while the query is empty.
    */
   placeholder = input<string>('Type a command…');
@@ -543,6 +549,17 @@ export class CommandPalette {
     }
     return this.items();
   };
+  currentDefaultItems = () => {
+    const frame = currentFrame(this.levelStack());
+    return frame ? frame.defaultItems : this.defaultItems();
+  };
+  currentBaseItems = () => {
+    const __query = this.query();
+    const q = String(__query == null ? '' : __query).trim();
+    const defaults = this.currentDefaultItems();
+    if (q === '' && Array.isArray(defaults) && defaults.length > 0) return defaults;
+    return this.currentItems();
+  };
   currentDepth = () => levelDepth(this.levelStack());
   currentStatus = () => {
     const frame = currentFrame(this.levelStack());
@@ -563,7 +580,7 @@ export class CommandPalette {
     return frame && frame.placeholder != null ? frame.placeholder : this.placeholder();
   };
   breadcrumbStack = () => buildBreadcrumb(this.levelStack(), this.ariaLabel());
-  filteredItems = () => scoreCommands(this.currentItems(), this.query(), this.score());
+  filteredItems = () => scoreCommands(this.currentBaseItems(), this.query(), this.score());
   groupedView = () => deriveCommandGroups(this.filteredItems());
   orderedItems = () => this.groupedView().ordered;
   commandGroups = () => this.groupedView().groups;
@@ -657,7 +674,13 @@ export class CommandPalette {
       item,
       depth: nextStack.length
     });
-    if (isAsyncLevel(item)) this.beginLevelLoad(item, '');
+    // command-palette-13-empty-home-view-first: an item carrying a non-empty
+    // defaultItems is seeded 'ready' by pushFrame — skip the initial
+    // beginLevelLoad('') kick-off entirely (no source('') call, no loading
+    // flash). Typing still triggers the debounced source(query) refetch below
+    // (onComboboxSearch); clearing back to '' returns to the home view without
+    // ever invoking source.
+    if (isAsyncLevel(item) && levelDefaultItems(item).length === 0) this.beginLevelLoad(item, '');
   };
   goBack = () => {
     if (this.levelStack().length === 0) return;
@@ -747,6 +770,18 @@ export class CommandPalette {
     this.query.set(q);
     const frame = currentFrame(this.levelStack());
     if (!frame || !isAsyncLevel(frame.item)) return;
+    // command-palette-13-empty-home-view-first: clearing back to '' on a level
+    // that carries defaultItems must NOT refetch (no source('') call) and must
+    // NOT let a late in-flight source result stomp the restored home view —
+    // bump the token (drops any in-flight resolution), clear any pending
+    // debounce timer, and return. currentBaseItems() already swaps back to
+    // the frame's defaultItems on the next render via filteredItems().
+    if (q === '' && levelDefaultItems(frame.item).length > 0) {
+      this.requestToken = nextRequestToken(this.requestToken);
+      if (this.debounceTimerId != null) clearTimeout(this.debounceTimerId);
+      this.debounceTimerId = null;
+      return;
+    }
     this.requestToken = nextRequestToken(this.requestToken);
     const token = this.requestToken;
     const item = frame.item;

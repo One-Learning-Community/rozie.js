@@ -50,6 +50,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * count stays 8 (grouping never drops/adds rows), and the old per-row
  * `.rozie-command-palette-option-group` badge is fully replaced (0 elements).
  *
+ * A FIFTH suite below (command-palette-default-items,
+ * command-palette-13-empty-home-view-first) proves the empty/home-view seam
+ * on the demo's SECOND, self-contained palette (`open-home-palette`,
+ * `homeOpen`/`homeQuery`, never touching the first palette's items/testids):
+ * an empty query at the ROOT renders the `defaultItems` prop's 3 items,
+ * grouped into 'Recent'/'Suggested' sections; typing switches to scored
+ * `items` results; clearing returns to `defaultItems`; pushing the
+ * `find-users` navigating item (which carries its OWN `defaultItems` field)
+ * shows ITS 2-item home view immediately — no loading flash, and critically
+ * NOT the async source's full 3-entry pool, proving `source('')` was never
+ * called; typing a real query still runs the async source; clearing restores
+ * the per-level home view again.
+ *
  * `examples/demos/CommandPaletteBehaviorDemo.rozie` drives a two-way
  * r-model:open + r-model:query, a mixed 8-item list (6 leaves, a static
  * `children` level, and an async `source` level), an open button, an openTo
@@ -577,6 +590,77 @@ for (const target of TARGETS) {
       .toBe(0);
 
     // ---- cleanup: close the palette ----
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+}
+
+/**
+ * command-palette-default-items (command-palette-13-empty-home-view-first)
+ * — the empty/home-view seam. Drives the demo's SECOND, self-contained
+ * palette (`open-home-palette` / `homeOpen` / `homeQuery`), which the other
+ * four suites above never touch. `HOME_RECENTS` (root `defaultItems`, 3
+ * items in 2 groups) is the root home view; `HOME_ITEMS` (root `items`, 4
+ * entries — 3 plain leaves + the `find-users` navigating item) is the
+ * scored/searchable list; `find-users` carries its OWN `defaultItems`
+ * (`HOME_USER_RECENTS`, 2 items) — that child level's home view, distinct
+ * from its async `source` (`findUsers`, a 3-entry pool with NO `if (!query)`
+ * overload — the whole point of the feature).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`command-palette-default-items [${target}]: root+nested home views, switch-to-scored, clear-restores, no source('') on push`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const openHomeBtn = page.getByTestId('open-home-palette');
+    const breadcrumbTitle = page.getByTestId('command-palette-title');
+
+    // ---- 1. open at root: empty query renders the 3 root defaultItems, ----
+    //         grouped 'Recent'/'Suggested' (author order, never reordered).
+    await openHomeBtn.click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(3);
+    await expect.poll(async () => groupHeadingTexts(page), { timeout: 10_000 }).toEqual(['Recent', 'Suggested']);
+
+    // ---- 2. typing switches to scored `items` results — defaultItems gone ----
+    await input.pressSequentially('folder', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await expect(page.locator('[role="option"]').first()).toContainText('Open folder');
+
+    // ---- 3. clearing the query RESTORES the root defaultItems + groups ----
+    await input.fill('');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(3);
+    await expect.poll(async () => groupHeadingTexts(page), { timeout: 10_000 }).toEqual(['Recent', 'Suggested']);
+
+    // ---- 4. PUSH the navigating item carrying its OWN defaultItems: shows ----
+    //         its 2-item home view IMMEDIATELY — NOT the async pool's 3
+    //         entries — proving source('') was never invoked on push.
+    await input.pressSequentially('users', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await page.locator('[role="option"]', { hasText: 'Find users' }).click();
+    await expect(breadcrumbTitle).toHaveText('Find users');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(2);
+
+    // ---- 5. typing a real query on the pushed level runs the async source ----
+    await input.pressSequentially('grace', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await expect(page.locator('[role="option"]').first()).toContainText('Grace Hopper');
+
+    // ---- 6. clearing the query on the pushed level restores ITS defaultItems ----
+    await input.fill('');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(2);
+
+    // ---- cleanup: Escape pops the level, Escape closes the palette ----
+    await page.keyboard.press('Escape');
+    await expect(breadcrumbTitle).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
