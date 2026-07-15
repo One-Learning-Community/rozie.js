@@ -187,7 +187,7 @@ function __rozieAttr(v: unknown): string | null {
         @if (atActions()) {
     <div data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" [attr.aria-label]="rozieAttr(__attr_aria_label)" [attr.style]="'top:' + actionMenuTop() + 'px'" (keydown)="onActionMenuKeydown($event)">
           @for (action of actionAnchor() ? actionAnchor().actions : []; track action.id; let ai = $index) {
-    <div class="rozie-command-palette-actions-menu-item" [ngClass]="{ 'rozie-command-palette-actions-menu-item--active': ai === actionIndex(), 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }" role="menuitem" data-testid="command-palette-action-item" [attr.aria-disabled]="!!action.disabled" tabindex="-1" (mouseenter)="actionIndex.set(ai)" (mousedown)="$event.preventDefault(); selectAction(action)">
+    <div class="rozie-command-palette-actions-menu-item" [ngClass]="{ 'rozie-command-palette-actions-menu-item--active': ai === actionIndex(), 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }" role="menuitem" data-testid="command-palette-action-item" [attr.aria-disabled]="!!action.disabled" tabindex="-1" (mouseenter)="actionIndex.set(Number(ai))" (mousedown)="$event.preventDefault(); selectAction(action)">
             @if ((actionItemTpl ?? templates()?.['actionItem'])) {
     <ng-container *ngTemplateOutlet="(actionItemTpl ?? templates()?.['actionItem']); context: { $implicit: { action: action, item: actionAnchor() ? actionAnchor().item : null, active: ai === actionIndex(), disabled: !!action.disabled }, action: action, item: actionAnchor() ? actionAnchor().item : null, active: ai === actionIndex(), disabled: !!action.disabled }" />
     } @else {
@@ -984,6 +984,8 @@ export class CommandPalette {
       const __actionAnchor = this.actionAnchor();
       return __actionAnchor ? __actionAnchor.label : null;
     }
+
+  protected readonly Number = Number;
 
   protected readonly labelHighlight = labelHighlight;
 

@@ -122,8 +122,12 @@ export function rovingActionIndex(
  * The SINGLE Escape/← routing oracle, encoding the full precedence table:
  * a sub-surface being open (`activeSurface !== 'list'`) ALWAYS wins over
  * popping a level, which ALWAYS wins over closing the palette at the root.
+ * The param is `string`, not `ActionSurface`: the caller passes a reactive
+ * state holder whose per-target lowering infers plain `string` (Vue `ref`,
+ * Angular local capture) — and any non-'list' surface routes identically,
+ * which is the surface-agnostic contract anyway ('args' works unchanged).
  */
-export function resolveEscape(activeSurface: ActionSurface, depth: number): EscapeRoute {
+export function resolveEscape(activeSurface: string, depth: number): EscapeRoute {
   if (activeSurface !== 'list') return 'close-surface';
   if (depth > 0) return 'pop-level';
   return 'close-palette';

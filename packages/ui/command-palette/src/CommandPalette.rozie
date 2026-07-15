@@ -1270,7 +1270,7 @@ $expose({ show, close, toggle, focus, goBack, openTo })
         data-testid="command-palette-action-item"
         :aria-disabled="!!action.disabled"
         tabindex="-1"
-        @mouseenter="$data.actionIndex = ai"
+        @mouseenter="$data.actionIndex = Number(ai)"
         @mousedown.prevent="selectAction(action)"
       >
         <slot
