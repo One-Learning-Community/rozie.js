@@ -186,6 +186,14 @@ Every value the component renders is a `--rozie-combobox-*` CSS custom property 
 
 The full token vocabulary — the wrapper width and font, the input box model (`input-padding`, `bg`, `color`, `border-width`, `border-color`, `radius`), the accent, the focus ring (`focus-ring-width`, `focus-ring-color`), the disabled state (`disabled-opacity`, `disabled-bg`), the popup listbox (`list-z`, `list-gap`, `list-padding`, `list-max-height`, `list-bg`, `list-border-color`, `list-shadow`), and the option (`option-padding`, `option-radius`, `option-active-bg`, `option-selected-weight`, `option-selected-color`, `option-disabled-opacity`) — has documented defaults in `themes/base.css`. Only cosmetic values flow through tokens; the structural rules (the relative wrapper, the absolutely-positioned popup, the input box model, the focus ring) compile per-leaf and are not consumer-overridable.
 
+New, render-neutral (260715-50l — additive; every fallback replicates today's rendered value, so a consumer who never sets these sees no change):
+
+| Token | Fallback | Description |
+| --- | --- | --- |
+| `--rozie-combobox-focus-border-color` | `var(--rozie-combobox-accent, #0066cc)` | The input's `:focus` border color, decoupled from `--rozie-combobox-accent` (which also colors the selected option) — set it independently without touching the selected-option accent. |
+| `--rozie-combobox-input-underline` | `var(--rozie-combobox-border-width, 1px) solid var(--rozie-combobox-border-color, …)` (blurred) / `…solid var(--rozie-combobox-focus-border-color, …)` (focused) | A bottom-border longhand that wins over both the base `border` shorthand and the `:focus` `border-color` override — a consumer-set divider (e.g. a command-palette composing this primitive) stays put whether the input is focused or not. |
+| `--rozie-combobox-group-heading-margin-top` | `0` | Top margin above each `.rozie-combobox-group-heading` — separates the leading ungrouped block from the first labeled section, and adds consistent spacing between sections. |
+
 ### Design-system bridges
 
 Each package ships token presets that map the combobox tokens onto a known design system's published CSS variables — so the control automatically follows that system's light/dark theme and accent:

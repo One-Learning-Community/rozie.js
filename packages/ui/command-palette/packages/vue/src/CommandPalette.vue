@@ -1,12 +1,18 @@
 <template>
 
 <div v-if="open" class="rozie-command-palette" @click="onBackdropClick($event)">
-  <div ref="panelRef" class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="props.ariaLabel" @keydown="onPanelKeydown($event)">
+  
+  <div ref="frameRef" class="rozie-command-palette-frame" data-testid="command-palette-frame" @keydown="onPanelKeydown($event)">
+  <div ref="panelRef" class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="props.ariaLabel">
     
     <div v-if="atDepth()" class="rozie-command-palette-header">
       <slot name="breadcrumb" :stack="breadcrumbStack()" :back="goBack">
         <button type="button" class="rozie-command-palette-back" aria-label="Back" data-testid="command-palette-back" @click="goBack()">‹</button>
-        <span class="rozie-command-palette-title" data-testid="command-palette-title">{{ currentTitle() }}</span>
+        <nav class="rozie-command-palette-breadcrumb-trail" data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb">
+          <span v-for="(entry, ei) in breadcrumbStack()" :key="ei" class="rozie-command-palette-breadcrumb-item">
+            <span v-if="Number(ei) > 0" class="rozie-command-palette-breadcrumb-separator" aria-hidden="true">›</span><span :class="['rozie-command-palette-breadcrumb-segment', { 'rozie-command-palette-breadcrumb-segment--current': Number(ei) === breadcrumbStack().length - 1 }]" :data-testid="Number(ei) === breadcrumbStack().length - 1 ? 'command-palette-title' : undefined">{{ entry.title }}</span>
+          </span>
+        </nav>
       </slot>
     </div><Combobox ref="comboboxRef" :inline="true" :disable-filter="true" :close-on-select="false" :options="orderedItems()" :groups="commandGroups()" :group-cap="props.groupCap" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="currentPlaceholder()" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
         <slot name="option" :option="option" :index="index" :active="active" :selected="selected" :disabled="disabled" :matches="labelHighlight(labelText(option), query)">
@@ -32,19 +38,22 @@
         <template v-if="currentStatus() === 'ready'"><slot name="empty" :query="query">{{ props.emptyText }}</slot></template></template></Combobox>
 
     
-    <div v-if="atActions()" data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" :aria-label="actionAnchor ? actionAnchor.label : undefined" :style="'top:' + actionMenuTop + 'px'" @keydown="onActionMenuKeydown($event)">
-      <div v-for="(action, ai) in actionAnchor ? actionAnchor.actions : []" :key="action.id" :class="['rozie-command-palette-actions-menu-item', { 'rozie-command-palette-actions-menu-item--active': ai === actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }]" role="menuitem" data-testid="command-palette-action-item" :aria-disabled="!!action.disabled" tabindex="-1" @mouseenter="actionIndex = Number(ai)" @mousedown.prevent="selectAction(action)">
-        <slot name="actionItem" :action="action" :item="actionAnchor ? actionAnchor.item : null" :active="ai === actionIndex" :disabled="!!action.disabled">
-          <span v-if="actionIcon(action)" class="rozie-command-palette-actions-menu-item-icon">{{ actionIcon(action) }}</span><span class="rozie-command-palette-actions-menu-item-label">{{ actionLabel(action) }}</span>
-          <span v-if="actionShortcut(action)" class="rozie-command-palette-actions-menu-item-shortcut">{{ actionShortcut(action) }}</span></slot>
-      </div>
-    </div><div v-if="currentStatus() === 'loading'" class="rozie-command-palette-loading">
+    <div v-if="currentStatus() === 'loading'" class="rozie-command-palette-loading">
       <slot name="loading" :query="query">Loading…</slot>
     </div><div v-else-if="currentStatus() === 'error'" class="rozie-command-palette-error">
       <slot name="error" :query="query" :error="currentError()" :retry="retryCurrentLevel"></slot>
     </div><div v-if="$slots.footer" class="rozie-command-palette-footer">
       <slot name="footer"></slot>
     </div></div>
+
+  
+  <div v-if="atActions()" data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" :aria-label="actionAnchor ? actionAnchor.label : undefined" :style="'top:' + actionMenuTop + 'px'" @keydown="onActionMenuKeydown($event)">
+    <div v-for="(action, ai) in actionAnchor ? actionAnchor.actions : []" :key="action.id" :class="['rozie-command-palette-actions-menu-item', { 'rozie-command-palette-actions-menu-item--active': ai === actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }]" role="menuitem" data-testid="command-palette-action-item" :aria-disabled="!!action.disabled" tabindex="-1" @mouseenter="actionIndex = Number(ai)" @mousedown.prevent="selectAction(action)">
+      <slot name="actionItem" :action="action" :item="actionAnchor ? actionAnchor.item : null" :active="ai === actionIndex" :disabled="!!action.disabled">
+        <span v-if="actionIcon(action)" class="rozie-command-palette-actions-menu-item-icon">{{ actionIcon(action) }}</span><span class="rozie-command-palette-actions-menu-item-label">{{ actionLabel(action) }}</span>
+        <span v-if="actionShortcut(action)" class="rozie-command-palette-actions-menu-item-shortcut">{{ actionShortcut(action) }}</span></slot>
+    </div>
+  </div></div>
 </div>
 </template>
 
@@ -138,10 +147,10 @@ defineSlots<{
   option(props: { option: any; index: any; active: any; selected: any; disabled: any; matches: any }): any;
   groupHeading(props: { group: any }): any;
   empty(props: { query: any }): any;
-  actionItem(props: { action: any; item: any; active: any; disabled: any }): any;
   loading(props: { query: any }): any;
   error(props: { query: any; error: any; retry: any }): any;
   footer(props: {  }): any;
+  actionItem(props: { action: any; item: any; active: any; disabled: any }): any;
   icon(props: { option: any }): any;
   actions(props: { option: any; actions: any }): any;
   trailing(props: { option: any }): any;
@@ -154,6 +163,7 @@ const actionIndex = ref(-1);
 const actionAnchor = ref<any>(null);
 const actionMenuTop = ref(0);
 
+const frameRef = ref<HTMLElement>();
 const panelRef = ref<HTMLElement>();
 const comboboxRef = ref<InstanceType<typeof Combobox>>();
 
@@ -734,11 +744,15 @@ const searchInputEl = () => {
 };
 // focusFirstMenuItem(): move real DOM focus into the first enabled menuitem —
 // the ACT-ARBITRATION "real focus" guarantee. Deferred a frame by the caller
-// (openActionMenu) so the flyout has mounted first.
+// (openActionMenu) so the flyout has mounted first. The flyout is now a
+// FRAME child (sibling of the panel, finding 1), so this queries
+// `$refs.frame` — a light-DOM ancestor sharing the palette's OWN shadow
+// root as the flyout (no nested shadow between frame and flyout), so a
+// plain `querySelector` resolves it on all six.
 const focusFirstMenuItem = () => {
-  const panel = panelRef.value;
-  if (!panel) return;
-  const el: any = panel.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])');
+  const frame = frameRef.value;
+  if (!frame) return;
+  const el: any = frame.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])');
   if (el && typeof el.focus === 'function') el.focus();
 };
 // openActionMenu(item): guarded no-op unless canOpenActions(item). Anchors
@@ -765,12 +779,36 @@ const openActionMenu = (item: any) => {
   actionIndex.value = firstEnabledActionIndex(actions);
   activeSurface.value = 'actions';
   const panel = panelRef.value;
+  const frame = frameRef.value;
   const activeRow: any = panel ? deepQuerySelector(panel, '.rozie-combobox-option--active') : null;
-  actionMenuTop.value = activeRow ? activeRow.offsetTop : 0;
+  // Frame-relative getBoundingClientRect delta (finding 1) — NOT
+  // `activeRow.offsetTop`, which is relative to the row's offsetParent (the
+  // `position: relative` `.rozie-combobox` root, Combobox.rozie) and so
+  // omits the header height + the combobox's own top (would float the
+  // flyout above its row at depth>0). A getBoundingClientRect delta is
+  // viewport-relative on BOTH sides of the Lit nested-shadow boundary
+  // (panel/combobox are separate shadow roots there) so it is correct ×6
+  // AND correct when the combobox list is scrolled (offsetTop ignores
+  // scroll). The frame wraps the panel tightly (no padding), so
+  // frame-top ≈ panel-top and the flyout still aligns to its row.
+  // `frame.scrollTop` is 0 — the frame does not scroll.
+  actionMenuTop.value = activeRow && frame ? activeRow.getBoundingClientRect().top - frame.getBoundingClientRect().top + frame.scrollTop : 0;
   comboboxRef.value?.pinOpen(true);
   if (typeof requestAnimationFrame !== 'undefined') {
     requestAnimationFrame(() => {
       focusFirstMenuItem();
+      // Viewport clamp (finding 1) — a menu opening on a 1-row panel must
+      // never run off the viewport bottom. Reads DOM post-mount (rAF), so
+      // the flyout has laid out. Shifts the menu UP only; never above the
+      // frame top.
+      const menuEl: any = frame ? frame.querySelector('[data-command-palette-menu]') : null;
+      if (menuEl && frame) {
+        const frameTop = frame.getBoundingClientRect().top;
+        const menuH = menuEl.getBoundingClientRect().height;
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+        const maxTop = Math.max(0, vh - 8 - frameTop - menuH);
+        if (actionMenuTop.value > maxTop) actionMenuTop.value = maxTop;
+      }
     });
   } else {
     focusFirstMenuItem();
@@ -795,9 +833,11 @@ const roveAction = (dir: any) => {
   if (!anchor) return;
   const idx = rovingActionIndex(anchor.actions, actionIndex.value, dir);
   actionIndex.value = idx;
-  const panel = panelRef.value;
-  if (!panel) return;
-  const items: any = panel.querySelectorAll('[data-command-palette-menu] [role="menuitem"]');
+  // Re-rooted to $refs.frame (finding 1) — the flyout moved out of the
+  // panel to be a frame child; see focusFirstMenuItem's comment.
+  const frame = frameRef.value;
+  if (!frame) return;
+  const items: any = frame.querySelectorAll('[data-command-palette-menu] [role="menuitem"]');
   const el: any = items[idx];
   if (el && typeof el.focus === 'function') el.focus();
 };
@@ -988,10 +1028,17 @@ defineExpose({ show, close, toggle, focus, goBack, openTo });
   background: var(--rozie-command-palette-backdrop-bg, rgba(0, 0, 0, 0.5));
   backdrop-filter: var(--rozie-command-palette-backdrop-filter, none);
 }
-.rozie-command-palette-panel {
+.rozie-command-palette-frame {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: var(--rozie-command-palette-width, min(40rem, 100%));
+  max-width: 100%;
+}
+.rozie-command-palette-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   max-height: var(--rozie-command-palette-max-height, 70vh);
   overflow: hidden;
   font: var(--rozie-command-palette-font, inherit);
@@ -1000,6 +1047,22 @@ defineExpose({ show, close, toggle, focus, goBack, openTo });
   border: var(--rozie-command-palette-border, none);
   border-radius: var(--rozie-command-palette-radius, 0.75rem);
   box-shadow: var(--rozie-command-palette-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25));
+  /*
+    Drive the vendored <Combobox>'s render-neutral tokens from panel scope
+    (260715-50l findings 3+4) — custom properties inherit through the Lit
+    nested-shadow boundary since this panel is the combobox's DOM ancestor.
+    Each declaration is itself token-driven with a fallback so a palette
+    consumer can still re-override. Result: a square, borderless-on-three-
+    sides, ring-free input with a subtle bottom divider that stays put on
+    focus (the clean cmdk look), plus subtle top separation above group
+    headings (separating the leading ungrouped block from the first group).
+  */
+  --rozie-combobox-radius: var(--rozie-command-palette-input-radius, 0);
+  --rozie-combobox-border-color: var(--rozie-command-palette-input-border-color, transparent);
+  --rozie-combobox-focus-border-color: var(--rozie-command-palette-input-focus-border-color, transparent);
+  --rozie-combobox-focus-ring-width: var(--rozie-command-palette-input-focus-ring-width, 0);
+  --rozie-combobox-input-underline: var(--rozie-command-palette-input-underline, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
+  --rozie-combobox-group-heading-margin-top: var(--rozie-command-palette-section-gap, 0.375rem);
 }
 .rozie-command-palette-search {
   padding: var(--rozie-command-palette-search-padding, 0.75rem);
@@ -1032,6 +1095,31 @@ defineExpose({ show, close, toggle, focus, goBack, openTo });
 }
 .rozie-command-palette-title {
   font-weight: var(--rozie-command-palette-title-weight, 600);
+}
+.rozie-command-palette-breadcrumb-trail {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+.rozie-command-palette-breadcrumb-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+.rozie-command-palette-breadcrumb-segment {
+  color: var(--rozie-command-palette-breadcrumb-color, rgba(0, 0, 0, 0.55));
+  font-weight: var(--rozie-command-palette-breadcrumb-weight, 400);
+  white-space: nowrap;
+}
+.rozie-command-palette-breadcrumb-segment--current {
+  color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
+  font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+}
+.rozie-command-palette-breadcrumb-separator {
+  color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
 }
 .rozie-command-palette-input {
   box-sizing: border-box;

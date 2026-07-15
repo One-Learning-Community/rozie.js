@@ -32,10 +32,17 @@ __rozieInjectStyle('CommandPalette-768cad96', `.rozie-command-palette[data-rozie
   background: var(--rozie-command-palette-backdrop-bg, rgba(0, 0, 0, 0.5));
   backdrop-filter: var(--rozie-command-palette-backdrop-filter, none);
 }
-.rozie-command-palette-panel[data-rozie-s-768cad96] {
+.rozie-command-palette-frame[data-rozie-s-768cad96] {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: var(--rozie-command-palette-width, min(40rem, 100%));
+  max-width: 100%;
+}
+.rozie-command-palette-panel[data-rozie-s-768cad96] {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   max-height: var(--rozie-command-palette-max-height, 70vh);
   overflow: hidden;
   font: var(--rozie-command-palette-font, inherit);
@@ -44,6 +51,22 @@ __rozieInjectStyle('CommandPalette-768cad96', `.rozie-command-palette[data-rozie
   border: var(--rozie-command-palette-border, none);
   border-radius: var(--rozie-command-palette-radius, 0.75rem);
   box-shadow: var(--rozie-command-palette-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25));
+  /*
+    Drive the vendored <Combobox>'s render-neutral tokens from panel scope
+    (260715-50l findings 3+4) — custom properties inherit through the Lit
+    nested-shadow boundary since this panel is the combobox's DOM ancestor.
+    Each declaration is itself token-driven with a fallback so a palette
+    consumer can still re-override. Result: a square, borderless-on-three-
+    sides, ring-free input with a subtle bottom divider that stays put on
+    focus (the clean cmdk look), plus subtle top separation above group
+    headings (separating the leading ungrouped block from the first group).
+  */
+  --rozie-combobox-radius: var(--rozie-command-palette-input-radius, 0);
+  --rozie-combobox-border-color: var(--rozie-command-palette-input-border-color, transparent);
+  --rozie-combobox-focus-border-color: var(--rozie-command-palette-input-focus-border-color, transparent);
+  --rozie-combobox-focus-ring-width: var(--rozie-command-palette-input-focus-ring-width, 0);
+  --rozie-combobox-input-underline: var(--rozie-command-palette-input-underline, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
+  --rozie-combobox-group-heading-margin-top: var(--rozie-command-palette-section-gap, 0.375rem);
 }
 .rozie-command-palette-search[data-rozie-s-768cad96] {
   padding: var(--rozie-command-palette-search-padding, 0.75rem);
@@ -76,6 +99,31 @@ __rozieInjectStyle('CommandPalette-768cad96', `.rozie-command-palette[data-rozie
 }
 .rozie-command-palette-title[data-rozie-s-768cad96] {
   font-weight: var(--rozie-command-palette-title-weight, 600);
+}
+.rozie-command-palette-breadcrumb-trail[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+.rozie-command-palette-breadcrumb-item[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+.rozie-command-palette-breadcrumb-segment[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-color, rgba(0, 0, 0, 0.55));
+  font-weight: var(--rozie-command-palette-breadcrumb-weight, 400);
+  white-space: nowrap;
+}
+.rozie-command-palette-breadcrumb-segment--current[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
+  font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+}
+.rozie-command-palette-breadcrumb-separator[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
 }
 .rozie-command-palette-input[data-rozie-s-768cad96] {
   box-sizing: border-box;
@@ -226,11 +274,11 @@ interface GroupHeadingSlotCtx { group: any; }
 
 interface EmptySlotCtx { query: any; }
 
-interface ActionItemSlotCtx { action: any; item: any; active: any; disabled: any; }
-
 interface LoadingSlotCtx { query: any; }
 
 interface ErrorSlotCtx { query: any; error: any; retry: any; }
+
+interface ActionItemSlotCtx { action: any; item: any; active: any; disabled: any; }
 
 interface IconSlotCtx { option: any; }
 
@@ -317,10 +365,10 @@ interface CommandPaletteProps {
   optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
   groupHeadingSlot?: (ctx: GroupHeadingSlotCtx) => JSX.Element;
   emptySlot?: (ctx: EmptySlotCtx) => JSX.Element;
-  actionItemSlot?: (ctx: ActionItemSlotCtx) => JSX.Element;
   loadingSlot?: (ctx: LoadingSlotCtx) => JSX.Element;
   errorSlot?: (ctx: ErrorSlotCtx) => JSX.Element;
   footerSlot?: JSX.Element;
+  actionItemSlot?: (ctx: ActionItemSlotCtx) => JSX.Element;
   iconSlot?: (ctx: IconSlotCtx) => JSX.Element;
   actionsSlot?: (ctx: ActionsSlotCtx) => JSX.Element;
   trailingSlot?: (ctx: TrailingSlotCtx) => JSX.Element;
@@ -372,6 +420,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
       requestToken = nextRequestToken(requestToken);
     }
   })(v)), { defer: true }));
+  let frameRef: HTMLElement | null = null;
   let panelRef: HTMLElement | null = null;
   let comboboxRef: ComboboxHandle | null = null;
 
@@ -1018,11 +1067,15 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
 
   // focusFirstMenuItem(): move real DOM focus into the first enabled menuitem —
   // the ACT-ARBITRATION "real focus" guarantee. Deferred a frame by the caller
-  // (openActionMenu) so the flyout has mounted first.
+  // (openActionMenu) so the flyout has mounted first. The flyout is now a
+  // FRAME child (sibling of the panel, finding 1), so this queries
+  // `$refs.frame` — a light-DOM ancestor sharing the palette's OWN shadow
+  // root as the flyout (no nested shadow between frame and flyout), so a
+  // plain `querySelector` resolves it on all six.
   function focusFirstMenuItem() {
-    const panel = panelRef;
-    if (!panel) return;
-    const el: any = panel.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])');
+    const frame = frameRef;
+    if (!frame) return;
+    const el: any = frame.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])');
     if (el && typeof el.focus === 'function') el.focus();
   }
 
@@ -1050,12 +1103,36 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     setActionIndex(firstEnabledActionIndex(actions));
     setActiveSurface('actions');
     const panel = panelRef;
+    const frame = frameRef;
     const activeRow: any = panel ? deepQuerySelector(panel, '.rozie-combobox-option--active') : null;
-    setActionMenuTop(activeRow ? activeRow.offsetTop : 0);
+    // Frame-relative getBoundingClientRect delta (finding 1) — NOT
+    // `activeRow.offsetTop`, which is relative to the row's offsetParent (the
+    // `position: relative` `.rozie-combobox` root, Combobox.rozie) and so
+    // omits the header height + the combobox's own top (would float the
+    // flyout above its row at depth>0). A getBoundingClientRect delta is
+    // viewport-relative on BOTH sides of the Lit nested-shadow boundary
+    // (panel/combobox are separate shadow roots there) so it is correct ×6
+    // AND correct when the combobox list is scrolled (offsetTop ignores
+    // scroll). The frame wraps the panel tightly (no padding), so
+    // frame-top ≈ panel-top and the flyout still aligns to its row.
+    // `frame.scrollTop` is 0 — the frame does not scroll.
+    setActionMenuTop(activeRow && frame ? activeRow.getBoundingClientRect().top - frame.getBoundingClientRect().top + frame.scrollTop : 0);
     comboboxRef?.pinOpen(true);
     if (typeof requestAnimationFrame !== 'undefined') {
       requestAnimationFrame(() => {
         focusFirstMenuItem();
+        // Viewport clamp (finding 1) — a menu opening on a 1-row panel must
+        // never run off the viewport bottom. Reads DOM post-mount (rAF), so
+        // the flyout has laid out. Shifts the menu UP only; never above the
+        // frame top.
+        const menuEl: any = frame ? frame.querySelector('[data-command-palette-menu]') : null;
+        if (menuEl && frame) {
+          const frameTop = frame.getBoundingClientRect().top;
+          const menuH = menuEl.getBoundingClientRect().height;
+          const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+          const maxTop = Math.max(0, vh - 8 - frameTop - menuH);
+          if (actionMenuTop() > maxTop) setActionMenuTop(maxTop);
+        }
       });
     } else {
       focusFirstMenuItem();
@@ -1082,9 +1159,11 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     if (!anchor) return;
     const idx = rovingActionIndex(anchor.actions, actionIndex(), dir);
     setActionIndex(idx);
-    const panel = panelRef;
-    if (!panel) return;
-    const items: any = panel.querySelectorAll('[data-command-palette-menu] [role="menuitem"]');
+    // Re-rooted to $refs.frame (finding 1) — the flyout moved out of the
+    // panel to be a frame child; see focusFirstMenuItem's comment.
+    const frame = frameRef;
+    if (!frame) return;
+    const items: any = frame.querySelectorAll('[data-command-palette-menu] [role="menuitem"]');
     const el: any = items[idx];
     if (el && typeof el.focus === 'function') el.focus();
   }
@@ -1246,10 +1325,16 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   return (
     <>
     {<Show when={open()}><div class={"rozie-command-palette"} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
-      <div role="dialog" aria-modal="true" aria-label={local.ariaLabel} ref={(el) => { panelRef = el as HTMLElement; }} class={"rozie-command-palette-panel"} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
+      
+      <div data-testid="command-palette-frame" ref={(el) => { frameRef = el as HTMLElement; }} class={"rozie-command-palette-frame"} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
+      <div ref={(el) => { panelRef = el as HTMLElement; }} class={"rozie-command-palette-panel"} role="dialog" aria-modal="true" aria-label={local.ariaLabel} data-rozie-s-768cad96="">
         
         {<Show when={atDepth()}><div class={"rozie-command-palette-header"} data-rozie-s-768cad96="">
-          {(_props.breadcrumbSlot ?? _props.slots?.['breadcrumb'])?.({ stack: breadcrumbStack(), back: goBack }) ?? <><button type="button" aria-label="Back" data-testid="command-palette-back" class={"rozie-command-palette-back"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { goBack(); }} data-rozie-s-768cad96="">‹</button><span class={"rozie-command-palette-title"} data-testid="command-palette-title" data-rozie-s-768cad96="">{rozieDisplay(currentTitle())}</span></>}
+          {(_props.breadcrumbSlot ?? _props.slots?.['breadcrumb'])?.({ stack: breadcrumbStack(), back: goBack }) ?? <><button type="button" aria-label="Back" data-testid="command-palette-back" class={"rozie-command-palette-back"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { goBack(); }} data-rozie-s-768cad96="">‹</button><nav class={"rozie-command-palette-breadcrumb-trail"} data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb" data-rozie-s-768cad96="">
+              <For each={breadcrumbStack()}>{(entry, ei) => <span class={"rozie-command-palette-breadcrumb-item"} data-rozie-s-768cad96="">
+                {<Show when={Number(ei()) > 0}><span class={"rozie-command-palette-breadcrumb-separator"} aria-hidden="true" data-rozie-s-768cad96="">›</span></Show>}<span class={"rozie-command-palette-breadcrumb-segment" + " " + rozieClass({ 'rozie-command-palette-breadcrumb-segment--current': Number(ei()) === breadcrumbStack().length - 1 })} data-testid={rozieAttr(Number(ei()) === breadcrumbStack().length - 1 ? 'command-palette-title' : null)} data-rozie-s-768cad96="">{rozieDisplay(entry.title)}</span>
+              </span>}</For>
+            </nav></>}
         </div></Show>}<Combobox aria-label={local.ariaLabel} ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={local.groupCap} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
             {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query()) }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {<Show when={(_props.iconSlot ?? _props.slots?.['icon'])}><span class={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
@@ -1271,17 +1356,20 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
             {<Show when={currentStatus() === 'ready'}>{(_props.emptySlot ?? _props.slots?.['empty'])?.({ query }) ?? local.emptyText}</Show>}</>)} />
 
         
-        {<Show when={atActions()}><div data-command-palette-menu="" data-testid="command-palette-actions-menu" role="menu" aria-label={rozieAttr(actionAnchor() ? actionAnchor().label : null)} class={"rozie-command-palette-actions-menu"} style={parseInlineStyle('top:' + actionMenuTop() + 'px')} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96="">
-          <Key each={actionAnchor() ? actionAnchor().actions : [] as readonly any[]} by={(action) => action.id}>{(action, ai) => <div role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action().disabled} class={"rozie-command-palette-actions-menu-item" + " " + rozieClass({ 'rozie-command-palette-actions-menu-item--active': ai() === actionIndex(), 'rozie-command-palette-actions-menu-item--disabled': !!action().disabled })} tabIndex={-1} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActionIndex(Number(ai())); }} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectAction(action()); }} data-rozie-s-768cad96="">
-            {(_props.actionItemSlot ?? _props.slots?.['actionItem'])?.({ action: action(), item: actionAnchor() ? actionAnchor().item : null, active: ai() === actionIndex(), disabled: !!action().disabled }) ?? <>{<Show when={actionIcon(action())}><span class={"rozie-command-palette-actions-menu-item-icon"} data-rozie-s-768cad96="">{rozieDisplay(actionIcon(action()))}</span></Show>}<span class={"rozie-command-palette-actions-menu-item-label"} data-rozie-s-768cad96="">{rozieDisplay(actionLabel(action()))}</span>{<Show when={actionShortcut(action())}><span class={"rozie-command-palette-actions-menu-item-shortcut"} data-rozie-s-768cad96="">{rozieDisplay(actionShortcut(action()))}</span></Show>}</>}
-          </div>}</Key>
-        </div></Show>}{<Show when={currentStatus() === 'loading'} fallback={<Show when={currentStatus() === 'error'}><div class={"rozie-command-palette-error"} data-rozie-s-768cad96="">
+        {<Show when={currentStatus() === 'loading'} fallback={<Show when={currentStatus() === 'error'}><div class={"rozie-command-palette-error"} data-rozie-s-768cad96="">
           {(_props.errorSlot ?? _props.slots?.['error'])?.({ query: query(), error: currentError(), retry: retryCurrentLevel })}
         </div></Show>}><div class={"rozie-command-palette-loading"} data-rozie-s-768cad96="">
           {(_props.loadingSlot ?? _props.slots?.['loading'])?.({ query: query() }) ?? "Loading…"}
         </div></Show>}{<Show when={(_props.footerSlot ?? _props.slots?.['footer'])}><div class={"rozie-command-palette-footer"} data-rozie-s-768cad96="">
           {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}
         </div></Show>}</div>
+
+      
+      {<Show when={atActions()}><div data-command-palette-menu="" data-testid="command-palette-actions-menu" role="menu" aria-label={rozieAttr(actionAnchor() ? actionAnchor().label : null)} class={"rozie-command-palette-actions-menu"} style={parseInlineStyle('top:' + actionMenuTop() + 'px')} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96="">
+        <Key each={actionAnchor() ? actionAnchor().actions : [] as readonly any[]} by={(action) => action.id}>{(action, ai) => <div role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action().disabled} class={"rozie-command-palette-actions-menu-item" + " " + rozieClass({ 'rozie-command-palette-actions-menu-item--active': ai() === actionIndex(), 'rozie-command-palette-actions-menu-item--disabled': !!action().disabled })} tabIndex={-1} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActionIndex(Number(ai())); }} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectAction(action()); }} data-rozie-s-768cad96="">
+          {(_props.actionItemSlot ?? _props.slots?.['actionItem'])?.({ action: action(), item: actionAnchor() ? actionAnchor().item : null, active: ai() === actionIndex(), disabled: !!action().disabled }) ?? <>{<Show when={actionIcon(action())}><span class={"rozie-command-palette-actions-menu-item-icon"} data-rozie-s-768cad96="">{rozieDisplay(actionIcon(action()))}</span></Show>}<span class={"rozie-command-palette-actions-menu-item-label"} data-rozie-s-768cad96="">{rozieDisplay(actionLabel(action()))}</span>{<Show when={actionShortcut(action())}><span class={"rozie-command-palette-actions-menu-item-shortcut"} data-rozie-s-768cad96="">{rozieDisplay(actionShortcut(action()))}</span></Show>}</>}
+        </div>}</Key>
+      </div></Show>}</div>
     </div></Show>}</>
   );
 }

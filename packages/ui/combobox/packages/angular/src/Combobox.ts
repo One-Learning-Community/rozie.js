@@ -216,12 +216,29 @@ function __rozieAttr(v: unknown): string | null {
       background: var(--rozie-combobox-bg, #fff);
       border: var(--rozie-combobox-border-width, 1px) solid var(--rozie-combobox-border-color, rgba(0, 0, 0, 0.25));
       border-radius: var(--rozie-combobox-radius, 0.5rem);
+      /*
+        Render-neutral bottom-divider token (260715-50l finding 3). A longhand
+        AFTER the \`border:\` shorthand above so it wins on the bottom side; the
+        fallback REPLICATES the shorthand's own bottom (border-width solid
+        border-color) so default rendering is byte-for-render unchanged. Lets a
+        consumer (e.g. command-palette) render a borderless-with-underline input
+        without touching the other three sides.
+      */
+      border-bottom: var(--rozie-combobox-input-underline, var(--rozie-combobox-border-width, 1px) solid var(--rozie-combobox-border-color, rgba(0, 0, 0, 0.25)));
       outline: none;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
     .rozie-combobox-input:focus {
-      border-color: var(--rozie-combobox-accent, #0066cc);
+      /* Decoupled from --rozie-combobox-accent (finding 3) so a consumer can */
+      /* neutralize the focus BORDER without touching the selected-option accent. */
+      border-color: var(--rozie-combobox-focus-border-color, var(--rozie-combobox-accent, #0066cc));
       box-shadow: 0 0 0 var(--rozie-combobox-focus-ring-width, 3px) var(--rozie-combobox-focus-ring-color, rgba(0, 102, 204, 0.25));
+      /*
+        Same underline token, focus-colored fallback — the longhand keeps
+        WINNING on the bottom side over the :focus border-color override above,
+        so a consumer-set divider survives both blurred and focused states.
+      */
+      border-bottom: var(--rozie-combobox-input-underline, var(--rozie-combobox-border-width, 1px) solid var(--rozie-combobox-focus-border-color, var(--rozie-combobox-accent, #0066cc)));
     }
     .rozie-combobox--disabled .rozie-combobox-input {
       cursor: not-allowed;
@@ -270,6 +287,10 @@ function __rozieAttr(v: unknown): string | null {
       list-style: none;
     }
     .rozie-combobox-group-heading {
+      /* Render-neutral section-separation token (260715-50l finding 4) — default */
+      /* 0 = unchanged; a consumer-set value separates the leading ungrouped */
+      /* block from the first group heading. */
+      margin-top: var(--rozie-combobox-group-heading-margin-top, 0);
       padding: var(--rozie-combobox-group-heading-padding, 0.35rem 0.6rem 0.15rem);
       font-size: var(--rozie-combobox-group-heading-size, 0.75rem);
       font-weight: var(--rozie-combobox-group-heading-weight, 600);

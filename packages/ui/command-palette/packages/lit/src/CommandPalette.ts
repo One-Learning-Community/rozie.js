@@ -46,13 +46,6 @@ interface RozieEmptySlotCtx {
   query: unknown;
 }
 
-interface RozieActionItemSlotCtx {
-  action: unknown;
-  item: unknown;
-  active: unknown;
-  disabled: unknown;
-}
-
 interface RozieLoadingSlotCtx {
   query: unknown;
 }
@@ -61,6 +54,13 @@ interface RozieErrorSlotCtx {
   query: unknown;
   error: unknown;
   retry: unknown;
+}
+
+interface RozieActionItemSlotCtx {
+  action: unknown;
+  item: unknown;
+  active: unknown;
+  disabled: unknown;
 }
 
 interface RozieIconSlotCtx {
@@ -91,10 +91,17 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   background: var(--rozie-command-palette-backdrop-bg, rgba(0, 0, 0, 0.5));
   backdrop-filter: var(--rozie-command-palette-backdrop-filter, none);
 }
-.rozie-command-palette-panel[data-rozie-s-768cad96] {
+.rozie-command-palette-frame[data-rozie-s-768cad96] {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: var(--rozie-command-palette-width, min(40rem, 100%));
+  max-width: 100%;
+}
+.rozie-command-palette-panel[data-rozie-s-768cad96] {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   max-height: var(--rozie-command-palette-max-height, 70vh);
   overflow: hidden;
   font: var(--rozie-command-palette-font, inherit);
@@ -103,6 +110,22 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   border: var(--rozie-command-palette-border, none);
   border-radius: var(--rozie-command-palette-radius, 0.75rem);
   box-shadow: var(--rozie-command-palette-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25));
+  /*
+    Drive the vendored <Combobox>'s render-neutral tokens from panel scope
+    (260715-50l findings 3+4) — custom properties inherit through the Lit
+    nested-shadow boundary since this panel is the combobox's DOM ancestor.
+    Each declaration is itself token-driven with a fallback so a palette
+    consumer can still re-override. Result: a square, borderless-on-three-
+    sides, ring-free input with a subtle bottom divider that stays put on
+    focus (the clean cmdk look), plus subtle top separation above group
+    headings (separating the leading ungrouped block from the first group).
+  */
+  --rozie-combobox-radius: var(--rozie-command-palette-input-radius, 0);
+  --rozie-combobox-border-color: var(--rozie-command-palette-input-border-color, transparent);
+  --rozie-combobox-focus-border-color: var(--rozie-command-palette-input-focus-border-color, transparent);
+  --rozie-combobox-focus-ring-width: var(--rozie-command-palette-input-focus-ring-width, 0);
+  --rozie-combobox-input-underline: var(--rozie-command-palette-input-underline, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
+  --rozie-combobox-group-heading-margin-top: var(--rozie-command-palette-section-gap, 0.375rem);
 }
 .rozie-command-palette-search[data-rozie-s-768cad96] {
   padding: var(--rozie-command-palette-search-padding, 0.75rem);
@@ -135,6 +158,31 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
 }
 .rozie-command-palette-title[data-rozie-s-768cad96] {
   font-weight: var(--rozie-command-palette-title-weight, 600);
+}
+.rozie-command-palette-breadcrumb-trail[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+.rozie-command-palette-breadcrumb-item[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+.rozie-command-palette-breadcrumb-segment[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-color, rgba(0, 0, 0, 0.55));
+  font-weight: var(--rozie-command-palette-breadcrumb-weight, 400);
+  white-space: nowrap;
+}
+.rozie-command-palette-breadcrumb-segment--current[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
+  font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+}
+.rozie-command-palette-breadcrumb-separator[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
 }
 .rozie-command-palette-input[data-rozie-s-768cad96] {
   box-sizing: border-box;
@@ -352,6 +400,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   private _actionIndex = signal(-1);
   private _actionAnchor = signal<any>(null);
   private _actionMenuTop = signal(0);
+  @query('[data-rozie-ref="frame"]') private _refFrame!: HTMLElement;
   @query('[data-rozie-ref="panel"]') private _refPanel!: HTMLElement;
   @query('[data-rozie-ref="combobox"]') private _refCombobox!: Combobox;
 private __rozieWatchInitial_0 = true;
@@ -368,9 +417,6 @@ private __rozieWatchInitial_0 = true;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
   @property({ attribute: false }) empty?: (scope: { query: unknown }) => unknown;
-  @state() private _hasSlotActionItem = false;
-  @queryAssignedElements({ slot: 'actionItem', flatten: true }) private _slotActionItemElements!: Element[];
-  @property({ attribute: false }) actionItem?: (scope: { action: unknown; item: unknown; active: unknown; disabled: unknown }) => unknown;
   @state() private _hasSlotLoading = false;
   @queryAssignedElements({ slot: 'loading', flatten: true }) private _slotLoadingElements!: Element[];
   @property({ attribute: false }) loading?: (scope: { query: unknown }) => unknown;
@@ -379,6 +425,9 @@ private __rozieWatchInitial_0 = true;
   @property({ attribute: false }) error?: (scope: { query: unknown; error: unknown; retry: unknown }) => unknown;
   @state() private _hasSlotFooter = false;
   @queryAssignedElements({ slot: 'footer', flatten: true }) private _slotFooterElements!: Element[];
+  @state() private _hasSlotActionItem = false;
+  @queryAssignedElements({ slot: 'actionItem', flatten: true }) private _slotActionItemElements!: Element[];
+  @property({ attribute: false }) actionItem?: (scope: { action: unknown; item: unknown; active: unknown; disabled: unknown }) => unknown;
   @state() private _hasSlotIcon = false;
   @queryAssignedElements({ slot: 'icon', flatten: true }) private _slotIconElements!: Element[];
   @property({ attribute: false }) icon?: (scope: { option: unknown }) => unknown;
@@ -440,17 +489,6 @@ private __rozieWatchInitial_0 = true;
     }
 
     {
-      const slotEl = this.shadowRoot?.querySelector('slot[name="actionItem"]');
-      if (slotEl !== null && slotEl !== undefined) {
-        const update = () => { this._hasSlotActionItem = this._slotActionItemElements.length > 0; };
-        slotEl.addEventListener('slotchange', update);
-        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
-        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
-        update();
-      }
-    }
-
-    {
       const slotEl = this.shadowRoot?.querySelector('slot[name="loading"]');
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotLoading = this._slotLoadingElements.length > 0; };
@@ -476,6 +514,17 @@ private __rozieWatchInitial_0 = true;
       const slotEl = this.shadowRoot?.querySelector('slot[name="footer"]');
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotFooter = this._slotFooterElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="actionItem"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotActionItem = this._slotActionItemElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
         // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
         this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
@@ -523,10 +572,10 @@ private __rozieWatchInitial_0 = true;
     this._hasSlotOption = Array.from(this.children).some((el) => el.getAttribute('slot') === 'option');
     this._hasSlotGroupHeading = Array.from(this.children).some((el) => el.getAttribute('slot') === 'groupHeading');
     this._hasSlotEmpty = Array.from(this.children).some((el) => el.getAttribute('slot') === 'empty');
-    this._hasSlotActionItem = Array.from(this.children).some((el) => el.getAttribute('slot') === 'actionItem');
     this._hasSlotLoading = Array.from(this.children).some((el) => el.getAttribute('slot') === 'loading');
     this._hasSlotError = Array.from(this.children).some((el) => el.getAttribute('slot') === 'error');
     this._hasSlotFooter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'footer');
+    this._hasSlotActionItem = Array.from(this.children).some((el) => el.getAttribute('slot') === 'actionItem');
     this._hasSlotIcon = Array.from(this.children).some((el) => el.getAttribute('slot') === 'icon');
     this._hasSlotActions = Array.from(this.children).some((el) => el.getAttribute('slot') === 'actions');
     this._hasSlotTrailing = Array.from(this.children).some((el) => el.getAttribute('slot') === 'trailing');
@@ -579,12 +628,18 @@ private __rozieWatchInitial_0 = true;
   render() {
     return html`
 ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onBackdropClick($event); }} data-rozie-s-768cad96>
-  <div class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label=${this.ariaLabel} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPanelKeydown($event); }} data-rozie-ref="panel" data-rozie-s-768cad96>
+  
+  <div class="rozie-command-palette-frame" data-testid="command-palette-frame" @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPanelKeydown($event); }} data-rozie-ref="frame" data-rozie-s-768cad96>
+  <div class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label=${this.ariaLabel} data-rozie-ref="panel" data-rozie-s-768cad96>
     
     ${this.atDepth() ? html`<div class="rozie-command-palette-header" data-rozie-s-768cad96>
       ${this.breadcrumb !== undefined ? this.breadcrumb({stack: this.breadcrumbStack(), back: this.goBack}) : html`<slot name="breadcrumb" data-rozie-params=${(() => { try { return JSON.stringify({stack: this.breadcrumbStack()}); } catch { return '{}'; } })()} @rozie-breadcrumb-back=${($event: CustomEvent) => ((this.goBack) as (...args: any[]) => any)($event.detail)}>
         <button class="rozie-command-palette-back" type="button" aria-label="Back" data-testid="command-palette-back" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.goBack(); }} data-rozie-s-768cad96>‹</button>
-        <span class="rozie-command-palette-title" data-testid="command-palette-title" data-rozie-s-768cad96>${rozieDisplay(this.currentTitle())}</span>
+        <nav class="rozie-command-palette-breadcrumb-trail" data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb" data-rozie-s-768cad96>
+          ${repeat<any>(this.breadcrumbStack(), (entry, ei) => ei, (entry, ei) => html`<span class="rozie-command-palette-breadcrumb-item" key=${rozieAttr(ei)} data-rozie-s-768cad96>
+            ${Number(ei) > 0 ? html`<span class="rozie-command-palette-breadcrumb-separator" aria-hidden="true" data-rozie-s-768cad96>›</span>` : nothing}<span class="${Object.entries({ "rozie-command-palette-breadcrumb-segment": true, 'rozie-command-palette-breadcrumb-segment--current': Number(ei) === this.breadcrumbStack().length - 1 }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-testid=${rozieAttr(Number(ei) === this.breadcrumbStack().length - 1 ? 'command-palette-title' : null)} data-rozie-s-768cad96>${rozieDisplay(entry.title)}</span>
+          </span>`)}
+        </nav>
       </slot>`}
     </div>` : nothing}<rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
         ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}); } catch { return '{}'; } })()}>
@@ -610,19 +665,22 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
         ${this.currentStatus() === 'ready' ? html`${this.empty !== undefined ? this.empty({query: scope.query}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: scope.query}); } catch { return '{}'; } })()}>${this.emptyText}</slot>`}` : nothing}`} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}></rozie-combobox>
 
     
-    ${this.atActions() ? html`<div class="rozie-command-palette-actions-menu" data-command-palette-menu="" data-testid="command-palette-actions-menu" role="menu" aria-label=${rozieAttr(this._actionAnchor.value ? this._actionAnchor.value.label : null)} style=${rozieStyle('top:' + this._actionMenuTop.value + 'px')} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onActionMenuKeydown($event); }} data-rozie-s-768cad96>
-      ${repeat<any>(this._actionAnchor.value ? this._actionAnchor.value.actions : [], (action, ai) => action.id, (action, ai) => html`<div class="${Object.entries({ "rozie-command-palette-actions-menu-item": true, 'rozie-command-palette-actions-menu-item--active': ai === this._actionIndex.value, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(action.id)} role="menuitem" data-testid="command-palette-action-item" aria-disabled=${!!action.disabled} tabindex="-1" @mouseenter=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this._actionIndex.value = Number(ai); }} @mousedown=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { $event.preventDefault(); this.selectAction(action); }} data-rozie-s-768cad96>
-        ${this.actionItem !== undefined ? this.actionItem({action: action, item: this._actionAnchor.value ? this._actionAnchor.value.item : null, active: ai === this._actionIndex.value, disabled: !!action.disabled}) : html`<slot name="actionItem" data-rozie-params=${(() => { try { return JSON.stringify({action: action, item: this._actionAnchor.value ? this._actionAnchor.value.item : null, active: ai === this._actionIndex.value, disabled: !!action.disabled}); } catch { return '{}'; } })()}>
-          ${this.actionIcon(action) ? html`<span class="rozie-command-palette-actions-menu-item-icon" data-rozie-s-768cad96>${rozieDisplay(this.actionIcon(action))}</span>` : nothing}<span class="rozie-command-palette-actions-menu-item-label" data-rozie-s-768cad96>${rozieDisplay(this.actionLabel(action))}</span>
-          ${this.actionShortcut(action) ? html`<span class="rozie-command-palette-actions-menu-item-shortcut" data-rozie-s-768cad96>${rozieDisplay(this.actionShortcut(action))}</span>` : nothing}</slot>`}
-      </div>`)}
-    </div>` : nothing}${this.currentStatus() === 'loading' ? html`<div class="rozie-command-palette-loading" data-rozie-s-768cad96>
+    ${this.currentStatus() === 'loading' ? html`<div class="rozie-command-palette-loading" data-rozie-s-768cad96>
       ${this.loading !== undefined ? this.loading({query: this.query}) : html`<slot name="loading" data-rozie-params=${(() => { try { return JSON.stringify({query: this.query}); } catch { return '{}'; } })()}>Loading…</slot>`}
     </div>` : this.currentStatus() === 'error' ? html`<div class="rozie-command-palette-error" data-rozie-s-768cad96>
       ${this.error !== undefined ? this.error({query: this.query, error: this.currentError(), retry: this.retryCurrentLevel}) : html`<slot name="error" data-rozie-params=${(() => { try { return JSON.stringify({query: this.query, error: this.currentError()}); } catch { return '{}'; } })()} @rozie-error-retry=${($event: CustomEvent) => ((this.retryCurrentLevel) as (...args: any[]) => any)($event.detail)}></slot>`}
     </div>` : nothing}${this._hasSlotFooter ? html`<div class="rozie-command-palette-footer" data-rozie-s-768cad96>
       <slot name="footer"></slot>
     </div>` : nothing}</div>
+
+  
+  ${this.atActions() ? html`<div class="rozie-command-palette-actions-menu" data-command-palette-menu="" data-testid="command-palette-actions-menu" role="menu" aria-label=${rozieAttr(this._actionAnchor.value ? this._actionAnchor.value.label : null)} style=${rozieStyle('top:' + this._actionMenuTop.value + 'px')} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onActionMenuKeydown($event); }} data-rozie-s-768cad96>
+    ${repeat<any>(this._actionAnchor.value ? this._actionAnchor.value.actions : [], (action, ai) => action.id, (action, ai) => html`<div class="${Object.entries({ "rozie-command-palette-actions-menu-item": true, 'rozie-command-palette-actions-menu-item--active': ai === this._actionIndex.value, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(action.id)} role="menuitem" data-testid="command-palette-action-item" aria-disabled=${!!action.disabled} tabindex="-1" @mouseenter=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this._actionIndex.value = Number(ai); }} @mousedown=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { $event.preventDefault(); this.selectAction(action); }} data-rozie-s-768cad96>
+      ${this.actionItem !== undefined ? this.actionItem({action: action, item: this._actionAnchor.value ? this._actionAnchor.value.item : null, active: ai === this._actionIndex.value, disabled: !!action.disabled}) : html`<slot name="actionItem" data-rozie-params=${(() => { try { return JSON.stringify({action: action, item: this._actionAnchor.value ? this._actionAnchor.value.item : null, active: ai === this._actionIndex.value, disabled: !!action.disabled}); } catch { return '{}'; } })()}>
+        ${this.actionIcon(action) ? html`<span class="rozie-command-palette-actions-menu-item-icon" data-rozie-s-768cad96>${rozieDisplay(this.actionIcon(action))}</span>` : nothing}<span class="rozie-command-palette-actions-menu-item-label" data-rozie-s-768cad96>${rozieDisplay(this.actionLabel(action))}</span>
+        ${this.actionShortcut(action) ? html`<span class="rozie-command-palette-actions-menu-item-shortcut" data-rozie-s-768cad96>${rozieDisplay(this.actionShortcut(action))}</span>` : nothing}</slot>`}
+    </div>`)}
+  </div>` : nothing}</div>
 </div>` : nothing}`;
   }
 
@@ -998,9 +1056,9 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
 };
 
   focusFirstMenuItem = () => {
-  const panel = this._refPanel;
-  if (!panel) return;
-  const el: any = panel.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])');
+  const frame = this._refFrame;
+  if (!frame) return;
+  const el: any = frame.querySelector('[data-command-palette-menu] [role="menuitem"]:not([aria-disabled="true"])');
   if (el && typeof el.focus === 'function') el.focus();
 };
 
@@ -1022,12 +1080,36 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   this._actionIndex.value = firstEnabledActionIndex(actions);
   this._activeSurface.value = 'actions';
   const panel = this._refPanel;
+  const frame = this._refFrame;
   const activeRow: any = panel ? this.deepQuerySelector(panel, '.rozie-combobox-option--active') : null;
-  this._actionMenuTop.value = activeRow ? activeRow.offsetTop : 0;
+  // Frame-relative getBoundingClientRect delta (finding 1) — NOT
+  // `activeRow.offsetTop`, which is relative to the row's offsetParent (the
+  // `position: relative` `.rozie-combobox` root, Combobox.rozie) and so
+  // omits the header height + the combobox's own top (would float the
+  // flyout above its row at depth>0). A getBoundingClientRect delta is
+  // viewport-relative on BOTH sides of the Lit nested-shadow boundary
+  // (panel/combobox are separate shadow roots there) so it is correct ×6
+  // AND correct when the combobox list is scrolled (offsetTop ignores
+  // scroll). The frame wraps the panel tightly (no padding), so
+  // frame-top ≈ panel-top and the flyout still aligns to its row.
+  // `frame.scrollTop` is 0 — the frame does not scroll.
+  this._actionMenuTop.value = activeRow && frame ? activeRow.getBoundingClientRect().top - frame.getBoundingClientRect().top + frame.scrollTop : 0;
   this._refCombobox?.pinOpen(true);
   if (typeof requestAnimationFrame !== 'undefined') {
     requestAnimationFrame(() => {
       this.focusFirstMenuItem();
+      // Viewport clamp (finding 1) — a menu opening on a 1-row panel must
+      // never run off the viewport bottom. Reads DOM post-mount (rAF), so
+      // the flyout has laid out. Shifts the menu UP only; never above the
+      // frame top.
+      const menuEl: any = frame ? frame.querySelector('[data-command-palette-menu]') : null;
+      if (menuEl && frame) {
+        const frameTop = frame.getBoundingClientRect().top;
+        const menuH = menuEl.getBoundingClientRect().height;
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+        const maxTop = Math.max(0, vh - 8 - frameTop - menuH);
+        if (this._actionMenuTop.value > maxTop) this._actionMenuTop.value = maxTop;
+      }
     });
   } else {
     this.focusFirstMenuItem();
@@ -1047,9 +1129,11 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   if (!anchor) return;
   const idx = rovingActionIndex(anchor.actions, this._actionIndex.value, dir);
   this._actionIndex.value = idx;
-  const panel = this._refPanel;
-  if (!panel) return;
-  const items: any = panel.querySelectorAll('[data-command-palette-menu] [role="menuitem"]');
+  // Re-rooted to $refs.frame (finding 1) — the flyout moved out of the
+  // panel to be a frame child; see focusFirstMenuItem's comment.
+  const frame = this._refFrame;
+  if (!frame) return;
+  const items: any = frame.querySelectorAll('[data-command-palette-menu] [role="menuitem"]');
   const el: any = items[idx];
   if (el && typeof el.focus === 'function') el.focus();
 };

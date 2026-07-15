@@ -110,10 +110,10 @@ palette.current?.close();
 | option | option, index, active, selected, disabled, matches |
 | groupHeading | group |
 | empty | query |
-| actionItem | action, item, active, disabled |
 | loading | query |
 | error | query, error, retry |
 | footer |  |
+| actionItem | action, item, active, disabled |
 | icon | option |
 | actions | option, actions |
 | trailing | option |

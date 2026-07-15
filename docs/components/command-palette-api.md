@@ -86,7 +86,54 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 | `empty` | `{ query }` | The settled-but-empty state; `query` is the current search string. Falls back to the `emptyText` prop. Not shown while `loading`/`error` (see below). |
 | `loading` | `{ query }` | Shown while the active level's async `source` is in flight. Falls back to "Loading…". |
 | `error` | `{ query, error, retry }` | Shown when the active level's async `source` rejected. `error` is the rejection value; `retry` re-invokes the source at the current query. |
-| `breadcrumb` | `{ stack, back }` | The depth > 0 header (a panel sibling above the input, not inside the combobox). `stack` is the root..current breadcrumb (`[{ id, title }]`); `back` is the `goBack` handle. Falls back to a back button + the current level's title. |
+| `breadcrumb` | `{ stack, back }` | The depth > 0 header (a panel sibling above the input, not inside the combobox). `stack` is the root..current breadcrumb (`[{ id, title }]`); `back` is the `goBack` handle. Falls back to a back button + the full root..current trail (muted ancestors › an emphasized current segment) — trail-segment click-to-jump is deferred; the back button is the only interactive affordance in v1. |
 | `actionItem` | `{ action, item, active, disabled }` | Custom render for one row inside the action menu. `action` is the entry from the anchored row's `actions[]`; `item` is the anchored command; `active` is whether it is currently roving-highlighted; `disabled` mirrors `action.disabled`. Falls back to icon (if present) + label + a right-aligned `shortcut` hint. Named `actionItem` (camelCase) — a hyphenated slot name is not a valid identifier across all six targets. |
 | `groupHeading` | `{ group }` | Custom render for a section heading when commands are grouped (see [Grouped commands](#grouped-commands) above). `group` is `{ id, label }` — the group's `id` is the `group` string it was derived from; `label` defaults to that same string. Falls back to `group.label`. Not rendered at all when no command carries a `group`. |
 | `footer` | — | A persistent footer bar below the list (e.g. keyboard hints). Rendered only when provided. |
+
+## Theming
+
+Every value the component renders is a `--rozie-command-palette-*` CSS custom property with a built-in fallback, so it works with **zero configuration** yet is completely re-skinnable. Override tokens at any ancestor scope (`:root`, `.dark`, a wrapper, or the `.rozie-command-palette` element).
+
+The palette also drives several of the vendored `@rozie-ui/combobox` primitive's own tokens from its panel scope (custom properties inherit through the combobox's DOM, including Lit's nested open-shadow boundary), so the composed search input renders borderless with a subtle bottom divider instead of the combobox's default bordered/blue-ring look, and group headings gain a bit of top breathing room:
+
+```css
+.rozie-command-palette-panel {
+  --rozie-command-palette-breadcrumb-current-color: #16a34a;
+  --rozie-command-palette-input-radius: 0.375rem;
+  --rozie-command-palette-input-border-color: rgba(0, 0, 0, 0.15);
+  --rozie-command-palette-input-focus-border-color: rgba(0, 0, 0, 0.15);
+  --rozie-command-palette-input-focus-ring-width: 0;
+  --rozie-command-palette-section-gap: 0.5rem;
+}
+```
+
+New in 260715-50l (style polish for nested levels + sub-actions):
+
+| Token | Fallback | Description |
+| --- | --- | --- |
+| `--rozie-command-palette-breadcrumb-gap` | `0.25rem` | Gap between breadcrumb segments/separators in the default `breadcrumb` fill. |
+| `--rozie-command-palette-breadcrumb-color` | `rgba(0, 0, 0, 0.55)` | Ancestor (non-current) breadcrumb segment color. |
+| `--rozie-command-palette-breadcrumb-weight` | `400` | Ancestor breadcrumb segment font weight. |
+| `--rozie-command-palette-breadcrumb-current-color` | `inherit` | The CURRENT (last) breadcrumb segment's color. |
+| `--rozie-command-palette-breadcrumb-current-weight` | `600` | The current segment's font weight. |
+| `--rozie-command-palette-breadcrumb-separator-color` | `rgba(0, 0, 0, 0.35)` | The `›` separator color between segments. |
+| `--rozie-command-palette-input-radius` | `0` | Forwarded to the composed `<Combobox>`'s `--rozie-combobox-radius` from panel scope — the search input's corner radius. |
+| `--rozie-command-palette-input-border-color` | `transparent` | Forwarded to `--rozie-combobox-border-color` — the input's top/left/right border color (borderless by default inside the palette). |
+| `--rozie-command-palette-input-focus-border-color` | `transparent` | Forwarded to `--rozie-combobox-focus-border-color` — the input's focus border color, decoupled from the combobox's selected-option accent. |
+| `--rozie-command-palette-input-focus-ring-width` | `0` | Forwarded to `--rozie-combobox-focus-ring-width` — no focus ring by default inside the palette (was the combobox's default `3px` blue ring). |
+| `--rozie-command-palette-input-underline` | `var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1))` | Forwarded to `--rozie-combobox-input-underline` — the input's bottom-border longhand, which survives the combobox's own `:focus` border-color override so the divider stays put whether the input is focused or not. |
+| `--rozie-command-palette-section-gap` | `0.375rem` | Forwarded to `--rozie-combobox-group-heading-margin-top` — top spacing above each group heading, separating the leading ungrouped block from the first labeled section. |
+
+The full token vocabulary — overlay/scrim, panel chrome, the flyout, the header/back button, the list/option box model, empty/loading/error states, and the footer — has documented defaults in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/command-palette/src/themes/base.css). Structural rules (the fixed overlay, the non-clipping frame's positioning, the panel's `overflow: hidden`, the flyout's `position: absolute`) compile per-leaf and are not consumer-overridable.
+
+### Design-system bridges
+
+Each package ships token presets that map the palette's tokens onto a known design system's published CSS variables:
+
+```ts
+import '@rozie-ui/command-palette-react/themes/shadcn.css';    // shadcn/ui (Radix)
+import '@rozie-ui/command-palette-react/themes/material.css';  // Material 3
+import '@rozie-ui/command-palette-react/themes/bootstrap.css'; // Bootstrap 5
+import '@rozie-ui/command-palette-react/themes/base.css';      // the documented default token set
+```

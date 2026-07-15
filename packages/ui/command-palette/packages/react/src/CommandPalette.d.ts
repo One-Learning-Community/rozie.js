@@ -81,10 +81,10 @@ export interface CommandPaletteProps {
   renderOption?: (params: { option: () => void; index: () => void; active: () => void; selected: () => void; disabled: () => void; matches: unknown }) => ReactNode;
   renderGroupHeading?: (params: { group: () => void }) => ReactNode;
   renderEmpty?: (params: { query: string }) => ReactNode;
-  renderActionItem?: (params: { action: () => void; item: unknown; active: unknown; disabled: unknown }) => ReactNode;
   renderLoading?: (params: { query: string }) => ReactNode;
   renderError?: (params: { query: string; error: unknown; retry: () => void }) => ReactNode;
   renderFooter?: () => ReactNode;
+  renderActionItem?: (params: { action: () => void; item: unknown; active: unknown; disabled: unknown }) => ReactNode;
   renderIcon?: (params: { option: () => void }) => ReactNode;
   renderActions?: (params: { option: () => void; actions: unknown }) => ReactNode;
   renderTrailing?: (params: { option: () => void }) => ReactNode;

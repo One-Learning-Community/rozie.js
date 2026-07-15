@@ -9,10 +9,17 @@
   background: var(--rozie-command-palette-backdrop-bg, rgba(0, 0, 0, 0.5));
   backdrop-filter: var(--rozie-command-palette-backdrop-filter, none);
 }
-.rozie-command-palette-panel[data-rozie-s-768cad96] {
+.rozie-command-palette-frame[data-rozie-s-768cad96] {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: var(--rozie-command-palette-width, min(40rem, 100%));
+  max-width: 100%;
+}
+.rozie-command-palette-panel[data-rozie-s-768cad96] {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   max-height: var(--rozie-command-palette-max-height, 70vh);
   overflow: hidden;
   font: var(--rozie-command-palette-font, inherit);
@@ -21,6 +28,22 @@
   border: var(--rozie-command-palette-border, none);
   border-radius: var(--rozie-command-palette-radius, 0.75rem);
   box-shadow: var(--rozie-command-palette-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25));
+  /*
+    Drive the vendored <Combobox>'s render-neutral tokens from panel scope
+    (260715-50l findings 3+4) — custom properties inherit through the Lit
+    nested-shadow boundary since this panel is the combobox's DOM ancestor.
+    Each declaration is itself token-driven with a fallback so a palette
+    consumer can still re-override. Result: a square, borderless-on-three-
+    sides, ring-free input with a subtle bottom divider that stays put on
+    focus (the clean cmdk look), plus subtle top separation above group
+    headings (separating the leading ungrouped block from the first group).
+  */
+  --rozie-combobox-radius: var(--rozie-command-palette-input-radius, 0);
+  --rozie-combobox-border-color: var(--rozie-command-palette-input-border-color, transparent);
+  --rozie-combobox-focus-border-color: var(--rozie-command-palette-input-focus-border-color, transparent);
+  --rozie-combobox-focus-ring-width: var(--rozie-command-palette-input-focus-ring-width, 0);
+  --rozie-combobox-input-underline: var(--rozie-command-palette-input-underline, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
+  --rozie-combobox-group-heading-margin-top: var(--rozie-command-palette-section-gap, 0.375rem);
 }
 .rozie-command-palette-search[data-rozie-s-768cad96] {
   padding: var(--rozie-command-palette-search-padding, 0.75rem);
@@ -53,6 +76,31 @@
 }
 .rozie-command-palette-title[data-rozie-s-768cad96] {
   font-weight: var(--rozie-command-palette-title-weight, 600);
+}
+.rozie-command-palette-breadcrumb-trail[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+.rozie-command-palette-breadcrumb-item[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+.rozie-command-palette-breadcrumb-segment[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-color, rgba(0, 0, 0, 0.55));
+  font-weight: var(--rozie-command-palette-breadcrumb-weight, 400);
+  white-space: nowrap;
+}
+.rozie-command-palette-breadcrumb-segment--current[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
+  font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+}
+.rozie-command-palette-breadcrumb-separator[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
 }
 .rozie-command-palette-input[data-rozie-s-768cad96] {
   box-sizing: border-box;
