@@ -48,14 +48,10 @@ const draft = ref('');
 // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
 // to '' so the <select> binds to a string.
 draft.value = props.value != null ? String(props.value) : '';
-
-// Picking/arrow-cycling an option updates the draft only — no commit.
 // Picking/arrow-cycling an option updates the draft only — no commit.
 const onChange = (e: any) => {
   draft.value = e && e.target ? e.target.value : '';
 };
-
-// commit/cancel are Function props (default null) — guard before calling.
 // commit/cancel are Function props (default null) — guard before calling.
 const doCommit = () => {
   props.commit && props.commit(draft.value);

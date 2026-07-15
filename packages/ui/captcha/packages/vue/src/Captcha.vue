@@ -57,20 +57,11 @@ const widgetElRef = ref<HTMLElement>();
 // of any framework (see internal/loadCaptchaApi.test.ts). codegen copies
 // src/internal/ into every leaf, so this relative import resolves verbatim ×6.
 import { loadCaptchaApi } from './internal/loadCaptchaApi';
-
-// Live widget handle. Top-level lets → React hoists to useRef (setup-once).
-// `api`/`widgetId` MUST be top-level — reset()/execute()/getResponse() (the
-// $expose'd imperative handle, callable any time) read them outside $onMount.
 // Live widget handle. Top-level lets → React hoists to useRef (setup-once).
 // `api`/`widgetId` MUST be top-level — reset()/execute()/getResponse() (the
 // $expose'd imperative handle, callable any time) read them outside $onMount.
 let api: any = null;
 let widgetId: any = null;
-
-// The render config shared across all three providers. The hyphenated
-// `expired-callback` / `error-callback` keys are the common option names each
-// provider's render() accepts. `tabindex` is omitted unless set; `options`
-// (the escape hatch) is merged last so a consumer can override any key.
 // The render config shared across all three providers. The hyphenated
 // `expired-callback` / `error-callback` keys are the common option names each
 // provider's render() accepts. `tabindex` is omitted unless set; `options`
@@ -114,11 +105,9 @@ function reset() {
   token.value = '';
 }
 // Invisible / programmatic challenge (size="invisible"). No-op until rendered.
-// Invisible / programmatic challenge (size="invisible"). No-op until rendered.
 function execute() {
   if (widgetId != null && api && typeof api.execute === 'function') api.execute(widgetId);
 }
-// Read the current response token on demand (e.g. just before form submit).
 // Read the current response token on demand (e.g. just before form submit).
 function getResponse() {
   return widgetId != null && api && typeof api.getResponse === 'function' ? api.getResponse(widgetId) : '';

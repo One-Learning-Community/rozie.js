@@ -71,12 +71,6 @@ const toggle = (id: any) => {
   } : i);
   emit('toggle', id);
 };
-
-// Internal method renamed from `remove` to `removeItem` to avoid colliding
-// with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
-// methods as class fields and the resulting `remove(id)` signature is
-// incompatible with the inherited `remove(): void`. Public API is unchanged:
-// the slot param is still `:remove`, the emitted event is still `'remove'`.
 // Internal method renamed from `remove` to `removeItem` to avoid colliding
 // with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
 // methods as class fields and the resulting `remove(id)` signature is

@@ -207,16 +207,9 @@ function jumpToDate(date: any) {
 // formatted STRING, but the parsed Date[] is otherwise only delivered on the
 // `change` event payload — a consumer needing the current Date objects on demand
 // (range bounds, multi-select, validation) had no path. `[]` before mount.
-// getSelectedDates closes a real asymmetry: the two-way `date` model is a
-// formatted STRING, but the parsed Date[] is otherwise only delivered on the
-// `change` event payload — a consumer needing the current Date objects on demand
-// (range bounds, multi-select, validation) had no path. `[]` before mount.
 function getSelectedDates() {
   return instance ? instance.selectedDates : [];
 }
-// togglePicker = open-or-close in one call (natural for a single trigger button).
-// `toggle` is not an emit, but suffixed `togglePicker` for symmetry with
-// openPicker/closePicker.
 // togglePicker = open-or-close in one call (natural for a single trigger button).
 // `toggle` is not an emit, but suffixed `togglePicker` for symmetry with
 // openPicker/closePicker.
@@ -226,13 +219,9 @@ function togglePicker() {
 // Programmatic calendar navigation for custom prev/next / "jump N months" UI.
 // changeMonth(value, isOffset?) — isOffset defaults to true (flatpickr). NOT
 // `monthChange`, which is the emitted event (so ROZ121-clear).
-// Programmatic calendar navigation for custom prev/next / "jump N months" UI.
-// changeMonth(value, isOffset?) — isOffset defaults to true (flatpickr). NOT
-// `monthChange`, which is the emitted event (so ROZ121-clear).
 function changeMonth(value: any, isOffset: any) {
   instance?.changeMonth(value, isOffset);
 }
-// changeYear(year) — jump to an absolute year. NOT `yearChange` (the emit).
 // changeYear(year) — jump to an absolute year. NOT `yearChange` (the emit).
 function changeYear(year: any) {
   instance?.changeYear(year);

@@ -18,7 +18,6 @@ const props = withDefaults(
 import { clampH } from './partial-helpers.js';
 let editTransitionH = 1;
 // leading: stays with the extracted decl, must NOT float to the hoisted import
-// leading: stays with the extracted decl, must NOT float to the hoisted import
 const editorBindingsH = (k: number): number => clampH(k * 2);
 
 onMounted(() => {

@@ -41,9 +41,6 @@ const sources = inject('maplibre:sources');
 // that benign. ZERO emitter change (the Phase 35 NO-emitter-touch lesson).
 let reg: any = null;
 reg = sources;
-
-// idempotency flag so the $onMount register and the late-context $onUpdate path
-// (Lit async, REQ-30) never double-register the source.
 // idempotency flag so the $onMount register and the late-context $onUpdate path
 // (Lit async, REQ-30) never double-register the source.
 let didRegister = false;

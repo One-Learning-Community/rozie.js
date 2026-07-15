@@ -42,14 +42,6 @@ let {
 // unit-tested independent of any framework (see internal/loadRecaptchaV3.test.ts).
 // codegen copies src/internal/ into every leaf, so this import resolves ×6.
 import { loadRecaptchaV3, execute as v3Execute } from './internal/loadRecaptchaV3';
-
-// `disposed` MUST be top-level (not $onMount-local): the exported `execute()`
-// below — callable any time via `$expose({ execute })`, including after
-// unmount — reads it to guard a late resolve that fires post-unmount. That
-// cross-function visibility (not a per-target emitter limitation) is why this
-// one stays top-level even after emitter-hardening backlog item #2 landed
-// (contrast Captcha.rozie's `disposed`, which IS $onMount-local — its
-// exposed handle functions don't read it).
 // `disposed` MUST be top-level (not $onMount-local): the exported `execute()`
 // below — callable any time via `$expose({ execute })`, including after
 // unmount — reads it to guard a late resolve that fires post-unmount. That

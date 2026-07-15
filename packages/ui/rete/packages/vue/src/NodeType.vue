@@ -60,21 +60,6 @@ const canvas = inject('rete:canvas');
 // Source/Layer lesson). ZERO emitter change.
 let cv: any = null;
 cv = canvas;
-
-// The live $portals.body handle ({ dispose }) returned by the parent-invoked
-// bodyRenderer callback. Module-scope `any` so the teardown — which the Solid
-// emitter hoists into a sibling onCleanup() OUTSIDE the mount closure — can dispose
-// it. (A NodeType type-template projects ONE body root per graph node; the canvas
-// disposes per-node on node unmount, this is the last-projection handle.)
-//
-// PER-NODE FIX: a Set of INDEPENDENT handles — ONE PER GRAPH NODE of this type.
-// render-by-type calls bodyRenderer once per node a->b->c; the old single-handle
-// form disposed the PRIOR node's body on each call, leaving only the LAST node of
-// the type rendered (3 nodes, 1 body — the count-only-VR-masking bug). Each call now
-// mounts an INDEPENDENT handle and disposes NONE of its siblings; the canvas already
-// owns per-node disposal (entry.bodyHandle in nodeEntries, torn down on node unmount).
-// Module-scope `any` so the Solid-hoisted teardown can sweep any leftovers. This is
-// the controlled-graph analog of FlowCanvas's per-node $portals.node handle map.
 // The live $portals.body handle ({ dispose }) returned by the parent-invoked
 // bodyRenderer callback. Module-scope `any` so the teardown — which the Solid
 // emitter hoists into a sibling onCleanup() OUTSIDE the mount closure — can dispose
@@ -91,14 +76,6 @@ cv = canvas;
 // the controlled-graph analog of FlowCanvas's per-node $portals.node handle map.
 let bodyHandles: any = null;
 bodyHandles = new Set();
-
-// The body-mount closure, DEFINED INSIDE $onMount (below) so it captures the
-// emitter-synthesized `portals` local — which on React/Angular/Lit is scoped to the
-// mount effect body, NOT visible from a spec callback the canvas invokes later (that
-// escaped scope is exactly why a bare `$portals.body(...)` in the bodyRenderer
-// threw "portals is not defined" on those 3 targets). Stored in a module-scope `any`
-// so the spec's bodyRenderer — invoked by the canvas's renderNode from its own
-// render scope — can delegate to it. ZERO emitter change (just correct scoping).
 // The body-mount closure, DEFINED INSIDE $onMount (below) so it captures the
 // emitter-synthesized `portals` local — which on React/Angular/Lit is scoped to the
 // mount effect body, NOT visible from a spec callback the canvas invokes later (that
@@ -107,21 +84,9 @@ bodyHandles = new Set();
 // so the spec's bodyRenderer — invoked by the canvas's renderNode from its own
 // render scope — can delegate to it. ZERO emitter change (just correct scoping).
 let mountBody: any = null;
-
-// idempotency flag so a reactive late-context registration (Lit async first
-// paint, REQ-30) and the $onMount registration never double-register the type.
 // idempotency flag so a reactive late-context registration (Lit async first
 // paint, REQ-30) and the $onMount registration never double-register the type.
 let registered = false;
-
-// the canvas TYPE spec builder — shared by the $onMount register and the late-context
-// $onUpdate below. The bodyRenderer render-callback is invoked by the canvas's
-// renderNode (per graph node of this type) from the canvas's own render scope with
-// the engine `body` host div + the { node, selected, emit } scope; the NodeType then
-// mounts its OWN `body` portal slot INTO that host via $portals.body — reusing the
-// shipped reactive-portal machinery (6/6 green on the config-array `node` path). NO
-// framework DOM is relocated. Returns { dispose } so the canvas can tear the body
-// projection down on node unmount / port-resync.
 // the canvas TYPE spec builder — shared by the $onMount register and the late-context
 // $onUpdate below. The bodyRenderer render-callback is invoked by the canvas's
 // renderNode (per graph node of this type) from the canvas's own render scope with

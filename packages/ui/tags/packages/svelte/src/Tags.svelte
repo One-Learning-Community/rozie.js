@@ -81,25 +81,14 @@ let root = $state<HTMLElement | undefined>(undefined);
 // ---- derived view (plain functions, uniform ×6) ------------------------
 // The committed tokens, normalized to a string[].
 const tokens = () => Array.isArray(modelValue) ? modelValue : [];
-
-// The configured commit keys, normalized to a string[].
 // The configured commit keys, normalized to a string[].
 const commitKeys = () => Array.isArray(delimiters) ? delimiters : [',', 'Enter'];
-
-// The non-Enter delimiters act as split characters for paste.
 // The non-Enter delimiters act as split characters for paste.
 const splitChars = () => commitKeys().filter((k: any) => k !== 'Enter');
-
-// Whether the control has reached its token cap.
 // Whether the control has reached its token cap.
 const atMax = () => typeof max === 'number' && tokens().length >= max;
-
-// Whether new input is accepted at all.
 // Whether new input is accepted at all.
 const canEdit = () => !disabled && !readonly;
-
-// ---- write funnel (single $emit site) ----------------------------------
-// Write the model and emit change. Every committed-list mutation funnels here.
 // ---- write funnel (single $emit site) ----------------------------------
 // Write the model and emit change. Every committed-list mutation funnels here.
 const commitTokens = (next: any) => {
@@ -108,10 +97,6 @@ const commitTokens = (next: any) => {
     value: next
   });
 };
-
-// ---- add / remove ------------------------------------------------------
-// Normalize → validate → dedup → cap a candidate, then commit + emit add.
-// Returns true if it was added (so the caller can clear the draft).
 // ---- add / remove ------------------------------------------------------
 // Normalize → validate → dedup → cap a candidate, then commit + emit add.
 // Returns true if it was added (so the caller can clear the draft).
@@ -136,8 +121,6 @@ const addToken = (raw: any) => {
   });
   return true;
 };
-
-// Remove the token at `idx`, commit, and emit remove.
 // Remove the token at `idx`, commit, and emit remove.
 const removeAt = (idx: any) => {
   if (!canEdit()) return;
@@ -152,10 +135,6 @@ const removeAt = (idx: any) => {
     tokens: next
   });
 };
-
-// ---- focus (container ref, post-mount only) ----------------------------
-// Read $refs.root only here / in $onMount / in $expose verbs (post-mount →
-// ROZ123-safe). querySelector reaches the input inside Lit's shadow root too.
 // ---- focus (container ref, post-mount only) ----------------------------
 // Read $refs.root only here / in $onMount / in $expose verbs (post-mount →
 // ROZ123-safe). querySelector reaches the input inside Lit's shadow root too.
@@ -165,11 +144,6 @@ const focusTheInput = () => {
   const el = root$local.querySelector('input');
   if (el) el.focus();
 };
-
-// ---- input handlers ----------------------------------------------------
-// Mirror the typed text into the draft buffer. Capture the fresh local value
-// (do NOT re-read $data.draft in the same handler — React setState is async and
-// would read the pre-write value).
 // ---- input handlers ----------------------------------------------------
 // Mirror the typed text into the draft buffer. Capture the fresh local value
 // (do NOT re-read $data.draft in the same handler — React setState is async and
@@ -177,9 +151,6 @@ const focusTheInput = () => {
 const onInput = (e: any) => {
   draft = e && e.target ? e.target.value : '';
 };
-
-// A delimiter key commits the current draft; Backspace in an empty input
-// deletes the previous token.
 // A delimiter key commits the current draft; Backspace in an empty input
 // deletes the previous token.
 const onKeydown = (e: any) => {
@@ -199,16 +170,12 @@ const onKeydown = (e: any) => {
     }
   }
 };
-
-// Commit any leftover draft when the input loses focus (a common chips UX).
 // Commit any leftover draft when the input loses focus (a common chips UX).
 const onBlur = (e: any) => {
   if (!canEdit()) return;
   const value = e && e.target ? e.target.value : '';
   if (value && addToken(value)) draft = '';
 };
-
-// Paste: split on the configured delimiter characters and bulk-add.
 // Paste: split on the configured delimiter characters and bulk-add.
 const onPaste = (e: any) => {
   if (!canEdit()) return;
@@ -236,17 +203,12 @@ const onPaste = (e: any) => {
   }
   if (addedAny) draft = '';
 };
-
-// ---- per-element attribute helpers -------------------------------------
 // ---- per-element attribute helpers -------------------------------------
 const removeLabel = (t: any) => 'Remove ' + String(t);
 const countLabel = () => {
   const n = tokens().length;
   return n === 1 ? '1 tag' : n + ' tags';
 };
-
-// ---- lifecycle + imperative handle -------------------------------------
-// clear() — remove every token (emits change with []) and focus the input.
 // ---- lifecycle + imperative handle -------------------------------------
 // clear() — remove every token (emits change with []) and focus the input.
 export const clear = () => {
@@ -254,10 +216,6 @@ export const clear = () => {
   draft = '';
   focusTheInput();
 };
-// focus() — move DOM focus to the text input. DELIBERATELY overrides the
-// inherited HTMLElement.focus on the Lit custom element (warn-only ROZ137,
-// accepted — the public focus() handle is the intended semantics; otp/slider
-// precedent, consistent with NumberField which also exposes `focus`).
 // focus() — move DOM focus to the text input. DELIBERATELY overrides the
 // inherited HTMLElement.focus on the Lit custom element (warn-only ROZ137,
 // accepted — the public focus() handle is the intended semantics; otp/slider

@@ -80,17 +80,10 @@ let input = $state<HTMLInputElement | undefined>(undefined);
 // sees them in teardown. `null`/0 when no repeat is running.
 let holdTimer: any = null;
 let holdInterval = 0;
-
-// Scrub-on-drag state (also top-level so teardown sees it).
 // Scrub-on-drag state (also top-level so teardown sees it).
 let scrubbing = false;
 let scrubStartX = 0;
 let scrubStartValue = 0;
-
-// ---- numeric helpers (plain functions, uniform ×6) -------------------------
-// The current value as a real number, or null when empty. Named readValue, NOT
-// valueOf — a `valueOf` binding cascades TS1240/1271 across the Lit class via
-// Object.prototype.
 // ---- numeric helpers (plain functions, uniform ×6) -------------------------
 // The current value as a real number, or null when empty. Named readValue, NOT
 // valueOf — a `valueOf` binding cascades TS1240/1271 across the Lit class via
@@ -101,8 +94,6 @@ const readValue = () => {
 };
 const hasMin = () => typeof min === 'number' && !Number.isNaN(min);
 const hasMax = () => typeof max === 'number' && !Number.isNaN(max);
-
-// Clamp n to [min, max] (whichever bounds are set).
 // Clamp n to [min, max] (whichever bounds are set).
 const clampValue = (n: any) => {
   let out = n;
@@ -110,8 +101,6 @@ const clampValue = (n: any) => {
   if (hasMax() && out > max) out = max;
   return out;
 };
-
-// Snap n to the nearest multiple of `step` measured from `min` (or 0).
 // Snap n to the nearest multiple of `step` measured from `min` (or 0).
 const snapValue = (n: any) => {
   const stepSize = typeof step === 'number' && step > 0 ? step : 1;
@@ -121,8 +110,6 @@ const snapValue = (n: any) => {
   const decimals = (String(stepSize).split('.')[1] || '').length;
   return decimals > 0 ? Number(snapped.toFixed(decimals)) : snapped;
 };
-
-// ---- locale formatting (plain functions, uniform ×6) -----------------------
 // ---- locale formatting (plain functions, uniform ×6) -----------------------
 const formatter = () => {
   try {
@@ -131,17 +118,11 @@ const formatter = () => {
     return new Intl.NumberFormat();
   }
 };
-
-// The value formatted for display (empty string when null).
 // The value formatted for display (empty string when null).
 const formatted = () => {
   const n = readValue();
   return n === null ? '' : formatter().format(n);
 };
-
-// Parse a user-typed string back to a number, or null when it is not a number.
-// Strips grouping separators + any non-numeric currency/percent chrome, keeping
-// digits, a sign, a decimal point, and an exponent.
 // Parse a user-typed string back to a number, or null when it is not a number.
 // Strips grouping separators + any non-numeric currency/percent chrome, keeping
 // digits, a sign, a decimal point, and an exponent.
@@ -153,24 +134,14 @@ const parseText = (raw: any) => {
   const n = Number.parseFloat(cleaned);
   return Number.isNaN(n) ? null : n;
 };
-
-// What the <input> should show: the live edit buffer while focused, otherwise
-// the locale-formatted value. A plain function (read in the template + handlers).
 // What the <input> should show: the live edit buffer while focused, otherwise
 // the locale-formatted value. A plain function (read in the template + handlers).
 const displayText = () => focused ? text : formatted();
-
-// ---- aria helpers (numbers/strings bound cleanly) --------------------------
 // ---- aria helpers (numbers/strings bound cleanly) --------------------------
 const ariaText = () => {
   const n = readValue();
   return n === null ? '' : formatted();
 };
-
-// ---- write funnel (single $emit site) --------------------------------------
-// Clamp + snap, write the model, mirror into the edit buffer, emit change. Named
-// commitValue (NOT writeValue) so it does not collide with the generated Angular
-// ControlValueAccessor.writeValue (TS2300).
 // ---- write funnel (single $emit site) --------------------------------------
 // Clamp + snap, write the model, mirror into the edit buffer, emit change. Named
 // commitValue (NOT writeValue) so it does not collide with the generated Angular
@@ -188,9 +159,6 @@ const commitValue = (n: any) => {
     value: next
   });
 };
-
-// Step by a signed multiple of `step` (used by buttons + arrows). A null value
-// seeds from min (or 0) so the first step lands on a sensible number.
 // Step by a signed multiple of `step` (used by buttons + arrows). A null value
 // seeds from min (or 0) so the first step lands on a sensible number.
 const stepBy = (dir: any, size: any) => {
@@ -200,9 +168,6 @@ const stepBy = (dir: any, size: any) => {
   const base = cur === null ? hasMin() ? min : 0 : cur;
   commitValue(base + dir * stepSize);
 };
-
-// ---- press-hold acceleration ----------------------------------------------
-// Stop any running repeat (pointerup / pointerleave / unmount).
 // ---- press-hold acceleration ----------------------------------------------
 // Stop any running repeat (pointerup / pointerleave / unmount).
 const stopHold = () => {
@@ -212,8 +177,6 @@ const stopHold = () => {
   }
   holdInterval = 0;
 };
-
-// Start a repeating step that ramps from slow to fast while the button is held.
 // Start a repeating step that ramps from slow to fast while the button is held.
 const startHold = (dir: any) => {
   if (disabled || readonly) return;
@@ -228,16 +191,12 @@ const startHold = (dir: any) => {
   };
   holdTimer = setTimeout(tick, holdInterval);
 };
-
-// ---- input + keyboard handlers ---------------------------------------------
 // ---- input + keyboard handlers ---------------------------------------------
 const onInput = (e: any) => {
   if (readonly) return;
   const raw = e && e.target ? e.target.value : '';
   text = raw;
 };
-
-// Commit the edit buffer on blur: parse → commit (or clear to null when empty).
 // Commit the edit buffer on blur: parse → commit (or clear to null when empty).
 const onBlur = () => {
   focused = false;
@@ -282,14 +241,6 @@ const onKeydown = (e: any) => {
     commitValue(parsed);
   }
 };
-
-// ---- scrub-on-drag (opt-in) ------------------------------------------------
-// Uses POINTER CAPTURE on the input element itself (set on pointerdown) so the
-// pointermove/pointerup keep firing on the same element through the whole drag,
-// even when the pointer leaves the element — no document-level <listeners> (which
-// would also avoid the React-effect `$event`-in-deps emitter edge). The handlers
-// are bound directly on the <input> in the template, where `@event` passes a
-// properly-typed `$event`.
 // ---- scrub-on-drag (opt-in) ------------------------------------------------
 // Uses POINTER CAPTURE on the input element itself (set on pointerdown) so the
 // pointermove/pointerup keep firing on the same element through the whole drag,

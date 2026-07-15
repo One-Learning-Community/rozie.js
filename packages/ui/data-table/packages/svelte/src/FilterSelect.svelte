@@ -39,9 +39,6 @@ let {
 // select `value` type on React/Solid — the fix is a plain function returning a
 // string (uniform ×6, NOT a $computed; the EditorSelect/listbox value lesson).
 const selectValue = () => value != null ? String(value) : '';
-
-// Immediate-apply-on-change: read the selected value the global-filter way. An
-// empty value (the leading "All" option) clears the column filter.
 // Immediate-apply-on-change: read the selected value the global-filter way. An
 // empty value (the leading "All" option) clears the column filter.
 const onChange = (e: any) => {

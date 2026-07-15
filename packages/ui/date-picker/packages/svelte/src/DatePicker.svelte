@@ -111,10 +111,6 @@ let viewMode = $state('days');
 let root = $state<HTMLElement | undefined>(undefined);
 
 import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
-
-// ---- today (deterministic per-render read) -----------------------------
-// Today's ISO, computed from the local clock. A plain function so each call is
-// fresh (a date picker open across midnight should follow the wall clock).
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
 // fresh (a date picker open across midnight should follow the wall clock).
@@ -122,15 +118,6 @@ const todayIso = () => {
   const d = new Date();
   return toIso(d.getFullYear(), d.getMonth(), d.getDate());
 };
-
-// ---- derived view (ONE plain function, uniform x6) ---------------------
-// The current selected ISO, normalized to a string. In range mode the value is
-// an object → this returns '' (so the SINGLE-mode grid highlight no-ops there).
-// `$props.value` lowers to an accessor CALL on both Solid (`value()`) and
-// Angular (`this.value()`); both emitters now hoist a local before the
-// `typeof` guard (hoistPolymorphicModelGuards, Solid emitter-hardening backlog
-// item #11 / Angular quick task 260711-v2l), so this inline guard narrows
-// cleanly on all six targets.
 // ---- derived view (ONE plain function, uniform x6) ---------------------
 // The current selected ISO, normalized to a string. In range mode the value is
 // an object → this returns '' (so the SINGLE-mode grid highlight no-ops there).
@@ -140,20 +127,10 @@ const todayIso = () => {
 // item #11 / Angular quick task 260711-v2l), so this inline guard narrows
 // cleanly on all six targets.
 const selected = (): string => typeof value === 'string' ? value : '';
-
-// The RANGE normalization funnel (mirrors selected()): coerce the polymorphic
-// `value` into a canonical ordered { start, end }. ALL range logic reads through
-// this — never $props.value directly — so the polymorph is funneled in one place.
 // The RANGE normalization funnel (mirrors selected()): coerce the polymorphic
 // `value` into a canonical ordered { start, end }. ALL range logic reads through
 // this — never $props.value directly — so the polymorph is funneled in one place.
 const readRange = () => normalizeRange(value);
-
-// The resolved month anchor: the local view state, falling back to the selected
-// value, then today. In range mode `selected()` is '' (the value is an object),
-// so fall back to the range's `start` endpoint — a DatePicker opened with a
-// pre-selected range must show that range's month, mirroring how single mode
-// pins the view to its selected ISO (else range mode always opens on today).
 // The resolved month anchor: the local view state, falling back to the selected
 // value, then today. In range mode `selected()` is '' (the value is an object),
 // so fall back to the range's `start` endpoint — a DatePicker opened with a
@@ -170,14 +147,6 @@ const viewMonthGrid = () => resolveViewIso({
   value: viewAnchor(),
   today: todayIso()
 });
-
-// The whole render model in a single call: { year, month, weeks }. A PLAIN
-// function (not $computed) so it reads uniformly on all six targets and can be
-// aliased in handlers without the Solid accessor divergence. Returns a FRESH
-// object each call — never feed it to a reference-equality $watch getter. In
-// range mode it additionally passes `selection` (the ordered range) + the live
-// `previewEnd` (the hovered day); in single mode those are omitted (undefined →
-// all range flags false → byte-stable single path).
 // The whole render model in a single call: { year, month, weeks }. A PLAIN
 // function (not $computed) so it reads uniformly on all six targets and can be
 // aliased in handlers without the Solid accessor divergence. Returns a FRESH
@@ -199,11 +168,6 @@ const grid = () => buildMonthGrid({
   selection: selectionMode === 'range' ? readRange() : undefined,
   previewEnd: selectionMode === 'range' ? hoverIso : undefined
 });
-
-// The multi-month render model: N grids stepping forward from the view month,
-// so `numberOfMonths` renders side by side. A PLAIN function (uniform x6),
-// mirroring grid() exactly but with the view anchor advanced by `i` months.
-// numberOfMonths === 1 yields a one-element array whose single grid === grid().
 // The multi-month render model: N grids stepping forward from the view month,
 // so `numberOfMonths` renders side by side. A PLAIN function (uniform x6),
 // mirroring grid() exactly but with the view anchor advanced by `i` months.
@@ -224,13 +188,6 @@ const grids = () => Array.from({
   selection: selectionMode === 'range' ? readRange() : undefined,
   previewEnd: selectionMode === 'range' ? hoverIso : undefined
 }));
-
-// ---- drill models (months / years panels) ------------------------------
-// The 12-cell month picker for the 'months' drill view + the 12-cell year
-// picker (decade-aligned) for the 'years' view. PLAIN functions (uniform x6),
-// each a fresh object per call. The gates that matter to a whole month/year span
-// are min/max (buildMonthList/buildYearGrid own the entire-span test); the
-// per-day weekday/predicate gates apply only in the days grid.
 // ---- drill models (months / years panels) ------------------------------
 // The 12-cell month picker for the 'months' drill view + the 12-cell year
 // picker (decade-aligned) for the 'years' view. PLAIN functions (uniform x6),
@@ -251,28 +208,13 @@ const yearGrid = () => buildYearGrid(viewMonthGrid(), {
   today: todayIso()
 });
 // The decade window label (e.g. "2020–2031") shown in the years-panel header.
-// The decade window label (e.g. "2020–2031") shown in the years-panel header.
 const yearRangeLabel = () => yearGrid().rangeLabel;
-
-// The day-grid iterable for the template: the N month grids in the 'days' view,
-// or an empty array in the months/years drill views. Gating the r-for through an
-// EMPTY array (rather than an r-if on the same element) keeps the day-grid
-// element free of an r-if+r-for combo, and at numberOfMonths === 1 it yields a
-// single grid with NO extra wrapper element (the byte-identical single-month path).
 // The day-grid iterable for the template: the N month grids in the 'days' view,
 // or an empty array in the months/years drill views. Gating the r-for through an
 // EMPTY array (rather than an r-if on the same element) keeps the day-grid
 // element free of an r-if+r-for combo, and at numberOfMonths === 1 it yields a
 // single grid with NO extra wrapper element (the byte-identical single-month path).
 const daysGrids = () => showsDaysView() ? grids() : [];
-
-// Roving-tabindex value for a day cell: the selected day (or today, when nothing
-// is selected) is the single tab stop (0), the rest are -1. The return type is
-// annotated `number | undefined` ON PURPOSE — the React emitter wraps every
-// numeric `:attr` binding in `(expr) ?? undefined`, and a PROVABLY non-null
-// value (a bare `0`/`-1` ternary) trips TS2869 "right operand of ?? is
-// unreachable". Routing tabindex through this nullable-typed helper keeps the
-// `?? undefined` reachable (the pagination `tabIndexFor` precedent).
 // Roving-tabindex value for a day cell: the selected day (or today, when nothing
 // is selected) is the single tab stop (0), the rest are -1. The return type is
 // annotated `number | undefined` ON PURPOSE — the React emitter wraps every
@@ -281,19 +223,12 @@ const daysGrids = () => showsDaysView() ? grids() : [];
 // unreachable". Routing tabindex through this nullable-typed helper keeps the
 // `?? undefined` reachable (the pagination `tabIndexFor` precedent).
 const dayTabIndex = (day: any): number | undefined => day.selected || selected() === '' && day.today ? 0 : -1;
-
-// The localized month-year heading. NAMED `monthHeading`, NOT `label` — a bare
-// `label` helper becomes a class field on the Lit custom element and a `title`
-// would collide with the inherited HTMLElement.title; `monthHeading` is clear.
 // The localized month-year heading. NAMED `monthHeading`, NOT `label` — a bare
 // `label` helper becomes a class field on the Lit custom element and a `title`
 // would collide with the inherited HTMLElement.title; `monthHeading` is clear.
 const monthHeading = () => monthLabel(viewMonthGrid(), locale);
 // The seven weekday header labels, rotated by weekStartsOn.
-// The seven weekday header labels, rotated by weekStartsOn.
 const weekdays = () => weekdayLabels(weekStartsOn, locale);
-
-// Whether a given ISO can be selected (the template gates clicks on it too).
 // Whether a given ISO can be selected (the template gates clicks on it too).
 const dayEnabled = (iso: any) => !isDayDisabled(iso, {
   viewIso: viewMonthGrid(),
@@ -307,11 +242,6 @@ const dayEnabled = (iso: any) => !isDayDisabled(iso, {
   weekStartsOn: weekStartsOn,
   disabled: disabled
 });
-
-// ---- write funnel (single $emit site) ----------------------------------
-// Select an ISO date: write the model + emit change. NOT named `setValue`
-// (collides with React's generated `value` model setter → ROZ524). A no-op
-// (re-selecting the same date) still re-emits intentionally? No — guard it.
 // ---- write funnel (single $emit site) ----------------------------------
 // Select an ISO date: write the model + emit change. NOT named `setValue`
 // (collides with React's generated `value` model setter → ROZ524). A no-op
@@ -327,14 +257,6 @@ const commitValue = (iso: any) => {
     value: iso
   });
 };
-
-// ---- range write funnel (direction-agnostic two-click state machine) ----
-// The anchor IS the partial model's `start` (end ''); there is no separate
-// anchor field. First click (no in-progress range, OR a completed one →
-// restart): write { start: iso, end: '' } + emit change. Second click
-// (anchor set, end empty → completing): write the ORDERED { start, end } +
-// clear the preview + emit change AND rangeComplete. Endpoints are compared by
-// VALUE (never object ===, Pitfall-4).
 // ---- range write funnel (direction-agnostic two-click state machine) ----
 // The anchor IS the partial model's `start` (end ''); there is no separate
 // anchor field. First click (no in-progress range, OR a completed one →
@@ -377,10 +299,6 @@ const commitRange = (iso: any) => {
     });
   }
 };
-
-// Hover preview: only meaningful in range mode while a range is in progress
-// (anchor set, end empty). Records the hovered ISO so the grid lights the
-// direction-agnostic preview band. Otherwise a no-op.
 // Hover preview: only meaningful in range mode while a range is in progress
 // (anchor set, end empty). Records the hovered ISO so the grid lights the
 // direction-agnostic preview band. Otherwise a no-op.
@@ -389,21 +307,11 @@ const onDayHover = (iso: any) => {
   const r = readRange();
   if (r.start !== '' && r.end === '') hoverIso = iso;
 };
-
-// Day-select dispatch: route a click / Enter / Space through the mode-appropriate
-// funnel (range → commitRange, single → commitValue).
 // Day-select dispatch: route a click / Enter / Space through the mode-appropriate
 // funnel (range → commitRange, single → commitValue).
 const onDaySelect = (iso: any) => {
   if (selectionMode === 'range') commitRange(iso);else commitValue(iso);
 };
-
-// ---- month navigation (view-mode-aware ‹ › step) -----------------------
-// The prev/next step advances the view anchor by ONE UNIT of the current drill
-// view: a month in 'days', a year (12 months) in 'months', 12 years (144
-// months) in 'years'. In the default 'days' view the delta is `delta` months —
-// byte-identical to the pre-navigation behavior, so `:month-year-nav="false"`
-// (which can never leave 'days') is unchanged.
 // ---- month navigation (view-mode-aware ‹ › step) -----------------------
 // The prev/next step advances the view anchor by ONE UNIT of the current drill
 // view: a month in 'days', a year (12 months) in 'months', 12 years (144
@@ -417,12 +325,6 @@ const goToMonth = (delta: any) => {
 };
 const goPrevMonth = () => goToMonth(-1);
 const goNextMonth = () => goToMonth(1);
-
-// ---- view-mode drill state machine (mutates $data.viewMode/$data.viewIso
-// ONLY — never $model.value; drilling is a pure VIEW concern) -------------
-// Named boolean guards (never a bare `.length` / bare string compare in an
-// r-if — route through a `(): boolean` so the JSX targets emit a true boolean
-// and no falsy value leaks a text node).
 // ---- view-mode drill state machine (mutates $data.viewMode/$data.viewIso
 // ONLY — never $model.value; drilling is a pure VIEW concern) -------------
 // Named boolean guards (never a bare `.length` / bare string compare in an
@@ -431,20 +333,16 @@ const goNextMonth = () => goToMonth(1);
 const showsDaysView = (): boolean => viewMode === 'days';
 const showsMonthsView = (): boolean => viewMode === 'months';
 const showsYearsView = (): boolean => viewMode === 'years';
-
-// Drill DOWN into the month picker (from the days heading).
 // Drill DOWN into the month picker (from the days heading).
 const enterMonthsView = () => {
   if (disabled) return;
   viewMode = 'months';
 };
 // Drill DOWN into the year picker (from the months-panel year label).
-// Drill DOWN into the year picker (from the months-panel year label).
 const enterYearsView = () => {
   if (disabled) return;
   viewMode = 'years';
 };
-// Pick a month → move the view anchor to it and drill back UP toward days.
 // Pick a month → move the view anchor to it and drill back UP toward days.
 const selectMonth = (iso: any) => {
   if (disabled) return;
@@ -453,18 +351,12 @@ const selectMonth = (iso: any) => {
   viewMode = 'days';
 };
 // Pick a year → move the view anchor's year and drill back UP toward months.
-// Pick a year → move the view anchor's year and drill back UP toward months.
 const selectYear = (iso: any) => {
   if (disabled) return;
   if (!isIsoDate(iso)) return;
   viewIso = iso;
   viewMode = 'months';
 };
-
-// ---- focus choreography (container ref, post-mount only) ---------------
-// Read $refs.root only here / in handlers / in $expose verbs (all post-mount →
-// ROZ123-safe). querySelectorAll reaches the day cells inside Lit's shadow root
-// too. Focus a day by its ISO; the [data-day] attribute carries the iso.
 // ---- focus choreography (container ref, post-mount only) ---------------
 // Read $refs.root only here / in handlers / in $expose verbs (all post-mount →
 // ROZ123-safe). querySelectorAll reaches the day cells inside Lit's shadow root
@@ -483,11 +375,6 @@ const focusDayIso = (iso: any) => {
     }
   }
 };
-
-// ---- drill focus choreography (months / years panels) ------------------
-// Mirror dayCells/focusDayIso, swapping [data-day] → [data-month]/[data-year].
-// $refs.root is read only here / in handlers (post-mount → ROZ123-safe) and the
-// querySelectorAll pierces Lit's shadow root exactly as the day walk does.
 // ---- drill focus choreography (months / years panels) ------------------
 // Mirror dayCells/focusDayIso, swapping [data-day] → [data-month]/[data-year].
 // $refs.root is read only here / in handlers (post-mount → ROZ123-safe) and the
@@ -520,21 +407,12 @@ const focusYearIso = (iso: any) => {
     }
   }
 };
-
-// Roving tabindex for the drill cells — nullable-typed `number | undefined` ON
-// PURPOSE (the dayTabIndex precedent): keeps React's `(expr) ?? undefined` wrap
-// reachable, avoiding TS2869. The selected cell (or the current month/year when
-// nothing is selected) is the single tab stop.
 // Roving tabindex for the drill cells — nullable-typed `number | undefined` ON
 // PURPOSE (the dayTabIndex precedent): keeps React's `(expr) ?? undefined` wrap
 // reachable, avoiding TS2869. The selected cell (or the current month/year when
 // nothing is selected) is the single tab stop.
 const monthTabIndex = (cell: any): number | undefined => cell.selected || selected() === '' && cell.current ? 0 : -1;
 const yearTabIndex = (cell: any): number | undefined => cell.selected || selected() === '' && cell.current ? 0 : -1;
-
-// Move the roving focus by `days`, crossing into an adjacent month when the
-// target leaves the displayed grid. Skips nothing — disabled days are still
-// focusable (standard grid pattern) but not selectable.
 // Move the roving focus by `days`, crossing into an adjacent month when the
 // target leaves the displayed grid. Skips nothing — disabled days are still
 // focusable (standard grid pattern) but not selectable.
@@ -548,10 +426,6 @@ const moveFocus = (fromIso: any, days: any) => {
   if (!present) viewIso = next;
   focusDayIso(next);
 };
-
-// ---- keyboard ----------------------------------------------------------
-// Arrow keys move a day, Home/End to the week bounds, PageUp/PageDown change the
-// month, Enter/Space select. The focused day's iso rides on [data-day].
 // ---- keyboard ----------------------------------------------------------
 // Arrow keys move a day, Home/End to the week bounds, PageUp/PageDown change the
 // month, Enter/Space select. The focused day's iso rides on [data-day].
@@ -606,11 +480,6 @@ const onDayKeydown = (iso: any, e: any) => {
     }
   }
 };
-
-// ---- drill keyboard (months / years 12-cell grid) ----------------------
-// A 3-column × 4-row grid: arrows move within the 12 cells (clamped at the
-// edges), Home/End jump to the row bounds, Enter/Space pick, Escape returns to
-// days. Params LEFT UNTYPED so `e.key` neutralizes to `any` and typechecks ×6.
 // ---- drill keyboard (months / years 12-cell grid) ----------------------
 // A 3-column × 4-row grid: arrows move within the 12 cells (clamped at the
 // edges), Home/End jump to the row bounds, Enter/Space pick, Escape returns to
@@ -656,8 +525,6 @@ const onYearKeydown = (iso: any, e: any) => {
   e.preventDefault();
   focusYearIso(cells[next].iso);
 };
-
-// Column index (0..6) of `iso` within its rendered week, honoring weekStartsOn.
 // Column index (0..6) of `iso` within its rendered week, honoring weekStartsOn.
 const weekdayOffset = (iso: any) => {
   const g = grid();
@@ -668,10 +535,6 @@ const weekdayOffset = (iso: any) => {
   }
   return 0;
 };
-
-// The day-delta to the same column one month away (PageUp/PageDown). Computed as
-// the difference between `iso` and `addMonths(iso, dir)` so the focus lands on
-// the clamped same-day-of-month.
 // The day-delta to the same column one month away (PageUp/PageDown). Computed as
 // the difference between `iso` and `addMonths(iso, dir)` so the focus lands on
 // the clamped same-day-of-month.
@@ -684,11 +547,6 @@ const isoToMs = (iso: any) => {
   const t = isIsoDate(iso) ? Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))) : 0;
   return t;
 };
-
-// ---- presets (range mode) ----------------------------------------------
-// Resolve every consumer preset's `range` (literal or () => RangeValue thunk)
-// into an ordered { label, range } for the rail + the #presets slot. A PLAIN
-// function (uniform x6), called fresh each render.
 // ---- presets (range mode) ----------------------------------------------
 // Resolve every consumer preset's `range` (literal or () => RangeValue thunk)
 // into an ordered { label, range } for the rail + the #presets slot. A PLAIN
@@ -697,14 +555,6 @@ const resolvedPresets = () => presetRanges.map((p: any) => ({
   label: p.label,
   range: rangeFromPreset(p)
 }));
-
-// Whether a preset rail should render. A BOOLEAN-returning helper, NOT a bare
-// `resolvedPresets().length` r-if: on the JSX targets `r-if` lowers to
-// `cond && <div>`, and a numeric `0` length leaks a literal "0" text node into
-// the DOM (React/Solid render falsy numbers). Even `length > 0` inline is
-// stripped back to `length` by the production minifier in the boolean-`&&`
-// context — routing through a named boolean helper keeps the guard a true
-// boolean through minification (the React falsy-number-in-r-if discipline).
 // Whether a preset rail should render. A BOOLEAN-returning helper, NOT a bare
 // `resolvedPresets().length` r-if: on the JSX targets `r-if` lowers to
 // `cond && <div>`, and a numeric `0` length leaks a literal "0" text node into
@@ -713,9 +563,6 @@ const resolvedPresets = () => presetRanges.map((p: any) => ({
 // context — routing through a named boolean helper keeps the guard a true
 // boolean through minification (the React falsy-number-in-r-if discipline).
 const hasPresets = (): boolean => resolvedPresets().length > 0;
-
-// Apply a preset = a complete range: write the (ordered) value + clear any
-// in-progress preview + emit change AND rangeComplete.
 // Apply a preset = a complete range: write the (ordered) value + clear any
 // in-progress preview + emit change AND rangeComplete.
 const applyPreset = (range: any) => {
@@ -730,9 +577,6 @@ const applyPreset = (range: any) => {
     value: next
   });
 };
-
-// Whether a preset matches the current value (ordered endpoint equality), used
-// for aria-pressed / is-active. An empty range never reads active.
 // Whether a preset matches the current value (ordered endpoint equality), used
 // for aria-pressed / is-active. An empty range never reads active.
 const isPresetActive = (range: any) => {
@@ -760,19 +604,11 @@ export const focus = () => {
     if (first) focusDayIso(first);
   }
 };
-
-// goToToday() — swing the view to the current month (no selection change).
 // goToToday() — swing the view to the current month (no selection change).
 export const goToToday = () => {
   if (disabled) return;
   viewIso = todayIso();
 };
-
-// ---- footer moves (Today / Clear row) ----------------------------------
-// selectToday() — the footer "Today" action. In single mode commit today
-// through the value funnel (write + emit change, gated exactly like a day
-// click); in range mode just swing the view to the current month (goToToday),
-// never mutating the value. Clear reuses the existing clear() funnel unchanged.
 // ---- footer moves (Today / Clear row) ----------------------------------
 // selectToday() — the footer "Today" action. In single mode commit today
 // through the value funnel (write + emit change, gated exactly like a day
@@ -786,15 +622,9 @@ const selectToday = () => {
     commitValue(todayIso());
   }
 };
-
-// Named boolean guard for the footer r-if (never a bare truthiness in the r-if
-// so the JSX targets emit a real boolean and leak no falsy value).
 // Named boolean guard for the footer r-if (never a bare truthiness in the r-if
 // so the JSX targets emit a real boolean and leak no falsy value).
 const showsFooter = (): boolean => !!showFooter;
-
-// clear() — deselect, writing the mode-appropriate empty ('' single /
-// { start:'', end:'' } range) + emit change.
 // clear() — deselect, writing the mode-appropriate empty ('' single /
 // { start:'', end:'' } range) + emit change.
 export const clear = () => {

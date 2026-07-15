@@ -11,11 +11,6 @@ import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
 // Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
 // elk.bundled.js entry — no web-worker resolution error, no manual fallback switch). Only
 // a consumer calling autoArrange() pulls these in.
-// T2.6 — auto-layout (D-08, verb-only). The 3 deps (rete-auto-arrange-plugin / elkjs
-// @0.8.2 / web-worker) are OPTIONAL leaf peers, installed + bundle-smoked on all 6 in
-// Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
-// elk.bundled.js entry — no web-worker resolution error, no manual fallback switch). Only
-// a consumer calling autoArrange() pulls these in.
 import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
 
 // ── engine instances — null-lets so typeNeutralize types them `any` (the

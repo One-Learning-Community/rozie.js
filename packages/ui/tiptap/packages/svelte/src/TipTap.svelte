@@ -99,31 +99,12 @@ import { Placeholder } from '@tiptap/extensions';
 // — verified against the installed dist .d.ts — and are `.configure({ element })`
 // Extensions that own Floating-UI positioning and append the host element to the
 // editor's parent automatically (no manual document insertion needed).
-// Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
-// @tiptap/extensions), version-pinned in lockstep with @tiptap/core (3.23.5).
-// Both export their extension as a NAMED export (`BubbleMenu` / `FloatingMenu`)
-// — verified against the installed dist .d.ts — and are `.configure({ element })`
-// Extensions that own Floating-UI positioning and append the host element to the
-// editor's parent automatically (no manual document insertion needed).
 import { BubbleMenu } from '@tiptap/extension-bubble-menu';
 import { FloatingMenu } from '@tiptap/extension-floating-menu';
-
-// The live editor instance — null before mount / after destroy. Named `editor`
-// (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
-// declaration trap (the Chart.js canvasEl/canvasNode lesson).
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
 let editor: any = null;
-
-// The raw HTML string the editor currently reflects. Compared against in the
-// $props.html reconciler so the watcher's mount-time fire is a no-op: the
-// editor is created with `content: $props.html`, so right after mount the bound
-// model already matches and setContent must NOT re-run (re-running it replaces
-// the whole ProseMirror document and resets the selection — the official
-// @tiptap/* wrappers guard the same way against the *raw* value, never against
-// the normalized `editor.getHTML()`). This is the CodeMirror suppress-echo
-// guard in HTML-string form (flatpickr lineage).
 // The raw HTML string the editor currently reflects. Compared against in the
 // $props.html reconciler so the watcher's mount-time fire is a no-op: the
 // editor is created with `content: $props.html`, so right after mount the bound
@@ -133,24 +114,11 @@ let editor: any = null;
 // the normalized `editor.getHTML()`). This is the CodeMirror suppress-echo
 // guard in HTML-string form (flatpickr lineage).
 let lastHtml: any = null;
-
-// The `toolbar` portal slot's dispose handle. COMPONENT-scope (top-level let),
-// NOT a $onMount-local — the Solid emitter hoists the $onMount-returned cleanup
-// into a sibling onCleanup() OUTSIDE the mount-body IIFE, so a mount-local would
-// lose scope there (the Chart.js tooltipEl/tooltipDispose hoist lesson).
 // The `toolbar` portal slot's dispose handle. COMPONENT-scope (top-level let),
 // NOT a $onMount-local — the Solid emitter hoists the $onMount-returned cleanup
 // into a sibling onCleanup() OUTSIDE the mount-body IIFE, so a mount-local would
 // lose scope there (the Chart.js tooltipEl/tooltipDispose hoist lesson).
 let toolbarDispose: any = null;
-
-// The `bubbleMenu` / `floatingMenu` portal-slot dispose handles + the imperatively
-// created menu host elements. COMPONENT-scope for the same hoist reason as
-// toolbarDispose — and the host els must be reachable from BOTH the pre-`new
-// Editor` extension build (the menu extension needs its `element` at construction)
-// AND the post-construction portal mount, so they live here too (not $onMount
-// locals). Each stays null when its slot is unfilled (zero overhead, no $portals
-// reference fired — the nodeView discipline).
 // The `bubbleMenu` / `floatingMenu` portal-slot dispose handles + the imperatively
 // created menu host elements. COMPONENT-scope for the same hoist reason as
 // toolbarDispose — and the host els must be reachable from BOTH the pre-`new
@@ -162,8 +130,6 @@ let bubbleMenuEl: any = null;
 let bubbleMenuDispose: any = null;
 let floatingMenuEl: any = null;
 let floatingMenuDispose: any = null;
-
-// Recompute the internal toolbar's active-mark booleans from the live editor.
 // Recompute the internal toolbar's active-mark booleans from the live editor.
 const refreshActive = () => {
   if (!editor) return;
@@ -179,31 +145,6 @@ const refreshActive = () => {
     bulletList: editor.isActive('bulletList')
   };
 };
-
-// ── Reactive node-view portal slot (Phase 33 — the FIRST shipped `reactive`
-// portal slot, the marquee TipTap differentiator). When the consumer fills the
-// `nodeView` slot, two custom ProseMirror nodes render the consumer fragment as
-// a custom node *in-engine*, re-rendering it in place on every transaction via
-// the reactive handle `$portals.nodeView(dom, scope) => { update, dispose }`
-// (REQ-22). Both halves of the primitive are proven and shipped here:
-//
-//   1. `mention` — a NON-EDITABLE inline ATOM (selectable:true, no contentDOM,
-//      Spike 009 / REQ-26). selectNode/deselectNode/update(node) → handle.update
-//      so the chip re-renders in place (engine-driven; no Rozie reactive loop).
-//
-//   2. `callout` — an EDITABLE BLOCK (content:'inline*', so it HAS a contentDOM,
-//      Spike 008 / REQ-23). ProseMirror owns the editable hole; the consumer
-//      fragment renders chrome wrapping a [data-rozie-hole] placeholder and the
-//      per-target portal bridge grafts contentDOM into that hole — native-ref on
-//      React/Solid/Lit, querySelector-after-render on Vue/Svelte/Angular. The
-//      .rozie source merely passes `contentDOM` in scope; the graft mechanism is
-//      PER-TARGET and lives in the emitted portal bridge, not here.
-//
-// $portals.nodeView is referenced ONLY inside $onMount/the addNodeView closures
-// (the $refs-only-in-onMount + bundled-leaf strict-typecheck discipline — the
-// same constraint the toolbar slot follows). `makeNodeViewExtensions` is invoked
-// from inside $onMount so the `nv` closure (capturing $portals.nodeView) is
-// constructed within the mount lifecycle.
 // ── Reactive node-view portal slot (Phase 33 — the FIRST shipped `reactive`
 // portal slot, the marquee TipTap differentiator). When the consumer fills the
 // `nodeView` slot, two custom ProseMirror nodes render the consumer fragment as
@@ -321,10 +262,6 @@ const makeNodeView = (nv: any, editable: any) => (props: any) => {
     }
   };
 };
-
-// Build the two custom Nodes bound to the reactive nodeView portal. Takes the
-// per-target `$portals.nodeView` (captured here so the reference stays inside
-// the mount lifecycle — never top-level, per the bundled-leaf typecheck rule).
 // Build the two custom Nodes bound to the reactive nodeView portal. Takes the
 // per-target `$portals.nodeView` (captured here so the reference stays inside
 // the mount lifecycle — never top-level, per the bundled-leaf typecheck rule).
@@ -420,15 +357,9 @@ export function getJSON() {
 // Plain-text extraction — word/char counts, search indexing, plaintext export.
 // Mirrors getHTML/getJSON (empty string before mount). Was advertised by intent
 // alongside getHTML/getJSON but never wired; now first-class.
-// Plain-text extraction — word/char counts, search indexing, plaintext export.
-// Mirrors getHTML/getJSON (empty string before mount). Was advertised by intent
-// alongside getHTML/getJSON but never wired; now first-class.
 export function getText() {
   return editor ? editor.getText() : '';
 }
-// setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
-// update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
-// reflect into the model so a programmatic set keeps the bound state in sync.
 // setContent routes through the SAME suppress-echo bookkeeping as $watch(html):
 // update lastHtml first, set with emitUpdate:false (no onUpdate bounce), then
 // reflect into the model so a programmatic set keeps the bound state in sync.
@@ -478,20 +409,9 @@ export function redo() {
 }
 // Power-user escape hatch — returns a pre-focused command chain (TipTap idiom:
 // chain().focus().toggleBold().setColor('#f00').run()). null before mount.
-// Power-user escape hatch — returns a pre-focused command chain (TipTap idiom:
-// chain().focus().toggleBold().setColor('#f00').run()). null before mount.
 export function chain() {
   return editor ? editor.chain().focus() : null;
 }
-// Read-side toolbar primitives. These are precisely what a bring-your-own
-// toolbar (the `toolbar`/`bubbleMenu`/`floatingMenu` portal slots) needs and
-// the component already computes internally via refreshActive() — exposing them
-// removes the per-consumer "drop to getEditor() and re-derive" boilerplate.
-//   - isActive(name, attrs?): is a mark/node active in the current selection
-//     (drive toolbar button active styling). False before mount.
-//   - can(): the command-availability chain (editor.can().chain()…run()) for
-//     enable/disable of toolbar buttons. null before mount (mirrors chain()).
-//   - isEmpty(): document-empty (submit-gating / empty-state). true before mount.
 // Read-side toolbar primitives. These are precisely what a bring-your-own
 // toolbar (the `toolbar`/`bubbleMenu`/`floatingMenu` portal slots) needs and
 // the component already computes internally via refreshActive() — exposing them

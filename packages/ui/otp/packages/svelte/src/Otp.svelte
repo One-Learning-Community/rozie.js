@@ -62,9 +62,6 @@ let root = $state<HTMLElement | undefined>(undefined);
 // ---- derived view (plain functions, uniform ×6) ------------------------
 // The current code, normalized to a string.
 const code = () => typeof value === 'string' ? value : '';
-
-// The cells to render: one { i, ch } per position, ch derived from `value`.
-// A plain function (called in the r-for and from handlers) — never $computed.
 // The cells to render: one { i, ch } per position, ch derived from `value`.
 // A plain function (called in the r-for and from handlers) — never $computed.
 const cells = () => {
@@ -76,8 +73,6 @@ const cells = () => {
   });
   return out;
 };
-
-// Allowed-character test for the configured `type`.
 // Allowed-character test for the configured `type`.
 const allowChar = (ch: any) => {
   if (!ch) return false;
@@ -85,19 +80,12 @@ const allowChar = (ch: any) => {
   if (type === 'alphanumeric') return /[a-zA-Z0-9]/.test(ch);
   return /\S/.test(ch);
 };
-
-// The cell that should receive focus for new input: the first empty position
-// (clamped to the last cell when full).
 // The cell that should receive focus for new input: the first empty position
 // (clamped to the last cell when full).
 const firstEmptyIndex = () => {
   const len = code().length;
   return len >= length ? length - 1 : len;
 };
-
-// ---- focus choreography (container ref, post-mount only) ----------------
-// Read $refs.root only here / in $onMount / in $expose verbs (all post-mount →
-// ROZ123-safe). querySelectorAll reaches the cells inside Lit's shadow root too.
 // ---- focus choreography (container ref, post-mount only) ----------------
 // Read $refs.root only here / in $onMount / in $expose verbs (all post-mount →
 // ROZ123-safe). querySelectorAll reaches the cells inside Lit's shadow root too.
@@ -114,10 +102,6 @@ const focusIndex = (idx: any) => {
     if (el.select) el.select();
   }
 };
-
-// ---- write funnel (single $emit site) ----------------------------------
-// Clamp to length, write the model, emit change, and emit complete when every
-// cell is filled (a contiguous full string has length === $props.length).
 // ---- write funnel (single $emit site) ----------------------------------
 // Clamp to length, write the model, emit change, and emit complete when every
 // cell is filled (a contiguous full string has length === $props.length).
@@ -131,12 +115,6 @@ const commitValue = (raw: any) => {
     value: next
   });
 };
-
-// ---- input handler -----------------------------------------------------
-// Take the LAST char typed (handles overwriting a filled cell), sanitize, splice
-// it into the contiguous string at this position, advance focus. An invalid char
-// is rejected by restoring the cell's DOM value directly (a no-op model write may
-// not re-render on React, so reset the element instead).
 // ---- input handler -----------------------------------------------------
 // Take the LAST char typed (handles overwriting a filled cell), sanitize, splice
 // it into the contiguous string at this position, advance focus. An invalid char
@@ -158,10 +136,6 @@ const onInput = (i: any, e: any) => {
   commitValue(cur.slice(0, i) + ch + cur.slice(i + 1));
   focusIndex(i + 1);
 };
-
-// ---- keyboard ----------------------------------------------------------
-// Backspace deletes the current char (or the previous one when the cell is
-// already empty) and moves focus accordingly; arrows / Home / End navigate.
 // ---- keyboard ----------------------------------------------------------
 // Backspace deletes the current char (or the previous one when the cell is
 // already empty) and moves focus accordingly; arrows / Home / End navigate.
@@ -190,8 +164,6 @@ const onKeydown = (i: any, e: any) => {
     focusIndex(length - 1);
   }
 };
-
-// ---- paste (distribute across cells from this position) ----------------
 // ---- paste (distribute across cells from this position) ----------------
 const onPaste = (i: any, e: any) => {
   if (e) e.preventDefault();
@@ -204,20 +176,12 @@ const onPaste = (i: any, e: any) => {
   const landed = i + chars.length;
   focusIndex(landed >= length ? length - 1 : landed);
 };
-
-// Select the cell's content on focus so a keystroke overwrites it.
 // Select the cell's content on focus so a keystroke overwrites it.
 const onFocus = (e: any) => {
   if (e && e.target && e.target.select) e.target.select();
 };
-
-// ---- per-cell attribute helpers ----------------------------------------
 // ---- per-cell attribute helpers ----------------------------------------
 const cellType = () => mask ? 'password' : 'text';
-// NOTE: named `cellInputMode`, NOT `inputMode` — a bare `inputMode` member
-// collides with the inherited `HTMLElement.inputMode: string` on the Lit custom
-// element (a hard TS2416/TS1238, unlike the warn-only `focus` override). The
-// `cell`-prefix keeps it collision-safe across all six strict-typecheck leaves.
 // NOTE: named `cellInputMode`, NOT `inputMode` — a bare `inputMode` member
 // collides with the inherited `HTMLElement.inputMode: string` on the Lit custom
 // element (a hard TS2416/TS1238, unlike the warn-only `focus` override). The

@@ -14,12 +14,6 @@ import { Placeholder } from '@tiptap/extensions';
 // — verified against the installed dist .d.ts — and are `.configure({ element })`
 // Extensions that own Floating-UI positioning and append the host element to the
 // editor's parent automatically (no manual document insertion needed).
-// Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
-// @tiptap/extensions), version-pinned in lockstep with @tiptap/core (3.23.5).
-// Both export their extension as a NAMED export (`BubbleMenu` / `FloatingMenu`)
-// — verified against the installed dist .d.ts — and are `.configure({ element })`
-// Extensions that own Floating-UI positioning and append the host element to the
-// editor's parent automatically (no manual document insertion needed).
 import { BubbleMenu } from '@tiptap/extension-bubble-menu';
 import { FloatingMenu } from '@tiptap/extension-floating-menu';
 

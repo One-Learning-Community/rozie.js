@@ -23,11 +23,6 @@ getFacetedUniqueValues as makeFacetedUniqueValues, getFacetedMinMaxValues as mak
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
 // guard so they never execute when off — the import token is the only static virtual-core
 // presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
-// Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
-// (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
-// by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
-// guard so they never execute when off — the import token is the only static virtual-core
-// presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
 import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
 
 // table-core instance — top-level `let` referenced from hooks → React hoists to

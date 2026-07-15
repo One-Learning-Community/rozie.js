@@ -44,10 +44,6 @@ draft.value = props.value != null ? String(props.value) : '';
 const onInput = (e: any) => {
   draft.value = e && e.target ? e.target.value : '';
 };
-
-// Coerce to a Number at commit time. Defensive guard: an empty/whitespace draft
-// commits null rather than NaN (Number('') === 0 is a silent footgun); a
-// non-numeric draft also commits null. Otherwise commit the coerced number.
 // Coerce to a Number at commit time. Defensive guard: an empty/whitespace draft
 // commits null rather than NaN (Number('') === 0 is a silent footgun); a
 // non-numeric draft also commits null. Otherwise commit the coerced number.

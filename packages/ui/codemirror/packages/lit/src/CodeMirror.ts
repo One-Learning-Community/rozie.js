@@ -10,21 +10,8 @@ import { EditorState, Compartment, EditorSelection, StateField, RangeSet } from 
 // 'gutter' has already been declared"). Same discipline as `basicSetup as
 // basicSetupBundle` below (a prop-vs-import collision). The `decoration` slot has
 // no matching import name, so `Decoration` (capitalized, distinct) needs no alias.
-// `gutter` is imported under an alias: the `gutter` SLOT (G5 wave 2) lowers into
-// a same-scope local on targets that bind slots as locals (Svelte snippet prop
-// `gutter`, etc.), so the bare CM6 `gutter` import would collide ("Identifier
-// 'gutter' has already been declared"). Same discipline as `basicSetup as
-// basicSetupBundle` below (a prop-vs-import collision). The `decoration` slot has
-// no matching import name, so `Decoration` (capitalized, distinct) needs no alias.
 import { EditorView, keymap, lineNumbers, showPanel, showTooltip, placeholder as placeholderExt, gutter as gutterExt, GutterMarker, Decoration, WidgetType } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-// Namespace import for the command functions exposed as verbs (undo/redo/
-// selectAll). A NAMED `import { undo as undoCmd }` would put the export name
-// `undo` in an ImportSpecifier's `imported` slot, and the Lit emitter's
-// identifier-rewrite (exposed verb → `this.undo`) mis-rewrites that slot into a
-// MemberExpression — a latent emitter limitation. The namespace form keeps the
-// command names as MEMBER accesses (`cmCommands.undo`), which the rewrite leaves
-// untouched, so the public verbs can be named `undo`/`redo`/`selectAll`.
 // Namespace import for the command functions exposed as verbs (undo/redo/
 // selectAll). A NAMED `import { undo as undoCmd }` would put the export name
 // `undo` in an ImportSpecifier's `imported` slot, and the Lit emitter's
@@ -35,9 +22,6 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import * as cmCommands from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
-// Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
-// with this binding on targets that lower props into same-scope locals (Svelte
-// `let basicSetup`, Solid/React destructured `props.basicSetup`).
 // Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
 // with this binding on targets that lower props into same-scope locals (Svelte
 // `let basicSetup`, Solid/React destructured `props.basicSetup`).

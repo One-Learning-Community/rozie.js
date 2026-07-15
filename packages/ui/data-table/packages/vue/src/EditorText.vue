@@ -48,16 +48,11 @@ const inputElRef = ref<HTMLInputElement>();
 // Seed the draft once at setup from the incoming value (setup-once, NOT in the
 // template). Normalize null/undefined to '' so the input value binds to a string.
 draft.value = props.value != null ? String(props.value) : '';
-
-// Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
-// ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
 // Untyped handler param neutralizes to `any`, so reading e.target.value typechecks
 // ×6 (the global-filter idiom). Never inline `$data.x = $event.target.value`.
 const onInput = (e: any) => {
   draft.value = e && e.target ? e.target.value : '';
 };
-
-// commit/cancel are Function props (default null) — guard before calling.
 // commit/cancel are Function props (default null) — guard before calling.
 const doCommit = () => {
   props.commit && props.commit(draft.value);

@@ -25,13 +25,10 @@ import { clampD } from './wr01-helpers.js';
 const headM = (n: number): number => n + 1;
 let editTransitionM = 1;
 // after-side: comment trails the host let editTransitionM and leads the spliced editorBindingsM below
-// after-side: comment trails the host let editTransitionM and leads the spliced editorBindingsM below
 const editorBindingsM = (k: number): number => k * 2;
-// trailing-seam: the inline host successor trails the spliced editorBindingsM
 // trailing-seam: the inline host successor trails the spliced editorBindingsM
 const hostTailM = (n: number): number => editorBindingsM(1) + headM(n);
 const tickM = (): number => props.base * 2;
-// gap-0 leading: stays with the extracted columnChromeM, must NOT float to the hoisted import
 // gap-0 leading: stays with the extracted columnChromeM, must NOT float to the hoisted import
 const columnChromeM = (k: number): number => clampB(tickM() + k);
 

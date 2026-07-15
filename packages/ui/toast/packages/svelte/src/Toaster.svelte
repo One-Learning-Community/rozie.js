@@ -50,8 +50,6 @@ let seq = $state(0);
 // top-level `let` → React useRef (it escapes into $onUnmount's effect, so the
 // emitter hoists it). The id counter lives in $data.seq instead (see <data>).
 let timers = {};
-
-// ---- timers ------------------------------------------------------------
 // ---- timers ------------------------------------------------------------
 const startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
@@ -67,8 +65,6 @@ const pauseTimers = () => {
   for (const k in timers) window.clearTimeout(timers[k]);
   timers = {};
 };
-
-// ---- queue (imperative handle implementations) -------------------------
 // ---- queue (imperative handle implementations) -------------------------
 export const show = (input: any) => {
   const t = input || {};
@@ -103,8 +99,6 @@ export const clear = () => {
   pauseTimers();
   toasts = [];
 };
-
-// ---- hover pause -------------------------------------------------------
 // ---- hover pause -------------------------------------------------------
 const onMouseEnter = () => {
   if (disablePauseOnHover) return;
@@ -114,8 +108,6 @@ const onMouseLeave = () => {
   if (disablePauseOnHover) return;
   for (const t of toasts as any) startTimer(t);
 };
-
-// ---- helpers -----------------------------------------------------------
 // ---- helpers -----------------------------------------------------------
 const regionLabel = () => ariaLabel != null ? ariaLabel : 'Notifications';
 const liveFor = (type: any) => type === 'error' || type === 'warning' ? 'assertive' : 'polite';

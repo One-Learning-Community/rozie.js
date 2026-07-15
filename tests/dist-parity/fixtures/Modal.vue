@@ -44,9 +44,6 @@ const close = () => {
   open.value = false;
   emit('close');
 };
-
-// Body-scroll-lock state lives outside reactive data because it tracks DOM
-// rather than UI; managed entirely via lifecycle and listeners.
 // Body-scroll-lock state lives outside reactive data because it tracks DOM
 // rather than UI; managed entirely via lifecycle and listeners.
 let savedBodyOverflow = '';

@@ -179,20 +179,7 @@ import { getDOMSocketPosition, classicConnectionPath } from 'rete-render-utils';
 // Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
 // elk.bundled.js entry — no web-worker resolution error, no manual fallback switch). Only
 // a consumer calling autoArrange() pulls these in.
-// T2.6 — auto-layout (D-08, verb-only). The 3 deps (rete-auto-arrange-plugin / elkjs
-// @0.8.2 / web-worker) are OPTIONAL leaf peers, installed + bundle-smoked on all 6 in
-// Plan 00 (the Vite/Angular-AOT/Lit rollup build resolves elkjs to the SYNCHRONOUS
-// elk.bundled.js entry — no web-worker resolution error, no manual fallback switch). Only
-// a consumer calling autoArrange() pulls these in.
 import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
-
-// ── engine instances — null-lets so typeNeutralize types them `any` (the
-// MapLibre `let instance = null` discipline). Rete's NodeEditor / AreaPlugin /
-// ConnectionPlugin / DOMSocketPosition carry rich generic Schemes types that the
-// loosely-typed .rozie props (any[]) don't satisfy under the strict react/solid/
-// lit leaf tsc; routing every engine call through an `any` instance is the
-// .rozie-native fix (no lang="ts", no codegen type-aid). These are top-level lets
-// referenced from hooks → React auto-hoists each to a useRef. ──
 // ── engine instances — null-lets so typeNeutralize types them `any` (the
 // MapLibre `let instance = null` discipline). Rete's NodeEditor / AreaPlugin /
 // ConnectionPlugin / DOMSocketPosition carry rich generic Schemes types that the
@@ -209,30 +196,13 @@ let selector: any = null;
 // T2.6 — the AutoArrangePlugin instance (elkjs-backed). COMPONENT-scope (NOT $onMount-local)
 // so the top-level autoArrange() verb sees it (the editor/area discipline). null until $onMount
 // wires it; the verb no-ops before mount.
-// T2.6 — the AutoArrangePlugin instance (elkjs-backed). COMPONENT-scope (NOT $onMount-local)
-// so the top-level autoArrange() verb sees it (the editor/area discipline). null until $onMount
-// wires it; the verb no-ops before mount.
 let arrange: any = null;
-// Win 1: the Delete/Backspace keydown listener + its host container. COMPONENT-scope
-// (NOT $onMount-local) so the $onMount-returned teardown — which the Solid emitter
-// hoists into a sibling onCleanup() OUTSIDE the mount IIFE — can still see them to
-// removeEventListener (the same component-scope discipline as nodeInstances below).
 // Win 1: the Delete/Backspace keydown listener + its host container. COMPONENT-scope
 // (NOT $onMount-local) so the $onMount-returned teardown — which the Solid emitter
 // hoists into a sibling onCleanup() OUTSIDE the mount IIFE — can still see them to
 // removeEventListener (the same component-scope discipline as nodeInstances below).
 let keydownContainer: any = null;
 let onCanvasKeydown: any = null;
-
-// Phase 42 MiniMap (opt-in :minimap) — the absolute SVG overlay host + its imperative
-// SVG layer + the pointer-pan listeners. COMPONENT-scope (NOT $onMount-local) so the
-// $onMount-returned teardown — which the Solid emitter hoists into a sibling
-// onCleanup() OUTSIDE the mount IIFE — can still removeEventListener them (the same
-// keydown / nodeInstances discipline). `minimapMap` is the live minimap-px ↔ graph-
-// coord mapping the pointer-pan handlers read; `scheduleMinimapRedraw` is the bridge
-// the top-level $watch + the engine pipes call (assigned inside $onMount, like the
-// reconcilers). minimapRedrawRaf coalesces the viewport-rect redraw to one per frame
-// (the drag-write-back discipline — the viewport rect redraws on every pan/zoom).
 // Phase 42 MiniMap (opt-in :minimap) — the absolute SVG overlay host + its imperative
 // SVG layer + the pointer-pan listeners. COMPONENT-scope (NOT $onMount-local) so the
 // $onMount-returned teardown — which the Solid emitter hoists into a sibling
@@ -251,14 +221,6 @@ let onMinimapPointerDown: any = null;
 let onMinimapPointerMove: any = null;
 let onMinimapPointerUp: any = null;
 let scheduleMinimapRedraw: any = null;
-
-// T2.4 MARQUEE select (mode:'select') — the programmatic-select handle captured from
-// AreaExtensions.selectableNodes ({ select(id, accumulate), unselect(id) }), the rubber-
-// band overlay box (component-template DOM, scoped CSS), and the capture-phase pointerdown
-// guard + window pointer listeners that draw the box in select mode. COMPONENT-scope (NOT
-// $onMount-local) so the Solid-hoisted teardown can removeEventListener them (the keydown /
-// minimap discipline). `marqueeBox` is the absolute overlay <div>; `marqueeActive` gates the
-// in-progress drag; `marqueeStart`/`marqueeCur` are container-relative px corners.
 // T2.4 MARQUEE select (mode:'select') — the programmatic-select handle captured from
 // AreaExtensions.selectableNodes ({ select(id, accumulate), unselect(id) }), the rubber-
 // band overlay box (component-template DOM, scoped CSS), and the capture-phase pointerdown
@@ -274,19 +236,6 @@ let marqueeCur: any = null;
 let onCanvasPointerDownCapture: any = null;
 let onMarqueePointerMove: any = null;
 let onMarqueePointerUp: any = null;
-
-// T2.8 NodeToolbar (opt-in :node-toolbar) — a floating component-template overlay (scoped
-// CSS, like the marquee box + Controls) over the SELECTED node, positioned from the engine
-// node-view element's rect relative to the canvas container + the area transform. COMPONENT-
-// scope (NOT $onMount-local) so the Solid-hoisted teardown sees them. `toolbarHost` is the
-// absolute overlay <div> (the $refs.toolbarEl element); `toolbarSelectedId` is the id of the
-// node the toolbar currently tracks (the SINGLE selected node — null when nothing or >1 is
-// selected, or selection is empty); `toolbarHandle` is the optional `#toolbar` reactive-
-// portal handle ({ update, dispose }) when the consumer fills the slot; `scheduleToolbarTrack`
-// is the rAF-coalesced reposition bridge (assigned in $onMount, called by the area pipes +
-// the selection emit, like scheduleMinimapRedraw); `toolbarTrackRaf` coalesces it to one per
-// frame. `toolbarDeleteBtn`/`toolbarDuplicateBtn` are the default buttons (kept so teardown
-// can removeEventListener them); their pointerup handlers are `onToolbarDelete`/`onToolbarDup`.
 // T2.8 NodeToolbar (opt-in :node-toolbar) — a floating component-template overlay (scoped
 // CSS, like the marquee box + Controls) over the SELECTED node, positioned from the engine
 // node-view element's rect relative to the canvas container + the area transform. COMPONENT-
@@ -306,16 +255,12 @@ let scheduleToolbarTrack: any = null;
 // component-scope bridge to the $onMount-local syncToolbar (the scheduleMinimapRedraw
 // discipline) — called from maybeEmitSelectionChange + the area pipes so a pick/unpick /
 // pan / zoom / drag re-tracks the toolbar over the selected node.
-// component-scope bridge to the $onMount-local syncToolbar (the scheduleMinimapRedraw
-// discipline) — called from maybeEmitSelectionChange + the area pipes so a pick/unpick /
-// pan / zoom / drag re-tracks the toolbar over the selected node.
 let syncToolbarSelection: any = null;
 let toolbarTrackRaf = 0;
 let toolbarDeleteBtn: any = null;
 let toolbarDuplicateBtn: any = null;
 let onToolbarDelete: any = null;
 let onToolbarDup: any = null;
-
 // Phase 74-03 — NodeResizer (D-05..D-17). Corner-anchored pointer-drag resize for a
 // SELECTED node whose TYPE was registered `resizable` (NodeType.rozie, 74-02). Follows
 // the SAME module-scope-not-$onMount-local discipline as the NodeToolbar/Marquee state
@@ -341,32 +286,7 @@ let onToolbarDup: any = null;
 // gesture's pointerup was immediately undoing its own resize by misfiring
 // resetNodeSize(). -Infinity guarantees `now - lastHandlePointerUpAt` is always Infinity
 // (never < 400) until a REAL prior pointerup has actually happened.
-// Phase 74-03 — NodeResizer (D-05..D-17). Corner-anchored pointer-drag resize for a
-// SELECTED node whose TYPE was registered `resizable` (NodeType.rozie, 74-02). Follows
-// the SAME module-scope-not-$onMount-local discipline as the NodeToolbar/Marquee state
-// above (the Solid-hoisted teardown must still see these after $onMount returns).
-// `pendingResizeSizes` is the resize analog of `pendingDragPositions` — id → the latest
-// clamped `{ width, height, x?, y? }` during a gesture (`x`/`y` are set ONLY for a
-// west/north-anchored corner — nw/ne/sw — per the opposite-corner-anchored resize
-// semantics; `se` never touches position). `resizerTrackedId` is the SINGLE
-// selected+resizable node id the 4 handles currently track (the resize analog of
-// `toolbarSelectedId`) — null when nothing/multiple is selected or the selected node's
-// type isn't resizable. `resizeHandle{Nw,Ne,Sw,Se}` are the 4 overlay div refs.
-// `pendingResizeSnapshot` stashes the pre-gesture history snapshot on pointerdown
-// (mirrors `pendingDragSnapshot`) — committed on the FIRST clamp-changed pointermove,
-// not on pointerdown itself, so a pointerdown+pointerup with no move creates no history
-// entry. `lastHandlePointerUpAt` is a module-scope timestamp for double-click-via-
-// pointerup-timing detection (Rete swallows real clicks during node interaction — the
-// file's existing pointerup-not-click discipline, e.g. the NodeToolbar buttons above).
-// Initialized to -Infinity (NOT 0): `performance.now()` is relative to the page's
-// navigation start, so a `0` sentinel means the very FIRST-EVER pointerup on a freshly
-// mounted canvas is erroneously treated as "within 400ms of a prior click" whenever the
-// whole mount+gesture sequence itself completes within 400ms of page load — a real bug
-// (not test flakiness) found via 74-05's Task 2 Linux VR gate: the very first resize
-// gesture's pointerup was immediately undoing its own resize by misfiring
-// resetNodeSize(). -Infinity guarantees `now - lastHandlePointerUpAt` is always Infinity
-// (never < 400) until a REAL prior pointerup has actually happened.
-const pendingResizeSizes = new Map(); // id → { width, height, x?, y? } (latest during a resize)
+const pendingResizeSizes = new Map();
 // id → { width, height, x?, y? } (latest during a resize)
 let resizeFlushRaf = 0;
 let resizeGestureActive = false;
@@ -384,12 +304,6 @@ let lastHandlePointerUpAt = -Infinity;
 // SINGLE shared onResizeHandleMove/onResizeHandleUp pair (rebound per-gesture) plus
 // `resizeActiveHandleEl` (which handle they're currently attached to) is enough — mirrors
 // the marquee's single pointermove/pointerup pair for its one drag surface.
-// Persistent (never-removed-mid-gesture) pointerdown listener refs on each handle, kept so
-// teardown can removeEventListener them (the toolbarDeleteBtn/onToolbarDelete discipline).
-// Only ONE resize gesture is ever in flight at a time (a user drags one corner), so a
-// SINGLE shared onResizeHandleMove/onResizeHandleUp pair (rebound per-gesture) plus
-// `resizeActiveHandleEl` (which handle they're currently attached to) is enough — mirrors
-// the marquee's single pointermove/pointerup pair for its one drag surface.
 let onResizeNwDown: any = null;
 let onResizeNeDown: any = null;
 let onResizeSwDown: any = null;
@@ -401,19 +315,11 @@ let resizeActiveHandleEl: any = null;
 // mirroring scheduleToolbarTrack/syncToolbarSelection — called from
 // maybeEmitSelectionChange + the 3 area pipes (nodetranslated/translated/zoomed) so a
 // pick/unpick / pan / zoom / drag re-tracks the resize handles over the selected node.
-// component-scope bridges to the $onMount-local trackResizer/syncResizerSelection,
-// mirroring scheduleToolbarTrack/syncToolbarSelection — called from
-// maybeEmitSelectionChange + the 3 area pipes (nodetranslated/translated/zoomed) so a
-// pick/unpick / pan / zoom / drag re-tracks the resize handles over the selected node.
 let scheduleResizerTrack: any = null;
 let syncResizerSelection: any = null;
-
-// MiniMap geometry (px) — MUST match the .rozie-flow-minimap CSS box below.
 // MiniMap geometry (px) — MUST match the .rozie-flow-minimap CSS box below.
 const MINIMAP_W = 200;
 const MINIMAP_H = 150;
-// Fallback node-rect dims when a node-view element isn't measurable yet (Lit async
-// first paint, REQ-30) — re-measured on the next render (the render pipe re-schedules).
 // Fallback node-rect dims when a node-view element isn't measurable yet (Lit async
 // first paint, REQ-30) — re-measured on the next render (the render pipe re-schedules).
 const MINIMAP_DEFAULT_NODE_W = 140;
@@ -421,34 +327,15 @@ const MINIMAP_DEFAULT_NODE_H = 52;
 // Phase 74-03 (D-17) — the resize floor when a resizable NodeType declares no
 // minWidth/minHeight: a small sane default so an unconstrained drag can't shrink a
 // node to 0px (belt-and-suspenders with the double-click-to-auto-size reset, D-08).
-// Phase 74-03 (D-17) — the resize floor when a resizable NodeType declares no
-// minWidth/minHeight: a small sane default so an unconstrained drag can't shrink a
-// node to 0px (belt-and-suspenders with the double-click-to-auto-size reset, D-08).
 const RESIZE_MIN_FALLBACK = 40;
-// WR-02: types whose maxWidth/maxHeight has already been warned-about as inverted
-// (below the effective minWidth/minHeight) — a one-time-per-type warning, not a
-// per-pointermove spam during a live resize drag.
 // WR-02: types whose maxWidth/maxHeight has already been warned-about as inverted
 // (below the effective minWidth/minHeight) — a one-time-per-type warning, not a
 // per-pointermove spam during a live resize drag.
 const clampInversionWarnedTypes = new Set();
 const SVGNS = 'http://www.w3.org/2000/svg';
-
-// One Socket shared by every port (Rete sockets gate compatibility by identity;
-// a single socket = "anything connects to anything", the common editor default).
 // One Socket shared by every port (Rete sockets gate compatibility by identity;
 // a single socket = "anything connects to anything", the common editor default).
 const SOCKET = new ClassicPreset.Socket('flow');
-
-// Live engine bookkeeping — COMPONENT-scope (NOT $onMount-local) so the
-// $onMount-returned teardown, which the Solid emitter hoists into a sibling
-// onCleanup() OUTSIDE the mount IIFE, keeps them in scope (the MapLibre
-// markerEntries lesson).
-//   nodeInstances : id → live ClassicPreset.Node          (engine truth)
-//   nodeMeta      : id → the consumer's node spec object  (for the slot scope)
-//   connInstances : id → live ClassicPreset.Connection    (engine truth)
-//   nodeEntries   : id → { element, bodyHost, handle, socketDisposers }
-//   connEntries   : id → { element, dispose }
 // Live engine bookkeeping — COMPONENT-scope (NOT $onMount-local) so the
 // $onMount-returned teardown, which the Solid emitter hoists into a sibling
 // onCleanup() OUTSIDE the mount IIFE, keeps them in scope (the MapLibre
@@ -465,17 +352,7 @@ const nodeEntries = new Map();
 const connEntries = new Map();
 // connMeta : id → the consumer's connection spec ({ …, label?, stroke?, dashed? }) — the
 // connection-side analog of nodeMeta, read by renderConnection for per-edge label/styling (F3).
-// connMeta : id → the consumer's connection spec ({ …, label?, stroke?, dashed? }) — the
-// connection-side analog of nodeMeta, read by renderConnection for per-edge label/styling (F3).
 const connMeta = new Map();
-
-// ids last applied FROM THE BOUND GRAPH, so reconcile removes only graph-managed
-// entities — an imperative $expose addNode/addConnection is NOT auto-reaped on the
-// next graph change (the power-user escape hatch stays alive). MapLibre reconciles
-// every marker because markers are purely prop-driven; a flow editor also accepts
-// imperative edits, so it tracks provenance. (Phase 41: nodes/connections now come
-// ONLY from the single `graph` model — the per-instance declarative-children
-// registries are gone; node TYPE templates + port schemas live in typeReg/portReg.)
 // ids last applied FROM THE BOUND GRAPH, so reconcile removes only graph-managed
 // entities — an imperative $expose addNode/addConnection is NOT auto-reaped on the
 // next graph change (the power-user escape hatch stays alive). MapLibre reconciles
@@ -485,39 +362,16 @@ const connMeta = new Map();
 // registries are gone; node TYPE templates + port schemas live in typeReg/portReg.)
 let lastPropNodeIds: any = null;
 let lastPropConnIds: any = null;
-
-// Re-entrant suppression counter: while > 0 the editor/area event handlers skip
-// echoing back into $emit / $model (our own programmatic add/remove/translate/
-// zoom must not bounce out as if the user did it — the MapLibre PROGRAMMATIC
-// eventData guard, in counter form so batched/nested ops never race).
 // Re-entrant suppression counter: while > 0 the editor/area event handlers skip
 // echoing back into $emit / $model (our own programmatic add/remove/translate/
 // zoom must not bounce out as if the user did it — the MapLibre PROGRAMMATIC
 // eventData guard, in counter form so batched/nested ops never race).
 let programmatic = 0;
-
-// Win 2: the last emitted selection id-set, joined to a stable string, so
-// @selection-change fires ONLY on an actual change (a repeated identical pick/unpick
-// set does not spam the consumer). `null` until the first emit (so the initial empty
-// selection does not emit on mount). COMPONENT-scope so it survives across area events.
 // Win 2: the last emitted selection id-set, joined to a stable string, so
 // @selection-change fires ONLY on an actual change (a repeated identical pick/unpick
 // set does not spam the consumer). `null` until the first emit (so the initial empty
 // selection does not emit on mount). COMPONENT-scope so it survives across area events.
 let lastSelectionIds: any = null;
-
-// T1.1 — EDGE SELECTION (D-08). The currently-selected CONNECTION id, or null. Lives
-// PURELY in component script (the selectedNodeIds echo-safety discipline) — NEVER
-// written into $model.graph, so the controlled-graph write-back assertions are
-// unaffected (Threat T-44-01-2: no spurious model write). COMPONENT-scope so it
-// survives across area events + so the Solid-hoisted teardown can clear it. The
-// `.is-selected` class is toggled imperatively on the engine-DOM __path; this id is the
-// source of truth the Delete branch reads. `selectedPathEl` caches the live <path>
-// element so a background-click clear (and re-select) can drop `.is-selected` without
-// re-walking the DOM. `edgeClickGuard` is a one-shot flag the area-background pointerup
-// branch checks so an edge click (which fires its own pointerup on the path AND lets the
-// area's background pointerup run) does not immediately clear the selection it just made
-// — reset on the next microtask, after the gesture settles.
 // T1.1 — EDGE SELECTION (D-08). The currently-selected CONNECTION id, or null. Lives
 // PURELY in component script (the selectedNodeIds echo-safety discipline) — NEVER
 // written into $model.graph, so the controlled-graph write-back assertions are
@@ -533,23 +387,6 @@ let lastSelectionIds: any = null;
 let selectedConnId: any = null;
 let selectedPathEl: any = null;
 let edgeClickGuard = false;
-
-// T1.3 — UNDO / REDO (D-02 on-by-default, D-03 per-gesture graph-only scope, D-04
-// echo-guarded restore). A CAPPED snapshot stack over the BOUND GRAPH only — nodes
-// (incl x/y) + connections — and explicitly NOT the viewport (pan/zoom is excluded,
-// D-03). One entry is pushed per COMPLETED gesture: a drag = ONE entry (snapshot taken
-// on pointer-down, committed on the first translate — never per pointermove frame), a
-// connect / disconnect / delete = one each. A push is gated on `!programmatic` so a
-// restore-driven write (which runs INSIDE the programmatic guard) never re-enters the
-// history (D-04). Pushing clears the redo branch and drops the oldest entry beyond the
-// cap (Threat T-44-03-1: bounded memory). Snapshots are deep clones of the consumer's own
-// serializable graph JSON (Pattern 7; the `$clone` sigil — a deep, de-proxied copy
-// that strips the Vue/Svelte reactivity Proxy that a bare `structuredClone` THROWS
-// on) — no external input, so the restore (T-44-03-2 accept)
-// cannot loop (it rides the programmatic guard + the existing $watch(graph) reconcile).
-// Undo is ALWAYS on for v1; `:history=false` (the `history` prop) is the cheap escape
-// hatch that skips every push (the stacks stay empty → undo/redo are no-ops).
-// COMPONENT-scope so the stack survives across area events + the Solid-hoisted teardown.
 // T1.3 — UNDO / REDO (D-02 on-by-default, D-03 per-gesture graph-only scope, D-04
 // echo-guarded restore). A CAPPED snapshot stack over the BOUND GRAPH only — nodes
 // (incl x/y) + connections — and explicitly NOT the viewport (pan/zoom is excluded,
@@ -574,13 +411,6 @@ const HISTORY_CAP = 100;
 // redoStack (a fresh edit discards the redo branch). undo() pops historyStack → pushes
 // the CURRENT (pre-undo) graph onto redoStack → restores the popped snapshot. redo()
 // pops redoStack → pushes the current graph back onto historyStack → restores it.
-// Two-stack model (simpler + correct than a single cursor): `historyStack` holds
-// PRE-gesture snapshots (the states to UNDO back to, newest last); `redoStack` holds
-// snapshots an undo popped off (the states to REDO forward to, newest last). A new
-// gesture (pushHistory) snapshots the PRE-gesture graph onto historyStack and CLEARS
-// redoStack (a fresh edit discards the redo branch). undo() pops historyStack → pushes
-// the CURRENT (pre-undo) graph onto redoStack → restores the popped snapshot. redo()
-// pops redoStack → pushes the current graph back onto historyStack → restores it.
 let historyStack = [];
 let redoStack = [];
 // One-shot per-drag guard: a drag fires `nodetranslated` (→ flushDragWriteBack) on EVERY
@@ -592,36 +422,8 @@ let redoStack = [];
 // the history stack on the FIRST `nodetranslated` of the gesture (a pick WITHOUT a drag
 // must not create a history entry). `dragGestureActive` then holds until the drag-ending
 // `pointerup` resets it. D-03: a drag = ONE undo step.
-// One-shot per-drag guard: a drag fires `nodetranslated` (→ flushDragWriteBack) on EVERY
-// pointermove frame, so a push-per-flush would record many entries for ONE gesture. We
-// snapshot the PRE-drag graph on `nodepicked` (pointer-DOWN, definitively before any
-// movement — capturing it on the first `nodetranslated` is too late: the engine has
-// already applied the initial delta + may have flushed a write-back, so $props.graph no
-// longer holds the start position), stash it in `pendingDragSnapshot`, and COMMIT it to
-// the history stack on the FIRST `nodetranslated` of the gesture (a pick WITHOUT a drag
-// must not create a history entry). `dragGestureActive` then holds until the drag-ending
-// `pointerup` resets it. D-03: a drag = ONE undo step.
 let dragGestureActive = false;
 let pendingDragSnapshot: any = null;
-
-// T2.5 — RECONNECT coalescing (D-08 reconnectable edges, D-03 one-gesture-one-entry).
-// Dragging an existing edge endpoint to a new socket is a SINGLE user gesture, but the
-// shipped `Presets.classic.setup()` implements it as `editor.removeConnection(old)` then
-// `editor.addConnection(new)` — so the write-back pipe sees a `connectionremoved` followed
-// by a `connectioncreated`, which would push TWO history entries (Pitfall 2: two Ctrl+Z to
-// undo one drag). The fix is to COALESCE: the ConnectionPlugin emits `connectionpick` when
-// the user grabs a socket and `connectiondrop` when they release. While a reconnect is in
-// flight (`reconnectInFlight > 0`) we SUPPRESS the per-event history pushes that
-// writeBackConnectionRemoved / writeBackConnectionCreated normally do (the graph write-back
-// itself STILL runs — the controlled graph stays correct), capturing the PRE-gesture
-// snapshot ONCE on connectionpick (`reconnectPreSnapshot`). On `connectiondrop` we push that
-// single snapshot (whether the drop landed on a new socket → `created:true` = a real
-// reconnect, OR on an empty pane → `created:false` = the edge was removed with no re-add)
-// and clear the flag. A plain drag-to-connect from an UNCONNECTED output socket also fires
-// connectionpick/drop, but there is no remove in that gesture — the single `connectioncreated`
-// write-back's own pushHistory is suppressed and the one coalesced snapshot is pushed on drop
-// instead, so the per-gesture count stays exactly one either way. Counter form (not a bool)
-// so a re-pick mid-gesture can't desync. COMPONENT-scope (survives across area events).
 // T2.5 — RECONNECT coalescing (D-08 reconnectable edges, D-03 one-gesture-one-entry).
 // Dragging an existing edge endpoint to a new socket is a SINGLE user gesture, but the
 // shipped `Presets.classic.setup()` implements it as `editor.removeConnection(old)` then
@@ -645,18 +447,11 @@ let reconnectPreSnapshot: any = null;
 // Set true if a write-back (remove or add) actually ran during the in-flight window, so a
 // connectionpick→drop that changed NOTHING (e.g. clicking a socket then releasing on the
 // pane with no edge created/removed) does NOT push an empty history entry.
-// Set true if a write-back (remove or add) actually ran during the in-flight window, so a
-// connectionpick→drop that changed NOTHING (e.g. clicking a socket then releasing on the
-// pane with no edge created/removed) does NOT push an empty history entry.
 let reconnectDidWriteBack = false;
 // One-shot guard for the DEFERRED close (the drop fires BEFORE the trailing remove+add
 // writeBacks, so the window must close on a macrotask AFTER they settle — see the
 // connectiondrop branch). A re-pick before the deferred close runs cancels it.
-// One-shot guard for the DEFERRED close (the drop fires BEFORE the trailing remove+add
-// writeBacks, so the window must close on a macrotask AFTER they settle — see the
-// connectiondrop branch). A re-pick before the deferred close runs cancels it.
 let reconnectCloseScheduled = false;
-
 // ─── controlled-graph write-back (D4 — the central NEW capability) ─────────────
 // On every drag/connect/disconnect the canvas emits a FRESH top-level
 // `{ nodes, connections }` object via `$model.graph` — immutable React-Flow
@@ -672,53 +467,14 @@ let reconnectCloseScheduled = false;
 // graph write per animation frame (dragFlushRaf), plus a final flush so the last
 // position always lands. requestAnimationFrame coalesces multiple moves in a frame
 // into a single $model.graph emit.
-// ─── controlled-graph write-back (D4 — the central NEW capability) ─────────────
-// On every drag/connect/disconnect the canvas emits a FRESH top-level
-// `{ nodes, connections }` object via `$model.graph` — immutable React-Flow
-// applyNodeChanges style (Wave-0-proven 6/6; in-place deep mutation is SILENT on
-// React/Solid/Lit/Angular). Echo-guarded by the `programmatic` counter + the
-// no-op-diff property: the write-back value already matches engine truth (the node
-// is already at x/y; the edge already exists) so the consumer's re-bind →
-// $watch(graph) → reconcile is a no-op diff.
-//
-// DRAG COALESCING (Pitfall 2): `nodetranslated` fires on every pointermove during a
-// drag; emitting a fresh graph + full reconcile per frame is a rebuild storm. We
-// accumulate the latest position per node (pendingDragPositions) and flush ONE fresh
-// graph write per animation frame (dragFlushRaf), plus a final flush so the last
-// position always lands. requestAnimationFrame coalesces multiple moves in a frame
-// into a single $model.graph emit.
-const pendingDragPositions = new Map(); // id → { x, y } (latest during a drag)
+const pendingDragPositions = new Map();
 // id → { x, y } (latest during a drag)
 let dragFlushRaf = 0;
-
-// The current bound graph — NEVER mutated in place.
 // The current bound graph — NEVER mutated in place.
 const currentGraph = () => graph || {
   nodes: [],
   connections: []
 };
-
-// T1.3 — deep-clone a graph snapshot. The graph is serializable JSON (nodes/connections of
-// primitives), so JSON round-trip is the robust path: it strips framework reactivity
-// wrappers — a Vue `reactive()` Proxy / Svelte `$state` proxy that a bare
-// `structuredClone` THROWS on ("could not be cloned"), the silent vue/svelte-only
-// failure that left the history stack empty. Phase 45 replaced the hand-rolled
-// JSON-first clone helper with the `$clone(x)` sigil at every call site below: it
-// lowers to `rozieDeepClone(x)` on Vue (Phase 45-07 — a recursive proxy-safe deep
-// clone in @rozie/runtime-vue that de-proxies nested INDEPENDENT reactive members,
-// not just the top level), `$state.snapshot(x)` on Svelte, and `structuredClone(x)`
-// on the other four — a deep, independent, de-proxied copy on all six (and
-// `$clone(null)` → `null` on all six, preserving the old `g == null` early-return
-// implicitly). The Rete graph is JSON-serializable, so `$clone` never throws here;
-// the former null-return fallbacks at the call sites are now dead but harmless.
-
-// T1.3 — the canvas's OWN last-written graph. Every write-back funnels through
-// `commitGraph`, which sets `$model.graph` AND records the written value here. undo/redo
-// use THIS (not the round-tripped `$props.graph`) as the "current" state to push onto the
-// opposite stack — `$props.graph` lags a drag write-back on React/Vue/Svelte (the
-// two-way re-bind is async / batched), so reading it at undo time captured an
-// INTERMEDIATE drag position. `lastWrittenGraph` is exact + synchronous. Seeded from the
-// bound graph in $onMount.
 // T1.3 — deep-clone a graph snapshot. The graph is serializable JSON (nodes/connections of
 // primitives), so JSON round-trip is the robust path: it strips framework reactivity
 // wrappers — a Vue `reactive()` Proxy / Svelte `$state` proxy that a bare
@@ -741,13 +497,6 @@ const currentGraph = () => graph || {
 // INTERMEDIATE drag position. `lastWrittenGraph` is exact + synchronous. Seeded from the
 // bound graph in $onMount.
 let lastWrittenGraph: any = null;
-
-// Funnel for every component-driven graph write: record the value, then emit it. A deep
-// clone is stored so a later consumer mutation of the live bound object can't corrupt the
-// recorded state. (Echo-guarding is the CALLER's responsibility — restoreGraph wraps this
-// in the programmatic guard.) `selfWriteInFlight` suppresses the resulting $watch(graph)
-// tick from clobbering `lastWrittenGraph` with the (possibly still-stale, async) bound
-// prop value — the value we just wrote IS the truth.
 // Funnel for every component-driven graph write: record the value, then emit it. A deep
 // clone is stored so a later consumer mutation of the live bound object can't corrupt the
 // recorded state. (Echo-guarding is the CALLER's responsibility — restoreGraph wraps this
@@ -761,29 +510,17 @@ const commitGraph = (g: any) => {
   selfWriteInFlight = true;
   graph = g;
 };
-
-// Capture the canvas's current graph state (its own last write, falling back to the bound
-// prop before the first write). Always a fresh deep clone.
 // Capture the canvas's current graph state (its own last write, falling back to the bound
 // prop before the first write). Always a fresh deep clone.
 const snapshotCurrent = () => {
   const src = lastWrittenGraph != null ? lastWrittenGraph : currentGraph();
   return $state.snapshot(src);
 };
-
-// The BASE graph a write-back builds its fresh object from: the canvas's own last write if
-// present (immune to the async prop re-bind lag), else the bound prop. This keeps a rapid
-// gesture sequence (e.g. drag then immediately disconnect) consistent even before the
-// consumer's two-way re-bind has propagated the prior write back into `$props.graph`.
 // The BASE graph a write-back builds its fresh object from: the canvas's own last write if
 // present (immune to the async prop re-bind lag), else the bound prop. This keeps a rapid
 // gesture sequence (e.g. drag then immediately disconnect) consistent even before the
 // consumer's two-way re-bind has propagated the prior write back into `$props.graph`.
 const baseGraph = () => lastWrittenGraph != null ? lastWrittenGraph : currentGraph();
-
-// Commit an ALREADY-CAPTURED snapshot onto the undo stack (caps + clears redo). Gated on
-// the `history` prop. Used by both the synchronous-commit path (connect/disconnect/delete)
-// and the drag gesture (pre-move snapshot taken on pointer-down, committed on first translate).
 // Commit an ALREADY-CAPTURED snapshot onto the undo stack (caps + clears redo). Gated on
 // the `history` prop. Used by both the synchronous-commit path (connect/disconnect/delete)
 // and the drag gesture (pre-move snapshot taken on pointer-down, committed on first translate).
@@ -796,10 +533,6 @@ const pushHistorySnapshot = (snap: any) => {
   }
   redoStack = [];
 };
-
-// Snapshot the canvas's CURRENT graph state + commit it onto the undo stack (the connect /
-// disconnect / delete path — called BEFORE the write-back so the snapshot is the
-// pre-gesture state). Gated on `!programmatic` (echo-guard) + history. D-03: one per gesture.
 // Snapshot the canvas's CURRENT graph state + commit it onto the undo stack (the connect /
 // disconnect / delete path — called BEFORE the write-back so the snapshot is the
 // pre-gesture state). Gated on `!programmatic` (echo-guard) + history. D-03: one per gesture.
@@ -808,14 +541,6 @@ const pushHistory = () => {
   if (history === false) return;
   pushHistorySnapshot(snapshotCurrent());
 };
-
-// T2.5 — close the reconnect coalesce window. Called on a DEFERRED macrotask after a
-// connectiondrop, so the trailing connectionremoved + connectioncreated writeBacks (which
-// the classic preset fires AFTER the drop) have all run with the window still open
-// (suppressing their per-event pushHistory, flagging reconnectDidWriteBack). Pushes the
-// SINGLE pre-gesture snapshot iff the gesture actually changed the graph, then resets the
-// per-gesture state. Idempotent + gated on the one-shot scheduled flag so a re-pick can
-// cancel a pending close.
 // T2.5 — close the reconnect coalesce window. Called on a DEFERRED macrotask after a
 // connectiondrop, so the trailing connectionremoved + connectioncreated writeBacks (which
 // the classic preset fires AFTER the drop) have all run with the window still open
@@ -835,20 +560,11 @@ const closeReconnectGesture = () => {
 };
 // Schedule the deferred close on a macrotask (setTimeout 0) — runs after the synchronous +
 // microtask writeBack signals settle. Falls back to a microtask where setTimeout is absent.
-// Schedule the deferred close on a macrotask (setTimeout 0) — runs after the synchronous +
-// microtask writeBack signals settle. Falls back to a microtask where setTimeout is absent.
 const scheduleReconnectClose = () => {
   if (reconnectCloseScheduled) return;
   reconnectCloseScheduled = true;
   if (typeof setTimeout === 'function') setTimeout(closeReconnectGesture, 0);else Promise.resolve().then(closeReconnectGesture);
 };
-
-// T1.3 — restore a captured snapshot by writing a FRESH `{ nodes, connections }` via
-// `commitGraph` (→ `$model.graph`), wrapped in the `programmatic` guard so the consumer's
-// re-bind → $watch(graph) → reconcile applies it WITHOUT re-entering history (D-04 —
-// pushHistory / the write-back helpers all bail while `programmatic` is raised). Recorded
-// in `lastWrittenGraph` so a following undo/redo sees the restored state as "current".
-// Graph-ONLY (D-03): the viewport transform is untouched.
 // T1.3 — restore a captured snapshot by writing a FRESH `{ nodes, connections }` via
 // `commitGraph` (→ `$model.graph`), wrapped in the `programmatic` guard so the consumer's
 // re-bind → $watch(graph) → reconcile applies it WITHOUT re-entering history (D-04 —
@@ -883,9 +599,6 @@ const restoreGraph = (snap: any) => {
     programmatic--;
   }
 };
-
-// undo() — pop the newest PRE-gesture snapshot, push the CURRENT graph onto the redo
-// stack, and restore the snapshot. No-op when nothing to undo.
 // undo() — pop the newest PRE-gesture snapshot, push the CURRENT graph onto the redo
 // stack, and restore the snapshot. No-op when nothing to undo.
 export const undo = () => {
@@ -895,9 +608,6 @@ export const undo = () => {
   if (cur) redoStack.push(cur);
   restoreGraph(snap);
 };
-
-// redo() — pop the newest redo snapshot, push the CURRENT graph back onto the undo
-// stack, and restore it. No-op when nothing to redo.
 // redo() — pop the newest redo snapshot, push the CURRENT graph back onto the undo
 // stack, and restore it. No-op when nothing to redo.
 export const redo = () => {
@@ -909,9 +619,6 @@ export const redo = () => {
 };
 export const canUndo = () => historyStack.length > 0;
 export const canRedo = () => redoStack.length > 0;
-
-// Flush the coalesced drag positions: one fresh graph object with every pending
-// node's x/y applied. Echo-guarded. Clears the pending map.
 // Flush the coalesced drag positions: one fresh graph object with every pending
 // node's x/y applied. Echo-guarded. Clears the pending map.
 const flushDragWriteBack = () => {
@@ -936,9 +643,6 @@ const flushDragWriteBack = () => {
     nodes
   });
 };
-
-// Schedule a coalesced drag write-back (rAF; falls back to a microtask where rAF is
-// unavailable — e.g. a non-DOM test env).
 // Schedule a coalesced drag write-back (rAF; falls back to a microtask where rAF is
 // unavailable — e.g. a non-DOM test env).
 const scheduleDragFlush = () => {
@@ -950,12 +654,6 @@ const scheduleDragFlush = () => {
     Promise.resolve().then(flushDragWriteBack);
   }
 };
-
-// Phase 74-03 (D-09) — resize write-back triad, copying flushDragWriteBack/
-// scheduleDragFlush's Map-accumulate → one commitGraph per rAF frame → clear-map shape
-// verbatim (renamed drag→resize). `x`/`y` on a pending entry are OPTIONAL — present only
-// for a west/north-anchored corner (Task 2's pointermove handler), omitted for `se` — so
-// an `se`-only resize never touches the node's position.
 // Phase 74-03 (D-09) — resize write-back triad, copying flushDragWriteBack/
 // scheduleDragFlush's Map-accumulate → one commitGraph per rAF frame → clear-map shape
 // verbatim (renamed drag→resize). `x`/`y` on a pending entry are OPTIONAL — present only
@@ -996,11 +694,6 @@ const scheduleResizeFlush = () => {
     Promise.resolve().then(flushResizeWriteBack);
   }
 };
-
-// Phase 74-03 (D-16/D-17) — clamp a live resize delta to the type's declared
-// minWidth/minHeight/maxWidth/maxHeight, falling back to RESIZE_MIN_FALLBACK (40px)
-// when a bound isn't declared. Reads only its own arguments (plus the module-scope
-// clampInversionWarnedTypes one-time-warn dedup set, WR-02 — the only side effect).
 // Phase 74-03 (D-16/D-17) — clamp a live resize delta to the type's declared
 // minWidth/minHeight/maxWidth/maxHeight, falling back to RESIZE_MIN_FALLBACK (40px)
 // when a bound isn't declared. Reads only its own arguments (plus the module-scope
@@ -1039,11 +732,6 @@ const clampResizeSize = (typeSpec: any, w: any, h: any) => {
     height: Math.min(maxH, Math.max(minH, h))
   };
 };
-
-// Phase 74-03 (D-08) — double-click-a-handle reset: clear a node's explicit
-// width/height back to undefined (auto-size), through the SAME pushHistory/baseGraph/
-// commitGraph path as every other write-back (one history entry, gated !readonly, D-10)
-// — never a special-cased direct $model.graph write.
 // Phase 74-03 (D-08) — double-click-a-handle reset: clear a node's explicit
 // width/height back to undefined (auto-size), through the SAME pushHistory/baseGraph/
 // commitGraph path as every other write-back (one history entry, gated !readonly, D-10)
@@ -1063,8 +751,6 @@ const resetNodeSize = (id: any) => {
     nodes
   });
 };
-
-// CONNECT — append a fresh connection into a fresh graph object. Echo-guarded.
 // CONNECT — append a fresh connection into a fresh graph object. Echo-guarded.
 const writeBackConnectionCreated = (c: any) => {
   if (programmatic) return;
@@ -1087,8 +773,6 @@ const writeBackConnectionCreated = (c: any) => {
     connections: [...(g.connections || []), conn]
   });
 };
-
-// DISCONNECT — filter the id out into a fresh graph object. Echo-guarded.
 // DISCONNECT — filter the id out into a fresh graph object. Echo-guarded.
 const writeBackConnectionRemoved = (id: any) => {
   if (programmatic) return;
@@ -1102,19 +786,6 @@ const writeBackConnectionRemoved = (id: any) => {
     connections: (g.connections || []).filter((e: any) => e && e.id !== id)
   });
 };
-
-// T1.1 — EDGE SELECTION helpers (D-08). Selection state is kept PURELY in script
-// (selectedConnId / selectedPathEl) and surfaced to the consumer via @edge-click /
-// @edge-selected — never written into $model.graph (echo-safe like selectedNodeIds).
-//
-// `clearEdgeSelection` drops `.is-selected` from the live <path> (if still attached) and
-// nulls the selection. `selectEdge` is invoked from the per-edge pointerup listener: it
-// clears any prior selection, marks THIS path `.is-selected`, records the id + element,
-// raises the one-shot `edgeClickGuard` (so the area's own background-pointerup branch
-// does not immediately clear what this click just selected — the same pointerup gesture
-// fires on the path AND lets the area pipe run), and emits BOTH @edge-click and
-// @edge-selected ({ id }). The guard self-resets on the next microtask once the gesture
-// has settled.
 // T1.1 — EDGE SELECTION helpers (D-08). Selection state is kept PURELY in script
 // (selectedConnId / selectedPathEl) and surfaced to the consumer via @edge-click /
 // @edge-selected — never written into $model.graph (echo-safe like selectedNodeIds).
@@ -1157,20 +828,6 @@ const selectEdge = (id: any, pathEl: any) => {
     id
   });
 };
-
-// CASCADING DELETE (the PUBLIC controlled-graph node delete — Win 1). Distinct from
-// the engine-only `removeNode` $expose verb: `removeNode` operates directly on the
-// editor and is NOT written back to the model (the provenance-tracked imperative
-// escape hatch); `deleteNode` is the BLESSED controlled-graph delete — it filters the
-// node AND every incident connection out of FRESH arrays and writes ONE fresh
-// top-level `{ ...g, nodes, connections }` object via `$model.graph` (the Phase-41
-// write-back contract — in-place mutation is silently dropped on React/Solid/Lit/
-// Angular). The wrapper's own `$watch(graph)` reconcile then reaps the live engine
-// node + edges — we do NOT call editor.removeNode here (a double-remove would race the
-// reconcile into Rete's "cannot find node"; the controlled-model filter is the single
-// removal path). NOT echo-guarded with `programmatic` — this is a CONSUMER-driven write
-// that SHOULD update the bound model (mirrors the demo's per-node ✕ filter). Returns
-// true if a node was removed. The id-coerce-to-String mirrors the demo's onRemoveClick.
 // CASCADING DELETE (the PUBLIC controlled-graph node delete — Win 1). Distinct from
 // the engine-only `removeNode` $expose verb: `removeNode` operates directly on the
 // editor and is NOT written back to the model (the provenance-tracked imperative
@@ -1200,11 +857,6 @@ export const deleteNode = (id: any) => {
   });
   return true;
 };
-
-// T2.8 — a fresh unique node id for a duplicated node. Derived from the source id + an
-// incrementing suffix, skipping any id already present in the live graph so a repeated
-// duplicate never collides (Threat T-44-06-2: a NEW unique id, never a forged/colliding
-// one). String ids only (mirrors the graph contract).
 // T2.8 — a fresh unique node id for a duplicated node. Derived from the source id + an
 // incrementing suffix, skipping any id already present in the live graph so a repeated
 // duplicate never collides (Threat T-44-06-2: a NEW unique id, never a forged/colliding
@@ -1220,14 +872,6 @@ const freshNodeId = (baseId: any, existing: any) => {
   }
   return candidate;
 };
-
-// T2.8 — DUPLICATE the given node: clone its spec at a small offset with a NEW unique id
-// into a FRESH `{ ...g, nodes:[...g.nodes, clone] }` object (the controlled-graph write-back
-// contract — never an in-place push). The clone's `data` is deep-cloned ($clone strips
-// any reactivity proxy) so the copy is independent of the source. Connections are NOT cloned
-// (a duplicate is an isolated node — the React-Flow default). One history entry per
-// duplicate gesture (pushHistory, gated on !programmatic + history). Returns the new id, or
-// null if the source isn't found. NOT echo-guarded — a duplicate SHOULD update the model.
 // T2.8 — DUPLICATE the given node: clone its spec at a small offset with a NEW unique id
 // into a FRESH `{ ...g, nodes:[...g.nodes, clone] }` object (the controlled-graph write-back
 // contract — never an in-place push). The clone's `data` is deep-cloned ($clone strips
@@ -1262,11 +906,6 @@ const duplicateNode = (id: any) => {
   });
   return newId;
 };
-
-// Collect the currently-SELECTED node ids from the live selector (Win 1 + Win 2). The
-// AreaExtensions.selector() `entities` Map holds the picked entities ({ label, id });
-// for selectable nodes each entity's `id` is the node id. Empty when nothing is picked
-// or selection is disabled. Read-only — no $data / engine write.
 // Collect the currently-SELECTED node ids from the live selector (Win 1 + Win 2). The
 // AreaExtensions.selector() `entities` Map holds the picked entities ({ label, id });
 // for selectable nodes each entity's `id` is the node id. Empty when nothing is picked
@@ -1279,15 +918,6 @@ const selectedNodeIds = () => {
   }
   return ids;
 };
-
-// Win 2: surface selection changes to the consumer via @selection-change ({ ids }).
-// Computes the current selected-id set, dedupes against the last-emitted set (joined
-// string), and emits only on an ACTUAL change. Echo-guarded by `programmatic` so a
-// PROGRAMMATIC unselect (clear/deleteNode may unpick) does not surface as a user
-// selection. Selection is kept PURELY in the emit — never written into the graph model
-// — so the controlled-graph echo-safety (the drag write-back assertions) is unaffected.
-// Sorted before joining so the dedup key is order-independent (the selector Map order
-// is not guaranteed stable across pick/unpick).
 // Win 2: surface selection changes to the consumer via @selection-change ({ ids }).
 // Computes the current selected-id set, dedupes against the last-emitted set (joined
 // string), and emits only on an ACTUAL change. Echo-guarded by `programmatic` so a
@@ -1314,13 +944,6 @@ const maybeEmitSelectionChange = () => {
   // the single selected+resizable node; hides on multi-select / empty / non-resizable).
   if (syncResizerSelection) syncResizerSelection();
 };
-
-// Schedule the selection recompute AFTER the engine's own async selection update has
-// settled. AreaExtensions.selectableNodes does its pick / unselectAll via AWAITED
-// area.update() calls, so a bare microtask can run before `selector.entities` reflects
-// the new state. A microtask AND an rAF together guarantee we recompute once the engine
-// chain has flushed (the dedup collapses the pair to at most one emit). Falls back to a
-// double microtask where rAF is unavailable (non-DOM test env).
 // Schedule the selection recompute AFTER the engine's own async selection update has
 // settled. AreaExtensions.selectableNodes does its pick / unselectAll via AWAITED
 // area.update() calls, so a bare microtask can run before `selector.entities` reflects
@@ -1335,30 +958,12 @@ const scheduleSelectionEmit = () => {
     Promise.resolve().then(() => Promise.resolve().then(maybeEmitSelectionChange));
   }
 };
-
-// The $portals/$emit-capturing reconcilers are built INSIDE $onMount ($portals
-// referenced at top level fails the bundled-leaf strict typecheck — the CM/
-// TipTap/MapLibre portal discipline) and bridged here so the top-level $watch can
-// call them.
 // The $portals/$emit-capturing reconcilers are built INSIDE $onMount ($portals
 // referenced at top level fails the bundled-leaf strict typecheck — the CM/
 // TipTap/MapLibre portal discipline) and bridged here so the top-level $watch can
 // call them.
 let reconcileNodes: any = null;
 let reconcileConnections: any = null;
-
-// Re-entrancy guard for reconcileNodes. The declarative-children path can fire the
-// node reconcile RE-ENTRANTLY on async-context targets (Lit): a <FlowNode>'s
-// $onMount register starts reconcile #1, and its late-context $onUpdate registration
-// (REQ-30) — or the registry $watch the register triggers — starts reconcile #2 while
-// #1's awaits (editor.addNode / area.translate / area.update) are still pending. Two
-// overlapping reconciles racing the same engine throw Rete's "cannot find node" (one
-// updates/translates a node-view the other just rebuilt), which aborts the whole graph
-// build (only the config-array `cfg` node survives on Lit). This flag serializes them:
-// a reconcile requested while one is running sets a "run again" bit and returns; the
-// in-flight reconcile re-runs once it finishes, so every registry mutation is folded
-// into a fresh non-overlapping pass. The config-array-only path never re-enters (props
-// change once per tick), so this is byte-transparent to its behavior.
 // Re-entrancy guard for reconcileNodes. The declarative-children path can fire the
 // node reconcile RE-ENTRANTLY on async-context targets (Lit): a <FlowNode>'s
 // $onMount register starts reconcile #1, and its late-context $onUpdate registration
@@ -1373,8 +978,6 @@ let reconcileConnections: any = null;
 // change once per tick), so this is byte-transparent to its behavior.
 let reconcileNodesRunning = false;
 let reconcileNodesPending = false;
-
-// ── pure helpers (no sigils → safe at top level) ──
 // ── pure helpers (no sigils → safe at top level) ──
 const serializeConn = (c: any) => ({
   id: c.id,
@@ -1383,11 +986,6 @@ const serializeConn = (c: any) => ({
   target: c.target,
   targetInput: c.targetInput
 });
-
-// Resolve a node TYPE's port schema from the flat per-TYPE portReg — the entries
-// whose key starts `type + '::'`. Returns { inputs:[{key,label,multiple,portType}],
-// outputs:[…] }. Pure (no $data write) so buildNode / buildSocketRow can call it on
-// every run regardless of the order the <NodeType> vs its <Port> children registered.
 // Resolve a node TYPE's port schema from the flat per-TYPE portReg — the entries
 // whose key starts `type + '::'`. Returns { inputs:[{key,label,multiple,portType}],
 // outputs:[…] }. Pure (no $data write) so buildNode / buildSocketRow can call it on
@@ -1417,14 +1015,6 @@ const portSchemaForType = (type: any, portReg: any) => {
     outputs
   };
 };
-
-// Build a live Rete node from a graph-node spec ({ id, type, x, y, data }). The
-// consumer's `id` is assigned onto the node so positions, portal keys, and
-// connection source/target ids all align with the author's identifiers (Rete would
-// otherwise auto-generate ids). Sockets come from the node's TYPE port schema
-// (portReg keyed `type::side::key`) — a type's ports declared ONCE apply to every
-// instance (render-by-type). The single shared SOCKET still gates compatibility by
-// identity; the per-port `portType` drives typed VALIDATION, not socket identity.
 // Build a live Rete node from a graph-node spec ({ id, type, x, y, data }). The
 // consumer's `id` is assigned onto the node so positions, portal keys, and
 // connection source/target ids all align with the author's identifiers (Rete would
@@ -1590,21 +1180,6 @@ export async function zoomTo(k: any) {
   }
   if (k !== zoom) zoom = k;
 }
-
-// ─── viewport API (Phase 42 — the T11 gap + what the pannable minimap needs) ─────
-// Both write the AreaPlugin transform via the CONFIRMED Rete v2 area API: with the
-// origin omitted `area.area.zoom(k)` leaves x/y unchanged (transform.x += 0·d), and
-// `area.area.translate(x, y)` sets the pan ABSOLUTELY (verified against rete-area-
-// plugin@2.1.5). Echo-guarded with `programmatic` so the transform write doesn't loop
-// back through the zoomed/nodetranslated write-back (the `translated` emit stays
-// UNCONDITIONAL, so @translated still surfaces a programmatic recenter — a real
-// viewport change the consumer asked for). After, echo `$model.zoom` (mirrors zoomTo).
-// Collision discipline: setCenter/setViewport are NOT Lit lifecycle names, NOT emit
-// names, NOT prop names, NOT React model-setters (`graph`/`zoom` → setGraph/setZoom),
-// and NOT inherited DOM methods (the Embla scrollTo lesson) — clean on all 6.
-//
-// setViewport({ x, y, k }) — set the raw transform (any field omitted keeps its
-// current value).
 // ─── viewport API (Phase 42 — the T11 gap + what the pannable minimap needs) ─────
 // Both write the AreaPlugin transform via the CONFIRMED Rete v2 area API: with the
 // origin omitted `area.area.zoom(k)` leaves x/y unchanged (transform.x += 0·d), and
@@ -1634,11 +1209,6 @@ export async function setViewport(vp: any) {
   }
   if (k !== zoom) zoom = k;
 }
-
-// setCenter(x, y, opts?) — center the viewport on graph-coords (x, y), optionally
-// setting zoom (`opts.zoom`). The transform that puts graph point (x,y) at the canvas
-// center is tx = W/2 − x·k, ty = H/2 − y·k (screen = graph·k + transform). W/H are the
-// engine container's pixel dims (area.container — public on AreaPlugin, no $refs read).
 // setCenter(x, y, opts?) — center the viewport on graph-coords (x, y), optionally
 // setting zoom (`opts.zoom`). The transform that puts graph point (x,y) at the canvas
 // center is tx = W/2 − x·k, ty = H/2 − y·k (screen = graph·k + transform). W/H are the
@@ -1660,13 +1230,6 @@ export async function setCenter(x: any, y: any, opts: any) {
   }
   if (k !== zoom) zoom = k;
 }
-
-// ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
-// Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
-// They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
-// clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
-// bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
-// edit the graph). A no-op before the area mounts.
 // ─── built-in Controls overlay handlers (Win 4) ──────────────────────────────
 // Wired to the in-template zoom in / out / fit buttons (gated r-if="$props.controls").
 // They REUSE the zoomTo / zoomToFit verbs (one implementation — no logic duplication),
@@ -1692,8 +1255,6 @@ const controlZoomOut = () => {
 const controlFit = () => {
   zoomToFit();
 };
-// T2.4 — the gated 4th Controls button toggles the two-way mode (pan ↔ select). Writes
-// $model.mode (model:true); the consumer's r-model:mode (or the internal demo state) updates.
 // T2.4 — the gated 4th Controls button toggles the two-way mode (pan ↔ select). Writes
 // $model.mode (model:true); the consumer's r-model:mode (or the internal demo state) updates.
 const toggleMode = () => {
@@ -1723,17 +1284,6 @@ export function getTransform() {
     k: area.area.transform.k
   } : null;
 }
-
-// screenToFlowPosition(clientX, clientY) → { x, y } in GRAPH coords (Phase 43 — the
-// palette-drop / no-code-builder primitive, the React-Flow `screenToFlowPosition`
-// parity). The INVERSE of the area transform: a graph point projects to the screen as
-// `screen = containerOrigin + transform.{x,y} + graph·k`, so
-// `graph = (client − containerOrigin − transform) / k`. `area.container` is public on
-// the AreaPlugin (no $refs read). Returns null before the area mounts. The component
-// owns ONLY this projection — the consumer owns the drag/drop (a palette item's
-// `draggable` + the canvas `@dragover.prevent`/`@drop`) and writes the new node into the
-// bound `graph` at the returned coords, exactly like React Flow (which does not own the
-// palette either).
 // screenToFlowPosition(clientX, clientY) → { x, y } in GRAPH coords (Phase 43 — the
 // palette-drop / no-code-builder primitive, the React-Flow `screenToFlowPosition`
 // parity). The INVERSE of the area transform: a graph point projects to the screen as
@@ -1756,31 +1306,6 @@ export function screenToFlowPosition(clientX: any, clientY: any) {
     y: (clientY - rect.top - t.y) / k
   };
 }
-
-// T2.6 — autoArrange(opts?) — relayout the graph into a non-overlapping LAYERED arrangement
-// (D-08, verb-only, NO auto-trigger — the MapLibre verb-first stance). Runs the
-// AutoArrangePlugin (elkjs classic preset), then READS the arranged positions BACK into a
-// FRESH `{ nodes, connections }` object written through `$model.graph` (the controlled-graph
-// contract — the engine is never the source of truth, mirroring the drag write-back).
-//
-// PITFALL 3 (Plan 00 / RESEARCH): elkjs needs each node's `width`/`height`; our nodes are
-// plain `ClassicPreset.Node` with no dimensions, so without dims the classic preset collapses
-// every node to (0,0). We set `node.width`/`node.height` from the MEASURED engine node-view
-// element (area.nodeViews.get(id).element offsetW/H — target-agnostic, the measureNodeSize
-// discipline) BEFORE layout, falling back to MINIMAP_DEFAULT_NODE_W/H for Lit's unmeasured
-// first paint. (measureNodeSize itself is $onMount-local; the verb is top-level, so the same
-// measure is inlined here over the component-scope `area` + `nodeInstances`.)
-//
-// Echo-guarded (programmatic++ around layout AND the write-back) so the engine relayout and
-// the resulting $model.graph re-bind → $watch(graph) → reconcile don't re-enter; ONE history
-// snapshot is pushed for the whole gesture (D-03, gated on !programmatic + history). The
-// optional `opts.options` (elk layout options — direction/spacing) is forwarded to
-// arrange.layout() (D-01 discretion — default-only is fine; the arg stays optional).
-//
-// Collision discipline: `autoArrange` is NOT a Lit lifecycle name (update/render/firstUpdated/
-// updated/willUpdate/requestUpdate), NOT an inherited DOM method (the Embla scrollTo lesson),
-// NOT an emit (node-*/connection-*/translated/context-menu/selection-change/edge-*/node-action),
-// NOT a prop, NOT a React model-setter (graph/zoom → setGraph/setZoom) — clean on all 6.
 // T2.6 — autoArrange(opts?) — relayout the graph into a non-overlapping LAYERED arrangement
 // (D-08, verb-only, NO auto-trigger — the MapLibre verb-first stance). Runs the
 // AutoArrangePlugin (elkjs classic preset), then READS the arranged positions BACK into a
@@ -1849,23 +1374,6 @@ export async function autoArrange(opts: any) {
     programmatic--;
   }
 }
-
-// ─── imperative selection control ────────────────────────────────────────────
-// Selection was previously PUSH-ONLY (the `selection-change` emit fires on change,
-// but a consumer couldn't READ or DRIVE selection). These reuse the internal
-// `selector` / `nodeSelectApi` (AreaExtensions.selector + selectableNodes) already
-// wired for the marquee — no new engine state. All no-op when selection is off
-// (readonly / !selectable, when `nodeSelectApi` is null). Each schedules the same
-// post-settle `selection-change` recompute the marquee uses, so an imperative
-// select keeps the consumer's bound state in sync (the zoomTo→$model.zoom echo
-// stance). Collision discipline: `selectNode` is NOT bare `select` — `select` is
-// an inherited HTMLElement method (Lit shadow, the Embla scrollTo lesson) AND a
-// FullCalendar-style emit hazard; getSelectedNodes/clearSelection/selectAll/
-// centerOnNode are NOT emits (selection-change/node-*/edge-*), NOT props, NOT
-// React model-setters (graph/zoom → setGraph/setZoom), NOT Lit lifecycle.
-//
-// getSelectedNodes() — the currently-selected nodes as { id, label, x, y } (the
-// getNodes() shape, filtered to the live selection). Empty when nothing selected.
 // ─── imperative selection control ────────────────────────────────────────────
 // Selection was previously PUSH-ONLY (the `selection-change` emit fires on change,
 // but a consumer couldn't READ or DRIVE selection). These reuse the internal
@@ -1888,14 +1396,11 @@ export function getSelectedNodes() {
 }
 // selectNode(id, accumulate?) — programmatically select a node (sidebar/search →
 // highlight). accumulate=true adds to the current selection; falsy replaces it.
-// selectNode(id, accumulate?) — programmatically select a node (sidebar/search →
-// highlight). accumulate=true adds to the current selection; falsy replaces it.
 export function selectNode(id: any, accumulate: any) {
   if (!nodeSelectApi || id == null) return;
   nodeSelectApi.select(id, !!accumulate);
   scheduleSelectionEmit();
 }
-// clearSelection() — unselect every selected node (and any selected edge).
 // clearSelection() — unselect every selected node (and any selected edge).
 export function clearSelection() {
   if (nodeSelectApi) {
@@ -1904,8 +1409,6 @@ export function clearSelection() {
   clearEdgeSelection();
   scheduleSelectionEmit();
 }
-// selectAll() — select every node (Ctrl+A is not bound; marquee only covers a
-// dragged region). Mirrors the marquee's first-replaces / rest-accumulate pattern.
 // selectAll() — select every node (Ctrl+A is not bound; marquee only covers a
 // dragged region). Mirrors the marquee's first-replaces / rest-accumulate pattern.
 export function selectAll() {
@@ -1917,10 +1420,6 @@ export function selectAll() {
   }
   scheduleSelectionEmit();
 }
-// centerOnNode(id, opts?) — pan (and optionally zoom via opts.zoom) to center the
-// viewport on a node by id. setCenter is coordinate-based; this measures the node
-// to compute its center in GRAPH coords (position is the top-left; offsetW/H are
-// unscaled graph units), falling back to the minimap default dims pre-measure.
 // centerOnNode(id, opts?) — pan (and optionally zoom via opts.zoom) to center the
 // viewport on a node by id. setCenter is coordinate-based; this measures the node
 // to compute its center in GRAPH coords (position is the top-left; offsetW/H are

@@ -150,35 +150,17 @@ let thumbsViewportEl = $state<HTMLElement | undefined>(undefined);
 
 import EmblaCarousel from 'embla-carousel';
 import Autoplay from 'embla-carousel-autoplay';
-
-// Top-level null-let (untyped → auto type-neutralized to `any`; React hoists it to
-// useRef cleanly). Do NOT annotate to a concrete EmblaCarouselType.
 // Top-level null-let (untyped → auto type-neutralized to `any`; React hoists it to
 // useRef cleanly). Do NOT annotate to a concrete EmblaCarouselType.
 let embla: any = null;
 // The SECOND Embla instance powering the optional synced thumbnail strip (null
 // when `thumbnails` is off). Top-level let for the same hoist reason as `embla`.
-// The SECOND Embla instance powering the optional synced thumbnail strip (null
-// when `thumbnails` is off). Top-level let for the same hoist reason as `embla`.
 let emblaThumbs: any = null;
-
-// Stable key for config-array slides — prefer an object id, fall back to value/index.
 // Stable key for config-array slides — prefer an object id, fall back to value/index.
 const keyFor = (slide: any, i: any) => {
   if (slide !== null && typeof slide === 'object') return slide.id ?? slide.key ?? i;
   return slide ?? i;
 };
-
-// Map the curated props → an EmblaOptionsType. `draggable` → `watchDrag`. The
-// `...$props.options` escape hatch spreads last so a consumer can override anything.
-//
-// NOTE the null-let return discipline: Embla's EmblaOptionsType narrows the string
-// options to literal unions (align→'start'|'center'|'end', axis→'x'|'y', …). The
-// untyped `String` props are `string`, which does NOT structurally narrow to those
-// unions under strict tsc on the emitted leaves. Building the object into a
-// pre-nulled `let` (auto type-neutralized to `any`) launders the literal so the
-// engine accepts it — the .rozie-native fix (no codegen type-aid, no lang="ts"),
-// the same laundering discipline MapLibre uses for its untyped option object.
 // Map the curated props → an EmblaOptionsType. `draggable` → `watchDrag`. The
 // `...$props.options` escape hatch spreads last so a consumer can override anything.
 //
@@ -218,9 +200,6 @@ const emblaOptionsFromProps = () => {
   };
   return opts;
 };
-
-// Build the plugin array: gate Autoplay behind the `autoplay` prop, then append
-// any consumer-supplied plugins verbatim.
 // Build the plugin array: gate Autoplay behind the `autoplay` prop, then append
 // any consumer-supplied plugins verbatim.
 const emblaPluginsFromProps = () => {
@@ -229,11 +208,6 @@ const emblaPluginsFromProps = () => {
   })] : [];
   return [...builtins, ...plugins];
 };
-
-// Thumbnail-strip Embla options (the canonical Embla "thumbs" config): keep every
-// snap reachable + free dragging so the strip scrolls independently of the main
-// carousel, sharing the main axis. Built into a pre-nulled let for the same
-// literal-union laundering reason as emblaOptionsFromProps (axis is a `string`).
 // Thumbnail-strip Embla options (the canonical Embla "thumbs" config): keep every
 // snap reachable + free dragging so the strip scrolls independently of the main
 // carousel, sharing the main axis. Built into a pre-nulled let for the same
@@ -247,11 +221,6 @@ const thumbsOptionsFromProps = () => {
   };
   return opts;
 };
-
-// Mirror the engine's live nav state into reactive $data so the built-in dots /
-// arrows re-render on every snap change. `snaps` is an INDEX array (one entry per
-// scroll snap → one dot), so the dot r-for needs no unused loop value. Also keeps
-// the thumbnail strip's scroll position in sync with the main selection.
 // Mirror the engine's live nav state into reactive $data so the built-in dots /
 // arrows re-render on every snap change. `snaps` is an INDEX array (one entry per
 // scroll snap → one dot), so the dot r-for needs no unused loop value. Also keeps
@@ -265,20 +234,6 @@ const syncNav = () => {
   canNext = embla.canScrollNext();
   if (emblaThumbs) emblaThumbs.scrollTo(i);
 };
-
-// Thumb click → scroll the MAIN carousel. Calls the $expose'd scrollToIndex verb
-// directly (below) — arg-light internal calls to an exposed verb now typecheck
-// cleanly on all six targets: the emitter lowers a TRAILING $expose verb param
-// optional (`jump?: any` / `index`+`jump?`) whenever it sees a fewer-arg internal
-// call site (emitter-hardening backlog item #5). The prior raw-engine
-// navPrev/navNext/navTo bypass existed ONLY to dodge the pre-fix required-arg
-// TS2554 and is gone now that the compiler owns the arity.
-//
-// NB: no `clickAllowed()` drag-vs-click guard. Embla 8 dropped `clickAllowed`
-// from the public API entirely (it isn't a method on EmblaCarouselType), so the
-// old guard threw `TypeError: emblaThumbs.clickAllowed is not a function` on
-// every thumb tap. The modern Embla thumbs idiom calls `scrollTo` directly; a
-// drag that ends on a thumb simply scrolls, which is acceptable for a nav strip.
 // Thumb click → scroll the MAIN carousel. Calls the $expose'd scrollToIndex verb
 // directly (below) — arg-light internal calls to an exposed verb now typecheck
 // cleanly on all six targets: the emitter lowers a TRAILING $expose verb param

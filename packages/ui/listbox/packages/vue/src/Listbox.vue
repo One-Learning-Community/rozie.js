@@ -781,11 +781,6 @@ const rowIsOutsideWindow = (r: any) => {
 // `virtualizer` guard so the non-virtual emitted path executes none of it
 // (byte-identical-off).
 import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
-
-// Windowing instance state (the `let table` precedent — React hoists reassigned
-// module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
-// when $props.virtual. gridScrollEl is the captured .rozie-listbox-list scroll div the
-// virtualizer observes; remeasurePending dedupes the deferred sweep.
 // Windowing instance state (the `let table` precedent — React hoists reassigned
 // module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
 // when $props.virtual. gridScrollEl is the captured .rozie-listbox-list scroll div the
@@ -794,18 +789,6 @@ let virtualizer: any = null;
 let virtualizerCleanup: any = null;
 let gridScrollEl: any = null;
 let remeasurePending = false;
-
-// windowSource(): the windowing.rzts host-contract row source — the FILTERED option
-// set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
-// (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
-// wr.row.id). A raw Listbox option is a primitive or a bare { label, value, disabled }
-// — NOT guaranteed to have `.id` — so an unwrapped raw set keyed on wr.row.id collapses
-// every framework :key (and every virtual-core measurement key) to `undefined`, which
-// recycles the wrong DOM node as the window scrolls. Wrap each option into an id-bearing
-// row the way the sibling Combobox's filteredOptions() does — `id` is the resolved
-// value, `_opt` the original option (read via wr.row._opt in the windowed template),
-// `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
-// the same wrapped row the count windows over.
 // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
 // set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
 // (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
@@ -822,12 +805,6 @@ const windowSource = () => visibleOptions().map((o: any, i: any) => ({
   _opt: o,
   _i: i
 }));
-
-// D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
-// A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
-// pinnedMeasurement() UNGUARDED by convention; a listbox has no edit-pinning, so these
-// reduce the pin union (-1 → never unioned) and the spacer subtraction (null → identity)
-// to a no-op. They MUST exist or the by-convention call ReferenceErrors at mount.
 // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
 // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
 // pinnedMeasurement() UNGUARDED by convention; a listbox has no edit-pinning, so these
@@ -835,20 +812,10 @@ const windowSource = () => visibleOptions().map((o: any, i: any) => ({
 // to a no-op. They MUST exist or the by-convention call ReferenceErrors at mount.
 const pinnedEditIndex = () => -1;
 const pinnedMeasurement = (pin: any) => null;
-
-// Keep $data.rows === windowSource() so the windowing math indexes the live option set.
 // Keep $data.rows === windowSource() so the windowing math indexes the live option set.
 const syncRows = () => {
   rows.value = windowSource();
 };
-
-// Defer remeasureWindow() until AFTER the framework commits the recycled window
-// (onChange fires BEFORE React/Solid commit). TWO deferred passes (microtask THEN rAF)
-// behind one in-flight flag (the data-table virtualization.rzts:46-56 pattern, copied
-// per-consumer per D-04/D-09): the microtask catches Solid's <For> / Svelte's {#each}
-// SYNCHRONOUS commit (the Phase 63 Solid under-convergence hazard — D-09 rAF-defer
-// budget), the rAF catches React's async commit. measureElement is idempotent on an
-// already-observed node, so running both is cheap and loop-free.
 // Defer remeasureWindow() until AFTER the framework commits the recycled window
 // (onChange fires BEFORE React/Solid commit). TWO deferred passes (microtask THEN rAF)
 // behind one in-flight flag (the data-table virtualization.rzts:46-56 pattern, copied
@@ -873,11 +840,6 @@ const scheduleRemeasure = () => {
   }
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass);else if (ranMicro) remeasurePending = false;else setTimeout(rafPass, 0);
 };
-
-// measureElement sweep: hand every rendered windowed option to the virtualizer so its
-// true (variable) height is observed (virtual-core measures ONLY nodes passed to
-// measureElement, keyed by the data-index attribute). Bails during a programmatic
-// scroll (scrollToIndex) so a measure can't starve the scroll target.
 // measureElement sweep: hand every rendered windowed option to the virtualizer so its
 // true (variable) height is observed (virtual-core measures ONLY nodes passed to
 // measureElement, keyed by the data-index attribute). Bails during a programmatic
@@ -888,11 +850,6 @@ const remeasureWindow = () => {
   const els = gridScrollEl.querySelectorAll('.rozie-listbox-option[data-index]');
   for (const el of els as any) virtualizer.measureElement(el);
 };
-
-// ---- focus / scroll helpers (post-mount $refs only) --------------------
-// Impure ($refs) → per the ROZ123 + A==B rules they stay in the host (the spine
-// only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
-// verb would override the inherited HTMLElement.focus method on the Lit element.
 // ---- focus / scroll helpers (post-mount $refs only) --------------------
 // Impure ($refs) → per the ROZ123 + A==B rules they stay in the host (the spine
 // only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
@@ -900,11 +857,6 @@ const remeasureWindow = () => {
 const focusControl = () => {
   triggerElRef.value?.focus();
 };
-
-// Keep the active option visible inside the scrolling listbox. Reads $refs in
-// a post-mount callback only (never eagerly — ROZ123). When windowing, route through
-// the virtualizer (scrollToIndex) so an active option OUTSIDE the rendered window is
-// scrolled into view (the windowed-arrow-nav seam); else the native scrollIntoView.
 // Keep the active option visible inside the scrolling listbox. Reads $refs in
 // a post-mount callback only (never eagerly — ROZ123). When windowing, route through
 // the virtualizer (scrollToIndex) so an active option OUTSIDE the rendered window is
@@ -927,17 +879,6 @@ const scrollActiveIntoView = () => {
     block: 'nearest'
   });
 };
-
-// ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
-// kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,
-// re-feeds the CURRENT option count into the virtualizer, re-attaches its rect observer
-// (_willUpdate), and bumps the windowVer signal so the windowed <For>/{#each}/repeat
-// re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
-// asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
-// (b) Solid/Lit recreate the list node between mount and first commit (leaving virtual-core's
-// scrollElement stale), and (c) the consumer often seeds options AFTER the listbox mounts
-// (Lit/React), so the count must be re-read once the prop propagates. Stops once the window
-// paints (or attempts run out) — idempotent + loop-free.
 // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
 // kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,
 // re-feeds the CURRENT option count into the virtualizer, re-attaches its rect observer

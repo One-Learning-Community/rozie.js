@@ -94,21 +94,8 @@ import { EditorState, Compartment, EditorSelection, StateField, RangeSet } from 
 // 'gutter' has already been declared"). Same discipline as `basicSetup as
 // basicSetupBundle` below (a prop-vs-import collision). The `decoration` slot has
 // no matching import name, so `Decoration` (capitalized, distinct) needs no alias.
-// `gutter` is imported under an alias: the `gutter` SLOT (G5 wave 2) lowers into
-// a same-scope local on targets that bind slots as locals (Svelte snippet prop
-// `gutter`, etc.), so the bare CM6 `gutter` import would collide ("Identifier
-// 'gutter' has already been declared"). Same discipline as `basicSetup as
-// basicSetupBundle` below (a prop-vs-import collision). The `decoration` slot has
-// no matching import name, so `Decoration` (capitalized, distinct) needs no alias.
 import { EditorView, keymap, lineNumbers, showPanel, showTooltip, placeholder as placeholderExt, gutter as gutterExt, GutterMarker, Decoration, WidgetType } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-// Namespace import for the command functions exposed as verbs (undo/redo/
-// selectAll). A NAMED `import { undo as undoCmd }` would put the export name
-// `undo` in an ImportSpecifier's `imported` slot, and the Lit emitter's
-// identifier-rewrite (exposed verb → `this.undo`) mis-rewrites that slot into a
-// MemberExpression — a latent emitter limitation. The namespace form keeps the
-// command names as MEMBER accesses (`cmCommands.undo`), which the rewrite leaves
-// untouched, so the public verbs can be named `undo`/`redo`/`selectAll`.
 // Namespace import for the command functions exposed as verbs (undo/redo/
 // selectAll). A NAMED `import { undo as undoCmd }` would put the export name
 // `undo` in an ImportSpecifier's `imported` slot, and the Lit emitter's
@@ -122,26 +109,13 @@ import { oneDark } from '@codemirror/theme-one-dark';
 // Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
 // with this binding on targets that lower props into same-scope locals (Svelte
 // `let basicSetup`, Solid/React destructured `props.basicSetup`).
-// Imported under an alias: the `basicSetup` PROP (G1) would otherwise collide
-// with this binding on targets that lower props into same-scope locals (Svelte
-// `let basicSetup`, Solid/React destructured `props.basicSetup`).
 import { basicSetup as basicSetupBundle } from 'codemirror';
 let view: any = null;
-
-// CodeMirror's updateListener fires on EVERY transaction, including our own
-// $watch-driven dispatch when the consumer changes `value`. Without a guard
-// the wrapper would emit its own dispatch back through the model path on
-// the next tick — a slow ping-pong loop that doesn't crash but eats RAFs.
 // CodeMirror's updateListener fires on EVERY transaction, including our own
 // $watch-driven dispatch when the consumer changes `value`. Without a guard
 // the wrapper would emit its own dispatch back through the model path on
 // the next tick — a slow ping-pong loop that doesn't crash but eats RAFs.
 let suppressEmit = false;
-
-// Compartments let us swap individual extensions at runtime via
-// `view.dispatch({ effects: compartment.reconfigure(newExt) })` without
-// rebuilding the entire EditorState. Each runtime-updatable prop gets one so
-// prop changes don't lose cursor/history/scroll position.
 // Compartments let us swap individual extensions at runtime via
 // `view.dispatch({ effects: compartment.reconfigure(newExt) })` without
 // rebuilding the entire EditorState. Each runtime-updatable prop gets one so
@@ -155,18 +129,7 @@ const extensionsCompartment = new Compartment();
 const panelCompartment = new Compartment();
 // topPanel is the top-docked sibling of `panel` — a SECOND mount-once portal
 // slot (G5 wave 1) wired through the same `showPanel` facet with `top: true`.
-// topPanel is the top-docked sibling of `panel` — a SECOND mount-once portal
-// slot (G5 wave 1) wired through the same `showPanel` facet with `top: true`.
 const topPanelCompartment = new Compartment();
-// gutter / decoration are the REACTIVE MULTI-INSTANCE portal slots (G5 wave 2) —
-// one portal handle per visible marker/widget (the TipTap nodeView template).
-// Each owns a compartment so its driving prop (`gutterLines` / `decorations`)
-// reconfigures the marked lines / decorated ranges LIVE with no remount, like
-// every other runtime-updatable prop. The GutterMarker/WidgetType classes that
-// capture $portals.gutter / $portals.decoration are built INSIDE $onMount (a
-// top-level $portals reference fails the bundled-leaf strict typecheck — the
-// panel/tooltip/nodeView discipline), so these compartments are filled from
-// factories invoked in the mount body.
 // gutter / decoration are the REACTIVE MULTI-INSTANCE portal slots (G5 wave 2) —
 // one portal handle per visible marker/widget (the TipTap nodeView template).
 // Each owns a compartment so its driving prop (`gutterLines` / `decorations`)
@@ -178,15 +141,6 @@ const topPanelCompartment = new Compartment();
 // factories invoked in the mount body.
 const gutterCompartment = new Compartment();
 const decorationCompartment = new Compartment();
-// The gutter / decoration extension FACTORIES capture the per-target $portals
-// helper, so they MUST be built inside $onMount (a top-level $portals reference
-// fails the bundled-leaf strict typecheck). But the gutterLines / decorations
-// $watch reconfigures are top-level and need to rebuild the extension on prop
-// change. Bridge with these component-scope `let`s: $onMount assigns each to its
-// mount-built factory; the $watch closures call through them (no-op before mount
-// or when the slot is unfilled). COMPONENT-scope (not $onMount-local) so the
-// top-level $watch can reach them — the same hoist the TipTap toolbarDispose
-// uses for a mount-built handle referenced from outside the mount body.
 // The gutter / decoration extension FACTORIES capture the per-target $portals
 // helper, so they MUST be built inside $onMount (a top-level $portals reference
 // fails the bundled-leaf strict typecheck). But the gutterLines / decorations
@@ -211,25 +165,7 @@ let rebuildDecorationExt: any = null;
 // highlighting); consumers add other languages via :extensions (D-03). This
 // FIXES the prior declared-but-ignored bug where buildState hard-coded
 // javascript() regardless of $props.language.
-// tooltip is CodeMirror's FIRST REACTIVE portal slot (G5 wave 1) — a
-// cursor-anchored tooltip via the `showTooltip` facet. Driven by a StateField
-// (`tooltipField`, built inside $onMount) so it tracks the caret; the reactive
-// portal handle re-renders the consumer fragment IN PLACE on caret move rather
-// than remounting it each keystroke. NO compartment — a StateField is the
-// idiomatic showTooltip source and there is no runtime prop to reconfigure it
-// against (slot presence is decided once at mount).
-
-// language is a convenience prop mapping to the ONE bundled language
-// (@codemirror/lang-javascript). Any other value → [] (plain text, no syntax
-// highlighting); consumers add other languages via :extensions (D-03). This
-// FIXES the prior declared-but-ignored bug where buildState hard-coded
-// javascript() regardless of $props.language.
 const langExt = () => language === 'javascript' ? javascript() : [];
-
-// theme resolution (G3): the two built-in strings map to oneDark / [];
-// anything else is treated as a CM Extension (or Extension[]) and passed
-// straight through the themeCompartment. The $watch(theme) reconfigure below
-// covers extension themes live, identical to the string forms.
 // theme resolution (G3): the two built-in strings map to oneDark / [];
 // anything else is treated as a CM Extension (or Extension[]) and passed
 // straight through the themeCompartment. The $watch(theme) reconfigure below
@@ -244,19 +180,8 @@ const themeExt = () => {
   // accept it; the type-neutral targets strip types entirely.
   return t;
 };
-
-// placeholder ext only when a non-empty placeholder string is supplied.
 // placeholder ext only when a non-empty placeholder string is supplied.
 const phExt = () => placeholder ? placeholderExt(placeholder) : [];
-
-// baseline keymap/gutter set (G1). When `basicSetup` is on, use CM6's
-// `basicSetup` bundle (autocomplete, search, bracket matching, code folding,
-// lint gutter, richer keymaps — it ALREADY includes line numbers + history, so
-// the manual trio would double those up). When off, keep the exact thin
-// baseline the wrapper shipped before G1 (line numbers + history + default/
-// history keymaps) → existing consumers stay byte-stable. Composed through
-// `baselineCompartment` (see below) so the `$watch(basicSetup)` reconfigure
-// can swap the bundle live.
 // baseline keymap/gutter set (G1). When `basicSetup` is on, use CM6's
 // `basicSetup` bundle (autocomplete, search, bracket matching, code folding,
 // lint gutter, richer keymaps — it ALREADY includes line numbers + history, so
@@ -330,12 +255,6 @@ export function getValue() {
 // collides on the React target (ROZ524: "already declared" + recursive rewrite).
 // Renamed to preserve the value-setter semantics collision-free across all 6
 // targets. (Deviation from the locked D-06 name `setValue`.)
-// replaceValue routes through the SAME suppress-echo guard as $watch(value).
-// NOTE: named `replaceValue` (not `setValue`) — a `value` model prop makes
-// React auto-generate a `setValue` state setter, so a `setValue` $expose verb
-// collides on the React target (ROZ524: "already declared" + recursive rewrite).
-// Renamed to preserve the value-setter semantics collision-free across all 6
-// targets. (Deviation from the locked D-06 name `setValue`.)
 export function replaceValue(v: any) {
   writeDoc(v);
 }
@@ -376,9 +295,6 @@ export function redo() {
 export function selectAll() {
   if (view) cmCommands.selectAll(view);
 }
-// Reveal a document position (jump-to-line, scroll-to-match/error). setSelection
-// moves the caret but does not guarantee scroll; this dispatches the scroll
-// effect. opts default centers the position vertically.
 // Reveal a document position (jump-to-line, scroll-to-match/error). setSelection
 // moves the caret but does not guarantee scroll; this dispatches the scroll
 // effect. opts default centers the position vertically.

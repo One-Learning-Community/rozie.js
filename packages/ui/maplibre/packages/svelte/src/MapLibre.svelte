@@ -209,27 +209,15 @@ let containerEl = $state<HTMLElement | undefined>(undefined);
 
 import maplibregl from 'maplibre-gl';
 let instance: any = null;
-
-// MapLibre's official no-token demo tiles — the zero-config `mapStyle` fallback
-// (the prop default is `undefined`; see the prop note).
 // MapLibre's official no-token demo tiles — the zero-config `mapStyle` fallback
 // (the prop default is `undefined`; see the prop note).
 const DEFAULT_STYLE = 'https://demotiles.maplibre.org/style.json';
-
-// The eventData merged onto programmatic camera ops so the camera-lifecycle echo
-// handlers can ignore our own moves (the documented MapLibre echo-guard — robust
-// across batched ops where Leaflet's single boolean would race).
 // The eventData merged onto programmatic camera ops so the camera-lifecycle echo
 // handlers can ignore our own moves (the documented MapLibre echo-guard — robust
 // across batched ops where Leaflet's single boolean would race).
 const PROGRAMMATIC = {
   rozieProgrammatic: true
 };
-
-// Live entry maps for the REACTIVE MULTI-INSTANCE portal slots — keyed by
-// entry.id ?? index. Each value: { engine, handle, el }. COMPONENT-scope (not
-// $onMount-local) so the $onMount-returned teardown — which the Solid emitter
-// hoists into a sibling onCleanup() OUTSIDE the mount IIFE — keeps them in scope.
 // Live entry maps for the REACTIVE MULTI-INSTANCE portal slots — keyed by
 // entry.id ?? index. Each value: { engine, handle, el }. COMPONENT-scope (not
 // $onMount-local) so the $onMount-returned teardown — which the Solid emitter
@@ -258,34 +246,20 @@ let controlDispose: any = null;
 let customControl: any = null;
 // layer-scoped feature listeners, registered per interactiveLayerId so they can
 // be unregistered on change. id → { enter, leave }.
-// layer-scoped feature listeners, registered per interactiveLayerId so they can
-// be unregistered on change. id → { enter, leave }.
 const featureListeners = new Map();
-// previously-applied source/layer ids (null-lets → `any`, [] in $onMount; same
-// never[] reason as controlInstances) so a sources/layers prop change can remove
-// the dropped ones.
 // previously-applied source/layer ids (null-lets → `any`, [] in $onMount; same
 // never[] reason as controlInstances) so a sources/layers prop change can remove
 // the dropped ones.
 let appliedLayerIds: any = null;
 let appliedSourceIds: any = null;
-
-// The $portals/$emit-capturing reconcilers are built INSIDE $onMount (a top-level
-// $portals reference fails the bundled-leaf strict typecheck — the CM/TipTap
-// portal discipline) and bridged here so the top-level $watch can call them.
 // The $portals/$emit-capturing reconcilers are built INSIDE $onMount (a top-level
 // $portals reference fails the bundled-leaf strict typecheck — the CM/TipTap
 // portal discipline) and bridged here so the top-level $watch can call them.
 let reconcileMarkers: any = null;
 let reconcilePopups: any = null;
 let reconcileInteractive: any = null;
-
-// ─── pure helpers (no sigils → safe at top level) ───────────────────────────
 // ─── pure helpers (no sigils → safe at top level) ───────────────────────────
 const sameCenter = (a: any, b: any) => Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1];
-
-// structured pointer-event payload — stable across targets, avoids handing the
-// raw engine event (with its circular `target: Map`) to consumers.
 // structured pointer-event payload — stable across targets, avoids handing the
 // raw engine event (with its circular `target: Map`) to consumers.
 const payload = (e: any) => ({
@@ -310,9 +284,6 @@ const buildControl = (spec: any) => {
   if (type === 'attribution') return new maplibregl.AttributionControl(opts);
   return null;
 };
-
-// Standard controls reconcile — no $portals/$emit, so top-level. Remove-all +
-// re-add from the config (controls rarely change; cheap and order-correct).
 // Standard controls reconcile — no $portals/$emit, so top-level. Remove-all +
 // re-add from the config (controls rarely change; cheap and order-correct).
 const applyControls = () => {
@@ -328,8 +299,6 @@ const applyControls = () => {
     controlInstances.push(ctrl);
   }
 };
-
-// Interaction-toggle reconcile — each toggle maps to a runtime handler object.
 // Interaction-toggle reconcile — each toggle maps to a runtime handler object.
 const applyInteractionToggles = () => {
   if (!instance) return;
@@ -346,10 +315,6 @@ const applyInteractionToggles = () => {
   set('touchZoomRotate', touchZoomRotate);
   set('touchPitch', touchPitch);
 };
-
-// Style-load-gated source/layer reconcile. Order matters: drop removed layers
-// FIRST, then add/update sources, then add/update layers, then drop removed
-// sources (after their layers are gone).
 // Style-load-gated source/layer reconcile. Order matters: drop removed layers
 // FIRST, then add/update sources, then add/update layers, then drop removed
 // sources (after their layers are gone).

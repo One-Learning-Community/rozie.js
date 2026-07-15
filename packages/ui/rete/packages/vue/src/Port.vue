@@ -46,21 +46,12 @@ const injectedType = inject('rete:nodeType');
 // lesson). ZERO emitter change.
 let nt: any = null;
 nt = injectedType;
-
-// Derive side + key from which of output=/input= is set. output wins if both are
-// (mis)set. `output`/`input` are ordinary identifiers (NOT reserved words) so they
-// read normally — no member-access-only workaround needed. null key (neither set) ⇒
-// addPort no-ops on the canvas side (key == null guard).
 // Derive side + key from which of output=/input= is set. output wins if both are
 // (mis)set. `output`/`input` are ordinary identifiers (NOT reserved words) so they
 // read normally — no member-access-only workaround needed. null key (neither set) ⇒
 // addPort no-ops on the canvas side (key == null guard).
 const portSide = () => props.output != null ? 'output' : 'input';
 const portKey = () => props.output != null ? props.output : props.input;
-
-// idempotency flag so the $onMount addPort and the late-context $onUpdate path
-// (Lit async, REQ-30) never double-add the port. (addTypePort is also idempotent —
-// same `type::side::key` key, same value — so this is belt-and-suspenders.)
 // idempotency flag so the $onMount addPort and the late-context $onUpdate path
 // (Lit async, REQ-30) never double-add the port. (addTypePort is also idempotent —
 // same `type::side::key` key, same value — so this is belt-and-suspenders.)

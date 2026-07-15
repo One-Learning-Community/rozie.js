@@ -68,11 +68,6 @@ const dragging = ref(false);
 const rootRef = ref<HTMLElement>();
 
 import { clampPercent, percentFromPointer, nudge } from './internal/resizeMath';
-
-// ---- derived view (plain functions, uniform ×6) ------------------------
-// The current size, normalized + clamped. Plain function (called in template
-// bindings AND handlers) — never $computed (a $computed is a value on React but
-// an accessor on Solid; a plain fn reads uniformly).
 // ---- derived view (plain functions, uniform ×6) ------------------------
 // The current size, normalized + clamped. Plain function (called in template
 // bindings AND handlers) — never $computed (a $computed is a value on React but
@@ -82,18 +77,11 @@ const currentSize = () => {
   return clampPercent(raw, props.min, props.max);
 };
 const isVertical = () => props.direction === 'vertical';
-
-// Inline CSS custom property positioning the panels. Read BARE in the template
-// via :style — a plain object literal, recomputed each render.
 // Inline CSS custom property positioning the panels. Read BARE in the template
 // via :style — a plain object literal, recomputed each render.
 const sizeStyle = () => ({
   '--rozie-resizable-size': currentSize() + '%'
 });
-
-// ---- write funnel (single $emit site) ----------------------------------
-// Clamp, write the model, emit resize. The SOLE $emit('resize') site so the
-// React prop-destructure for onResize hoists exactly once.
 // ---- write funnel (single $emit site) ----------------------------------
 // Clamp, write the model, emit resize. The SOLE $emit('resize') site so the
 // React prop-destructure for onResize hoists exactly once.
@@ -104,9 +92,6 @@ const commitSize = (raw: any) => {
     size: next
   });
 };
-
-// ---- pointer drag (template @event + pointer capture) ------------------
-// $refs.root is post-mount-only (ROZ123-safe): read inside these handlers.
 // ---- pointer drag (template @event + pointer capture) ------------------
 // $refs.root is post-mount-only (ROZ123-safe): read inside these handlers.
 const onPointerDown = (e: any) => {
@@ -136,10 +121,6 @@ const onPointerUp = (e: any) => {
     }
   }
 };
-
-// ---- keyboard (role="separator") ---------------------------------------
-// Arrow keys nudge by 1% (toward/away from the start panel along the axis);
-// Home/End jump to min/max. Matches the WAI-ARIA window-splitter pattern.
 // ---- keyboard (role="separator") ---------------------------------------
 // Arrow keys nudge by 1% (toward/away from the start panel along the axis);
 // Home/End jump to min/max. Matches the WAI-ARIA window-splitter pattern.
@@ -163,18 +144,6 @@ const onKeydown = (e: any) => {
     commitSize(props.max);
   }
 };
-
-// ---- imperative handle -------------------------------------------------
-// applySize(percent) — set the split programmatically (clamped + emits resize).
-// reset() — recentre to the midpoint of [min, max].
-// COLLISION NOTE: the verb is `applySize`, NOT the natural `setSize` — the model
-// prop is `size`, so the React emitter auto-generates a `setSize` state setter.
-// A `$expose` verb named `setSize` collapses onto that setter ident and trips
-// ROZ524 (it fires as an INTERNAL diagnostic because the Phase-46 deconfliction
-// pass does NOT rename inside an `$expose`-verb closure — see the emitter-gap
-// note in the family README). `apply<X>` is the listbox/data-table precedent for
-// dodging a generated React setter. It is also NOT `resize` (→ ROZ121 emit clash)
-// and NOT a host-element member.
 // ---- imperative handle -------------------------------------------------
 // applySize(percent) — set the split programmatically (clamped + emits resize).
 // reset() — recentre to the midpoint of [min, max].

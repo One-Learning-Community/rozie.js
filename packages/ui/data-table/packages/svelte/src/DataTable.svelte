@@ -292,30 +292,13 @@ getFacetedUniqueValues as makeFacetedUniqueValues, getFacetedMinMaxValues as mak
 // by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
 // guard so they never execute when off — the import token is the only static virtual-core
 // presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
-// Vertical row windowing (phase 53). A3: this static import line is emitted UNCONDITIONALLY
-// (virtual-core is a peer dep the consumer installs); byte-identical-off (req-1) is satisfied
-// by ALL virtual-core RUNTIME references sitting behind `if ($props.virtual)` / a `virtualizer`
-// guard so they never execute when off — the import token is the only static virtual-core
-// presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
 import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
-
-// table-core instance — top-level `let` referenced from hooks → React hoists to
-// useRef (hoistModuleLet). NULL until $onMount: createTable lives in $onMount so its
-// getRowModel-reading closures capture the LIVE instance, NOT an empty initial
-// snapshot (the rete stale-closure anti-pattern — a top-level $computed/useCallback
-// freezes the table at the empty-initial state on React).
 // table-core instance — top-level `let` referenced from hooks → React hoists to
 // useRef (hoistModuleLet). NULL until $onMount: createTable lives in $onMount so its
 // getRowModel-reading closures capture the LIVE instance, NOT an empty initial
 // snapshot (the rete stale-closure anti-pattern — a top-level $computed/useCallback
 // freezes the table at the empty-initial state on React).
 let table: any = null;
-
-// ── Vertical row windowing instance state (phase 53) ──────────────────────────────────
-// Mutable top-level instances (the `let table` precedent — React hoists to useRef; do NOT
-// const). NULL until $onMount, and ONLY constructed when $props.virtual. virtualizerCleanup
-// holds the _didMount() teardown for $onUnmount; gridScrollEl is the captured .rdt-scroll div
-// the virtualizer observes.
 // ── Vertical row windowing instance state (phase 53) ──────────────────────────────────
 // Mutable top-level instances (the `let table` precedent — React hoists to useRef; do NOT
 // const). NULL until $onMount, and ONLY constructed when $props.virtual. virtualizerCleanup
@@ -333,21 +316,7 @@ let gridScrollEl: any = null;
 // (virtualizer.isScrolling), so a measure can't run during scrollToIndex; the next settled
 // onChange re-measures the now-stable window. Scroll-driven recycling (the CR-01 case, measured
 // once motion settles between scroll steps) is unaffected.
-// CR-01 remeasure scheduling state. remeasurePending dedupes the deferred sweep — at most ONE
-// rAF is in flight, so a burst of onChange ticks (a fast scroll) collapses to a single measure
-// pass per frame instead of piling up rAF callbacks that fire mid-gesture. The piled-up
-// callbacks were what broke the Solid scroll-then-focus seam (D-12 focusActiveCell →
-// scrollToIndex → double-rAF focus): a stray remeasure firing inside that focus deferral
-// disrupted the focus landing. The sweep ALSO bails while virtual-core is mid-scroll
-// (virtualizer.isScrolling), so a measure can't run during scrollToIndex; the next settled
-// onChange re-measures the now-stable window. Scroll-driven recycling (the CR-01 case, measured
-// once motion settles between scroll steps) is unaffected.
 let remeasurePending = false;
-
-// ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
-// Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
-// via the same focusActiveCell() scroll-into-view seam — kept a top-level const so that
-// later change is a one-line edit.
 // ── Grid interaction-mode constants + DOM root (phase 49, REQ-2/6) ────────────────────
 // Fixed PageUp/PageDown row step (D-06). Phase 53 swaps this for the visible-window size
 // via the same focusActiveCell() scroll-into-view seam — kept a top-level const so that
@@ -358,28 +327,10 @@ const GRID_PAGE_STEP = 10;
 // shadow-safe because the query runs from INSIDE the component's own scope (the listbox
 // querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
 // computed/template binding (ROZ123).
-// The stable table-root element, captured in $onMount (the ONLY ROZ123-safe place to read
-// $el / query DOM across all six). focusActiveCell() resolves cells off this root; it is
-// shadow-safe because the query runs from INSIDE the component's own scope (the listbox
-// querySelector-off-root precedent, proven ×6 by plan 01's probe). NEVER read in a
-// computed/template binding (ROZ123).
 let gridRoot: any = null;
-
-// Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
-// the funnel. A counter (not a boolean) so nested writes are safe.
 // Echo-guard: while WE are writing a slice back, the re-feed watcher must not re-enter
 // the funnel. A counter (not a boolean) so nested writes are safe.
 let programmatic = 0;
-
-// Focus-intent epoch (#9) — a monotonic counter bumped at every focus-INTENT entry point
-// (focusActiveCell / focusCell+focusAbsCellWhenReady arm / a genuine active-cell-moving
-// focusin in syncActiveFromEvent). The two async focus-recovery polls (focusWhenReady for the
-// virtual off-window scroll, focusAbsCellWhenReady for the paginated page-switch) CAPTURE this
-// value at arm time (AFTER their own bump) and abort at the top of each iteration if it has since
-// changed — so a LATER user nav (ArrowKey / click) supersedes a stale poll instead of the poll
-// yanking focus back frames later. A naive guardMoved "abort if focus moved" check is WRONG here:
-// both polls arm while focus still sits on the OLD/being-left cell BY DESIGN (scroll-to /
-// page-switch), so an epoch — bumped only by a NEWER intent — is the correct abort signal.
 // Focus-intent epoch (#9) — a monotonic counter bumped at every focus-INTENT entry point
 // (focusActiveCell / focusCell+focusAbsCellWhenReady arm / a genuine active-cell-moving
 // focusin in syncActiveFromEvent). The two async focus-recovery polls (focusWhenReady for the
@@ -390,37 +341,6 @@ let programmatic = 0;
 // both polls arm while focus still sits on the OLD/being-left cell BY DESIGN (scroll-to /
 // page-switch), so an epoch — bumped only by a NEWER intent — is the correct abort signal.
 let focusIntentEpoch = 0;
-
-// ── Grid-wide undo/redo (260709-8ct) — history STATE lives in top-level `let` (mirroring
-// `programmatic` above), NOT $data: recording a snapshot on every keystroke must not trigger
-// a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array
-// REFERENCES (never deep copies — see undoHistory.rzts's header comment on the shared-row
-// invariant). restoringHistory suppresses re-recording while an undo()/redo() replay is
-// in flight.
-//
-// The external-swap history reset keys on data ORIGIN, not a timing window. Every internal
-// writeback stamps its fresh `data` array with a durable, non-enumerable marker under
-// DATA_WRITE_TOKEN_KEY (see writeData in writeFunnels.rzts); the reset (maybeClearHistoryOnExternal
-// Swap, below) clears history ONLY when a newly-supplied `$props.data` carries no marker — it did
-// not come from us, so it is a genuine external dataset swap. Presence of the marker ⟺ "descends
-// from one of our writes", and it survives EVERYTHING that defeated the four flag/timer variants:
-//   1. A raw-reference latch (`lastWrittenData === currentData()`) — Vue `reactive()` / Svelte 5
-//      `$state` / Solid store re-wrap a written array in a NEW Proxy on its way back through props,
-//      so `===` never holds. (A non-enumerable own PROPERTY, by contrast, is forwarded through
-//      every target's reactive Proxy via `Reflect.get` — readable through the wrap.)
-//   2. A single-consume boolean — the re-feed watch fires MULTIPLE times per write; the first pass
-//      consumed the flag, a later pass wrongly cleared.
-//   3. A content signature (`JSON.stringify`) — the watch can fire with a TRANSIENTLY STALE
-//      `currentData()` mid-settle (Solid/Lit), a real-but-older value → false mismatch.
-//   4. A deferred settle-window flag (rAF, then a 96ms macrotask) — a slow re-feed on a LARGE
-//      controlled table OUTRAN the window (#8); no fixed timeout can be correct (re-feed latency
-//      scales with dataset size).
-// A STRING key (not a JS Symbol) is deliberate: it is stable BY VALUE on all six targets with ZERO
-// caching, whereas a `Symbol()` needs a per-instance memo to hold one identity — and Lit lowers
-// `$computed(() => Symbol())` to a plain getter that RE-MINTS the Symbol on every read, so writeData
-// and the reset would stamp/read DIFFERENT symbols and the marker would never match. Non-enumerable
-// → invisible to JSON.stringify / spread / Object.keys (the consumer's data stays clean); namespaced
-// so a consumer array never collides.
 // ── Grid-wide undo/redo (260709-8ct) — history STATE lives in top-level `let` (mirroring
 // `programmatic` above), NOT $data: recording a snapshot on every keystroke must not trigger
 // a reactive re-render. React hoists each to useRef. undoStack/redoStack hold `data` array
@@ -455,14 +375,6 @@ const DATA_WRITE_TOKEN_KEY = '__rozieDataWriteToken';
 let undoStack: unknown[] = [];
 let redoStack: unknown[] = [];
 let restoringHistory: boolean = false;
-
-// Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
-// has not bound `expanded` and has not yet toggled any group, group-header rows default to
-// EXPANDED (so the grouped subtree is visible — the standard grouped-grid affordance + the
-// roundout-VR leaf-visible baseline). The FIRST group/row toggle sets this true (in
-// writeExpanded), after which the user's expanded state wins. Stays false (untouched) on the
-// non-grouping path → byte-identical-off (the `expanded` slice resolves to $data.expandedDefault
-// exactly as before, both for the plain table AND the expandable-rows feature).
 // Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
 // has not bound `expanded` and has not yet toggled any group, group-header rows default to
 // EXPANDED (so the grouped subtree is visible — the standard grouped-grid affordance + the
@@ -1838,15 +1750,9 @@ const announceState: {
 };
 // Effective (controlled-or-uncontrolled) reads of the sort/filter slices: the bound prop when
 // the consumer bound the matching r-model, else the uncontrolled $data default (mirrors currentState()).
-// Effective (controlled-or-uncontrolled) reads of the sort/filter slices: the bound prop when
-// the consumer bound the matching r-model, else the uncontrolled $data default (mirrors currentState()).
 const effectiveSorting = () => sorting != null ? sorting : sortingDefault;
 const effectiveColumnFilters = () => columnFilters != null ? columnFilters : columnFiltersDefault;
 const effectiveGlobalFilter = () => globalFilter != null ? globalFilter : globalFilterDefault;
-// Build the polite message for a sort/filter change and advance announceState. Sort takes
-// precedence when the sorting reference changed; otherwise a filter changed → the post-filter
-// result count (the FILTERED total via totalRowCount(), NOT the page slice). Returns '' when
-// neither actually changed (a no-op watch tick — do not re-announce).
 // Build the polite message for a sort/filter change and advance announceState. Sort takes
 // precedence when the sorting reference changed; otherwise a filter changed → the post-filter
 // result count (the FILTERED total via totalRowCount(), NOT the page slice). Returns '' when
@@ -1938,29 +1844,6 @@ const reFeed = () => {
   }));
   if (refreshRowModel) refreshRowModel();
 };
-
-// LIT (+ any fine-grained target whose effect-tracked watch does NOT observe the plain
-// `data` PROPERTY): the re-feed $watch reads `(this.data||[]).length` inside a
-// preact-signals effect, but `data` is a Lit @property (not a signal) so the effect
-// never re-runs when the consumer pushes new rows post-mount (the sticky demo seeds 20
-// rows in its own $onMount AFTER the child mounted empty → the body stayed at 0). The
-// slice models DO re-pull (their $data.<slice>Default signals are effect-tracked), so
-// only a raw `data` reference/length change slips through. $onUpdate (Lit updated())
-// fires on ANY property change incl `data`; guard with a stored last-seen data ref +
-// length so it re-feeds ONLY on a real data change (no churn). On the coarse-render
-// targets the watch already covers it; this is a cheap idempotent backstop.
-// External-swap history reset (grid-wide undo/redo, 260709-8ct; #8 fix). Keyed on the CONTROLLED
-// `$props.data` REFERENCE changing — deliberately NOT on `currentData()` inside reFeed. An internal
-// writeback changes `$data.dataDefault` SYNCHRONOUSLY and only LATER round-trips into `$props.data`;
-// keying on `$props.data`'s OWN change means we never observe the transient window where a fine-
-// grained target's reFeed reads a stale, unstamped `$props.data` mid-write and wrongly wipes a
-// just-recorded edit's history (the stale-read false-clear — the SAME failure that broke the
-// content-signature variant — that regressed Solid/Lit when this clear lived in reFeed). When
-// `$props.data` genuinely changes: a new array carrying DATA_WRITE_TOKEN round-tripped from one of
-// OUR writes → keep; one without it is a dataset the consumer handed us → external swap → clear. A
-// non-data tick (sort/filter/pagination) never touches `$props.data` → never clears. Called from
-// BOTH the coarse re-feed watch AND the $onUpdate backstop (Lit's @property `data` the effect-
-// tracked watch can't observe); both are ref-gated so the redundant call is an idempotent no-op.
 // LIT (+ any fine-grained target whose effect-tracked watch does NOT observe the plain
 // `data` PROPERTY): the re-feed $watch reads `(this.data||[]).length` inside a
 // preact-signals effect, but `data` is a Lit @property (not a signal) so the effect
@@ -2004,17 +1887,6 @@ const onHeaderSort = (colId: any, evt: any) => {
   // toggleSorting(desc?, isMulti?) cycles asc → desc → none; multi accumulates.
   col.toggleSorting(undefined, multi);
 };
-
-// aria-sort string for a column header: 'ascending' | 'descending' | 'none'. Reads
-// Reactive tick: read $data.rowModelVer (bumped by every refreshRowModel) so a
-// template binding that calls a table-READING chrome helper (pagination/sort/pin/
-// visibility predicates below) re-evaluates when the row model changes. On the
-// coarse-render targets (Vue/React/Angular) the whole template re-runs anyway so this
-// is a no-op; on the FINE-GRAINED targets (Solid/Lit) a helper that only reads the
-// non-reactive `table` let would be computed ONCE (when table is still null → the
-// default branch) and never update — pagination would read "Page 1 of 1" forever,
-// aria-sort never flips, the pin position never sticks. Touching rowModelVer puts each
-// helper in the reactive scope. The chrome helpers prefix `tick()` in their guard.
 // aria-sort string for a column header: 'ascending' | 'descending' | 'none'. Reads
 // Reactive tick: read $data.rowModelVer (bumped by every refreshRowModel) so a
 // template binding that calls a table-READING chrome helper (pagination/sort/pin/
@@ -4265,23 +4137,6 @@ const clampActiveCell = (rowCount: any, colCount: any) => {
 // already read reactive $data synchronously). A top-level reassigned `let` referenced from the
 // refreshRowModel/clampActiveCell chain → React hoists to useRef → persists per-instance.
 let gridEmptyFallback = false;
-
-// ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
-// A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
-// (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the
-// highlight reattaches to the correct cells across virtualization recycling (the
-// activeRow/activeColIndex invariant). ONE-WAY (D-07): exposed via getSelectedRange +
-// range-change, NOT a model:true slice. Coexists with — and is visually distinct from —
-// the row-selection slice (the two never touch each other's state).
-
-// inRange(rIdx, cIdx): is the cell at the visible-model index pair inside the current
-// rectangle? Pure index math (the min/max box of anchor+focus). False when no range —
-// the byte-identical-off guard for the range markup (no anchor/focus → no :data-in-range).
-// rangeTransition: set true while extendRange/setRangeFocus moves DOM focus to the new
-// range-focus corner. That focus move fires @focusin → syncActiveFromEvent with NO shiftKey
-// (a programmatic focus carries no modifier), which would otherwise clearRange() and wipe the
-// range we just set. The flag suppresses that collapse for the in-flight focus settle (the
-// editTransition blur-guard precedent). A top-level let → React hoists to useRef.
 // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
 // A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
 // (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the
@@ -4302,18 +4157,7 @@ let rangeTransition = false;
 // rangeClickPending: set by onGridMouseDown on a Shift+Click (the range is set off the
 // pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
 // to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
-// rangeClickPending: set by onGridMouseDown on a Shift+Click (the range is set off the
-// pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
-// to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
 let rangeClickPending = false;
-// B19: a SYNCHRONOUS mirror of "a range currently exists" — extendRange/setRangeFocus set it
-// true, clearRange/clampRange-to-empty set it false. clearRange is invoked TWICE in one plain-
-// arrow keydown (the explicit collapse + the focusin that follows the programmatic focus move);
-// on React `$data.rangeAnchor = null` is an async setState, so the SECOND clearRange's
-// `$data.rangeAnchor == null` guard reads the STALE (pre-write) range and fires a duplicate
-// range-change. This module-let is written synchronously (no setState async), so the second
-// clearRange sees `rangeActive === false` and returns → exactly ONE range-change per real drop
-// across all six targets. A top-level let → React hoists to useRef.
 // B19: a SYNCHRONOUS mirror of "a range currently exists" — extendRange/setRangeFocus set it
 // true, clearRange/clampRange-to-empty set it false. clearRange is invoked TWICE in one plain-
 // arrow keydown (the explicit collapse + the focusin that follows the programmatic focus move);
@@ -5145,9 +4989,6 @@ const fillRange = (sourceBox: any, endCell: any) => {
 // cell under the pointer) and, on release, value-fills the dragged rectangle. Kept minimal:
 // pointermove extends the range to the cell under the pointer; pointerup commits the fill.
 let fillDragging = false;
-// CR-04: track the live fill-drag document listeners in module-lets so $onUnmount can remove
-// them if the component unmounts MID-DRAG (the `up` handler clears them on a normal release,
-// but a mid-drag unmount would otherwise leak a pointermove/pointerup listener on document).
 // CR-04: track the live fill-drag document listeners in module-lets so $onUnmount can remove
 // them if the component unmounts MID-DRAG (the `up` handler clears them on a normal release,
 // but a mid-drag unmount would otherwise leak a pointermove/pointerup listener on document).
@@ -6343,30 +6184,12 @@ const prevEditableCell = (fromRow: any, fromCol: any) => {
 // guard onEditorBlur would re-enter commitEdit on the (already-resolved or newly-opened)
 // cell, double-counting cell-edit-commit. A top-level `let` (React hoists to useRef).
 let editTransition = false;
-
-// B23: a pending "follow the committed row's focus" request, set by commitEdit (a single-cell
-// commit that may relocate the row under an active sort/filter) and consumed ONCE by the next
-// refreshRowModel pass — which runs with the FRESH re-derived row model, so it can resolve the
-// committed row's NEW display index (React-stale-safe) and re-seat focus there. Shape:
-// { rowOriginal, rowId, col } or null. A top-level `let` (React hoists to useRef → persists).
 // B23: a pending "follow the committed row's focus" request, set by commitEdit (a single-cell
 // commit that may relocate the row under an active sort/filter) and consumed ONCE by the next
 // refreshRowModel pass — which runs with the FRESH re-derived row model, so it can resolve the
 // committed row's NEW display index (React-stale-safe) and re-seat focus there. Shape:
 // { rowOriginal, rowId, col } or null. A top-level `let` (React hoists to useRef → persists).
 let pendingEditFollow: any = null;
-
-// Sync idempotency latch for a cell commit (drop-in double cell-edit-commit fix, 260705):
-// commitEdit's `$data.editingRow < 0` re-entry guard is ASYNC-STALE on React — a deferred
-// drop-in editor's unmount-blur (onBlur → $props.commit → commitEdit) fires AFTER commitEdit
-// has already returned (editTransition is a SYNC latch, cleared before the async blur), while
-// `$data.editingRow` in that stale closure still reads the OLD (pre-endEdit) value, so the
-// second commit slips through and re-emits `cell-edit-commit`. A top-level `let` is written/read
-// synchronously by plain assignment (unaffected by React's setState batching — that's the point)
-// so it stays correct across the async window editTransition/editingRow cannot cover. Set true on
-// a SUCCESSFUL commitEdit/toggleActiveBooleanCell; reset to false wherever a NEW edit session
-// begins (beginEdit/beginRowEdit/editCell) so the next legitimate commit fires exactly once.
-// A top-level `let` (React hoists to useRef → persists).
 // Sync idempotency latch for a cell commit (drop-in double cell-edit-commit fix, 260705):
 // commitEdit's `$data.editingRow < 0` re-entry guard is ASYNC-STALE on React — a deferred
 // drop-in editor's unmount-blur (onBlur → $props.commit → commitEdit) fires AFTER commitEdit

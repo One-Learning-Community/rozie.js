@@ -52,25 +52,12 @@ let reg: any = null;
 reg = layers;
 let ctx: any = null;
 ctx = srcCtx;
-
-// Effective source id: explicit prop wins, else the nearest <Source> ancestor id,
-// else undefined (a sourceless layer e.g. background). Reads the LIVE `ctx`/`srcCtx`
-// at CALL time so a late-resolving <Source> context (parent mounts AFTER this child
-// on React/Vue/Svelte/Angular; async on Lit) is picked up on re-register. `ctx` is
-// the `any` alias so the `.id` read type-checks on the strict bundled leaves.
 // Effective source id: explicit prop wins, else the nearest <Source> ancestor id,
 // else undefined (a sourceless layer e.g. background). Reads the LIVE `ctx`/`srcCtx`
 // at CALL time so a late-resolving <Source> context (parent mounts AFTER this child
 // on React/Vue/Svelte/Angular; async on Lit) is picked up on re-register. `ctx` is
 // the `any` alias so the `.id` read type-checks on the strict bundled leaves.
 const resolveSource = () => props.source ?? (ctx && ctx.id);
-
-// The last source id we registered with. A nested <Layer> may register on mount
-// (React/Vue/Svelte/Angular) BEFORE its <Source> parent has mounted, so its
-// injected source ctx is null and resolveSource() yields undefined — registering a
-// non-background layer with no source, which applyLayers can't add. When the source
-// ctx resolves we re-register with the now-correct source id (idempotent upsert in
-// the parent registry). null = not yet registered.
 // The last source id we registered with. A nested <Layer> may register on mount
 // (React/Vue/Svelte/Angular) BEFORE its <Source> parent has mounted, so its
 // injected source ctx is null and resolveSource() yields undefined — registering a

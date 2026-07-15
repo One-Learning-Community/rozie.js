@@ -9,8 +9,6 @@ interface Props {
 let { base = 1, ...__rozieAttrs }: Props = $props();
 
 import { clamp } from './partial-helpers.js';
-
-/* between-statement: a transitive non-exported helper pulled in as the closure of usedName */
 /* between-statement: a transitive non-exported helper pulled in as the closure of usedName */
 const double = (n: number): number => n * 2; // trailing: doubles its input
 

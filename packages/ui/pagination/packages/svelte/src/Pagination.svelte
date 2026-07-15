@@ -71,13 +71,6 @@ const nextControl = $derived(__nextControlProp ?? snippets?.nextControl);
 let nav = $state<HTMLElement | undefined>(undefined);
 
 import { paginationItems } from './internal/paginationItems';
-
-// ---- derived view (ONE plain function, uniform x6) ---------------------
-// The whole render model in a single call: { totalPages, page, pages,
-// hasPrev, hasNext }. A PLAIN function (not $computed) so it reads uniformly
-// on all six targets and can be aliased in handlers without the Solid
-// accessor divergence. Returns a FRESH object each call — never feed it to a
-// reference-equality $watch getter.
 // ---- derived view (ONE plain function, uniform x6) ---------------------
 // The whole render model in a single call: { totalPages, page, pages,
 // hasPrev, hasNext }. A PLAIN function (not $computed) so it reads uniformly
@@ -92,12 +85,6 @@ const model = () => paginationItems({
   siblingCount: siblingCount,
   boundaryCount: boundaryCount
 });
-
-// The resolved effective total page count (read in the template + handlers).
-// NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
-// the `totalPages` PROP, which on Lit becomes a class field of type `number`
-// (hard TS2300/TS2717 against a `() => number` helper). The prop-name-collision
-// sibling of the otp `inputMode` gotcha.
 // The resolved effective total page count (read in the template + handlers).
 // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
 // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -105,19 +92,10 @@ const model = () => paginationItems({
 // sibling of the otp `inputMode` gotcha.
 const effectivePages = () => model().totalPages;
 // The clamped current page (the raw prop may be out of range).
-// The clamped current page (the raw prop may be out of range).
 const currentPage = () => model().page;
 const canPrev = () => model().hasPrev;
 const canNext = () => model().hasNext;
 const isActive = (page: any) => page === currentPage();
-
-// Roving-tabindex value for a control: the active page is the single tab stop
-// (0), the rest are -1. The return type is annotated `number | undefined` ON
-// PURPOSE: the React emitter wraps every numeric `:attr` binding in
-// `(expr) ?? undefined`, and a PROVABLY non-null value (a bare `0`/`-1` or a
-// `0 : -1` ternary) trips TS2869 "right operand of ?? is unreachable". Routing
-// every tabindex through this nullable-typed helper keeps the `?? undefined`
-// reachable (the data-table cellTabindex precedent).
 // Roving-tabindex value for a control: the active page is the single tab stop
 // (0), the rest are -1. The return type is annotated `number | undefined` ON
 // PURPOSE: the React emitter wraps every numeric `:attr` binding in
@@ -126,11 +104,6 @@ const isActive = (page: any) => page === currentPage();
 // every tabindex through this nullable-typed helper keeps the `?? undefined`
 // reachable (the data-table cellTabindex precedent).
 const tabIndexFor = (active: any): number | undefined => active ? 0 : -1;
-
-// ---- write funnel (single $emit site) ----------------------------------
-// Clamp to [1, totalPages], write the model, and emit `change` with the new
-// page. NOT named `setModelValue` (that collides with React's generated model
-// setter → ROZ524) — `goToPage` is collision-safe across all six leaves.
 // ---- write funnel (single $emit site) ----------------------------------
 // Clamp to [1, totalPages], write the model, and emit `change` with the new
 // page. NOT named `setModelValue` (that collides with React's generated model
@@ -155,11 +128,6 @@ const goPrev = () => {
 };
 const goFirst = () => goToPage(1);
 const goLast = () => goToPage(effectivePages());
-
-// ---- roving focus across the page controls -----------------------------
-// Read $refs.nav only here / in handlers (post-mount → ROZ123-safe).
-// querySelectorAll<HTMLElement> reaches the controls inside Lit's shadow root
-// too; the generic gives `.focus()` (Element has no `.focus`, TS2339).
 // ---- roving focus across the page controls -----------------------------
 // Read $refs.nav only here / in handlers (post-mount → ROZ123-safe).
 // querySelectorAll<HTMLElement> reaches the controls inside Lit's shadow root
@@ -184,10 +152,6 @@ const focusedIndex = () => {
   const active = nav$local ? nav$local.ownerDocument.activeElement : null;
   return els.indexOf(active as HTMLElement);
 };
-
-// Roving keyboard navigation: arrows move focus between controls, Home/End jump
-// to the ends. Each control keeps tabindex via the template (the active page is
-// 0, the rest -1) so the group is a single tab stop.
 // Roving keyboard navigation: arrows move focus between controls, Home/End jump
 // to the ends. Each control keeps tabindex via the template (the active page is
 // 0, the rest -1) so the group is a single tab stop.
@@ -209,11 +173,6 @@ const onControlKeydown = ($event: any) => {
     focusControlAt(controls().length - 1);
   }
 };
-
-// ---- imperative handle -------------------------------------------------
-// Consumer-callable verbs. `goto` clamps; `next`/`prev`/`first`/`last` are the
-// bounds-aware steppers. None collide with an emit name (`change`) or the React
-// model setter (`setModelValue`).
 // ---- imperative handle -------------------------------------------------
 // Consumer-callable verbs. `goto` clamps; `next`/`prev`/`first`/`last` are the
 // bounds-aware steppers. None collide with an emit name (`change`) or the React

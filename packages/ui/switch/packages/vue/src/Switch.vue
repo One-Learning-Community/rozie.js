@@ -55,10 +55,6 @@ const controlRef = ref<HTMLButtonElement>();
 // function (read in the template AND inside handlers/verbs) — never $computed,
 // whose value-vs-accessor form diverges between React and Solid.
 const isChecked = () => modelValue.value === true;
-
-// ---- write funnel (single $emit site) --------------------------------------
-// Write the model and emit change. Named commitValue (NOT writeValue) so it does
-// not collide with the generated Angular ControlValueAccessor.writeValue (TS2300).
 // ---- write funnel (single $emit site) --------------------------------------
 // Write the model and emit change. Named commitValue (NOT writeValue) so it does
 // not collide with the generated Angular ControlValueAccessor.writeValue (TS2300).
@@ -69,24 +65,16 @@ const commitValue = (next: any) => {
     checked: v
   });
 };
-
-// Flip the state, unless disabled / readonly. The public toggle verb + the
-// click/keyboard handlers all funnel through here.
 // Flip the state, unless disabled / readonly. The public toggle verb + the
 // click/keyboard handlers all funnel through here.
 const toggle = () => {
   if (props.disabled || props.readonly) return;
   commitValue(!isChecked());
 };
-
-// ---- pointer + keyboard handlers -------------------------------------------
 // ---- pointer + keyboard handlers -------------------------------------------
 const onClick = () => {
   toggle();
 };
-
-// Space and Enter toggle the switch (the WAI-ARIA switch keyboard pattern).
-// preventDefault on Space so the page does not scroll.
 // Space and Enter toggle the switch (the WAI-ARIA switch keyboard pattern).
 // preventDefault on Space so the page does not scroll.
 const onKeydown = (e: any) => {
@@ -97,22 +85,10 @@ const onKeydown = (e: any) => {
     toggle();
   }
 };
-
-// ---- focusability helper (plain function, uniform ×6) ----------------------
-// tabindex is 0 when interactive, dropped (null → attribute omitted) when
-// disabled. Returns number | null; rozieAttr drops the attr on null.
 // ---- focusability helper (plain function, uniform ×6) ----------------------
 // tabindex is 0 when interactive, dropped (null → attribute omitted) when
 // disabled. Returns number | null; rozieAttr drops the attr on null.
 const controlTabindex = () => props.disabled ? null : 0;
-
-// ---- imperative handle -----------------------------------------------------
-// focus() — move DOM focus to the control. DELIBERATELY overrides
-// HTMLElement.focus on Lit (ROZ137 warn, accepted; the public focus() handle is
-// intended). Reads $refs in a post-mount handle call (ROZ123-safe). $refs.control
-// types to the generic HTMLElement on the tsdown/vue leaves, so we only touch
-// HTMLElement members here (`focus`). toggle() — flip the state (same funnel as
-// the UI), a no-op when disabled / readonly.
 // ---- imperative handle -----------------------------------------------------
 // focus() — move DOM focus to the control. DELIBERATELY overrides
 // HTMLElement.focus on Lit (ROZ137 warn, accepted; the public focus() handle is

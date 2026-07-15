@@ -23,17 +23,11 @@ const solve = (token$local: any) => {
     token: token$local
   });
 };
-
-// setStatus(status): param == the $data key. `$data.status = status` lowers on
-// Vue to `status.value = status` (param shadows the state ref) pre-fix.
 // setStatus(status): param == the $data key. `$data.status = status` lowers on
 // Vue to `status.value = status` (param shadows the state ref) pre-fix.
 const setStatus = (status: any) => {
   status = status;
 };
-
-// logLabel(label): param == the $computed name. The bare `label` read lowers on
-// Vue to `label.value` (reads the computed ref, not the param) pre-fix.
 // logLabel(label): param == the $computed name. The bare `label` read lowers on
 // Vue to `label.value` (reads the computed ref, not the param) pre-fix.
 const logLabel = (label: any) => {

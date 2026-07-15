@@ -63,17 +63,6 @@ const applyScrollLock = (lock: any) => {
   const root = document.documentElement;
   if (root) root.style.overflow = lock ? 'hidden' : '';
 };
-
-// Reconcile the native <dialog> to the desired open state. Guarded on the
-// native `el.open` flag (showModal throws if already open; close is a no-op when
-// closed). Reads $refs in a post-mount callback (ROZ123-safe).
-//
-// The ref lives on the inner panel <div> (which the emitter types as
-// HTMLDivElement), and we reach the <dialog> via `panel.parentElement` cast to
-// HTMLDialogElement. This sidesteps an emitter gap: the per-target ref-type map
-// has no `dialog` case, so a ref placed directly on <dialog> would be typed the
-// generic HTMLElement (no `.open`/`.showModal()`/`.close()`), failing strict
-// leaf typecheck. Fixing it here keeps the change source-only (no emitter edit).
 // Reconcile the native <dialog> to the desired open state. Guarded on the
 // native `el.open` flag (showModal throws if already open; close is a no-op when
 // closed). Reads $refs in a post-mount callback (ROZ123-safe).
@@ -96,8 +85,6 @@ const sync = (isOpen: any) => {
     applyScrollLock(false);
   }
 };
-
-// ---- close funnel (single $emit site) ----------------------------------
 // ---- close funnel (single $emit site) ----------------------------------
 const closeWith = (reason: any) => {
   open.value = false;
@@ -105,10 +92,6 @@ const closeWith = (reason: any) => {
     reason
   });
 };
-
-// ---- handlers ----------------------------------------------------------
-// Native Esc fires `cancel` on the <dialog>. preventDefault so WE drive the
-// close through the model (keeping `open` in sync); honor the opt-out.
 // ---- handlers ----------------------------------------------------------
 // Native Esc fires `cancel` on the <dialog>. preventDefault so WE drive the
 // close through the model (keeping `open` in sync); honor the opt-out.
@@ -117,11 +100,6 @@ const onCancel = (e: any) => {
   if (props.disableEscapeClose) return;
   closeWith('escape');
 };
-
-// A click whose target IS the <dialog> element (not its panel/children) is a
-// backdrop click — the ::backdrop is part of the dialog box. We compare the
-// real `e.target` (reliable even under Solid's event delegation) to the dialog
-// element resolved via the panel ref's parent.
 // A click whose target IS the <dialog> element (not its panel/children) is a
 // backdrop click — the ::backdrop is part of the dialog box. We compare the
 // real `e.target` (reliable even under Solid's event delegation) to the dialog

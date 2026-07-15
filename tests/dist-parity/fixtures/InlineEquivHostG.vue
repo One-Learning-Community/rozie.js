@@ -21,10 +21,8 @@ let selectAllBoxG = headG(1);
 const afterDeclG = (k: number): number => k * 2;
 const midDeclG = (k: number): number => k + 3;
 // before-side: the sandwiched host let trails the spliced midDeclG above
-// before-side: the sandwiched host let trails the spliced midDeclG above
 let rangeTransitionG = midDeclG(1);
 const beforeDeclG = (k: number): number => k * 5;
-// before-side: the sandwiched host let trails the spliced beforeDeclG above
 // before-side: the sandwiched host let trails the spliced beforeDeclG above
 let fillDragUpG = beforeDeclG(1);
 </script>

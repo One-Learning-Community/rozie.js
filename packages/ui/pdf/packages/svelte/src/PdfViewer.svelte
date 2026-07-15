@@ -105,15 +105,6 @@ let viewerEl = $state<HTMLElement | undefined>(undefined);
 // engine out of the initial bundle. `pdfjsLib` is a null-let → typeNeutralize
 // `any` (so pdfjsLib.getDocument / .TextLayer / .GlobalWorkerOptions are unchecked).
 let pdfjsLib: any = null;
-
-// version-locked jsDelivr CDN base for the workerSrc/standardFontDataUrl
-// defaults — built from pdfjsLib.version (read at runtime off the dynamically
-// imported engine, once resolved) rather than a hand-typed version string, so
-// the default can never drift from the pdfjs-dist actually installed. NOT
-// `new URL(..., import.meta.url)`: that idiom is left unresolved by the
-// Angular (analogjs) AOT pipeline and trips ngtsc into a JIT fallback (see the
-// PdfViewerDemo `?url`-worker note) — a plain CDN string works uniformly across
-// every target's own build tooling AND every downstream consumer bundler.
 // version-locked jsDelivr CDN base for the workerSrc/standardFontDataUrl
 // defaults — built from pdfjsLib.version (read at runtime off the dynamically
 // imported engine, once resolved) rather than a hand-typed version string, so
@@ -125,12 +116,6 @@ let pdfjsLib: any = null;
 function cdnBase() {
   return 'https://cdn.jsdelivr.net/npm/pdfjs-dist@' + pdfjsLib.version;
 }
-
-// more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
-// the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
-// containerEl is the scroll host, observer is the continuous-mode scroll spy,
-// resizeObserver is the autoFit resize sensor (separate from `observer` — that
-// one is IntersectionObserver-typed, this one ResizeObserver-typed).
 // more null-lets (→ `any`): `instance` is the PDFDocumentProxy (whose strict types
 // the loosely-typed props don't satisfy — the maplibre mapOptions idiom),
 // containerEl is the scroll host, observer is the continuous-mode scroll spy,
@@ -143,12 +128,7 @@ let resizeObserver: any = null;
 // the PDFDocumentLoadingTask — it (NOT the PDFDocumentProxy, which has no
 // destroy() in pdfjs v6) owns teardown of the worker + document. Held so a
 // src/password change or unmount can tear the previous load down.
-// the PDFDocumentLoadingTask — it (NOT the PDFDocumentProxy, which has no
-// destroy() in pdfjs v6) owns teardown of the worker + document. Held so a
-// src/password change or unmount can tear the previous load down.
 let loadingTask: any = null;
-// monotonic token cancels stale async loads/renders (src can change mid-render,
-// pages render async — the SortableList rebuild-cancel discipline).
 // monotonic token cancels stale async loads/renders (src can change mid-render,
 // pages render async — the SortableList rebuild-cancel discipline).
 let renderToken = 0;
@@ -157,16 +137,9 @@ let renderToken = 0;
 // next/prev cycle); findIndex is the current match (-1=none). TOP-LEVEL lets (not
 // $onMount-local) so renderPage's coarse highlight pass + the find verbs can read
 // them across renders.
-// find/search state. findQuery is the active lowercased query (''=inactive);
-// findMatches is a flat per-OCCURRENCE list [{ page }] (drives the count + the
-// next/prev cycle); findIndex is the current match (-1=none). TOP-LEVEL lets (not
-// $onMount-local) so renderPage's coarse highlight pass + the find verbs can read
-// them across renders.
 let findQuery = '';
 let findMatches = [];
 let findIndex = -1;
-
-// ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
 // ─── build the getDocument() source (no sigils beyond $props/$snapshot) ──────
 const buildSource = () => {
   let cfg: any = null;
@@ -202,8 +175,6 @@ const buildSource = () => {
   cfg.standardFontDataUrl = standardFontDataUrl || cdnBase() + '/standard_fonts/';
   return cfg;
 };
-
-// ─── render one page (canvas + optional text layer) into the container ───────
 // ─── render one page (canvas + optional text layer) into the container ───────
 const renderPage = async (pdf: any, pageNum: any, container: any) => {
   const page = await pdf.getPage(pageNum);
@@ -269,18 +240,6 @@ const renderPage = async (pdf: any, pageNum: any, container: any) => {
   });
   return pageDiv;
 };
-
-// continuous-mode scroll spy — reflect the most-visible page into $data.current.
-// It ONLY writes $data.current (which echoes to $model.page + the `pagechange`
-// event via the $data.current $watch); it deliberately does NOT scroll. The
-// scroll-into-view lives at the navigation origins (goToPage + the `page`-prop
-// $watch) so an observer-driven page change never snaps the view back under the
-// user's own scroll. This is the origin-distinguishing fix for the render-all-
-// pages scroll fight: a suppress flag set here and read by the ASYNC $data.current
-// effect is defeated by flush timing (the flag is already reset by the time the
-// deferred effect runs — true on Vue's flush:'pre' and every other target's
-// deferred-effect model), so origin is encoded by WHERE scrollToPage is called,
-// not by a boolean held across a flush.
 // continuous-mode scroll spy — reflect the most-visible page into $data.current.
 // It ONLY writes $data.current (which echoes to $model.page + the `pagechange`
 // event via the $data.current $watch); it deliberately does NOT scroll. The
@@ -325,8 +284,6 @@ const scrollToPage = (n: any) => {
     behavior: 'auto'
   });
 };
-
-// ─── render the current view (single page, or all pages) ─────────────────────
 // ─── render the current view (single page, or all pages) ─────────────────────
 const renderView = async () => {
   if (!instance || !containerEl) return;
@@ -352,8 +309,6 @@ const renderView = async () => {
   if (renderAllPages) setupScrollSpy();
   onpagesrendered?.();
 };
-
-// ─── load the document ───────────────────────────────────────────────────────
 // ─── load the document ───────────────────────────────────────────────────────
 const load = async () => {
   if (!pdfjsLib) return;
@@ -476,8 +431,6 @@ export function rotateCCW() {
 }
 // Save the original PDF bytes. getData() resolves the raw Uint8Array; wrap in a
 // Blob and trigger a download via a transient anchor. Resolves false before mount.
-// Save the original PDF bytes. getData() resolves the raw Uint8Array; wrap in a
-// Blob and trigger a download via a transient anchor. Resolves false before mount.
 export async function download(filename: any) {
   if (!instance) return false;
   const bytes = await instance.getData();
@@ -494,11 +447,9 @@ export async function download(filename: any) {
   return true;
 }
 // Document info (title/author/page labels) — resolves null before mount.
-// Document info (title/author/page labels) — resolves null before mount.
 export function getMetadata() {
   return instance ? instance.getMetadata() : null;
 }
-// Bookmark / table-of-contents tree — resolves null when absent or before mount.
 // Bookmark / table-of-contents tree — resolves null when absent or before mount.
 export function getOutline() {
   return instance ? instance.getOutline() : null;
@@ -506,21 +457,9 @@ export function getOutline() {
 // The rendered page's DOM node (see the DOM contract docs), or null if page n
 // isn't currently rendered (single-page mode viewing a different page, or
 // before any render). Mirrors scrollToPage's own lookup.
-// The rendered page's DOM node (see the DOM contract docs), or null if page n
-// isn't currently rendered (single-page mode viewing a different page, or
-// before any render). Mirrors scrollToPage's own lookup.
 export function getPageElement(n: any) {
   return containerEl ? containerEl.querySelector('[data-page="' + n + '"]') : null;
 }
-
-// ─── text find/search (coarse span-level highlight) ──────────────────────────
-// find(query) scans EVERY page's extracted text for occurrences, navigates to +
-// highlights the first match, returns the match count, and emits `findresult`. The
-// highlight is COARSE / span-level: renderPage adds .rozie-pdf-find to whole
-// text-layer spans that CONTAIN the query (a query straddling two spans won't
-// highlight). findNext/findPrev cycle (wrap) through the per-occurrence match list;
-// clearFind resets the query + highlights. All async-safe over the `any`
-// PDFDocumentProxy (`instance`); no-op / return 0 before the document loads.
 // ─── text find/search (coarse span-level highlight) ──────────────────────────
 // find(query) scans EVERY page's extracted text for occurrences, navigates to +
 // highlights the first match, returns the match count, and emits `findresult`. The

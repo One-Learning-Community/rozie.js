@@ -83,16 +83,9 @@ const registry = inject('data-table:columns');
 // change.
 let reg: any = null;
 reg = registry;
-
-// idempotency flag so a reactive late-context registration (Lit async first paint,
-// REQ-30) and the $onMount registration never double-register the column.
 // idempotency flag so a reactive late-context registration (Lit async first paint,
 // REQ-30) and the $onMount registration never double-register the column.
 let registered = false;
-
-// the column SPEC builder — shared by the $onMount register and the late-context
-// $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
-// per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).
 // the column SPEC builder — shared by the $onMount register and the late-context
 // $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
 // per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).

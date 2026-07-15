@@ -135,9 +135,6 @@ const pct = (v: any) => {
   if (p > 100) return 100;
   return p;
 };
-
-// Clamp a raw number into [min,max] and quantize to `step` (guarding against a
-// non-finite or zero step). Returns a finite number bounded by the scale.
 // Clamp a raw number into [min,max] and quantize to `step` (guarding against a
 // non-finite or zero step). Returns a finite number bounded by the scale.
 const clampStep = (raw: any) => {
@@ -154,10 +151,6 @@ const clampStep = (raw: any) => {
   }
   return v;
 };
-
-// The current range pair, defaulting to the full span when `value` is not yet a
-// 2-tuple. Read into a stable local before destructuring — `$props.value`
-// lowers to a `value()` accessor on Solid, so narrowing one local is uniform.
 // The current range pair, defaulting to the full span when `value` is not yet a
 // 2-tuple. Read into a stable local before destructuring — `$props.value`
 // lowers to a `value()` accessor on Solid, so narrowing one local is uniform.
@@ -166,8 +159,6 @@ const rangePair = () => {
   if (Array.isArray(cur) && cur.length === 2) return [cur[0], cur[1]];
   return [props.min, props.max];
 };
-
-// The single (scalar) value, defaulting to min when not yet a number.
 // The single (scalar) value, defaulting to min when not yet a number.
 const singleValue = () => {
   const cur = value.value;
@@ -196,28 +187,18 @@ const normalizedMarks = () => {
     };
   });
 };
-
-// Format a value for the bubble / aria-valuetext. A plain function: `$props.x`
-// reads uniformly inside it.
 // Format a value for the bubble / aria-valuetext. A plain function: `$props.x`
 // reads uniformly inside it.
 const display = (v: any) => {
   if (props.formatValue !== null) return props.formatValue(v);
   return String(v);
 };
-
-// ---- write-back (single emit funnel) -----------------------------------
-// The SOLE `$emit('change')` site, called from every commit path so the React
-// prop-destructure for `onChange` hoists exactly once.
 // ---- write-back (single emit funnel) -----------------------------------
 // The SOLE `$emit('change')` site, called from every commit path so the React
 // prop-destructure for `onChange` hoists exactly once.
 const fireChange = (value: any) => emit('change', {
   value
 });
-
-// Single-mode commit: capture the fresh number, write the scalar, emit. Never
-// re-read $data after the write (ROZ138: React setState is async).
 // Single-mode commit: capture the fresh number, write the scalar, emit. Never
 // re-read $data after the write (ROZ138: React setState is async).
 const commitSingle = (raw: any) => {
@@ -225,10 +206,6 @@ const commitSingle = (raw: any) => {
   value.value = v;
   fireChange(v);
 };
-
-// Range-mode commit: keep the [lo, hi] array SORTED and clamp each thumb at its
-// neighbour, then write a FRESH array (in-place mutation is dropped on
-// React/Solid/Lit/Angular change detectors — listbox precedent).
 // Range-mode commit: keep the [lo, hi] array SORTED and clamp each thumb at its
 // neighbour, then write a FRESH array (in-place mutation is dropped on
 // React/Solid/Lit/Angular change detectors — listbox precedent).
@@ -242,21 +219,12 @@ const commitRange = (which: any, raw: any) => {
   value.value = next;
   fireChange(next);
 };
-
-// ---- native input handlers ---------------------------------------------
-// Single input. `valueAsNumber` is a number (never the string `.value`).
 // ---- native input handlers ---------------------------------------------
 // Single input. `valueAsNumber` is a number (never the string `.value`).
 const onInputSingle = ($event: any) => commitSingle($event.target.valueAsNumber);
 // Range inputs (lo / hi).
-// Range inputs (lo / hi).
 const onInputLo = ($event: any) => commitRange('lo', $event.target.valueAsNumber);
 const onInputHi = ($event: any) => commitRange('hi', $event.target.valueAsNumber);
-
-// ---- PageUp / PageDown augment (Open Q1 / RESEARCH A3) ------------------
-// Native PageUp/PageDown uses the browser's default large step, which may not
-// equal `pageStep`. Augment ONLY those two keys: apply ±pageStep (null → step×10),
-// quantize + clamp via clampStep, write back. Arrows / Home / End stay native.
 // ---- PageUp / PageDown augment (Open Q1 / RESEARCH A3) ------------------
 // Native PageUp/PageDown uses the browser's default large step, which may not
 // equal `pageStep`. Augment ONLY those two keys: apply ±pageStep (null → step×10),
@@ -283,18 +251,11 @@ const onKeyDownRange = (which: any, $event: any) => {
   const base = which === 'lo' ? pair[0] : pair[1];
   commitRange(which, base + delta);
 };
-
-// ---- imperative handle (D-05) ------------------------------------------
-// `focus` reads $refs in a post-mount callback (called via the handle) — safe,
-// never eager (ROZ123). It DELIBERATELY overrides HTMLElement.focus on Lit
-// (ROZ137 warns; accepted — see header).
 // ---- imperative handle (D-05) ------------------------------------------
 // `focus` reads $refs in a post-mount callback (called via the handle) — safe,
 // never eager (ROZ123). It DELIBERATELY overrides HTMLElement.focus on Lit
 // (ROZ137 warns; accepted — see header).
 const focus = () => inputElRef.value?.focus();
-
-// Step a thumb by ±step. In range mode `thumb` selects 'lo' | 'hi' (default 'lo').
 // Step a thumb by ±step. In range mode `thumb` selects 'lo' | 'hi' (default 'lo').
 const increment = (thumb: any) => {
   if (props.range) {

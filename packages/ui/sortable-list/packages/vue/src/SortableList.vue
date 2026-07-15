@@ -127,18 +127,6 @@ const __rozieRootRef = ref<HTMLElement>();
 
 import { useSortableJS } from './internal/useSortableJS';
 let instance: any = null;
-
-// Instance-scoped synthetic-id store for id-less object items. Keyed by object
-// IDENTITY, so the same object keeps its synthetic id across a reorder (the
-// framework reconciler then rebinds the row component instance to its ORIGINAL
-// item, not its slot position — the data-corruption fix).
-//
-// Phase 73 item #11-b removed the former "fold the WeakMap + counter into ONE
-// member-mutated object const" workaround: `hoistModuleLet`'s reachability
-// walk now also roots at helpers called ONLY from a template expression
-// (`keyFor` is called from `:key`/`:data-id`, never from a hook), so the bare
-// `let __rowKeySeq = 0` below hoists to a `useRef` on React exactly like the
-// hook-reached case — no more per-render reset. Verified in codegen.
 // Instance-scoped synthetic-id store for id-less object items. Keyed by object
 // IDENTITY, so the same object keeps its synthetic id across a reorder (the
 // framework reconciler then rebinds the row component instance to its ORIGINAL
@@ -152,8 +140,6 @@ let instance: any = null;
 // hook-reached case — no more per-render reset. Verified in codegen.
 const __rowKeyMap = new WeakMap();
 let __rowKeySeq = 0;
-
-// 4-tier per-row key precedence. Its return feeds BOTH :key and :data-id.
 // 4-tier per-row key precedence. Its return feeds BOTH :key and :data-id.
 const keyFor = (item: any, index: any) => {
   // (a) function itemKey: consumer-supplied (item, index) => key.
@@ -176,15 +162,6 @@ const keyFor = (item: any, index: any) => {
   //     unsafe to reorder this way — pass a function itemKey for those.
   return index;
 };
-
-// Resolve the SortableJS `group` option: `cloneable` is a high-level Rozie
-// prop that REPLACES a string `group` with SortableJS's
-// `{ name, pull: 'clone', put: true }` clone-mode object form. When
-// `cloneable:false`, pass `$props.group` through verbatim. When
-// `cloneable:true` AND `$props.group` is null, leave it null — a clone-mode
-// list without a group name is not meaningful (no peer list can join the
-// cross-list flow). Shared by $onMount construction AND the group/cloneable
-// $watch reconcile below — single source of truth, no duplicated ternary.
 // Resolve the SortableJS `group` option: `cloneable` is a high-level Rozie
 // prop that REPLACES a string `group` with SortableJS's
 // `{ name, pull: 'clone', put: true }` clone-mode object form. When
@@ -198,10 +175,6 @@ const resolveGroup = () => props.cloneable && typeof props.group === 'string' ? 
   pull: 'clone' as const,
   put: true as const
 } : props.group ?? undefined;
-
-// Resolve itemClass for a row: a static value (string | array | object) OR a
-// per-row (item, index) => class function. The result is fed into the :class
-// array and normalized by each target's class path (rozieClass / clsx / native).
 // Resolve itemClass for a row: a static value (string | array | object) OR a
 // per-row (item, index) => class function. The result is fed into the :class
 // array and normalized by each target's class path (rozieClass / clsx / native).
@@ -209,10 +182,6 @@ const itemClassFor = (item: any, index: any) => {
   const v = props.itemClass;
   return typeof v === 'function' ? v(item, index) : v;
 };
-
-// Resolve itemStyle for a row: a static value (string | object) OR a per-row
-// (item, index) => style function. Returns string | object | null; the dynamic
-// :style binding normalizes it per target. null / empty → attribute dropped.
 // Resolve itemStyle for a row: a static value (string | object) OR a per-row
 // (item, index) => style function. Returns string | object | null; the dynamic
 // :style binding normalizes it per target. null / empty → attribute dropped.
@@ -220,11 +189,6 @@ const itemStyleFor = (item: any, index: any) => {
   const s = typeof props.itemStyle === 'function' ? props.itemStyle(item, index) : props.itemStyle;
   return s == null || s === '' ? null : s;
 };
-
-// Read the display label for an item — used by the aria-live announcer.
-// Phase 16 R7 / D-08: $props.labelFor reads as `null` on all 6 targets when
-// the consumer omits it (Plan 16-01 prop-default coercion fix); the check is
-// a plain null compare — NO runtime callable-type coercion.
 // Read the display label for an item — used by the aria-live announcer.
 // Phase 16 R7 / D-08: $props.labelFor reads as `null` on all 6 targets when
 // the consumer omits it (Plan 16-01 prop-default coercion fix); the check is
@@ -235,22 +199,6 @@ const getLabel = (idx: any) => {
   if (item !== null && typeof item === 'object' && 'label' in item) return item.label;
   return String(item);
 };
-
-// Keyboard handler (Phase 16 R7): Space lifts/drops, ArrowDown/ArrowUp move
-// the lifted row, Escape cancels, Enter is an alternate drop trigger. After
-// any array-reorder write, $restoreFocus('[role="listitem"]', newIdx) keeps
-// focus on the moved row across the React/Vue/Angular vs Svelte/Solid/Lit
-// keyed-reconciler divide (Plan 16-03 sigil — no-op on the first three;
-// queueMicrotask + querySelectorAll + .focus() on the latter three).
-//
-// Note: `index` is passed directly as a number. Plan 16-02 (Solid call-arg
-// accessor unwrap) ensures Solid's <For> alias unwraps to `index()` at the
-// call site — no runtime callable-type coercion needed in user source.
-// Keyboard reordering is available only when the list is not disabled AND the
-// `disableKeyboard` opt-out is off. Drives BOTH the row tabindex (rows are
-// focusable only when reorderable) and the onRowKeyDown guard below. Reads
-// straight off $props so the tabindex binding re-evaluates reactively when
-// `disabled`/`disableKeyboard` toggle at runtime.
 // Keyboard handler (Phase 16 R7): Space lifts/drops, ArrowDown/ArrowUp move
 // the lifted row, Escape cancels, Enter is an alternate drop trigger. After
 // any array-reorder write, $restoreFocus('[role="listitem"]', newIdx) keeps
@@ -342,17 +290,12 @@ function getInstance() {
 // toArray()/sort() operate on SortableJS's data-id ordering — every row carries
 // :data-id="keyFor(item, index)", so toArray() returns the current key order and
 // sort(order) reorders by those keys (set itemKey for stable object-list keys).
-// toArray()/sort() operate on SortableJS's data-id ordering — every row carries
-// :data-id="keyFor(item, index)", so toArray() returns the current key order and
-// sort(order) reorders by those keys (set itemKey for stable object-list keys).
 function toArray() {
   return instance ? instance.toArray() : [];
 }
 function sort(order: any, useAnimation = true) {
   instance?.sort(order, useAnimation);
 }
-// option(name) reads a live SortableJS option; option(name, value) sets one — the
-// runtime escape hatch for any SortableJS option beyond the curated props.
 // option(name) reads a live SortableJS option; option(name, value) sets one — the
 // runtime escape hatch for any SortableJS option beyond the curated props.
 function option(name: any, value: any) {

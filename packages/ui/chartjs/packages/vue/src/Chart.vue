@@ -83,18 +83,6 @@ const slots = useSlots();
 const canvasElRef = ref<HTMLElement>();
 
 import { Chart as ChartJS } from 'chart.js';
-
-// Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
-// generic Chart does NOT auto-register — the consumer registers only what they
-// use (the tree-shakable Chart.js v3+ idiom every framework wrapper follows), so
-// an app that only renders line charts doesn't ship every controller. Two paths:
-//   - selective: `import { Chart, LineController, ... } from 'chart.js';
-//     Chart.register(LineController, ...)` once at app startup; OR
-//   - kitchen sink: import this package's `/auto` entry
-//     (`@rozie-ui/chartjs-<fw>/auto`), or `import 'chart.js/auto'`, which
-//     registers everything.
-// The per-type components (Line/Bar/…) register their own controller set, so
-// importing one is tree-shakable by construction.
 // Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
 // generic Chart does NOT auto-register — the consumer registers only what they
 // use (the tree-shakable Chart.js v3+ idiom every framework wrapper follows), so
@@ -113,16 +101,7 @@ let instance: any = null;
 // `canvasNode` (NOT `canvasEl`) so it does not collide with the template
 // `ref="canvasEl"` binding, which the per-target emitters lower to their own
 // `canvasEl` ref declaration (a same-name script local double-declares it).
-// $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
-// captured node so no $refs read ever executes outside the mount hook. Named
-// `canvasNode` (NOT `canvasEl`) so it does not collide with the template
-// `ref="canvasEl"` binding, which the per-target emitters lower to their own
-// `canvasEl` ref declaration (a same-name script local double-declares it).
 let canvasNode: any = null;
-// buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
-// references are bound in the mount-lifecycle scope the per-target emitters
-// provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
-// note) and stored here so the top-level re-create $watches can call it.
 // buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
 // references are bound in the mount-lifecycle scope the per-target emitters
 // provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
