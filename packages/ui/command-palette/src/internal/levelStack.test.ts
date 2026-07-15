@@ -10,6 +10,7 @@ import {
   breadcrumb,
   levelTitle,
   levelPlaceholder,
+  levelDefaultItems,
   type LevelFrame,
 } from './levelStack';
 
@@ -51,6 +52,52 @@ describe('levelTitle / levelPlaceholder', () => {
     expect(levelPlaceholder({ id: 'a', placeholder: 'Search A…' }, 'Type a command…')).toBe('Search A…');
     expect(levelPlaceholder({ id: 'a' }, 'Type a command…')).toBe('Type a command…');
     expect(levelPlaceholder({ id: 'a' }, null)).toBeNull();
+  });
+});
+
+describe('levelDefaultItems / defaultItems frame field', () => {
+  it('returns item.defaultItems when it is a non-empty array', () => {
+    const defaultItems = [{ id: 'r1', label: 'Recent 1' }];
+    expect(levelDefaultItems({ id: 'a', label: 'A', defaultItems })).toBe(defaultItems);
+  });
+
+  it('returns [] for an item without a defaultItems field', () => {
+    expect(levelDefaultItems({ id: 'a', label: 'A' })).toEqual([]);
+  });
+
+  it('returns [] for null/undefined/non-array defaultItems', () => {
+    expect(levelDefaultItems(null)).toEqual([]);
+    expect(levelDefaultItems(undefined)).toEqual([]);
+    // biome-ignore lint/suspicious/noExplicitAny: deliberately malformed input for the guard
+    expect(levelDefaultItems({ id: 'a', label: 'A', defaultItems: 'not-an-array' } as any)).toEqual([]);
+  });
+
+  it('pushFrame copies defaultItems onto the new frame', () => {
+    const defaultItems = [{ id: 'r1', label: 'Recent 1' }, { id: 'r2', label: 'Recent 2' }];
+    const item = { id: 'a', label: 'A', source: (_q: string) => [], defaultItems };
+    const stack = pushFrame([], item, '');
+    expect(stack[0].defaultItems).toEqual(defaultItems);
+  });
+
+  it('a SOURCE item carrying a non-empty defaultItems seeds status ready (no loading flash)', () => {
+    const defaultItems = [{ id: 'r1', label: 'Recent 1' }];
+    const item = { id: 'a', label: 'A', source: (_q: string) => [], defaultItems };
+    const stack = pushFrame([], item, '');
+    expect(stack[0].status).toBe('ready');
+    expect(stack[0].resolvedItems).toEqual([]);
+  });
+
+  it('a source item with an EMPTY defaultItems still seeds status loading (regression guard)', () => {
+    const item = { id: 'a', label: 'A', source: (_q: string) => [], defaultItems: [] };
+    const stack = pushFrame([], item, '');
+    expect(stack[0].status).toBe('loading');
+  });
+
+  it('a source item with no defaultItems field still seeds status loading (regression guard)', () => {
+    const item = { id: 'a', label: 'A', source: (_q: string) => [] };
+    const stack = pushFrame([], item, '');
+    expect(stack[0].status).toBe('loading');
+    expect(stack[0].defaultItems).toEqual([]);
   });
 });
 
