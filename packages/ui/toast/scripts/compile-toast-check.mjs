@@ -24,7 +24,7 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'Toaster',
-  props: ['position', 'duration', 'max', 'disablePauseOnHover', 'ariaLabel', 'disableSwipe'],
+  props: ['position', 'duration', 'max', 'disablePauseOnHover', 'ariaLabel', 'disableSwipe', 'stacked'],
   models: [],
   emits: ['dismissed'],
   slots: ['toast'],

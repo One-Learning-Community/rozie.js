@@ -48,6 +48,7 @@ import '@rozie-ui/toast-solid/themes/shadcn.css';    // or material.css, bootstr
 | `disablePauseOnHover` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `disableSwipe` | `Boolean` | `false` |  |  |
+| `stacked` | `Boolean` | `false` |  |  |
 
 ## Events
 

@@ -21,4 +21,9 @@
   --rozie-toast-error-bg: hsl(var(--destructive, 0 84.2% 60.2%));
   --rozie-toast-warning-bg: hsl(38 92% 50%);
   --rozie-toast-info-bg: hsl(var(--muted, 210 40% 96.1%));
+
+  /* Radix's own Toast primitive animates fast (~150ms) — match that snap. */
+  --rozie-toast-enter-duration: 150ms;
+  --rozie-toast-exit-duration: 150ms;
+  --rozie-toast-spinner-color: hsl(var(--foreground, 222.2 84% 4.9%));
 }

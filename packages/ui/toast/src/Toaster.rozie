@@ -52,6 +52,17 @@
   toast back. A drag starting on a `button`/`a` (the close button) never
   swipes.
 
+  Stacked mode (opt-in via `stacked`): a `.rozie-toaster--stacked` class marks
+  the region; the ACTUAL collapse-vs-expand look is pure CSS
+  (`:not(:hover):not(:focus-within)` for collapsed, hover/focus-within falls
+  back to the plain flex column — no JS hover-tracking needed for this). Every
+  toast ALWAYS carries its depth-from-newest as a string-form `:style` custom
+  property `--rozie-toast-depth` (harmless when `stacked` is off); CSS turns
+  that into `translateY`/`scale`/`opacity`/`z-index` in collapsed mode. `depth`
+  is `$data.toasts.length - 1 - index` — corner-independent (newest = last in
+  the array = depth 0), since the collapsed grid overlay ignores
+  flex-direction entirely.
+
   Authoring notes (collision classes — see the authoring playbook):
     - Imperative verbs `show` / `dismiss` / `clear` are NOT inherited HTMLElement
       members (no ROZ137). The single `dismissed` event does not collide with
@@ -134,6 +145,17 @@
     docs: {
       description:
         'Opt **out** of pointer swipe-to-dismiss. By default, dragging a toast past 45% of its own width/height (direction auto-derived from `position`) or a fast flick dismisses it with reason `\'swipe\'`; a short drag springs back. A drag starting on the close button (or any button/link) never swipes.',
+    },
+  },
+
+  // Opt IN to the sonner-style collapsed stack (default: the plain flex
+  // column, unchanged).
+  stacked:              {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times.',
     },
   },
 }
@@ -433,19 +455,32 @@ const onToastPointerCancel = (t) => {
   if ($data.swipe && $data.swipe.id === t.id) $data.swipe = null
 }
 
-// String-form `:style` for the toast row — EITHER the active drag transform
-// (while $data.swipe tracks this id) OR the swipe-exit sign custom property
-// (once `dismissBegin('swipe')` flipped `t.swipeExitSign`). Never both.
+// ---- stacked mode ----------------------------------------------------------
+// Depth from newest: the newest toast (last in the array — show() appends)
+// is depth 0; each older toast is one deeper. Corner-independent — the
+// collapsed grid overlay ignores flex-direction/column-reverse entirely, so
+// this needs no position-aware math.
+const depth = (t) => {
+  const idx = $data.toasts.findIndex((x) => x.id === t.id)
+  return idx === -1 ? 0 : $data.toasts.length - 1 - idx
+}
+
+// String-form `:style` for the toast row. ALWAYS carries `--rozie-toast-depth`
+// (a no-op unless `stacked` is on — CSS reads it only inside
+// `.rozie-toaster--stacked`), plus EITHER the active drag transform (while
+// $data.swipe tracks this id) OR the swipe-exit sign custom property (once
+// `dismissBegin('swipe')` flipped `t.swipeExitSign`). Drag/exit never overlap.
 const toastStyle = (t) => {
+  const depthDecl = '--rozie-toast-depth: ' + depth(t) + ';'
   if (t.exiting) {
-    return t.swipeExitSign != null ? '--rozie-toast-swipe-exit: ' + t.swipeExitSign + ';' : ''
+    return t.swipeExitSign != null ? depthDecl + ' --rozie-toast-swipe-exit: ' + t.swipeExitSign + ';' : depthDecl
   }
   const swipe = $data.swipe
-  if (!swipe || swipe.id !== t.id) return ''
+  if (!swipe || swipe.id !== t.id) return depthDecl
   const translate = swipe.axis === 'x' ? 'translateX(' + swipe.d + 'px)' : 'translateY(' + swipe.d + 'px)'
   const magnitude = swipe.d * swipe.sign
   const opacity = magnitude > 0 && swipe.size > 0 ? Math.max(0.3, 1 - magnitude / swipe.size) : 1
-  return 'transform: ' + translate + '; opacity: ' + opacity + '; transition: none;'
+  return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;'
 }
 
 // ---- hover pause -------------------------------------------------------
@@ -476,7 +511,7 @@ $expose({ show, dismiss, clear, patch, promise })
 <template>
 <div
   class="rozie-toaster"
-  :class="'rozie-toaster--' + $props.position"
+  :class="'rozie-toaster--' + $props.position + ($props.stacked ? ' rozie-toaster--stacked' : '')"
   role="region"
   :aria-label="regionLabel()"
   @mouseenter="onMouseEnter()"
@@ -538,6 +573,41 @@ $expose({ show, dismiss, clear, patch, promise })
 .rozie-toaster--bottom-left { bottom: 0; left: 0; align-items: flex-start; flex-direction: column-reverse; }
 .rozie-toaster--bottom-right { bottom: 0; right: 0; align-items: flex-end; flex-direction: column-reverse; }
 .rozie-toaster--bottom-center { bottom: 0; left: 50%; transform: translateX(-50%); align-items: center; flex-direction: column-reverse; }
+
+/*
+  Stacked mode (opt-in `stacked` prop): `.rozie-toaster--stacked` is a pure
+  ENABLEMENT marker — the actual collapsed-vs-expanded look is entirely
+  `:hover`/`:focus-within`-driven CSS (no JS hover-tracking needed). Collapsed
+  = a single-cell grid overlay (`grid-area: 1 / 1` on every toast — an
+  overlay, no absolute-position math); each toast's `--rozie-toast-depth`
+  custom property (always set — see toastStyle() in <script>) drives a
+  depth-scaled translate/scale + an opacity that reaches 0 at depth>=3
+  (`calc(1 - min(1, max(0, depth - 2)))`) + a depth-descending z-index
+  (newest highest). Hover/focus-within simply stops matching the
+  `:not(:hover):not(:focus-within)` selectors below, falling back to the
+  plain flex column (the `.rozie-toast` `transition` — added alongside swipe
+  above — animates the collapse/expand smoothly).
+*/
+.rozie-toaster--stacked .rozie-toast {
+  grid-area: 1 / 1;
+  z-index: calc(100 - var(--rozie-toast-depth, 0));
+}
+.rozie-toaster--stacked:not(:hover):not(:focus-within) {
+  display: grid;
+}
+.rozie-toaster--stacked:not(:hover):not(:focus-within) .rozie-toast {
+  transform:
+    translateY(calc(var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-offset, 8px)))
+    scale(calc(1 - var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-scale-step, 0.05)));
+  opacity: calc(1 - min(1, max(0, var(--rozie-toast-depth, 0) - 2)));
+}
+.rozie-toaster--stacked.rozie-toaster--bottom-left:not(:hover):not(:focus-within) .rozie-toast,
+.rozie-toaster--stacked.rozie-toaster--bottom-right:not(:hover):not(:focus-within) .rozie-toast,
+.rozie-toaster--stacked.rozie-toaster--bottom-center:not(:hover):not(:focus-within) .rozie-toast {
+  transform:
+    translateY(calc(var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-offset, 8px) * -1))
+    scale(calc(1 - var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-scale-step, 0.05)));
+}
 
 .rozie-toast {
   display: flex;

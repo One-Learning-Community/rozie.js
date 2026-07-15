@@ -33,7 +33,7 @@ function __rozieAttr(v: unknown): string | null {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <div class="rozie-toaster" [ngClass]="'rozie-toaster--' + position()" role="region" [attr.aria-label]="rozieAttr(regionLabel())" #rozieSpread_0 (mouseenter)="onMouseEnter()" (mouseleave)="onMouseLeave()" #rozieListenersTarget_1>
+    <div class="rozie-toaster" [ngClass]="'rozie-toaster--' + position() + (stacked() ? ' rozie-toaster--stacked' : '')" role="region" [attr.aria-label]="rozieAttr(regionLabel())" #rozieSpread_0 (mouseenter)="onMouseEnter()" (mouseleave)="onMouseLeave()" #rozieListenersTarget_1>
       
       @for (t of toasts(); track t.id) {
     <div class="rozie-toast" [ngClass]="'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')" [style]="toastStyle(t)" role="status" [attr.aria-live]="rozieAttr(liveFor(t.type))" (animationend)="t.exiting && removeToast(t.id)" (pointerdown)="onToastPointerDown(t, $event)" (pointermove)="onToastPointerMove(t, $event)" (pointerup)="onToastPointerUp(t, $event)" (pointercancel)="onToastPointerCancel(t)">
@@ -84,6 +84,26 @@ function __rozieAttr(v: unknown): string | null {
     .rozie-toaster--bottom-left { bottom: 0; left: 0; align-items: flex-start; flex-direction: column-reverse; }
     .rozie-toaster--bottom-right { bottom: 0; right: 0; align-items: flex-end; flex-direction: column-reverse; }
     .rozie-toaster--bottom-center { bottom: 0; left: 50%; transform: translateX(-50%); align-items: center; flex-direction: column-reverse; }
+    .rozie-toaster--stacked .rozie-toast {
+      grid-area: 1 / 1;
+      z-index: calc(100 - var(--rozie-toast-depth, 0));
+    }
+    .rozie-toaster--stacked:not(:hover):not(:focus-within) {
+      display: grid;
+    }
+    .rozie-toaster--stacked:not(:hover):not(:focus-within) .rozie-toast {
+      transform:
+        translateY(calc(var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-offset, 8px)))
+        scale(calc(1 - var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-scale-step, 0.05)));
+      opacity: calc(1 - min(1, max(0, var(--rozie-toast-depth, 0) - 2)));
+    }
+    .rozie-toaster--stacked.rozie-toaster--bottom-left:not(:hover):not(:focus-within) .rozie-toast,
+    .rozie-toaster--stacked.rozie-toaster--bottom-right:not(:hover):not(:focus-within) .rozie-toast,
+    .rozie-toaster--stacked.rozie-toaster--bottom-center:not(:hover):not(:focus-within) .rozie-toast {
+      transform:
+        translateY(calc(var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-offset, 8px) * -1))
+        scale(calc(1 - var(--rozie-toast-depth, 0) * var(--rozie-toast-stack-scale-step, 0.05)));
+    }
     .rozie-toast {
       display: flex;
       align-items: center;
@@ -210,6 +230,10 @@ export class Toaster {
    * Opt **out** of pointer swipe-to-dismiss. By default, dragging a toast past 45% of its own width/height (direction auto-derived from `position`) or a fast flick dismisses it with reason `'swipe'`; a short drag springs back. A drag starting on the close button (or any button/link) never swipes.
    */
   disableSwipe = input<boolean>(false);
+  /**
+   * Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times.
+   */
+  stacked = input<boolean>(false);
   toasts = signal<any[]>([]);
   seq = signal(0);
   swipe = signal<any>(null);
@@ -452,16 +476,22 @@ export class Toaster {
     if (this.swipeGesture && this.swipeGesture.id === t.id) this.swipeGesture = null;
     if (this.swipe() && this.swipe().id === t.id) this.swipe.set(null);
   };
+  depth = (t: any) => {
+    const __toasts = this.toasts();
+    const idx = __toasts.findIndex((x: any) => x.id === t.id);
+    return idx === -1 ? 0 : __toasts.length - 1 - idx;
+  };
   toastStyle = (t: any) => {
+    const depthDecl = '--rozie-toast-depth: ' + this.depth(t) + ';';
     if (t.exiting) {
-      return t.swipeExitSign != null ? '--rozie-toast-swipe-exit: ' + t.swipeExitSign + ';' : '';
+      return t.swipeExitSign != null ? depthDecl + ' --rozie-toast-swipe-exit: ' + t.swipeExitSign + ';' : depthDecl;
     }
     const swipe = this.swipe();
-    if (!swipe || swipe.id !== t.id) return '';
+    if (!swipe || swipe.id !== t.id) return depthDecl;
     const translate = swipe.axis === 'x' ? 'translateX(' + swipe.d + 'px)' : 'translateY(' + swipe.d + 'px)';
     const magnitude = swipe.d * swipe.sign;
     const opacity = magnitude > 0 && swipe.size > 0 ? Math.max(0.3, 1 - magnitude / swipe.size) : 1;
-    return 'transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
+    return depthDecl + ' transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
   };
   onMouseEnter = () => {
     if (this.disablePauseOnHover()) return;

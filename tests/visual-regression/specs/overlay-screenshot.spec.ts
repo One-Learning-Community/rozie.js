@@ -44,6 +44,11 @@ const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 const EXAMPLES = [
   'DialogScreenshot',
   'ToasterScreenshot',
+  // TOAST-STACK (toast-ux-cluster) — the opt-in `stacked` collapsed-mode
+  // pixel cell. Same `position:fixed` top-right corner as ToasterScreenshot,
+  // so it escapes the matrix mount clip too; a SEPARATE baseline (4 sticky
+  // toasts, collapsed depth-driven grid overlay, depth>=3 hidden).
+  'ToasterStackedScreenshot',
   // @rozie-ui/popover — the floating panel is `position: absolute` (laid out by
   // Floating UI relative to the anchor, not the rozie-mount wrapper), so it
   // escapes the matrix mount clip and is captured PAGE-LEVEL here. The demo seeds
@@ -110,6 +115,15 @@ for (const example of EXAMPLES) {
         // the $refs.toaster.show() handle; each toast carries role="status". Wait
         // for the single fixed-corner toast before the clip. role= pierces Lit's shadow.
         await expect(page.locator('[role="status"]')).toHaveCount(1, {
+          timeout: 15_000,
+        });
+      } else if (example === 'ToasterStackedScreenshot') {
+        // The demo's $onMount enqueues FOUR sticky toasts + `stacked`; the pointer
+        // never hovers, so the collapsed depth-driven grid overlay paints (newest
+        // on top, depth>=3 hidden — the 4th toast fades to opacity 0 but stays in
+        // the DOM). Wait for all 4 role="status" entries before the clip (the
+        // COUNT proves the queue settled even though one is visually hidden).
+        await expect(page.locator('[role="status"]')).toHaveCount(4, {
           timeout: 15_000,
         });
       } else if (example === 'PopoverScreenshot') {

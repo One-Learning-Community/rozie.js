@@ -42,4 +42,16 @@
   --rozie-toast-font-size: 0.9rem;
   --rozie-toast-close-size: 1.25rem;
   --rozie-toast-close-opacity: 0.75;
+
+  /* enter/exit lifecycle */
+  --rozie-toast-enter-duration: 200ms;
+  --rozie-toast-exit-duration: 200ms;
+
+  /* stacked mode (opt-in `stacked` prop) — collapsed depth transform */
+  --rozie-toast-stack-offset: 8px;
+  --rozie-toast-stack-scale-step: 0.05;
+
+  /* the decorative 'loading' type spinner */
+  --rozie-toast-spinner-size: 1em;
+  --rozie-toast-spinner-color: currentColor;
 }

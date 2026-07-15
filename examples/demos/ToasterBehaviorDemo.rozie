@@ -11,9 +11,13 @@
   Playwright drag can grab. A `dismissed-reason` readout mirrors the LATEST
   `@dismissed` event's `reason` (proves 'swipe' fires, distinct from 'close'/
   'api'/'timeout'); a `toggle-disable-swipe` button flips the `disableSwipe`
-  prop so the spec can assert swipe goes inert. Behavioral-only (no pixel
-  baseline) — the swipe/stacked choreography's own pixel + gesture proof is
-  the ToasterStackedScreenshot cell + this spec's structural drag assertions.
+  prop so the spec can assert swipe goes inert.
+
+  Also drives stacked mode (TOAST-STACK): a `toggle-stacked` button flips the
+  `stacked` prop; the spec queues several `show-toast` clicks then toggles
+  `stacked` on to assert the collapsed depth-driven grid overlay (depth>=3
+  hidden) and its hover-triggered expand. Behavioral-only (no pixel baseline
+  here) — stacked's own pixel proof is the ToasterStackedScreenshot cell.
 -->
 <rozie name="ToasterBehaviorDemo">
 
@@ -27,6 +31,7 @@
 {
   count: 0,
   disableSwipe: false,
+  stacked: false,
   dismissedReason: '',
 }
 </data>
@@ -39,6 +44,9 @@ const showToast = () => {
 }
 const toggleDisableSwipe = () => {
   $data.disableSwipe = !$data.disableSwipe
+}
+const toggleStacked = () => {
+  $data.stacked = !$data.stacked
 }
 const onDismissed = (payload) => {
   $data.dismissedReason = payload.reason
@@ -53,6 +61,7 @@ const onDismissed = (payload) => {
     <button type="button" data-testid="show-toast" @click="showToast()">Show toast</button>
     <span class="readout" data-testid="readout-count">{{ $data.count }}</span>
     <button type="button" data-testid="toggle-disable-swipe" @click="toggleDisableSwipe()">Toggle disableSwipe</button>
+    <button type="button" data-testid="toggle-stacked" @click="toggleStacked()">Toggle stacked</button>
     <span class="readout" data-testid="dismissed-reason">{{ $data.dismissedReason }}</span>
   </div>
 
@@ -62,6 +71,7 @@ const onDismissed = (payload) => {
     :duration="0"
     ariaLabel="Notifications"
     :disable-swipe="$data.disableSwipe"
+    :stacked="$data.stacked"
     @dismissed="onDismissed"
   />
 </div>

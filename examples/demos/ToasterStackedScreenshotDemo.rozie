@@ -1,0 +1,67 @@
+<!--
+  ToasterStackedScreenshotDemo.rozie — content-STABLE screenshot consumer for
+  the opt-in `stacked` collapsed mode (TOAST-STACK), pure-Rozie/no-engine.
+
+  Where ToasterScreenshotDemo.rozie is the single-sticky-toast baseline cell,
+  THIS demo is the SEPARATE deterministic screenshot cell for the collapsed
+  stack — never extend it for behavior (see ToasterBehaviorDemo.rozie /
+  toaster.spec.ts for the stacked collapse/expand/depth-hidden BEHAVIORAL
+  assertions).
+
+  Made deterministic by `$onMount` enqueuing FOUR sticky toasts (`:duration="0"`
+  — never auto-dismiss, no timer-driven inter-run drift) via the imperative
+  `$refs.toaster.show()` handle, deferred one macrotask (the
+  ToasterScreenshotDemo precedent: calling a CHILD component's `$expose`
+  handle from the PARENT's $onMount runs before the child's handle is
+  registered on Solid — children-before-parent mount + ref-readiness timing).
+  `stacked` is on and the pointer never hovers the region, so the collapsed
+  depth-driven grid overlay (newest on top, depth>=3 hidden — the 4th toast
+  fades to invisible) paints on first frame — a fixed, collapsed frame.
+
+  FIXED-POSITION NOTE: same as ToasterScreenshotDemo — the toaster region is
+  `position: fixed` (top-right corner), escaping the
+  `[data-testid="rozie-mount"]` clip, so this cell is captured PAGE-LEVEL by
+  specs/overlay-screenshot.spec.ts, NOT matrix.spec.ts. The spec waits for
+  all 4 `[role="status"]` toasts before the clip.
+
+  One .rozie source compiles to six per-framework screenshot consumers; the
+  Linux PNG baseline is generated separately in pinned Linux Docker (NOT here
+  — feedback_vr_linux_baselines). Until it lands the cell auto-fixmes on
+  baselineExists().
+-->
+
+<rozie name="ToasterStackedScreenshotDemo">
+
+<components>
+{
+  Toaster: '../../packages/ui/toast/src/Toaster.rozie',
+}
+</components>
+
+<script>
+$onMount(() => {
+  setTimeout(() => {
+    $refs.toaster.show({ message: 'First notice', type: 'info', duration: 0 })
+    $refs.toaster.show({ message: 'Second notice', type: 'success', duration: 0 })
+    $refs.toaster.show({ message: 'Third notice', type: 'warning', duration: 0 })
+    $refs.toaster.show({ message: 'Fourth notice (hidden — depth 3)', type: 'error', duration: 0 })
+  }, 0)
+})
+</script>
+
+<template>
+<div class="toast-stacked-screenshot-demo">
+  <Toaster ref="toaster" position="top-right" :duration="0" ariaLabel="Notifications" stacked />
+</div>
+</template>
+
+<style>
+.toast-stacked-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+</style>
+
+</rozie>

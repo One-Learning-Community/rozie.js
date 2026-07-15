@@ -222,3 +222,63 @@ for (const target of TARGETS) {
     await expect(page.locator('[role="status"]')).toHaveCount(1, { timeout: 5_000 });
   });
 }
+
+/**
+ * Stacked mode (TOAST-STACK) — the opt-in collapsed depth-driven grid
+ * overlay. `toggle-stacked` flips the `stacked` prop on the SAME
+ * `ToasterBehaviorDemo` instance; `.rozie-toast` locators are DOM-order (=
+ * `$data.toasts` array order, oldest first — corner-independent), so
+ * `.nth(0)` is the OLDEST (depth 3, hidden when collapsed) and `.nth(3)` is
+ * the NEWEST (depth 0, always visible).
+ *
+ * Proven GREEN ×6 only in the ONE batched Linux Docker VR run (Task 7).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+
+  runner(`toaster [${target}]: stacked collapses to a depth-driven overlay (depth>=3 hidden) and expands on hover`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ToasterBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('toggle-stacked').click();
+    for (let i = 0; i < 4; i++) {
+      await page.getByTestId('show-toast').click();
+    }
+    await expect(page.locator('[role="status"]')).toHaveCount(4, { timeout: 15_000 });
+
+    // Collapsed (not hovered): the oldest (depth 3) toast is hidden.
+    const oldest = page.locator('.rozie-toast').nth(0);
+    const newest = page.locator('.rozie-toast').nth(3);
+    await expect(oldest).toHaveCSS('opacity', '0');
+    await expect(newest).toHaveCSS('opacity', '1');
+
+    // Hover the region → expands to the flex column: every toast visible.
+    await page.locator('.rozie-toaster').first().hover();
+    await expect(oldest).toHaveCSS('opacity', '1');
+
+    // Move away → re-collapses.
+    await page.mouse.move(10, 10);
+    await expect(oldest).toHaveCSS('opacity', '0');
+  });
+
+  runner(`toaster [${target}]: stacked:false (default) renders the plain flex column at all times`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ToasterBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    for (let i = 0; i < 4; i++) {
+      await page.getByTestId('show-toast').click();
+    }
+    await expect(page.locator('[role="status"]')).toHaveCount(4, { timeout: 15_000 });
+
+    // stacked is OFF (default) — every toast is visible, none hidden by depth.
+    const oldest = page.locator('.rozie-toast').nth(0);
+    await expect(oldest).toHaveCSS('opacity', '1');
+  });
+}

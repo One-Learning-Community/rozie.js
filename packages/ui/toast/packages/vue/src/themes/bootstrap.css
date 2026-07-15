@@ -19,4 +19,9 @@
   --rozie-toast-error-bg: var(--bs-danger, #dc3545);
   --rozie-toast-warning-bg: var(--bs-warning, #ffc107);
   --rozie-toast-info-bg: var(--bs-info, #0dcaf0);
+
+  /* Bootstrap's own $transition-fade / $toast-*-time defaults are ~150ms. */
+  --rozie-toast-enter-duration: 150ms;
+  --rozie-toast-exit-duration: 150ms;
+  --rozie-toast-spinner-color: #fff;
 }

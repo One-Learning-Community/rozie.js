@@ -565,6 +565,15 @@ export const EXAMPLES = [
   'ComboboxScreenshot',
   'DialogScreenshot',
   'ToasterScreenshot',
+  // TOAST-STACK (toast-ux-cluster) — the opt-in `stacked` collapsed-mode
+  // content-STABLE pixel cell (loader → ToasterStackedScreenshotDemo.rozie,
+  // which imports packages/ui/toast/src/Toaster.rozie). Same fixed top-right
+  // `position:fixed` corner as ToasterScreenshot, so it ALSO escapes the
+  // rozie-mount clip → the SAME dedicated FULL-PAGE spec
+  // (overlay-screenshot.spec.ts). Seeds 4 sticky toasts + `stacked`, never
+  // hovered, so the collapsed depth-driven grid overlay (depth>=3 hidden)
+  // paints on first frame — a SEPARATE baseline from ToasterScreenshot.
+  'ToasterStackedScreenshot',
   // @rozie-ui/data-table (headless, accessible, cross-framework data table on a
   // single inline @tanstack/table-core bridge — NO per-framework adapter) — the
   // six BEHAVIORAL cells (loaders → examples/demos/DataTable{Columns,Sort,
@@ -1253,6 +1262,10 @@ export const LIT_TAGS: Record<Example, string> = {
   ComboboxScreenshot: 'rozie-combobox-screenshot',
   DialogScreenshot: 'rozie-dialog-screenshot',
   ToasterScreenshot: 'rozie-toaster-screenshot',
+  // 'rozie-toaster-stacked-screenshot-demo' = kebab of
+  // ToasterStackedScreenshotDemo (the wrapper component is
+  // name="ToasterStackedScreenshotDemo").
+  ToasterStackedScreenshot: 'rozie-toaster-stacked-screenshot',
   // @rozie-ui/data-table — '-demo' appended on Lit → tags
   // 'rozie-data-table-columns-demo' etc. = kebab of DataTable*Demo (the wrapper
   // components are name="DataTable{Columns,...}Demo"). Behavioral-only, no
@@ -1658,6 +1671,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   ComboboxScreenshot: {},
   DialogScreenshot: {},
   ToasterScreenshot: {},
+  // ToasterStackedScreenshotDemo is self-contained too: it seeds its own 4
+  // sticky toasts in $onMount and passes `stacked` as a literal template
+  // attribute (not parent-supplied), so no MODEL_PROPS entry. No parent props.
+  ToasterStackedScreenshot: {},
   // @rozie-ui/data-table — every DataTable*Demo is self-contained: it seeds its
   // own rows + column-declaration in <data>/<components> and binds the state
   // slices via r-model internally (not parent-supplied), so no MODEL_PROPS entry.

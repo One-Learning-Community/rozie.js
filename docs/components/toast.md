@@ -55,6 +55,7 @@ Mount the host **once** (typically near your app root), grab a ref to it, and ca
 | `disablePauseOnHover` | `Boolean` | `false` | yes | Opt **out** of pausing the auto-dismiss timers while the pointer is over the stack (default: hovering pauses, restarting the timers on leave). |
 | `ariaLabel` | `String` | `null` | yes | Accessible name for the live region (`role="region"`). Defaults to `'Notifications'` when not set. |
 | `disableSwipe` | `Boolean` | `false` | yes | Opt **out** of pointer swipe-to-dismiss. By default, dragging a toast past 45% of its own width/height (direction auto-derived from `position`) or a fast flick dismisses it with reason `'swipe'`; a short drag springs back. A drag starting on the close button (or any button/link) never swipes. |
+| `stacked` | `Boolean` | `false` | yes | Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times. |
 
 ### Imperative handle
 

@@ -19,4 +19,10 @@
   --rozie-toast-error-bg: var(--md-sys-color-error, #b3261e);
   --rozie-toast-warning-bg: #f9a825;
   --rozie-toast-info-bg: var(--md-sys-color-inverse-surface, #322f35);
+
+  /* MD3's motion system favors slightly longer "emphasized" easing/duration
+     for surfaces entering/leaving the screen than the 200ms baseline. */
+  --rozie-toast-enter-duration: 250ms;
+  --rozie-toast-exit-duration: 250ms;
+  --rozie-toast-spinner-color: var(--md-sys-color-inverse-on-surface, #f5eff7);
 }

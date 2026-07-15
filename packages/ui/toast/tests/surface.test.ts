@@ -27,7 +27,7 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'Toaster',
-  props: ['position', 'duration', 'max', 'disablePauseOnHover', 'ariaLabel', 'disableSwipe'],
+  props: ['position', 'duration', 'max', 'disablePauseOnHover', 'ariaLabel', 'disableSwipe', 'stacked'],
   models: [] as string[],
   emits: ['dismissed'] as string[],
   slots: ['toast'],
@@ -51,7 +51,7 @@ describe('Toaster.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (6 props)', () => {
+  it('props surface matches (7 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
