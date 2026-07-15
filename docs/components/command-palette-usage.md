@@ -36,7 +36,7 @@ export function Demo() {
         query={query}
         onQueryChange={setQuery}
         items={commands}
-        onSelect={(e) => console.log('ran:', e.id)}
+        onSelect={(e) => console.log('ran:', e.item.id)}
       />
     </>
   );
@@ -56,8 +56,8 @@ const commands = [
   { id: 'open', label: 'Open File', group: 'File' },
   { id: 'settings', label: 'Preferences', group: 'App' },
 ];
-function onSelect(e: { id: string }) {
-  console.log('ran:', e.id);
+function onSelect(e: { item: { id: string }; path: string[] }) {
+  console.log('ran:', e.item.id);
 }
 </script>
 
@@ -86,7 +86,7 @@ function onSelect(e: { id: string }) {
   bind:open
   bind:query
   items={commands}
-  onselect={(e) => console.log('ran:', e.id)}
+  onselect={(e) => console.log('ran:', e.item.id)}
 />
 ```
 
@@ -111,8 +111,8 @@ export class DemoComponent {
     { id: 'open', label: 'Open File', group: 'File' },
     { id: 'settings', label: 'Preferences', group: 'App' },
   ];
-  onSelect(e: { id: string }) {
-    console.log('ran:', e.id);
+  onSelect(e: { item: { id: string }; path: string[] }) {
+    console.log('ran:', e.item.id);
   }
 }
 ```
@@ -140,7 +140,7 @@ export function Demo() {
         query={query()}
         onQueryChange={setQuery}
         items={commands}
-        onSelect={(e) => console.log('ran:', e.id)}
+        onSelect={(e) => console.log('ran:', e.item.id)}
       />
     </>
   );
@@ -161,7 +161,7 @@ el.items = [
 ];
 el.addEventListener('open-change', (e) => { el.open = e.detail.open; });
 el.addEventListener('query-change', (e) => { el.query = e.detail; });
-el.addEventListener('select', (e) => { console.log('ran:', e.detail.id); });
+el.addEventListener('select', (e) => { console.log('ran:', e.detail.item.id); });
 el.open = true;
 ```
 

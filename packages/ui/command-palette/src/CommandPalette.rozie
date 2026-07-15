@@ -63,8 +63,9 @@
       `close` is collision-safe (no `@close` EVENT is emitted — closing writes the
       `open` model + emits nothing named `close`). `focus` is the accepted
       ROZ137 Lit override (slider/otp/combobox precedent).
-    - The select event is `select` (the chosen item object). `open`/`query` are
-      two-way MODELS, not emits.
+    - The select event is `select` — payload `{ item, path }`, where `item` is the full chosen
+      LEAF command object and `path` is the levels id-breadcrumb (mirrors `navigate`'s `{ item, depth }`).
+      `open`/`query` are two-way MODELS, not emits.
     - $refs.inputEl is read only in post-mount callbacks ($onMount / the open
       $watch callback / handlers) — ROZ123-safe. The watch GETTER is
       `() => $props.open` (touches no ref).
@@ -535,11 +536,12 @@ const openTo = async (path) => {
 // item (isNavigating — children/source) is intercepted here and PUSHES a
 // child level instead of emitting `select` (presence of children/source is
 // the navigation signal, no separate flag). Otherwise re-emit the PUBLIC
-// `select` event with the chosen leaf command (optionally close); its
-// payload gains `path` — the id breadcrumb of levels navigated through to
-// reach it (levelStack item ids, root excluded — root carries no item). The
-// `option` IS the original command item (we feed items straight through as
-// combobox options), so read its id/label/group directly.
+// `select` event as `{ item, path }` — `item` is the FULL original command
+// object (the `option` IS the original command item, since we feed items
+// straight through as combobox options — no id/label/group projection) and
+// `path` is the id breadcrumb of levels navigated through to reach it
+// (levelStack item ids, root excluded — root carries no item). This mirrors
+// `navigate`'s `{ item, depth }` shape.
 const onComboboxChange = (e) => {
   const item = e ? e.option : null
   if (!item || item.disabled) return
@@ -548,7 +550,7 @@ const onComboboxChange = (e) => {
     return
   }
   const path = $data.levelStack.map((f) => (f.item ? f.item.id : null))
-  $emit('select', { id: item.id, label: item.label, group: item.group, path })
+  $emit('select', { item, path })
   // Clear the internal selection so re-selecting the same command re-fires.
   $data.activeValue = null
   if ($props.closeOnSelect) closePalette()

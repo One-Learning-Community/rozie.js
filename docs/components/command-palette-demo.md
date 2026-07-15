@@ -23,8 +23,8 @@ const commands = [
   { id: 'logout', label: 'Sign Out', group: 'App', disabled: true },
 ];
 
-function onSelect(e: { id: string; label: string }) {
-  lastRun.value = e.label;
+function onSelect(e: { item: { id: string; label: string; group?: string }; path: string[] }) {
+  lastRun.value = e.item.label;
 }
 </script>
 

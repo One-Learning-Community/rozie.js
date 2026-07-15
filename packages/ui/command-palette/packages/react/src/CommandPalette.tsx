@@ -346,9 +346,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     }
     const path = levelStack.map((f: any) => f.item ? f.item.id : null);
     _rozieProp_onSelect && _rozieProp_onSelect({
-      id: item.id,
-      label: item.label,
-      group: item.group,
+      item,
       path
     });
     // Clear the internal selection so re-selecting the same command re-fires.

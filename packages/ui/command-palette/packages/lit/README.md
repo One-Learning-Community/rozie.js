@@ -26,7 +26,7 @@ el.items = [
 ];
 el.addEventListener('open-change', (e) => { el.open = e.detail.open; });
 el.addEventListener('query-change', (e) => { el.query = e.detail; });
-el.addEventListener('select', (e) => { console.log('ran:', e.detail.id); });
+el.addEventListener('select', (e) => { console.log('ran:', e.detail.item.id); });
 el.open = true;
 ```
 
@@ -59,7 +59,7 @@ import '@rozie-ui/command-palette-lit/themes/shadcn.css';    // or material.css,
 | --- | --- |
 | `navigate` | Fired when a nested level is PUSHED — selecting an item that carries `children` or `source` drills into it instead of emitting `select`. Payload `{ item, depth }` — the navigated-to item and the resulting nesting depth (1-based; the root is depth 0). |
 | `back` | Fired when a level is POPPED — via Backspace-on-empty, Escape at depth>0, the imperative `goBack()` handle, or an equivalent consumer-triggered back navigation. No payload. Does not fire at the root (popping is a no-op there). |
-| `select` | Fired when the user chooses a LEAF command (clicks it, or highlights it and presses Enter) — an item with no `children`/`source` (see `navigate` for a navigating item). Payload `{ id, label, group, path }` — `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). If `closeOnSelect` is true (the default) the palette also closes (its `open` model is written `false`). |
+| `select` | Fired when the user chooses a LEAF command (clicks it, or highlights it and presses Enter) — an item with no `children`/`source` (see `navigate` for a navigating item). Payload `{ item, path }` — `item` is the full chosen command object, `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). If `closeOnSelect` is true (the default) the palette also closes (its `open` model is written `false`). |
 
 ## Imperative handle
 

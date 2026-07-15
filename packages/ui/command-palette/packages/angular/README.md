@@ -33,8 +33,8 @@ export class DemoComponent {
     { id: 'open', label: 'Open File', group: 'File' },
     { id: 'settings', label: 'Preferences', group: 'App' },
   ];
-  onSelect(e: { id: string }) {
-    console.log('ran:', e.id);
+  onSelect(e: { item: { id: string }; path: string[] }) {
+    console.log('ran:', e.item.id);
   }
 }
 ```
@@ -68,7 +68,7 @@ import '@rozie-ui/command-palette-angular/themes/shadcn.css';    // or material.
 | --- | --- |
 | `navigate` | Fired when a nested level is PUSHED — selecting an item that carries `children` or `source` drills into it instead of emitting `select`. Payload `{ item, depth }` — the navigated-to item and the resulting nesting depth (1-based; the root is depth 0). |
 | `back` | Fired when a level is POPPED — via Backspace-on-empty, Escape at depth>0, the imperative `goBack()` handle, or an equivalent consumer-triggered back navigation. No payload. Does not fire at the root (popping is a no-op there). |
-| `select` | Fired when the user chooses a LEAF command (clicks it, or highlights it and presses Enter) — an item with no `children`/`source` (see `navigate` for a navigating item). Payload `{ id, label, group, path }` — `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). If `closeOnSelect` is true (the default) the palette also closes (its `open` model is written `false`). |
+| `select` | Fired when the user chooses a LEAF command (clicks it, or highlights it and presses Enter) — an item with no `children`/`source` (see `navigate` for a navigating item). Payload `{ item, path }` — `item` is the full chosen command object, `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). If `closeOnSelect` is true (the default) the palette also closes (its `open` model is written `false`). |
 
 ## Imperative handle
 

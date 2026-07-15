@@ -588,9 +588,7 @@ export class CommandPalette {
     }
     const path = this.levelStack().map((f: any) => f.item ? f.item.id : null);
     this.select.emit({
-      id: item.id,
-      label: item.label,
-      group: item.group,
+      item,
       path
     });
     // Clear the internal selection so re-selecting the same command re-fires.

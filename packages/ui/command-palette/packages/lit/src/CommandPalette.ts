@@ -699,9 +699,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   const path = this._levelStack.value.map((f: any) => f.item ? f.item.id : null);
   this.dispatchEvent(new CustomEvent("select", {
     detail: {
-      id: item.id,
-      label: item.label,
-      group: item.group,
+      item,
       path
     },
     bubbles: true,

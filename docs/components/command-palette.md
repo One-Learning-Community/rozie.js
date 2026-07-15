@@ -45,7 +45,7 @@ const commands = [
 ]
 
 const run = (e) => {
-  console.log('ran command:', e.id)
+  console.log('ran command:', e.item.id)
 }
 </script>
 
@@ -97,7 +97,7 @@ const commands = [
   },
 ]
 
-const run = (e) => console.log('ran leaf command:', e.id, 'via path', e.path)
+const run = (e) => console.log('ran leaf command:', e.item.id, 'via path', e.path)
 </script>
 
 <template>

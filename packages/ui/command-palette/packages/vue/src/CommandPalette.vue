@@ -425,11 +425,12 @@ const openTo = async (path: any) => {
 // item (isNavigating — children/source) is intercepted here and PUSHES a
 // child level instead of emitting `select` (presence of children/source is
 // the navigation signal, no separate flag). Otherwise re-emit the PUBLIC
-// `select` event with the chosen leaf command (optionally close); its
-// payload gains `path` — the id breadcrumb of levels navigated through to
-// reach it (levelStack item ids, root excluded — root carries no item). The
-// `option` IS the original command item (we feed items straight through as
-// combobox options), so read its id/label/group directly.
+// `select` event as `{ item, path }` — `item` is the FULL original command
+// object (the `option` IS the original command item, since we feed items
+// straight through as combobox options — no id/label/group projection) and
+// `path` is the id breadcrumb of levels navigated through to reach it
+// (levelStack item ids, root excluded — root carries no item). This mirrors
+// `navigate`'s `{ item, depth }` shape.
 const onComboboxChange = (e: any) => {
   const item = e ? e.option : null;
   if (!item || item.disabled) return;
@@ -439,9 +440,7 @@ const onComboboxChange = (e: any) => {
   }
   const path = levelStack.value.map((f: any) => f.item ? f.item.id : null);
   emit('select', {
-    id: item.id,
-    label: item.label,
-    group: item.group,
+    item,
     path
   });
   // Clear the internal selection so re-selecting the same command re-fires.

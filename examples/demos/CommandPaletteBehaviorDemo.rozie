@@ -94,7 +94,7 @@ const items = [
 ]
 
 const onSelect = (e) => {
-  $data.lastSelect = e && e.id != null ? e.id : ''
+  $data.lastSelect = e && e.item && e.item.id != null ? e.item.id : ''
 }
 const onNavigate = (e) => {
   $data.lastNavigate = e && e.item && e.item.id != null ? e.item.id : ''
