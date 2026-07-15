@@ -24,7 +24,7 @@ export interface CommandPaletteProps {
    */
   score?: ((...args: any[]) => any) | null;
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
+   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; commands sharing an optional `group` string are bucketed under a labeled section heading (auto-derived, via the vendored combobox's native section groups) — commands with no `group` render first in a headingless block. The heading text is the `group` string itself; override its markup with the `#groupHeading` slot. Optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
    */
   items?: unknown[];
   /**
@@ -69,6 +69,7 @@ export interface CommandPaletteProps {
   onActionSelect?: (...args: unknown[]) => void;
   renderBreadcrumb?: (params: { stack: unknown; back: () => void }) => ReactNode;
   renderOption?: (params: { option: () => void; index: () => void; active: () => void; selected: () => void; disabled: () => void; matches: unknown }) => ReactNode;
+  renderGroupHeading?: (params: { group: () => void }) => ReactNode;
   renderEmpty?: (params: { query: string }) => ReactNode;
   renderActionItem?: (params: { action: () => void; item: unknown; active: unknown; disabled: unknown }) => ReactNode;
   renderLoading?: (params: { query: string }) => ReactNode;

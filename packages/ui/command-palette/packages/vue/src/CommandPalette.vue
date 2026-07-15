@@ -8,7 +8,7 @@
         <button type="button" class="rozie-command-palette-back" aria-label="Back" data-testid="command-palette-back" @click="goBack()">‹</button>
         <span class="rozie-command-palette-title" data-testid="command-palette-title">{{ currentTitle() }}</span>
       </slot>
-    </div><Combobox ref="comboboxRef" :inline="true" :disable-filter="true" :close-on-select="false" :options="filteredItems()" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="currentPlaceholder()" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
+    </div><Combobox ref="comboboxRef" :inline="true" :disable-filter="true" :close-on-select="false" :options="orderedItems()" :groups="commandGroups()" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="currentPlaceholder()" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
         <slot name="option" :option="option" :index="index" :active="active" :selected="selected" :disabled="disabled" :matches="labelHighlight(labelText(option), query)">
           <div class="rozie-command-palette-option">
             <span v-if="$slots.icon" class="rozie-command-palette-option-icon">
@@ -17,7 +17,7 @@
               <span class="rozie-command-palette-option-label">
                 <span v-for="(segment, si) in labelSegments(option)" :key="si" :class="{ 'rozie-command-palette-option-label-match': segment.match }">{{ segment.text }}</span>
               </span>
-              <span v-if="groupText(option)" class="rozie-command-palette-option-group">{{ groupText(option) }}</span></span>
+              <span v-if="groupText(option) && !grouped()" class="rozie-command-palette-option-group">{{ groupText(option) }}</span></span>
             
             <span v-if="$slots.actions || actionsList(option).length > 0" class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" @mousedown.stop="openActionMenu(option)">
               <slot name="actions" :option="option" :actions="actionsList(option)">
@@ -26,6 +26,8 @@
               <slot name="trailing" :option="option"></slot>
             </span></div>
         </slot>
+      </template><template #groupHeading="{ group }">
+        <slot name="groupHeading" :group="group">{{ groupLabel(group) }}</slot>
       </template><template #empty="{ query }">
         <template v-if="currentStatus() === 'ready'"><slot name="empty" :query="query">{{ props.emptyText }}</slot></template></template></Combobox>
 
@@ -60,7 +62,7 @@ const props = withDefaults(
      */
     score?: ((...args: any[]) => any) | null;
     /**
-     * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
+     * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; commands sharing an optional `group` string are bucketed under a labeled section heading (auto-derived, via the vendored combobox's native section groups) — commands with no `group` render first in a headingless block. The heading text is the `group` string itself; override its markup with the `#groupHeading` slot. Optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
      */
     items?: any[];
     /**
@@ -124,6 +126,7 @@ const emit = defineEmits<{
 defineSlots<{
   breadcrumb(props: { stack: any; back: any }): any;
   option(props: { option: any; index: any; active: any; selected: any; disabled: any; matches: any }): any;
+  groupHeading(props: { group: any }): any;
   empty(props: { query: any }): any;
   actionItem(props: { action: any; item: any; active: any; disabled: any }): any;
   loading(props: { query: any }): any;
@@ -148,6 +151,7 @@ import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
+import { deriveCommandGroups } from './internal/commandGroups';
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
 // boundaries within a single handler (bump a token, then compare it after an
@@ -241,6 +245,22 @@ const breadcrumbStack = () => buildBreadcrumb(levelStack.value, props.ariaLabel)
 // Levels sit ABOVE the pipeline (LVL-STACK) — currentItems() resolves the
 // active level's list (root or the top pushed frame) BEFORE ranking.
 const filteredItems = () => scoreCommands(currentItems(), query.value, props.score);
+// ---- native combobox groups (cp-adopts-combobox-groups) -----------------
+// groupedView(): derives `{ groups, ordered }` off filteredItems() via the
+// pure commandGroups.ts helper (mirrors combobox groupOptions() exactly —
+// see that file's header). orderedItems()/commandGroups() split the result
+// for the two template bindings below; grouped() gates the per-row badge.
+// Plain functions (never $computed — the combobox value-vs-accessor split).
+const groupedView = () => deriveCommandGroups(filteredItems());
+const orderedItems = () => groupedView().ordered;
+const commandGroups = () => groupedView().groups;
+const grouped = () => commandGroups().length > 0;
+// groupLabel(): UNTYPED display resolver for the re-projected #groupHeading
+// scope param — `group` threads as `unknown` on the Lit leaf (the same
+// cross-target slot-param-type gap as labelText/groupText/actionLabel
+// above), so the default fill reads `.label` through this rather than
+// `group.label` directly.
+const groupLabel = (g: any) => g && g.label !== undefined ? g.label : '';
 // The vendored <Combobox> commits the OPTION's value; resolve each command's value
 // to its stable `id` (the key passed back on `select`). disabled is resolved off
 // the item's own `disabled` flag (combobox's default `.disabled` fallback already
@@ -632,10 +652,13 @@ const deepQuerySelector = (root: any, selector: any) => {
 // highlightedItem(): resolve the combobox's currently-highlighted row back to
 // its command object. Combobox owns `activeIndex` internally (no public model
 // for it), so this reads the ACTIVE option element's id — `idBase + '-opt-' +
-// i`, where `i` is its position in filteredItems() (the exact list combobox
-// was fed as `:options`) — off the DOM, via `deepQuerySelector` (ROZ123-safe:
-// called only from post-mount handlers, never eagerly). Returns null when
-// nothing is highlighted or the id can't be parsed.
+// i`, where `i` is its position in orderedItems() (the group-visual-order
+// list combobox was fed as `:options` — cp-adopts-combobox-groups: the
+// combobox's own internal `groupOptions()` re-partition of an
+// already-group-ordered list is idempotent, so its index-based option ids
+// stay aligned with this same order) — off the DOM, via `deepQuerySelector`
+// (ROZ123-safe: called only from post-mount handlers, never eagerly).
+// Returns null when nothing is highlighted or the id can't be parsed.
 const highlightedItem = () => {
   const panel = panelRef.value;
   if (!panel) return null;
@@ -646,7 +669,7 @@ const highlightedItem = () => {
   if (id.indexOf(prefix) !== 0) return null;
   const idx = parseInt(id.slice(prefix.length), 10);
   if (Number.isNaN(idx)) return null;
-  const list = filteredItems();
+  const list = orderedItems();
   return idx >= 0 && idx < list.length ? list[idx] : null;
 };
 // searchInputEl(): the vendored combobox's underlying `<input role="combobox">`

@@ -7,6 +7,7 @@ import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
+import { deriveCommandGroups } from './internal/commandGroups';
 
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
@@ -34,6 +35,11 @@ interface OptionCtx {
   selected: any;
   disabled: any;
   matches: any;
+}
+
+interface GroupHeadingCtx {
+  $implicit: { group: any };
+  group: any;
 }
 
 interface EmptyCtx {
@@ -120,7 +126,7 @@ function __rozieAttr(v: unknown): string | null {
           
     }
         </div>
-    }<rozie-combobox #combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="filteredItems()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="currentPlaceholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
+    }<rozie-combobox #combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="orderedItems()" [groups]="commandGroups()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="currentPlaceholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
             @if ((optionTpl ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }, option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }" />
     } @else {
@@ -138,7 +144,7 @@ function __rozieAttr(v: unknown): string | null {
     <span [class]="{ 'rozie-command-palette-option-label-match': segment.match }">{{ rozieDisplay(segment.text) }}</span>
     }
                   </span>
-                  @if (groupText(option)) {
+                  @if (groupText(option) && !grouped()) {
     <span class="rozie-command-palette-option-group">{{ rozieDisplay(groupText(option)) }}</span>
     }</span>
                 
@@ -161,6 +167,12 @@ function __rozieAttr(v: unknown): string | null {
                 </span>
     }</div>
             
+    }
+          </ng-template><ng-template #groupHeading let-group="group">
+            @if ((groupHeadingTpl ?? templates()?.['groupHeading'])) {
+    <ng-container *ngTemplateOutlet="(groupHeadingTpl ?? templates()?.['groupHeading']); context: { $implicit: { group: group }, group: group }" />
+    } @else {
+    {{ rozieDisplay(groupLabel(group)) }}
     }
           </ng-template><ng-template #empty let-query="query">
             @if (currentStatus() === 'ready') {
@@ -430,7 +442,7 @@ export class CommandPalette {
    */
   score = input<((...args: any[]) => any) | null>(null);
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
+   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; commands sharing an optional `group` string are bucketed under a labeled section heading (auto-derived, via the vendored combobox's native section groups) — commands with no `group` render first in a headingless block. The heading text is the `group` string itself; override its markup with the `#groupHeading` slot. Optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
    */
   items = input<any[]>((() => [])());
   /**
@@ -483,6 +495,7 @@ export class CommandPalette {
   actionSelect = output<unknown>({ alias: 'action-select' });
   @ContentChild('breadcrumb', { read: TemplateRef }) breadcrumbTpl?: TemplateRef<BreadcrumbCtx>;
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
+  @ContentChild('groupHeading', { read: TemplateRef }) groupHeadingTpl?: TemplateRef<GroupHeadingCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
   @ContentChild('actionItem', { read: TemplateRef }) actionItemTpl?: TemplateRef<ActionItemCtx>;
   @ContentChild('loading', { read: TemplateRef }) loadingTpl?: TemplateRef<LoadingCtx>;
@@ -551,6 +564,11 @@ export class CommandPalette {
   };
   breadcrumbStack = () => buildBreadcrumb(this.levelStack(), this.ariaLabel());
   filteredItems = () => scoreCommands(this.currentItems(), this.query(), this.score());
+  groupedView = () => deriveCommandGroups(this.filteredItems());
+  orderedItems = () => this.groupedView().ordered;
+  commandGroups = () => this.groupedView().groups;
+  grouped = () => this.commandGroups().length > 0;
+  groupLabel = (g: any) => g && g.label !== undefined ? g.label : '';
   commandValue = (it: any) => it && it.id !== undefined ? it.id : it;
   commandDisabled = (it: any) => !!(it && it.disabled);
   labelText = (o: any) => o && o.label !== undefined ? o.label : '';
@@ -794,7 +812,7 @@ export class CommandPalette {
     if (id.indexOf(prefix) !== 0) return null;
     const idx = parseInt(id.slice(prefix.length), 10);
     if (Number.isNaN(idx)) return null;
-    const list = this.filteredItems();
+    const list = this.orderedItems();
     return idx >= 0 && idx < list.length ? list[idx] : null;
   };
   searchInputEl = () => {
@@ -958,7 +976,7 @@ export class CommandPalette {
   static ngTemplateContextGuard(
     _dir: CommandPalette,
     _ctx: unknown,
-  ): _ctx is BreadcrumbCtx | OptionCtx | EmptyCtx | ActionItemCtx | LoadingCtx | ErrorCtx | FooterCtx | IconCtx | ActionsCtx | TrailingCtx {
+  ): _ctx is BreadcrumbCtx | OptionCtx | GroupHeadingCtx | EmptyCtx | ActionItemCtx | LoadingCtx | ErrorCtx | FooterCtx | IconCtx | ActionsCtx | TrailingCtx {
     return true;
   }
 

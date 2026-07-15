@@ -7,6 +7,7 @@ import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
+import { deriveCommandGroups } from './internal/commandGroups';
 
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
@@ -221,6 +222,8 @@ interface BreadcrumbSlotCtx { stack: any; back: any; }
 
 interface OptionSlotCtx { option: any; index: any; active: any; selected: any; disabled: any; matches: any; }
 
+interface GroupHeadingSlotCtx { group: any; }
+
 interface EmptySlotCtx { query: any; }
 
 interface ActionItemSlotCtx { action: any; item: any; active: any; disabled: any; }
@@ -257,7 +260,7 @@ interface CommandPaletteProps {
    */
   score?: ((...args: any[]) => any) | null;
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
+   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; commands sharing an optional `group` string are bucketed under a labeled section heading (auto-derived, via the vendored combobox's native section groups) — commands with no `group` render first in a headingless block. The heading text is the `group` string itself; override its markup with the `#groupHeading` slot. Optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
    */
   items?: any[];
   /**
@@ -302,6 +305,7 @@ interface CommandPaletteProps {
   onActionSelect?: (...args: unknown[]) => void;
   breadcrumbSlot?: (ctx: BreadcrumbSlotCtx) => JSX.Element;
   optionSlot?: (ctx: OptionSlotCtx) => JSX.Element;
+  groupHeadingSlot?: (ctx: GroupHeadingSlotCtx) => JSX.Element;
   emptySlot?: (ctx: EmptySlotCtx) => JSX.Element;
   actionItemSlot?: (ctx: ActionItemSlotCtx) => JSX.Element;
   loadingSlot?: (ctx: LoadingSlotCtx) => JSX.Element;
@@ -472,6 +476,34 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // active level's list (root or the top pushed frame) BEFORE ranking.
   function filteredItems() {
     return scoreCommands(currentItems(), query(), local.score);
+  }
+
+  // ---- native combobox groups (cp-adopts-combobox-groups) -----------------
+  // groupedView(): derives `{ groups, ordered }` off filteredItems() via the
+  // pure commandGroups.ts helper (mirrors combobox groupOptions() exactly —
+  // see that file's header). orderedItems()/commandGroups() split the result
+  // for the two template bindings below; grouped() gates the per-row badge.
+  // Plain functions (never $computed — the combobox value-vs-accessor split).
+  function groupedView() {
+    return deriveCommandGroups(filteredItems());
+  }
+  function orderedItems() {
+    return groupedView().ordered;
+  }
+  function commandGroups() {
+    return groupedView().groups;
+  }
+  function grouped() {
+    return commandGroups().length > 0;
+  }
+
+  // groupLabel(): UNTYPED display resolver for the re-projected #groupHeading
+  // scope param — `group` threads as `unknown` on the Lit leaf (the same
+  // cross-target slot-param-type gap as labelText/groupText/actionLabel
+  // above), so the default fill reads `.label` through this rather than
+  // `group.label` directly.
+  function groupLabel(g: any) {
+    return g && g.label !== undefined ? g.label : '';
   }
 
   // The vendored <Combobox> commits the OPTION's value; resolve each command's value
@@ -900,10 +932,13 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // highlightedItem(): resolve the combobox's currently-highlighted row back to
   // its command object. Combobox owns `activeIndex` internally (no public model
   // for it), so this reads the ACTIVE option element's id — `idBase + '-opt-' +
-  // i`, where `i` is its position in filteredItems() (the exact list combobox
-  // was fed as `:options`) — off the DOM, via `deepQuerySelector` (ROZ123-safe:
-  // called only from post-mount handlers, never eagerly). Returns null when
-  // nothing is highlighted or the id can't be parsed.
+  // i`, where `i` is its position in orderedItems() (the group-visual-order
+  // list combobox was fed as `:options` — cp-adopts-combobox-groups: the
+  // combobox's own internal `groupOptions()` re-partition of an
+  // already-group-ordered list is idempotent, so its index-based option ids
+  // stay aligned with this same order) — off the DOM, via `deepQuerySelector`
+  // (ROZ123-safe: called only from post-mount handlers, never eagerly).
+  // Returns null when nothing is highlighted or the id can't be parsed.
   function highlightedItem() {
     const panel = panelRef;
     if (!panel) return null;
@@ -914,7 +949,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     if (id.indexOf(prefix) !== 0) return null;
     const idx = parseInt(id.slice(prefix.length), 10);
     if (Number.isNaN(idx)) return null;
-    const list = filteredItems();
+    const list = orderedItems();
     return idx >= 0 && idx < list.length ? list[idx] : null;
   }
 
@@ -1161,7 +1196,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
         
         {<Show when={atDepth()}><div class={"rozie-command-palette-header"} data-rozie-s-768cad96="">
           {(_props.breadcrumbSlot ?? _props.slots?.['breadcrumb'])?.({ stack: breadcrumbStack(), back: goBack }) ?? <><button type="button" aria-label="Back" data-testid="command-palette-back" class={"rozie-command-palette-back"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { goBack(); }} data-rozie-s-768cad96="">‹</button><span class={"rozie-command-palette-title"} data-testid="command-palette-title" data-rozie-s-768cad96="">{rozieDisplay(currentTitle())}</span></>}
-        </div></Show>}<Combobox aria-label={local.ariaLabel} ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
+        </div></Show>}<Combobox aria-label={local.ariaLabel} ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
             {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query()) }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {<Show when={(_props.iconSlot ?? _props.slots?.['icon'])}><span class={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
                   {(_props.iconSlot ?? _props.slots?.['icon'])?.({ option })}
@@ -1169,13 +1204,15 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
                   <span class={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">
                     <For each={labelSegments(option)}>{(segment, si) => <span class={rozieClass({ 'rozie-command-palette-option-label-match': segment.match })} data-rozie-s-768cad96="">{rozieDisplay(segment.text)}</span>}</For>
                   </span>
-                  {<Show when={groupText(option)}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</span>
+                  {<Show when={groupText(option) && !grouped()}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</span>
                 
                 {<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
                   {(_props.actionsSlot ?? _props.slots?.['actions'])?.({ option, actions: actionsList(option) }) ?? <Show when={actionsList(option).length > 0}><span class={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span></Show>}
                 </span></Show>}{<Show when={(_props.trailingSlot ?? _props.slots?.['trailing'])}><span class={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
                   {(_props.trailingSlot ?? _props.slots?.['trailing'])?.({ option })}
                 </span></Show>}</div>}
+          </>)} groupHeadingSlot={({ group }) => (<>
+            {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ group }) ?? rozieDisplay(groupLabel(group))}
           </>)} emptySlot={({ query }) => (<>
             {<Show when={currentStatus() === 'ready'}>{(_props.emptySlot ?? _props.slots?.['empty'])?.({ query }) ?? local.emptyText}</Show>}</>)} />
 

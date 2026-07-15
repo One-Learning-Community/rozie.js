@@ -7,6 +7,7 @@ import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
+import { deriveCommandGroups } from './internal/commandGroups';
 
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
@@ -23,6 +24,8 @@ import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, 
 interface BreadcrumbCtx { stack: any; back: any; }
 
 interface OptionCtx { option: any; index: any; active: any; selected: any; disabled: any; matches: any; }
+
+interface GroupHeadingCtx { group: any; }
 
 interface EmptyCtx { query: any; }
 
@@ -60,7 +63,7 @@ interface CommandPaletteProps {
    */
   score?: ((...args: any[]) => any) | null;
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
+   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; commands sharing an optional `group` string are bucketed under a labeled section heading (auto-derived, via the vendored combobox's native section groups) — commands with no `group` render first in a headingless block. The heading text is the `group` string itself; override its markup with the `#groupHeading` slot. Optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
    */
   items?: any[];
   /**
@@ -105,6 +108,7 @@ interface CommandPaletteProps {
   onActionSelect?: (...args: any[]) => void;
   renderBreadcrumb?: (ctx: BreadcrumbCtx) => ReactNode;
   renderOption?: (ctx: OptionCtx) => ReactNode;
+  renderGroupHeading?: (ctx: GroupHeadingCtx) => ReactNode;
   renderEmpty?: (ctx: EmptyCtx) => ReactNode;
   renderActionItem?: (ctx: ActionItemCtx) => ReactNode;
   renderLoading?: (ctx: LoadingCtx) => ReactNode;
@@ -207,6 +211,21 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   }
   function filteredItems() {
     return scoreCommands(currentItems(), query, props.score);
+  }
+  function groupedView() {
+    return deriveCommandGroups(filteredItems());
+  }
+  function orderedItems() {
+    return groupedView().ordered;
+  }
+  function commandGroups() {
+    return groupedView().groups;
+  }
+  function grouped() {
+    return commandGroups().length > 0;
+  }
+  function groupLabel(g: any) {
+    return g && g.label !== undefined ? g.label : '';
   }
   function commandValue(it: any) {
     return it && it.id !== undefined ? it.id : it;
@@ -469,7 +488,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     if (id.indexOf(prefix) !== 0) return null;
     const idx = parseInt(id.slice(prefix.length), 10);
     if (Number.isNaN(idx)) return null;
-    const list = filteredItems();
+    const list = orderedItems();
     return idx >= 0 && idx < list.length ? list[idx] : null;
   }
   function searchInputEl() {
@@ -670,7 +689,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
         
         {!!(atDepth()) && <div className={"rozie-command-palette-header"} data-rozie-s-768cad96="">
           {(props.renderBreadcrumb ?? props.slots?.['breadcrumb']) ? ((props.renderBreadcrumb ?? props.slots?.['breadcrumb']) as Function)({ stack: breadcrumbStack(), back: goBack }) : <><button type="button" className={"rozie-command-palette-back"} aria-label="Back" data-testid="command-palette-back" onClick={($event) => { goBack(); }} data-rozie-s-768cad96="">‹</button><span className={"rozie-command-palette-title"} data-testid="command-palette-title" data-rozie-s-768cad96="">{rozieDisplay(currentTitle())}</span></>}
-        </div>}<Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
+        </div>}<Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
             {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) }) : <div className={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {!!((props.renderIcon ?? props.slots?.['icon'])) && <span className={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
                   {(props.renderIcon ?? props.slots?.['icon'])?.({ option })}
@@ -678,13 +697,15 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
                   <span className={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">
                     {labelSegments(option).map((segment, si) => <span key={si} className={clsx({ "rozie-command-palette-option-label-match": segment.match })} data-rozie-s-768cad96="">{rozieDisplay(segment.text)}</span>)}
                   </span>
-                  {!!(groupText(option)) && <span className={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span>}</span>
+                  {!!(groupText(option) && !grouped()) && <span className={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span>}</span>
                 
                 {!!((props.renderActions ?? props.slots?.['actions']) || actionsList(option).length > 0) && <span className={"rozie-command-palette-option-actions"} data-testid="command-palette-actions-affordance" onMouseDown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
                   {(props.renderActions ?? props.slots?.['actions']) ? ((props.renderActions ?? props.slots?.['actions']) as Function)({ option, actions: actionsList(option) }) : !!(actionsList(option).length > 0) && <span className={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span>}
                 </span>}{!!((props.renderTrailing ?? props.slots?.['trailing'])) && <span className={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
                   {(props.renderTrailing ?? props.slots?.['trailing'])?.({ option })}
                 </span>}</div>}
+          </>)} renderGroupHeading={({ group }) => (<>
+            {(props.renderGroupHeading ?? props.slots?.['groupHeading']) ? ((props.renderGroupHeading ?? props.slots?.['groupHeading']) as Function)({ group }) : rozieDisplay(groupLabel(group))}
           </>)} renderEmpty={({ query }) => (<>
             {!!(currentStatus() === 'ready') && ((props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : props.emptyText)}</>)} />
 

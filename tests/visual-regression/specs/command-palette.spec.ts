@@ -42,6 +42,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * phase) doesn't regress its OTHER consumer — see the separately-gated
  * `data-table` VR cell in the same `vr.sh -g` run.
  *
+ * A FOURTH suite below (command-palette-groups, cp-adopts-combobox-groups)
+ * proves the vendored <Combobox>'s NATIVE section-groups adoption: the demo's
+ * `File` (new/open/save) and `Edit` (cut/copy/paste) commands render as two
+ * labeled sections, the two navigating items (`goto`/`search-users`, which
+ * carry no `group`) render in a leading headingless block, the `role="option"`
+ * count stays 8 (grouping never drops/adds rows), and the old per-row
+ * `.rozie-command-palette-option-group` badge is fully replaced (0 elements).
+ *
  * `examples/demos/CommandPaletteBehaviorDemo.rozie` drives a two-way
  * r-model:open + r-model:query, a mixed 8-item list (6 leaves, a static
  * `children` level, and an async `source` level), an open button, an openTo
@@ -136,6 +144,48 @@ async function activeElementText(page: Page): Promise<string> {
       node = node.shadowRoot.activeElement as Element & { shadowRoot?: ShadowRoot | null };
     }
     return node ? (node.textContent || '').trim() : '';
+  });
+}
+
+/**
+ * Count elements matching `.<className>`, RECURSIVELY piercing every open
+ * shadow root — reused below for the retired per-row group badge
+ * (`.rozie-command-palette-option-group`, cp-adopts-combobox-groups).
+ */
+async function countByClass(page: Page, className: string): Promise<number> {
+  return page.evaluate((cls) => {
+    let total = 0;
+    const walk = (root: Document | ShadowRoot): void => {
+      total += root.querySelectorAll(`.${cls}`).length;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) walk(sr);
+      }
+    };
+    walk(document);
+    return total;
+  }, className);
+}
+
+/**
+ * The trimmed text content of every combobox group-heading element
+ * (`.rozie-combobox-group-heading`), in DOM order, RECURSIVELY piercing
+ * every open shadow root — cp-adopts-combobox-groups' section-heading proof.
+ */
+async function groupHeadingTexts(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    const walk = (root: Document | ShadowRoot): void => {
+      for (const el of Array.from(root.querySelectorAll('.rozie-combobox-group-heading'))) {
+        out.push((el.textContent || '').trim());
+      }
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) walk(sr);
+      }
+    };
+    walk(document);
+    return out;
   });
 }
 
@@ -479,6 +529,52 @@ for (const target of TARGETS) {
       role: 'combobox',
       disabled: false,
     });
+
+    // ---- cleanup: close the palette ----
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+}
+
+/**
+ * command-palette-groups (cp-adopts-combobox-groups) — the native combobox
+ * section-groups adoption. Drives the demo's `File` (new/open/save) and
+ * `Edit` (cut/copy/paste) commands, plus the two ungrouped navigating items
+ * (`goto`, `search-users`).
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`command-palette-groups [${target}]: renders File/Edit sections, preserves option count, retires the per-row badge`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const openBtn = page.getByTestId('open-palette');
+    await openBtn.click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+
+    // ---- 1. grouping preserves the role="option" count (8 — grouped options ----
+    //         render as <div role="option">, same count as the flat branch).
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(8);
+
+    // ---- 2. exactly 2 group HEADINGS render, "File" then "Edit" (the demo's ----
+    //         two groups, in first-appearance order). The 2 ungrouped navigating
+    //         items (goto, search-users) render in a LEADING headingless
+    //         role="group" block, so this asserts on the heading ELEMENTS/text,
+    //         not on role="group" count (which is 3, including that block).
+    await expect.poll(async () => groupHeadingTexts(page), { timeout: 10_000 }).toEqual(['File', 'Edit']);
+
+    // ---- 3. the old per-row badge is fully retired — 0 elements anywhere ----
+    //         (shadow-pierced), since grouping now fully replaces it.
+    await expect
+      .poll(async () => countByClass(page, 'rozie-command-palette-option-group'), { timeout: 10_000 })
+      .toBe(0);
 
     // ---- cleanup: close the palette ----
     await page.keyboard.press('Escape');

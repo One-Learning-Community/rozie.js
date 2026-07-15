@@ -23,7 +23,7 @@ interface Props {
    */
   score?: ((...args: any[]) => any) | null;
   /**
-   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; optional `group` is shown as a per-row label on each matching command (it is not a section heading — items are not bucketed); optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
+   * The command list — `[{ id, label, group?, keywords?, disabled?, icon?, actions? }]`. `label` is the displayed (and filtered) text; `id` is a stable key passed back on `select`; commands sharing an optional `group` string are bucketed under a labeled section heading (auto-derived, via the vendored combobox's native section groups) — commands with no `group` render first in a headingless block. The heading text is the `group` string itself; override its markup with the `#groupHeading` slot. Optional `keywords` are extra strings the query also matches; an optional `disabled` flag styles an item and skips it for selection/navigation. The optional `icon` and `actions` fields are display-only — unused by ranking — surfaced through the `#icon` and `#actions` option-row slots.
    */
   items?: any[];
   /**
@@ -64,6 +64,7 @@ interface Props {
   closeOnAction?: boolean;
   breadcrumb?: Snippet<[{ stack: any; back: any }]>;
   option?: Snippet<[{ option: any; index: any; active: any; selected: any; disabled: any; matches: any }]>;
+  groupHeading?: Snippet<[{ group: any }]>;
   empty?: Snippet<[{ query: any }]>;
   actionItem?: Snippet<[{ action: any; item: any; active: any; disabled: any }]>;
   loading?: Snippet<[{ query: any }]>;
@@ -97,6 +98,7 @@ let {
   closeOnAction = true,
   breadcrumb: __breadcrumbProp,
   option: __optionProp,
+  groupHeading: __groupHeadingProp,
   empty: __emptyProp,
   actionItem: __actionItemProp,
   loading: __loadingProp,
@@ -115,6 +117,7 @@ let {
 
 const breadcrumb = $derived(__breadcrumbProp ?? snippets?.breadcrumb);
 const option$$slot = $derived(__optionProp ?? snippets?.option);
+const groupHeading$$slot = $derived(__groupHeadingProp ?? snippets?.groupHeading);
 const empty$$slot = $derived(__emptyProp ?? snippets?.empty);
 const actionItem = $derived(__actionItemProp ?? snippets?.actionItem);
 const loading = $derived(__loadingProp ?? snippets?.loading);
@@ -138,6 +141,7 @@ import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
+import { deriveCommandGroups } from './internal/commandGroups';
 // ---- async race-drop token + debounce timer (module-level lets) ---------
 // These are NOT $data. They are read-after-write SYNCHRONOUSLY across async
 // boundaries within a single handler (bump a token, then compare it after an
@@ -231,6 +235,22 @@ const breadcrumbStack = () => buildBreadcrumb(levelStack, ariaLabel);
 // Levels sit ABOVE the pipeline (LVL-STACK) — currentItems() resolves the
 // active level's list (root or the top pushed frame) BEFORE ranking.
 const filteredItems = () => scoreCommands(currentItems(), query, score);
+// ---- native combobox groups (cp-adopts-combobox-groups) -----------------
+// groupedView(): derives `{ groups, ordered }` off filteredItems() via the
+// pure commandGroups.ts helper (mirrors combobox groupOptions() exactly —
+// see that file's header). orderedItems()/commandGroups() split the result
+// for the two template bindings below; grouped() gates the per-row badge.
+// Plain functions (never $computed — the combobox value-vs-accessor split).
+const groupedView = () => deriveCommandGroups(filteredItems());
+const orderedItems = () => groupedView().ordered;
+const commandGroups = () => groupedView().groups;
+const grouped = () => commandGroups().length > 0;
+// groupLabel(): UNTYPED display resolver for the re-projected #groupHeading
+// scope param — `group` threads as `unknown` on the Lit leaf (the same
+// cross-target slot-param-type gap as labelText/groupText/actionLabel
+// above), so the default fill reads `.label` through this rather than
+// `group.label` directly.
+const groupLabel = (g: any) => g && g.label !== undefined ? g.label : '';
 // The vendored <Combobox> commits the OPTION's value; resolve each command's value
 // to its stable `id` (the key passed back on `select`). disabled is resolved off
 // the item's own `disabled` flag (combobox's default `.disabled` fallback already
@@ -622,10 +642,13 @@ const deepQuerySelector = (root: any, selector: any) => {
 // highlightedItem(): resolve the combobox's currently-highlighted row back to
 // its command object. Combobox owns `activeIndex` internally (no public model
 // for it), so this reads the ACTIVE option element's id — `idBase + '-opt-' +
-// i`, where `i` is its position in filteredItems() (the exact list combobox
-// was fed as `:options`) — off the DOM, via `deepQuerySelector` (ROZ123-safe:
-// called only from post-mount handlers, never eagerly). Returns null when
-// nothing is highlighted or the id can't be parsed.
+// i`, where `i` is its position in orderedItems() (the group-visual-order
+// list combobox was fed as `:options` — cp-adopts-combobox-groups: the
+// combobox's own internal `groupOptions()` re-partition of an
+// already-group-ordered list is idempotent, so its index-based option ids
+// stay aligned with this same order) — off the DOM, via `deepQuerySelector`
+// (ROZ123-safe: called only from post-mount handlers, never eagerly).
+// Returns null when nothing is highlighted or the id can't be parsed.
 const highlightedItem = () => {
   const panel$local = panel;
   if (!panel$local) return null;
@@ -636,7 +659,7 @@ const highlightedItem = () => {
   if (id.indexOf(prefix) !== 0) return null;
   const idx = parseInt(id.slice(prefix.length), 10);
   if (Number.isNaN(idx)) return null;
-  const list = filteredItems();
+  const list = orderedItems();
   return idx >= 0 && idx < list.length ? list[idx] : null;
 };
 // searchInputEl(): the vendored combobox's underlying `<input role="combobox">`
@@ -890,7 +913,7 @@ $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWa
 })(__watchVal); }); });
 </script>
 
-{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96>{#if atDepth()}<div class="rozie-command-palette-header" data-rozie-s-768cad96>{#if breadcrumb}{@render breadcrumb({ stack: breadcrumbStack(), back: goBack })}{:else}<button type="button" class="rozie-command-palette-back" aria-label="Back" data-testid="command-palette-back" onclick={($event) => { goBack(); }} data-rozie-s-768cad96>‹</button><span class="rozie-command-palette-title" data-testid="command-palette-title" data-rozie-s-768cad96>{rozieDisplay(currentTitle())}</span>{/if}</div>{/if}<Combobox bind:this={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={filteredItems()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) })}{:else}<div class="rozie-command-palette-option" data-rozie-s-768cad96>{#if icon}<span class="rozie-command-palette-option-icon" data-rozie-s-768cad96>{#if icon}{@render icon({ option })}{/if}</span>{/if}<span class="rozie-command-palette-option-main" data-rozie-s-768cad96><span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{#each labelSegments(option) as segment, si (si)}<span class={{ 'rozie-command-palette-option-label-match': segment.match }} data-rozie-s-768cad96>{rozieDisplay(segment.text)}</span>{/each}</span>{#if groupText(option)}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}</span>{#if actions || actionsList(option).length > 0}<span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" onmousedown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96>{#if actions}{@render actions({ option, actions: actionsList(option) })}{:else}{#if actionsList(option).length > 0}<span class="rozie-command-palette-option-actions-hint" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(actionKeyHint())}</span>{/if}{/if}</span>{/if}{#if trailing}<span class="rozie-command-palette-option-trailing" data-rozie-s-768cad96>{#if trailing}{@render trailing({ option })}{/if}</span>{/if}</div>{/if}{/snippet}{#snippet empty({ query })}{#if currentStatus() === 'ready'}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/if}{/snippet}</Combobox>{#if atActions()}<div data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" aria-label={rozieAttr(actionAnchor ? actionAnchor.label : null)} style={rozieStyle('top:' + actionMenuTop + 'px')} onkeydown={($event) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96>{#each actionAnchor ? actionAnchor.actions : [] as action, ai (action.id)}<div class={["rozie-command-palette-actions-menu-item", { 'rozie-command-palette-actions-menu-item--active': ai === actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }]} role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action.disabled} tabindex="-1" onmouseenter={($event) => { actionIndex = ai; }} onmousedown={($event) => { $event.preventDefault(); selectAction(action); }} data-rozie-s-768cad96>{#if actionItem}{@render actionItem({ action, item: actionAnchor ? actionAnchor.item : null, active: ai === actionIndex, disabled: !!action.disabled })}{:else}{#if actionIcon(action)}<span class="rozie-command-palette-actions-menu-item-icon" data-rozie-s-768cad96>{rozieDisplay(actionIcon(action))}</span>{/if}<span class="rozie-command-palette-actions-menu-item-label" data-rozie-s-768cad96>{rozieDisplay(actionLabel(action))}</span>{#if actionShortcut(action)}<span class="rozie-command-palette-actions-menu-item-shortcut" data-rozie-s-768cad96>{rozieDisplay(actionShortcut(action))}</span>{/if}{/if}</div>{/each}</div>{/if}{#if currentStatus() === 'loading'}<div class="rozie-command-palette-loading" data-rozie-s-768cad96>{#if loading}{@render loading({ query })}{:else}Loading…{/if}</div>{:else if currentStatus() === 'error'}<div class="rozie-command-palette-error" data-rozie-s-768cad96>{@render error?.({ query, error: currentError(), retry: retryCurrentLevel })}</div>{/if}{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
+{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96>{#if atDepth()}<div class="rozie-command-palette-header" data-rozie-s-768cad96>{#if breadcrumb}{@render breadcrumb({ stack: breadcrumbStack(), back: goBack })}{:else}<button type="button" class="rozie-command-palette-back" aria-label="Back" data-testid="command-palette-back" onclick={($event) => { goBack(); }} data-rozie-s-768cad96>‹</button><span class="rozie-command-palette-title" data-testid="command-palette-title" data-rozie-s-768cad96>{rozieDisplay(currentTitle())}</span>{/if}</div>{/if}<Combobox bind:this={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) })}{:else}<div class="rozie-command-palette-option" data-rozie-s-768cad96>{#if icon}<span class="rozie-command-palette-option-icon" data-rozie-s-768cad96>{#if icon}{@render icon({ option })}{/if}</span>{/if}<span class="rozie-command-palette-option-main" data-rozie-s-768cad96><span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{#each labelSegments(option) as segment, si (si)}<span class={{ 'rozie-command-palette-option-label-match': segment.match }} data-rozie-s-768cad96>{rozieDisplay(segment.text)}</span>{/each}</span>{#if groupText(option) && !grouped()}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}</span>{#if actions || actionsList(option).length > 0}<span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" onmousedown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96>{#if actions}{@render actions({ option, actions: actionsList(option) })}{:else}{#if actionsList(option).length > 0}<span class="rozie-command-palette-option-actions-hint" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(actionKeyHint())}</span>{/if}{/if}</span>{/if}{#if trailing}<span class="rozie-command-palette-option-trailing" data-rozie-s-768cad96>{#if trailing}{@render trailing({ option })}{/if}</span>{/if}</div>{/if}{/snippet}{#snippet groupHeading({ group })}{#if groupHeading$$slot}{@render groupHeading$$slot({ group })}{:else}{rozieDisplay(groupLabel(group))}{/if}{/snippet}{#snippet empty({ query })}{#if currentStatus() === 'ready'}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/if}{/snippet}</Combobox>{#if atActions()}<div data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" aria-label={rozieAttr(actionAnchor ? actionAnchor.label : null)} style={rozieStyle('top:' + actionMenuTop + 'px')} onkeydown={($event) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96>{#each actionAnchor ? actionAnchor.actions : [] as action, ai (action.id)}<div class={["rozie-command-palette-actions-menu-item", { 'rozie-command-palette-actions-menu-item--active': ai === actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }]} role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action.disabled} tabindex="-1" onmouseenter={($event) => { actionIndex = ai; }} onmousedown={($event) => { $event.preventDefault(); selectAction(action); }} data-rozie-s-768cad96>{#if actionItem}{@render actionItem({ action, item: actionAnchor ? actionAnchor.item : null, active: ai === actionIndex, disabled: !!action.disabled })}{:else}{#if actionIcon(action)}<span class="rozie-command-palette-actions-menu-item-icon" data-rozie-s-768cad96>{rozieDisplay(actionIcon(action))}</span>{/if}<span class="rozie-command-palette-actions-menu-item-label" data-rozie-s-768cad96>{rozieDisplay(actionLabel(action))}</span>{#if actionShortcut(action)}<span class="rozie-command-palette-actions-menu-item-shortcut" data-rozie-s-768cad96>{rozieDisplay(actionShortcut(action))}</span>{/if}{/if}</div>{/each}</div>{/if}{#if currentStatus() === 'loading'}<div class="rozie-command-palette-loading" data-rozie-s-768cad96>{#if loading}{@render loading({ query })}{:else}Loading…{/if}</div>{:else if currentStatus() === 'error'}<div class="rozie-command-palette-error" data-rozie-s-768cad96>{@render error?.({ query, error: currentError(), retry: retryCurrentLevel })}</div>{/if}{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div></div>{/if}
 
 <style>
 :global {
