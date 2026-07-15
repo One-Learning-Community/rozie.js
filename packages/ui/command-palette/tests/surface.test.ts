@@ -32,12 +32,15 @@ const EXPECT = {
   // command-palette-levels (LVL-STACK/ASYNC): gained `searchDebounce`.
   // command-palette-sub-actions (ACT-MODEL/ACT-TRIGGER): gains `actionKey`
   // (the actionKey shortcut, default '$mod+k') and `closeOnAction` (default
-  // true — whether running an action also closes the palette) — 12 props
-  // total.
+  // true — whether running an action also closes the palette).
+  // command-palette-13-empty-home-view-first: gains `defaultItems` — the
+  // root's empty/home-view items (a nested level's own `defaultItems` field
+  // is captured onto its frame, not a separate prop) — 13 props total.
   props: [
     'open',
     'query',
     'items',
+    'defaultItems',
     'placeholder',
     'emptyText',
     'closeOnSelect',
@@ -124,7 +127,7 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (12 props)', () => {
+  it('props surface matches (13 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

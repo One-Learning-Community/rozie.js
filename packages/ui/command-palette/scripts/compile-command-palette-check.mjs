@@ -38,11 +38,13 @@ const EXPECT = {
   // uncaught; kept in sync with tests/surface.test.ts by hand). Gained
   // `searchDebounce` (LVL-ASYNC). command-palette-sub-actions (ACT-MODEL/
   // ACT-TRIGGER) adds `actionKey` (default '$mod+k') + `closeOnAction`
-  // (default true) — 12 props total.
+  // (default true). command-palette-13-empty-home-view-first adds
+  // `defaultItems` — the root empty/home-view prop (13 props total).
   props: [
     'open',
     'query',
     'items',
+    'defaultItems',
     'placeholder',
     'emptyText',
     'closeOnSelect',
