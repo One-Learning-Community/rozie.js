@@ -55,6 +55,7 @@ import '@rozie-ui/toast-vue/themes/shadcn.css';    // or material.css, bootstrap
 | `max` | `Number` | `0` |  |  |
 | `disablePauseOnHover` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
+| `disableSwipe` | `Boolean` | `false` |  |  |
 
 ## Events
 

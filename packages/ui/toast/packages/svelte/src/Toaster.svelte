@@ -1,5 +1,5 @@
 <script lang="ts">
-import { applyListeners, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-svelte';
+import { applyListeners, rozieAttr, rozieClass, rozieDisplay, rozieStyle } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 import { onDestroy } from 'svelte';
@@ -25,6 +25,10 @@ interface Props {
    * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
   ariaLabel?: (string) | null;
+  /**
+   * Opt **out** of pointer swipe-to-dismiss. By default, dragging a toast past 45% of its own width/height (direction auto-derived from `position`) or a fast flick dismisses it with reason `'swipe'`; a short drag springs back. A drag starting on the close button (or any button/link) never swipes.
+   */
+  disableSwipe?: boolean;
   toast?: Snippet<[{ toast: any; dismiss: any }]>;
   snippets?: Record<string, any>;
   ondismissed?: (...args: unknown[]) => void;
@@ -37,6 +41,7 @@ let {
   max = 0,
   disablePauseOnHover = false,
   ariaLabel = null,
+  disableSwipe = false,
   toast: __toastProp,
   snippets,
   ondismissed,
@@ -47,6 +52,7 @@ const toast = $derived(__toastProp ?? snippets?.toast);
 
 let toasts: any[] = $state([]);
 let seq = $state(0);
+let swipe: any = $state(null);
 
 // Mutable cross-render scratch (NOT reactive): per-id timer bookkeeping. A
 // top-level `let` → React useRef (it escapes into $onUnmount's effect, so the
@@ -63,6 +69,11 @@ let timers = {};
 // a toast after the host itself is gone). A top-level `let` → React useRef
 // (it escapes into $onUnmount's effect).
 let unmounted = false;
+// Non-reactive per-gesture scratch for the ACTIVE swipe drag:
+// { id, axis, sign, size, startX, startY, startTime } | null. Only the
+// derived visual state ($data.swipe) needs to be reactive; this bookkeeping
+// is read/written exclusively inside the @pointer* handlers below.
+let swipeGesture: any = null;
 // ---- timers ------------------------------------------------------------
 const startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
@@ -166,11 +177,12 @@ const removeToast = (id: any) => {
 };
 // The single dismissal funnel every path routes through: the `dismiss(id)`
 // verb ('api'), the built-in close button ('close'), a timer expiry
-// ('timeout'), and (Task 4) a swipe past threshold ('swipe'). Idempotent via
-// the entry's `exiting` flag — a second call on an id already exiting (or
+// ('timeout'), and a swipe past threshold ('swipe'). Idempotent via the
+// entry's `exiting` flag — a second call on an id already exiting (or
 // already gone) is a no-op, so a stray timeout firing mid-exit never
-// double-emits.
-const dismissBegin = (id: any, reason: any) => {
+// double-emits. `extra` (swipe only) carries `{ swipeExitSign }` so the
+// template can apply the direction-matched swipe-exit animation.
+const dismissBegin = (id: any, reason: any, extra: any) => {
   const entry = toasts.find((t: any) => t.id === id);
   if (!entry || entry.exiting) return;
   clearTimer(id);
@@ -180,7 +192,8 @@ const dismissBegin = (id: any, reason: any) => {
   });
   toasts = toasts.map((t: any) => t.id === id ? {
     ...t,
-    exiting: true
+    exiting: true,
+    ...(extra || {})
   } : t);
   if (typeof window === 'undefined') {
     removeToast(id);
@@ -256,6 +269,94 @@ export const promise = (p: any, opts: any) => {
   }
   return id;
 };
+// ---- swipe-to-dismiss ------------------------------------------------------
+// Axis + dismiss-direction sign, purely derived from the corner (no per-
+// gesture state needed for these two — they only depend on $props.position).
+const swipeAxisFor = (position: any) => position === 'top-center' || position === 'bottom-center' ? 'y' : 'x';
+const swipeSignFor = (position: any) => {
+  if (position === 'top-right' || position === 'bottom-right') return 1;
+  if (position === 'top-left' || position === 'bottom-left') return -1;
+  if (position === 'bottom-center') return 1;
+  return -1; // top-center
+};
+const onToastPointerDown = (t: any, event: any) => {
+  if (disableSwipe) return;
+  if (event.button != null && event.button !== 0) return;
+  // Ignore drags starting on the close button / any button-or-link chrome.
+  const chrome = event.target && event.target.closest ? event.target.closest('button, a') : null;
+  if (chrome) return;
+  const axis = swipeAxisFor(position);
+  const sign = swipeSignFor(position);
+  const el = event.currentTarget;
+  const size = axis === 'x' ? el.offsetWidth : el.offsetHeight;
+  swipeGesture = {
+    id: t.id,
+    axis,
+    sign,
+    size,
+    startX: event.clientX,
+    startY: event.clientY,
+    startTime: Date.now()
+  };
+  if (el && el.setPointerCapture) {
+    try {
+      el.setPointerCapture(event.pointerId);
+    } catch (e: any) {
+      // Some embedded contexts throw on setPointerCapture — swipe still
+      // works without capture (just loses "keeps tracking off-element").
+    }
+  }
+};
+const onToastPointerMove = (t: any, event: any) => {
+  if (disableSwipe) return;
+  const gesture = swipeGesture;
+  if (!gesture || gesture.id !== t.id) return;
+  const raw = gesture.axis === 'x' ? event.clientX - gesture.startX : event.clientY - gesture.startY;
+  const towardDismiss = raw * gesture.sign > 0;
+  const d = towardDismiss ? raw : raw * 0.15;
+  swipe = {
+    id: t.id,
+    d,
+    axis: gesture.axis,
+    sign: gesture.sign,
+    size: gesture.size
+  };
+};
+const onToastPointerUp = (t: any, event: any) => {
+  if (disableSwipe) return;
+  const gesture = swipeGesture;
+  swipeGesture = null;
+  const swipe = swipe;
+  swipe = null;
+  if (!gesture || gesture.id !== t.id || !swipe) return;
+  const elapsed = Math.max(1, Date.now() - gesture.startTime);
+  const magnitude = swipe.d * gesture.sign;
+  const velocity = magnitude / elapsed;
+  if (magnitude > 0 && (magnitude > gesture.size * 0.45 || velocity > 0.11)) {
+    dismissBegin(t.id, 'swipe', {
+      swipeExitSign: gesture.sign
+    });
+  }
+};
+const onToastPointerCancel = (t: any) => {
+  if (disableSwipe) return;
+  if (swipeGesture && swipeGesture.id === t.id) swipeGesture = null;
+  if (swipe && swipe.id === t.id) swipe = null;
+};
+// String-form `:style` for the toast row — EITHER the active drag transform
+// (while $data.swipe tracks this id) OR the swipe-exit sign custom property
+// (once `dismissBegin('swipe')` flipped `t.swipeExitSign`). Never both.
+const toastStyle = (t: any) => {
+  if (t.exiting) {
+    return t.swipeExitSign != null ? '--rozie-toast-swipe-exit: ' + t.swipeExitSign + ';' : '';
+  }
+  const swipe = swipe;
+  if (!swipe || swipe.id !== t.id) return '';
+  const translate = swipe.axis === 'x' ? 'translateX(' + swipe.d + 'px)' : 'translateY(' + swipe.d + 'px)';
+  const magnitude = swipe.d * swipe.sign;
+  const opacity = magnitude > 0 && swipe.size > 0 ? Math.max(0.3, 1 - magnitude / swipe.size) : 1;
+  return 'transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
+};
 // ---- hover pause -------------------------------------------------------
 const onMouseEnter = () => {
   if (disablePauseOnHover) return;
@@ -279,7 +380,7 @@ onDestroy(() => (() => {
 })());
 </script>
 
-<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : ''))]} role="status" aria-live={rozieAttr(liveFor(t.type))} onanimationend={($event) => { t.exiting && removeToast(t.id); }} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}{#if t.type === 'loading'}<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>{/if}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span><button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
+<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))]} style={rozieStyle(toastStyle(t))} role="status" aria-live={rozieAttr(liveFor(t.type))} onanimationend={($event) => { t.exiting && removeToast(t.id); }} onpointerdown={($event) => { onToastPointerDown(t, $event); }} onpointermove={($event) => { onToastPointerMove(t, $event); }} onpointerup={($event) => { onToastPointerUp(t, $event); }} onpointercancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}{#if t.type === 'loading'}<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>{/if}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span><button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
 
 <style>
 :global {
@@ -324,6 +425,16 @@ onDestroy(() => (() => {
     background: var(--rozie-toast-bg, #333);
     border-radius: var(--rozie-toast-radius, 0.5rem);
     box-shadow: var(--rozie-toast-shadow, 0 6px 20px rgba(0, 0, 0, 0.25));
+    /* Swipe: page scroll stays alive on touch along the axis the toast does
+       NOT move on. The transition here drives the spring-back (the active-drag
+       :style sets an inline `transition: none` to track the finger 1:1;
+       releasing it without a further gesture falls back to this transition). */
+    touch-action: pan-y;
+    transition: transform 200ms ease, opacity 200ms ease;
+  }
+  .rozie-toaster--top-center[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c],
+  .rozie-toaster--bottom-center[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c] {
+    touch-action: pan-x;
   }
   .rozie-toast--success[data-rozie-s-12d4265c] { background: var(--rozie-toast-success-bg, #16a34a); }
   .rozie-toast--error[data-rozie-s-12d4265c] { background: var(--rozie-toast-error-bg, #dc2626); }
@@ -357,6 +468,17 @@ onDestroy(() => (() => {
   to[data-rozie-s-12d4265c] { opacity: 1; }
   from[data-rozie-s-12d4265c] { opacity: 1; }
   to[data-rozie-s-12d4265c] { opacity: 0; }
+  from[data-rozie-s-12d4265c] { opacity: 1; transform: translateX(0); }
+  to[data-rozie-s-12d4265c] { opacity: 0; transform: translateX(calc(var(--rozie-toast-swipe-exit, 1) * 100%)); }
+  from[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+  to[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(calc(var(--rozie-toast-swipe-exit, 1) * 100%)); }
+  .rozie-toast--exiting.rozie-toast--swipe-exit[data-rozie-s-12d4265c] {
+    animation-name: rozie-toast-swipe-exit-x;
+  }
+  .rozie-toaster--top-center[data-rozie-s-12d4265c] .rozie-toast--exiting.rozie-toast--swipe-exit[data-rozie-s-12d4265c],
+  .rozie-toaster--bottom-center[data-rozie-s-12d4265c] .rozie-toast--exiting.rozie-toast--swipe-exit[data-rozie-s-12d4265c] {
+    animation-name: rozie-toast-swipe-exit-y;
+  }
   .rozie-toast-spinner[data-rozie-s-12d4265c] {
     flex: 0 0 auto;
     width: var(--rozie-toast-spinner-size, 1em);

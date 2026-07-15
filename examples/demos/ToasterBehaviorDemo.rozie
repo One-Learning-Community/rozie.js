@@ -4,7 +4,16 @@
   $refs.toaster.show({...}) (the $expose handle resolves on all 6 targets) and
   bumps a count readout; toasts are sticky (:duration="0") so the spec can assert
   the rendered toast + its close button, then dismiss it. See toaster.spec.ts.
-  Behavioral-only (no pixel baseline).
+
+  Also drives swipe-to-dismiss (TOAST-SWIPE): the SAME `Toaster` instance sits
+  in its default `top-right` corner (dismiss direction = right), so a
+  `show-toast`-enqueued sticky toast is a stable, always-present target the
+  Playwright drag can grab. A `dismissed-reason` readout mirrors the LATEST
+  `@dismissed` event's `reason` (proves 'swipe' fires, distinct from 'close'/
+  'api'/'timeout'); a `toggle-disable-swipe` button flips the `disableSwipe`
+  prop so the spec can assert swipe goes inert. Behavioral-only (no pixel
+  baseline) — the swipe/stacked choreography's own pixel + gesture proof is
+  the ToasterStackedScreenshot cell + this spec's structural drag assertions.
 -->
 <rozie name="ToasterBehaviorDemo">
 
@@ -17,6 +26,8 @@
 <data>
 {
   count: 0,
+  disableSwipe: false,
+  dismissedReason: '',
 }
 </data>
 
@@ -25,6 +36,12 @@ const showToast = () => {
   const n = $data.count + 1
   $data.count = n
   $refs.toaster.show({ message: 'Saved ' + n, type: 'success' })
+}
+const toggleDisableSwipe = () => {
+  $data.disableSwipe = !$data.disableSwipe
+}
+const onDismissed = (payload) => {
+  $data.dismissedReason = payload.reason
 }
 </script>
 
@@ -35,9 +52,18 @@ const showToast = () => {
   <div class="controls">
     <button type="button" data-testid="show-toast" @click="showToast()">Show toast</button>
     <span class="readout" data-testid="readout-count">{{ $data.count }}</span>
+    <button type="button" data-testid="toggle-disable-swipe" @click="toggleDisableSwipe()">Toggle disableSwipe</button>
+    <span class="readout" data-testid="dismissed-reason">{{ $data.dismissedReason }}</span>
   </div>
 
-  <Toaster ref="toaster" position="top-right" :duration="0" ariaLabel="Notifications" />
+  <Toaster
+    ref="toaster"
+    position="top-right"
+    :duration="0"
+    ariaLabel="Notifications"
+    :disable-swipe="$data.disableSwipe"
+    @dismissed="onDismissed"
+  />
 </div>
 </template>
 

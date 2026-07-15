@@ -89,3 +89,136 @@ for (const target of TARGETS) {
     await expect(toasts).toHaveCount(1, { timeout: 10_000 });
   });
 }
+
+/**
+ * Swipe-to-dismiss (TOAST-SWIPE) — pointer drag on a toast. The demo's
+ * `Toaster` sits in its default `top-right` corner (dismiss direction =
+ * right), so a `show-toast`-enqueued sticky toast is the drag target;
+ * `.rozie-toast` locators pierce Lit's open shadow root the same as
+ * `[role="status"]` above. `dismissed-reason` mirrors the LATEST `@dismissed`
+ * payload's `reason`, and `toggle-disable-swipe` flips `disableSwipe`.
+ *
+ * Proven GREEN ×6 only in the ONE batched Linux Docker VR run (Task 7) — see
+ * the plan's verification section; authored here so the assertions exist and
+ * gate that run.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+
+  runner(`toaster [${target}]: swipe past threshold dismisses with reason 'swipe'`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ToasterBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('show-toast').click();
+    const toast = page.locator('.rozie-toast').first();
+    await expect(toast).toBeVisible({ timeout: 15_000 });
+    const box = await toast.boundingBox();
+    if (!box) throw new Error('toast bounding box unavailable');
+
+    // top-right corner → dismiss direction is RIGHT. Drag well past 45% of
+    // the toast's own width (a generous 80% to comfortably clear the
+    // threshold regardless of synthetic-event timing).
+    const startX = box.x + box.width * 0.5;
+    const startY = box.y + box.height * 0.5;
+    const endX = startX + box.width * 0.8;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) {
+      await page.mouse.move(startX + ((endX - startX) * i) / 10, startY, { steps: 2 });
+    }
+    await page.mouse.up();
+
+    await expect(page.locator('[role="status"]')).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.getByTestId('dismissed-reason')).toHaveText('swipe', { timeout: 10_000 });
+  });
+
+  runner(`toaster [${target}]: a short drag springs back (toast still present)`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ToasterBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('show-toast').click();
+    const toast = page.locator('.rozie-toast').first();
+    await expect(toast).toBeVisible({ timeout: 15_000 });
+    const box = await toast.boundingBox();
+    if (!box) throw new Error('toast bounding box unavailable');
+
+    // A short drag — well under the 45% threshold — must spring back.
+    const startX = box.x + box.width * 0.5;
+    const startY = box.y + box.height * 0.5;
+    const endX = startX + box.width * 0.1;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let i = 1; i <= 5; i++) {
+      await page.mouse.move(startX + ((endX - startX) * i) / 5, startY, { steps: 2 });
+    }
+    await page.mouse.up();
+
+    await expect(page.locator('[role="status"]')).toHaveCount(1, { timeout: 10_000 });
+    await expect(page.getByTestId('dismissed-reason')).not.toHaveText('swipe');
+  });
+
+  runner(`toaster [${target}]: a drag starting on the close button does not swipe`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ToasterBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('show-toast').click();
+    const closeButton = page.locator('.rozie-toast-close').first();
+    await expect(closeButton).toBeVisible({ timeout: 15_000 });
+    const box = await closeButton.boundingBox();
+    if (!box) throw new Error('close button bounding box unavailable');
+
+    const startX = box.x + box.width * 0.5;
+    const startY = box.y + box.height * 0.5;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) {
+      await page.mouse.move(startX + i * 20, startY, { steps: 2 });
+    }
+    await page.mouse.up();
+
+    // The toast is still present (no swipe fired from a close-button-origin
+    // drag) — a plain click on the SAME button (from Task 2's suite) is the
+    // only thing that dismisses it.
+    await expect(page.locator('[role="status"]')).toHaveCount(1, { timeout: 5_000 });
+  });
+
+  runner(`toaster [${target}]: disableSwipe makes all three pointer handlers inert`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ToasterBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('toggle-disable-swipe').click();
+    await page.getByTestId('show-toast').click();
+    const toast = page.locator('.rozie-toast').first();
+    await expect(toast).toBeVisible({ timeout: 15_000 });
+    const box = await toast.boundingBox();
+    if (!box) throw new Error('toast bounding box unavailable');
+
+    const startX = box.x + box.width * 0.5;
+    const startY = box.y + box.height * 0.5;
+    const endX = startX + box.width * 0.9;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) {
+      await page.mouse.move(startX + ((endX - startX) * i) / 10, startY, { steps: 2 });
+    }
+    await page.mouse.up();
+
+    // disableSwipe=true: even a full-width drag never dismisses.
+    await expect(page.locator('[role="status"]')).toHaveCount(1, { timeout: 5_000 });
+  });
+}

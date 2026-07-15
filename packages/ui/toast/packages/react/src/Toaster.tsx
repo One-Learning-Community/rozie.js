@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { clsx, rozieAttr, rozieDisplay } from '@rozie/runtime-react';
+import { clsx, parseInlineStyle, rozieAttr, rozieDisplay } from '@rozie/runtime-react';
 import './Toaster.css';
 
 interface ToastCtx { toast: any; dismiss: any; }
@@ -26,6 +26,10 @@ interface ToasterProps {
    * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
   ariaLabel?: (string) | null;
+  /**
+   * Opt **out** of pointer swipe-to-dismiss. By default, dragging a toast past 45% of its own width/height (direction auto-derived from `position`) or a fast flick dismisses it with reason `'swipe'`; a short drag springs back. A drag starting on the close button (or any button/link) never swipes.
+   */
+  disableSwipe?: boolean;
   onDismissed?: (...args: any[]) => void;
   renderToast?: (ctx: ToastCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
@@ -40,24 +44,33 @@ export interface ToasterHandle {
 }
 
 const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props: ToasterProps, ref): JSX.Element {
-  const props: Omit<ToasterProps, 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel'> & { position: string; duration: number; max: number; disablePauseOnHover: boolean; ariaLabel: (string) | null } = {
+  const props: Omit<ToasterProps, 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe'> & { position: string; duration: number; max: number; disablePauseOnHover: boolean; ariaLabel: (string) | null; disableSwipe: boolean } = {
     ..._props,
     position: _props.position ?? 'bottom-right',
     duration: _props.duration ?? 4000,
     max: _props.max ?? 0,
     disablePauseOnHover: _props.disablePauseOnHover ?? false,
     ariaLabel: _props.ariaLabel ?? null,
+    disableSwipe: _props.disableSwipe ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { position, duration, max, disablePauseOnHover, ariaLabel, ...rest } = _props as ToasterProps & Record<string, unknown>;
-    void position; void duration; void max; void disablePauseOnHover; void ariaLabel;
+    const { position, duration, max, disablePauseOnHover, ariaLabel, disableSwipe, ...rest } = _props as ToasterProps & Record<string, unknown>;
+    void position; void duration; void max; void disablePauseOnHover; void ariaLabel; void disableSwipe;
     return rest;
   })();
   const unmounted = useRef(false);
   const timers = useRef({});
   const [toasts, setToasts] = useState<any[]>([]);
   const [seq, setSeq] = useState(0);
+  const [swipe, setSwipe] = useState<any>(null);
 
+  // Non-reactive per-gesture scratch for the ACTIVE swipe drag:
+  // { id, axis, sign, size, startX, startY, startTime } | null. Only the
+  // derived visual state ($data.swipe) needs to be reactive; this bookkeeping
+  // is read/written exclusively inside the @pointer* handlers below.
+  let swipeGesture: any = null;
+
+  // ---- timers ------------------------------------------------------------
   function startTimer(toast: any) {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
@@ -148,7 +161,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     setToasts(prev => prev.filter((t: any) => t.id !== id));
   }, []);
   const { onDismissed: _rozieProp_onDismissed } = props;
-    const dismissBegin = useCallback((id: any, reason: any) => {
+    const dismissBegin = useCallback((id: any, reason: any, extra: any) => {
     const entry = toasts.find((t: any) => t.id === id);
     if (!entry || entry.exiting) return;
     clearTimer(id);
@@ -158,7 +171,8 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     });
     setToasts(prev => prev.map((t: any) => t.id === id ? {
       ...t,
-      exiting: true
+      exiting: true,
+      ...(extra || {})
     } : t));
     if (typeof window === 'undefined') {
       removeToast(id);
@@ -219,6 +233,90 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     }
     return id;
   }
+  function swipeAxisFor(position: any) {
+    return position === 'top-center' || position === 'bottom-center' ? 'y' : 'x';
+  }
+  function swipeSignFor(position: any) {
+    if (position === 'top-right' || position === 'bottom-right') return 1;
+    if (position === 'top-left' || position === 'bottom-left') return -1;
+    if (position === 'bottom-center') return 1;
+    return -1; // top-center
+  }
+  const onToastPointerDown = useCallback((t: any, event: any) => {
+    if (props.disableSwipe) return;
+    if (event.button != null && event.button !== 0) return;
+    // Ignore drags starting on the close button / any button-or-link chrome.
+    const chrome = event.target && event.target.closest ? event.target.closest('button, a') : null;
+    if (chrome) return;
+    const axis = swipeAxisFor(props.position);
+    const sign = swipeSignFor(props.position);
+    const el = event.currentTarget;
+    const size = axis === 'x' ? el.offsetWidth : el.offsetHeight;
+    swipeGesture = {
+      id: t.id,
+      axis,
+      sign,
+      size,
+      startX: event.clientX,
+      startY: event.clientY,
+      startTime: Date.now()
+    };
+    if (el && el.setPointerCapture) {
+      try {
+        el.setPointerCapture(event.pointerId);
+      } catch (e: any) {
+        // Some embedded contexts throw on setPointerCapture — swipe still
+        // works without capture (just loses "keeps tracking off-element").
+      }
+    }
+  }, [props.disableSwipe, props.position, swipeAxisFor, swipeSignFor]);
+  const onToastPointerMove = useCallback((t: any, event: any) => {
+    if (props.disableSwipe) return;
+    const gesture = swipeGesture;
+    if (!gesture || gesture.id !== t.id) return;
+    const raw = gesture.axis === 'x' ? event.clientX - gesture.startX : event.clientY - gesture.startY;
+    const towardDismiss = raw * gesture.sign > 0;
+    const d = towardDismiss ? raw : raw * 0.15;
+    setSwipe({
+      id: t.id,
+      d,
+      axis: gesture.axis,
+      sign: gesture.sign,
+      size: gesture.size
+    });
+  }, [props.disableSwipe]);
+  const onToastPointerUp = useCallback((t: any, event: any) => {
+    if (props.disableSwipe) return;
+    const gesture = swipeGesture;
+    swipeGesture = null;
+    const swipe = swipe;
+    setSwipe(null);
+    if (!gesture || gesture.id !== t.id || !swipe) return;
+    const elapsed = Math.max(1, Date.now() - gesture.startTime);
+    const magnitude = swipe.d * gesture.sign;
+    const velocity = magnitude / elapsed;
+    if (magnitude > 0 && (magnitude > gesture.size * 0.45 || velocity > 0.11)) {
+      dismissBegin(t.id, 'swipe', {
+        swipeExitSign: gesture.sign
+      });
+    }
+  }, [dismissBegin, props.disableSwipe]);
+  const onToastPointerCancel = useCallback((t: any) => {
+    if (props.disableSwipe) return;
+    if (swipeGesture && swipeGesture.id === t.id) swipeGesture = null;
+    if (swipe && swipe.id === t.id) setSwipe(null);
+  }, [props.disableSwipe, swipe]);
+  function toastStyle(t: any) {
+    if (t.exiting) {
+      return t.swipeExitSign != null ? '--rozie-toast-swipe-exit: ' + t.swipeExitSign + ';' : '';
+    }
+    const swipe = swipe;
+    if (!swipe || swipe.id !== t.id) return '';
+    const translate = swipe.axis === 'x' ? 'translateX(' + swipe.d + 'px)' : 'translateY(' + swipe.d + 'px)';
+    const magnitude = swipe.d * swipe.sign;
+    const opacity = magnitude > 0 && swipe.size > 0 ? Math.max(0.3, 1 - magnitude / swipe.size) : 1;
+    return 'transform: ' + translate + '; opacity: ' + opacity + '; transition: none;';
+  }
   const onMouseEnter = useCallback(() => {
     if (props.disablePauseOnHover) return;
     pauseTimers();
@@ -249,7 +347,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     <>
     <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} className={clsx(clsx("rozie-toaster", 'rozie-toaster--' + props.position), (attrs.className as string | undefined))} onMouseEnter={($event) => { onMouseEnter(); }} onMouseLeave={($event) => { onMouseLeave(); }} data-rozie-s-12d4265c="">
       
-      {toasts.map((t) => <div key={t.id} className={clsx("rozie-toast", 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : ''))} role="status" aria-live={rozieAttr(liveFor(t.type))} onAnimationEnd={($event) => { t.exiting && removeToast(t.id); }} data-rozie-s-12d4265c="">
+      {toasts.map((t) => <div key={t.id} className={clsx("rozie-toast", 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))} style={parseInlineStyle(toastStyle(t))} role="status" aria-live={rozieAttr(liveFor(t.type))} onAnimationEnd={($event) => { t.exiting && removeToast(t.id); }} onPointerDown={($event) => { onToastPointerDown(t, $event); }} onPointerMove={($event) => { onToastPointerMove(t, $event); }} onPointerUp={($event) => { onToastPointerUp(t, $event); }} onPointerCancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c="">
         {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast: t, dismiss }) : <>{!!(t.type === 'loading') && <span className={"rozie-toast-spinner"} aria-hidden="true" data-rozie-s-12d4265c="" />}<span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span><button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
       </div>)}
     </div>

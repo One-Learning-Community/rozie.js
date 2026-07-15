@@ -42,6 +42,7 @@ import '@rozie-ui/toast-lit/themes/shadcn.css';    // or material.css, bootstrap
 | `max` | `Number` | `0` |  |  |
 | `disablePauseOnHover` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
+| `disableSwipe` | `Boolean` | `false` |  |  |
 
 ## Events
 

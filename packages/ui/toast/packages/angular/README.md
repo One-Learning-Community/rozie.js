@@ -50,6 +50,7 @@ import '@rozie-ui/toast-angular/themes/shadcn.css';    // or material.css, boots
 | `max` | `Number` | `0` |  |  |
 | `disablePauseOnHover` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
+| `disableSwipe` | `Boolean` | `false` |  |  |
 
 ## Events
 

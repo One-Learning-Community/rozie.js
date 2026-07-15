@@ -39,6 +39,16 @@
   background: var(--rozie-toast-bg, #333);
   border-radius: var(--rozie-toast-radius, 0.5rem);
   box-shadow: var(--rozie-toast-shadow, 0 6px 20px rgba(0, 0, 0, 0.25));
+  /* Swipe: page scroll stays alive on touch along the axis the toast does
+     NOT move on. The transition here drives the spring-back (the active-drag
+     :style sets an inline `transition: none` to track the finger 1:1;
+     releasing it without a further gesture falls back to this transition). */
+  touch-action: pan-y;
+  transition: transform 200ms ease, opacity 200ms ease;
+}
+.rozie-toaster--top-center[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c],
+.rozie-toaster--bottom-center[data-rozie-s-12d4265c] .rozie-toast[data-rozie-s-12d4265c] {
+  touch-action: pan-x;
 }
 .rozie-toast--success[data-rozie-s-12d4265c] { background: var(--rozie-toast-success-bg, #16a34a); }
 .rozie-toast--error[data-rozie-s-12d4265c] { background: var(--rozie-toast-error-bg, #dc2626); }
@@ -72,6 +82,17 @@ from[data-rozie-s-12d4265c] { opacity: 0; }
 to[data-rozie-s-12d4265c] { opacity: 1; }
 from[data-rozie-s-12d4265c] { opacity: 1; }
 to[data-rozie-s-12d4265c] { opacity: 0; }
+from[data-rozie-s-12d4265c] { opacity: 1; transform: translateX(0); }
+to[data-rozie-s-12d4265c] { opacity: 0; transform: translateX(calc(var(--rozie-toast-swipe-exit, 1) * 100%)); }
+from[data-rozie-s-12d4265c] { opacity: 1; transform: translateY(0); }
+to[data-rozie-s-12d4265c] { opacity: 0; transform: translateY(calc(var(--rozie-toast-swipe-exit, 1) * 100%)); }
+.rozie-toast--exiting.rozie-toast--swipe-exit[data-rozie-s-12d4265c] {
+  animation-name: rozie-toast-swipe-exit-x;
+}
+.rozie-toaster--top-center[data-rozie-s-12d4265c] .rozie-toast--exiting.rozie-toast--swipe-exit[data-rozie-s-12d4265c],
+.rozie-toaster--bottom-center[data-rozie-s-12d4265c] .rozie-toast--exiting.rozie-toast--swipe-exit[data-rozie-s-12d4265c] {
+  animation-name: rozie-toast-swipe-exit-y;
+}
 .rozie-toast-spinner[data-rozie-s-12d4265c] {
   flex: 0 0 auto;
   width: var(--rozie-toast-spinner-size, 1em);

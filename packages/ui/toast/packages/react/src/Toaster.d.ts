@@ -23,6 +23,10 @@ export interface ToasterProps {
    * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
   ariaLabel?: (string) | null;
+  /**
+   * Opt **out** of pointer swipe-to-dismiss. By default, dragging a toast past 45% of its own width/height (direction auto-derived from `position`) or a fast flick dismisses it with reason `'swipe'`; a short drag springs back. A drag starting on the close button (or any button/link) never swipes.
+   */
+  disableSwipe?: boolean;
   onDismissed?: (...args: unknown[]) => void;
   renderToast?: (params: { toast: () => void; dismiss: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
