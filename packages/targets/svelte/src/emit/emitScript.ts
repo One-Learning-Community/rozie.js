@@ -278,8 +278,30 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
     const curSpliced = curExtra?.__roziePartialOrigin !== undefined;
     const prevSpliced = prevExtra?.__roziePartialOrigin !== undefined;
     // Fire ONLY at a genuine splice boundary, in EITHER direction. Host-only pairs
-    // (neither node spliced) are left exactly as authored.
-    if (!curSpliced && !prevSpliced) continue;
+    // (neither node spliced) are left exactly as authored — EXCEPT for the
+    // de-dup below (quick task 260714-orv).
+    if (!curSpliced && !prevSpliced) {
+      // Quick task 260714-orv — a HOST-authored comment sitting BETWEEN two
+      // adjacent statements is attached by @babel/parser to BOTH neighbours as
+      // the SAME comment object (`prev.trailingComments[last] ===
+      // cur.leadingComments[0]`). The residual body is generated one statement
+      // at a time (`stmts.map(genCode).join('\n')`), so each `genCode` call
+      // carries its own comment-dedup set and the shared object prints TWICE.
+      // Strip the shared object from PREV's trailing side only — CUR's
+      // leading side still prints it once. Gated STRICTLY to the host-only,
+      // same-object case so splice-boundary pairs (handled below) and
+      // independently-authored adjacent comments are untouched.
+      const hostPrevTrail = prev.trailingComments;
+      const hostCurLead = cur.leadingComments;
+      if (
+        hostPrevTrail && hostPrevTrail.length > 0 &&
+        hostCurLead && hostCurLead.length > 0 &&
+        hostPrevTrail[hostPrevTrail.length - 1] === hostCurLead[0]
+      ) {
+        prev.trailingComments = hostPrevTrail.slice(0, -1);
+      }
+      continue;
+    }
     const lead = cur.leadingComments;
     const prevTrail = prev.trailingComments;
     // AFTER-side seam (Phase 56 shape-5): CUR is the spliced node with NO leading

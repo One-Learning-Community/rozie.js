@@ -52,6 +52,20 @@ function genCode(node: t.Node): string {
 }
 
 /**
+ * Quick task 260714-orv — render hoisted user imports in ONE
+ * @babel/generator pass so a comment shared between two adjacent imports
+ * (Babel attaches it as BOTH the earlier import's `trailingComments` AND the
+ * later import's `leadingComments`) prints exactly once. Generating imports
+ * one at a time (`nodes.map(genCode).join`) gives each import its OWN
+ * comment-dedup set, doubling any shared comment. `t.program(nodes)` prints
+ * only its body statements (no wrapping braces/`File` boilerplate), so
+ * non-comment cases stay byte-identical.
+ */
+function genImportsBlock(nodes: t.Statement[]): string {
+  return generate(t.program(nodes), GEN_OPTS).code;
+}
+
+/**
  * ROZ-cast-blindness fix — Solid emits each ComputedDecl's body via
  * `rewriteNode(c.body, ir)` directly from IR (never re-scanning the cloned
  * Program for the body itself), so there is no existing "find the cloned
@@ -543,9 +557,7 @@ export function emitScript(
   } = partitionUserImports(rewriteResult.rewrittenProgram);
   rewriteResult.rewrittenProgram.program.body = bodyStmts;
   const userImports =
-    userImportNodes.length > 0
-      ? userImportNodes.map((imp) => genCode(imp)).join('\n') + '\n'
-      : '';
+    userImportNodes.length > 0 ? genImportsBlock(userImportNodes) + '\n' : '';
   const hoistedTypeDecls = hoistedTypeNodes.map((decl) => genCode(decl));
 
   // Phase 36 — cross-component context ($provide/$inject). Reads the rewritten

@@ -1129,10 +1129,18 @@ export function emitScript(
   // userImports is byte-identical for every non-composed component.
   const composedTypeImportsBlock =
     composedTypeImportLines.length > 0 ? composedTypeImportLines.join('\n') + '\n' : '';
+  // Quick task 260714-orv — render hoisted user imports in ONE
+  // @babel/generator pass (`t.program(nodes)` prints only its body
+  // statements) so a comment shared between two adjacent imports (Babel
+  // attaches it as BOTH the earlier import's `trailingComments` AND the
+  // later import's `leadingComments`) prints exactly once. Generating
+  // imports one at a time (`nodes.map(...).join`) gives each import its OWN
+  // comment-dedup set, doubling any shared comment. Non-comment cases stay
+  // byte-identical.
   const userImports =
     composedTypeImportsBlock +
     (userImportNodes.length > 0
-      ? userImportNodes.map((imp) => generate(imp, GEN_OPTS).code).join('\n') + '\n'
+      ? generate(t.program(userImportNodes), GEN_OPTS).code + '\n'
       : '');
   const hoistedTypeDecls = hoistedTypeNodes.map(
     (decl) => generate(decl, GEN_OPTS).code,

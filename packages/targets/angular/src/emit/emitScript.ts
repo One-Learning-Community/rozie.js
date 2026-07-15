@@ -110,6 +110,20 @@ function genCode(node: t.Node): string {
 }
 
 /**
+ * Quick task 260714-orv — render hoisted user imports in ONE
+ * @babel/generator pass so a comment shared between two adjacent imports
+ * (Babel attaches it as BOTH the earlier import's `trailingComments` AND the
+ * later import's `leadingComments`) prints exactly once. Generating imports
+ * one at a time (`nodes.map(genCode).join`) gives each import its OWN
+ * comment-dedup set, doubling any shared comment. `t.program(nodes)` prints
+ * only its body statements (no wrapping braces/`File` boilerplate), so
+ * non-comment cases stay byte-identical.
+ */
+function genImportsBlock(nodes: t.Statement[]): string {
+  return generate(t.program(nodes), GEN_OPTS).code;
+}
+
+/**
  * Emit `() => body` for an Expression or BlockStatement body.
  *
  * Building the arrow as a Babel node (rather than string-templating
@@ -896,9 +910,7 @@ export function emitScript(
   } = partitionUserImports(cloned);
   cloned.program.body = bodyStmts;
   const userImports =
-    userImportNodes.length > 0
-      ? userImportNodes.map((imp) => genCode(imp)).join('\n') + '\n'
-      : '';
+    userImportNodes.length > 0 ? genImportsBlock(userImportNodes) + '\n' : '';
 
   // 1b-bis. Phase 18 (Req 2) — normalize the producer-side two-way-write sigil
   //     `$model.X` → `$props.X` at the EARLIEST point, BEFORE the double-read
