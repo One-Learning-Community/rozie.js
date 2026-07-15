@@ -71,7 +71,21 @@ const EXPECT = {
   // `defineSlots<{…}>()` can't emit an unquoted hyphenated object key); the
   // existing `#actions` slot is KEPT unchanged (now doubles as the
   // interactive open-the-menu affordance — see CommandPalette.rozie).
-  slots: ['option', 'empty', 'footer', 'icon', 'trailing', 'actions', 'loading', 'error', 'breadcrumb', 'actionItem'],
+  // cp-adopts-combobox-groups: gains `groupHeading` (scope `{ group }`) —
+  // the re-projected vendored <Combobox>'s native section-heading slot.
+  slots: [
+    'option',
+    'empty',
+    'footer',
+    'icon',
+    'trailing',
+    'actions',
+    'loading',
+    'error',
+    'breadcrumb',
+    'actionItem',
+    'groupHeading',
+  ],
   // command-palette-levels: gains `openTo` (the ⌘P deep-link) and `goBack`
   // (pop one level). The pop verb is `goBack`, NOT `back` — a `back()`
   // expose verb would collide with the `back` EMIT above (ROZ121:
@@ -126,7 +140,7 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
-  it('declares the option/empty/footer + icon/trailing/actions + loading/error/breadcrumb/actionItem slots', () => {
+  it('declares the option/empty/footer + icon/trailing/actions + loading/error/breadcrumb/actionItem/groupHeading slots', () => {
     const slotNames = ir.slots.map((s: { name: string }) => s.name);
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });

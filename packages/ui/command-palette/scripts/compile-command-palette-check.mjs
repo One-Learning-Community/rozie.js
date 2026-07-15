@@ -67,8 +67,22 @@ const EXPECT = {
   // `action-item` (hyphenated), which fails ROZ127 (Vue's
   // `defineSlots<{…}>()` can't emit an unquoted hyphenated object key). The
   // existing `actions` slot is KEPT (now doubles as the interactive
-  // open-the-menu affordance).
-  slots: ['option', 'empty', 'footer', 'icon', 'trailing', 'actions', 'loading', 'error', 'breadcrumb', 'actionItem'],
+  // open-the-menu affordance). cp-adopts-combobox-groups: gains
+  // `groupHeading` (scope `{ group }`) — the re-projected vendored
+  // <Combobox>'s native section-heading slot.
+  slots: [
+    'option',
+    'empty',
+    'footer',
+    'icon',
+    'trailing',
+    'actions',
+    'loading',
+    'error',
+    'breadcrumb',
+    'actionItem',
+    'groupHeading',
+  ],
   // command-palette-levels: gains `openTo` (⌘P deep-link) + `goBack` (pop one
   // level — NOT `back`, which would collide with the `back` EMIT above,
   // ROZ121: expose∩emits must be empty). command-palette-sub-actions: NO new
