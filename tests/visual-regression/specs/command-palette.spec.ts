@@ -1049,3 +1049,215 @@ for (const target of TARGETS) {
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
 }
+
+/**
+ * The trimmed `placeholder` attribute of the deepest REAL active element
+ * (shadow-piercing, the `activeMenuItemInfo`/`deepActiveElement` precedent
+ * mirrored here) — used to identify WHICH args field currently holds real
+ * DOM focus (each field's placeholder is distinct: 'Page name' vs
+ * 'Template' vs 'Search pages' on the CommandPaletteArgsDemo item set).
+ */
+async function deepActiveElementPlaceholder(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    let node: (Element & { shadowRoot?: ShadowRoot | null }) | null = document.activeElement as Element | null;
+    while (node && node.shadowRoot && node.shadowRoot.activeElement) {
+      node = node.shadowRoot.activeElement as Element & { shadowRoot?: ShadowRoot | null };
+    }
+    return node ? node.getAttribute('placeholder') : null;
+  });
+}
+
+/**
+ * command-palette-inline-args (feature #12) — the panel-internal args
+ * surface. `examples/demos/CommandPaletteArgsDemo.rozie` drives a dedicated
+ * item set: `create-page` (a required `name` + a `default`-prefilled
+ * `template`), `save` (argless — non-regression), and `go-to-page` (carries
+ * BOTH `source` and `args` — proving args wins, the source is never
+ * reached). Authored to gate the batched Linux Docker VR union run that
+ * closes the 0.4.0 series — NOT executed in this phase
+ * (`feedback_vr_linux_baselines` / Dan's "wait to do expensive testing like
+ * vr until the end").
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`command-palette-args-auto-entry [${target}]: selecting an args item renders the chip + fields, focuses the first field, dims the list`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteArgs&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('args-open-palette').click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(3);
+
+    await page.locator('[role="option"]', { hasText: 'Create page' }).click();
+
+    const argsSurface = page.locator('[data-testid="command-palette-args"]');
+    await expect(argsSurface).toBeVisible({ timeout: 10_000 });
+    await expect(argsSurface).toHaveAttribute('role', 'group');
+    await expect(page.getByTestId('command-palette-args-chip')).toHaveText('Create page');
+
+    // Real DOM focus lands in the FIRST field ('Page name'), not merely an
+    // aria-activedescendant pointer.
+    await expect
+      .poll(async () => deepActiveElementPlaceholder(page), { timeout: 10_000 })
+      .toBe('Page name');
+
+    // The result list stays visibly open (keepOpen) but is now inert +
+    // aria-hidden.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const find = (root: Document | ShadowRoot): Element | null => {
+              const direct = root.querySelector('.rozie-command-palette-list-region');
+              if (direct) return direct;
+              for (const el of Array.from(root.querySelectorAll('*'))) {
+                const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+                if (sr) {
+                  const found = find(sr);
+                  if (found) return found;
+                }
+              }
+              return null;
+            };
+            return find(document)?.getAttribute('aria-hidden') ?? null;
+          }),
+        { timeout: 10_000 },
+      )
+      .toBe('true');
+
+    // No @select yet.
+    await expect(page.getByTestId('args-readout-select-item')).toHaveText('');
+
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+
+  runner(`command-palette-args-submit [${target}]: Enter with every required field filled emits the trimmed, additive args payload`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteArgs&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('args-open-palette').click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(3);
+
+    await page.locator('[role="option"]', { hasText: 'Create page' }).click();
+    await expect(page.getByTestId('command-palette-args')).toBeVisible({ timeout: 10_000 });
+
+    const fields = page.locator('[data-command-palette-args] input');
+    await fields.nth(0).fill('  My Page  ');
+    await page.keyboard.press('Enter');
+
+    await expect(page.getByTestId('args-readout-select-item')).toHaveText('create-page');
+    await expect
+      .poll(async () => (await page.getByTestId('args-readout-select-args').textContent())?.trim() ?? '', {
+        timeout: 10_000,
+      })
+      .toBe(JSON.stringify({ name: 'My Page', template: 'blank' }));
+
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+
+  runner(`command-palette-args-required-block [${target}]: Enter with the required field empty does NOT emit and refocuses it`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteArgs&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('args-open-palette').click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(3);
+
+    await page.locator('[role="option"]', { hasText: 'Create page' }).click();
+    await expect(page.getByTestId('command-palette-args')).toBeVisible({ timeout: 10_000 });
+
+    await page.keyboard.press('Enter');
+
+    await expect(page.getByTestId('args-readout-select-item')).toHaveText('');
+    await expect
+      .poll(async () => deepActiveElementPlaceholder(page), { timeout: 10_000 })
+      .toBe('Page name');
+
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+
+  runner(`command-palette-args-escape-restore [${target}]: Escape closes the args surface and restores the interactive list`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteArgs&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('args-open-palette').click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(3);
+
+    await page.locator('[role="option"]', { hasText: 'Create page' }).click();
+    await expect(page.getByTestId('command-palette-args')).toBeVisible({ timeout: 10_000 });
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('command-palette-args')).toHaveCount(0);
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(3);
+
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+
+  runner(`command-palette-args-backspace-empty [${target}]: Backspace on the empty first field returns to the list`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteArgs&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('args-open-palette').click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(3);
+
+    await page.locator('[role="option"]', { hasText: 'Create page' }).click();
+    await expect(page.getByTestId('command-palette-args')).toBeVisible({ timeout: 10_000 });
+
+    await page.keyboard.press('Backspace');
+    await expect(page.getByTestId('command-palette-args')).toHaveCount(0);
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(3);
+
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+
+  runner(`command-palette-args-source-wins [${target}]: a source+args item enters the args surface — source is never reached`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteArgs&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('args-open-palette').click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(3);
+
+    await page.locator('[role="option"]', { hasText: 'Go to page' }).click();
+    await expect(page.getByTestId('command-palette-args')).toBeVisible({ timeout: 10_000 });
+    // The nested source item never renders — args won, no child level pushed.
+    await expect(page.getByTestId('command-palette-title')).toHaveCount(0);
+
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+}

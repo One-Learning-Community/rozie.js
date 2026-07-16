@@ -13,7 +13,7 @@
  */
 export const eventManifest = {
   select:
-    'Fired when the user chooses a LEAF command (clicks it, or highlights it and presses Enter) — an item with no `children`/`source` (see `navigate` for a navigating item). Payload `{ item, path }` — `item` is the full chosen command object, `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). If `closeOnSelect` is true (the default) the palette also closes (its `open` model is written `false`).',
+    'Fired when the user chooses a LEAF command (clicks it, or highlights it and presses Enter) — an item with no `children`/`source` (see `navigate` for a navigating item). Payload `{ item, path }` — `item` is the full chosen command object, `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). When the chosen command declared `args` (inline command arguments, feature #12), the payload additionally carries `args: { [id]: value }` — every declared arg, TRIMMED — absent entirely for an argless command (additive, non-breaking). If `closeOnSelect` is true (the default) the palette also closes (its `open` model is written `false`).',
   navigate:
     'Fired when a nested level is PUSHED — selecting an item that carries `children` or `source` drills into it instead of emitting `select`. Payload `{ item, depth }` — the navigated-to item and the resulting nesting depth (1-based; the root is depth 0).',
   back:

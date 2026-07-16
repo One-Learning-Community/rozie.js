@@ -1,0 +1,115 @@
+<!--
+  CommandPaletteArgsDemo — VR behavioral cell proving the
+  command-palette-inline-args feature (#12): a command declares `args:
+  [{ id, placeholder?, required?, default? }]`; selecting it enters the
+  panel-internal args surface (chip + fields), Enter submits the EXISTING
+  `@select` with an added `args` payload key, Escape restores the list.
+  Cloned from CommandPaletteClippedDemo's shell — a SEPARATE, self-contained
+  cell. Do NOT touch CommandPaletteBehaviorDemo's own pinned items/
+  assertions (its row-count assertions stay untouched).
+
+  Behavioral-only (no pixel baseline authored HERE — the Linux Docker VR
+  union run that closes the 0.4.0 series is the one batched run that
+  captures pixels; this phase authors the driving demo + spec assertions
+  only, per Dan's "wait to do expensive testing like vr until the end").
+-->
+
+<rozie name="CommandPaletteArgsDemo">
+
+<components>
+{
+  CommandPalette: '../../packages/ui/command-palette/src/CommandPalette.rozie',
+}
+</components>
+
+<data>
+{
+  open: false,
+  query: '',
+  lastSelectItem: '',
+  lastSelectArgs: '',
+}
+</data>
+
+<script>
+// A small items set proving the three args cases the batched VR spec
+// drives: a required + optional-with-default field ("Create page"), a
+// plain argless leaf (non-regression), and a source+args item (args wins —
+// the source navigation is ignored, no child level pushed).
+const items = [
+  {
+    id: 'create-page',
+    label: 'Create page',
+    args: [
+      { id: 'name', placeholder: 'Page name', required: true },
+      { id: 'template', placeholder: 'Template', default: 'blank' },
+    ],
+  },
+  { id: 'save', label: 'Save' },
+  {
+    id: 'go-to-page',
+    label: 'Go to page (source+args)',
+    args: [{ id: 'query', placeholder: 'Search pages', required: true }],
+    source: () => [{ id: 'nested', label: 'Nested (should never render)' }],
+  },
+]
+
+// COLLISION NOTE (mirrors CommandPaletteClippedDemo): `openPalette`, not
+// `open` — `open` is the local $data key AND the inner component's model,
+// and an `open`-named helper collapses onto the generated $data.open setter
+// on React/Solid (ROZ524).
+const openPalette = () => {
+  $data.open = true
+}
+
+// onSelect(e): the readout the VR spec asserts against — `args` is present
+// (JSON-stringified) only for an args command, absent for an argless one.
+const onSelect = (e) => {
+  $data.lastSelectItem = e && e.item && e.item.id != null ? e.item.id : ''
+  $data.lastSelectArgs = e && e.args ? JSON.stringify(e.args) : ''
+}
+</script>
+
+<template>
+<div class="command-palette-args-demo">
+  <h3>CommandPalette — inline command arguments</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="args-open-palette" @click="openPalette()">Open</button>
+    <span class="readout" data-testid="args-readout-select-item">{{ $data.lastSelectItem }}</span>
+    <span class="readout" data-testid="args-readout-select-args">{{ $data.lastSelectArgs }}</span>
+  </div>
+
+  <CommandPalette
+    ref="palette"
+    r-model:open="$data.open"
+    r-model:query="$data.query"
+    :items="items"
+    placeholder="Type a command…"
+    ariaLabel="Command palette"
+    @select="onSelect($event)"
+  />
+</div>
+</template>
+
+<style>
+.command-palette-args-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.command-palette-args-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.command-palette-args-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+}
+</style>
+
+</rozie>

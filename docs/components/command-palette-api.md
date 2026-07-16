@@ -92,11 +92,37 @@ Each result row may carry its own `actions?: [{ id, label, icon?, shortcut?, dis
 
 Opening the menu moves REAL DOM focus into the first enabled `role="menuitem"` — the search input's own popup stays visibly open the whole time (it does not blur-close). Inside the menu: ↑/↓ rove over enabled actions (disabled entries are skipped, clamped at the ends — never wraps); Enter/Space fires `action-select` and always closes the menu; Escape or ← closes the menu, restores focus to the search input, and reopens the result list — it does **not** pop a level or close the palette (a sub-surface being open always takes precedence over level-pop, which always takes precedence over closing at the root). Pushing or popping a level while the menu is open closes it first — level navigation always returns to the result list.
 
+## Inline command arguments
+
+Any command item may declare `args: [{ id, placeholder?, required?, default? }]` — a Raycast-style inline argument form (text inputs only in v1). `placeholder` doubles as the field's accessible label; if absent, `id` is used instead.
+
+Selecting an args-bearing item (Enter or click; an action-select from the sub-actions menu does **not** apply) enters a **panel-internal args surface** automatically — no extra keypress. It reuses the exact same mechanics as the [interactive sub-actions](#interactive-sub-actions) flyout: real DOM focus moves into the first field, the search input's own popup stays visibly open the whole time (`pinOpen`), and a non-interactive chip shows the pending command's label above the fields. The result list is made **inert** while the args surface is active — dimmed and `aria-hidden`, so a stray click on it never commits a selection.
+
+- **`args` × `source`/`children` (level push)** — mutually exclusive: `args` **wins**, the navigation is ignored for that item.
+- **`args` × `actions`** — compatible: action triggers (⌘K, Right-arrow, the row affordance) only fire from the LIST surface; once in the args surface they are inactive.
+- **Submit** — Enter fires the EXISTING `select` event with an added `args: { [id]: value }` key (every declared arg, required and optional, each value TRIMMED) — additive and non-breaking: an argless command's `select` payload carries no `args` key at all. Enter with a missing `required` field instead focuses the first unfilled required field (no emit, no close). Enter submits regardless of which field currently has focus. `default` prefills its field (selected on focus, so typing replaces it immediately). `closeOnSelect` semantics are unchanged.
+- **Escape** closes the args surface and restores the list + query, at the same precedence tier as closing the sub-actions menu (above level-pop, above closing the palette at the root). **Backspace** on an empty FIRST field also pops back to the list (the same convention as levels' Backspace-on-empty). Neither entering nor leaving the args surface fires `navigate`/`back`. Tab/Shift-Tab move between fields in natural DOM order — no extra focus trap.
+- Override the default field chrome with the `argsField` slot (see below) — its `setValue` writes flow straight back into the same submit payload.
+
+```ts
+const items = [
+  {
+    id: 'create-page',
+    label: 'Create page',
+    args: [
+      { id: 'name', placeholder: 'Page name', required: true },
+      { id: 'template', placeholder: 'Template', default: 'blank' },
+    ],
+  },
+];
+// select payload on submit: { item, path, args: { name: 'My Page', template: 'blank' } }
+```
+
 ## Events
 
 | Event | Description |
 | --- | --- |
-| `select` | Fired when the user chooses a LEAF command — one with no `children`/`source` (click, or highlight + Enter). Payload `{ item, path }` — `item` is the full chosen command object, `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). `open` / `query` are two-way **models**, not events. |
+| `select` | Fired when the user chooses a LEAF command — one with no `children`/`source` (click, or highlight + Enter). Payload `{ item, path }` — `item` is the full chosen command object, `path` is the id breadcrumb of levels navigated through to reach it (empty at the root). When the chosen command declared [`args`](#inline-command-arguments), the payload additionally carries `args: { [id]: value }` (every declared arg, trimmed) — absent entirely for an argless command. `open` / `query` are two-way **models**, not events. |
 | `navigate` | Fired when a nested level is pushed (selecting an item with `children`/`source`). Payload `{ item, depth }` — the navigated-to item and the resulting nesting depth (1-based; root is 0). |
 | `back` | Fired when a level is popped (Backspace-on-empty, Escape at depth > 0, or `goBack()`). No payload. Does not fire at the root. |
 | `action-select` | Fired when the user chooses a row action from its action menu. Payload `{ item, action }` — `item` is the full anchored command object (the row the menu was opened for), `action` is the chosen entry from that row's `actions[]`. The menu always closes on selection; the palette additionally closes when `closeOnAction` is `true` (the default). |
@@ -125,6 +151,7 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 | `breadcrumb` | `{ stack, back }` | The depth > 0 header (a panel sibling above the input, not inside the combobox). `stack` is the root..current breadcrumb (`[{ id, title }]`); `back` is the `goBack` handle. Falls back to a back button + the full root..current trail (muted ancestors › an emphasized current segment). Every ancestor segment is a real, keyboard-focusable `<button>` (`aria-label="Back to <title>"`) that jumps straight to that tier — popping one level per hop the same way repeated Backspace presses would. The current segment stays a plain, non-interactive `<span>`. |
 | `actionItem` | `{ action, item, active, disabled }` | Custom render for one row inside the action menu. `action` is the entry from the anchored row's `actions[]`; `item` is the anchored command; `active` is whether it is currently roving-highlighted; `disabled` mirrors `action.disabled`. Falls back to icon (if present) + label + a right-aligned `shortcut` hint. Named `actionItem` (camelCase) — a hyphenated slot name is not a valid identifier across all six targets. |
 | `groupHeading` | `{ group }` | Custom render for a section heading when commands are grouped (see [Grouped commands](#grouped-commands) above). `group` is `{ id, label }` — the group's `id` is the `group` string it was derived from; `label` defaults to that same string. Falls back to `group.label`. Not rendered at all when no command carries a `group`. |
+| `argsField` | `{ item, arg, value, setValue }` | Custom render for one field inside the [inline args surface](#inline-command-arguments). `item` is the command the args surface is open for; `arg` is the declared `{ id, placeholder?, required?, default? }` entry; `value` is its current string value; `setValue(next)` writes it back — feeding the same trimmed `select` payload as the default field. Falls back to a real `<input>` (`aria-label` from `placeholder`/`id`). Named `argsField` (camelCase) — mirrors `actionItem`'s naming precedent. |
 | `footer` | — | A persistent footer bar below the list (e.g. keyboard hints). Rendered only when provided. |
 
 ## Theming
@@ -178,6 +205,20 @@ New in a later release ([breadcrumb ancestor click-to-jump](#nested-levels)) —
 | `--rozie-command-palette-breadcrumb-jump-radius` | `0.25rem` | The ancestor jump button's corner radius (focus ring follows it). |
 | `--rozie-command-palette-breadcrumb-jump-hover-color` | `--rozie-command-palette-breadcrumb-current-color` (`inherit`) | The ancestor jump button's text color on hover. |
 | `--rozie-command-palette-breadcrumb-jump-hover-decoration` | `underline` | The ancestor jump button's `text-decoration` on hover. |
+
+New in a later release ([inline command arguments](#inline-command-arguments)) — the chip additionally reuses the `--rozie-command-palette-breadcrumb-current-*` color/weight tokens above; the fields alias the existing panel/input tokens:
+
+| Token | Fallback | Description |
+| --- | --- | --- |
+| `--rozie-command-palette-args-padding` | `0.75rem` | Padding around the whole args surface (chip + fields). |
+| `--rozie-command-palette-args-gap` | `0.5rem` | Vertical gap between the chip and each field. |
+| `--rozie-command-palette-args-chip-bg` | `rgba(0, 0, 0, 0.06)` | The pending-command chip's background. |
+| `--rozie-command-palette-args-chip-color` | `inherit` | The chip's text color. |
+| `--rozie-command-palette-args-field-padding` | `--rozie-command-palette-input-padding` (`0.5rem 0.75rem`) | Each field's padding. |
+| `--rozie-command-palette-args-field-border` | `--rozie-command-palette-border-width` solid `--rozie-command-palette-divider-color` | Each field's border. |
+| `--rozie-command-palette-args-field-radius` | `--rozie-command-palette-input-radius` (`0.5rem`) | Each field's corner radius. |
+| `--rozie-command-palette-args-field-bg` | `--rozie-command-palette-input-bg` (`transparent`) | Each field's background. |
+| `--rozie-command-palette-args-dim-opacity` | `0.45` | The result list's opacity while the args surface is active (the list is also `pointer-events: none` + `aria-hidden`). |
 
 The full token vocabulary — overlay/scrim, panel chrome, the flyout, the header/back button, the list/option box model, empty/loading/error states, and the footer — has documented defaults in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/command-palette/src/themes/base.css). Structural rules (the fixed overlay, the non-clipping frame's positioning, the panel's `overflow: hidden`, the flyout's `position: absolute`) compile per-leaf and are not consumer-overridable.
 

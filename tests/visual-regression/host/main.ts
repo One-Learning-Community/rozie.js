@@ -1038,6 +1038,14 @@ export const EXAMPLES = [
   // (the fix). Behavioral-only; the batched Linux Docker VR union run that
   // closes the 0.4.0 series captures the pixel proof, not this phase.
   'CommandPaletteClipped',
+  // command-palette-inline-args phase (feature #12, loader →
+  // examples/demos/CommandPaletteArgsDemo.rozie). Self-contained wrapper: a
+  // dedicated args item set (required+default fields, an argless leaf, a
+  // source+args item proving args-wins) — a SEPARATE cell from
+  // CommandPaletteBehaviorDemo (whose pinned row-counts stay untouched).
+  // Behavioral-only; the batched Linux Docker VR union run that closes the
+  // 0.4.0 series captures the pixel proof, not this phase.
+  'CommandPaletteArgs',
   // Phase 64 P0 — @rozie-ui/headless-core CROSS-PACKAGE `.rzts` boundary proof
   // (loader → examples/demos/HeadlessCoreSmokeDemo.rozie, which imports the smoke
   // partial via the BARE specifier `@rozie-ui/headless-core/smoke.rzts`). The
@@ -1397,6 +1405,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // command-palette-portal-overlay phase — '-demo' appended on Lit → tag
   // 'rozie-command-palette-clipped-demo' = kebab of CommandPaletteClippedDemo.
   CommandPaletteClipped: 'rozie-command-palette-clipped',
+  // command-palette-inline-args phase — '-demo' appended on Lit → tag
+  // 'rozie-command-palette-args-demo' = kebab of CommandPaletteArgsDemo.
+  CommandPaletteArgs: 'rozie-command-palette-args',
   // @rozie-ui/date-picker RANGE-mode cells — '-demo' appended on Lit → tags
   // 'rozie-date-picker-range-complete-demo' etc. = kebab of
   // DatePickerRange{Complete,Behavior}Demo / DatePickerPresetActiveDemo.
@@ -1780,6 +1791,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // `open`/`query`/`appendTo` in <data>, binds the inner CommandPalette via
   // r-model + :append-to). No parent-supplied props.
   CommandPaletteClipped: {},
+  // command-palette-inline-args phase — self-contained wrapper (seeds
+  // `open`/`query` in <data>, binds the inner CommandPalette via r-model).
+  // No parent-supplied props.
+  CommandPaletteArgs: {},
   // @rozie-ui/date-picker RANGE-mode cells — self-contained wrappers (each seeds
   // its own range value + presets in <data> and binds the inner DatePicker via
   // r-model). No parent-supplied props; no MODEL_PROPS entry (the model is bound
