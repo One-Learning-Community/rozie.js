@@ -43,6 +43,15 @@ export interface NavigableItem {
   // level's `defaultItems` is a PARALLEL home-view source resolved above the
   // scoring pipeline in the `.rozie` (currentDefaultItems/currentBaseItems).
   defaultItems?: unknown[];
+  // command-palette-per-level-virtual (FD-01 resolved — the vendored
+  // combobox's `virtual` prop is now live-flippable): a navigating item's
+  // own windowing fields, captured onto its pushed frame exactly like
+  // defaultItems/title/placeholder above. Distinct from the palette-level
+  // `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` props, which
+  // resolve the ROOT list.
+  virtual?: boolean;
+  virtualMaxHeight?: string | null;
+  virtualEstimateRowHeight?: number | null;
   [key: string]: unknown;
 }
 
@@ -59,6 +68,15 @@ export interface LevelFrame<TItem = NavigableItem> {
   // The item's own empty/home-view items, captured at push time exactly like
   // title/placeholder — this level's home view when the query is empty.
   defaultItems: unknown[];
+  // command-palette-per-level-virtual: the item's own windowing fields,
+  // captured at push time exactly like defaultItems above — this level's
+  // `virtual` (Boolean, default false) / `virtualMaxHeight` (String, else
+  // null — falls back to the palette-level prop) / `virtualEstimateRowHeight`
+  // (Number, else null — falls back to the palette-level prop, itself
+  // falling back to 36, combobox's own default).
+  virtual: boolean;
+  virtualMaxHeight: string | null;
+  virtualEstimateRowHeight: number | null;
   status: LevelStatus;
   error: unknown;
 }
@@ -107,6 +125,26 @@ export function levelDefaultItems(item: NavigableItem | null | undefined): unkno
   return Array.isArray(item?.defaultItems) ? (item.defaultItems as unknown[]) : [];
 }
 
+/** True iff the item explicitly opts its pushed level into windowing: item.virtual === true. */
+export function levelVirtual(item: NavigableItem | null | undefined): boolean {
+  return item?.virtual === true;
+}
+
+/** The item's own windowed-scroll-container bound: item.virtualMaxHeight when set, else null. */
+export function levelVirtualMaxHeight(item: NavigableItem | null | undefined): string | null {
+  return item?.virtualMaxHeight ?? null;
+}
+
+/**
+ * The item's own windowing row-height estimate: item.virtualEstimateRowHeight
+ * when it is a finite number, else null (the caller/accessor falls back to
+ * the palette-level prop, ultimately to 36 — combobox's own default).
+ */
+export function levelVirtualEstimateRowHeight(item: NavigableItem | null | undefined): number | null {
+  const v = item?.virtualEstimateRowHeight;
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
 /**
  * Push a new frame for `item` onto `stack`, snapshotting `currentQuery` as
  * the frame's `parentQuery` (restored on pop). A `children` item seeds
@@ -134,6 +172,9 @@ export function pushFrame<TItem extends NavigableItem = NavigableItem>(
     parentQuery: currentQuery,
     resolvedItems: hasChildren ? (item.children as unknown[]).slice() : [],
     defaultItems: levelDefaultItems(item),
+    virtual: levelVirtual(item),
+    virtualMaxHeight: levelVirtualMaxHeight(item),
+    virtualEstimateRowHeight: levelVirtualEstimateRowHeight(item),
     status: hasChildren || hasDefaults ? 'ready' : 'loading',
     error: null,
   };
