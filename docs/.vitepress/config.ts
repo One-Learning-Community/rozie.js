@@ -45,7 +45,7 @@ export default defineConfig({
   // Contributor/maintainer guides that live under docs/ but are NOT site pages
   // (they contain bare <slug>/<Name> tokens the VitePress Vue compiler would try
   // to parse as unclosed elements). Keep them co-located but out of the build.
-  srcExclude: ['ADDING-COMPONENT-DOCS.md'],
+  srcExclude: ['ADDING-COMPONENT-DOCS.md', 'superpowers/**'],
   markdown: {
     languages: [
       {
