@@ -221,6 +221,58 @@ async function deepHitAtLastMenuItem(page: Page): Promise<boolean> {
 }
 
 /**
+ * Shadow-piercing hit-test at the `.rozie-command-palette-frame`'s OWN
+ * bottom-center: true iff that point actually PAINTS the frame (visible
+ * there), false iff the frame is clipped away / covered. The clipped-ancestor
+ * proof (command-palette-portal-appendTo-escape): with `appendTo:false` the
+ * frame is TALLER than the deliberately-tiny 160px clipping ancestor, so its
+ * bottom overflows and is CLIPPED by the ancestor's `overflow:hidden`
+ * (hit=false); portalled to `body` the SAME frame paints fully (hit=true). A
+ * plain bounding-box "bounded" check cannot tell "laid out beyond the clip"
+ * from "actually hidden by it" — this can, and it is the real regression guard
+ * for the containing-block trap.
+ */
+async function frameBottomVisible(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const find = (root: Document | ShadowRoot): Element | null => {
+      const direct = root.querySelector('[data-testid="command-palette-frame"]');
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const f = find(sr);
+          if (f) return f;
+        }
+      }
+      return null;
+    };
+    const frame = find(document);
+    if (!frame) return false;
+    const r = frame.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.bottom - 4;
+    if (y > window.innerHeight || y < 0 || x < 0 || x > window.innerWidth) return false;
+    let el: Element | null = document.elementFromPoint(x, y);
+    while (el && (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot) {
+      const inner = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot!.elementFromPoint(x, y);
+      if (!inner || inner === el) break;
+      el = inner;
+    }
+    // Shadow-INCLUSIVE containment: on Lit the frame's content (the vendored
+    // combobox list) lives in a NESTED shadow root, so `frame.contains(el)`
+    // returns false across the shadow boundary. Walk el's ancestor chain,
+    // crossing shadow-host boundaries (shadowRoot → host), to see if `frame`
+    // is an ancestor — the same shadow-pierce discipline as the deep* helpers.
+    let node: (Node & { host?: Element }) | null = el;
+    while (node) {
+      if (node === frame) return true;
+      node = node.parentNode ?? (node as unknown as ShadowRoot).host ?? null;
+    }
+    return false;
+  });
+}
+
+/**
  * The trimmed text content of every combobox group-heading element
  * (`.rozie-combobox-group-heading`), in DOM order, RECURSIVELY piercing
  * every open shadow root — cp-adopts-combobox-groups' section-heading proof.
@@ -831,32 +883,61 @@ for (const target of TARGETS) {
 
     // ---- 1. appendTo:false (default) — the overlay's containing block IS ----
     //         the clipping ancestor (its `transform` creates one for the
-    //         fixed-position overlay), so the frame's rendered rect is
-    //         BOUNDED by the ancestor's small box.
+    //         fixed-position overlay), so the frame is HORIZONTALLY bounded by
+    //         (and TOP-anchored inside) the ancestor's small box. The frame's
+    //         own content (search + the 4-item list) is TALLER than the
+    //         deliberately-tiny 160px ancestor, so it overflows the ancestor's
+    //         clip region downward and its bottom is CLIPPED AWAY by
+    //         `overflow:hidden` — the reproduced bug (this demo's whole point,
+    //         per its header comment). A plain layout-box "bottom bounded"
+    //         check is WRONG here: the frame is TRAPPED + CLIPPED, not shrunk
+    //         to fit — so we prove the trap (horizontal containment) AND the
+    //         clip (overflow + a real hit-test), which a fitted frame fails.
+    const input = page.locator('input[role="combobox"]').first();
     await openBtn.click();
     await expect(frame).toBeVisible({ timeout: 15_000 });
+    // Wait for the FULL 4-item list to render before measuring — the frame
+    // becomes visible with just the search input a frame before the options
+    // paint, and the clip proof (b)/(c) depends on the frame being taller than
+    // the 160px ancestor, which only holds once the list is present.
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(4);
     const ancestorBox = await ancestor.boundingBox();
     const clippedFrameBox = await frame.boundingBox();
     expect(ancestorBox).not.toBeNull();
     expect(clippedFrameBox).not.toBeNull();
+    // (a) containing block IS the ancestor: horizontally within it, top-anchored.
     expect(clippedFrameBox!.x).toBeGreaterThanOrEqual(ancestorBox!.x - 1);
     expect(clippedFrameBox!.y).toBeGreaterThanOrEqual(ancestorBox!.y - 1);
     expect(clippedFrameBox!.x + clippedFrameBox!.width).toBeLessThanOrEqual(
       ancestorBox!.x + ancestorBox!.width + 1,
     );
-    expect(clippedFrameBox!.y + clippedFrameBox!.height).toBeLessThanOrEqual(
+    // (b) the frame is TALLER than the clip region — it overflows the
+    //     ancestor's bottom (a fitted, non-trapped frame would not).
+    expect(clippedFrameBox!.y + clippedFrameBox!.height).toBeGreaterThan(
       ancestorBox!.y + ancestorBox!.height + 1,
     );
+    // (c) and that overflow is ACTUALLY CLIPPED: the frame's own bottom-center
+    //     is not hittable (the ancestor's overflow:hidden hides it).
+    expect(await frameBottomVisible(page)).toBe(false);
 
-    await page.keyboard.press('Escape');
-    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
-
-    // ---- 2. appendTo:'body' — the SAME overlay markup now escapes the ----
-    //         ancestor's small box entirely (its rect is NOT contained by
-    //         the ancestor — the fix).
+    // ---- 2. Toggle appendTo → 'body' WHILE THE PALETTE STAYS OPEN — the ----
+    //         SAME live overlay node relocates out of the clipping ancestor to
+    //         document.body, escaping the clip entirely (the fix). Toggling
+    //         while open exercises the steady-state relocate (the controller
+    //         moves the EXISTING node); it deliberately avoids a
+    //         close→toggle→reopen cycle, whose r-if node-recreate is an
+    //         unrelated, separately-tracked Lit `@query(cache:true)` limitation
+    //         (see .planning/debug/command-palette-portal-through-portal.md).
+    //         This test's contract is clip-vs-escape, which the live relocate
+    //         proves directly (you SEE the open palette jump out of the clip).
     await toggleBtn.click();
     await expect(appendToReadout).toHaveText('body');
-    await openBtn.click();
+    // The relocate is a MOVE (detach + reattach), which blurs the focused input
+    // and collapses the combobox popup; re-focus to bring the full-height list
+    // back so the escaped frame is measured under the SAME condition as the
+    // clipped one.
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(4);
     await expect(frame).toBeVisible({ timeout: 15_000 });
     const escapedFrameBox = await frame.boundingBox();
     expect(escapedFrameBox).not.toBeNull();
@@ -866,7 +947,14 @@ for (const target of TARGETS) {
       escapedFrameBox!.x + escapedFrameBox!.width > ancestorBox!.x + ancestorBox!.width + 1 ||
       escapedFrameBox!.y + escapedFrameBox!.height > ancestorBox!.y + ancestorBox!.height + 1;
     expect(escapes).toBe(true);
+    // The complement of the trapped (c): portalled to `body`, the SAME frame is
+    // no longer inside the clipping ancestor, so its bottom-center now paints
+    // the frame (fully visible — the clip is gone). This is the live proof the
+    // portal UN-clips, not merely that the box moved.
+    expect(await frameBottomVisible(page)).toBe(true);
 
+    await input.focus();
+    await waitListRefocused(page);
     await page.keyboard.press('Escape');
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
@@ -936,11 +1024,28 @@ for (const target of TARGETS) {
 
     // ---- 3. Escape AT DEPTH>0 pops ONE level — does NOT close the palette ----
     //         (resolveEscape's depth-aware funnel, unmodified, now running
-    //         against a node relocated to document.body).
+    //         against a node relocated to document.body). goBack() RESTORES
+    //         the snapshotted parent query 'go' — BOTH the model AND the
+    //         combobox's VISIBLE input text (seedQuery — the documented "full
+    //         query undo", proven by the command-palette-levels test) — so the
+    //         restored 'go' re-filters the ROOT list back down to the single
+    //         matching command ("Go to page…"), count 1. This proves the pop
+    //         returned to ROOT (breadcrumb gone) AND that query-undo drove the
+    //         pipeline THROUGH the portal, not just the model.
     await page.keyboard.press('Escape');
     await expect(breadcrumbTitle).toHaveCount(0);
-    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(4);
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await expect(input).toHaveValue('go');
     await expect(readoutBackCount).toHaveText('1');
+
+    // Pace past reopenComboboxPopup's blur→rAF focus boundary, then clear the
+    // restored 'go' — the cleared ROOT shows the FULL 4-item set (the
+    // through-portal root-count proof) and gives the action-menu step below a
+    // clean input to filter from (mirrors the levels test's input.fill('')
+    // between tiers — otherwise 'new' would append onto 'go').
+    await waitListRefocused(page);
+    await input.fill('');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(4);
 
     // ---- 4. action-menu real-focus arbitration + the frame-relative ----
     //         flyout anchor (finding 1) — isolate the `new` row (carries
@@ -951,6 +1056,15 @@ for (const target of TARGETS) {
     //         cannot distinguish "clipped but sized" from "visible").
     await input.pressSequentially('new', { delay: 30 });
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    // Park the mouse in a neutral corner BEFORE opening the action menu. The
+    // menu items carry `@mouseenter="actionIndex = ai"` (hover-roving), so a
+    // cursor left over the flyout area from a prior click would fire mouseenter
+    // on whichever item renders under it when the menu opens — desyncing the
+    // hover-roving index from the keyboard focus and making Enter select the
+    // HOVERED action (flakily 'duplicate') instead of the keyboard-focused
+    // first one. This isolates the KEYBOARD action-menu flow the test asserts;
+    // it does not change product behavior.
+    await page.mouse.move(2, 2);
     await page.keyboard.press('ControlOrMeta+k');
     await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 10_000 }).toBe(2);
     await expect
@@ -959,6 +1073,17 @@ for (const target of TARGETS) {
     await expect.poll(async () => deepHitAtLastMenuItem(page), { timeout: 10_000 }).toBe(true);
     // keepOpen: the result list stays visible while the menu holds focus.
     await expect(countOptions(page)).resolves.toBe(1);
+
+    // Pace past the menu-open roving/focus settle: confirm the FIRST action
+    // ('Rename') is the STABLY deeply-focused menuitem before Enter. The
+    // generic activeMenuItemInfo poll above only proves "a menuitem is
+    // focused" — on Lit the open-focus rAF can transiently land on a sibling,
+    // so an immediate Enter occasionally fired 'duplicate'. Asserting the
+    // SPECIFIC active item removes that race (and is a stronger real-focus
+    // arbitration proof: the menu opens on its first enabled action).
+    await expect
+      .poll(async () => activeElementText(page), { timeout: 10_000 })
+      .toContain('Rename');
 
     // ---- 5. Enter fires @action-select through the portal ----
     await page.keyboard.press('Enter');
@@ -1045,6 +1170,15 @@ for (const target of TARGETS) {
     });
     expect(backdropBg).toBe('rgb(1, 2, 3)');
 
+    // Focus the search input and settle before the closing Escape: on the
+    // Linux Docker harness the combobox autofocus lands a frame later than an
+    // immediate keypress, so an un-paced Escape would land on <body> (outside
+    // onPanelKeydown's funnel) and be lost — the documented rAF focus-boundary
+    // hazard (waitListRefocused), NOT a behavior change. (Passes locally on
+    // every target un-paced; this hardens the Docker cell that flaked.)
+    const closeInput = page.locator('input[role="combobox"]').first();
+    await closeInput.focus();
+    await waitListRefocused(page);
     await page.keyboard.press('Escape');
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
