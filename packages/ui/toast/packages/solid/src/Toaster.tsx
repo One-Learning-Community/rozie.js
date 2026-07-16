@@ -229,10 +229,23 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   // (it escapes into $onUnmount's effect).
   let unmounted = false;
 
+  // Hover-pause flag: true while the pointer is over the stack (set by
+  // pauseTimers, cleared by resumeTimers). Read by patch() so a duration change
+  // arriving mid-hover stores the new remainder WITHOUT arming a live timer
+  // (which would dismiss the toast while it is still hovered) — resume arms it
+  // on leave. A top-level `let` reachable from the $expose verbs (patch/show →
+  // startTimer) and the @mouseenter/@mouseleave handlers, so React hoists it to
+  // useRef (persistent) like `timers`.
+  let paused = false;
+
   // ---- timers ------------------------------------------------------------
   function startTimer(toast: any) {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
+    // Belt-and-braces: clear any pre-existing live handle for this id before
+    // overwriting the entry, so a re-arm never orphans a running timeout.
+    const existing = timers[toast.id];
+    if (existing && existing.handle != null) window.clearTimeout(existing.handle);
     const remaining = toast.duration;
     const handle = window.setTimeout(() => dismissBegin(toast.id, 'timeout'), remaining);
     timers[toast.id] = {
@@ -252,6 +265,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   // delete it — the old v1 shortcut deleted entries here, which is why leave
   // had to do a full restart).
   function pauseTimers() {
+    paused = true;
     if (typeof window === 'undefined') return;
     for (const id in timers) {
       const entry = timers[id];
@@ -278,6 +292,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   // (it will be cleaned up by the next dismiss/clear pass) rather than firing
   // immediately from inside this loop.
   function resumeTimers() {
+    paused = false;
     if (typeof window === 'undefined') return;
     for (const id in timers) {
       const entry = timers[id];
@@ -423,7 +438,20 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
     if (c.duration !== undefined) {
       clearTimer(id);
       const patched = next.find((t: any) => t.id === id);
-      startTimer(patched);
+      if (paused) {
+        // Hovered: store the new duration as the pending remainder WITHOUT
+        // arming a live timer (which would dismiss the toast while the pointer
+        // is still over the stack). resumeTimers() arms it on leave.
+        if (patched && patched.duration > 0 && typeof window !== 'undefined') {
+          timers[id] = {
+            handle: null,
+            startedAt: Date.now(),
+            remaining: patched.duration
+          };
+        }
+      } else {
+        startTimer(patched);
+      }
     }
     return true;
   }

@@ -181,6 +181,47 @@ describe('Toaster patch(id, changes) — update-in-place (behavioral)', () => {
 
     app.unmount();
   });
+
+  // RED-FIRST (T4): patch(duration) during a hover-pause armed a LIVE
+  // window.setTimeout regardless of the paused state, so a toast dismissed
+  // while the pointer was still over the stack; and resume then overwrote the
+  // timers entry without clearing that live handle (a leak / double-fire). The
+  // fix threads a module `paused` flag: while paused, patch stores the new
+  // duration as the pending remainder WITHOUT arming, and resume arms it on
+  // leave. startTimer also clears any pre-existing handle before overwrite.
+  it('patch(duration) while hovered does NOT dismiss until leave, then dismisses after the patched duration', async () => {
+    const { app, host, handle } = mountToaster();
+    const region = () => host.querySelector('.rozie-toaster')!;
+
+    const id = handle().show({ message: 'x', type: 'info', duration: 5000 });
+    await nextTick();
+    expect(statusCount(host)).toBe(1);
+
+    // Hover → pause.
+    region().dispatchEvent(new MouseEvent('mouseenter'));
+    await nextTick();
+
+    // Patch a SHORT duration while hovered. Pre-fix this arms a live 300ms
+    // timer immediately → the toast dismisses mid-hover.
+    handle().patch(id, { duration: 300 });
+    await nextTick();
+
+    // Well past 300ms but STILL hovered — must remain (paused).
+    await vi.advanceTimersByTimeAsync(2000);
+    await nextTick();
+    expect(statusCount(host)).toBe(1);
+
+    // Leave → the patched 300ms remainder arms and dismisses.
+    region().dispatchEvent(new MouseEvent('mouseleave'));
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(300);
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(360); // exit failsafe
+    await nextTick();
+    expect(statusCount(host)).toBe(0);
+
+    app.unmount();
+  });
 });
 
 describe("Toaster's 'loading' type — decorative spinner (behavioral)", () => {

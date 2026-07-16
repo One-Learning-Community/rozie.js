@@ -262,9 +262,15 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 
   unmounted = false;
 
+  paused = false;
+
   startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
   if (typeof window === 'undefined') return;
+  // Belt-and-braces: clear any pre-existing live handle for this id before
+  // overwriting the entry, so a re-arm never orphans a running timeout.
+  const existing = this.timers[toast.id];
+  if (existing && existing.handle != null) window.clearTimeout(existing.handle);
   const remaining = toast.duration;
   const handle = window.setTimeout(() => this.dismissBegin(toast.id, 'timeout'), remaining);
   this.timers[toast.id] = {
@@ -281,6 +287,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 };
 
   pauseTimers = () => {
+  this.paused = true;
   if (typeof window === 'undefined') return;
   for (const id in this.timers) {
     const entry = this.timers[id];
@@ -303,6 +310,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 };
 
   resumeTimers = () => {
+  this.paused = false;
   if (typeof window === 'undefined') return;
   for (const id in this.timers) {
     const entry = this.timers[id];
@@ -427,7 +435,20 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   if (c.duration !== undefined) {
     this.clearTimer(id);
     const patched = next.find((t: any) => t.id === id);
-    this.startTimer(patched);
+    if (this.paused) {
+      // Hovered: store the new duration as the pending remainder WITHOUT
+      // arming a live timer (which would dismiss the toast while the pointer
+      // is still over the stack). resumeTimers() arms it on leave.
+      if (patched && patched.duration > 0 && typeof window !== 'undefined') {
+        this.timers[id] = {
+          handle: null,
+          startedAt: Date.now(),
+          remaining: patched.duration
+        };
+      }
+    } else {
+      this.startTimer(patched);
+    }
   }
   return true;
 };

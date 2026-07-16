@@ -65,6 +65,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   })();
   const unmounted = useRef(false);
   const timers = useRef({});
+  const paused = useRef(false);
   const [toasts, setToasts] = useState<any[]>([]);
   const [seq, setSeq] = useState(0);
   const [swipe, setSwipe] = useState<any>(null);
@@ -73,6 +74,10 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   function startTimer(toast: any) {
     if (!toast || !toast.duration || toast.duration <= 0) return;
     if (typeof window === 'undefined') return;
+    // Belt-and-braces: clear any pre-existing live handle for this id before
+    // overwriting the entry, so a re-arm never orphans a running timeout.
+    const existing = timers.current[toast.id];
+    if (existing && existing.handle != null) window.clearTimeout(existing.handle);
     const remaining = toast.duration;
     const handle = window.setTimeout(() => dismissBegin(toast.id, 'timeout'), remaining);
     timers.current[toast.id] = {
@@ -87,6 +92,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     delete timers.current[id];
   }
   function pauseTimers() {
+    paused.current = true;
     if (typeof window === 'undefined') return;
     for (const id in timers.current) {
       const entry = timers.current[id];
@@ -108,6 +114,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     }
   }
   function resumeTimers() {
+    paused.current = false;
     if (typeof window === 'undefined') return;
     for (const id in timers.current) {
       const entry = timers.current[id];
@@ -229,7 +236,20 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     if (c.duration !== undefined) {
       clearTimer(id);
       const patched = next.find((t: any) => t.id === id);
-      startTimer(patched);
+      if (paused.current) {
+        // Hovered: store the new duration as the pending remainder WITHOUT
+        // arming a live timer (which would dismiss the toast while the pointer
+        // is still over the stack). resumeTimers() arms it on leave.
+        if (patched && patched.duration > 0 && typeof window !== 'undefined') {
+          timers.current[id] = {
+            handle: null,
+            startedAt: Date.now(),
+            remaining: patched.duration
+          };
+        }
+      } else {
+        startTimer(patched);
+      }
     }
     return true;
   }
