@@ -29,6 +29,18 @@ import {
   rewriteTemplateExpression,
   hoistTemplateDoubleReadAccessor,
 } from '../rewrite/rewriteTemplateExpression.js';
+// command-palette-portal-overlay phase — `rewriteListenerExpression` is the
+// SCRIPT-context sibling of `rewriteTemplateExpression` (mirrors emitKeynav.ts's
+// identical split): a `r-portal` container expression is spliced into an
+// `effect()` FIELD-INITIALIZER callback body, not a template binding, so a bare
+// user-declared script function reference (e.g. `resolveTo` in
+// `resolveTo($props.to)`) needs an EXPLICIT `this.` prefix — Angular's
+// template-scope implicit-`this` resolution does not apply outside a template
+// string. `rewriteTemplateExpression`'s `prefixThis` option only prefixes
+// KNOWN sigil-derived categories (props/data/refs/computed); it does NOT know
+// about arbitrary user-declared script functions, which is exactly what
+// `classMembers` + `rewriteListenerExpression`'s Identifier visitor solves.
+import { rewriteListenerExpression } from '../rewrite/rewriteListenerExpression.js';
 import type { AngularScriptInjection } from './emitTemplateEvent.js';
 
 export interface EmitAttrCtx {
@@ -115,6 +127,17 @@ export interface EmitAttrCtx {
    */
   cvaModelProp?: string | null | undefined;
   cvaMergeDisabled?: boolean | undefined;
+  /**
+   * command-palette-portal-overlay phase — class members from rewriteScript
+   * (includes user method names). Threaded ONLY into `emitPortalDirective`'s
+   * `rewriteListenerExpression` call (SCRIPT context) so a bare user-function
+   * reference inside an `r-portal` container expression gets the `this.`
+   * prefix a class-field-initializer `effect()` body requires. Optional/
+   * back-compat — `emitSpreadBinding`/`emitListenerSpread` do NOT consume
+   * this field (a pre-existing, narrower gap in those two paths, out of
+   * scope for this phase).
+   */
+  classMembers?: ReadonlySet<string> | undefined;
 }
 
 /**
@@ -1236,12 +1259,192 @@ function emitListenerSpread(
 }
 
 /**
+ * command-palette-portal-overlay phase — the SHARED (once-per-component)
+ * `__roziePortalPlace` helper method. Mirrors `applyAttrsHelperDecl` /
+ * `listenersRendererFieldDecl`'s dedup pattern: pushed onto
+ * `ctx.scriptInjections` at most once regardless of how many `r-portal`
+ * elements the component has.
+ *
+ * A `WeakMap<Element, anchor>` lazily captures each portalled element's
+ * ORIGINAL parent + next-sibling on first placement (so a later falsy
+ * `target` restores it to its exact natural template position — the AOT-
+ * safe, signals-era analog of Vue's `<Teleport :disabled>` / React's
+ * ternary in-place fallback). A truthy `target` moves the element via
+ * native `appendChild` and records it in `__roziePortalMoved` so the
+ * shared `ngOnDestroy` teardown (registered by the per-portal effect, see
+ * `emitPortalDirective`) can remove any STILL-relocated node — Angular's
+ * own view-destroy machinery is not guaranteed to find a node that has
+ * been moved outside its logical view position.
+ */
+const ROZIE_PORTAL_PLACE_FIELD_NAME = '__roziePortalPlace';
+const ROZIE_PORTAL_ANCHORS_FIELD_NAME = '__roziePortalAnchors';
+const ROZIE_PORTAL_MOVED_FIELD_NAME = '__roziePortalMoved';
+
+function portalAnchorsFieldDecl(): string {
+  return `private ${ROZIE_PORTAL_ANCHORS_FIELD_NAME} = new WeakMap<Element, { parent: Node | null; next: Node | null }>();`;
+}
+
+function portalMovedFieldDecl(): string {
+  return `private ${ROZIE_PORTAL_MOVED_FIELD_NAME} = new Set<Element>();`;
+}
+
+function portalPlaceMethodDecl(): string {
+  return [
+    `private ${ROZIE_PORTAL_PLACE_FIELD_NAME}(el: Element, target: Element | null | undefined): void {`,
+    `  let anchor = this.${ROZIE_PORTAL_ANCHORS_FIELD_NAME}.get(el);`,
+    `  if (!anchor) {`,
+    `    anchor = { parent: el.parentNode, next: el.nextSibling };`,
+    `    this.${ROZIE_PORTAL_ANCHORS_FIELD_NAME}.set(el, anchor);`,
+    `  }`,
+    `  if (target) {`,
+    `    target.appendChild(el);`,
+    `    this.${ROZIE_PORTAL_MOVED_FIELD_NAME}.add(el);`,
+    `    return;`,
+    `  }`,
+    `  this.${ROZIE_PORTAL_MOVED_FIELD_NAME}.delete(el);`,
+    `  if (anchor.parent) {`,
+    `    if (anchor.next && anchor.next.parentNode === anchor.parent) {`,
+    `      anchor.parent.insertBefore(el, anchor.next);`,
+    `    } else {`,
+    `      anchor.parent.appendChild(el);`,
+    `    }`,
+    `  }`,
+    `}`,
+  ].join('\n');
+}
+
+/**
+ * command-palette-portal-overlay phase — emit the per-element machinery for
+ * ONE `r-portal="<expr>"` element:
+ *   - a `#roziePortal_<N>` template-ref attribute (returned for splicing
+ *     onto the open tag),
+ *   - a `viewChild<ElementRef>('roziePortal_<N>')` private field,
+ *   - the SHARED `__roziePortalPlace`/anchors/moved-set fields (once per
+ *     component — mirrors `emitSpreadBinding`'s `applyAttrsHelperDecl`
+ *     dedup),
+ *   - a `private __roziePortal_<N>_effect = effect(() => { ... });` field
+ *     initializer that guards `nativeElement` (Pitfall 7 — `viewChild()`
+ *     signals return `undefined` until the view is initialized, so a
+ *     pre-render effect tick is a safe no-op) and re-runs the placement
+ *     whenever the container expression's SIGNAL dependencies change
+ *     (the AOT-safe, signals-era analog of a reactive `$watch`).
+ *
+ * AOT-SAFE by construction: no `import.meta.url` (not referenced at all),
+ * no inline template arrow (the container expression is a plain property/
+ * method-call expression spliced into a `effect()` callback BODY — a
+ * function statement, not a template-attribute arrow literal; analogjs AOT
+ * rejects arrows INSIDE `{{ }}`/binding attribute VALUES, not inside a
+ * class-field-initializer's own script-side callback).
+ *
+ * `effect()` in a field initializer is valid Angular injection context
+ * (mirrors `emitSpreadBinding`/`emitListenerSpread`'s identical Pitfall-8
+ * rationale) — no separate `ngAfterViewInit`/constructor wiring is needed,
+ * unlike the r-keynav controller (which needs `viewChild()` to resolve
+ * itself for the FIRST commit-timing-sensitive read; a portal's placement
+ * has no such ordering hazard — `effect()`'s own no-op-until-mounted guard
+ * covers the initial-render case identically to every render after it).
+ */
+function emitPortalDirective(
+  element: { portalTo: { expression: t.Expression } },
+  ctx: EmitAttrCtx,
+): string {
+  const counter = ctx.injectionCounter ?? { next: 0 };
+  const idx = counter.next++;
+  const refName = `roziePortal_${idx}`;
+  const effectFieldName = `__roziePortal_${idx}_effect`;
+  const destroyRegisteredFieldName = `__roziePortal_${idx}_destroyRegistered`;
+
+  // Field-initializer (SCRIPT, not template) context — `rewriteListenerExpression`
+  // (NOT `rewriteTemplateExpression`, whose `prefixThis` only prefixes KNOWN
+  // sigil categories) so `$props.appendTo` lowers to `this.appendTo()` AND a
+  // bare user-declared script function (`resolveTo`/`resolveAppendTo`) gets
+  // `this.`-prefixed via `classMembers` — mirrors emitKeynav.ts's identical
+  // SCRIPT-context rationale (`buildGetSourceCode`/`buildCommitCode`).
+  const containerCode = rewriteListenerExpression(element.portalTo.expression, ctx.ir, {
+    collisionRenames: ctx.collisionRenames,
+    classMembers: ctx.classMembers,
+    cvaModelProp: ctx.cvaModelProp,
+    cvaMergeDisabled: ctx.cvaMergeDisabled,
+  });
+
+  if (ctx.scriptInjections !== undefined) {
+    ctx.scriptInjections.push({
+      name: refName,
+      decl: `private ${refName} = viewChild<ElementRef>('${refName}');`,
+    });
+
+    // Shared anchors/moved-set/place-method fields — once per component.
+    if (!ctx.scriptInjections.some((si) => si.name === ROZIE_PORTAL_ANCHORS_FIELD_NAME)) {
+      ctx.scriptInjections.push({
+        name: ROZIE_PORTAL_ANCHORS_FIELD_NAME,
+        decl: portalAnchorsFieldDecl(),
+      });
+      ctx.scriptInjections.push({
+        name: ROZIE_PORTAL_MOVED_FIELD_NAME,
+        decl: portalMovedFieldDecl(),
+      });
+      ctx.scriptInjections.push({
+        name: ROZIE_PORTAL_PLACE_FIELD_NAME,
+        decl: portalPlaceMethodDecl(),
+      });
+    }
+
+    ctx.scriptInjections.push({
+      name: destroyRegisteredFieldName,
+      decl: `private ${destroyRegisteredFieldName} = false;`,
+    });
+
+    const effectDecl = [
+      `private ${effectFieldName} = effect(() => {`,
+      `  const el = this.${refName}()?.nativeElement;`,
+      `  if (!el) return;`,
+      `  this.${ROZIE_PORTAL_PLACE_FIELD_NAME}(el, ${containerCode});`,
+      `  if (!this.${destroyRegisteredFieldName}) {`,
+      `    this.${destroyRegisteredFieldName} = true;`,
+      `    this.__rozieDestroyRef.onDestroy(() => {`,
+      `      for (const moved of this.${ROZIE_PORTAL_MOVED_FIELD_NAME}) {`,
+      `        moved.parentNode?.removeChild(moved);`,
+      `      }`,
+      `    });`,
+      `  }`,
+      `});`,
+    ].join('\n');
+    ctx.scriptInjections.push({
+      name: effectFieldName,
+      decl: effectDecl,
+    });
+  }
+
+  if (ctx.hasListenerSpread !== undefined) {
+    // Reuse the existing hasListenerSpread flag's downstream effect: it
+    // already drives emitAngular's `inject`/`Renderer2`/`ElementRef`/
+    // `effect`/`viewChild`/`DestroyRef` import additions to `@angular/core`
+    // (NOT `hasSpreadBinding`, which adds `afterRenderEffect` instead of
+    // `effect` — the wrong scheduling primitive for portal placement) — the
+    // exact surface `r-portal`'s effect()+viewChild()+DestroyRef machinery
+    // needs too (`Renderer2` rides along unused, which is harmless — no
+    // `noUnusedLocals` gate in this project's tsconfig). No new flag/
+    // import-wiring is required.
+    ctx.hasListenerSpread.value = true;
+  }
+  if (ctx.needsDestroyRefField !== undefined) {
+    ctx.needsDestroyRefField.value = true;
+  }
+
+  return `#${refName}`;
+}
+
+/**
  * Plan 15-05 — public re-export for the cross-cutting per-element walker
  * in `emitTemplateNode.ts`, which needs to emit a dynamic `ListenerSpreadIR`
  * as a sibling template-ref attribute alongside the per-event `(click)=`
  * bindings.
+ *
+ * command-palette-portal-overlay phase — `emitPortalDirective` re-exported
+ * alongside it for the SAME reason (a per-element `r-portal` teleport
+ * spliced onto the open tag as `#roziePortal_<N>`).
  */
-export { emitListenerSpread };
+export { emitListenerSpread, emitPortalDirective };
 
 /**
  * Emit a single attribute. Returns null when the attribute should be dropped

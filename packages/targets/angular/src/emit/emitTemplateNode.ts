@@ -41,6 +41,7 @@ import {
 import {
   emitAttributes,
   emitListenerSpread,
+  emitPortalDirective,
   findRHtml,
   findRShow,
 } from './emitTemplateAttribute.js';
@@ -690,6 +691,30 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   if (attrText) partsHead.push(attrText);
   if (eventText) partsHead.push(eventText);
   for (const text of dynamicListenerTexts) partsHead.push(text);
+
+  // command-palette-portal-overlay phase — `r-portal="<expr>"` element
+  // teleport. Emits a `#roziePortal_<N>` template-ref + a per-element
+  // `effect()`/`viewChild()` field pair (AOT-safe, signals-era lifecycle —
+  // see emitPortalDirective's doc comment). Mirrors the dynamic-listener-
+  // spread wiring immediately above.
+  if (node.portalTo) {
+    const portalRefText = emitPortalDirective(
+      node as TemplateElementIR & { portalTo: NonNullable<TemplateElementIR['portalTo']> },
+      {
+        ir: ctx.ir,
+        collisionRenames: ctx.collisionRenames,
+        loopBindings: ctx.loopBindings,
+        scriptInjections: ctx.scriptInjections,
+        injectionCounter: ctx.injectionCounter,
+        hasListenerSpread: ctx.hasListenerSpread,
+        needsDestroyRefField: ctx.needsDestroyRefField,
+        cvaModelProp: ctx.cvaModelProp,
+        cvaMergeDisabled: ctx.cvaMergeDisabled,
+        classMembers: ctx.classMembers,
+      },
+    );
+    partsHead.push(portalRefText);
+  }
 
   // Phase 71 (r-keynav) — root `#…`/`[attr.aria-activedescendant]` and item
   // `[id]`/`[attr.data-rozie-keynav-item]`/`[attr.data-rozie-keynav-active]`/
