@@ -311,6 +311,24 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  * Teleport skips target resolution/warnings entirely when disabled; see
  * `resolveTarget`/`mountToTarget` in @vue/runtime-core — no console warning,
  * no throw, for a falsy `to` when `disabled` is true).
+ *
+ * Finding 4 (R2) — the container expression is HOISTED into a single Vue
+ * `computed` (the same D-04 hoist pattern `r-match` uses) instead of being
+ * spliced verbatim into both `:to` and `:disabled`. This fixes three
+ * defects at once:
+ *   1. SSR guard — the computed body wraps the expression in the SAME
+ *      `typeof document === 'undefined' ? null : (...)` guard the React and
+ *      Solid targets emit, so a container expression that touches `document`
+ *      (e.g. `document.querySelector(...)`) is null on the server rather
+ *      than throwing; a null container makes `:disabled` truthy → renders
+ *      in place (parity with React's ternary / Solid's <Show> fallback).
+ *   2. single evaluation — a Vue computed caches, so a side-effecting
+ *      selector runs once per render, not twice (`:to` + `:disabled`).
+ *   3. escaping — the raw expression now lives in the script (where
+ *      @babel/generator escapes JS strings), and `:to`/`:disabled` bind a
+ *      bare computed identifier, so an expression containing a `"` can no
+ *      longer break the double-quoted attribute (obviating a per-attribute
+ *      escapeAttrValue call at the interpolation site).
  */
 function emitPortalElement(
   node: TemplateElementIR,
@@ -320,8 +338,14 @@ function emitPortalElement(
   const { expression } = node.portalTo!;
   if (ctx.elementPortalFlag) ctx.elementPortalFlag.seen = true;
   const containerCode = rewriteTemplateExpression(expression, ctx.ir);
+  const hoistName = `__roziePortalTo${ctx.injectionCounter.next++}`;
+  ctx.scriptInjections.push({
+    wrapName: hoistName,
+    import: { from: 'vue', name: 'computed' },
+    decl: `const ${hoistName} = computed(() => (typeof document === 'undefined' ? null : (${containerCode})));`,
+  });
   const innerVue = emitElementWithExtraDirectiveInner(node, extraDirective, ctx);
-  return `<Teleport :to="${containerCode}" :disabled="!(${containerCode})">${innerVue}</Teleport>`;
+  return `<Teleport :to="${hoistName}" :disabled="!${hoistName}">${innerVue}</Teleport>`;
 }
 
 function emitElementWithExtraDirective(
