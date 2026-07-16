@@ -369,3 +369,97 @@ describe('CommandPalette inline command arguments (behavioral, RED-first)', () =
     app.unmount();
   });
 });
+
+/**
+ * Finding 2 (SEV) — the args surface must not SELF-SUBMIT on the very Enter
+ * that opens it. Chain: the vendored <Combobox>'s Enter commit
+ * (Combobox.rozie onKeydown → selectOption → synchronous `@change`) preventDefaults
+ * but does NOT stopPropagation, so onComboboxChange → openArgsSurface flips
+ * activeSurface='args' SYNCHRONOUSLY (on the 5 non-React targets) and the SAME
+ * keydown then bubbles to the frame's onPanelKeydown, whose args-branch fired
+ * submitArgs() unconditionally on Enter — instantly @select-ing any command
+ * whose args are already valid on open (a required arg with a `default`, or
+ * all-optional args). RED-first against the pre-fix leaf.
+ */
+describe('CommandPalette args surface — opening Enter must not self-submit (finding 2, RED-first)', () => {
+  // A required arg WITH a `default` → initArgValues prefills it → canSubmitArgs
+  // is TRUE the instant the surface opens, so the buggy opening-Enter would
+  // submit immediately. (create-page in makeItems has a required NO-default
+  // `name`, so it would harmlessly focus-block — this fixture is what actually
+  // exercises the self-submit.)
+  function autoSubmitItems() {
+    return [
+      {
+        id: 'defaulted',
+        label: 'Defaulted',
+        args: [{ id: 'name', placeholder: 'Name', required: true, default: 'preset' }],
+      },
+    ];
+  }
+
+  /**
+   * Highlight the single row (combobox activates on @mouseenter) and press
+   * Enter on the combobox input — the vendored <Combobox> commits the active
+   * option on Enter (preventDefault, NO stopPropagation), and the SAME keydown
+   * bubbles to the frame's onPanelKeydown.
+   */
+  async function highlightAndEnter(host: HTMLElement) {
+    const input = host.querySelector('input[role="combobox"]') as HTMLInputElement;
+    const row = optionRowFor(host, 'Defaulted');
+    row.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    await nextTick();
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+    );
+    await nextTick();
+    await nextFrame();
+  }
+
+  it('opening Enter OPENS the args surface and does NOT emit @select', async () => {
+    const { app, host, selectPayloads } = mountPalette({ items: autoSubmitItems() });
+    await openPopup(host);
+    await highlightAndEnter(host);
+
+    expect(host.querySelector('[data-testid="command-palette-args"]')).not.toBeNull();
+    expect(selectPayloads.length).toBe(0);
+
+    app.unmount();
+  });
+
+  it('a SECOND Enter (fields untouched, defaults valid) submits with the defaulted args', async () => {
+    const { app, host, selectPayloads } = mountPalette({ items: autoSubmitItems() });
+    await openPopup(host);
+    await highlightAndEnter(host);
+    // Let the opening-Enter guard disarm (a microtask) before the real submit.
+    await Promise.resolve();
+    await nextTick();
+
+    const frame = host.querySelector('[data-testid="command-palette-frame"]') as HTMLElement;
+    frame.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await nextTick();
+
+    expect(selectPayloads.length).toBe(1);
+    const payload = selectPayloads[0] as { item: { id: string }; args: Record<string, string> };
+    expect(payload.item.id).toBe('defaulted');
+    expect(payload.args).toEqual({ name: 'preset' });
+
+    app.unmount();
+  });
+
+  it('Escape immediately after opening still exits (the guard must not eat Escape)', async () => {
+    const { app, host, selectPayloads } = mountPalette({ items: autoSubmitItems() });
+    await openPopup(host);
+    await highlightAndEnter(host);
+    expect(host.querySelector('[data-testid="command-palette-args"]')).not.toBeNull();
+
+    const frame = host.querySelector('[data-testid="command-palette-frame"]') as HTMLElement;
+    frame.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await nextTick();
+    await nextFrame();
+
+    expect(host.querySelector('[data-testid="command-palette-args"]')).toBeNull();
+    expect(selectPayloads.length).toBe(0);
+
+    app.unmount();
+  });
+});
