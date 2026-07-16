@@ -26,6 +26,15 @@
  *     getActive, setActive, onCommit, activeClass?, windower? }}` on the
  *     `r-keynav` root element. See `keynav.ts`'s module doc comment for why
  *     this is an action `update()`, not a separate `$effect` block.
+ *
+ *   - `roziePortal` (command-palette-portal-overlay phase) — the Svelte 5
+ *     action for the NEW element-level `r-portal="<expr>"` teleport
+ *     directive. Emitted as `use:roziePortal={<container-expr>}` on the
+ *     `r-portal` host element. Distinct from `PortalHost.svelte` (the
+ *     slot-content-INTO-container primitive) — this relocates the element's
+ *     OWN rendered subtree OUT to a container via native DOM
+ *     appendChild/insertBefore (Svelte has no `<Teleport>`-equivalent
+ *     framework component). See `roziePortal.ts`'s module doc comment.
  */
 
 export { applyListeners } from './applyListeners.js';
@@ -34,3 +43,4 @@ export { rozieAttr } from './rozieAttr.js';
 export { rozieClass } from './rozieClass.js';
 export { rozieStyle } from './rozieStyle.js';
 export { keynav, type KeynavActionOpts } from './keynav.js';
+export { roziePortal } from './roziePortal.js';

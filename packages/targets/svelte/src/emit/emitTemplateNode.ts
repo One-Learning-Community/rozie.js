@@ -556,6 +556,25 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       break;
     }
   }
+  // command-palette-portal-overlay phase — `r-portal="<expr>"` → a Svelte 5
+  // action (`use:roziePortal={<expr>}`, `@rozie/runtime-svelte`). Svelte has
+  // no framework-level teleport component (unlike Vue's <Teleport> or
+  // React's createPortal) — an action operating on the already-rendered node
+  // is the idiomatic primitive (mirrors `applyListeners`'s D-11 rationale).
+  // `ctx.runtimeImports.add(...)` is the SAME generic accumulator Phase 15's
+  // `applyListeners` uses; emitSvelte.ts's import-line synthesis picks it up
+  // automatically — no new plumbing needed.
+  let portalAttr: string | null = null;
+  if (node.portalTo) {
+    ctx.runtimeImports.add('roziePortal');
+    const containerCode = rewriteTemplateExpression(
+      node.portalTo.expression,
+      ctx.ir,
+      ctxRenames(ctx),
+    );
+    portalAttr = `use:roziePortal={${containerCode}}`;
+  }
+
   const attrText = emitAttributes(node.attributes, {
     ir: ctx.ir,
     elementTagKind: node.tagKind,
@@ -633,6 +652,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   if (eventText) partsHead.push(eventText);
   for (const sp of spreadTexts) partsHead.push(sp);
   for (const ka of keynavAttrs) partsHead.push(ka);
+  if (portalAttr) partsHead.push(portalAttr);
   // Pre-Phase-16 Item 2: stamp the per-component scope attribute on every
   // emitted element AND on every component-tag invocation. The element-side
   // stamp matches the `[data-rozie-s-<hash>]` selector that `scopeCss`
