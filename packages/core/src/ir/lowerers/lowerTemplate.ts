@@ -907,6 +907,19 @@ function lowerBareElement(
       } else if (attr.kind === 'static' && attr.name === 'portal' && attr.value === null) {
         // Portal-slot primitive (Spike 003) — boolean attribute.
         isPortal = true;
+      } else if (attr.kind === 'directive' && attr.name === 'portal') {
+        // command-palette-portal-overlay phase — `r-portal="expr"` is the
+        // ELEMENT-level teleport directive; it is not valid on a <slot>,
+        // which uses the orthogonal bare boolean `portal` attribute (handled
+        // above) for slot-content-INTO-container portalling. Redirect.
+        diagnostics.push({
+          code: RozieErrorCode.PORTAL_DIRECTIVE_ON_SLOT,
+          severity: 'error',
+          message:
+            'r-portal is not valid on <slot> — use the boolean `portal` attribute for slot-content portalling (r-portal is a distinct directive for portalling an ordinary element\'s own rendered subtree).',
+          loc: attr.loc,
+          hint: 'Use <slot portal /> (no r-, boolean form) to portal slot content into an engine-owned container; r-portal="<expr>" portals an ordinary element out to a container.',
+        });
       } else if (attr.kind === 'binding' && attr.value !== null) {
         // Portal slots use `:params="['arg']"` as a TYPE DECLARATION (consumed
         // by lowerSlots into SlotDecl.portalParamNames) — strip it here so it
@@ -991,6 +1004,10 @@ function lowerBareElement(
   let keynavItem: KeynavItemIR | undefined;
   let keynavActiveClassExpression: t.Expression | undefined;
   let keynavActiveClassDeps: SignalRef[] | undefined;
+  // command-palette-portal-overlay phase — `r-portal="<container-expr>"`
+  // staging locals (mirrors the isExternal staging-then-spread pattern).
+  let portalToExpression: t.Expression | undefined;
+  let portalToDeps: SignalRef[] | undefined;
 
   for (const attr of el.attributes) {
     if (attr.kind === 'event') {
@@ -1383,6 +1400,44 @@ function lowerBareElement(
         continue;
       }
 
+      // command-palette-portal-overlay phase — `r-portal="<container-expr>"`.
+      // ELEMENT-level teleport directive, parallel to (never interacting
+      // with) the `<slot portal>` slot-content primitive above. Parsed +
+      // deps-computed here so the container expression participates in
+      // reactivity; the FALSY-container in-place fallback is a per-target
+      // EMIT-time decision (see TemplateElementIR.portalTo doc comment) —
+      // this lowerer never drops the field for a falsy literal.
+      if (attr.name === 'portal') {
+        if (attr.value === null || attr.value.trim() === '') {
+          diagnostics.push({
+            code: RozieErrorCode.PORTAL_DIRECTIVE_EMPTY_VALUE,
+            severity: 'error',
+            message:
+              'r-portal requires a container expression (e.g. r-portal="$props.appendTo") — an empty value is not a valid portal target.',
+            loc: attr.loc,
+            hint: 'Provide an expression that evaluates to an Element (or a falsy value / null to render in place).',
+          });
+          continue;
+        }
+        if (elementIsComponent) {
+          diagnostics.push({
+            code: RozieErrorCode.PORTAL_DIRECTIVE_ON_COMPONENT,
+            severity: 'error',
+            message:
+              'r-portal is not supported on a <components>-registered child component element (v1 limitation) — only plain/host elements can be portalled.',
+            loc: attr.loc,
+            hint: 'Wrap the component in a plain host element and put r-portal on that wrapper instead.',
+          });
+          continue;
+        }
+        const expr = tryParseExpression(attr.value);
+        if (expr) {
+          portalToExpression = expr;
+          portalToDeps = computeExpressionDeps(expr, bindings);
+        }
+        continue;
+      }
+
       // r-model / r-show / r-html / r-text are preserved as binding
       // attributes (named with the `r-` prefix) for downstream emitters to
       // expand into target-specific output. r-if/r-else/r-else-if/r-for
@@ -1547,6 +1602,12 @@ function lowerBareElement(
     // stay byte-identical to the pre-phase IR.
     ...(keynavRoot !== undefined ? { keynavRoot } : {}),
     ...(keynavItem !== undefined ? { keynavItem } : {}),
+    // command-palette-portal-overlay phase — `r-portal` marker. Spread only
+    // when set so non-marked elements stay byte-identical to the pre-phase
+    // IR (no rebless for the front-end; existing corpus is untouched).
+    ...(portalToExpression !== undefined
+      ? { portalTo: { expression: portalToExpression, deps: portalToDeps ?? [] } }
+      : {}),
   };
   return result;
 }

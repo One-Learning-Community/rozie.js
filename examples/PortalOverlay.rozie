@@ -1,0 +1,70 @@
+<!--
+  PortalOverlay.rozie — dependency-free demonstration of the ELEMENT-level
+  portal directive (`r-portal`, command-palette-portal-overlay phase).
+
+  Distinct from PortalList.rozie's SLOT-content-INTO-container primitive
+  (`<slot portal />` + `$portals.NAME(...)`): this fixture portals the
+  component's OWN rendered subtree OUT to a container, using each target's
+  native element-teleport construct (React createPortal, Vue <Teleport>,
+  Solid <Portal>, a Svelte portal action, an Angular AOT-safe relocation
+  directive, Lit light-DOM render). This is the compiler primitive the
+  @rozie-ui/command-palette `appendTo` prop is built on.
+
+  Exercises:
+    - `r-portal="<expr>"` on a plain (non-slot) element
+    - `r-portal` + `r-if` on the SAME element (the conditional subtree
+      renders inside the teleport target; falsy `to` renders in place)
+    - a Boolean|String `to` prop — `false`/absent = in place, `true`/`'body'`
+      = document.body, a CSS selector string = that container
+-->
+
+<rozie name="PortalOverlay">
+
+<props>
+{
+  open: { type: Boolean, default: false },
+  to:   { type: [Boolean, String], default: false },
+}
+</props>
+
+<script>
+function resolveTo(to) {
+  if (!to) return null
+  if (typeof document === 'undefined') return null
+  if (to === true || to === 'body') return document.body
+  return document.querySelector(to)
+}
+</script>
+
+<template>
+<div r-if="$props.open" r-portal="resolveTo($props.to)" class="rozie-portal-overlay-backdrop">
+  <div class="rozie-portal-overlay-box">
+    <slot>Portalled content</slot>
+  </div>
+</div>
+</template>
+
+<style>
+.rozie-portal-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: var(--rozie-portal-overlay-z, 3000);
+}
+.rozie-portal-overlay-box {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  min-width: 16rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+:root {
+  --rozie-portal-overlay-z: 3000;
+}
+</style>
+
+</rozie>

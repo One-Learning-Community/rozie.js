@@ -887,6 +887,33 @@ export interface TemplateElementIR {
    * element. Additive-optional, same corpus-safety rationale as `keynavRoot`.
    */
   keynavItem?: KeynavItemIR;
+  /**
+   * command-palette-portal-overlay phase — `r-portal="<container-expr>"` on
+   * an ORDINARY template element (never a `<slot>` — that's the pre-existing
+   * `TemplateSlotInvocationIR.isPortal` slot-content-INTO-container primitive,
+   * an orthogonal, untouched mechanism). `r-portal` is the inverse direction:
+   * it relocates THIS element's OWN rendered subtree OUT to the container the
+   * expression resolves to, using each target's native element-teleport
+   * construct (React `createPortal`, Vue `<Teleport>`, Solid `<Portal>`, a
+   * Svelte portal action, an Angular AOT-safe relocation directive, Lit
+   * light-DOM + the portalCss scope-attribute cascade).
+   *
+   * `deps` is computed from `expression` so the container is tracked
+   * reactively (a prop/data change re-evaluates the container). The FALSY
+   * runtime value of `expression` (e.g. `null`/`false`/undefined) is a
+   * RUNTIME decision, not a lower-time drop — every per-target emitter must
+   * fall back to rendering the subtree IN PLACE when the resolved container
+   * is falsy (this is what makes `appendTo:false` byte-behavior-identical to
+   * no directive at all).
+   *
+   * Additive-optional: absent on every element without `r-portal`, so
+   * existing corpus IR (and every non-participating dist-parity fixture)
+   * stays byte-identical — no rebless for the front-end.
+   */
+  portalTo?: {
+    expression: Expression;
+    deps: SignalRef[];
+  };
 }
 
 /**

@@ -882,6 +882,16 @@ export const RozieErrorCode = {
   // verified current highest (Phase 71 r-keynav) — these do NOT collide.
   MANIFEST_SCHEMA_VERSION_MISMATCH: 'ROZ988', // error — installed primitive manifest schemaVersion incompatible with the compiler's MANIFEST_SCHEMA_VERSION (D-04)
   MALFORMED_MANIFEST: 'ROZ989', // error — manifest JSON is not an object, or is missing/mistyped a required field (props/slots/emits/expose/schemaVersion)
+
+  // ---- command-palette-portal-overlay phase — r-portal element directive — ROZ990..ROZ992 ----
+  // `r-portal="<container-expr>"` is a NEW element-level teleport directive on
+  // an ORDINARY template element — orthogonal to the pre-existing `<slot
+  // portal>` slot-content-INTO-container primitive (ROZ979's DEFAULT_PORTAL_
+  // NAME_RESERVED family). ROZ989 (Phase 75 manifest) is the verified current
+  // highest; ROZ990 is the next free code.
+  PORTAL_DIRECTIVE_ON_SLOT: 'ROZ990', // error — `r-portal="expr"` used on a <slot> element; redirect to the boolean `portal` attribute (slot-content portalling is a distinct, orthogonal primitive)
+  PORTAL_DIRECTIVE_ON_COMPONENT: 'ROZ991', // error — `r-portal` used on a <components>-registered child component element; v1 only supports plain/host elements
+  PORTAL_DIRECTIVE_EMPTY_VALUE: 'ROZ992', // error — `r-portal` with an empty/missing value; a portal needs a container expression
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];
