@@ -6301,10 +6301,10 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@rozie/runtime-react':
-        specifier: workspace:*
+        specifier: '>=0.1.0 <1.0.0'
         version: link:../runtime/react
       '@rozie/runtime-vue':
-        specifier: workspace:*
+        specifier: '>=0.1.0 <1.0.0'
         version: link:../runtime/vue
       '@vitejs/plugin-react':
         specifier: ^4 || ^5
