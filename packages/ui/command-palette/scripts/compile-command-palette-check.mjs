@@ -40,6 +40,8 @@ const EXPECT = {
   // ACT-TRIGGER) adds `actionKey` (default '$mod+k') + `closeOnAction`
   // (default true). command-palette-13-empty-home-view-first adds
   // `defaultItems` — the root empty/home-view prop (13 props total).
+  // command-palette-portal-overlay adds `appendTo` — element-portal target
+  // for the overlay root (default false = render in place) — 15 props total.
   props: [
     'open',
     'query',
@@ -55,6 +57,7 @@ const EXPECT = {
     'actionKey',
     'closeOnAction',
     'groupCap',
+    'appendTo',
   ],
   models: ['open', 'query'],
   // command-palette-levels: gains `navigate` (a level was pushed) and `back`

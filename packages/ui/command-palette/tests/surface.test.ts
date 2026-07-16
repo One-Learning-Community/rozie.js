@@ -36,6 +36,8 @@ const EXPECT = {
   // command-palette-13-empty-home-view-first: gains `defaultItems` — the
   // root's empty/home-view items (a nested level's own `defaultItems` field
   // is captured onto its frame, not a separate prop) — 13 props total.
+  // command-palette-portal-overlay: gains `appendTo` — element-portal target
+  // for the overlay root (default false = render in place) — 15 props total.
   props: [
     'open',
     'query',
@@ -51,6 +53,7 @@ const EXPECT = {
     'actionKey',
     'closeOnAction',
     'groupCap',
+    'appendTo',
   ],
   models: ['open', 'query'],
   // command-palette-levels: gains `navigate` (a level was pushed — payload

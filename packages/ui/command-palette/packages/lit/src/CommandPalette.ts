@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { adoptConsumerStyles, createLitControllableProperty, rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runtime-lit';
+import { RoziePortalController, adoptConsumerStyles, createLitControllableProperty, injectGlobalStyles, rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { ref } from 'lit/directives/ref.js';
 import '@rozie-ui/combobox-lit';
@@ -419,6 +419,12 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
    * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). `groupCap` composes with per-row `actions`: the ⌘K/Right-arrow row action menu always anchors to the exact highlighted VISIBLE row (cap-aware, order-independent), and firing it on a '+N more' row is a no-op.
    */
   @property({ type: Number, reflect: true }) groupCap: number = 0;
+  /**
+   * Where the overlay portals to, escaping an ancestor `overflow:hidden`/`transform`/`filter`/`contain` that would otherwise clip a `position:fixed` overlay (e.g. an embedding iframe/app-shell with its own layout chrome). `false`/absent (default) renders in place — byte-behavior-identical to every existing consumer, zero churn. `true` or `'body'` portals to `document.body`. A CSS selector string portals to the first element that selector matches. An `Element` reference portals to that element directly. SSR-safe: falls back to in-place when `document` is unavailable. Token-placement note: theming custom properties (`--rozie-command-palette-*`) must be set on `:root` (or the `appendTo` container itself) to reach a portalled overlay — a host-scoped token does not cross the portal on any target.
+   * @example
+   * <CommandPalette append-to="body" :items="commands" />
+   */
+  @property({ type: Boolean }) appendTo: boolean | string = false;
   private _activeValue = signal<any>(null);
   private _levelStack = signal<any[]>([]);
   private _activeSurface = signal('list');
@@ -429,6 +435,9 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   @query('[data-rozie-ref="panel"]') private _refPanel!: HTMLElement;
   @query('[data-rozie-ref="combobox"]') private _refCombobox!: Combobox;
 private __rozieWatchInitial_0 = true;
+
+  @query('[data-rozie-ref="__roziePortal0"]', true) private __roziePortal0!: HTMLElement;
+  private __roziePortal0Controller = new RoziePortalController(this, () => this.__roziePortal0, () => (this.resolveAppendTo(this.appendTo)));
 
   @state() private _hasSlotBreadcrumb = false;
   @queryAssignedElements({ slot: 'breadcrumb', flatten: true }) private _slotBreadcrumbElements!: Element[];
@@ -652,7 +661,7 @@ private __rozieWatchInitial_0 = true;
 
   render() {
     return html`
-${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onBackdropClick($event); }} data-rozie-s-768cad96>
+${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onBackdropClick($event); }} data-rozie-ref="__roziePortal0" data-rozie-s-768cad96>
   
   <div class="rozie-command-palette-frame" data-testid="command-palette-frame" @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onPanelKeydown($event); }} data-rozie-ref="frame" data-rozie-s-768cad96>
   <div class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label=${this.ariaLabel} data-rozie-ref="panel" data-rozie-s-768cad96>
@@ -713,6 +722,14 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   requestToken = 0;
 
   debounceTimerId: any = null;
+
+  resolveAppendTo = (to: any) => {
+  if (!to) return null;
+  if (typeof document === 'undefined') return null;
+  if (to === true || to === 'body') return document.body;
+  if (typeof to === 'string') return document.querySelector(to);
+  return to;
+};
 
   currentItems = () => {
   const frame = currentFrame(this._levelStack.value);
@@ -1315,3 +1332,274 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   get query(): string { return this._queryControllable.read(); }
   set query(v: string) { this._queryControllable.notifyPropertyWrite(v); }
 }
+
+injectGlobalStyles('rozie-command-palette-global', `
+.rozie-command-palette[data-rozie-s-768cad96] {
+  position: fixed;
+  inset: 0;
+  z-index: var(--rozie-command-palette-z, 1000);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--rozie-command-palette-overlay-padding, 12vh 1rem 1rem);
+  background: var(--rozie-command-palette-backdrop-bg, rgba(0, 0, 0, 0.5));
+  backdrop-filter: var(--rozie-command-palette-backdrop-filter, none);
+}
+.rozie-command-palette-frame[data-rozie-s-768cad96] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--rozie-command-palette-width, min(40rem, 100%));
+  max-width: 100%;
+}
+.rozie-command-palette-panel[data-rozie-s-768cad96] {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: var(--rozie-command-palette-max-height, 70vh);
+  overflow: hidden;
+  font: var(--rozie-command-palette-font, inherit);
+  color: var(--rozie-command-palette-color, inherit);
+  background: var(--rozie-command-palette-bg, #fff);
+  border: var(--rozie-command-palette-border, none);
+  border-radius: var(--rozie-command-palette-radius, 0.75rem);
+  box-shadow: var(--rozie-command-palette-shadow, 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25));
+  /*
+    Drive the vendored <Combobox>'s render-neutral tokens from panel scope
+    (260715-50l findings 3+4) — custom properties inherit through the Lit
+    nested-shadow boundary since this panel is the combobox's DOM ancestor.
+    Each declaration is itself token-driven with a fallback so a palette
+    consumer can still re-override. Result: a square, borderless-on-three-
+    sides, ring-free input with a subtle bottom divider that stays put on
+    focus (the clean cmdk look), plus subtle top separation above group
+    headings (separating the leading ungrouped block from the first group).
+  */
+  --rozie-combobox-radius: var(--rozie-command-palette-input-radius, 0);
+  --rozie-combobox-border-color: var(--rozie-command-palette-input-border-color, transparent);
+  --rozie-combobox-focus-border-color: var(--rozie-command-palette-input-focus-border-color, transparent);
+  --rozie-combobox-focus-ring-width: var(--rozie-command-palette-input-focus-ring-width, 0);
+  --rozie-combobox-input-underline: var(--rozie-command-palette-input-underline, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
+  --rozie-combobox-group-heading-margin-top: var(--rozie-command-palette-section-gap, 0.375rem);
+}
+.rozie-command-palette-search[data-rozie-s-768cad96] {
+  padding: var(--rozie-command-palette-search-padding, 0.75rem);
+  border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+}
+.rozie-command-palette-header[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-header-gap, 0.5rem);
+  padding: var(--rozie-command-palette-header-padding, 0.5rem 0.75rem);
+  border-bottom: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+  font-size: var(--rozie-command-palette-header-font-size, 0.875rem);
+}
+.rozie-command-palette-back[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--rozie-command-palette-back-padding, 0.125rem 0.375rem);
+  font: inherit;
+  font-size: var(--rozie-command-palette-back-font-size, 1.1rem);
+  line-height: 1;
+  color: inherit;
+  background: var(--rozie-command-palette-back-bg, transparent);
+  border: var(--rozie-command-palette-back-border, none);
+  border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+  cursor: pointer;
+}
+.rozie-command-palette-back[data-rozie-s-768cad96]:hover {
+  background: var(--rozie-command-palette-back-hover-bg, rgba(0, 0, 0, 0.06));
+}
+.rozie-command-palette-title[data-rozie-s-768cad96] {
+  font-weight: var(--rozie-command-palette-title-weight, 600);
+}
+.rozie-command-palette-breadcrumb-trail[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+.rozie-command-palette-breadcrumb-item[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--rozie-command-palette-breadcrumb-gap, 0.25rem);
+  min-width: 0;
+}
+.rozie-command-palette-breadcrumb-segment[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-color, rgba(0, 0, 0, 0.55));
+  font-weight: var(--rozie-command-palette-breadcrumb-weight, 400);
+  white-space: nowrap;
+}
+.rozie-command-palette-breadcrumb-segment--current[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
+  font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+}
+.rozie-command-palette-breadcrumb-segment--link[data-rozie-s-768cad96] {
+  padding: 0;
+  font: inherit;
+  line-height: inherit;
+  background: none;
+  border: none;
+  border-radius: var(--rozie-command-palette-breadcrumb-jump-radius, 0.25rem);
+  cursor: pointer;
+}
+.rozie-command-palette-breadcrumb-segment--link[data-rozie-s-768cad96]:hover {
+  color: var(--rozie-command-palette-breadcrumb-jump-hover-color, var(--rozie-command-palette-breadcrumb-current-color, inherit));
+  text-decoration: var(--rozie-command-palette-breadcrumb-jump-hover-decoration, underline);
+}
+.rozie-command-palette-breadcrumb-separator[data-rozie-s-768cad96] {
+  color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
+}
+.rozie-command-palette-input[data-rozie-s-768cad96] {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--rozie-command-palette-input-padding, 0.5rem 0.75rem);
+  font: inherit;
+  font-size: var(--rozie-command-palette-input-font-size, 1.05rem);
+  color: inherit;
+  background: var(--rozie-command-palette-input-bg, transparent);
+  border: var(--rozie-command-palette-input-border, none);
+  border-radius: var(--rozie-command-palette-input-radius, 0.5rem);
+  outline: none;
+}
+.rozie-command-palette-list[data-rozie-s-768cad96] {
+  margin: 0;
+  padding: var(--rozie-command-palette-list-padding, 0.5rem);
+  list-style: none;
+  overflow-y: auto;
+}
+.rozie-command-palette-option-anchor[data-rozie-s-768cad96] {
+  display: contents;
+}
+.rozie-command-palette-option[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-option-gap, 0.75rem);
+}
+.rozie-command-palette-option-main[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-option-gap, 0.75rem);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rozie-command-palette-option-icon[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-icon-color, inherit);
+  font-size: var(--rozie-command-palette-icon-size, 1rem);
+}
+.rozie-command-palette-option-actions[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--rozie-command-palette-actions-gap, 0.375rem);
+  color: var(--rozie-command-palette-actions-color, rgba(0, 0, 0, 0.55));
+  font-size: var(--rozie-command-palette-actions-font-size, 0.75rem);
+  cursor: pointer;
+  border-radius: var(--rozie-command-palette-actions-radius, 0.25rem);
+}
+.rozie-command-palette-option-actions[data-rozie-s-768cad96]:hover {
+  color: var(--rozie-command-palette-actions-hover-color, rgba(0, 0, 0, 0.85));
+  background: var(--rozie-command-palette-actions-hover-bg, rgba(0, 0, 0, 0.06));
+}
+.rozie-command-palette-option-actions-hint[data-rozie-s-768cad96] {
+  padding: var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem);
+  font-size: var(--rozie-command-palette-actions-hint-font-size, 0.6875rem);
+  color: var(--rozie-command-palette-actions-hint-color, inherit);
+  background: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
+  border-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+}
+.rozie-command-palette-option-hotkey[data-rozie-s-768cad96] {
+  flex: 0 0 auto;
+  padding: var(--rozie-command-palette-hotkey-padding, var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem));
+  font-size: var(--rozie-command-palette-hotkey-font-size, var(--rozie-command-palette-actions-hint-font-size, 0.6875rem));
+  color: var(--rozie-command-palette-hotkey-color, var(--rozie-command-palette-actions-hint-color, inherit));
+  background: var(--rozie-command-palette-hotkey-bg, var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06)));
+  border-radius: var(--rozie-command-palette-hotkey-radius, var(--rozie-command-palette-actions-hint-radius, 0.25rem));
+}
+.rozie-command-palette-actions-menu[data-rozie-s-768cad96] {
+  position: absolute;
+  right: var(--rozie-command-palette-action-right, 0.5rem);
+  z-index: var(--rozie-command-palette-action-z, 10);
+  min-width: var(--rozie-command-palette-action-min-width, 10rem);
+  max-width: var(--rozie-command-palette-action-max-width, 16rem);
+  padding: var(--rozie-command-palette-action-padding, 0.25rem);
+  background: var(--rozie-command-palette-action-bg, #fff);
+  border: var(--rozie-command-palette-action-border, 1px solid rgba(0, 0, 0, 0.1));
+  border-radius: var(--rozie-command-palette-action-radius, 0.5rem);
+  box-shadow: var(--rozie-command-palette-action-shadow, 0 6px 24px rgba(0, 0, 0, 0.25));
+}
+.rozie-command-palette-actions-menu-item[data-rozie-s-768cad96] {
+  display: flex;
+  align-items: center;
+  gap: var(--rozie-command-palette-action-gap, 0.5rem);
+  padding: var(--rozie-command-palette-action-item-padding, 0.375rem 0.5rem);
+  border-radius: var(--rozie-command-palette-action-item-radius, 0.375rem);
+  cursor: pointer;
+  outline: none;
+}
+.rozie-command-palette-actions-menu-item--active[data-rozie-s-768cad96],
+.rozie-command-palette-actions-menu-item[data-rozie-s-768cad96]:focus {
+  background: var(--rozie-command-palette-action-active-bg, rgba(0, 0, 0, 0.08));
+}
+.rozie-command-palette-actions-menu-item--disabled[data-rozie-s-768cad96] {
+  opacity: var(--rozie-command-palette-action-disabled-opacity, 0.5);
+  cursor: default;
+}
+.rozie-command-palette-actions-menu-item-icon[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-action-icon-color, inherit);
+}
+.rozie-command-palette-actions-menu-item-label[data-rozie-s-768cad96] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rozie-command-palette-actions-menu-item-shortcut[data-rozie-s-768cad96] {
+  flex: 0 0 auto;
+  font-size: var(--rozie-command-palette-action-shortcut-font-size, 0.75rem);
+  color: var(--rozie-command-palette-action-shortcut-color, rgba(0, 0, 0, 0.5));
+}
+.rozie-command-palette-option-trailing[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--rozie-command-palette-trailing-color, rgba(0, 0, 0, 0.5));
+  font-size: var(--rozie-command-palette-trailing-font-size, 0.75rem);
+}
+.rozie-command-palette-option-group[data-rozie-s-768cad96] {
+  font-size: var(--rozie-command-palette-group-font-size, 0.75rem);
+  color: var(--rozie-command-palette-group-color, rgba(0, 0, 0, 0.5));
+  text-transform: var(--rozie-command-palette-group-transform, uppercase);
+  letter-spacing: 0.04em;
+}
+.rozie-command-palette-option-label-match[data-rozie-s-768cad96] {
+  font-weight: var(--rozie-command-palette-match-weight, 600);
+  color: var(--rozie-command-palette-match-color, inherit);
+}
+.rozie-command-palette-empty[data-rozie-s-768cad96] {
+  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  text-align: center;
+  color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
+}
+.rozie-command-palette-loading[data-rozie-s-768cad96] {
+  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  text-align: center;
+  color: var(--rozie-command-palette-loading-color, rgba(0, 0, 0, 0.5));
+}
+.rozie-command-palette-error[data-rozie-s-768cad96] {
+  padding: var(--rozie-command-palette-empty-padding, 1.5rem);
+  text-align: center;
+  color: var(--rozie-command-palette-error-color, #c0392b);
+}
+.rozie-command-palette-footer[data-rozie-s-768cad96] {
+  padding: var(--rozie-command-palette-footer-padding, 0.5rem 0.75rem);
+  border-top: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+  font-size: var(--rozie-command-palette-footer-font-size, 0.8125rem);
+  color: var(--rozie-command-palette-footer-color, rgba(0, 0, 0, 0.55));
+}
+`);

@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
 import { For, Show, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 import Combobox, { type ComboboxHandle } from '@rozie-ui/combobox-solid';
@@ -382,6 +383,12 @@ interface CommandPaletteProps {
    * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). `groupCap` composes with per-row `actions`: the ⌘K/Right-arrow row action menu always anchors to the exact highlighted VISIBLE row (cap-aware, order-independent), and firing it on a '+N more' row is a no-op.
    */
   groupCap?: number;
+  /**
+   * Where the overlay portals to, escaping an ancestor `overflow:hidden`/`transform`/`filter`/`contain` that would otherwise clip a `position:fixed` overlay (e.g. an embedding iframe/app-shell with its own layout chrome). `false`/absent (default) renders in place — byte-behavior-identical to every existing consumer, zero churn. `true` or `'body'` portals to `document.body`. A CSS selector string portals to the first element that selector matches. An `Element` reference portals to that element directly. SSR-safe: falls back to in-place when `document` is unavailable. Token-placement note: theming custom properties (`--rozie-command-palette-*`) must be set on `:root` (or the `appendTo` container itself) to reach a portalled overlay — a host-scoped token does not cross the portal on any target.
+   * @example
+   * <CommandPalette append-to="body" :items="commands" />
+   */
+  appendTo?: boolean | string;
   onNavigate?: (...args: unknown[]) => void;
   onBack?: (...args: unknown[]) => void;
   onSelect?: (...args: unknown[]) => void;
@@ -411,8 +418,8 @@ export interface CommandPaletteHandle {
 }
 
 export default function CommandPalette(_props: CommandPaletteProps): JSX.Element {
-  const _merged = mergeProps({ score: null, items: (() => [])() as any[], defaultItems: (() => [])() as any[], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0 }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'query', 'score', 'items', 'defaultItems', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase', 'searchDebounce', 'actionKey', 'closeOnAction', 'groupCap', 'ref']);
+  const _merged = mergeProps({ score: null, items: (() => [])() as any[], defaultItems: (() => [])() as any[], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0, appendTo: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['open', 'query', 'score', 'items', 'defaultItems', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase', 'searchDebounce', 'actionKey', 'closeOnAction', 'groupCap', 'appendTo', 'ref']);
   onMount(() => { local.ref?.({ show, close, toggle, focus, goBack, openTo }); });
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
@@ -462,6 +469,27 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // depth on React/Solid/Lit).
   let requestToken = 0;
   let debounceTimerId: any = null;
+
+  // command-palette-portal-overlay phase — resolveAppendTo(): normalizes the
+  // `appendTo` prop into a portal container (or `null` = render in place). A
+  // PLAIN function (never $computed — this is read from inside `r-portal`'s
+  // container expression, a runtime/reactive-effect position on every target,
+  // not a template-bare-read derived value). SSR-guarded FIRST so a falsy `to`
+  // or a missing `document` never reaches `document.querySelector` — `null`
+  // feeds `r-portal`'s falsy/disabled path, which is what makes
+  // `appendTo:false` (the default) byte-behavior-identical to no directive at
+  // all. `to === true || to === 'body'` -> `document.body`; a CSS selector
+  // string -> `document.querySelector(to)` (no match = `null`, in place — never
+  // a blank overlay); anything else (e.g. an author-passed Element reference,
+  // outside the declared Boolean|String prop type but tolerated at runtime) is
+  // returned as-is.
+  function resolveAppendTo(to: any) {
+    if (!to) return null;
+    if (typeof document === 'undefined') return null;
+    if (to === true || to === 'body') return document.body;
+    if (typeof to === 'string') return document.querySelector(to);
+    return to;
+  }
 
   // ---- level-stack derived views (plain functions, uniform ×6) -----------
   // currentItems(): the ACTIVE level's items fed to the vendored <Combobox>.
@@ -1426,7 +1454,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
 
   return (
     <>
-    {<Show when={open()}><div class={"rozie-command-palette"} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
+    {<Show when={open()}><Show when={(typeof document === 'undefined' ? null : (resolveAppendTo(local.appendTo)))} fallback={<div class={"rozie-command-palette"} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
       
       <div data-testid="command-palette-frame" ref={(el) => { frameRef = el as HTMLElement; }} class={"rozie-command-palette-frame"} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
       <div ref={(el) => { panelRef = el as HTMLElement; }} class={"rozie-command-palette-panel"} role="dialog" aria-modal="true" aria-label={local.ariaLabel} data-rozie-s-768cad96="">
@@ -1473,6 +1501,53 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
           {(_props.actionItemSlot ?? _props.slots?.['actionItem'])?.({ action: action(), item: actionAnchor() ? actionAnchor().item : null, active: ai() === actionIndex(), disabled: !!action().disabled }) ?? <>{<Show when={actionIcon(action())}><span class={"rozie-command-palette-actions-menu-item-icon"} data-rozie-s-768cad96="">{rozieDisplay(actionIcon(action()))}</span></Show>}<span class={"rozie-command-palette-actions-menu-item-label"} data-rozie-s-768cad96="">{rozieDisplay(actionLabel(action()))}</span>{<Show when={actionShortcut(action())}><span class={"rozie-command-palette-actions-menu-item-shortcut"} data-rozie-s-768cad96="">{rozieDisplay(actionShortcut(action()))}</span></Show>}</>}
         </div>}</Key>
       </div></Show>}</div>
-    </div></Show>}</>
+    </div>}><Portal mount={(typeof document === 'undefined' ? null : (resolveAppendTo(local.appendTo)))}><div class={"rozie-command-palette"} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onBackdropClick($event); }} data-rozie-s-768cad96="">
+      
+      <div data-testid="command-palette-frame" ref={(el) => { frameRef = el as HTMLElement; }} class={"rozie-command-palette-frame"} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onPanelKeydown($event); }} data-rozie-s-768cad96="">
+      <div ref={(el) => { panelRef = el as HTMLElement; }} class={"rozie-command-palette-panel"} role="dialog" aria-modal="true" aria-label={local.ariaLabel} data-rozie-s-768cad96="">
+        
+        {<Show when={atDepth()}><div class={"rozie-command-palette-header"} data-rozie-s-768cad96="">
+          {(_props.breadcrumbSlot ?? _props.slots?.['breadcrumb'])?.({ stack: breadcrumbStack(), back: goBack }) ?? <><button type="button" aria-label="Back" data-testid="command-palette-back" class={"rozie-command-palette-back"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { goBack(); }} data-rozie-s-768cad96="">‹</button><nav class={"rozie-command-palette-breadcrumb-trail"} data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb" data-rozie-s-768cad96="">
+              <For each={breadcrumbStack()}>{(entry, ei) => <span class={"rozie-command-palette-breadcrumb-item"} data-rozie-s-768cad96="">
+                {<Show when={Number(ei()) > 0}><span class={"rozie-command-palette-breadcrumb-separator"} aria-hidden="true" data-rozie-s-768cad96="">›</span></Show>}{<Show when={Number(ei()) < breadcrumbStack().length - 1} fallback={<span class={"rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current"} data-testid="command-palette-title" data-rozie-s-768cad96="">{rozieDisplay(entry.title)}</span>}><button type="button" aria-label={rozieAttr('Back to ' + entry.title)} data-testid="command-palette-breadcrumb-jump" class={"rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { jumpToLevel(Number(ei())); }} data-rozie-s-768cad96="">{rozieDisplay(entry.title)}</button></Show>}</span>}</For>
+            </nav></>}
+        </div></Show>}<Combobox aria-label={local.ariaLabel} ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={local.groupCap} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
+            <span class={"rozie-command-palette-option-anchor"} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96="">
+            {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query()) }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
+                {<Show when={(_props.iconSlot ?? _props.slots?.['icon'])}><span class={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
+                  {(_props.iconSlot ?? _props.slots?.['icon'])?.({ option })}
+                </span></Show>}<span class={"rozie-command-palette-option-main"} data-rozie-s-768cad96="">
+                  <span class={"rozie-command-palette-option-label"} data-rozie-s-768cad96="">
+                    <For each={labelSegments(option)}>{(segment, si) => <span class={rozieClass({ 'rozie-command-palette-option-label-match': segment.match })} data-rozie-s-768cad96="">{rozieDisplay(segment.text)}</span>}</For>
+                  </span>
+                  {<Show when={groupText(option) && !grouped()}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</span>
+                
+                {<Show when={hotKeyOf(option)}><span class={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), isApplePlatform()))}</span></Show>}{<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
+                  {(_props.actionsSlot ?? _props.slots?.['actions'])?.({ option, actions: actionsList(option) }) ?? <Show when={actionsList(option).length > 0}><span class={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span></Show>}
+                </span></Show>}{<Show when={(_props.trailingSlot ?? _props.slots?.['trailing'])}><span class={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
+                  {(_props.trailingSlot ?? _props.slots?.['trailing'])?.({ option })}
+                </span></Show>}</div>}
+            </span>
+          </>)} groupHeadingSlot={({ group }) => (<>
+            {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ group }) ?? rozieDisplay(groupLabel(group))}
+          </>)} emptySlot={({ query }) => (<>
+            {<Show when={currentStatus() === 'ready'}>{(_props.emptySlot ?? _props.slots?.['empty'])?.({ query }) ?? local.emptyText}</Show>}</>)} />
+
+        
+        {<Show when={currentStatus() === 'loading'} fallback={<Show when={currentStatus() === 'error'}><div class={"rozie-command-palette-error"} data-rozie-s-768cad96="">
+          {(_props.errorSlot ?? _props.slots?.['error'])?.({ query: query(), error: currentError(), retry: retryCurrentLevel })}
+        </div></Show>}><div class={"rozie-command-palette-loading"} data-rozie-s-768cad96="">
+          {(_props.loadingSlot ?? _props.slots?.['loading'])?.({ query: query() }) ?? "Loading…"}
+        </div></Show>}{<Show when={(_props.footerSlot ?? _props.slots?.['footer'])}><div class={"rozie-command-palette-footer"} data-rozie-s-768cad96="">
+          {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}
+        </div></Show>}</div>
+
+      
+      {<Show when={atActions()}><div data-command-palette-menu="" data-testid="command-palette-actions-menu" role="menu" aria-label={rozieAttr(actionAnchor() ? actionAnchor().label : null)} class={"rozie-command-palette-actions-menu"} style={parseInlineStyle('top:' + actionMenuTop() + 'px')} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96="">
+        <Key each={(actionAnchor() ? actionAnchor().actions : []) as readonly any[]} by={(action) => action.id}>{(action, ai) => <div role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action().disabled} class={"rozie-command-palette-actions-menu-item" + " " + rozieClass({ 'rozie-command-palette-actions-menu-item--active': ai() === actionIndex(), 'rozie-command-palette-actions-menu-item--disabled': !!action().disabled })} tabIndex={-1} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setActionIndex(Number(ai())); }} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { $event.preventDefault(); selectAction(action()); }} data-rozie-s-768cad96="">
+          {(_props.actionItemSlot ?? _props.slots?.['actionItem'])?.({ action: action(), item: actionAnchor() ? actionAnchor().item : null, active: ai() === actionIndex(), disabled: !!action().disabled }) ?? <>{<Show when={actionIcon(action())}><span class={"rozie-command-palette-actions-menu-item-icon"} data-rozie-s-768cad96="">{rozieDisplay(actionIcon(action()))}</span></Show>}<span class={"rozie-command-palette-actions-menu-item-label"} data-rozie-s-768cad96="">{rozieDisplay(actionLabel(action()))}</span>{<Show when={actionShortcut(action())}><span class={"rozie-command-palette-actions-menu-item-shortcut"} data-rozie-s-768cad96="">{rozieDisplay(actionShortcut(action()))}</span></Show>}</>}
+        </div>}</Key>
+      </div></Show>}</div>
+    </div></Portal></Show></Show>}</>
   );
 }

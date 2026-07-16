@@ -14,10 +14,27 @@
   Angular ControlValueAccessor (a palette is not a single form control) — that is
   the intended shape, not a regression.
 
-  OVERLAY: the overlay renders inline (a fixed full-viewport backdrop + a centered
-  `role="dialog"` panel) gated by `r-if="$props.open"`, NOT the native <dialog>
-  element. This sidesteps the emitter's missing `dialog` ref-type-map case (the
-  dialog family works around the same gap) and keeps the surface framework-owned.
+  OVERLAY (rewritten command-palette-portal-overlay phase — this comment was
+  STALE, citing a ref-type-map gap that was fixed in Phase 73 and no longer
+  the actual reason): the overlay renders inline (a fixed full-viewport
+  backdrop + a centered `role="dialog"` panel) gated by `r-if="$props.open"`,
+  NOT the native `<dialog>` element. The ACTUAL rationale: `<dialog>.showModal()`
+  imports a native focus-trap + native Escape handling that would fight the
+  levels custom-Escape funnel (`resolveEscape` — Escape pops one level, only
+  closes at root) and combobox's own focus management. Decided 2026-07-14,
+  recorded in `project_command_palette_030_roadmap`.
+  PORTAL (command-palette-portal-overlay phase): the overlay root additionally
+  carries `r-portal="resolveAppendTo($props.appendTo)"` — `appendTo` defaults
+  to `false` (render in place, zero churn for existing consumers); `true` /
+  `'body'` / a CSS selector / an Element escapes an ancestor whose
+  `overflow`/`transform`/`filter`/`contain` would otherwise clip the
+  `position: fixed` overlay (the real embedding bug this phase fixes). The
+  mount model stays open-driven (mounts/unmounts WITH `open`, not P33
+  mount-once) — appropriate for an inherently open-gated overlay. Every DOM
+  read below is rooted at `$refs.panel`/`$refs.frame` (never `$el`), so the
+  moved node's ref identity survives the teleport — the levels Escape funnel,
+  combobox focus, and the action-menu arbitration all keep working THROUGH
+  the portal with no logic changes.
 
   COMPOSITION (Phase 999.4): the search input + navigable results list + empty
   state are NO LONGER hand-rolled here — they are delegated to the shipped
@@ -247,6 +264,20 @@
         "Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). `groupCap` composes with per-row `actions`: the ⌘K/Right-arrow row action menu always anchors to the exact highlighted VISIBLE row (cap-aware, order-independent), and firing it on a '+N more' row is a no-op.",
     },
   },
+
+  // command-palette-portal-overlay phase — element-portal target for the
+  // overlay root (default false = render in place, today's behavior, ZERO
+  // churn for existing consumers). See `resolveAppendTo()` below for the
+  // full value-grammar resolution.
+  appendTo: {
+    type: [Boolean, String],
+    default: false,
+    docs: {
+      description:
+        'Where the overlay portals to, escaping an ancestor `overflow:hidden`/`transform`/`filter`/`contain` that would otherwise clip a `position:fixed` overlay (e.g. an embedding iframe/app-shell with its own layout chrome). `false`/absent (default) renders in place — byte-behavior-identical to every existing consumer, zero churn. `true` or `\'body\'` portals to `document.body`. A CSS selector string portals to the first element that selector matches. An `Element` reference portals to that element directly. SSR-safe: falls back to in-place when `document` is unavailable. Token-placement note: theming custom properties (`--rozie-command-palette-*`) must be set on `:root` (or the `appendTo` container itself) to reach a portalled overlay — a host-scoped token does not cross the portal on any target.',
+      example: "<CommandPalette append-to=\"body\" :items=\"commands\" />",
+    },
+  },
 }
 </props>
 
@@ -309,6 +340,27 @@ import { formatKeyToken } from './internal/formatKeyToken'
 // depth on React/Solid/Lit).
 let requestToken = 0
 let debounceTimerId = null
+
+// command-palette-portal-overlay phase — resolveAppendTo(): normalizes the
+// `appendTo` prop into a portal container (or `null` = render in place). A
+// PLAIN function (never $computed — this is read from inside `r-portal`'s
+// container expression, a runtime/reactive-effect position on every target,
+// not a template-bare-read derived value). SSR-guarded FIRST so a falsy `to`
+// or a missing `document` never reaches `document.querySelector` — `null`
+// feeds `r-portal`'s falsy/disabled path, which is what makes
+// `appendTo:false` (the default) byte-behavior-identical to no directive at
+// all. `to === true || to === 'body'` -> `document.body`; a CSS selector
+// string -> `document.querySelector(to)` (no match = `null`, in place — never
+// a blank overlay); anything else (e.g. an author-passed Element reference,
+// outside the declared Boolean|String prop type but tolerated at runtime) is
+// returned as-is.
+const resolveAppendTo = (to) => {
+  if (!to) return null
+  if (typeof document === 'undefined') return null
+  if (to === true || to === 'body') return document.body
+  if (typeof to === 'string') return document.querySelector(to)
+  return to
+}
 
 // ---- level-stack derived views (plain functions, uniform ×6) -----------
 // currentItems(): the ACTIVE level's items fed to the vendored <Combobox>.
@@ -1254,6 +1306,7 @@ $expose({ show, close, toggle, focus, goBack, openTo })
 <template>
 <div
   r-if="$props.open"
+  r-portal="resolveAppendTo($props.appendTo)"
   class="rozie-command-palette"
   @click="onBackdropClick($event)"
 >

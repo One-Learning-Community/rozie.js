@@ -18,6 +18,27 @@ The full prop surface. The two `model: true` slices (`open` and `query`, the **T
 | `open` | `boolean` | Whether the overlay is shown. Written back `false` on every close path (backdrop click, Escape at the root, a `closeOnSelect` selection, or `close()`/`toggle()`). |
 | `query` | `string` | The current LEVEL's search text. Written back as the user types; cleared to `""` on open AND whenever a nested level is pushed. Popping a level restores the parent level's query (both the model and the visible input text) — back is a full undo. |
 
+## Escaping a clipped ancestor (`appendTo`)
+
+By default the overlay renders **in place** — inline, wherever `<CommandPalette>` is mounted in your component tree (`appendTo: false`/absent, today's behavior, byte-identical for every existing consumer). If an ancestor has `overflow: hidden`, `transform`, `filter`, or `contain` set, it creates a clipping context or a new containing block that traps a `position: fixed` overlay — a real embedding bug (an app-shell iframe or a designer-chrome wrapper with its own layout is the common case).
+
+Set `appendTo` to escape it:
+
+| `appendTo` value | Behavior |
+| --- | --- |
+| `false` / absent (default) | Render in place — zero change from today. |
+| `true` or `'body'` | Portal to `document.body`. |
+| a CSS selector string | Portal to the first element that selector matches. |
+| an `Element` reference | Portal to that element directly. |
+
+```rozie
+<CommandPalette append-to="body" :items="commands" r-model:open="open" />
+```
+
+The portal is implemented via the compiler's `r-portal` element directive — see the [compiler feature guide](/guide/features#r-portal-container-expr-teleport-an-element-s-own-subtree) for the per-target native-construct table (React `createPortal`, Vue `<Teleport>`, Solid `<Portal>`, a Svelte action, an AOT-safe Angular effect, a Lit `ReactiveController`). Everything else about the palette works unchanged through the portal: the levels Escape funnel, combobox's own focus management, and the row-action-menu arbitration are all rooted at `$refs.panel`/`$refs.frame` (never `$el`), so a moved node's ref identity survives the relocation.
+
+**Theming tokens** (`--rozie-command-palette-*`) must be set on `:root` — or on the `appendTo` container itself — to reach a portalled overlay. A token set on a host-scoped ancestor (e.g. a `:host { }` rule, or a class on an ancestor that is no longer in the overlay's DOM path once portalled) does **not** cross the portal on any target.
+
 ## Nested levels
 
 Selecting an item that carries `children` (a static array) or `source` (a `(query) => items | Promise<items>` function) **pushes** a child level instead of firing `select` — presence of either field is the navigation signal, no separate flag. A `source` may return a `Promise`; the level enters `loading` until it settles, and only the LATEST in-flight request's result is applied (stale resolutions are dropped). `searchDebounce` (default ~150ms) debounces an async level's keystroke refetch only — a `children` level re-ranks locally with no debounce.

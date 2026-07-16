@@ -1,6 +1,6 @@
 <template>
 
-<div v-if="open" class="rozie-command-palette" @click="onBackdropClick($event)">
+<Teleport :to="resolveAppendTo(props.appendTo)" :disabled="!(resolveAppendTo(props.appendTo))"><div v-if="open" class="rozie-command-palette" @click="onBackdropClick($event)">
   
   <div ref="frameRef" class="rozie-command-palette-frame" data-testid="command-palette-frame" @keydown="onPanelKeydown($event)">
   <div ref="panelRef" class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="props.ariaLabel">
@@ -55,7 +55,7 @@
         <span v-if="actionShortcut(action)" class="rozie-command-palette-actions-menu-item-shortcut">{{ actionShortcut(action) }}</span></slot>
     </div>
   </div></div>
-</div>
+</div></Teleport>
 </template>
 
 <script setup lang="ts">
@@ -121,8 +121,14 @@ const props = withDefaults(
      * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). `groupCap` composes with per-row `actions`: the ⌘K/Right-arrow row action menu always anchors to the exact highlighted VISIBLE row (cap-aware, order-independent), and firing it on a '+N more' row is a no-op.
      */
     groupCap?: number;
+    /**
+     * Where the overlay portals to, escaping an ancestor `overflow:hidden`/`transform`/`filter`/`contain` that would otherwise clip a `position:fixed` overlay (e.g. an embedding iframe/app-shell with its own layout chrome). `false`/absent (default) renders in place — byte-behavior-identical to every existing consumer, zero churn. `true` or `'body'` portals to `document.body`. A CSS selector string portals to the first element that selector matches. An `Element` reference portals to that element directly. SSR-safe: falls back to in-place when `document` is unavailable. Token-placement note: theming custom properties (`--rozie-command-palette-*`) must be set on `:root` (or the `appendTo` container itself) to reach a portalled overlay — a host-scoped token does not cross the portal on any target.
+     * @example
+     * <CommandPalette append-to="body" :items="commands" />
+     */
+    appendTo?: boolean | string;
   }>(),
-  { score: null, items: () => [], defaultItems: () => [], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0 }
+  { score: null, items: () => [], defaultItems: () => [], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0, appendTo: false }
 );
 
 /**
@@ -187,6 +193,26 @@ import { formatKeyToken } from './internal/formatKeyToken';
 // depth on React/Solid/Lit).
 let requestToken = 0;
 let debounceTimerId: any = null;
+// command-palette-portal-overlay phase — resolveAppendTo(): normalizes the
+// `appendTo` prop into a portal container (or `null` = render in place). A
+// PLAIN function (never $computed — this is read from inside `r-portal`'s
+// container expression, a runtime/reactive-effect position on every target,
+// not a template-bare-read derived value). SSR-guarded FIRST so a falsy `to`
+// or a missing `document` never reaches `document.querySelector` — `null`
+// feeds `r-portal`'s falsy/disabled path, which is what makes
+// `appendTo:false` (the default) byte-behavior-identical to no directive at
+// all. `to === true || to === 'body'` -> `document.body`; a CSS selector
+// string -> `document.querySelector(to)` (no match = `null`, in place — never
+// a blank overlay); anything else (e.g. an author-passed Element reference,
+// outside the declared Boolean|String prop type but tolerated at runtime) is
+// returned as-is.
+const resolveAppendTo = (to: any) => {
+  if (!to) return null;
+  if (typeof document === 'undefined') return null;
+  if (to === true || to === 'body') return document.body;
+  if (typeof to === 'string') return document.querySelector(to);
+  return to;
+};
 // ---- level-stack derived views (plain functions, uniform ×6) -----------
 // currentItems(): the ACTIVE level's items fed to the vendored <Combobox>.
 // While the active level is 'loading' or 'error' this returns [] so combobox's

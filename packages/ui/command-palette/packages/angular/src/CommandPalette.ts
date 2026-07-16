@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, TemplateRef, ViewEncapsulation, effect, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 
 import { Combobox } from '@rozie-ui/combobox-angular';
@@ -113,7 +113,7 @@ function __rozieAttr(v: unknown): string | null {
   template: `
 
     @if (open()) {
-    <div class="rozie-command-palette" (click)="onBackdropClick($event)">
+    <div class="rozie-command-palette" (click)="onBackdropClick($event)" #roziePortal_0>
       
       <div #frame class="rozie-command-palette-frame" data-testid="command-palette-frame" (keydown)="onPanelKeydown($event)">
       <div #panel class="rozie-command-palette-panel" role="dialog" aria-modal="true" [attr.aria-label]="ariaLabel()">
@@ -584,6 +584,12 @@ export class CommandPalette {
    * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). `groupCap` composes with per-row `actions`: the ⌘K/Right-arrow row action menu always anchors to the exact highlighted VISIBLE row (cap-aware, order-independent), and firing it on a '+N more' row is a no-op.
    */
   groupCap = input<number>(0);
+  /**
+   * Where the overlay portals to, escaping an ancestor `overflow:hidden`/`transform`/`filter`/`contain` that would otherwise clip a `position:fixed` overlay (e.g. an embedding iframe/app-shell with its own layout chrome). `false`/absent (default) renders in place — byte-behavior-identical to every existing consumer, zero churn. `true` or `'body'` portals to `document.body`. A CSS selector string portals to the first element that selector matches. An `Element` reference portals to that element directly. SSR-safe: falls back to in-place when `document` is unavailable. Token-placement note: theming custom properties (`--rozie-command-palette-*`) must be set on `:root` (or the `appendTo` container itself) to reach a portalled overlay — a host-scoped token does not cross the portal on any target.
+   * @example
+   * <CommandPalette append-to="body" :items="commands" />
+   */
+  appendTo = input<boolean | string>(false);
   activeValue = signal<any>(null);
   levelStack = signal<any[]>([]);
   activeSurface = signal('list');
@@ -639,6 +645,13 @@ export class CommandPalette {
 
   requestToken = 0;
   debounceTimerId: any = null;
+  resolveAppendTo = (to: any) => {
+    if (!to) return null;
+    if (typeof document === 'undefined') return null;
+    if (to === true || to === 'body') return document.body;
+    if (typeof to === 'string') return document.querySelector(to);
+    return to;
+  };
   currentItems = () => {
     const frame = currentFrame(this.levelStack());
     if (frame) {
@@ -1166,6 +1179,51 @@ export class CommandPalette {
   ): _ctx is BreadcrumbCtx | OptionCtx | GroupHeadingCtx | EmptyCtx | LoadingCtx | ErrorCtx | FooterCtx | ActionItemCtx | IconCtx | ActionsCtx | TrailingCtx {
     return true;
   }
+
+  private __rozieDestroyRef = inject(DestroyRef);
+
+  private roziePortal_0 = viewChild<ElementRef>('roziePortal_0');
+
+  private __roziePortalAnchors = new WeakMap<Element, { parent: Node | null; next: Node | null }>();
+
+  private __roziePortalMoved = new Set<Element>();
+
+  private __roziePortalPlace(el: Element, target: Element | null | undefined): void {
+    let anchor = this.__roziePortalAnchors.get(el);
+    if (!anchor) {
+      anchor = { parent: el.parentNode, next: el.nextSibling };
+      this.__roziePortalAnchors.set(el, anchor);
+    }
+    if (target) {
+      target.appendChild(el);
+      this.__roziePortalMoved.add(el);
+      return;
+    }
+    this.__roziePortalMoved.delete(el);
+    if (anchor.parent) {
+      if (anchor.next && anchor.next.parentNode === anchor.parent) {
+        anchor.parent.insertBefore(el, anchor.next);
+      } else {
+        anchor.parent.appendChild(el);
+      }
+    }
+  }
+
+  private __roziePortal_0_destroyRegistered = false;
+
+  private __roziePortal_0_effect = effect(() => {
+    const el = this.roziePortal_0()?.nativeElement;
+    if (!el) return;
+    this.__roziePortalPlace(el, this.resolveAppendTo(this.appendTo()));
+    if (!this.__roziePortal_0_destroyRegistered) {
+      this.__roziePortal_0_destroyRegistered = true;
+      this.__rozieDestroyRef.onDestroy(() => {
+        for (const moved of this.__roziePortalMoved) {
+          moved.parentNode?.removeChild(moved);
+        }
+      });
+    }
+  });
 
   protected get __attr_aria_label() {
       const __actionAnchor = this.actionAnchor();
