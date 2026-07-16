@@ -1,0 +1,101 @@
+<!--
+  SortableListInteractiveDemo.rozie — RED-first fixture for the SortableList
+  slotted-interactive-child keyboard hijack (quick 260716-ggq).
+
+  The row-level `@keydown="onRowKeyDown($event, index)"` handler on
+  SortableList.rozie ran unconditionally on ANY keydown that reached the row —
+  including one that BUBBLED UP from an interactive element (an `<input>`,
+  `<button>`, etc.) rendered into the row's default slot. Because Space/Enter
+  both call `preventDefault()` inside `onRowKeyDown`, typing a space into a
+  slotted `<input>` never reached the input's own value — the row hijacked it
+  for lift/drop instead.
+
+  This demo renders a plain uncontrolled `<input class="row-input"
+  data-testid="row-input">` inside each row's default slot alongside a visible
+  label span. `sortable-interactive-child.spec.ts` types into the FIRST row's
+  input and asserts:
+    (1) the keystroke lands in the input's own value (not swallowed),
+    (2) no lift occurred (aria-live stays silent, no `-lifted` class applied),
+    (3) reorder keys still work when the ROW ITSELF (not the input) is
+        focused — the sanity check that the origin-guard fix does not disable
+        keyboard reordering outright.
+
+  Default keyboard reordering stays ON (no :disabled / :disableKeyboard) so
+  rows keep `tabindex="0"` and the row-focus sanity path (3) stays exercisable.
+-->
+
+<rozie name="SortableListInteractiveDemo">
+
+<components>
+{
+  SortableList: '../../packages/ui/sortable-list/src/SortableList.rozie',
+}
+</components>
+
+<data>
+{
+  items: [],
+}
+</data>
+
+<script>
+const SEED = () => [
+  { id: 'a', label: 'Apple' },
+  { id: 'b', label: 'Banana' },
+  { id: 'c', label: 'Cherry' },
+]
+
+$onMount(() => {
+  $data.items = SEED()
+})
+</script>
+
+<template>
+<div class="interactive-demo">
+  <h4>Slotted interactive child (input) inside a sortable row</h4>
+  <SortableList r-model:items="$data.items" itemKey="id">
+    <template #default="{ item }">
+      <span class="row">
+        <span class="label">{{ item.label }}</span>
+        <input class="row-input" data-testid="row-input" placeholder="type here" />
+      </span>
+    </template>
+  </SortableList>
+</div>
+</template>
+
+<style>
+.interactive-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 420px;
+}
+.interactive-demo h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  margin: 0.25rem 0;
+}
+.row-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  font: inherit;
+}
+</style>
+
+</rozie>

@@ -125,6 +125,11 @@ export const EXAMPLES = [
   // but NOT a screenshot cell — deliberately NOT in matrix.spec.ts EXAMPLES
   // (behavioral-only; no pixel baseline).
   'SortableListKeying',
+  // Quick 260716-ggq — SortableListInteractive is the BEHAVIORAL-only
+  // slotted-interactive-child fixture (loader → examples/demos/
+  // SortableListInteractiveDemo.rozie, which imports ../../packages/ui/
+  // sortable-list/src/SortableList.rozie). NOT a screenshot cell.
+  'SortableListInteractive',
   'Flatpickr',
   'LeafletMap',
   'TipTap',
@@ -1130,6 +1135,7 @@ export const LIT_TAGS: Record<Example, string> = {
   // Quick 260620-o6a — the lit entry appends '-demo' → tag
   // 'rozie-sortable-list-keying-demo' = kebab of SortableListKeyingDemo.
   SortableListKeying: 'rozie-sortable-list-keying',
+  SortableListInteractive: 'rozie-sortable-list-interactive',
   Flatpickr: 'rozie-flatpickr',
   LeafletMap: 'rozie-leaflet-map',
   TipTap: 'rozie-tip-tap',
@@ -1518,6 +1524,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Quick 260620-o6a — SortableListKeying is self-contained: both lists' id-less
   // object arrays live in the demo's <data> (items / fnItems), seeded in $onMount.
   SortableListKeying: {},
+  // Quick 260716-ggq — SortableListInteractive is self-contained: the seeded
+  // 3-item array lives in the demo's <data>, seeded in $onMount.
+  SortableListInteractive: {},
   SortableListShowcase: {},
   Flatpickr: {},
   LeafletMap: {},
