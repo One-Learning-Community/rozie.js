@@ -997,14 +997,15 @@ for (const target of TARGETS) {
 
     // ---- 2. Toggle appendTo → 'body' WHILE THE PALETTE STAYS OPEN — the ----
     //         SAME live overlay node relocates out of the clipping ancestor to
-    //         document.body, escaping the clip entirely (the fix). Toggling
-    //         while open exercises the steady-state relocate (the controller
-    //         moves the EXISTING node); it deliberately avoids a
-    //         close→toggle→reopen cycle, whose r-if node-recreate is an
-    //         unrelated, separately-tracked Lit `@query(cache:true)` limitation
-    //         (see .planning/debug/command-palette-portal-through-portal.md).
-    //         This test's contract is clip-vs-escape, which the live relocate
-    //         proves directly (you SEE the open palette jump out of the clip).
+    //         document.body, escaping the clip entirely (the fix). This test's
+    //         contract is clip-vs-escape, which the live relocate proves
+    //         directly (you SEE the open palette jump out of the clip), so it
+    //         toggles while open by design. (The close→reopen r-if node-recreate
+    //         that the old Lit `@query(cache: true)` binding could not follow is
+    //         now FIXED by the SENTINEL-NODE design — uncached element + sentinel
+    //         queries under `RoziePortalController`; the natural close→remove is
+    //         asserted in the cleanup below and in the runtime-lit controller
+    //         close→reopen unit test.)
     await toggleBtn.click();
     await expect(appendToReadout).toHaveText('body');
     // The relocate is a MOVE (detach + reattach), which blurs the focused input
@@ -1032,6 +1033,23 @@ for (const target of TARGETS) {
     await waitListRefocused(page);
     await page.keyboard.press('Escape');
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+
+    // SEV-1 close-while-portalled zombie fix (SENTINEL-NODE): with
+    // appendTo:'body' the overlay was relocated into document.body's LIGHT DOM;
+    // closing (r-if → false) must REMOVE it. Before the fix, Lit's ChildPart
+    // clear could not reach the moved node and it lingered forever as a
+    // pointer-capturing backdrop. Assert no portalled overlay survives — a
+    // light-DOM `.rozie-command-palette` whose root node is `document` (i.e. NOT
+    // inside any component shadow root, so it is a teleported overlay, not an
+    // in-place shadow render). Uniform across all six targets: every target's
+    // native teleport removes the node on close; Lit is the one this fix
+    // repairs.
+    const zombieOverlays = await page.evaluate(() =>
+      Array.from(document.body.querySelectorAll('.rozie-command-palette')).filter(
+        (el) => el.getRootNode() === document,
+      ).length,
+    );
+    expect(zombieOverlays).toBe(0);
   });
 }
 
