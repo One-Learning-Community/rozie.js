@@ -112,6 +112,48 @@ describe('roziePortal (Svelte 5 action) — command-palette-portal-overlay', () 
     expect(parent.children.indexOf(node)).toBe(parent.children.indexOf(after) - 1);
   });
 
+  // PORTAL cluster Finding 10 (R3) — the Lit move guards, ported.
+  it('update() with the SAME container does NOT re-append the node (position guard)', () => {
+    // A re-append of an already-correctly-parented node is a detach+reattach
+    // (MOVE), which blurs any focused descendant. A steady-state update with
+    // an unchanged container must leave the node physically untouched.
+    const parent = makeNode('parent');
+    const node = makeNode('portalled');
+    const container = makeNode('container');
+    parent.appendChild(node);
+
+    const action = roziePortal(node as unknown as Element, container as unknown as Element);
+    expect(node.parentNode).toBe(container);
+
+    let appends = 0;
+    const orig = container.appendChild.bind(container);
+    container.appendChild = (child: FakeNode) => {
+      appends++;
+      orig(child);
+    };
+
+    action.update(container as unknown as Element); // same container, steady state
+    expect(appends).toBe(0);
+    expect(node.parentNode).toBe(container);
+  });
+
+  it('update() to a truthy container does NOT resurrect a never-moved, disconnected node (resurrect guard)', () => {
+    // The node was never portalled out (initial falsy container); the
+    // surrounding block then removes it (disconnected). A newly-truthy
+    // container must NOT append that node back — doing so resurrects a
+    // block-removed node (mirrors the Lit `!moved && !isConnected` guard).
+    const parent = makeNode('parent');
+    const node = makeNode('portalled');
+    const container = makeNode('container');
+    parent.appendChild(node);
+
+    const action = roziePortal(node as unknown as Element, null);
+    node.isConnected = false; // block-removed
+
+    action.update(container as unknown as Element);
+    expect(container.children).not.toContain(node);
+  });
+
   it('destroy() removes the node from wherever it currently lives', () => {
     const parent = makeNode('parent');
     const node = makeNode('portalled');

@@ -1297,10 +1297,25 @@ function portalPlaceMethodDecl(): string {
     `    this.${ROZIE_PORTAL_ANCHORS_FIELD_NAME}.set(el, anchor);`,
     `  }`,
     `  if (target) {`,
-    `    target.appendChild(el);`,
+    // Finding 10 (R3) — resurrect GUARD (ported from RoziePortalController):
+    // a never-moved, currently-disconnected node was removed by its
+    // structural directive (`@if`) — a newly-truthy target must NOT append
+    // it back (that resurrects a removed node).
+    `    if (!this.${ROZIE_PORTAL_MOVED_FIELD_NAME}.has(el) && !el.isConnected) return;`,
+    // Position GUARD: appendChild of an already-parented node is a MOVE
+    // (detach + reattach), NOT a no-op — it blurs any focused descendant.
+    // The effect re-runs on every signal tick, so re-asserting an already-
+    // correct position must leave the node physically untouched.
+    `    if (el.parentNode !== target) {`,
+    `      target.appendChild(el);`,
+    `    }`,
     `    this.${ROZIE_PORTAL_MOVED_FIELD_NAME}.add(el);`,
     `    return;`,
     `  }`,
+    // Falsy target (render in place). Only restore when we PREVIOUSLY moved
+    // the node out — re-inserting a never-moved node would blur a focused
+    // descendant (mirrors the Lit `if (!this.moved) return;` falsy guard).
+    `  if (!this.${ROZIE_PORTAL_MOVED_FIELD_NAME}.has(el)) return;`,
     `  this.${ROZIE_PORTAL_MOVED_FIELD_NAME}.delete(el);`,
     `  if (anchor.parent) {`,
     `    if (anchor.next && anchor.next.parentNode === anchor.parent) {`,

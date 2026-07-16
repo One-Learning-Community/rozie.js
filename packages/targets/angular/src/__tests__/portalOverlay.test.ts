@@ -60,6 +60,16 @@ describe('emitAngular — PortalOverlay (command-palette-portal-overlay Task 3, 
     expect(code).toMatch(/this\.__roziePortalPlace\(el, this\.resolveTo\(this\.to\(\)\)\);/);
     expect(code).not.toMatch(/this\.__roziePortalPlace\(el, resolveTo\(/);
 
+    // Finding 10 (R3) — the Lit move guards, ported into __roziePortalPlace.
+    // Position guard: an already-parented node must NOT be re-appended (a
+    // re-append is a detach+reattach MOVE that blurs focused descendants).
+    expect(code).toMatch(/if \(el\.parentNode !== target\) \{/);
+    // Resurrect guard: a never-moved, disconnected node (block-removed) must
+    // NOT be appended back into a newly-truthy container.
+    expect(code).toMatch(
+      /if \(!this\.__roziePortalMoved\.has\(el\) && !el\.isConnected\) return;/,
+    );
+
     // AOT bans (memory project_angular_aot_no_import_meta_url /
     // project_angular_aot_no_template_arrow).
     expect(code).not.toMatch(/import\.meta\.url/);

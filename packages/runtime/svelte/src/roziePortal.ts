@@ -52,15 +52,38 @@ export function roziePortal(
   // "disabled" in-place restoration).
   const originalParent = node.parentNode;
   const originalNextSibling = node.nextSibling;
+  // Finding 10 (R3) — track whether we currently have the node relocated
+  // OUT to a container (mirrors the Lit controller's `moved` field). Needed
+  // for the resurrect guard below and to avoid a spurious restore-move when
+  // the node was never portalled.
+  let moved = false;
 
   function place(target: Element | null | undefined): void {
     if (target) {
-      target.appendChild(node);
+      // Resurrect GUARD (ported verbatim from RoziePortalController): when
+      // the node was never moved out AND is currently disconnected, the
+      // enclosing `{#if}` block removed it — a newly-truthy container must
+      // NOT append it back (that resurrects a block-removed node).
+      if (!moved && !node.isConnected) return;
+      // Position GUARD: appendChild of an already-present node is a MOVE
+      // (detach + reattach), NOT a no-op — it blurs any focused descendant.
+      // `update()` re-runs on every parameter change, so re-asserting an
+      // already-correct position must leave the node physically untouched.
+      if (node.parentNode !== target) {
+        target.appendChild(node);
+      }
+      moved = true;
       return;
     }
-    // Falsy target — restore to the captured natural position, if it's
-    // still attached to the document (a torn-down ancestor is a no-op:
-    // the enclosing {#if}/component teardown will discard this node too).
+    // Falsy target (render in place). Only restore when we PREVIOUSLY moved
+    // the node out — a never-moved node is already in its natural position,
+    // and re-inserting it would blur a focused descendant (mirrors the Lit
+    // controller's `if (!this.moved) return;` falsy-branch guard).
+    if (!moved) return;
+    moved = false;
+    // Restore to the captured natural position, if it's still attached to
+    // the document (a torn-down ancestor is a no-op: the enclosing
+    // {#if}/component teardown will discard this node too).
     if (originalParent && originalParent.isConnected) {
       if (originalNextSibling && originalNextSibling.parentNode === originalParent) {
         originalParent.insertBefore(node, originalNextSibling);
