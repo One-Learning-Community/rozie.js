@@ -52,8 +52,10 @@ describe('emitLit — PortalOverlay (command-palette-portal-overlay Task 3, r-po
     expect(code).toMatch(/import \{[^}]*RoziePortalController[^}]*\} from '@rozie\/runtime-lit';/);
     // CACHED query — the load-bearing fix. An uncached @query would lose
     // the node after the first relocation (see module doc comment).
-    expect(code).toMatch(/@query\('\[data-rozie-ref="__roziePortal0"\]', true\)/);
-    expect(code).toMatch(/data-rozie-ref="__roziePortal0"/);
+    // Finding 5 (R1) — the portal marker rides a DISTINCT attribute name
+    // (`data-rozie-portal-ref`) so it never collides with an author `ref=`.
+    expect(code).toMatch(/@query\('\[data-rozie-portal-ref="__roziePortal0"\]', true\)/);
+    expect(code).toMatch(/data-rozie-portal-ref="__roziePortal0"/);
     expect(code).toMatch(
       /new RoziePortalController\(this, \(\) => this\.__roziePortal0, \(\) => \(/,
     );

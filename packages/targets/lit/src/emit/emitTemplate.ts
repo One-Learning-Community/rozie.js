@@ -1561,7 +1561,14 @@ function emitElementOpenTag(
   if (node.portalTo && opts._state) {
     const n = opts._state.portalCount++;
     const fieldName = `__roziePortal${n}`;
-    parts.push(`data-rozie-ref="${fieldName}"`);
+    // Finding 5 (R1) — the portal marker rides a DISTINCT attribute name
+    // (`data-rozie-portal-ref`), NOT `data-rozie-ref`. An author `ref=` on
+    // the SAME element ALSO emits `data-rozie-ref="<name>"` (see refAttr
+    // above); two identically-named attributes on one open tag collapse to
+    // the FIRST under HTML parsing, so a shared `data-rozie-ref` marker left
+    // the portal's `@query` matching nothing (silently inert portal). A
+    // separate attribute name avoids the collision by construction.
+    parts.push(`data-rozie-portal-ref="${fieldName}"`);
     opts.decorators.add('query');
     opts.runtime.add('RoziePortalController');
     const containerCode = rewriteTemplateExpression(node.portalTo.expression, ir);
@@ -1569,7 +1576,7 @@ function emitElementOpenTag(
       // `cache: true` (2nd @query arg) — REQUIRED. An uncached @query
       // re-searches `this.shadowRoot` on every access, which no longer
       // contains the node once `RoziePortalController` has relocated it.
-      `  @query('[data-rozie-ref="${fieldName}"]', true) private ${fieldName}!: HTMLElement;`,
+      `  @query('[data-rozie-portal-ref="${fieldName}"]', true) private ${fieldName}!: HTMLElement;`,
     );
     opts._state.portalFieldDecls.push(
       `  private ${fieldName}Controller = new RoziePortalController(this, () => this.${fieldName}, () => (${containerCode}));`,

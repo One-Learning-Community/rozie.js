@@ -28,7 +28,7 @@ export default class PortalOverlay extends SignalWatcher(LitElement) {
   @property({ type: Boolean, reflect: true }) open: boolean = false;
   @property({ type: Boolean }) to: boolean | string = false;
 
-  @query('[data-rozie-ref="__roziePortal0"]', true) private __roziePortal0!: HTMLElement;
+  @query('[data-rozie-portal-ref="__roziePortal0"]', true) private __roziePortal0!: HTMLElement;
   private __roziePortal0Controller = new RoziePortalController(this, () => this.__roziePortal0, () => (this.resolveTo(this.to)));
 
   @state() private _hasSlotDefault = false;
@@ -75,7 +75,7 @@ export default class PortalOverlay extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-${this.open ? html`<div class="rozie-portal-overlay-backdrop" data-rozie-ref="__roziePortal0" data-rozie-s-56b9c1c8>
+${this.open ? html`<div class="rozie-portal-overlay-backdrop" data-rozie-portal-ref="__roziePortal0" data-rozie-s-56b9c1c8>
   <div class="rozie-portal-overlay-box" data-rozie-s-56b9c1c8>
     <slot>Portalled content</slot>
   </div>
