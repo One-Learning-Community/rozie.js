@@ -1,5 +1,5 @@
 ---
-surface_hash: 0424d00e3c12
+surface_hash: e68b1e7a9c14
 ---
 
 # Command palette — comparison
@@ -21,7 +21,7 @@ The "⌘K" command palette — a centered modal overlay with a search box over a
 | Angular CDK `Dialog` + `Listbox` | Angular only | ✅ primitives | Strong if assembled correctly | Yes (Angular CDK) | You assemble it — filtering/scoring is yours to write | No dominant Angular command palette; usually hand-assembled from CDK primitives. |
 | [**ninja-keys**](https://github.com/ssleptsov/ninja-keys) | Web component (HTML/Vue/React/Svelte) | ❌ styled element | Keyboard nav; not a documented APG-grade a11y story | Low activity — no GitHub releases, ~2023-era | Nested menus, hotkeys, theming, root search | Cross-framework, but a *styled* `<ninja-keys>` element you configure via a `data` array — a different authoring model. |
 | [Algolia **DocSearch**](https://docsearch.algolia.com/) | Any (drop-in widget) | ❌ hosted widget | Good, but a search box, not a command runner | Yes (v4) | Crawls + indexes your docs; instant search | Adjacent category: ⌘K *site search*, not an app *command* menu. Hosted Algolia index. |
-| **`@rozie-ui/command-palette`** | React, Vue, Svelte, Angular, Solid, Lit | ✅ headless | WAI-ARIA dialog + combobox + listbox/option, `aria-activedescendant` | New — `0.3.0` | Fuzzy-subsequence ranking + match highlighting (pluggable `score`), nested levels with optional async sources (loading/error), auto-derived group sections (cappable via `groupCap`), per-row action menus, a `defaultItems` home view | One `.rozie` source → six idiomatic packages, same API. |
+| **`@rozie-ui/command-palette`** | React, Vue, Svelte, Angular, Solid, Lit | ✅ headless | WAI-ARIA dialog + combobox + listbox/option, `aria-activedescendant` | New — `0.4.0` | Fuzzy-subsequence ranking + match highlighting (pluggable `score`), nested levels with optional async sources (loading/error), auto-derived group sections (cappable via `groupCap`), per-row action menus, a `defaultItems` home view, an escapable overlay (`appendTo` portals out of a clipping/embedding ancestor on all six targets) | One `.rozie` source → six idiomatic packages, same API. |
 
 ## The honest core point
 
@@ -59,7 +59,7 @@ Stated plainly — this doubles as the roadmap:
 - **Async data is a first-class level source (as of `0.2.0`).** A nested level's `source` may return a `Promise`: the palette shows the `loading` slot while it resolves, drops stale in-flight results (race-safe), debounces refetch via `searchDebounce`, and shows the `error` slot with a `retry` on rejection — no need to hand-drive it through `items`.
 - **It does not own a global keyboard shortcut.** Bind ⌘K / Ctrl-K yourself and call `show()` (or set the `open` model). cmdk, kbar, and ninja-keys variously help with this; Rozie stays unopinionated about how the palette is summoned.
 - **It is self-contained, not composed from the listbox family.** The results list is authored inline (scoped slots + roving nav), **not** by composing the published `@rozie-ui/listbox` package — cross-family composition of published leaves isn't expressible in the compiler today. The accessibility primitives are the same; the implementation is just not a dependency on another leaf.
-- **`@rozie-ui/command-palette` is `0.3.0`.** The surface (14 props / 4 events / a 6-verb handle / 11 slots / two-way `open` + `query`) is stable and gate-verified across all six targets, but it is far younger and less battle-tested than cmdk.
+- **`@rozie-ui/command-palette` is `0.4.0`.** The surface (15 props / 4 events / a 6-verb handle / 11 slots / two-way `open` + `query`) is stable and gate-verified across all six targets, but it is far younger and less battle-tested than cmdk.
 
 ## Try it
 

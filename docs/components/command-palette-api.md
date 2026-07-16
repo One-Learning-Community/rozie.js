@@ -35,7 +35,7 @@ Set `appendTo` to escape it:
 <CommandPalette append-to="body" :items="commands" r-model:open="open" />
 ```
 
-The portal is implemented via the compiler's `r-portal` element directive — see the [compiler feature guide](/guide/features#r-portal-container-expr-teleport-an-element-s-own-subtree) for the per-target native-construct table (React `createPortal`, Vue `<Teleport>`, Solid `<Portal>`, a Svelte action, an AOT-safe Angular effect, a Lit `ReactiveController`). Everything else about the palette works unchanged through the portal: the levels Escape funnel, combobox's own focus management, and the row-action-menu arbitration are all rooted at `$refs.panel`/`$refs.frame` (never `$el`), so a moved node's ref identity survives the relocation.
+The portal is implemented via the compiler's `r-portal` element directive — see the [compiler feature guide](/guide/features#r-portal-container-expr-—-teleport-an-element-s-own-subtree) for the per-target native-construct table (React `createPortal`, Vue `<Teleport>`, Solid `<Portal>`, a Svelte action, an AOT-safe Angular effect, a Lit `ReactiveController`). Everything else about the palette works unchanged through the portal: the levels Escape funnel, combobox's own focus management, and the row-action-menu arbitration are all rooted at `$refs.panel`/`$refs.frame` (never `$el`), so a moved node's ref identity survives the relocation.
 
 **Theming tokens** (`--rozie-command-palette-*`) must be set on `:root` — or on the `appendTo` container itself — to reach a portalled overlay. A token set on a host-scoped ancestor (e.g. a `:host { }` rule, or a class on an ancestor that is no longer in the overlay's DOM path once portalled) does **not** cross the portal on any target.
 
