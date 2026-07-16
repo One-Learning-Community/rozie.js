@@ -102,12 +102,20 @@ const pauseTimers = () => {
   if (typeof window === 'undefined') return;
   for (const id in timers) {
     const entry = timers[id];
+    // Idempotent: an entry already paused (handle cleared) keeps its stored
+    // remainder. A second pause must NOT re-subtract elapsed against the
+    // original startedAt — that drove `remaining` negative and stranded the
+    // toast forever once resume saw the non-positive value.
+    if (entry.handle == null) continue;
     window.clearTimeout(entry.handle);
     const elapsed = Date.now() - entry.startedAt;
+    // Clamp so a late pause (e.g. a background-tab timer that overran) can
+    // never store a negative remainder.
+    const remaining = Math.max(0, entry.remaining - elapsed);
     timers[id] = {
       handle: null,
       startedAt: entry.startedAt,
-      remaining: entry.remaining - elapsed
+      remaining
     };
   }
 };
@@ -119,7 +127,16 @@ const resumeTimers = () => {
   if (typeof window === 'undefined') return;
   for (const id in timers) {
     const entry = timers[id];
-    if (entry.remaining == null || entry.remaining <= 0) continue;
+    // Only re-arm entries that are actually paused (handle cleared). A live
+    // handle is left alone — re-arming it would orphan the running timeout.
+    if (entry.handle != null) continue;
+    if (entry.remaining == null || entry.remaining <= 0) {
+      // Its deadline elapsed while paused (a background-tab overrun, or a
+      // remainder clamped to 0): treat as EXPIRED and dismiss now — its time
+      // is up — rather than leaving it un-armed and stranded forever.
+      dismissBegin(id, 'timeout');
+      continue;
+    }
     const remaining = entry.remaining;
     const handle = window.setTimeout(() => dismissBegin(id, 'timeout'), remaining);
     timers[id] = {

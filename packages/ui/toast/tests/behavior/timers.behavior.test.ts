@@ -226,3 +226,49 @@ describe('Toaster numeric consumer id — survives a hover cycle (T3, behavioral
     app.unmount();
   });
 });
+
+describe('Toaster pauseTimers idempotency — no negative-remainder strand (T1, behavioral)', () => {
+  // RED-FIRST: pauseTimers was NOT idempotent — a second pause on an
+  // already-paused entry re-subtracted the elapsed time against the ORIGINAL
+  // (unchanged) startedAt, driving `remaining` negative; resumeTimers then
+  // saw `remaining <= 0` and skipped it FOREVER (never re-armed, never
+  // dismissed) → the toast was stranded. The fix makes pauseTimers skip
+  // entries whose handle is already null (idempotent) AND clamp
+  // `remaining = Math.max(0, …)`, and makes resumeTimers treat a non-positive
+  // remainder as EXPIRED (dismiss now, matching "its time elapsed") rather
+  // than skipping.
+  it('a double pause (with wall-clock between) still dismisses on resume, never strands', async () => {
+    const { app, host, handle } = mountToaster();
+    const region = () => host.querySelector('.rozie-toaster')!;
+
+    handle().show({ message: 'x', type: 'info', duration: 1000 });
+    await nextTick();
+    expect(statusCount(host)).toBe(1);
+
+    // Elapse 300ms, then pause (remainder → 700ms).
+    await vi.advanceTimersByTimeAsync(300);
+    region().dispatchEvent(new MouseEvent('mouseenter'));
+    await nextTick();
+
+    // A LOT of wall-clock passes while paused (the timer handle is cleared so
+    // nothing fires), THEN a second pause event arrives. Pre-fix, this second
+    // pause computes elapsed = now - startedAt (~1100ms) against remaining
+    // 700ms → remaining = -400ms, and resume skips it forever.
+    await vi.advanceTimersByTimeAsync(800);
+    region().dispatchEvent(new MouseEvent('mouseenter'));
+    await nextTick();
+    expect(statusCount(host)).toBe(1); // still paused/present
+
+    // Leave → resume. The remainder must still be the correct positive ~700ms
+    // (idempotent second pause was a no-op), so the toast dismisses.
+    region().dispatchEvent(new MouseEvent('mouseleave'));
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(700);
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(360); // exit failsafe
+    await nextTick();
+    expect(statusCount(host)).toBe(0);
+
+    app.unmount();
+  });
+});
