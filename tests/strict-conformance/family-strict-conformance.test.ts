@@ -81,7 +81,10 @@ const FAMILIES: FamilySpec[] = [
     leaf: 'packages/ui/combobox/packages/react',
     baseline: {
       'Combobox.tsx': {
-        TS2531: 5,
+        // combobox-virtual-reactivity: windowedView() added a 6th windowSource()
+        // call site — one more occurrence of the KNOWN Class-4 nullable-return
+        // body-noise class (TS2531), do-not-fix-here per this file's scope fence.
+        TS2531: 6,
         // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04 (windowing.rzts pinMeasurement retype).
         // 260714-nqe: Function-prop TS lowering flipped `unknown`→`any` (optionLabel/
         // optionValue/optionDisabled) shifted 2 more body-passthrough nullability
@@ -109,7 +112,10 @@ const FAMILIES: FamilySpec[] = [
         // 260714-nqe: Function-prop TS lowering flipped `unknown`→`any`
         // shifted 2 more sites into tsc's reach (TS2322 4→5, TS18047 4→6).
         TS2322: 5,
-        TS2531: 4,
+        // combobox-virtual-reactivity: windowedView() added a 6th windowSource()
+        // call site — one more occurrence of the KNOWN Class-4 nullable-return
+        // body-noise class (TS2531), do-not-fix-here per this file's scope fence.
+        TS2531: 5,
         TS18047: 6,
         TS2769: 1,
       },
@@ -122,7 +128,10 @@ const FAMILIES: FamilySpec[] = [
     baseline: {
       'Combobox.ts': {
         TS2769: 1,
-        TS2531: 4,
+        // combobox-virtual-reactivity: windowedView() added a 6th windowSource()
+        // call site — one more occurrence of the KNOWN Class-4 nullable-return
+        // body-noise class (TS2531), do-not-fix-here per this file's scope fence.
+        TS2531: 5,
         // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
         // 260714-nqe: Function-prop TS lowering flipped `unknown`→`any`
         // shifted 2 more sites into tsc's reach (TS2322 5→6, TS18047 4→6).

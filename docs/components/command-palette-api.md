@@ -59,7 +59,7 @@ A palette (or level) with no `defaultItems` set behaves exactly as before this f
 
 ## Per-level virtual windowing
 
-`virtual` / `virtualMaxHeight` / `virtualEstimateRowHeight` opt a long list into vertical windowing (only the visible slice of rows renders inside a bounded scrolling container), threaded straight onto the vendored combobox's own [`virtual`](/components/combobox#virtual-windowing) support — now that the combobox `virtual` prop is **live-flippable at runtime** (see the combobox changelog), a level pushed with `virtual: true` windows immediately, no remount required.
+`virtual` / `virtualMaxHeight` / `virtualEstimateRowHeight` opt a long list into vertical windowing (only the visible slice of rows renders inside a bounded scrolling container), threaded straight onto the vendored combobox's own [`virtual`](/components/combobox) support — now that the combobox `virtual` prop is **live-flippable at runtime** (see the combobox changelog), a level pushed with `virtual: true` windows immediately, no remount required.
 
 Resolved **per level**, exactly like `defaultItems`/`title`/`placeholder`: the top-level `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` props window the ROOT list; a navigating item's own `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` fields (alongside its `children`/`source`) window THAT pushed child level instead — captured onto its frame at push time. Popping back to a level whose `virtual` resolves `false` restores the non-windowed (and, if it carries `group` fields, grouped) render for that level.
 
