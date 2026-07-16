@@ -149,7 +149,12 @@ const show = (input: any) => {
   // back (no read-after-write of the same key in one fn → ROZ138-safe).
   let id;
   if (t.id != null) {
-    id = t.id;
+    // Coerce a consumer-supplied id to a String once, at the single entry
+    // point. Ids flow through the `timers` map (whose `for (const id in …)`
+    // keys are ALWAYS strings) and every downstream `t.id === id` strict
+    // comparison; a numeric consumer id (`show({ id: 42 })`) would otherwise
+    // stop matching after a hover pause/resume re-arms with the string key.
+    id = String(t.id);
   } else {
     const s = seq.value;
     id = 't' + s;

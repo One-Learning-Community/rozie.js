@@ -190,3 +190,39 @@ describe('Toaster hover pause — precise remaining-time (behavioral)', () => {
     expect(threw).toBe(false);
   });
 });
+
+describe('Toaster numeric consumer id — survives a hover cycle (T3, behavioral)', () => {
+  // RED-FIRST: the timers map is keyed by `for (const id in timers)`, which
+  // yields STRING keys; `resumeTimers` re-arms `dismissBegin(id, 'timeout')`
+  // with that string, but a consumer-supplied NUMERIC id (`show({ id: 42 })`)
+  // stored the toast's `id` as the number 42, so `dismissBegin`'s
+  // `$data.toasts.find(t => t.id === '42')` strict-compares number-vs-string
+  // and never matches → the toast is stranded after the hover pause/resume.
+  // GREEN only once show() coerces `id = String(t.id)` so every id is a string
+  // end-to-end.
+  it('show({ id: 42 }) still auto-dismisses after hover → leave', async () => {
+    const { app, host, handle } = mountToaster();
+
+    handle().show({ id: 42, message: 'numbered', type: 'info', duration: 1000 });
+    await nextTick();
+    expect(statusCount(host)).toBe(1);
+
+    // Hover partway through → pause.
+    await vi.advanceTimersByTimeAsync(300);
+    host.querySelector('.rozie-toaster')!.dispatchEvent(new MouseEvent('mouseenter'));
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(statusCount(host)).toBe(1); // paused, still present
+
+    // Leave → resume with the ~700ms remainder, which must dismiss id 42.
+    host.querySelector('.rozie-toaster')!.dispatchEvent(new MouseEvent('mouseleave'));
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(700);
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(360); // exit failsafe
+    await nextTick();
+    expect(statusCount(host)).toBe(0);
+
+    app.unmount();
+  });
+});
