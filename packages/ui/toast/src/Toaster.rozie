@@ -387,6 +387,11 @@ const patch = (id, changes) => {
   let existed = false
   const next = $data.toasts.map((t) => {
     if (t.id !== id) return t
+    // Treat an EXITING entry as absent — never resurrect a toast whose
+    // dismissal is already in flight (removal deferred to @animationend / the
+    // failsafe). `existed` stays false → patch returns false, writes nothing,
+    // arms no timer.
+    if (t.exiting) return t
     existed = true
     const merged = { ...t }
     if (c.message !== undefined) merged.message = c.message
@@ -417,8 +422,11 @@ const patch = (id, changes) => {
 // dismissed while the promise was still pending (never-resurrect).
 const settlePromise = (id, type, messageOrFn, value) => {
   if (unmounted) return
-  const stillThere = $data.toasts.some((t) => t.id === id)
-  if (!stillThere) return
+  // Never-resurrect: no-op if the toast is gone OR already exiting (its
+  // dismissal is in flight — settling now would flip it back to a live
+  // success/error toast and re-arm a timer).
+  const entry = $data.toasts.find((t) => t.id === id)
+  if (!entry || entry.exiting) return
   const message = typeof messageOrFn === 'function' ? messageOrFn(value) : messageOrFn
   patch(id, { type, message, duration: $props.duration })
 }

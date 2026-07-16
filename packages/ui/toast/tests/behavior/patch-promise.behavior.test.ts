@@ -375,3 +375,70 @@ describe('Toaster promise(p, { loading, success, error }) — sugar verb (behavi
     app.unmount();
   });
 });
+
+describe('Toaster never resurrects an EXITING toast (T5, behavioral)', () => {
+  // RED-FIRST: patch()/settlePromise() only checked EXISTENCE in $data.toasts.
+  // During the exit window a dismissed toast is still PRESENT (exiting: true,
+  // removal deferred to @animationend / the ~350ms failsafe), so a patch() or
+  // a promise settle landing in that window found the entry, mutated it back
+  // to a live state, and (for a duration key) re-armed a timer — resurrecting
+  // a toast the contract says is gone. The fix treats an entry with
+  // exiting: true as ABSENT: patch returns false, settlePromise no-ops.
+  it('patch() on an already-exiting toast returns false and makes no change', async () => {
+    const { app, host, handle } = mountToaster();
+    const id = handle().show({ message: 'orig', type: 'info', duration: 0 });
+    await nextTick();
+    expect(statusCount(host)).toBe(1);
+
+    // Begin the exit (exiting: true, removal pending ~350ms).
+    handle().dismiss(id);
+    await nextTick();
+
+    // Within the exit window, patch must be a no-op returning false.
+    const ok = handle().patch(id, { message: 'resurrected', type: 'success', duration: 5000 });
+    await nextTick();
+
+    expect(ok).toBe(false);
+    expect(messageText(host)).not.toBe('resurrected');
+    expect(host.querySelector('.rozie-toast--success')).toBeNull();
+
+    // The re-armed 5000ms timer must NOT exist — the toast still fully leaves
+    // via its exit failsafe and never lingers.
+    await settleExit();
+    expect(statusCount(host)).toBe(0);
+
+    app.unmount();
+  });
+
+  it('settlePromise landing in the exit window is a no-op (no success flip, no timer)', async () => {
+    const { app, host, handle } = mountToaster();
+    const { promise, resolve } = deferred<string>();
+
+    const id = handle().promise(promise, {
+      loading: 'Saving…',
+      success: 'Saved!',
+      error: 'Failed',
+    });
+    await nextTick();
+    expect(statusCount(host)).toBe(1);
+
+    // Dismiss while pending → the entry is now exiting (still present, removal
+    // pending) — NOT yet fully gone.
+    handle().dismiss(id);
+    await nextTick();
+
+    // Settle NOW, inside the exit window. settlePromise must no-op: no flip to
+    // the success class, no re-armed timer, no resurrection.
+    resolve('too late');
+    await Promise.resolve();
+    await Promise.resolve();
+    await nextTick();
+
+    expect(host.querySelector('.rozie-toast--success')).toBeNull();
+
+    await settleExit();
+    expect(statusCount(host)).toBe(0);
+
+    app.unmount();
+  });
+});

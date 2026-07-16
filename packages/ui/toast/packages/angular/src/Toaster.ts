@@ -394,6 +394,11 @@ export class Toaster {
     let existed = false;
     const next = this.toasts().map((t: any) => {
       if (t.id !== id) return t;
+      // Treat an EXITING entry as absent — never resurrect a toast whose
+      // dismissal is already in flight (removal deferred to @animationend / the
+      // failsafe). `existed` stays false → patch returns false, writes nothing,
+      // arms no timer.
+      if (t.exiting) return t;
       existed = true;
       const merged = {
         ...t
@@ -427,8 +432,11 @@ export class Toaster {
   };
   settlePromise = (id: any, type: any, messageOrFn: any, value: any) => {
     if (this.unmounted) return;
-    const stillThere = this.toasts().some((t: any) => t.id === id);
-    if (!stillThere) return;
+    // Never-resurrect: no-op if the toast is gone OR already exiting (its
+    // dismissal is in flight — settling now would flip it back to a live
+    // success/error toast and re-arm a timer).
+    const entry = this.toasts().find((t: any) => t.id === id);
+    if (!entry || entry.exiting) return;
     const message = typeof messageOrFn === 'function' ? messageOrFn(value) : messageOrFn;
     this.patch(id, {
       type,
