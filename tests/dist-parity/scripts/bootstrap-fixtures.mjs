@@ -504,6 +504,15 @@ const EXAMPLES = [
   // Plan 57-02). Single-file; no sibling .rozie producers — stays OUT of
   // RESOLVER_ROOT (and NOT in FIXTURE_ANGULAR_CVA_OFF).
   'ModelParamShadow',
+  // command-palette-portal-overlay phase — the r-portal element-teleport
+  // primitive proving fixture. A plain-element `r-portal="resolveTo($props.to)"`
+  // overlay subtree gated by `r-if`, exercising the r-portal + r-if interplay
+  // across all 6 targets' native teleport constructs. Registering it here makes
+  // the bootstrap compile() it across all six targets — the unplugin resolveId
+  // consumer-demo gate (feedback_unplugin_resolveid_mediation) for the new
+  // emitter shape. Single-file; no sibling .rozie producers — stays OUT of
+  // RESOLVER_ROOT (and NOT in FIXTURE_ANGULAR_CVA_OFF).
+  'PortalOverlay',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.

@@ -1093,6 +1093,69 @@ Authors targeting only one framework can leave the marker and sigil in place at 
 The marker and sigil are escape hatches, not a default. Use them only when a third-party engine actually mutates DOM your component owns. Calling the sigil on every state change on Lit forces a child-tree rebuild and defeats lit-html's keyed diffing; the marker by itself is cheap, but the pairing has a real per-call cost. If you're not integrating with an engine that touches the DOM, you don't need either.
 :::
 
+## `r-portal="<container-expr>"` — teleport an element's own subtree
+
+Sometimes a modal overlay, a dropdown menu, or a tooltip needs to escape an ancestor's `overflow: hidden` / `transform` / `filter` / `contain` — any of which creates a clipping context or a new containing block that traps a `position: fixed` element. The fix on every framework is the same idea: render the subtree somewhere else in the DOM (usually `document.body`), while keeping it logically part of the same component.
+
+`r-portal` is an element-level directive, distinct from the `<slot portal />` primitive (`$portals.NAME(...)`, used for mounting *slot-fill content* into an *engine-owned container* — see the [`PortalList` example](../examples/portal-list.md)). `r-portal` is the inverse: it relocates the element's **own rendered subtree**, declaratively, using each target's native teleport construct.
+
+```rozie
+<props>
+{
+  open: { type: Boolean, default: false },
+  to:   { type: [Boolean, String], default: false },
+}
+</props>
+
+<script>
+function resolveTo(to) {
+  if (!to) return null
+  if (typeof document === 'undefined') return null
+  if (to === true || to === 'body') return document.body
+  return document.querySelector(to)
+}
+</script>
+
+<template>
+<div r-if="$props.open" r-portal="resolveTo($props.to)" class="overlay-backdrop">
+  <div class="overlay-box">
+    <slot />
+  </div>
+</div>
+</template>
+```
+
+The container expression is evaluated fresh on every render. A **falsy** result (`null`, `undefined`, `false`) means "render in place" — the subtree stays exactly where it was authored, byte-behavior-identical to not having the directive at all. This is what makes an `appendTo`-style consumer prop safe to default OFF: existing consumers who never opt in see zero change.
+
+`r-portal` composes with `r-if`/`r-for` on the SAME element — the conditional/loop governs *whether* the subtree renders at all; the portal governs *where* it renders once it does.
+
+Per-target lowering:
+
+| Target | Native construct | In-place fallback |
+| --- | --- | --- |
+| React | `createPortal(tree, container)` from `react-dom` | `container ? createPortal(tree, container) : tree` — a plain ternary |
+| Vue | `<Teleport :to :disabled>` (emitter-only — authors cannot write `<Teleport>` directly; see below) | `:disabled="!(container)"` — Vue skips target resolution and mounts in place when disabled |
+| Solid | `<Portal mount={container}>` from `solid-js/web`, gated by `<Show>` | `<Show when={container} fallback={tree}>` — falsy container never mounts `<Portal>` at all |
+| Svelte | a `use:roziePortal={container}` action (`@rozie/runtime-svelte`) | the action's own `place()` step — falsy container is a no-op on initial attach, or restores the node's original anchor on transition |
+| Angular | a per-element `effect()` field initializer + `viewChild()` ref (AOT-safe; no `import.meta.url`, no inline template arrow) | the effect's own placement logic restores the original DOM anchor on a falsy container |
+| Lit | a `RoziePortalController` (`@rozie/runtime-lit`, a `ReactiveController`) driving a **cached** `@query(..., true)` ref | same anchor-capture-and-restore semantics; see the theming note below |
+
+**Vue's `<Teleport>` is an author-side escape hatch that is otherwise rejected** (`ROZ926`) — writing `<Teleport>` directly in a `.rozie` template is a compile error, because Rozie deliberately does not expose framework-specific primitives to authors. `r-portal` is different: it's a Rozie-native directive that the **emitter** may lower to `<Teleport>` internally. ROZ926 gates author input, not emit output.
+
+**A component-registered child (`<Foo r-portal="...">`) is not supported in v1** — only a plain/host element can carry `r-portal`. Put the directive on a wrapping `<div>` instead.
+
+### Theming through the portal — the Lit hazard
+
+Every target except Lit renders into ordinary DOM, so a relocated element still inherits any custom property (`--my-token`) set on `:root` or an ancestor. Lit is different: a Lit component renders into a **shadow root**, and its scoped `static styles` sheet is attached via `shadowRoot.adoptedStyleSheets` — physically confined to that shadow tree. Once `r-portal` relocates an element to `document.body` (light DOM, outside any shadow root), the shadow-scoped stylesheet no longer reaches it.
+
+Rozie's Lit emitter closes this gap automatically: whenever a component has an `r-portal` element, its scoped CSS is **also** pushed through `injectGlobalStyles` (the same runtime helper `:root { }` rules already use) — the relocated element already carries the component's `[data-rozie-s-<hash>]` scope attribute (every plain element does, unconditionally), so the globally-injected rules match only that component's own elements, never a sibling consumer's shadow-internal ones.
+
+The practical rule for consumers on every target: **set theming custom properties on `:root`** (or on the container you pass to `appendTo`-style props), not on a host-scoped ancestor — a host-scoped token does not reach a body-portalled subtree on any target, Lit included.
+
+::: warning When NOT to reach for this
+`r-portal` is for escaping a *real* clipping/stacking problem — a modal, dropdown, or tooltip trapped by an ancestor's `overflow`/`transform`/`filter`. It is not a general-purpose DOM-reparenting primitive. Default any consumer-facing "portal target" prop to OFF (render in place) so existing consumers see zero behavior change until they opt in.
+:::
+
 ## `$restoreFocus(selector, idx)` — keep focus on a row across keyed-reconciler re-renders
 
 When user source rewrites an array that drives an `r-for`, the framework's keyed reconciler decides what to do with the existing DOM. React, Vue, and Angular preserve identity for items whose key didn't change — focus survives the rewrite naturally. Svelte, Solid, and Lit's keyed reconcilers re-create the row DOM on reorder, dropping focus to `<body>`. That's a real accessibility gap for keyboard-driven reorder UIs — Space-lift / ArrowDown-move / Space-drop is unusable if focus disappears the moment you commit a move.

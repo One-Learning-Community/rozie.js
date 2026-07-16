@@ -213,6 +213,20 @@ const EXAMPLES = [
   // carries the renamed-param writes AND the other five targets carry NO `$local`
   // rename, across all four entrypoints. Single-file — stays OUT of RESOLVER_ROOT.
   'ModelParamShadow',
+  // command-palette-portal-overlay phase — the r-portal element-teleport
+  // primitive proving fixture (Task 1 RED-first; Tasks 2/3 per-target emit).
+  // A plain-element `r-portal="resolveTo($props.to)"` overlay subtree gated
+  // by `r-if`, exercising the r-portal + r-if interplay across all 6
+  // targets' native teleport constructs (React createPortal, Vue
+  // <Teleport :to :disabled>, Solid <Portal>/<Show>, Svelte roziePortal
+  // action, Angular AOT-safe RoziePortalController effect, Lit
+  // RoziePortalController + injectGlobalStyles shadow-DOM bridge). THIS is
+  // the unplugin resolveId consumer-demo gate for the new emitter shape
+  // (feedback_unplugin_resolveid_mediation) — every pre-existing fixture
+  // above MUST stay byte-identical (34 -> 35, purely additive; the new
+  // r-portal emit path is taken ONLY when `portalTo` is present on an
+  // element). Single-file — stays OUT of RESOLVER_ROOT.
+  'PortalOverlay',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.

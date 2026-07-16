@@ -1,0 +1,16 @@
+.rozie-portal-overlay-backdrop[data-rozie-s-56b9c1c8] {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: var(--rozie-portal-overlay-z, 3000);
+}
+.rozie-portal-overlay-box[data-rozie-s-56b9c1c8] {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  min-width: 16rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
