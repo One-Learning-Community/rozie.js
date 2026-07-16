@@ -106,6 +106,7 @@ const palette = ref();          // template ref
 | option | option, index, active, selected, disabled, matches |
 | groupHeading | group |
 | empty | query |
+| argsField | item, arg, value, setValue |
 | loading | query |
 | error | query, error, retry |
 | footer |  |

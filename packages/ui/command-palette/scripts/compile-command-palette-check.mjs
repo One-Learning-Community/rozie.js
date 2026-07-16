@@ -75,7 +75,9 @@ const EXPECT = {
   // existing `actions` slot is KEPT (now doubles as the interactive
   // open-the-menu affordance). cp-adopts-combobox-groups: gains
   // `groupHeading` (scope `{ group }`) — the re-projected vendored
-  // <Combobox>'s native section-heading slot.
+  // <Combobox>'s native section-heading slot. command-palette-inline-args
+  // (ARGS-RENDER, feature #12) adds `argsField` (scope `{ item, arg, value,
+  // setValue }`) — the args surface's per-field override slot — 12 total.
   slots: [
     'option',
     'empty',
@@ -88,6 +90,7 @@ const EXPECT = {
     'breadcrumb',
     'actionItem',
     'groupHeading',
+    'argsField',
   ],
   // command-palette-levels: gains `openTo` (⌘P deep-link) + `goBack` (pop one
   // level — NOT `back`, which would collide with the `back` EMIT above,

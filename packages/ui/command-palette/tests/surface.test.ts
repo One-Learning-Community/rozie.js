@@ -80,6 +80,10 @@ const EXPECT = {
   // interactive open-the-menu affordance — see CommandPalette.rozie).
   // cp-adopts-combobox-groups: gains `groupHeading` (scope `{ group }`) —
   // the re-projected vendored <Combobox>'s native section-heading slot.
+  // command-palette-inline-args (ARGS-RENDER, feature #12): gains
+  // `argsField` (scope `{ item, arg, value, setValue }`) — the panel-
+  // internal args surface's per-field override slot (camelCase, ROZ127-clear
+  // — mirrors `actionItem`'s naming precedent) — 12 slots total.
   slots: [
     'option',
     'empty',
@@ -92,6 +96,7 @@ const EXPECT = {
     'breadcrumb',
     'actionItem',
     'groupHeading',
+    'argsField',
   ],
   // command-palette-levels: gains `openTo` (the ⌘P deep-link) and `goBack`
   // (pop one level). The pop verb is `goBack`, NOT `back` — a `back()`
@@ -147,7 +152,7 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
-  it('declares the option/empty/footer + icon/trailing/actions + loading/error/breadcrumb/actionItem/groupHeading slots', () => {
+  it('declares the option/empty/footer + icon/trailing/actions + loading/error/breadcrumb/actionItem/groupHeading/argsField slots (12)', () => {
     const slotNames = ir.slots.map((s: { name: string }) => s.name);
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });

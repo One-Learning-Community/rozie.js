@@ -102,6 +102,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | option | option, index, active, selected, disabled, matches |
 | groupHeading | group |
 | empty | query |
+| argsField | item, arg, value, setValue |
 | loading | query |
 | error | query, error, retry |
 | footer |  |

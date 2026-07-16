@@ -304,7 +304,9 @@
   // ---- action menu (ACT-SEAM/ACT-ARBITRATION) --------------------------
   // The single source of truth for keyboard ownership (internal/actionMenu.ts
   // ActionSurface): 'list' (default — the vendored <Combobox> owns arrows/
-  // Enter) or 'actions' (the flyout holds real focus and owns them instead).
+  // Enter), 'actions' (the flyout holds real focus and owns them instead),
+  // or 'args' (feature #12 — the panel-internal args surface holds real
+  // focus in its own fields).
   activeSurface: 'list',
   // The roving index into actionAnchor.actions while activeSurface==='actions'.
   // -1 when no menu is open.
@@ -316,6 +318,15 @@
   // The flyout's px vertical offset, read once (openActionMenu) from the
   // anchored row's offsetTop and bound to the flyout's :style.
   actionMenuTop: 0,
+
+  // ---- inline command arguments (ARGS-SURFACE, feature #12) -------------
+  // null (closed) or { item, values: { [id]: string }, label, argList } —
+  // the args-value state. FRESH-object writes on every mutation
+  // (setArgValue) — NOT a module-let: a module-let referenced only from
+  // template-bound handlers resets on React (the inverse of the
+  // requestToken hoist, see script top). Widened to `any` by the emitter
+  // (the actionAnchor null-initialized $data field precedent).
+  argsState: null,
 }
 </data>
 
@@ -324,6 +335,7 @@ import { scoreCommands, labelHighlight } from './internal/scoreCommands'
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems } from './internal/levelStack'
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource'
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu'
+import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface'
 import { deriveCommandGroups } from './internal/commandGroups'
 import { formatKeyToken } from './internal/formatKeyToken'
 
@@ -646,9 +658,9 @@ const retryCurrentLevel = () => {
 // the pre-write (0) value on React (setState is async).
 const pushLevel = (item) => {
   // Level nav always resets to the list surface (spec §Composition) — a
-  // navigating item's own action menu, if somehow open, must not survive
-  // the push.
-  if ($data.activeSurface !== 'list') closeActionMenu()
+  // navigating item's own action menu (or, feature #12, an in-progress args
+  // surface), if somehow open, must not survive the push.
+  closeAnySurface()
   const nextStack = pushFrame($data.levelStack, item, $props.query)
   $data.levelStack = nextStack
   $model.query = ''
@@ -676,8 +688,8 @@ const pushLevel = (item) => {
 const goBack = () => {
   if ($data.levelStack.length === 0) return
   // Level nav always resets to the list surface (spec §Composition) — pop
-  // closes an open action menu FIRST.
-  if ($data.activeSurface !== 'list') closeActionMenu()
+  // closes an open action menu (or args surface, feature #12) FIRST.
+  closeAnySurface()
   const { stack, restoreQuery } = popFrame($data.levelStack)
   $data.levelStack = stack
   requestToken = nextRequestToken(requestToken)
@@ -715,7 +727,7 @@ const jumpToLevel = (targetDepth) => {
   if (targetDepth < 0 || targetDepth >= stack.length) return
   // Level nav always resets to the list surface (spec §Composition) — mirror
   // goBack: a jump always resets to the list surface FIRST.
-  if ($data.activeSurface !== 'list') closeActionMenu()
+  closeAnySurface()
   let restoreQuery = null
   while (stack.length > targetDepth) {
     const popped = popFrame(stack)
@@ -804,8 +816,22 @@ const openTo = async (path) => {
 // (levelStack item ids, root excluded — root carries no item). This mirrors
 // `navigate`'s `{ item, depth }` shape.
 const onComboboxChange = (e) => {
+  // Inert guard (ARGS-SURFACE): the result list stays visibly open (dimmed +
+  // aria-hidden) while the args surface owns focus — a stray commit from the
+  // combobox (e.g. a residual pointer event) must never fire a leaf @select
+  // out from under an in-progress args form. The onComboboxChange handler is
+  // the SAME single entry point args auto-entry uses below, so this leading
+  // guard covers every path.
+  if ($data.activeSurface === 'args') return
   const item = e ? e.option : null
   if (!item || item.disabled) return
+  // args WINS over source/children navigation (spec: args × source mutually
+  // exclusive) — checked BEFORE isNavigating so a source+args item enters
+  // the args surface, never a child level.
+  if (hasArgs(item)) {
+    openArgsSurface(item)
+    return
+  }
   if (isNavigating(item)) {
     pushLevel(item)
     return
@@ -1094,6 +1120,134 @@ const closeActionMenu = () => {
   reopenComboboxPopup()
 }
 
+// ---- inline command arguments (ARGS-SURFACE/ARGS-SUBMIT/ARGS-ESCAPE, #12) --
+// Reuses the action-menu seam VERBATIM: pinOpen(true/false) + real
+// $refs.frame-rooted focus + reopenComboboxPopup on close (openActionMenu/
+// closeActionMenu's exact shape). The args-SPECIFIC pure logic (entry-init
+// with `default`, required-gating after trim, submit-payload trimming,
+// backspace-empty) lives in internal/argsSurface.ts (imported above) — this
+// script only orchestrates $refs/$data around it.
+
+// focusFirstArgField(): real DOM focus into the FIRST args <input> —
+// $refs.frame-rooted (a light-DOM ancestor sharing this component's OWN
+// shadow root as the args fields, mirroring focusFirstMenuItem). Also
+// selects the field's text (spec: "default prefills its field, selected on
+// focus so typing replaces") — a harmless no-op on an empty field.
+const focusFirstArgField = () => {
+  const frame = $refs.frame
+  if (!frame) return
+  const el: any = frame.querySelector('[data-command-palette-args] input')
+  if (el && typeof el.focus === 'function') el.focus()
+  if (el && typeof el.select === 'function') el.select()
+}
+
+// focusArgFieldAt(idx): real DOM focus into the args field at `idx` — the
+// "focus the first unfilled required field instead of firing" submit-block
+// target (ARGS-SUBMIT).
+const focusArgFieldAt = (idx) => {
+  const frame = $refs.frame
+  if (!frame) return
+  const els: any = frame.querySelectorAll('[data-command-palette-args] input')
+  const el: any = els[idx]
+  if (el && typeof el.focus === 'function') el.focus()
+}
+
+// openArgsSurface(item): guarded no-op unless hasArgs(item). Seeds
+// argsState (values via initArgValues — default-prefilled, fresh object;
+// argList via argsOf), lands activeSurface='args', pinOpen(true) (ACT-
+// KEEPOPEN — the result list stays visibly open but INERT, see
+// onComboboxChange's leading guard + the template's dimming wrapper), then
+// moves real focus into the first field next frame.
+const openArgsSurface = (item) => {
+  if (!hasArgs(item)) return
+  const argList = argsOf(item)
+  // The chip's :aria-label reads $data.argsState.label (a plain PROPERTY
+  // read, computed here in script) rather than calling labelText(item)
+  // directly from a template attribute binding — a bare top-level-helper
+  // CALL inside a plain (non-slot-scoped) :attr binding throws on Angular
+  // specifically (the same trap openActionMenu's actionAnchor.label
+  // precomputation dodges above) — a source-level workaround, not an
+  // emitter change.
+  $data.argsState = { item, values: initArgValues(argList), label: labelText(item), argList }
+  $data.activeSurface = 'args'
+  $refs.combobox?.pinOpen(true)
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      focusFirstArgField()
+    })
+  } else {
+    focusFirstArgField()
+  }
+}
+
+// setArgValue(id, v): fresh-object write (the setup-once-persistence /
+// React-setState-is-async discipline — never member-mutate $data in place).
+const setArgValue = (id, v) => {
+  const state = $data.argsState
+  if (!state) return
+  $data.argsState = { ...state, values: { ...state.values, [id]: v } }
+}
+
+// setArgValueFor(id): a curried write helper — the #argsField slot scope's
+// `setValue` (mirrors data-table's editorCommitFor(colId) => (value) => …
+// curry-per-id pattern) rather than an inline arrow literal in the template
+// attribute.
+const setArgValueFor = (id) => (v) => setArgValue(id, v)
+
+// onArgFieldInput(id, e): the default (unfilled #argsField) field's own
+// @input handler — untyped `e` neutralizes to `any` so reading
+// e.target.value typechecks ×6 (the global-filter idiom; never inline
+// `$data.x = $event.target.value` directly in the template).
+const onArgFieldInput = (id, e) => {
+  setArgValue(id, e && e.target ? e.target.value : '')
+}
+
+// submitArgs(): captures a FRESH local of argList/values BEFORE any $data
+// write (the React stale-read guard — mirrors pushLevel/selectAction).
+// !canSubmitArgs -> focus the first unfilled required field and return (no
+// emit, no close — the "missing required" no-op). Otherwise fires the
+// EXISTING @select with the additive, trimmed `args` payload key, then
+// closes the args surface and — mirroring onComboboxChange's own leaf-select
+// path — closes the palette too iff closeOnSelect.
+const submitArgs = () => {
+  const state = $data.argsState
+  if (!state) return
+  const argList = state.argList
+  const values = state.values
+  if (!canSubmitArgs(argList, values)) {
+    focusArgFieldAt(firstUnfilledRequiredIndex(argList, values))
+    return
+  }
+  const item = state.item
+  const path = $data.levelStack.map((f) => (f.item ? f.item.id : null))
+  const args = buildArgsPayload(argList, values)
+  $emit('select', { item, path, args })
+  $data.activeValue = null
+  closeArgsSurface()
+  if ($props.closeOnSelect) closePalette()
+}
+
+// closeArgsSurface(): the focus-restore invariant — ALWAYS returns to the
+// list surface, releases keepOpen (pinOpen(false)), and reopens the combobox
+// popup with focus back on the search input (reopenComboboxPopup — reused
+// verbatim, the same primitive closeActionMenu uses).
+const closeArgsSurface = () => {
+  $data.activeSurface = 'list'
+  $data.argsState = null
+  $refs.combobox?.pinOpen(false)
+  reopenComboboxPopup()
+}
+
+// closeAnySurface(): a no-op at the list surface; otherwise routes to
+// whichever sub-surface transition-closer applies. The level-nav call sites
+// (pushLevel/goBack/jumpToLevel) always reset to the list surface first —
+// this is their single dispatch point so neither an open action menu NOR an
+// in-progress args surface (#12) can survive a level push/pop/jump.
+const closeAnySurface = () => {
+  if ($data.activeSurface === 'args') closeArgsSurface()
+  else if ($data.activeSurface !== 'list') closeActionMenu()
+}
+
 // roveAction(dir): disabled-skip clamped roving (internal/actionMenu.ts
 // rovingActionIndex — the combobox nextEnabled convention) over the anchored
 // item's actions, then moves real focus to the new index's menuitem.
@@ -1212,47 +1366,79 @@ $watch(() => $props.open, (isOpen) => {
     $model.query = ''
     $data.levelStack = []
     $data.activeValue = null
-    // Reset the action surface directly (NOT closeActionMenu — the palette is
-    // closing, so there is no combobox popup left to reopen/keepOpen-release;
-    // a plain reset keeps a reopen starting clean, per spec §Composition).
+    // Reset the action/args surface directly (NOT closeActionMenu/
+    // closeArgsSurface — the palette is closing, so there is no combobox
+    // popup left to reopen/keepOpen-release; a plain reset keeps a reopen
+    // starting clean, per spec §Composition).
     $data.activeSurface = 'list'
     $data.actionIndex = -1
     $data.actionAnchor = null
+    $data.argsState = null
     if (debounceTimerId != null) clearTimeout(debounceTimerId)
     debounceTimerId = null
     requestToken = nextRequestToken(requestToken)
   }
 })
 
-// Bubble-phase panel keydown (LVL-NAV, ACT-ARBITRATION, ACT-TRIGGER):
+// Bubble-phase panel keydown (LVL-NAV, ACT-ARBITRATION, ACT-TRIGGER, ARGS-
+// SURFACE/ARGS-SUBMIT/ARGS-ESCAPE):
 //   - Escape: routed through resolveEscape(activeSurface, currentDepth()) —
-//     the SINGLE precedence oracle (menu-close > level-pop > palette-close-
-//     at-root). A sub-surface open (activeSurface!=='list') ALWAYS wins —
-//     closeActionMenu() and STOP; only once the menu is closed does Escape
+//     the SINGLE precedence oracle (menu-close/args-close > level-pop >
+//     palette-close-at-root). A sub-surface open (activeSurface!=='list')
+//     ALWAYS wins — closeArgsSurface()/closeActionMenu() (whichever surface
+//     is open) and STOP; only once the sub-surface is closed does Escape
 //     fall through to level-pop or root-close on a LATER keypress. The
 //     vendored <Combobox> (a child) sees the Escape FIRST on the bubble path
 //     and closes its OWN popup (Combobox.rozie onKeydown → isOpen=false);
 //     goBack()'s reopenComboboxPopup() re-opens it afterward so the restored
 //     parent level's list is visible.
+//   - Args surface (activeSurface==='args', #12): Enter submits (via
+//     submitArgs — regardless of which field has focus, per spec "Enter
+//     submits when valid"); Backspace on an empty FIRST field pops back to
+//     the list (isFirstFieldEmpty, gated on e.target === the first field so
+//     backspacing in a LATER empty field just edits text normally). Neither
+//     falls through to the level-nav Backspace-pop below — args entry/exit
+//     never emits @navigate/@back (spec §Composition).
 //   - actionKey (⌘K) / caret-at-end Right-arrow (ACT-TRIGGER): open the
 //     action menu for the highlighted row, but ONLY while activeSurface is
 //     'list' (the menu owns these keys itself once open, via
 //     onActionMenuKeydown) and the row canOpenActions — a no-op otherwise
 //     (an action-less row, or no highlighted row).
 //   - Backspace on an empty query at depth>0 → pop one level, but ONLY while
-//     activeSurface==='list' (Backspace must never pop a level while the menu
-//     owns focus). Backspace does NOT close the combobox popup — its
-//     onKeydown ignores it — so the reopen is a harmless no-op cycle there.
-//     Otherwise Backspace edits the query text normally (never intercepted
-//     at the root or with text in the box).
+//     activeSurface==='list' (Backspace must never pop a level while a
+//     sub-surface owns focus). Backspace does NOT close the combobox popup —
+//     its onKeydown ignores it — so the reopen is a harmless no-op cycle
+//     there. Otherwise Backspace edits the query text normally (never
+//     intercepted at the root or with text in the box).
 const onPanelKeydown = (e) => {
   if (!e) return
   if (e.key === 'Escape') {
     e.preventDefault()
     const route = resolveEscape($data.activeSurface, currentDepth())
-    if (route === 'close-surface') closeActionMenu()
-    else if (route === 'pop-level') goBack()
+    if (route === 'close-surface') {
+      if ($data.activeSurface === 'args') closeArgsSurface()
+      else closeActionMenu()
+    } else if (route === 'pop-level') goBack()
     else closePalette()
+    return
+  }
+  if ($data.activeSurface === 'args') {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      submitArgs()
+      return
+    }
+    if (e.key === 'Backspace') {
+      const state = $data.argsState
+      const argList = state ? state.argList : []
+      const values = state ? state.values : {}
+      const frame = $refs.frame
+      const firstInput: any = frame ? frame.querySelector('[data-command-palette-args] input') : null
+      if (e.target === firstInput && isFirstFieldEmpty(argList, values)) {
+        e.preventDefault()
+        closeArgsSurface()
+      }
+    }
     return
   }
   if ($data.activeSurface === 'list') {
@@ -1385,6 +1571,19 @@ $expose({ show, close, toggle, focus, goBack, openTo })
       </slot>
     </div>
 
+    <!--
+      Inert-list wrapper (ARGS-SURFACE, feature #12) — a command-palette-OWNED
+      div (NOT a fallthrough onto <Combobox>'s own root, to keep the scoped
+      CSS selector match guaranteed ×6) that dims + aria-hides the vendored
+      <Combobox> while the args surface owns focus. The onComboboxChange
+      leading guard (above) is the FUNCTIONAL inertness (no stray @select);
+      this is the VISUAL/a11y half.
+    -->
+    <div
+      class="rozie-command-palette-list-region"
+      :class="{ 'rozie-command-palette-list-region--inert': $data.activeSurface === 'args' }"
+      :aria-hidden="!!($data.activeSurface === 'args')"
+    >
     <!--
       The vendored <Combobox> owns the search input + navigable results list +
       empty state. command-palette feeds it the pre-filtered command list
@@ -1531,6 +1730,61 @@ $expose({ show, close, toggle, focus, goBack, openTo })
         <slot name="empty" :query="query" r-if="currentStatus() === 'ready'">{{ $props.emptyText }}</slot>
       </template>
     </Combobox>
+    </div>
+
+    <!--
+      Panel-internal args surface (ARGS-SURFACE/ARGS-SUBMIT/ARGS-RENDER,
+      feature #12) — a command-palette-OWNED panel sibling (like the async
+      status region below), gated by activeSurface==='args'. Reuses
+      openArgsSurface/closeArgsSurface's pinOpen(true/false)+
+      reopenComboboxPopup() mechanics verbatim (the sub-actions precedent,
+      ACT-KEEPOPEN). Enter/Backspace/Escape for this surface are handled by
+      the EXISTING onPanelKeydown bubble-phase funnel above (the inputs below
+      are DOM descendants of $refs.frame — no separate keydown handler
+      needed). A non-interactive aria-hidden chip (reusing the breadcrumb
+      current-segment styling) shows the pending command's label
+      (precomputed into argsState.label at open-time — the Angular
+      bare-helper-in-:attr trap); the fields loop renders the optional
+      #argsField slot (scope { item, arg, value, setValue }) with a real
+      <input> default fill.
+    -->
+    <div
+      r-if="$data.activeSurface === 'args'"
+      data-command-palette-args
+      data-testid="command-palette-args"
+      class="rozie-command-palette-args"
+      role="group"
+      :aria-label="'Arguments for ' + ($data.argsState ? $data.argsState.label : '')"
+    >
+      <span
+        class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current"
+        data-testid="command-palette-args-chip"
+        aria-hidden="true"
+      >{{ $data.argsState ? $data.argsState.label : '' }}</span>
+      <span
+        r-for="arg, argIdx in ($data.argsState ? $data.argsState.argList : [])"
+        :key="arg.id"
+        class="rozie-command-palette-args-field"
+      >
+        <slot
+          name="argsField"
+          :item="$data.argsState ? $data.argsState.item : null"
+          :arg="arg"
+          :value="$data.argsState ? $data.argsState.values[arg.id] : ''"
+          :setValue="setArgValueFor(arg.id)"
+        >
+          <input
+            type="text"
+            class="rozie-command-palette-args-input"
+            data-testid="command-palette-args-input"
+            :value="$data.argsState ? $data.argsState.values[arg.id] : ''"
+            :placeholder="arg.placeholder || arg.id"
+            :aria-label="arg.placeholder || arg.id"
+            @input="onArgFieldInput(arg.id, $event)"
+          />
+        </slot>
+      </span>
+    </div>
 
     <!--
       Async status region (LVL-ASYNC) — command-palette-OWNED panel markup (a
@@ -1965,6 +2219,60 @@ $expose({ show, close, toggle, focus, goBack, openTo })
   padding: var(--rozie-command-palette-empty-padding, 1.5rem);
   text-align: center;
   color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
+}
+
+/*
+  Inert-list wrapper (ARGS-SURFACE, feature #12) — dims + disables pointer
+  interaction on the vendored <Combobox> while the args surface owns focus.
+  The onComboboxChange leading guard is the functional half; this is the
+  visual half. Not tokenized beyond the dim opacity (structural, mirrors the
+  action-menu-item--disabled precedent).
+*/
+.rozie-command-palette-list-region--inert {
+  pointer-events: none;
+  opacity: var(--rozie-command-palette-args-dim-opacity, 0.45);
+}
+
+/*
+  Panel-internal args surface (ARGS-RENDER, feature #12) — the chip + fields
+  form rendered in place of the (now-inert) result list. Every visual value
+  is a var(--rozie-command-palette-args-*, <fallback>), aliasing the
+  existing panel/input tokens (mirrors the option/footer/breadcrumb token
+  conventions above).
+*/
+.rozie-command-palette-args {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rozie-command-palette-args-gap, 0.5rem);
+  padding: var(--rozie-command-palette-args-padding, 0.75rem);
+}
+
+/* Reuses the breadcrumb current-segment styling (color/weight) per the
+   design's chip precedent — this class adds the chip-specific bg/padding. */
+.rozie-command-palette-args-chip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: var(--rozie-command-palette-args-chip-padding, 0.125rem 0.5rem);
+  color: var(--rozie-command-palette-args-chip-color, inherit);
+  background: var(--rozie-command-palette-args-chip-bg, rgba(0, 0, 0, 0.06));
+  border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+}
+
+.rozie-command-palette-args-field {
+  display: block;
+}
+
+.rozie-command-palette-args-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--rozie-command-palette-args-field-padding, var(--rozie-command-palette-input-padding, 0.5rem 0.75rem));
+  font: inherit;
+  color: inherit;
+  background: var(--rozie-command-palette-args-field-bg, var(--rozie-command-palette-input-bg, transparent));
+  border: var(--rozie-command-palette-args-field-border, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
+  border-radius: var(--rozie-command-palette-args-field-radius, var(--rozie-command-palette-input-radius, 0.5rem));
+  outline: none;
 }
 
 /* LVL-ASYNC status states re-projected inside combobox's #empty region. */

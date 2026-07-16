@@ -87,6 +87,7 @@ export interface CommandPaletteProps {
   renderOption?: (params: { option: () => void; index: () => void; active: () => void; selected: () => void; disabled: () => void; matches: unknown }) => ReactNode;
   renderGroupHeading?: (params: { group: () => void }) => ReactNode;
   renderEmpty?: (params: { query: string }) => ReactNode;
+  renderArgsField?: (params: { item: unknown; arg: () => void; value: unknown; setValue: unknown }) => ReactNode;
   renderLoading?: (params: { query: string }) => ReactNode;
   renderError?: (params: { query: string; error: unknown; retry: () => void }) => ReactNode;
   renderFooter?: () => ReactNode;

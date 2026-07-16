@@ -7,6 +7,7 @@ import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
+import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
 import { deriveCommandGroups } from './internal/commandGroups';
 import { formatKeyToken } from './internal/formatKeyToken';
 
@@ -46,6 +47,14 @@ interface GroupHeadingCtx {
 interface EmptyCtx {
   $implicit: { query: any };
   query: any;
+}
+
+interface ArgsFieldCtx {
+  $implicit: { item: any; arg: any; value: any; setValue: any };
+  item: any;
+  arg: any;
+  value: any;
+  setValue: any;
 }
 
 interface LoadingCtx {
@@ -140,7 +149,9 @@ function __rozieAttr(v: unknown): string | null {
           
     }
         </div>
-    }<rozie-combobox #combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="orderedItems()" [groups]="commandGroups()" [groupCap]="groupCap()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="currentPlaceholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
+    }<div class="rozie-command-palette-list-region" [ngClass]="{ 'rozie-command-palette-list-region--inert': activeSurface() === 'args' }" [attr.aria-hidden]="!!(activeSurface() === 'args')">
+        
+        <rozie-combobox #combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="orderedItems()" [groups]="commandGroups()" [groupCap]="groupCap()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="currentPlaceholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
             <span class="rozie-command-palette-option-anchor" [attr.data-cp-value]="rozieAttr(commandValue(option))">
             @if ((optionTpl ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }, option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }" />
@@ -200,9 +211,25 @@ function __rozieAttr(v: unknown): string | null {
     {{ emptyText() }}
     }
     }</ng-template></rozie-combobox>
+        </div>
 
         
-        @if (currentStatus() === 'loading') {
+        @if (activeSurface() === 'args') {
+    <div data-command-palette-args="" data-testid="command-palette-args" class="rozie-command-palette-args" role="group" [attr.aria-label]="rozieAttr(__attr_aria_label)">
+          <span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true">{{ rozieDisplay(argsState() ? argsState().label : '') }}</span>
+          @for (arg of argsState() ? argsState().argList : []; track arg.id; let argIdx = $index) {
+    <span class="rozie-command-palette-args-field">
+            @if ((argsFieldTpl ?? templates()?.['argsField'])) {
+    <ng-container *ngTemplateOutlet="(argsFieldTpl ?? templates()?.['argsField']); context: { $implicit: { item: argsState() ? argsState().item : null, arg: arg, value: argsState() ? argsState().values[arg.id] : '', setValue: setArgValueFor(arg.id) }, item: argsState() ? argsState().item : null, arg: arg, value: argsState() ? argsState().values[arg.id] : '', setValue: setArgValueFor(arg.id) }" />
+    } @else {
+
+              <input type="text" class="rozie-command-palette-args-input" data-testid="command-palette-args-input" [value]="argsState() ? argsState().values[arg.id] : ''" [attr.placeholder]="rozieAttr(arg.placeholder || arg.id)" [attr.aria-label]="rozieAttr(arg.placeholder || arg.id)" (input)="onArgFieldInput(arg.id, $event)" />
+            
+    }
+          </span>
+    }
+        </div>
+    }@if (currentStatus() === 'loading') {
     <div class="rozie-command-palette-loading">
           @if ((loadingTpl ?? templates()?.['loading'])) {
     <ng-container *ngTemplateOutlet="(loadingTpl ?? templates()?.['loading']); context: { $implicit: { query: query() }, query: query() }" />
@@ -224,7 +251,7 @@ function __rozieAttr(v: unknown): string | null {
 
       
       @if (atActions()) {
-    <div data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" [attr.aria-label]="rozieAttr(__attr_aria_label)" [attr.style]="'top:' + actionMenuTop() + 'px'" (keydown)="onActionMenuKeydown($event)">
+    <div data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" [attr.aria-label]="rozieAttr(__attr_aria_label_2)" [attr.style]="'top:' + actionMenuTop() + 'px'" (keydown)="onActionMenuKeydown($event)">
         @for (action of actionAnchor() ? actionAnchor().actions : []; track action.id; let ai = $index) {
     <div class="rozie-command-palette-actions-menu-item" [ngClass]="{ 'rozie-command-palette-actions-menu-item--active': ai === actionIndex(), 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }" role="menuitem" data-testid="command-palette-action-item" [attr.aria-disabled]="!!action.disabled" tabindex="-1" (mouseenter)="actionIndex.set(Number(ai))" (mousedown)="$event.preventDefault(); selectAction(action)">
           @if ((actionItemTpl ?? templates()?.['actionItem'])) {
@@ -499,6 +526,39 @@ function __rozieAttr(v: unknown): string | null {
       text-align: center;
       color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
     }
+    .rozie-command-palette-list-region--inert {
+      pointer-events: none;
+      opacity: var(--rozie-command-palette-args-dim-opacity, 0.45);
+    }
+    .rozie-command-palette-args {
+      display: flex;
+      flex-direction: column;
+      gap: var(--rozie-command-palette-args-gap, 0.5rem);
+      padding: var(--rozie-command-palette-args-padding, 0.75rem);
+    }
+    .rozie-command-palette-args-chip {
+      display: inline-flex;
+      align-items: center;
+      align-self: flex-start;
+      padding: var(--rozie-command-palette-args-chip-padding, 0.125rem 0.5rem);
+      color: var(--rozie-command-palette-args-chip-color, inherit);
+      background: var(--rozie-command-palette-args-chip-bg, rgba(0, 0, 0, 0.06));
+      border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+    }
+    .rozie-command-palette-args-field {
+      display: block;
+    }
+    .rozie-command-palette-args-input {
+      box-sizing: border-box;
+      width: 100%;
+      padding: var(--rozie-command-palette-args-field-padding, var(--rozie-command-palette-input-padding, 0.5rem 0.75rem));
+      font: inherit;
+      color: inherit;
+      background: var(--rozie-command-palette-args-field-bg, var(--rozie-command-palette-input-bg, transparent));
+      border: var(--rozie-command-palette-args-field-border, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
+      border-radius: var(--rozie-command-palette-args-field-radius, var(--rozie-command-palette-input-radius, 0.5rem));
+      outline: none;
+    }
     .rozie-command-palette-loading {
       padding: var(--rozie-command-palette-empty-padding, 1.5rem);
       text-align: center;
@@ -596,6 +656,7 @@ export class CommandPalette {
   actionIndex = signal(-1);
   actionAnchor = signal<any>(null);
   actionMenuTop = signal(0);
+  argsState = signal<any>(null);
   frame = viewChild<ElementRef<HTMLDivElement>>('frame');
   panel = viewChild<ElementRef<HTMLDivElement>>('panel');
   combobox = viewChild<Combobox>('combobox');
@@ -607,6 +668,7 @@ export class CommandPalette {
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('groupHeading', { read: TemplateRef }) groupHeadingTpl?: TemplateRef<GroupHeadingCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
+  @ContentChild('argsField', { read: TemplateRef }) argsFieldTpl?: TemplateRef<ArgsFieldCtx>;
   @ContentChild('loading', { read: TemplateRef }) loadingTpl?: TemplateRef<LoadingCtx>;
   @ContentChild('error', { read: TemplateRef }) errorTpl?: TemplateRef<ErrorCtx>;
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
@@ -626,12 +688,14 @@ export class CommandPalette {
         this.query.set('');
         this.levelStack.set([]);
         this.activeValue.set(null);
-        // Reset the action surface directly (NOT closeActionMenu — the palette is
-        // closing, so there is no combobox popup left to reopen/keepOpen-release;
-        // a plain reset keeps a reopen starting clean, per spec §Composition).
+        // Reset the action/args surface directly (NOT closeActionMenu/
+        // closeArgsSurface — the palette is closing, so there is no combobox
+        // popup left to reopen/keepOpen-release; a plain reset keeps a reopen
+        // starting clean, per spec §Composition).
         this.activeSurface.set('list');
         this.actionIndex.set(-1);
         this.actionAnchor.set(null);
+        this.argsState.set(null);
         if (this.debounceTimerId != null) clearTimeout(this.debounceTimerId);
         this.debounceTimerId = null;
         this.requestToken = nextRequestToken(this.requestToken);
@@ -777,9 +841,9 @@ export class CommandPalette {
   };
   pushLevel = (item: any) => {
     // Level nav always resets to the list surface (spec §Composition) — a
-    // navigating item's own action menu, if somehow open, must not survive
-    // the push.
-    if (this.activeSurface() !== 'list') this.closeActionMenu();
+    // navigating item's own action menu (or, feature #12, an in-progress args
+    // surface), if somehow open, must not survive the push.
+    this.closeAnySurface();
     const nextStack = pushFrame(this.levelStack(), item, this.query());
     this.levelStack.set(nextStack);
     this.query.set('');
@@ -801,8 +865,8 @@ export class CommandPalette {
   goBack = () => {
     if (this.levelStack().length === 0) return;
     // Level nav always resets to the list surface (spec §Composition) — pop
-    // closes an open action menu FIRST.
-    if (this.activeSurface() !== 'list') this.closeActionMenu();
+    // closes an open action menu (or args surface, feature #12) FIRST.
+    this.closeAnySurface();
     const {
       stack,
       restoreQuery
@@ -821,7 +885,7 @@ export class CommandPalette {
     if (targetDepth < 0 || targetDepth >= stack.length) return;
     // Level nav always resets to the list surface (spec §Composition) — mirror
     // goBack: a jump always resets to the list surface FIRST.
-    if (this.activeSurface() !== 'list') this.closeActionMenu();
+    this.closeAnySurface();
     let restoreQuery: any = null;
     while (stack.length > targetDepth) {
       const popped = popFrame(stack);
@@ -887,8 +951,22 @@ export class CommandPalette {
     }
   };
   onComboboxChange = (e: any) => {
+    // Inert guard (ARGS-SURFACE): the result list stays visibly open (dimmed +
+    // aria-hidden) while the args surface owns focus — a stray commit from the
+    // combobox (e.g. a residual pointer event) must never fire a leaf @select
+    // out from under an in-progress args form. The onComboboxChange handler is
+    // the SAME single entry point args auto-entry uses below, so this leading
+    // guard covers every path.
+    if (this.activeSurface() === 'args') return;
     const item = e ? e.option : null;
     if (!item || item.disabled) return;
+    // args WINS over source/children navigation (spec: args × source mutually
+    // exclusive) — checked BEFORE isNavigating so a source+args item enters
+    // the args surface, never a child level.
+    if (hasArgs(item)) {
+      this.openArgsSurface(item);
+      return;
+    }
     if (isNavigating(item)) {
       this.pushLevel(item);
       return;
@@ -1059,6 +1137,92 @@ export class CommandPalette {
     this.combobox()?.pinOpen(false);
     this.reopenComboboxPopup();
   };
+  focusFirstArgField = () => {
+    const frame = this.frame()?.nativeElement;
+    if (!frame) return;
+    const el: any = frame.querySelector('[data-command-palette-args] input');
+    if (el && typeof el.focus === 'function') el.focus();
+    if (el && typeof el.select === 'function') el.select();
+  };
+  focusArgFieldAt = (idx: any) => {
+    const frame = this.frame()?.nativeElement;
+    if (!frame) return;
+    const els: any = frame.querySelectorAll('[data-command-palette-args] input');
+    const el: any = els[idx];
+    if (el && typeof el.focus === 'function') el.focus();
+  };
+  openArgsSurface = (item: any) => {
+    if (!hasArgs(item)) return;
+    const argList = argsOf(item);
+    // The chip's :aria-label reads $data.argsState.label (a plain PROPERTY
+    // read, computed here in script) rather than calling labelText(item)
+    // directly from a template attribute binding — a bare top-level-helper
+    // CALL inside a plain (non-slot-scoped) :attr binding throws on Angular
+    // specifically (the same trap openActionMenu's actionAnchor.label
+    // precomputation dodges above) — a source-level workaround, not an
+    // emitter change.
+    this.argsState.set({
+      item,
+      values: initArgValues(argList),
+      label: this.labelText(item),
+      argList
+    });
+    this.activeSurface.set('args');
+    this.combobox()?.pinOpen(true);
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        this.focusFirstArgField();
+      });
+    } else {
+      this.focusFirstArgField();
+    }
+  };
+  setArgValue = (id: any, v: any) => {
+    const state = this.argsState();
+    if (!state) return;
+    this.argsState.set({
+      ...state,
+      values: {
+        ...state.values,
+        [id]: v
+      }
+    });
+  };
+  setArgValueFor = (id: any) => (v: any) => this.setArgValue(id, v);
+  onArgFieldInput = (id: any, e: any) => {
+    this.setArgValue(id, e && e.target ? e.target.value : '');
+  };
+  submitArgs = () => {
+    const state = this.argsState();
+    if (!state) return;
+    const argList = state.argList;
+    const values = state.values;
+    if (!canSubmitArgs(argList, values)) {
+      this.focusArgFieldAt(firstUnfilledRequiredIndex(argList, values));
+      return;
+    }
+    const item = state.item;
+    const path = this.levelStack().map((f: any) => f.item ? f.item.id : null);
+    const args = buildArgsPayload(argList, values);
+    this.select.emit({
+      item,
+      path,
+      args
+    });
+    this.activeValue.set(null);
+    this.closeArgsSurface();
+    if (this.closeOnSelect()) this.closePalette();
+  };
+  closeArgsSurface = () => {
+    this.activeSurface.set('list');
+    this.argsState.set(null);
+    this.combobox()?.pinOpen(false);
+    this.reopenComboboxPopup();
+  };
+  closeAnySurface = () => {
+    const __activeSurface = this.activeSurface();
+    if (__activeSurface === 'args') this.closeArgsSurface();else if (__activeSurface !== 'list') this.closeActionMenu();
+  };
   roveAction = (dir: any) => {
     const anchor = this.actionAnchor();
     if (!anchor) return;
@@ -1134,7 +1298,28 @@ export class CommandPalette {
     if (e.key === 'Escape') {
       e.preventDefault();
       const route = resolveEscape(__activeSurface, this.currentDepth());
-      if (route === 'close-surface') this.closeActionMenu();else if (route === 'pop-level') this.goBack();else this.closePalette();
+      if (route === 'close-surface') {
+        if (__activeSurface === 'args') this.closeArgsSurface();else this.closeActionMenu();
+      } else if (route === 'pop-level') this.goBack();else this.closePalette();
+      return;
+    }
+    if (__activeSurface === 'args') {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.submitArgs();
+        return;
+      }
+      if (e.key === 'Backspace') {
+        const state = this.argsState();
+        const argList = state ? state.argList : [];
+        const values = state ? state.values : {};
+        const frame = this.frame()?.nativeElement;
+        const firstInput: any = frame ? frame.querySelector('[data-command-palette-args] input') : null;
+        if (e.target === firstInput && isFirstFieldEmpty(argList, values)) {
+          e.preventDefault();
+          this.closeArgsSurface();
+        }
+      }
       return;
     }
     if (__activeSurface === 'list') {
@@ -1176,7 +1361,7 @@ export class CommandPalette {
   static ngTemplateContextGuard(
     _dir: CommandPalette,
     _ctx: unknown,
-  ): _ctx is BreadcrumbCtx | OptionCtx | GroupHeadingCtx | EmptyCtx | LoadingCtx | ErrorCtx | FooterCtx | ActionItemCtx | IconCtx | ActionsCtx | TrailingCtx {
+  ): _ctx is BreadcrumbCtx | OptionCtx | GroupHeadingCtx | EmptyCtx | ArgsFieldCtx | LoadingCtx | ErrorCtx | FooterCtx | ActionItemCtx | IconCtx | ActionsCtx | TrailingCtx {
     return true;
   }
 
@@ -1226,6 +1411,11 @@ export class CommandPalette {
   });
 
   protected get __attr_aria_label() {
+      const __argsState = this.argsState();
+      return 'Arguments for ' + (__argsState ? __argsState.label : '');
+    }
+
+  protected get __attr_aria_label_2() {
       const __actionAnchor = this.actionAnchor();
       return __actionAnchor ? __actionAnchor.label : null;
     }

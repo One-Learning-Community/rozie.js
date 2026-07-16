@@ -12,10 +12,10 @@
  *
  * The load-bearing design constraint: every helper here models a GENERIC
  * keyboard-owning sub-surface, never a menu-only shape — `ActiveSurface` is
- * `'list' | 'actions'` today, and feature #12 (inline command arguments)
- * extends it to add `'args'` with ZERO rework of these primitives. Keep it
- * that way: no helper here should read "menu" into its logic beyond the
- * literal string value passed in by the caller.
+ * `'list' | 'actions' | 'args'`, feature #12 (inline command arguments)
+ * having added `'args'` with ZERO rework of these primitives. Keep it that
+ * way: no helper here should read "menu" into its logic beyond the literal
+ * string value passed in by the caller.
  */
 
 /** A single row-level action item (the consumer-supplied `item.actions[]` entries). */
@@ -40,12 +40,12 @@ export interface ActionableItem {
 
 /**
  * The keyboard-owning sub-surface. `'list'` is the default (the vendored
- * combobox owns arrows/Enter). `'actions'` is the action menu.
- * extends to 'args' (#12) — feature #12 (inline command arguments) widens
- * this union with zero rework of the transition helpers below; none of them
- * branch on the literal surface value beyond echoing it through.
+ * combobox owns arrows/Enter). `'actions'` is the action menu. `'args'`
+ * (inline command arguments, this phase) is the panel-internal args form —
+ * none of the transition helpers below branch on the literal surface value
+ * beyond echoing it through, so `'args'` needed zero rework of them.
  */
-export type ActionSurface = 'list' | 'actions';
+export type ActionSurface = 'list' | 'actions' | 'args';
 
 /** The reducer's full state — surface-agnostic (works for any sub-surface). */
 export interface ActionMenuState {

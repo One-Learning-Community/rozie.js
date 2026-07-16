@@ -10,6 +10,7 @@ import { scoreCommands, labelHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
+import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
 import { deriveCommandGroups } from './internal/commandGroups';
 import { formatKeyToken } from './internal/formatKeyToken';
 
@@ -45,6 +46,13 @@ interface RozieGroupHeadingSlotCtx {
 
 interface RozieEmptySlotCtx {
   query: unknown;
+}
+
+interface RozieArgsFieldSlotCtx {
+  item: unknown;
+  arg: unknown;
+  value: unknown;
+  setValue: unknown;
 }
 
 interface RozieLoadingSlotCtx {
@@ -333,6 +341,39 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   text-align: center;
   color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
 }
+.rozie-command-palette-list-region--inert[data-rozie-s-768cad96] {
+  pointer-events: none;
+  opacity: var(--rozie-command-palette-args-dim-opacity, 0.45);
+}
+.rozie-command-palette-args[data-rozie-s-768cad96] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rozie-command-palette-args-gap, 0.5rem);
+  padding: var(--rozie-command-palette-args-padding, 0.75rem);
+}
+.rozie-command-palette-args-chip[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: var(--rozie-command-palette-args-chip-padding, 0.125rem 0.5rem);
+  color: var(--rozie-command-palette-args-chip-color, inherit);
+  background: var(--rozie-command-palette-args-chip-bg, rgba(0, 0, 0, 0.06));
+  border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+}
+.rozie-command-palette-args-field[data-rozie-s-768cad96] {
+  display: block;
+}
+.rozie-command-palette-args-input[data-rozie-s-768cad96] {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--rozie-command-palette-args-field-padding, var(--rozie-command-palette-input-padding, 0.5rem 0.75rem));
+  font: inherit;
+  color: inherit;
+  background: var(--rozie-command-palette-args-field-bg, var(--rozie-command-palette-input-bg, transparent));
+  border: var(--rozie-command-palette-args-field-border, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
+  border-radius: var(--rozie-command-palette-args-field-radius, var(--rozie-command-palette-input-radius, 0.5rem));
+  outline: none;
+}
 .rozie-command-palette-loading[data-rozie-s-768cad96] {
   padding: var(--rozie-command-palette-empty-padding, 1.5rem);
   text-align: center;
@@ -431,6 +472,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   private _actionIndex = signal(-1);
   private _actionAnchor = signal<any>(null);
   private _actionMenuTop = signal(0);
+  private _argsState = signal<any>(null);
   @query('[data-rozie-ref="frame"]') private _refFrame!: HTMLElement;
   @query('[data-rozie-ref="panel"]') private _refPanel!: HTMLElement;
   @query('[data-rozie-ref="combobox"]') private _refCombobox!: Combobox;
@@ -451,6 +493,9 @@ private __rozieWatchInitial_0 = true;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
   @property({ attribute: false }) empty?: (scope: { query: unknown }) => unknown;
+  @state() private _hasSlotArgsField = false;
+  @queryAssignedElements({ slot: 'argsField', flatten: true }) private _slotArgsFieldElements!: Element[];
+  @property({ attribute: false }) argsField?: (scope: { item: unknown; arg: unknown; value: unknown; setValue: unknown }) => unknown;
   @state() private _hasSlotLoading = false;
   @queryAssignedElements({ slot: 'loading', flatten: true }) private _slotLoadingElements!: Element[];
   @property({ attribute: false }) loading?: (scope: { query: unknown }) => unknown;
@@ -515,6 +560,17 @@ private __rozieWatchInitial_0 = true;
       const slotEl = this.shadowRoot?.querySelector('slot[name="empty"]');
       if (slotEl !== null && slotEl !== undefined) {
         const update = () => { this._hasSlotEmpty = this._slotEmptyElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="argsField"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotArgsField = this._slotArgsFieldElements.length > 0; };
         slotEl.addEventListener('slotchange', update);
         // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
         this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
@@ -606,6 +662,7 @@ private __rozieWatchInitial_0 = true;
     this._hasSlotOption = Array.from(this.children).some((el) => el.getAttribute('slot') === 'option');
     this._hasSlotGroupHeading = Array.from(this.children).some((el) => el.getAttribute('slot') === 'groupHeading');
     this._hasSlotEmpty = Array.from(this.children).some((el) => el.getAttribute('slot') === 'empty');
+    this._hasSlotArgsField = Array.from(this.children).some((el) => el.getAttribute('slot') === 'argsField');
     this._hasSlotLoading = Array.from(this.children).some((el) => el.getAttribute('slot') === 'loading');
     this._hasSlotError = Array.from(this.children).some((el) => el.getAttribute('slot') === 'error');
     this._hasSlotFooter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'footer');
@@ -625,12 +682,14 @@ private __rozieWatchInitial_0 = true;
         this._queryControllable.write('');
         this._levelStack.value = [];
         this._activeValue.value = null;
-        // Reset the action surface directly (NOT closeActionMenu — the palette is
-        // closing, so there is no combobox popup left to reopen/keepOpen-release;
-        // a plain reset keeps a reopen starting clean, per spec §Composition).
+        // Reset the action/args surface directly (NOT closeActionMenu/
+        // closeArgsSurface — the palette is closing, so there is no combobox
+        // popup left to reopen/keepOpen-release; a plain reset keeps a reopen
+        // starting clean, per spec §Composition).
         this._activeSurface.value = 'list';
         this._actionIndex.value = -1;
         this._actionAnchor.value = null;
+        this._argsState.value = null;
         if (this.debounceTimerId != null) clearTimeout(this.debounceTimerId);
         this.debounceTimerId = null;
         this.requestToken = nextRequestToken(this.requestToken);
@@ -674,7 +733,9 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
             ${Number(ei) > 0 ? html`<span class="rozie-command-palette-breadcrumb-separator" aria-hidden="true" data-rozie-s-768cad96>›</span>` : nothing}${Number(ei) < this.breadcrumbStack().length - 1 ? html`<button class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link" type="button" aria-label=${rozieAttr('Back to ' + entry.title)} data-testid="command-palette-breadcrumb-jump" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.jumpToLevel(Number(ei)); }} data-rozie-s-768cad96>${rozieDisplay(entry.title)}</button>` : html`<span class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-title" data-rozie-s-768cad96>${rozieDisplay(entry.title)}</span>`}</span>`)}
         </nav>
       </slot>`}
-    </div>` : nothing}<rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
+    </div>` : nothing}<div class="${Object.entries({ "rozie-command-palette-list-region": true, 'rozie-command-palette-list-region--inert': this._activeSurface.value === 'args' }).filter(([, v]) => v).map(([k]) => k).join(' ')}" aria-hidden=${!!(this._activeSurface.value === 'args')} data-rozie-s-768cad96>
+    
+    <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
         <span class="rozie-command-palette-option-anchor" data-cp-value=${rozieAttr(this.commandValue(scope.option))} data-rozie-s-768cad96>
         ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}); } catch { return '{}'; } })()}>
           <div class="rozie-command-palette-option" data-rozie-s-768cad96>
@@ -698,9 +759,17 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
         ${this.groupHeading !== undefined ? this.groupHeading({group: scope.group}) : html`<slot name="groupHeading" data-rozie-params=${(() => { try { return JSON.stringify({group: scope.group}); } catch { return '{}'; } })()}>${rozieDisplay(this.groupLabel(scope.group))}</slot>`}
       `} .empty=${(scope: { query: unknown }) => html`
         ${this.currentStatus() === 'ready' ? html`${this.empty !== undefined ? this.empty({query: scope.query}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: scope.query}); } catch { return '{}'; } })()}>${this.emptyText}</slot>`}` : nothing}`} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}></rozie-combobox>
+    </div>
 
     
-    ${this.currentStatus() === 'loading' ? html`<div class="rozie-command-palette-loading" data-rozie-s-768cad96>
+    ${this._activeSurface.value === 'args' ? html`<div class="rozie-command-palette-args" data-command-palette-args="" data-testid="command-palette-args" role="group" aria-label=${rozieAttr('Arguments for ' + (this._argsState.value ? this._argsState.value.label : ''))} data-rozie-s-768cad96>
+      <span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true" data-rozie-s-768cad96>${rozieDisplay(this._argsState.value ? this._argsState.value.label : '')}</span>
+      ${repeat<any>(this._argsState.value ? this._argsState.value.argList : [], (arg, argIdx) => arg.id, (arg, argIdx) => html`<span class="rozie-command-palette-args-field" key=${rozieAttr(arg.id)} data-rozie-s-768cad96>
+        ${this.argsField !== undefined ? this.argsField({item: this._argsState.value ? this._argsState.value.item : null, arg: arg, value: this._argsState.value ? this._argsState.value.values[arg.id] : '', setValue: this.setArgValueFor(arg.id)}) : html`<slot name="argsField" data-rozie-params=${(() => { try { return JSON.stringify({item: this._argsState.value ? this._argsState.value.item : null, arg: arg, value: this._argsState.value ? this._argsState.value.values[arg.id] : '', setValue: this.setArgValueFor(arg.id)}); } catch { return '{}'; } })()}>
+          <input class="rozie-command-palette-args-input" type="text" data-testid="command-palette-args-input" .value=${this._argsState.value ? this._argsState.value.values[arg.id] : ''} placeholder=${rozieAttr(arg.placeholder || arg.id)} aria-label=${rozieAttr(arg.placeholder || arg.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onArgFieldInput(arg.id, $event); }} data-rozie-s-768cad96 />
+        </slot>`}
+      </span>`)}
+    </div>` : nothing}${this.currentStatus() === 'loading' ? html`<div class="rozie-command-palette-loading" data-rozie-s-768cad96>
       ${this.loading !== undefined ? this.loading({query: this.query}) : html`<slot name="loading" data-rozie-params=${(() => { try { return JSON.stringify({query: this.query}); } catch { return '{}'; } })()}>Loading…</slot>`}
     </div>` : this.currentStatus() === 'error' ? html`<div class="rozie-command-palette-error" data-rozie-s-768cad96>
       ${this.error !== undefined ? this.error({query: this.query, error: this.currentError(), retry: this.retryCurrentLevel}) : html`<slot name="error" data-rozie-params=${(() => { try { return JSON.stringify({query: this.query, error: this.currentError()}); } catch { return '{}'; } })()} @rozie-error-retry=${($event: CustomEvent) => ((this.retryCurrentLevel) as (...args: any[]) => any)($event.detail)}></slot>`}
@@ -888,9 +957,9 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
 
   pushLevel = (item: any) => {
   // Level nav always resets to the list surface (spec §Composition) — a
-  // navigating item's own action menu, if somehow open, must not survive
-  // the push.
-  if (this._activeSurface.value !== 'list') this.closeActionMenu();
+  // navigating item's own action menu (or, feature #12, an in-progress args
+  // surface), if somehow open, must not survive the push.
+  this.closeAnySurface();
   const nextStack = pushFrame(this._levelStack.value, item, this.query);
   this._levelStack.value = nextStack;
   this._queryControllable.write('');
@@ -917,8 +986,8 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   goBack = () => {
   if (this._levelStack.value.length === 0) return;
   // Level nav always resets to the list surface (spec §Composition) — pop
-  // closes an open action menu FIRST.
-  if (this._activeSurface.value !== 'list') this.closeActionMenu();
+  // closes an open action menu (or args surface, feature #12) FIRST.
+  this.closeAnySurface();
   const {
     stack,
     restoreQuery
@@ -942,7 +1011,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   if (targetDepth < 0 || targetDepth >= stack.length) return;
   // Level nav always resets to the list surface (spec §Composition) — mirror
   // goBack: a jump always resets to the list surface FIRST.
-  if (this._activeSurface.value !== 'list') this.closeActionMenu();
+  this.closeAnySurface();
   let restoreQuery: any = null;
   while (stack.length > targetDepth) {
     const popped = popFrame(stack);
@@ -1014,8 +1083,22 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
 };
 
   onComboboxChange = (e: any) => {
+  // Inert guard (ARGS-SURFACE): the result list stays visibly open (dimmed +
+  // aria-hidden) while the args surface owns focus — a stray commit from the
+  // combobox (e.g. a residual pointer event) must never fire a leaf @select
+  // out from under an in-progress args form. The onComboboxChange handler is
+  // the SAME single entry point args auto-entry uses below, so this leading
+  // guard covers every path.
+  if (this._activeSurface.value === 'args') return;
   const item = e ? e.option : null;
   if (!item || item.disabled) return;
+  // args WINS over source/children navigation (spec: args × source mutually
+  // exclusive) — checked BEFORE isNavigating so a source+args item enters
+  // the args surface, never a child level.
+  if (hasArgs(item)) {
+    this.openArgsSurface(item);
+    return;
+  }
   if (isNavigating(item)) {
     this.pushLevel(item);
     return;
@@ -1202,6 +1285,104 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   this.reopenComboboxPopup();
 };
 
+  focusFirstArgField = () => {
+  const frame = this._refFrame;
+  if (!frame) return;
+  const el: any = frame.querySelector('[data-command-palette-args] input');
+  if (el && typeof el.focus === 'function') el.focus();
+  if (el && typeof el.select === 'function') el.select();
+};
+
+  focusArgFieldAt = (idx: any) => {
+  const frame = this._refFrame;
+  if (!frame) return;
+  const els: any = frame.querySelectorAll('[data-command-palette-args] input');
+  const el: any = els[idx];
+  if (el && typeof el.focus === 'function') el.focus();
+};
+
+  openArgsSurface = (item: any) => {
+  if (!hasArgs(item)) return;
+  const argList = argsOf(item);
+  // The chip's :aria-label reads $data.argsState.label (a plain PROPERTY
+  // read, computed here in script) rather than calling labelText(item)
+  // directly from a template attribute binding — a bare top-level-helper
+  // CALL inside a plain (non-slot-scoped) :attr binding throws on Angular
+  // specifically (the same trap openActionMenu's actionAnchor.label
+  // precomputation dodges above) — a source-level workaround, not an
+  // emitter change.
+  this._argsState.value = {
+    item,
+    values: initArgValues(argList),
+    label: this.labelText(item),
+    argList
+  };
+  this._activeSurface.value = 'args';
+  this._refCombobox?.pinOpen(true);
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      this.focusFirstArgField();
+    });
+  } else {
+    this.focusFirstArgField();
+  }
+};
+
+  setArgValue = (id: any, v: any) => {
+  const state = this._argsState.value;
+  if (!state) return;
+  this._argsState.value = {
+    ...state,
+    values: {
+      ...state.values,
+      [id]: v
+    }
+  };
+};
+
+  setArgValueFor = (id: any) => (v: any) => this.setArgValue(id, v);
+
+  onArgFieldInput = (id: any, e: any) => {
+  this.setArgValue(id, e && e.target ? e.target.value : '');
+};
+
+  submitArgs = () => {
+  const state = this._argsState.value;
+  if (!state) return;
+  const argList = state.argList;
+  const values = state.values;
+  if (!canSubmitArgs(argList, values)) {
+    this.focusArgFieldAt(firstUnfilledRequiredIndex(argList, values));
+    return;
+  }
+  const item = state.item;
+  const path = this._levelStack.value.map((f: any) => f.item ? f.item.id : null);
+  const args = buildArgsPayload(argList, values);
+  this.dispatchEvent(new CustomEvent("select", {
+    detail: {
+      item,
+      path,
+      args
+    },
+    bubbles: true,
+    composed: true
+  }));
+  this._activeValue.value = null;
+  this.closeArgsSurface();
+  if (this.closeOnSelect) this.closePalette();
+};
+
+  closeArgsSurface = () => {
+  this._activeSurface.value = 'list';
+  this._argsState.value = null;
+  this._refCombobox?.pinOpen(false);
+  this.reopenComboboxPopup();
+};
+
+  closeAnySurface = () => {
+  if (this._activeSurface.value === 'args') this.closeArgsSurface();else if (this._activeSurface.value !== 'list') this.closeActionMenu();
+};
+
   roveAction = (dir: any) => {
   const anchor = this._actionAnchor.value;
   if (!anchor) return;
@@ -1284,7 +1465,28 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   if (e.key === 'Escape') {
     e.preventDefault();
     const route = resolveEscape(this._activeSurface.value, this.currentDepth());
-    if (route === 'close-surface') this.closeActionMenu();else if (route === 'pop-level') this.goBack();else this.closePalette();
+    if (route === 'close-surface') {
+      if (this._activeSurface.value === 'args') this.closeArgsSurface();else this.closeActionMenu();
+    } else if (route === 'pop-level') this.goBack();else this.closePalette();
+    return;
+  }
+  if (this._activeSurface.value === 'args') {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this.submitArgs();
+      return;
+    }
+    if (e.key === 'Backspace') {
+      const state = this._argsState.value;
+      const argList = state ? state.argList : [];
+      const values = state ? state.values : {};
+      const frame = this._refFrame;
+      const firstInput: any = frame ? frame.querySelector('[data-command-palette-args] input') : null;
+      if (e.target === firstInput && isFirstFieldEmpty(argList, values)) {
+        e.preventDefault();
+        this.closeArgsSurface();
+      }
+    }
     return;
   }
   if (this._activeSurface.value === 'list') {
@@ -1585,6 +1787,39 @@ injectGlobalStyles('rozie-command-palette-global', `
   padding: var(--rozie-command-palette-empty-padding, 1.5rem);
   text-align: center;
   color: var(--rozie-command-palette-empty-color, rgba(0, 0, 0, 0.5));
+}
+.rozie-command-palette-list-region--inert[data-rozie-s-768cad96] {
+  pointer-events: none;
+  opacity: var(--rozie-command-palette-args-dim-opacity, 0.45);
+}
+.rozie-command-palette-args[data-rozie-s-768cad96] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rozie-command-palette-args-gap, 0.5rem);
+  padding: var(--rozie-command-palette-args-padding, 0.75rem);
+}
+.rozie-command-palette-args-chip[data-rozie-s-768cad96] {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: var(--rozie-command-palette-args-chip-padding, 0.125rem 0.5rem);
+  color: var(--rozie-command-palette-args-chip-color, inherit);
+  background: var(--rozie-command-palette-args-chip-bg, rgba(0, 0, 0, 0.06));
+  border-radius: var(--rozie-command-palette-back-radius, 0.375rem);
+}
+.rozie-command-palette-args-field[data-rozie-s-768cad96] {
+  display: block;
+}
+.rozie-command-palette-args-input[data-rozie-s-768cad96] {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--rozie-command-palette-args-field-padding, var(--rozie-command-palette-input-padding, 0.5rem 0.75rem));
+  font: inherit;
+  color: inherit;
+  background: var(--rozie-command-palette-args-field-bg, var(--rozie-command-palette-input-bg, transparent));
+  border: var(--rozie-command-palette-args-field-border, var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1)));
+  border-radius: var(--rozie-command-palette-args-field-radius, var(--rozie-command-palette-input-radius, 0.5rem));
+  outline: none;
 }
 .rozie-command-palette-loading[data-rozie-s-768cad96] {
   padding: var(--rozie-command-palette-empty-padding, 1.5rem);
