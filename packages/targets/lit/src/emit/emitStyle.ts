@@ -74,6 +74,22 @@ export interface EmitStyleOpts {
    * `:host` / `::slotted()` selectors are exempted automatically.
    */
   scopeHash?: string;
+  /**
+   * command-palette-portal-overlay phase — true when the template has at
+   * least one `r-portal` element. Lit is the shadow-DOM hazard target:
+   * `static styles`' `[data-rozie-s-<hash>]`-scoped CSS is attached via
+   * `shadowRoot.adoptedStyleSheets`, PHYSICALLY confined to the shadow
+   * tree — attribute-selector matching alone does not cross the shadow
+   * boundary. When true, `scopedCss` is ALSO folded into the
+   * `injectGlobalStyles` sink (the SAME runtime helper `:root {}` rules
+   * already use) so the component's own scoped rules exist GLOBALLY too;
+   * the relocated element already carries `[data-rozie-s-<hash>]`
+   * (stamped on every `tagKind: 'html'` element unconditionally), so the
+   * globally-injected rules match ONLY this component's own elements.
+   * False (default) is byte-identical to pre-phase output — a non-portal
+   * component's CSS routing is completely untouched.
+   */
+  hasElementPortal?: boolean;
 }
 
 export interface EmitStyleResult {
@@ -138,8 +154,17 @@ export function emitStyle(
     ? scopeCss(rawScopedCss, opts.scopeHash)
     : rawScopedCss;
   const rootCss = rootRules.length > 0 ? stringifyRules(rootRules, source) : '';
-  // injectGlobalStyles sink gets flat :root (D-03) PLUS engine rules (D-04).
-  const globalParts = [rootCss, engineCss].filter((s) => s.length > 0);
+  // injectGlobalStyles sink gets flat :root (D-03) PLUS engine rules (D-04)
+  // PLUS — command-palette-portal-overlay phase — the component's OWN
+  // scoped CSS when `r-portal` is in use (see opts.hasElementPortal doc
+  // comment). `scopedCss` is already `[data-rozie-s-<hash>]`-qualified, so
+  // its global copy matches ONLY this component's own (portalled)
+  // elements, never a sibling consumer's shadow-internal ones.
+  const globalParts = [
+    rootCss,
+    engineCss,
+    opts.hasElementPortal === true ? scopedCss : '',
+  ].filter((s) => s.length > 0);
   const globalCss = globalParts.join('\n');
 
   // Spike 004 — @portal rules emit INTO the same `static styles` css block.

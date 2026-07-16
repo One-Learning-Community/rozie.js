@@ -244,6 +244,20 @@ export interface EmitTemplateOpts {
      * re-attempt wiring cleanly.
      */
     slotFillerDisconnectReset: string[];
+    /**
+     * command-palette-portal-overlay phase — per-`r-portal`-element class
+     * field declarations: a CACHED `@query('[data-rozie-ref="__roziePortal<N>"]',
+     * true)` field (see `RoziePortalController.ts`'s module doc comment for
+     * why `cache: true` is REQUIRED — an uncached `@query` re-searches
+     * `this.shadowRoot` on every access, which no longer contains the node
+     * once it has been relocated) + a
+     * `new RoziePortalController(this, () => this.__roziePortal<N>, () =>
+     * <containerExpr>)` field. emitLit splices these into the class body
+     * (mirrors `keynavFieldDecls`/`hoistedLiteralFieldDecls` plumbing).
+     * `portalCount` is the push-order index for `__roziePortal<N>` naming.
+     */
+    portalFieldDecls: string[];
+    portalCount: number;
   };
 }
 
@@ -355,6 +369,14 @@ export interface EmitTemplateResult {
    * plumbing).
    */
   keynavFieldDecls: string[];
+  /**
+   * command-palette-portal-overlay phase — per-`r-portal`-element
+   * `@query(..., true)` ref field + `RoziePortalController` field-initializer
+   * declarations (empty array for every non-portal component — SPEC-style
+   * "no corpus rebless"). emitLit splices these into the class body
+   * alongside the other field declarations (mirrors `keynavFieldDecls`).
+   */
+  portalFieldDecls: string[];
   diagnostics: Diagnostic[];
 }
 
@@ -1527,6 +1549,33 @@ function emitElementOpenTag(
 
   if (refAttr) parts.push(refAttr);
 
+  // command-palette-portal-overlay phase — `r-portal="<expr>"` element
+  // teleport. Stamps a SYNTHETIC `data-rozie-ref="__roziePortal<N>"` (the
+  // SAME attribute-name convention author `ref=` uses, but this element is
+  // NOT in `ir.refs` — the field/controller decls below are emitted
+  // independently, keyed on this template walk, not the IR's flat ref
+  // list). See `RoziePortalController.ts`'s module doc comment for why
+  // Lit — the shadow-DOM target — is the hazard case (the relocated
+  // element leaves `static styles`' `adoptedStyleSheets` reach; `emitStyle.ts`
+  // separately reuses `injectGlobalStyles` to cover that).
+  if (node.portalTo && opts._state) {
+    const n = opts._state.portalCount++;
+    const fieldName = `__roziePortal${n}`;
+    parts.push(`data-rozie-ref="${fieldName}"`);
+    opts.decorators.add('query');
+    opts.runtime.add('RoziePortalController');
+    const containerCode = rewriteTemplateExpression(node.portalTo.expression, ir);
+    opts._state.portalFieldDecls.push(
+      // `cache: true` (2nd @query arg) — REQUIRED. An uncached @query
+      // re-searches `this.shadowRoot` on every access, which no longer
+      // contains the node once `RoziePortalController` has relocated it.
+      `  @query('[data-rozie-ref="${fieldName}"]', true) private ${fieldName}!: HTMLElement;`,
+    );
+    opts._state.portalFieldDecls.push(
+      `  private ${fieldName}Controller = new RoziePortalController(this, () => this.${fieldName}, () => (${containerCode}));`,
+    );
+  }
+
   // Phase 71 (r-keynav) — root `aria-activedescendant` and item
   // `id`/`data-rozie-keynav-item`/`data-rozie-keynav-active`/`tabindex`
   // markers (see emitKeynav.ts's module doc comment). `[]` for every
@@ -2150,6 +2199,8 @@ export function emitTemplate(
     slotFillerClassFields: [] as string[],
     slotFillerUpdatedBody: [] as string[],
     slotFillerDisconnectReset: [] as string[],
+    portalFieldDecls: [] as string[],
+    portalCount: 0,
     diagnostics,
   };
   // Phase 71 (r-keynav) — resolved ONCE per component (not per element; see
@@ -2190,6 +2241,7 @@ export function emitTemplate(
       slotFillerUpdatedBody: state.slotFillerUpdatedBody,
       slotFillerDisconnectReset: state.slotFillerDisconnectReset,
       keynavFieldDecls,
+      portalFieldDecls: state.portalFieldDecls,
       diagnostics,
     };
   }
@@ -2217,6 +2269,7 @@ export function emitTemplate(
     slotFillerUpdatedBody: state.slotFillerUpdatedBody,
     slotFillerDisconnectReset: state.slotFillerDisconnectReset,
     keynavFieldDecls,
+    portalFieldDecls: state.portalFieldDecls,
     diagnostics,
   };
 }

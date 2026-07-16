@@ -24,7 +24,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { IRComponent } from '../../../core/src/ir/types.js';
+import type { IRComponent, TemplateNode } from '../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../core/src/diagnostics/Diagnostic.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { BlockMap } from '../../../core/src/ast/types.js';
@@ -77,6 +77,43 @@ export interface EmitLitResult {
    */
   map: null;
   diagnostics: Diagnostic[];
+}
+
+/**
+ * command-palette-portal-overlay phase — a cheap, INDEPENDENT presence-only
+ * walk over `ir.template` for at least one `r-portal` element. Needed
+ * because `emitStyle` runs BEFORE `emitTemplate` in this file's call
+ * sequence (styles must be ready before the template walk references
+ * `opts.scopeHash`), so the template-walk-derived `portalCount` isn't
+ * available yet at the point `emitStyle` needs to know whether to ALSO
+ * push `scopedCss` through `injectGlobalStyles` (see `emitStyle.ts`'s
+ * `opts.hasElementPortal` doc comment / `RoziePortalController.ts`'s module
+ * doc comment for WHY). A second, tiny boolean-only walk is simpler and
+ * lower-risk than reordering the two emit passes or synchronizing two
+ * independent per-element counters.
+ */
+function hasElementPortal(node: TemplateNode | null): boolean {
+  if (node === null) return false;
+  switch (node.type) {
+    case 'TemplateElement':
+      if (node.portalTo !== undefined) return true;
+      return node.children.some(hasElementPortal);
+    case 'TemplateFragment':
+      return node.children.some(hasElementPortal);
+    case 'TemplateConditional':
+      return node.branches.some((b) => b.body.some(hasElementPortal));
+    case 'TemplateMatch':
+      return (
+        node.branches.some((b) => b.body.some(hasElementPortal)) ||
+        (node.hostElement !== undefined && hasElementPortal(node.hostElement))
+      );
+    case 'TemplateLoop':
+      return node.body.some(hasElementPortal);
+    case 'TemplateSlotInvocation':
+      return node.fallback.some(hasElementPortal);
+    default:
+      return false;
+  }
 }
 
 export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResult {
@@ -144,6 +181,9 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     lit: litImports,
     runtime: runtimeImports,
     scopeHash,
+    // command-palette-portal-overlay phase — see hasElementPortal's doc
+    // comment + emitStyle.ts's opts.hasElementPortal doc comment.
+    hasElementPortal: hasElementPortal(ir.template),
   });
   diagnostics.push(...styleResult.diagnostics);
 
@@ -369,6 +409,10 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // Phase 71 (r-keynav) — the group-id field + `new KeynavController(this,
     // {...})` field initializer (empty for every non-keynav component).
     keynavFieldDecls: templateResult.keynavFieldDecls.join('\n'),
+    // command-palette-portal-overlay phase — per-`r-portal`-element
+    // @query(..., true) ref field + RoziePortalController field
+    // initializer (empty for every non-portal component).
+    portalFieldDecls: templateResult.portalFieldDecls.join('\n'),
     slotFillerClassFields: templateResult.slotFillerClassFields
       .map((f) => '  ' + f)
       .join('\n'),
@@ -542,6 +586,13 @@ interface ComposeClassBodyParts {
    */
   keynavFieldDecls: string;
   /**
+   * command-palette-portal-overlay phase — per-`r-portal`-element
+   * `@query(..., true)` ref field + `RoziePortalController` field
+   * initializer. Empty string for every non-portal component (byte-
+   * identical to pre-phase output).
+   */
+  portalFieldDecls: string;
+  /**
    * Phase 07.2 Plan 03 — class-field declarations storing captured scoped-
    * slot fill ctx (e.g. `private _headerCtx?: { close: unknown };`). Spliced
    * in alongside the other field decls so firstUpdated()'s
@@ -611,6 +662,9 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   }
   if (parts.keynavFieldDecls.trim().length > 0) {
     sections.push(parts.keynavFieldDecls);
+  }
+  if (parts.portalFieldDecls.trim().length > 0) {
+    sections.push(parts.portalFieldDecls);
   }
   if (parts.slotFillerClassFields.trim().length > 0) {
     sections.push(parts.slotFillerClassFields);

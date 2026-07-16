@@ -201,7 +201,15 @@ export type RuntimeLitImport =
    * a non-keynav component's `@rozie/runtime-lit` import line stays
    * byte-identical (SPEC §11 — no corpus rebless).
    */
-  | 'KeynavController';
+  | 'KeynavController'
+  /**
+   * command-palette-portal-overlay phase — the `RoziePortalController`
+   * ReactiveController, shipped from `@rozie/runtime-lit`. Added by
+   * `emitTemplate.ts` ONLY when the component has at least one `r-portal`
+   * element, so a non-portal component's `@rozie/runtime-lit` import line
+   * stays byte-identical (mirrors `KeynavController`'s identical gate).
+   */
+  | 'RoziePortalController';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();

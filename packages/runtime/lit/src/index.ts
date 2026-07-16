@@ -19,6 +19,10 @@ export {
   type KeynavControllerHost,
   type KeynavControllerOpts,
 } from './KeynavController.js';
+export {
+  RoziePortalController,
+  type RoziePortalControllerHost,
+} from './RoziePortalController.js';
 export { injectGlobalStyles } from './injectGlobalStyles.js';
 export { adoptConsumerStyles } from './adoptConsumerStyles.js';
 export { adoptDocumentStyles } from './adoptDocumentStyles.js';

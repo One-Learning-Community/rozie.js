@@ -1,0 +1,104 @@
+/**
+ * RoziePortalController — command-palette-portal-overlay phase — Lit
+ * `ReactiveController` for the NEW element-level `r-portal="<expr>"`
+ * teleport directive.
+ *
+ * LIT IS THE HAZARD TARGET (Shadow DOM): every other target's element lives
+ * in the light DOM (or, for Vue's `<Teleport>`/React's `createPortal`, moves
+ * within the same document tree with no encapsulation boundary crossed). A
+ * Lit component's template renders into a SHADOW ROOT — `static styles`
+ * (the component's `[data-rozie-s-<hash>]`-scoped CSS, see `scopeCss.ts`)
+ * is attached via `shadowRoot.adoptedStyleSheets`, which is PHYSICALLY
+ * confined to that shadow tree. When `r-portal` relocates an element OUT to
+ * `document.body` (light DOM, outside ANY shadow root), the shadow-scoped
+ * stylesheet no longer reaches it — attribute-selector matching alone
+ * cannot cross the shadow boundary; the stylesheet must ALSO exist
+ * globally. `emitStyle.ts` reuses the EXISTING `injectGlobalStyles` runtime
+ * helper (the same one `:root {}` rules already use) to ALSO push the
+ * component's scoped CSS into `document.head` when the template has at
+ * least one `r-portal` element — the relocated node already carries
+ * `[data-rozie-s-<hash>]` (every `tagKind: 'html'` element does,
+ * unconditionally), so the globally-injected, identically-scoped rules
+ * match ONLY this component's own (portalled) elements, never a sibling
+ * consumer's shadow-internal ones.
+ *
+ * This controller owns ONLY the DOM-relocation half (the Svelte
+ * `roziePortal` action / Angular `__roziePortalPlace` method's shared
+ * anchor-capture-and-restore semantics, ported to Lit's `ReactiveController`
+ * lifecycle):
+ *   - `hostUpdated()` — Lit's reactive-controller lifecycle hook, called
+ *     after EVERY render (including the first). Idempotent by design
+ *     (`appendChild` on an already-correct parent is a harmless no-op), so
+ *     no dependency-array bookkeeping is needed — every call just
+ *     re-asserts the correct DOM position for the CURRENT resolved
+ *     container.
+ *   - `hostDisconnected()` — removes the node from wherever it currently
+ *     lives IF it was moved. Lit's own shadow-root teardown is not
+ *     guaranteed to find a node relocated outside its logical DOM position.
+ *
+ * `getElement`/`getContainer` are getters (not values) so the controller
+ * always reads the LATEST `@query`-resolved element + freshly-evaluated
+ * container expression on each `hostUpdated()` call — mirrors
+ * `KeynavController`'s identical getter-based `opts` shape.
+ *
+ * @public — runtime API consumed by emitted Lit components.
+ */
+import type { ReactiveController, ReactiveControllerHost } from 'lit';
+
+export interface RoziePortalControllerHost extends ReactiveControllerHost {}
+
+export class RoziePortalController implements ReactiveController {
+  private readonly host: RoziePortalControllerHost;
+  private readonly getElement: () => Element | null | undefined;
+  private readonly getContainer: () => Element | null | undefined;
+  private anchor: { parent: Node | null; next: Node | null } | null = null;
+  private moved = false;
+
+  constructor(
+    host: RoziePortalControllerHost,
+    getElement: () => Element | null | undefined,
+    getContainer: () => Element | null | undefined,
+  ) {
+    this.host = host;
+    this.getElement = getElement;
+    this.getContainer = getContainer;
+    host.addController(this);
+  }
+
+  private place(el: Element, target: Element | null | undefined): void {
+    if (!this.anchor) {
+      // Lazily capture the element's NATURAL template position on the
+      // first placement — before any move — so a later falsy `target`
+      // restores it exactly (mirrors Vue Teleport's `:disabled` in-place
+      // restoration / Angular's `__roziePortalAnchors` WeakMap).
+      this.anchor = { parent: el.parentNode, next: el.nextSibling };
+    }
+    if (target) {
+      target.appendChild(el);
+      this.moved = true;
+      return;
+    }
+    this.moved = false;
+    if (this.anchor.parent) {
+      if (this.anchor.next && this.anchor.next.parentNode === this.anchor.parent) {
+        this.anchor.parent.insertBefore(el, this.anchor.next);
+      } else {
+        this.anchor.parent.appendChild(el);
+      }
+    }
+  }
+
+  hostUpdated(): void {
+    const el = this.getElement();
+    if (!el) return; // Pre-render / falsy r-if — nothing to place yet.
+    this.place(el, this.getContainer());
+  }
+
+  hostDisconnected(): void {
+    const el = this.getElement();
+    if (el && this.moved && el.parentNode) {
+      el.parentNode.removeChild(el);
+      this.moved = false;
+    }
+  }
+}
