@@ -74,10 +74,29 @@ export class RoziePortalController implements ReactiveController {
       this.anchor = { parent: el.parentNode, next: el.nextSibling };
     }
     if (target) {
-      target.appendChild(el);
+      // Position GUARD: `appendChild`/`insertBefore` of an already-present
+      // node is a MOVE (detach + reattach), NOT a no-op — it blurs any
+      // focused descendant and fires spurious DOM mutations. `hostUpdated`
+      // runs after EVERY render, so re-asserting an already-correct position
+      // must leave the node physically untouched. Only append when the node
+      // is not already parented by the target.
+      if (el.parentNode !== target) {
+        target.appendChild(el);
+      }
       this.moved = true;
       return;
     }
+    // Target is falsy (render in place). ONLY restore-to-anchor when we had
+    // previously moved the element OUT to a container. When the element was
+    // never portalled (steady in-place — the common case: `appendTo` absent),
+    // Lit owns its full lifecycle: an `r-if`/`open` toggle legitimately
+    // removes it, and `@query(cache: true)` keeps returning the now-removed
+    // node. Re-inserting it here would RESURRECT a Lit-detached "zombie"
+    // (e.g. the command-palette overlay reappearing with a stale, still-open
+    // result list after the palette was told to close), and even a same-parent
+    // re-insert blurs a focused descendant on every keystroke. So: if we never
+    // moved it, do nothing and let Lit render authoritatively.
+    if (!this.moved) return;
     this.moved = false;
     if (this.anchor.parent) {
       if (this.anchor.next && this.anchor.next.parentNode === this.anchor.parent) {
