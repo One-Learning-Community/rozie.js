@@ -57,6 +57,14 @@ name: Release (early subset)
 #     @rozie-ui/combobox-<target> (^0.1.0) as a required peer — hence combobox MUST publish first
 #     (above) and build before command-palette. angular = tslib only; the rest carry
 #     @rozie/runtime-<fw>. Release-verified 2026-07-13: local `--gate` PASS (12/12 with combobox).
+#   - 6 @rozie-ui toast leaves: toast-{react,vue,solid,lit,svelte,angular}
+#     (all six debuting at 0.1.0 — toast has never been published before). No @rozie-ui workspace
+#     peer (self-contained, no composition dependency on any other leaf family) — react/solid/lit/
+#     vue carry @rozie/runtime-<fw> and svelte carries @rozie/runtime-svelte (rewritten from
+#     `workspace:` at publish; live on npm); angular carries tslib only, no @rozie dep. Same
+#     build/publish profile as captcha: builds after the toolchain step (so local
+#     @rozie/runtime-* dist exists for type resolution) with no ordering coupling to combobox or
+#     any other leaf family.
 #
 # Everything else is DELIBERATELY out of scope: the react/solid/svelte/lit/angular
 # leaves of cropper + fullcalendar are not release-verified. Do NOT widen the --filter
@@ -245,6 +253,23 @@ jobs:
           --filter=@rozie-ui/pdf-angular
           build
 
+      # Build all six toast leaves into their compiled dist/ drop-in. Same mixed per-target
+      # toolchain as captcha/sortable-list/flatpickr/pdf (react/solid/lit tsdown, vue Vite lib +
+      # vue-tsc, svelte @sveltejs/package, angular ng-packagr APF). Sits AFTER the toolchain
+      # build so the local @rozie/runtime-* dist exists for the react/solid/lit/svelte/vue leaf
+      # type resolution (angular = tslib only, no @rozie dep). Self-contained — no @rozie-ui
+      # workspace peer, so it has NO ordering dependency on combobox, popover, or data-table.
+      - name: Build toast leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/toast-react
+          --filter=@rozie-ui/toast-vue
+          --filter=@rozie-ui/toast-solid
+          --filter=@rozie-ui/toast-lit
+          --filter=@rozie-ui/toast-svelte
+          --filter=@rozie-ui/toast-angular
+          build
+
       # Build all six popover leaves into their compiled dist/ drop-in. Mixed per-target
       # toolchain (react/solid/lit tsdown, vue Vite lib + vue-tsc, svelte @sveltejs/package,
       # angular ng-packagr APF). Sits AFTER the toolchain build so the local @rozie/runtime-*
@@ -404,6 +429,12 @@ jobs:
           --filter @rozie-ui/command-palette-lit
           --filter @rozie-ui/command-palette-svelte
           --filter @rozie-ui/command-palette-angular
+          --filter @rozie-ui/toast-react
+          --filter @rozie-ui/toast-vue
+          --filter @rozie-ui/toast-solid
+          --filter @rozie-ui/toast-lit
+          --filter @rozie-ui/toast-svelte
+          --filter @rozie-ui/toast-angular
 
       # Then the 6 Vue leaves. They carry zero @rozie/* deps so they don't
       # actually depend on the step above — ordering just keeps the log readable.
@@ -580,6 +611,28 @@ jobs:
           --filter=@rozie-ui/command-palette-lit
           --filter=@rozie-ui/command-palette-svelte
           --filter=@rozie-ui/command-palette-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # All six toast leaves (debut all-targets toast release line, aligned at 0.1.0 — toast has
+      # never been published before). pnpm rewrites their `workspace:` deps to the concrete
+      # @rozie/runtime-* versions (live on npm) in the tarball: react/solid/lit/vue carry
+      # @rozie/runtime-<fw>, svelte carries @rozie/runtime-svelte; angular carries no @rozie dep
+      # (tslib only). Self-contained — no @rozie-ui workspace peer, so this has NO ordering
+      # dependency on combobox, popover, data-table, or command-palette above. Inherits dry_run
+      # (default TRUE) via steps.flags.outputs.extra and the skip-if-already-published behavior
+      # (no --force).
+      - name: Publish toast leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/toast-react
+          --filter=@rozie-ui/toast-vue
+          --filter=@rozie-ui/toast-solid
+          --filter=@rozie-ui/toast-lit
+          --filter=@rozie-ui/toast-svelte
+          --filter=@rozie-ui/toast-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
