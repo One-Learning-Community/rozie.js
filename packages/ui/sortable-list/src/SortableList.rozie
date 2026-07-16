@@ -344,6 +344,13 @@ const getLabel = (idx) => {
 const keyboardEnabled = () => !$props.disabled && !$props.disableKeyboard
 
 const onRowKeyDown = ($event, index) => {
+  // Origin guard (quick 260716-ggq): reorder keys apply ONLY when the row
+  // element ITSELF is focused. A slotted interactive child (an <input>,
+  // <button>, etc. rendered into the row's default slot) bubbles its own
+  // keydown up to this handler — without this guard, Space/Enter typed into
+  // that child would be hijacked for lift/drop instead of reaching the
+  // child. Must run FIRST, before the keyboardEnabled() check.
+  if ($event.target !== $event.currentTarget) return
   // Defense-in-depth: when keyboard reordering is off the rows carry no
   // tabindex and can't receive focus, but a consumer-focused row (or a
   // programmatic .focus()) must still no-op here rather than reorder.
