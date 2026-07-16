@@ -1,5 +1,5 @@
 ---
-surface_hash: 96d3c1067523
+surface_hash: 8685349f7d90
 ---
 
 # Command palette — comparison

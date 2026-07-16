@@ -4,7 +4,7 @@ import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { Combobox } from '@rozie-ui/combobox-angular';
 
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
@@ -151,7 +151,7 @@ function __rozieAttr(v: unknown): string | null {
         </div>
     }<div class="rozie-command-palette-list-region" [ngClass]="{ 'rozie-command-palette-list-region--inert': activeSurface() === 'args' }" [attr.aria-hidden]="!!(activeSurface() === 'args')">
         
-        <rozie-combobox #combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="orderedItems()" [groups]="commandGroups()" [groupCap]="groupCap()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="currentPlaceholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
+        <rozie-combobox #combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="orderedItems()" [groups]="commandGroups()" [groupCap]="groupCap()" [virtual]="currentVirtual()" [maxHeight]="currentVirtualMaxHeight()" [estimateRowHeight]="currentVirtualEstimateRowHeight()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="currentPlaceholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
             <span class="rozie-command-palette-option-anchor" [attr.data-cp-value]="rozieAttr(commandValue(option))">
             @if ((optionTpl ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }, option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }" />
@@ -650,6 +650,24 @@ export class CommandPalette {
    * <CommandPalette append-to="body" :items="commands" />
    */
   appendTo = input<boolean | string>(false);
+  /**
+   * Opt-in vertical windowing for a long list, resolved PER LEVEL — this prop is the ROOT level; a navigating item's own `virtual` field windows THAT child level instead. A virtual level renders FLAT: the auto-derived groups + `groupCap` + `#groupHeading` are inactive for that level (the vendored combobox's `isGrouped` requires `!virtual`) — popping back to a grouped non-virtual level restores its groups. Windowing needs a bounded scroll height — pair with `virtualMaxHeight`. Default `false` is byte-behavior-identical to today (non-windowed).
+   * @example
+   * <CommandPalette virtual virtual-max-height="320px" :items="longCommandList" />
+   */
+  virtual = input<boolean>(false);
+  /**
+   * A CSS length string (e.g. `"320px"`) bounding the windowed scroll container while the active level is virtual, resolved PER LEVEL like `virtual` above — passed straight through to the vendored combobox's `maxHeight`. Distinct from and non-conflicting with the panel's own `--rozie-command-palette-max-height` token (that clips the WHOLE panel; this bounds the INNER windowed list). Ignored while the active level is not virtual.
+   * @example
+   * <CommandPalette virtual virtual-max-height="320px" :items="longCommandList" />
+   */
+  virtualMaxHeight = input<(string) | null>(null);
+  /**
+   * Estimated option row height (px) seeding the windowing engine, resolved PER LEVEL like `virtual` above. Unset falls back to the vendored combobox's own default (36px) — but command-palette rows are typically taller (an icon + a right-aligned hotkey badge), so a consumer windowing a real palette level should usually raise this.
+   * @example
+   * <CommandPalette virtual :virtual-estimate-row-height="44" :items="longCommandList" />
+   */
+  virtualEstimateRowHeight = input<(number) | null>(null);
   activeValue = signal<any>(null);
   levelStack = signal<any[]>([]);
   activeSurface = signal('list');
@@ -753,6 +771,20 @@ export class CommandPalette {
   currentPlaceholder = () => {
     const frame = currentFrame(this.levelStack());
     return frame && frame.placeholder != null ? frame.placeholder : this.placeholder();
+  };
+  currentVirtual = () => {
+    const frame = currentFrame(this.levelStack());
+    return frame ? frame.virtual : this.virtual() === true;
+  };
+  currentVirtualMaxHeight = () => {
+    const frame = currentFrame(this.levelStack());
+    const raw = frame ? frame.virtualMaxHeight : this.virtualMaxHeight();
+    return this.currentVirtual() && raw != null ? raw : '';
+  };
+  currentVirtualEstimateRowHeight = () => {
+    const frame = currentFrame(this.levelStack());
+    const raw = frame ? frame.virtualEstimateRowHeight : this.virtualEstimateRowHeight();
+    return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
   };
   breadcrumbStack = () => buildBreadcrumb(this.levelStack(), this.ariaLabel());
   filteredItems = () => scoreCommands(this.currentBaseItems(), this.query(), this.score());

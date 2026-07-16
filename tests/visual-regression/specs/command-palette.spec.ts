@@ -294,6 +294,81 @@ async function groupHeadingTexts(page: Page): Promise<string[]> {
   });
 }
 
+/**
+ * command-palette-per-level-virtual (FD-01 resolved — combobox-virtual-
+ * reactivity, commits 6fd84251+afa0a7ec, made the vendored combobox's
+ * `virtual` prop live-flippable at runtime). Drives the demo's THIRD,
+ * self-contained palette (`open-virtual-palette` / `virtualOpen` /
+ * `virtualQuery`), which the four suites above never touch. Its root
+ * (`VIRTUAL_ROOT_ITEMS`) is GROUPED ('File'/'Edit') and non-virtual; its one
+ * navigating item (`v-goto-many`) carries `virtual: true` +
+ * `virtualMaxHeight`/`virtualEstimateRowHeight` and 60 static `children`.
+ * Asserts: (1) the pushed virtual level WINDOWS — the combobox renders its
+ * windowed `<ul>` branch (2 `.rozie-combobox-spacer` elements) and the
+ * rendered `role="option"` count is strictly less than the full 60-item
+ * list; (2) the pushed level renders FLAT — 0 group headings, the vendored
+ * combobox's `isGrouped` requiring `!virtual` (the per-level caveat); (3)
+ * popping back restores the grouped, non-virtual root — 0 spacer elements,
+ * the 2 File/Edit headings again, and the full 4-item root count.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`command-palette-per-level-virtual [${target}]: pushed virtual level windows + flattens, pop restores grouped non-virtual root`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const openBtn = page.getByTestId('open-virtual-palette');
+    const breadcrumbTitle = page.getByTestId('command-palette-title');
+
+    // ---- 1. open at root: 4 items, GROUPED (File/Edit), non-virtual (0 ----
+    //         spacer elements — the plain `<ul>` branch, not the windowed one).
+    await openBtn.click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(4);
+    await expect.poll(async () => groupHeadingTexts(page), { timeout: 10_000 }).toEqual(['File', 'Edit']);
+    await expect
+      .poll(async () => countByClass(page, 'rozie-combobox-spacer'), { timeout: 10_000 })
+      .toBe(0);
+
+    // ---- 2. PUSH the virtual level: `v-goto-many` (virtual:true, 60 static ----
+    //         children) — windows (2 spacer elements + a rendered option count
+    //         strictly less than 60) AND flattens (0 group headings — the
+    //         flat-render caveat, combobox-side `isGrouped requires !virtual`).
+    await page.locator('[role="option"]', { hasText: 'Browse many' }).click();
+    await expect(breadcrumbTitle).toHaveText('Browse many');
+    await expect
+      .poll(async () => countByClass(page, 'rozie-combobox-spacer'), { timeout: 10_000 })
+      .toBe(2);
+    const windowedCount = await countOptions(page);
+    expect(windowedCount).toBeGreaterThan(0);
+    expect(windowedCount).toBeLessThan(60);
+    await expect.poll(async () => groupHeadingTexts(page), { timeout: 10_000 }).toEqual([]);
+
+    // ---- 3. POP via Backspace-on-empty: restores the grouped, non-virtual ----
+    //         root — 0 spacer elements, the 2 File/Edit headings again, and
+    //         the full 4-item root count (the per-level caveat, honestly
+    //         bidirectional — nothing is lost popping OUT of a virtual level).
+    await page.keyboard.press('Backspace');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(4);
+    await expect(breadcrumbTitle).toHaveCount(0);
+    await expect.poll(async () => groupHeadingTexts(page), { timeout: 10_000 }).toEqual(['File', 'Edit']);
+    await expect
+      .poll(async () => countByClass(page, 'rozie-combobox-spacer'), { timeout: 10_000 })
+      .toBe(0);
+
+    // ---- cleanup: close the palette ----
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+}
+
 for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),

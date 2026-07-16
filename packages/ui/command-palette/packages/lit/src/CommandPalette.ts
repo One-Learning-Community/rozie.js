@@ -7,7 +7,7 @@ import { ref } from 'lit/directives/ref.js';
 import '@rozie-ui/combobox-lit';
 import type { Combobox } from '@rozie-ui/combobox-lit';
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
@@ -466,6 +466,24 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
    * <CommandPalette append-to="body" :items="commands" />
    */
   @property({ type: Boolean }) appendTo: boolean | string = false;
+  /**
+   * Opt-in vertical windowing for a long list, resolved PER LEVEL — this prop is the ROOT level; a navigating item's own `virtual` field windows THAT child level instead. A virtual level renders FLAT: the auto-derived groups + `groupCap` + `#groupHeading` are inactive for that level (the vendored combobox's `isGrouped` requires `!virtual`) — popping back to a grouped non-virtual level restores its groups. Windowing needs a bounded scroll height — pair with `virtualMaxHeight`. Default `false` is byte-behavior-identical to today (non-windowed).
+   * @example
+   * <CommandPalette virtual virtual-max-height="320px" :items="longCommandList" />
+   */
+  @property({ type: Boolean, reflect: true }) virtual: boolean = false;
+  /**
+   * A CSS length string (e.g. `"320px"`) bounding the windowed scroll container while the active level is virtual, resolved PER LEVEL like `virtual` above — passed straight through to the vendored combobox's `maxHeight`. Distinct from and non-conflicting with the panel's own `--rozie-command-palette-max-height` token (that clips the WHOLE panel; this bounds the INNER windowed list). Ignored while the active level is not virtual.
+   * @example
+   * <CommandPalette virtual virtual-max-height="320px" :items="longCommandList" />
+   */
+  @property({ type: String, reflect: true }) virtualMaxHeight: string | null = null;
+  /**
+   * Estimated option row height (px) seeding the windowing engine, resolved PER LEVEL like `virtual` above. Unset falls back to the vendored combobox's own default (36px) — but command-palette rows are typically taller (an icon + a right-aligned hotkey badge), so a consumer windowing a real palette level should usually raise this.
+   * @example
+   * <CommandPalette virtual :virtual-estimate-row-height="44" :items="longCommandList" />
+   */
+  @property({ type: Number, reflect: true }) virtualEstimateRowHeight: number | null = null;
   private _activeValue = signal<any>(null);
   private _levelStack = signal<any[]>([]);
   private _activeSurface = signal('list');
@@ -735,7 +753,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
       </slot>`}
     </div>` : nothing}<div class="${Object.entries({ "rozie-command-palette-list-region": true, 'rozie-command-palette-list-region--inert': this._activeSurface.value === 'args' }).filter(([, v]) => v).map(([k]) => k).join(' ')}" aria-hidden=${!!(this._activeSurface.value === 'args')} data-rozie-s-768cad96>
     
-    <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
+    <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .virtual=${this.currentVirtual()} .maxHeight=${this.currentVirtualMaxHeight()} .estimateRowHeight=${this.currentVirtualEstimateRowHeight()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
         <span class="rozie-command-palette-option-anchor" data-cp-value=${rozieAttr(this.commandValue(scope.option))} data-rozie-s-768cad96>
         ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}); } catch { return '{}'; } })()}>
           <div class="rozie-command-palette-option" data-rozie-s-768cad96>
@@ -845,6 +863,23 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   currentPlaceholder = () => {
   const frame = currentFrame(this._levelStack.value);
   return frame && frame.placeholder != null ? frame.placeholder : this.placeholder;
+};
+
+  currentVirtual = () => {
+  const frame = currentFrame(this._levelStack.value);
+  return frame ? frame.virtual : this.virtual === true;
+};
+
+  currentVirtualMaxHeight = () => {
+  const frame = currentFrame(this._levelStack.value);
+  const raw = frame ? frame.virtualMaxHeight : this.virtualMaxHeight;
+  return this.currentVirtual() && raw != null ? raw : '';
+};
+
+  currentVirtualEstimateRowHeight = () => {
+  const frame = currentFrame(this._levelStack.value);
+  const raw = frame ? frame.virtualEstimateRowHeight : this.virtualEstimateRowHeight;
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
 };
 
   breadcrumbStack = () => buildBreadcrumb(this._levelStack.value, this.ariaLabel);

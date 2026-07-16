@@ -15,7 +15,7 @@
       </slot>
     </div><div :class="['rozie-command-palette-list-region', { 'rozie-command-palette-list-region--inert': activeSurface === 'args' }]" :aria-hidden="!!(activeSurface === 'args')">
     
-    <Combobox ref="comboboxRef" :inline="true" :disable-filter="true" :close-on-select="false" :options="orderedItems()" :groups="commandGroups()" :group-cap="props.groupCap" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="currentPlaceholder()" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
+    <Combobox ref="comboboxRef" :inline="true" :disable-filter="true" :close-on-select="false" :options="orderedItems()" :groups="commandGroups()" :group-cap="props.groupCap" :virtual="currentVirtual()" :max-height="currentVirtualMaxHeight()" :estimate-row-height="currentVirtualEstimateRowHeight()" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="currentPlaceholder()" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
         <span class="rozie-command-palette-option-anchor" :data-cp-value="commandValue(option)">
         <slot name="option" :option="option" :index="index" :active="active" :selected="selected" :disabled="disabled" :matches="labelHighlight(labelText(option), query)">
           <div class="rozie-command-palette-option">
@@ -137,8 +137,26 @@ const props = withDefaults(
      * <CommandPalette append-to="body" :items="commands" />
      */
     appendTo?: boolean | string;
+    /**
+     * Opt-in vertical windowing for a long list, resolved PER LEVEL — this prop is the ROOT level; a navigating item's own `virtual` field windows THAT child level instead. A virtual level renders FLAT: the auto-derived groups + `groupCap` + `#groupHeading` are inactive for that level (the vendored combobox's `isGrouped` requires `!virtual`) — popping back to a grouped non-virtual level restores its groups. Windowing needs a bounded scroll height — pair with `virtualMaxHeight`. Default `false` is byte-behavior-identical to today (non-windowed).
+     * @example
+     * <CommandPalette virtual virtual-max-height="320px" :items="longCommandList" />
+     */
+    virtual?: boolean;
+    /**
+     * A CSS length string (e.g. `"320px"`) bounding the windowed scroll container while the active level is virtual, resolved PER LEVEL like `virtual` above — passed straight through to the vendored combobox's `maxHeight`. Distinct from and non-conflicting with the panel's own `--rozie-command-palette-max-height` token (that clips the WHOLE panel; this bounds the INNER windowed list). Ignored while the active level is not virtual.
+     * @example
+     * <CommandPalette virtual virtual-max-height="320px" :items="longCommandList" />
+     */
+    virtualMaxHeight?: string | null;
+    /**
+     * Estimated option row height (px) seeding the windowing engine, resolved PER LEVEL like `virtual` above. Unset falls back to the vendored combobox's own default (36px) — but command-palette rows are typically taller (an icon + a right-aligned hotkey badge), so a consumer windowing a real palette level should usually raise this.
+     * @example
+     * <CommandPalette virtual :virtual-estimate-row-height="44" :items="longCommandList" />
+     */
+    virtualEstimateRowHeight?: number | null;
   }>(),
-  { score: null, items: () => [], defaultItems: () => [], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0, appendTo: false }
+  { score: null, items: () => [], defaultItems: () => [], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: 'rozie-command-palette', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0, appendTo: false, virtual: false, virtualMaxHeight: null, virtualEstimateRowHeight: null }
 );
 
 /**
@@ -187,7 +205,7 @@ const panelRef = ref<HTMLElement>();
 const comboboxRef = ref<InstanceType<typeof Combobox>>();
 
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
@@ -299,6 +317,35 @@ const currentTitle = () => {
 const currentPlaceholder = () => {
   const frame = currentFrame(levelStack.value);
   return frame && frame.placeholder != null ? frame.placeholder : props.placeholder;
+};
+// currentVirtual()/currentVirtualMaxHeight()/currentVirtualEstimateRowHeight()
+// (command-palette-per-level-virtual, FD-01 resolved): the active level's
+// windowing trio bound onto the vendored <Combobox> below — the top frame's
+// captured `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` (levelStack.ts
+// pushFrame, mirroring defaultItems/title/placeholder) when nested, else the
+// root `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` props. Plain
+// functions (never $computed — the combobox value-vs-accessor split), each
+// reading currentFrame($data.levelStack) once.
+const currentVirtual = () => {
+  const frame = currentFrame(levelStack.value);
+  return frame ? frame.virtual : props.virtual === true;
+};
+// combobox's own empty-string default falls back to its
+// `--rozie-combobox-list-max-height` token; maxHeight is also ignored by
+// combobox whenever `virtual` is off — so `''` here is byte-identical-off.
+const currentVirtualMaxHeight = () => {
+  const frame = currentFrame(levelStack.value);
+  const raw = frame ? frame.virtualMaxHeight : props.virtualMaxHeight;
+  return currentVirtual() && raw != null ? raw : '';
+};
+// MUST fall back to a real number — combobox consumes this as
+// `estimateSize: () => $props.estimateRowHeight` (headless-core/windowing.rzts),
+// so a null binding would seed the virtualizer with null. `36` mirrors
+// combobox's own `estimateRowHeight` default.
+const currentVirtualEstimateRowHeight = () => {
+  const frame = currentFrame(levelStack.value);
+  const raw = frame ? frame.virtualEstimateRowHeight : props.virtualEstimateRowHeight;
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
 };
 // breadcrumbStack(): the full root..current breadcrumb (internal/levelStack.ts
 // breadcrumb(), imported aliased `buildBreadcrumb` — the SVELTE EMITTER

@@ -32,6 +32,17 @@
   untouched. See command-palette.spec.ts's `command-palette-default-items`
   suite. The helper is `openHome` (not `open` — the ROZ524 collision note
   above applies identically to a second same-shaped helper).
+
+  command-palette-per-level-virtual (FD-01 resolved): a THIRD, self-contained
+  `<CommandPalette>` (distinct `id-base`, `ref="virtualPalette"`, its own
+  `virtualOpen`/`virtualQuery` models) proves the per-level virtual-windowing
+  thread WITHOUT touching either palette above. Its root is GROUPED (`File`/
+  `Edit`) and non-virtual; its one navigating item (`v-goto-many`) carries
+  `virtual: true` + `virtualMaxHeight`/`virtualEstimateRowHeight` and 60
+  static `children` — enough rows that a bounded, windowed scroll container
+  renders fewer `role="option"` elements than the full list. Popping back
+  restores the grouped, non-virtual root. See command-palette.spec.ts's
+  `command-palette-per-level-virtual` suite.
 -->
 <rozie name="CommandPaletteBehaviorDemo">
 
@@ -54,6 +65,9 @@
   // command-palette-13-empty-home-view-first: the second palette's own models.
   homeOpen: false,
   homeQuery: '',
+  // command-palette-per-level-virtual: the third palette's own models.
+  virtualOpen: false,
+  virtualQuery: '',
 }
 </data>
 
@@ -201,6 +215,37 @@ const HOME_ITEMS = [
 const openHome = () => {
   $data.homeOpen = true
 }
+
+// ---- command-palette-per-level-virtual (FD-01 resolved) -------------------
+// A THIRD, self-contained palette proving the per-level virtual-windowing
+// thread. VIRTUAL_MANY_ITEMS is deliberately large (60) so a bounded windowed
+// scroll container (virtualMaxHeight '160px', virtualEstimateRowHeight 24 —
+// well under 160/24≈7 visible rows + the shared 8-row overscan) renders
+// meaningfully fewer role="option" rows than the full 60. VIRTUAL_ROOT_ITEMS
+// is GROUPED ('File'/'Edit') and non-virtual (no `virtual` prop set on the
+// palette) — the flat-render-then-restore proof: pushing `v-goto-many`
+// (virtual:true) flattens (no group headings, windowed rows); popping back
+// restores the grouped, non-virtual root.
+const VIRTUAL_MANY_ITEMS = Array.from({ length: 60 }, (_, i) => ({ id: `vitem-${i}`, label: `Item ${i}` }))
+
+const VIRTUAL_ROOT_ITEMS = [
+  { id: 'v-new', label: 'New File', group: 'File' },
+  { id: 'v-open', label: 'Open File', group: 'File' },
+  { id: 'v-cut', label: 'Cut', group: 'Edit' },
+  {
+    id: 'v-goto-many',
+    label: 'Browse many…',
+    title: 'Browse many',
+    virtual: true,
+    virtualMaxHeight: '160px',
+    virtualEstimateRowHeight: 24,
+    children: VIRTUAL_MANY_ITEMS,
+  },
+]
+
+const openVirtual = () => {
+  $data.virtualOpen = true
+}
 </script>
 
 <template>
@@ -211,6 +256,7 @@ const openHome = () => {
     <button type="button" data-testid="open-palette" @click="openPalette()">Open</button>
     <button type="button" data-testid="open-to-users" @click="openToUsers()">Open to Users</button>
     <button type="button" data-testid="open-home-palette" @click="openHome()">Open Home</button>
+    <button type="button" data-testid="open-virtual-palette" @click="openVirtual()">Open Virtual</button>
     <span class="readout" data-testid="readout-open">{{ $data.open }}</span>
     <span class="readout" data-testid="readout-query">{{ $data.query }}</span>
     <span class="readout" data-testid="readout-select">{{ $data.lastSelect }}</span>
@@ -254,6 +300,19 @@ const openHome = () => {
     :items="HOME_ITEMS"
     placeholder="Type a command…"
     ariaLabel="Command palette home"
+  />
+
+  <!-- command-palette-per-level-virtual: a third, self-contained palette
+       exercising the per-level virtual-windowing seam — its own models + a
+       distinct idBase so it never collides with the palettes above. -->
+  <CommandPalette
+    id-base="rozie-command-palette-virtual"
+    ref="virtualPalette"
+    r-model:open="$data.virtualOpen"
+    r-model:query="$data.virtualQuery"
+    :items="VIRTUAL_ROOT_ITEMS"
+    placeholder="Type a command…"
+    ariaLabel="Command palette virtual"
   />
 </div>
 </template>

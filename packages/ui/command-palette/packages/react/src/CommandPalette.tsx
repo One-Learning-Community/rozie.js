@@ -5,7 +5,7 @@ import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState }
 import './CommandPalette.css';
 import Combobox, { type ComboboxHandle } from '@rozie-ui/combobox-react';
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
@@ -123,6 +123,24 @@ interface CommandPaletteProps {
    * <CommandPalette append-to="body" :items="commands" />
    */
   appendTo?: boolean | string;
+  /**
+   * Opt-in vertical windowing for a long list, resolved PER LEVEL — this prop is the ROOT level; a navigating item's own `virtual` field windows THAT child level instead. A virtual level renders FLAT: the auto-derived groups + `groupCap` + `#groupHeading` are inactive for that level (the vendored combobox's `isGrouped` requires `!virtual`) — popping back to a grouped non-virtual level restores its groups. Windowing needs a bounded scroll height — pair with `virtualMaxHeight`. Default `false` is byte-behavior-identical to today (non-windowed).
+   * @example
+   * <CommandPalette virtual virtual-max-height="320px" :items="longCommandList" />
+   */
+  virtual?: boolean;
+  /**
+   * A CSS length string (e.g. `"320px"`) bounding the windowed scroll container while the active level is virtual, resolved PER LEVEL like `virtual` above — passed straight through to the vendored combobox's `maxHeight`. Distinct from and non-conflicting with the panel's own `--rozie-command-palette-max-height` token (that clips the WHOLE panel; this bounds the INNER windowed list). Ignored while the active level is not virtual.
+   * @example
+   * <CommandPalette virtual virtual-max-height="320px" :items="longCommandList" />
+   */
+  virtualMaxHeight?: (string) | null;
+  /**
+   * Estimated option row height (px) seeding the windowing engine, resolved PER LEVEL like `virtual` above. Unset falls back to the vendored combobox's own default (36px) — but command-palette rows are typically taller (an icon + a right-aligned hotkey badge), so a consumer windowing a real palette level should usually raise this.
+   * @example
+   * <CommandPalette virtual :virtual-estimate-row-height="44" :items="longCommandList" />
+   */
+  virtualEstimateRowHeight?: (number) | null;
   onNavigate?: (...args: any[]) => void;
   onBack?: (...args: any[]) => void;
   onSelect?: (...args: any[]) => void;
@@ -154,7 +172,7 @@ export interface CommandPaletteHandle {
 const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(function CommandPalette(_props: CommandPaletteProps, ref): JSX.Element {
   const __defaultItems = useState(() => (() => [])())[0];
   const __defaultDefaultItems = useState(() => (() => [])())[0];
-  const props: Omit<CommandPaletteProps, 'score' | 'items' | 'defaultItems' | 'placeholder' | 'emptyText' | 'closeOnSelect' | 'ariaLabel' | 'idBase' | 'searchDebounce' | 'actionKey' | 'closeOnAction' | 'groupCap' | 'appendTo'> & { score: ((...args: any[]) => any) | null; items: any[]; defaultItems: any[]; placeholder: string; emptyText: string; closeOnSelect: boolean; ariaLabel: string; idBase: string; searchDebounce: number; actionKey: string; closeOnAction: boolean; groupCap: number; appendTo: boolean | string } = {
+  const props: Omit<CommandPaletteProps, 'score' | 'items' | 'defaultItems' | 'placeholder' | 'emptyText' | 'closeOnSelect' | 'ariaLabel' | 'idBase' | 'searchDebounce' | 'actionKey' | 'closeOnAction' | 'groupCap' | 'appendTo' | 'virtual' | 'virtualMaxHeight' | 'virtualEstimateRowHeight'> & { score: ((...args: any[]) => any) | null; items: any[]; defaultItems: any[]; placeholder: string; emptyText: string; closeOnSelect: boolean; ariaLabel: string; idBase: string; searchDebounce: number; actionKey: string; closeOnAction: boolean; groupCap: number; appendTo: boolean | string; virtual: boolean; virtualMaxHeight: (string) | null; virtualEstimateRowHeight: (number) | null } = {
     ..._props,
     score: _props.score ?? null,
     items: _props.items ?? __defaultItems,
@@ -169,10 +187,13 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     closeOnAction: _props.closeOnAction ?? true,
     groupCap: _props.groupCap ?? 0,
     appendTo: _props.appendTo ?? false,
+    virtual: _props.virtual ?? false,
+    virtualMaxHeight: _props.virtualMaxHeight ?? null,
+    virtualEstimateRowHeight: _props.virtualEstimateRowHeight ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, query, score, items, defaultItems, placeholder, emptyText, closeOnSelect, ariaLabel, idBase, searchDebounce, actionKey, closeOnAction, groupCap, appendTo, defaultValue, onOpenChange, defaultOpen, onQueryChange, defaultQuery, ...rest } = _props as CommandPaletteProps & Record<string, unknown>;
-    void open; void query; void score; void items; void defaultItems; void placeholder; void emptyText; void closeOnSelect; void ariaLabel; void idBase; void searchDebounce; void actionKey; void closeOnAction; void groupCap; void appendTo; void defaultValue; void onOpenChange; void defaultOpen; void onQueryChange; void defaultQuery;
+    const { open, query, score, items, defaultItems, placeholder, emptyText, closeOnSelect, ariaLabel, idBase, searchDebounce, actionKey, closeOnAction, groupCap, appendTo, virtual, virtualMaxHeight, virtualEstimateRowHeight, defaultValue, onOpenChange, defaultOpen, onQueryChange, defaultQuery, ...rest } = _props as CommandPaletteProps & Record<string, unknown>;
+    void open; void query; void score; void items; void defaultItems; void placeholder; void emptyText; void closeOnSelect; void ariaLabel; void idBase; void searchDebounce; void actionKey; void closeOnAction; void groupCap; void appendTo; void virtual; void virtualMaxHeight; void virtualEstimateRowHeight; void defaultValue; void onOpenChange; void defaultOpen; void onQueryChange; void defaultQuery;
     return rest;
   })();
   const debounceTimerId = useRef<any>(null);
@@ -251,6 +272,20 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function currentPlaceholder() {
     const frame = currentFrame(levelStack);
     return frame && frame.placeholder != null ? frame.placeholder : props.placeholder;
+  }
+  function currentVirtual() {
+    const frame = currentFrame(levelStack);
+    return frame ? frame.virtual : props.virtual === true;
+  }
+  function currentVirtualMaxHeight() {
+    const frame = currentFrame(levelStack);
+    const raw = frame ? frame.virtualMaxHeight : props.virtualMaxHeight;
+    return currentVirtual() && raw != null ? raw : '';
+  }
+  function currentVirtualEstimateRowHeight() {
+    const frame = currentFrame(levelStack);
+    const raw = frame ? frame.virtualEstimateRowHeight : props.virtualEstimateRowHeight;
+    return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
   }
   function breadcrumbStack() {
     return buildBreadcrumb(levelStack, props.ariaLabel);
@@ -939,7 +974,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
             </nav></>}
         </div>}<div className={clsx("rozie-command-palette-list-region", { "rozie-command-palette-list-region--inert": activeSurface === 'args' })} aria-hidden={!!(activeSurface === 'args')} data-rozie-s-768cad96="">
         
-        <Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={props.groupCap} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
+        <Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={props.groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
             <span className={"rozie-command-palette-option-anchor"} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96="">
             {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) }) : <div className={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {!!((props.renderIcon ?? props.slots?.['icon'])) && <span className={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
@@ -994,7 +1029,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
             </nav></>}
         </div>}<div className={clsx("rozie-command-palette-list-region", { "rozie-command-palette-list-region--inert": activeSurface === 'args' })} aria-hidden={!!(activeSurface === 'args')} data-rozie-s-768cad96="">
         
-        <Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={props.groupCap} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
+        <Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={props.groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
             <span className={"rozie-command-palette-option-anchor"} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96="">
             {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) }) : <div className={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {!!((props.renderIcon ?? props.slots?.['icon'])) && <span className={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">

@@ -57,6 +57,33 @@ This is the first-class replacement for branching on `query === ''` inside a `so
 
 A palette (or level) with no `defaultItems` set behaves exactly as before this feature — the full, unfiltered `items`/`children` list in source order.
 
+## Per-level virtual windowing
+
+`virtual` / `virtualMaxHeight` / `virtualEstimateRowHeight` opt a long list into vertical windowing (only the visible slice of rows renders inside a bounded scrolling container), threaded straight onto the vendored combobox's own [`virtual`](/components/combobox#virtual-windowing) support — now that the combobox `virtual` prop is **live-flippable at runtime** (see the combobox changelog), a level pushed with `virtual: true` windows immediately, no remount required.
+
+Resolved **per level**, exactly like `defaultItems`/`title`/`placeholder`: the top-level `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` props window the ROOT list; a navigating item's own `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` fields (alongside its `children`/`source`) window THAT pushed child level instead — captured onto its frame at push time. Popping back to a level whose `virtual` resolves `false` restores the non-windowed (and, if it carries `group` fields, grouped) render for that level.
+
+```ts
+const items = [
+  {
+    id: 'goto',
+    label: 'Go to page…',
+    source: (q: string) => fetchPages(q),
+    virtual: true,
+    virtualMaxHeight: '320px',
+    virtualEstimateRowHeight: 44,
+  },
+];
+```
+
+```rozie
+<CommandPalette :items="items" r-model:open="open" r-model:query="query" />
+```
+
+**The flat-render caveat (per level, honestly bidirectional):** a virtual level renders **flat** — the vendored combobox's `isGrouped` requires `!virtual`, so auto-derived groups, `groupCap`, and the `#groupHeading` slot are all inactive for that level. This is combobox's own grouping/windowing tradeoff (groups × virtual is unsupported by design), surfaced here per-level rather than palette-wide: a virtual level renders flat while a sibling or ancestor level that is NOT virtual keeps its groups exactly as before. Popping back out of a virtual level to a grouped non-virtual level restores its sections — nothing is lost, the flat render only applies while that specific level is active.
+
+`virtualMaxHeight` is distinct from and non-conflicting with the panel's own `--rozie-command-palette-max-height` token: that token clips the WHOLE panel (a CSS layer), while `virtualMaxHeight` bounds the INNER windowed scroll container passed to the combobox's `maxHeight` prop — pair `virtual` with `virtualMaxHeight` for a properly bounded windowed list. `virtualEstimateRowHeight` seeds the windowing engine before it measures actual row heights; unset, it falls back to the combobox's own default (36px) — but command-palette rows are usually taller (an icon plus a right-aligned hotkey badge), so raise it when windowing a real palette level.
+
 ## Per-item hotKey badge
 
 Any command item may carry an optional `hotKey?: string` field — a **display-only** teaching badge advertising an app-global shortcut the CONSUMER owns (e.g. Copy `$mod+c`, Print `$mod+p`, New `$mod+n`). It uses the same portable `$mod`/`$shift`/`$alt`/`$ctrl` modifier grammar as `actionKey` (see [Interactive sub-actions](#interactive-sub-actions) above) — `$mod+p` renders `⌘P` on Apple platforms and `Ctrl+P` elsewhere.
