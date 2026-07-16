@@ -216,6 +216,79 @@ describe('RoziePortalController — command-palette-portal-overlay', () => {
     expect(el.shadowRoot.querySelector('[data-testid="target"]')).toBeNull();
   });
 
+  it('a truthy container does NOT resurrect an r-if-removed node (appendTo toggled while closed)', async () => {
+    // Regression (command-palette-portal-through-portal VR gap closure): the
+    // falsy-container path already guards against resurrecting a Lit-removed
+    // node, but the TRUTHY-container path did not. Sequence: palette CLOSED
+    // (r-if → false removes the overlay), then `appendTo` flips to a real
+    // container. `@query(cache:true)` still returns the detached node, and the
+    // truthy branch `container.appendChild(el)` re-mounted it into the
+    // container as a full-viewport, pointer-capturing zombie backdrop that
+    // blocked every click (appendTo-escape [lit] openBtn timeout). The
+    // controller must only place a node Lit still intends to render.
+    const tag = `portal-toggle-zombie-host-${tagCounter++}`;
+    class ToggleZombieHostEl extends LitElement {
+      static override properties = {
+        show: { attribute: false },
+        container: { attribute: false },
+      };
+      declare show: boolean;
+      declare container: Element | null;
+      controller: RoziePortalController;
+      private cachedTarget: Element | null = null;
+      constructor() {
+        super();
+        this.show = true;
+        this.container = null;
+        this.controller = new RoziePortalController(
+          this,
+          () => {
+            if (!this.cachedTarget) {
+              this.cachedTarget =
+                this.shadowRoot?.querySelector('[data-testid="target"]') ?? null;
+            }
+            return this.cachedTarget; // cache: true — stays non-null after removal
+          },
+          () => this.container,
+        );
+      }
+      override render() {
+        return html`<div id="wrap">${this.show ? html`<div data-testid="target">payload</div>` : nothing}</div>`;
+      }
+    }
+    if (!customElements.get(tag)) customElements.define(tag, ToggleZombieHostEl);
+    const el = (await mount(tag)) as HostInstance & { show: boolean; container: Element | null };
+    mountedEls.push(el);
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    mountedEls.push(container);
+
+    // Close: Lit removes the (never-portalled) overlay node.
+    el.show = false;
+    await el.updateComplete;
+    expect(el.shadowRoot.querySelector('[data-testid="target"]')).toBeNull();
+
+    // Flip appendTo to a real container WHILE closed — must NOT resurrect it.
+    el.container = container;
+    await el.updateComplete;
+
+    expect(container.querySelector('[data-testid="target"]')).toBeNull();
+
+    // NOTE: re-opening after a toggle-while-closed does NOT re-portal the
+    // freshly-rendered node here, because the emitted `@query(cache:true)` ref
+    // stays bound to the FIRST node and the controller never sees the recreated
+    // one — a separately-tracked limitation
+    // (.planning/debug/command-palette-portal-through-portal.md; the VR
+    // appendTo-escape cell toggles WHILE OPEN to avoid it). This test's scope
+    // is the resurrect guard: a closed overlay must never reappear as a
+    // pointer-capturing zombie in the container.
+    el.show = true;
+    await el.updateComplete;
+    // The freshly-rendered node lives in the shadow root (not resurrected into
+    // the container from the stale cache).
+    expect(el.shadowRoot.querySelector('[data-testid="target"]')).not.toBeNull();
+  });
+
   it('a re-render while portalled to a container does NOT re-move the element on every update', async () => {
     const tag = defineHostEl();
     const el = await mount(tag);

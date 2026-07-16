@@ -74,6 +74,17 @@ export class RoziePortalController implements ReactiveController {
       this.anchor = { parent: el.parentNode, next: el.nextSibling };
     }
     if (target) {
+      // Resurrect GUARD (mirrors the falsy-target `!this.moved` guard below):
+      // when the element is currently DISCONNECTED and we never moved it out,
+      // Lit authoritatively removed it (`r-if`/`open` → false) while
+      // `@query(cache:true)` still returns the stale node. A newly-truthy
+      // target must NOT append that node back into the document — doing so
+      // RESURRECTS a closed overlay (toggling `appendTo` to a container while
+      // the palette is closed re-mounted a full-viewport, pointer-capturing
+      // backdrop into the container, blocking every click). Only place a node
+      // Lit still intends to render (connected in the shadow root) or one we
+      // already own (previously moved out).
+      if (!this.moved && !el.isConnected) return;
       // Position GUARD: `appendChild`/`insertBefore` of an already-present
       // node is a MOVE (detach + reattach), NOT a no-op — it blurs any
       // focused descendant and fires spurious DOM mutations. `hostUpdated`
