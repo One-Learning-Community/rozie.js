@@ -1,6 +1,6 @@
 <template>
 
-<Teleport :to="resolveTo(props.to)" :disabled="!(resolveTo(props.to))"><div v-if="props.open" class="rozie-portal-overlay-backdrop">
+<Teleport :to="__roziePortalTo0" :disabled="!__roziePortalTo0"><div v-if="props.open" class="rozie-portal-overlay-backdrop">
   <div class="rozie-portal-overlay-box">
     <slot>Portalled content</slot>
   </div>
@@ -8,6 +8,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+
 const props = withDefaults(
   defineProps<{ open?: boolean; to?: boolean | string }>(),
   { open: false, to: false }
@@ -23,6 +25,8 @@ function resolveTo(to: any) {
   if (to === true || to === 'body') return document.body;
   return document.querySelector(to);
 }
+
+const __roziePortalTo0 = computed(() => (typeof document === 'undefined' ? null : (resolveTo(props.to))));
 </script>
 
 <style scoped>

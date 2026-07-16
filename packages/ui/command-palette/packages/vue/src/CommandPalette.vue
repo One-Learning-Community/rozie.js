@@ -1,6 +1,6 @@
 <template>
 
-<Teleport :to="resolveAppendTo(props.appendTo)" :disabled="!(resolveAppendTo(props.appendTo))"><div v-if="open" class="rozie-command-palette" @click="onBackdropClick($event)">
+<Teleport :to="__roziePortalTo0" :disabled="!__roziePortalTo0"><div v-if="open" class="rozie-command-palette" @click="onBackdropClick($event)">
   
   <div ref="frameRef" class="rozie-command-palette-frame" data-testid="command-palette-frame" @keydown="onPanelKeydown($event)">
   <div ref="panelRef" class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="props.ariaLabel">
@@ -72,6 +72,7 @@
 import Combobox from '@rozie-ui/combobox-vue';
 
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -1353,6 +1354,8 @@ watch(() => open.value, (isOpen: any) => {
 });
 
 defineExpose({ show, close, toggle, focus, goBack, openTo });
+
+const __roziePortalTo0 = computed(() => (typeof document === 'undefined' ? null : (resolveAppendTo(props.appendTo))));
 </script>
 
 <style scoped>

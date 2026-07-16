@@ -80,10 +80,14 @@ export class PortalOverlay {
       this.__roziePortalAnchors.set(el, anchor);
     }
     if (target) {
-      target.appendChild(el);
+      if (!this.__roziePortalMoved.has(el) && !el.isConnected) return;
+      if (el.parentNode !== target) {
+        target.appendChild(el);
+      }
       this.__roziePortalMoved.add(el);
       return;
     }
+    if (!this.__roziePortalMoved.has(el)) return;
     this.__roziePortalMoved.delete(el);
     if (anchor.parent) {
       if (anchor.next && anchor.next.parentNode === anchor.parent) {
