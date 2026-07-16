@@ -65,6 +65,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   })();
   const unmounted = useRef(false);
   const timers = useRef({});
+  const exitFailsafes = useRef({});
   const paused = useRef(false);
   const [toasts, setToasts] = useState<any[]>([]);
   const [seq, setSeq] = useState(0);
@@ -143,8 +144,14 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
         const entry = timers.current[id];
         if (entry.handle != null) window.clearTimeout(entry.handle);
       }
+      // Also cancel every pending exit failsafe — otherwise a removal timeout
+      // scheduled just before unmount/clear() fires afterward and writes $data.
+      for (const id in exitFailsafes.current) {
+        if (exitFailsafes.current[id] != null) window.clearTimeout(exitFailsafes.current[id]);
+      }
     }
     timers.current = {};
+    exitFailsafes.current = {};
   }, []);
   function show(input: any) {
     const t = input || {};
@@ -186,6 +193,12 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   // twice (from the inline @animationend binding AND the failsafe) — the
   // second call is a harmless no-op filter over an already-absent id.
   const removeToast = useCallback((id: any) => {
+    // Cancel any pending exit failsafe for this id (first-wins: @animationend
+    // beating the ~350ms timeout, or vice-versa — either way, only one removal).
+    if (typeof window !== 'undefined' && exitFailsafes.current[id] != null) {
+      window.clearTimeout(exitFailsafes.current[id]);
+    }
+    delete exitFailsafes.current[id];
     setToasts(prev => prev.filter((t: any) => t.id !== id));
   }, []);
   const { onDismissed: _rozieProp_onDismissed } = props;
@@ -207,7 +220,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     if (typeof window === 'undefined') {
       removeToast(id);
     } else {
-      window.setTimeout(() => removeToast(id), EXIT_FAILSAFE_MS);
+      exitFailsafes.current[id] = window.setTimeout(() => removeToast(id), EXIT_FAILSAFE_MS);
     }
   }, [_rozieProp_onDismissed, clearTimer, removeToast, toasts]);
   function dismiss(id: any) {

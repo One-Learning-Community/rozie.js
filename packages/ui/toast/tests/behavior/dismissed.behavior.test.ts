@@ -176,3 +176,58 @@ describe('Toaster @dismissed — exit lifecycle (behavioral)', () => {
     app.unmount();
   });
 });
+
+describe('Toaster exit failsafe — cleaned up on unmount (T2, behavioral)', () => {
+  // RED-FIRST: dismissBegin scheduled the ~350ms removal failsafe via an
+  // UNTRACKED window.setTimeout, so $onUnmount's teardown could not clear it —
+  // a dismiss immediately followed by an unmount left the failsafe pending and
+  // it fired post-unmount, writing $data on a torn-down instance. The fix
+  // records failsafe handles in a module `exitFailsafes` map, cleared by
+  // teardownTimers ($onUnmount / clear()) and cancelled first-wins by
+  // removeToast. `vi.getTimerCount()` proves the pending timer is gone.
+  it('a dismiss-then-unmount within the failsafe window leaves NO pending timer', async () => {
+    const { app, host, handle } = mountToaster();
+    const id = handle().show({ message: 'x', type: 'info', duration: 0 }); // sticky → no auto-timer
+    await nextTick();
+    expect(statusCount(host)).toBe(1);
+
+    // Dismiss → schedules the ~350ms removal failsafe (the only pending timer).
+    handle().dismiss(id);
+    await nextTick();
+    expect(vi.getTimerCount()).toBe(1);
+
+    // Unmount BEFORE the failsafe fires — teardown must clear it.
+    app.unmount();
+    await nextTick();
+    expect(vi.getTimerCount()).toBe(0);
+
+    // And advancing time triggers nothing (no post-unmount $data write / throw).
+    let threw = false;
+    try {
+      await vi.advanceTimersByTimeAsync(1000);
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+  });
+
+  it('the @animationend removal path cancels the pending failsafe first-wins', async () => {
+    const { app, host, handle } = mountToaster();
+    const id = handle().show({ message: 'x', type: 'info', duration: 0 });
+    await nextTick();
+
+    handle().dismiss(id);
+    await nextTick();
+    expect(vi.getTimerCount()).toBe(1); // failsafe pending
+
+    // Fire the element's animationend (the real removal path) — it removes the
+    // toast AND must cancel the now-redundant failsafe.
+    host.querySelector('.rozie-toast')!.dispatchEvent(new AnimationEvent('animationend'));
+    await nextTick();
+
+    expect(statusCount(host)).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+
+    app.unmount();
+  });
+});

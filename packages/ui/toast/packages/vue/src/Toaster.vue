@@ -73,6 +73,14 @@ const swipeGesture = ref<any>(null);
 // remainder. `clearTimer`/the full-teardown helper below are the only ways an
 // entry is actually removed from the map.
 let timers = {};
+// Per-id handles for the ~350ms exit-removal failsafe (the fallback that
+// removes a toast if its @animationend never fires). Tracked in a module map
+// — NOT an anonymous window.setTimeout — so teardownTimers ($onUnmount /
+// clear()) can cancel a pending failsafe (else it fires post-unmount and
+// writes $data on a torn-down instance) and removeToast can cancel it
+// first-wins when @animationend beats it. Escapes into $onUnmount's effect →
+// React hoists it to useRef alongside `timers`.
+let exitFailsafes = {};
 // Set true in $onUnmount; read by promise()'s settle guard (never-resurrect
 // a toast after the host itself is gone). A top-level `let` → React useRef
 // (it escapes into $onUnmount's effect).
@@ -169,8 +177,14 @@ const teardownTimers = () => {
       const entry = timers[id];
       if (entry.handle != null) window.clearTimeout(entry.handle);
     }
+    // Also cancel every pending exit failsafe — otherwise a removal timeout
+    // scheduled just before unmount/clear() fires afterward and writes $data.
+    for (const id in exitFailsafes) {
+      if (exitFailsafes[id] != null) window.clearTimeout(exitFailsafes[id]);
+    }
   }
   timers = {};
+  exitFailsafes = {};
 };
 // ---- queue (imperative handle implementations) -------------------------
 const show = (input: any) => {
@@ -212,6 +226,12 @@ const EXIT_FAILSAFE_MS = 350;
 // twice (from the inline @animationend binding AND the failsafe) — the
 // second call is a harmless no-op filter over an already-absent id.
 const removeToast = (id: any) => {
+  // Cancel any pending exit failsafe for this id (first-wins: @animationend
+  // beating the ~350ms timeout, or vice-versa — either way, only one removal).
+  if (typeof window !== 'undefined' && exitFailsafes[id] != null) {
+    window.clearTimeout(exitFailsafes[id]);
+  }
+  delete exitFailsafes[id];
   toasts.value = toasts.value.filter((t: any) => t.id !== id);
 };
 // The single dismissal funnel every path routes through: the `dismiss(id)`
@@ -239,7 +259,7 @@ const dismissBegin = (id: any, reason: any, extra?: {
   if (typeof window === 'undefined') {
     removeToast(id);
   } else {
-    window.setTimeout(() => removeToast(id), EXIT_FAILSAFE_MS);
+    exitFailsafes[id] = window.setTimeout(() => removeToast(id), EXIT_FAILSAFE_MS);
   }
 };
 const dismiss = (id: any) => {

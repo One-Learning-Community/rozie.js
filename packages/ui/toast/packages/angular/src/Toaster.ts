@@ -250,6 +250,7 @@ export class Toaster {
   }
 
   timers = {};
+  exitFailsafes = {};
   unmounted = false;
   paused = false;
   startTimer = (toast: any) => {
@@ -324,8 +325,14 @@ export class Toaster {
         const entry = this.timers[id];
         if (entry.handle != null) window.clearTimeout(entry.handle);
       }
+      // Also cancel every pending exit failsafe — otherwise a removal timeout
+      // scheduled just before unmount/clear() fires afterward and writes $data.
+      for (const id in this.exitFailsafes) {
+        if (this.exitFailsafes[id] != null) window.clearTimeout(this.exitFailsafes[id]);
+      }
     }
     this.timers = {};
+    this.exitFailsafes = {};
   };
   show = (input: any) => {
     const t = input || {};
@@ -359,6 +366,12 @@ export class Toaster {
   };
   EXIT_FAILSAFE_MS = 350;
   removeToast = (id: any) => {
+    // Cancel any pending exit failsafe for this id (first-wins: @animationend
+    // beating the ~350ms timeout, or vice-versa — either way, only one removal).
+    if (typeof window !== 'undefined' && this.exitFailsafes[id] != null) {
+      window.clearTimeout(this.exitFailsafes[id]);
+    }
+    delete this.exitFailsafes[id];
     this.toasts.set(this.toasts().filter((t: any) => t.id !== id));
   };
   dismissBegin = (id: any, reason: any, extra?: {
@@ -379,7 +392,7 @@ export class Toaster {
     if (typeof window === 'undefined') {
       this.removeToast(id);
     } else {
-      window.setTimeout(() => this.removeToast(id), this.EXIT_FAILSAFE_MS);
+      this.exitFailsafes[id] = window.setTimeout(() => this.removeToast(id), this.EXIT_FAILSAFE_MS);
     }
   };
   dismiss = (id: any) => {
