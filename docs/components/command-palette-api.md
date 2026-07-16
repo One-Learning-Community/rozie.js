@@ -22,7 +22,7 @@ The full prop surface. The two `model: true` slices (`open` and `query`, the **T
 
 Selecting an item that carries `children` (a static array) or `source` (a `(query) => items | Promise<items>` function) **pushes** a child level instead of firing `select` — presence of either field is the navigation signal, no separate flag. A `source` may return a `Promise`; the level enters `loading` until it settles, and only the LATEST in-flight request's result is applied (stale resolutions are dropped). `searchDebounce` (default ~150ms) debounces an async level's keystroke refetch only — a `children` level re-ranks locally with no debounce.
 
-Backspace on an empty query pops one level; Escape pops one level at depth > 0 and only closes the palette at the root. A breadcrumb/back header renders above the input at depth > 0 (overridable via the `breadcrumb` slot). The imperative `openTo(path)` handle deep-links straight to a nested level.
+Backspace on an empty query pops one level; Escape pops one level at depth > 0 and only closes the palette at the root. A breadcrumb/back header renders above the input at depth > 0 (overridable via the `breadcrumb` slot). Every ancestor segment in that trail is itself a keyboard-focusable jump button — clicking (or activating) one pops straight to that tier in one step, while the current (last) segment stays a plain, non-interactive label. The imperative `openTo(path)` handle deep-links straight to a nested level.
 
 ## Default items (empty / home view)
 
@@ -99,7 +99,7 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 | `empty` | `{ query }` | The settled-but-empty state; `query` is the current search string. Falls back to the `emptyText` prop. Not shown while `loading`/`error` (see below). |
 | `loading` | `{ query }` | Shown while the active level's async `source` is in flight. Falls back to "Loading…". |
 | `error` | `{ query, error, retry }` | Shown when the active level's async `source` rejected. `error` is the rejection value; `retry` re-invokes the source at the current query. |
-| `breadcrumb` | `{ stack, back }` | The depth > 0 header (a panel sibling above the input, not inside the combobox). `stack` is the root..current breadcrumb (`[{ id, title }]`); `back` is the `goBack` handle. Falls back to a back button + the full root..current trail (muted ancestors › an emphasized current segment) — trail-segment click-to-jump is deferred; the back button is the only interactive affordance in v1. |
+| `breadcrumb` | `{ stack, back }` | The depth > 0 header (a panel sibling above the input, not inside the combobox). `stack` is the root..current breadcrumb (`[{ id, title }]`); `back` is the `goBack` handle. Falls back to a back button + the full root..current trail (muted ancestors › an emphasized current segment). Every ancestor segment is a real, keyboard-focusable `<button>` (`aria-label="Back to <title>"`) that jumps straight to that tier — popping one level per hop the same way repeated Backspace presses would. The current segment stays a plain, non-interactive `<span>`. |
 | `actionItem` | `{ action, item, active, disabled }` | Custom render for one row inside the action menu. `action` is the entry from the anchored row's `actions[]`; `item` is the anchored command; `active` is whether it is currently roving-highlighted; `disabled` mirrors `action.disabled`. Falls back to icon (if present) + label + a right-aligned `shortcut` hint. Named `actionItem` (camelCase) — a hyphenated slot name is not a valid identifier across all six targets. |
 | `groupHeading` | `{ group }` | Custom render for a section heading when commands are grouped (see [Grouped commands](#grouped-commands) above). `group` is `{ id, label }` — the group's `id` is the `group` string it was derived from; `label` defaults to that same string. Falls back to `group.label`. Not rendered at all when no command carries a `group`. |
 | `footer` | — | A persistent footer bar below the list (e.g. keyboard hints). Rendered only when provided. |
@@ -147,6 +147,14 @@ New in a later release (per-item [hotKey badge](#per-item-hotkey-badge)) — eac
 | `--rozie-command-palette-hotkey-color` | `--rozie-command-palette-actions-hint-color` (`inherit`) | The badge's text color. |
 | `--rozie-command-palette-hotkey-bg` | `--rozie-command-palette-actions-hint-bg` (`rgba(0, 0, 0, 0.06)`) | The badge's background. |
 | `--rozie-command-palette-hotkey-radius` | `--rozie-command-palette-actions-hint-radius` (`0.25rem`) | The badge's corner radius. |
+
+New in a later release ([breadcrumb ancestor click-to-jump](#nested-levels)) — the ancestor jump button inherits the base `--rozie-command-palette-breadcrumb-*` color/weight tokens above; these three additionally style its native-button reset and hover affordance, with the hover color aliasing the existing current-segment color:
+
+| Token | Fallback | Description |
+| --- | --- | --- |
+| `--rozie-command-palette-breadcrumb-jump-radius` | `0.25rem` | The ancestor jump button's corner radius (focus ring follows it). |
+| `--rozie-command-palette-breadcrumb-jump-hover-color` | `--rozie-command-palette-breadcrumb-current-color` (`inherit`) | The ancestor jump button's text color on hover. |
+| `--rozie-command-palette-breadcrumb-jump-hover-decoration` | `underline` | The ancestor jump button's `text-decoration` on hover. |
 
 The full token vocabulary — overlay/scrim, panel chrome, the flyout, the header/back button, the list/option box model, empty/loading/error states, and the footer — has documented defaults in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/command-palette/src/themes/base.css). Structural rules (the fixed overlay, the non-clipping frame's positioning, the panel's `overflow: hidden`, the flyout's `position: absolute`) compile per-leaf and are not consumer-overridable.
 

@@ -448,6 +448,60 @@ for (const target of TARGETS) {
     await openToUsersBtn.click();
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(2);
     await expect(breadcrumbTitle).toHaveText('Search users');
+
+    // ---- 9. 260715-uz1: breadcrumb ANCESTOR segment click-to-jump. This demo's ----
+    //         two navigable levels (`goto`'s static children, `search-users`'s
+    //         async source) are both leaf-only one level deep, so depth 1 is the
+    //         max reachable here — the single ancestor segment at depth 1 is
+    //         always the ROOT (index 0, the `ariaLabel` title). That still fully
+    //         exercises the LOCKED N-T=1 contract (one `@back` per popped level,
+    //         byte-identical to one Backspace) end-to-end through the DOM click
+    //         path; the deeper N-T>1 pop-chain shape is unit-proven directly
+    //         against the pure reducer (levelStack.test.ts's popFrame coverage)
+    //         and the compile-output test (breadcrumb-jump.test.ts).
+    //         Type a DISTINGUISHING query first so the jump's restore-on-pop is
+    //         observable (not just '' -> '').
+    await input.pressSequentially('ada', { delay: 30 });
+    await expect
+      .poll(async () => (await readoutQuery.textContent())?.trim() ?? '', { timeout: 10_000 })
+      .toBe('ada');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+
+    const backCountBeforeJump = Number((await readoutBackCount.textContent())?.trim() ?? '0');
+    const jumpBtn = page.getByTestId('command-palette-breadcrumb-jump').first();
+    await expect(jumpBtn).toBeVisible();
+    // The ancestor button carries the "Back to <title>" aria-label — the demo's
+    // root title is its ariaLabel ("Command palette").
+    await expect(jumpBtn).toHaveAttribute('aria-label', 'Back to Command palette');
+    await jumpBtn.click();
+
+    // (a) breadcrumb collapses to the clicked (root) depth — at depth 0 the
+    //     header is not rendered at all, so `command-palette-title` has no
+    //     match (the same shape steps 3/6 assert for a pop-to-root).
+    await expect(breadcrumbTitle).toHaveCount(0);
+    // (b) readout-back-count increased by EXACTLY 1 — one `@back` per popped
+    //     level (N-T=1 here), proving the click path fires the same emit
+    //     shape a physical Backspace would.
+    await expect(readoutBackCount).toHaveText(String(backCountBeforeJump + 1));
+    // (c) readout-query restored to the root tier's query — '' (the query in
+    //     effect just before `search-users` was pushed via openTo).
+    await expect
+      .poll(async () => (await readoutQuery.textContent())?.trim() ?? '', { timeout: 10_000 })
+      .toBe('');
+    await expect(input).toHaveValue('');
+    // (d) the jump did NOT commit a command and did NOT leave the popup
+    //     stuck-closed — the root list (8 items) is visible again and real
+    //     DOM focus landed back on the search input (reopenComboboxPopup's
+    //     reused restore path, the same invariant proven at L556-569 for the
+    //     sub-actions Escape-close case).
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(8);
+    await expect
+      .poll(async () => activeMenuItemInfo(page), { timeout: 10_000 })
+      .toEqual({ role: 'combobox', disabled: false });
+    // (e) the CURRENT segment stays a non-interactive span, never a button —
+    //     at root the whole header is gone, so there is no
+    //     `command-palette-breadcrumb-jump` element left in the DOM at all.
+    await expect(page.getByTestId('command-palette-breadcrumb-jump')).toHaveCount(0);
   });
 }
 
