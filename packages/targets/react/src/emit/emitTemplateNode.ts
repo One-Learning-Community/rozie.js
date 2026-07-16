@@ -116,6 +116,17 @@ export interface EmitNodeCtx {
    * a loop, or the enclosing loop has no keynav item and needed no index.
    */
   keynavItemIndexAlias?: string | null;
+  /**
+   * command-palette-portal-overlay phase — mutable out-flag flipped by
+   * `emitElement` when it emits a `TemplateElementIR.portalTo` node. Reusing
+   * the existing single tree-walk (rather than a second dedicated walker)
+   * lets `emitTemplate.ts` learn, after `emitNode` returns, whether the
+   * component needs the `import { createPortal } from 'react-dom';` line —
+   * mirrors the P33 `hasPortals` flag emitScript.ts threads for the (distinct,
+   * untouched) slot-content-INTO-container primitive. `undefined` for callers
+   * that don't thread it (back-compat; no-op).
+   */
+  elementPortalFlag?: { seen: boolean };
 }
 
 function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
@@ -326,7 +337,47 @@ function scopeAttrForElement(node: TemplateElementIR, ctx: EmitNodeCtx): string 
  * declarations are hoisted within their containing scope). Both emit the tag
  * verbatim PascalCase below; no template AST rewrite needed.
  */
+/**
+ * command-palette-portal-overlay phase — `r-portal="<expr>"` element
+ * teleport. Wraps the normal element emit (`emitElementInner`) in a
+ * `container ? createPortal(tree, container) : tree` check, using React's
+ * native `createPortal` (react-dom) — NEVER the P33 `emitPortals.ts`
+ * createRoot-into-container machinery (that is the INVERSE direction: slot-
+ * content mounted INTO an engine-owned container, not a component's own
+ * subtree relocated OUT).
+ *
+ * SSR guard: the container expression is evaluated ONLY when `document`
+ * exists — some author expressions call `document.querySelector` internally
+ * (see `resolveAppendTo`/`resolveTo` in the authoring convention), so simply
+ * checking the RESULT for null is not enough; the whole resolution must be
+ * skipped on the server. Falsy/null container falls back to rendering the
+ * subtree in place — this is what makes `appendTo:false` byte-behavior-
+ * identical to no directive at emit time (the lower-time field is always
+ * present per Task 1; this is the runtime decision point).
+ *
+ * Returns a `{...}` JSX-expression-container mustache — valid directly in
+ * JSX children position, and `renderBranchBody` (emitConditional.ts) strips
+ * the outer braces via `stripBalancedMustache` when this is a single-child
+ * r-if branch body, so `r-portal` + `r-if` on the same element compose for
+ * free with zero special-casing in the conditional emitter.
+ */
+function emitPortalElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
+  const { expression } = node.portalTo!;
+  if (ctx.elementPortalFlag) ctx.elementPortalFlag.seen = true;
+  const containerCode = rewriteTemplateExpression(expression, ctx.ir);
+  // `emitElementInner` never reads `.portalTo` — call it directly (not via
+  // the `emitElement` dispatcher) so there is no risk of re-entering this
+  // portal branch for the same node.
+  const treeJsx = emitElementInner(node, ctx);
+  return `{(() => { const __rozieContainer = typeof document === 'undefined' ? null : (${containerCode}); return __rozieContainer ? createPortal(${treeJsx}, __rozieContainer) : (${treeJsx}); })()}`;
+}
+
 function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
+  if (origNode.portalTo) return emitPortalElement(origNode, ctx);
+  return emitElementInner(origNode, ctx);
+}
+
+function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
   // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
   // BEFORE any listener emission runs; it's routed into `useKeynav`'s
   // `onCommit` option by emitTemplate.ts, never as a JSX `onKeynavCommit=`

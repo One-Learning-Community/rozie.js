@@ -34,6 +34,15 @@ export interface EmitTemplateResult {
   slotPropFields: string[];
   slotCtxInterfaces: string[];
   diagnostics: Diagnostic[];
+  /**
+   * command-palette-portal-overlay phase — true when the template walk
+   * emitted at least one `r-portal` element teleport (`emitPortalElement` in
+   * emitTemplateNode.ts). Drives the conditional
+   * `import { createPortal } from 'react-dom';` line in emitReact.ts —
+   * mirrors the P33 `hasPortals` flag emitScript.ts threads for the
+   * (distinct, untouched) slot-content primitive.
+   */
+  hasElementPortal: boolean;
 }
 
 export interface EmitTemplateOptions {
@@ -62,6 +71,7 @@ export function emitTemplate(
       slotPropFields: slotResult.slotPropFields,
       slotCtxInterfaces: slotResult.slotCtxInterfaces,
       diagnostics: [],
+      hasElementPortal: false,
     };
   }
 
@@ -72,6 +82,10 @@ export function emitTemplate(
   // every existing fixture (SPEC §11: "no corpus rebless").
   const keynav = resolveKeynavPlan(ir);
 
+  // command-palette-portal-overlay phase — mutable out-flag; see
+  // EmitNodeCtx.elementPortalFlag doc comment.
+  const elementPortalFlag = { seen: false };
+
   const ctx: EmitNodeCtx = {
     ir,
     collectors,
@@ -81,6 +95,7 @@ export function emitTemplate(
     injectionCounter: { next: 0 },
     ...(opts.scopeAttr !== undefined ? { scopeAttr: opts.scopeAttr } : {}),
     keynav,
+    elementPortalFlag,
   };
 
   const jsx = emitNode(ir.template, ctx);
@@ -99,5 +114,6 @@ export function emitTemplate(
     slotPropFields: slotResult.slotPropFields,
     slotCtxInterfaces: slotResult.slotCtxInterfaces,
     diagnostics,
+    hasElementPortal: elementPortalFlag.seen,
   };
 }

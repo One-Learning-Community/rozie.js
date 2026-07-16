@@ -143,18 +143,6 @@ export function emitReact(
     scriptOpts,
   );
 
-  // Portal-slot primitive (Spike 003) — when the script emit synthesized a
-  // portals closure, the shell needs the matching react-dom/client import.
-  // `Root` is type-only so the line uses `type Root` to avoid a runtime
-  // import (the value-side reference is `createRoot`).
-  // The flushSync line lives in 'react-dom' (not 'react-dom/client'); it
-  // forces synchronous portal-tree commits so engine callbacks never see
-  // an unmounted-but-DOM-attached node mid-reconciliation (see emitPortals.ts
-  // for the rationale).
-  const portalImport = hasPortals
-    ? "import { createRoot, type Root } from 'react-dom/client';\nimport { flushSync } from 'react-dom';\n"
-    : '';
-
   // Plan 04-03: emit the template-side JSX, slot-prop fields + ctx interfaces.
   // Threads scopeAttr through to emitTemplateNode so every HTML host element
   // emits the matching attribute. Component tags (tagKind 'component'/'self')
@@ -165,6 +153,27 @@ export function emitReact(
     registry,
     { scopeAttr },
   );
+
+  // Portal-slot primitive (Spike 003) — when the script emit synthesized a
+  // portals closure, the shell needs the matching react-dom/client import.
+  // `Root` is type-only so the line uses `type Root` to avoid a runtime
+  // import (the value-side reference is `createRoot`).
+  // The flushSync line lives in 'react-dom' (not 'react-dom/client'); it
+  // forces synchronous portal-tree commits so engine callbacks never see
+  // an unmounted-but-DOM-attached node mid-reconciliation (see emitPortals.ts
+  // for the rationale).
+  //
+  // command-palette-portal-overlay phase — a SIBLING, independent import:
+  // when the template emitted at least one `r-portal` element teleport
+  // (`tmpl.hasElementPortal`, `emitPortalElement` in emitTemplateNode.ts),
+  // add `import { createPortal } from 'react-dom';`. This is the NATIVE
+  // element-subtree teleport construct — orthogonal to (and may coexist
+  // with) the P33 createRoot-into-container slot machinery above.
+  const portalImport =
+    (hasPortals
+      ? "import { createRoot, type Root } from 'react-dom/client';\nimport { flushSync } from 'react-dom';\n"
+      : '') +
+    (tmpl.hasElementPortal ? "import { createPortal } from 'react-dom';\n" : '');
 
   // Plan 04-04: emit <listeners>-block entries (4-class A/B/C/D classifier).
   const listeners = emitListeners(
