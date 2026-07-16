@@ -38,6 +38,11 @@ const EXPECT = {
   // is captured onto its frame, not a separate prop) — 13 props total.
   // command-palette-portal-overlay: gains `appendTo` — element-portal target
   // for the overlay root (default false = render in place) — 15 props total.
+  // command-palette-per-level-virtual (FD-01 resolved — combobox-virtual-
+  // reactivity, commits 6fd84251+afa0a7ec, made the vendored combobox's
+  // `virtual` prop live-flippable): gains `virtual`/`virtualMaxHeight`/
+  // `virtualEstimateRowHeight` — a virtual-windowing pass-through cluster
+  // placed LAST, after `appendTo` — 18 props total.
   props: [
     'open',
     'query',
@@ -54,6 +59,9 @@ const EXPECT = {
     'closeOnAction',
     'groupCap',
     'appendTo',
+    'virtual',
+    'virtualMaxHeight',
+    'virtualEstimateRowHeight',
   ],
   models: ['open', 'query'],
   // command-palette-levels: gains `navigate` (a level was pushed — payload
@@ -136,7 +144,7 @@ describe('CommandPalette.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (14 props)', () => {
+  it('props surface matches (18 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

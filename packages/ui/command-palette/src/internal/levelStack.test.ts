@@ -11,6 +11,9 @@ import {
   levelTitle,
   levelPlaceholder,
   levelDefaultItems,
+  levelVirtual,
+  levelVirtualMaxHeight,
+  levelVirtualEstimateRowHeight,
   type LevelFrame,
 } from './levelStack';
 
@@ -98,6 +101,53 @@ describe('levelDefaultItems / defaultItems frame field', () => {
     const stack = pushFrame([], item, '');
     expect(stack[0].status).toBe('loading');
     expect(stack[0].defaultItems).toEqual([]);
+  });
+});
+
+describe('levelVirtual / levelVirtualMaxHeight / levelVirtualEstimateRowHeight / virtual frame fields (command-palette-per-level-virtual)', () => {
+  it('levelVirtual is true only when item.virtual === true', () => {
+    expect(levelVirtual({ id: 'a', label: 'A', virtual: true })).toBe(true);
+    expect(levelVirtual({ id: 'a', label: 'A', virtual: false })).toBe(false);
+    expect(levelVirtual({ id: 'a', label: 'A' })).toBe(false);
+    expect(levelVirtual(null)).toBe(false);
+    expect(levelVirtual(undefined)).toBe(false);
+  });
+
+  it('levelVirtualMaxHeight returns item.virtualMaxHeight, else null', () => {
+    expect(levelVirtualMaxHeight({ id: 'a', label: 'A', virtualMaxHeight: '320px' })).toBe('320px');
+    expect(levelVirtualMaxHeight({ id: 'a', label: 'A' })).toBeNull();
+    expect(levelVirtualMaxHeight(null)).toBeNull();
+    expect(levelVirtualMaxHeight(undefined)).toBeNull();
+  });
+
+  it('levelVirtualEstimateRowHeight returns item.virtualEstimateRowHeight, else null', () => {
+    expect(levelVirtualEstimateRowHeight({ id: 'a', label: 'A', virtualEstimateRowHeight: 48 })).toBe(48);
+    expect(levelVirtualEstimateRowHeight({ id: 'a', label: 'A' })).toBeNull();
+    expect(levelVirtualEstimateRowHeight(null)).toBeNull();
+    expect(levelVirtualEstimateRowHeight(undefined)).toBeNull();
+  });
+
+  it('pushFrame captures virtual/virtualMaxHeight/virtualEstimateRowHeight onto the new frame (mirrors defaultItems)', () => {
+    const item = {
+      id: 'goto',
+      label: 'Go to page…',
+      source: (_q: string) => [],
+      virtual: true,
+      virtualMaxHeight: '320px',
+      virtualEstimateRowHeight: 48,
+    };
+    const stack = pushFrame([], item, '');
+    expect(stack[0].virtual).toBe(true);
+    expect(stack[0].virtualMaxHeight).toBe('320px');
+    expect(stack[0].virtualEstimateRowHeight).toBe(48);
+  });
+
+  it('absent virtual fields → frame.virtual=false, virtualMaxHeight=null, virtualEstimateRowHeight=null', () => {
+    const item = { id: 'a', label: 'A', children: [{ id: 'a1', label: 'A1' }] };
+    const stack = pushFrame([], item, '');
+    expect(stack[0].virtual).toBe(false);
+    expect(stack[0].virtualMaxHeight).toBeNull();
+    expect(stack[0].virtualEstimateRowHeight).toBeNull();
   });
 });
 

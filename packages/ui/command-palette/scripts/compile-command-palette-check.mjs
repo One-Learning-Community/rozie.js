@@ -42,6 +42,10 @@ const EXPECT = {
   // `defaultItems` — the root empty/home-view prop (13 props total).
   // command-palette-portal-overlay adds `appendTo` — element-portal target
   // for the overlay root (default false = render in place) — 15 props total.
+  // command-palette-per-level-virtual (FD-01 resolved — combobox-virtual-
+  // reactivity, commits 6fd84251+afa0a7ec) adds `virtual`/`virtualMaxHeight`/
+  // `virtualEstimateRowHeight` — a virtual-windowing pass-through cluster
+  // placed LAST, after `appendTo` — 18 props total.
   props: [
     'open',
     'query',
@@ -58,6 +62,9 @@ const EXPECT = {
     'closeOnAction',
     'groupCap',
     'appendTo',
+    'virtual',
+    'virtualMaxHeight',
+    'virtualEstimateRowHeight',
   ],
   models: ['open', 'query'],
   // command-palette-levels: gains `navigate` (a level was pushed) and `back`
