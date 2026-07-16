@@ -90,6 +90,14 @@ export interface EmitNodeCtx {
    * a loop, or the enclosing loop has no keynav item and needed no index.
    */
   keynavItemIndexAlias?: string | null;
+  /**
+   * command-palette-portal-overlay phase — mutable out-flag flipped when
+   * `emitElementWithExtraDirective` emits a `TemplateElementIR.portalTo`
+   * node as a `<Teleport>`. `undefined` for callers that don't thread it
+   * (back-compat; no-op). See the React target's `EmitNodeCtx.elementPortalFlag`
+   * doc comment for the shared rationale.
+   */
+  elementPortalFlag?: { seen: boolean };
 }
 
 /**
@@ -287,7 +295,45 @@ function emitElement(node: TemplateElementIR, ctx: EmitNodeCtx): string {
  * (`<template #header="{ close }">…</template>`); default-shorthand
  * (`{ name: '' }`) emits as bare children inside the component tag.
  */
+/**
+ * command-palette-portal-overlay phase — `r-portal="<expr>"` element
+ * teleport. Wraps the element in Vue's NATIVE `<Teleport :to :disabled>`
+ * component — authors cannot write `<Teleport>` directly (ROZ926 rejects
+ * it), but the EMITTER may synthesize it as the lowering target for
+ * `r-portal` (ROZ926 gates author input, not emit output). `<Teleport>`
+ * tolerates a `v-if`/`v-for` child, so `extraDirective` (the r-if/r-for
+ * directive the parent conditional/loop walker wants to inject) is applied
+ * to the INNER element, not the `<Teleport>` wrapper — the wrapper is
+ * unconditional; when `disabled` the child's own `v-if` still governs
+ * whether anything renders at all.
+ *
+ * `:disabled="!(<expr>)"` — a falsy container renders in place (Vue's
+ * Teleport skips target resolution/warnings entirely when disabled; see
+ * `resolveTarget`/`mountToTarget` in @vue/runtime-core — no console warning,
+ * no throw, for a falsy `to` when `disabled` is true).
+ */
+function emitPortalElement(
+  node: TemplateElementIR,
+  extraDirective: string | null,
+  ctx: EmitNodeCtx,
+): string {
+  const { expression } = node.portalTo!;
+  if (ctx.elementPortalFlag) ctx.elementPortalFlag.seen = true;
+  const containerCode = rewriteTemplateExpression(expression, ctx.ir);
+  const innerVue = emitElementWithExtraDirectiveInner(node, extraDirective, ctx);
+  return `<Teleport :to="${containerCode}" :disabled="!(${containerCode})">${innerVue}</Teleport>`;
+}
+
 function emitElementWithExtraDirective(
+  origNode: TemplateElementIR,
+  extraDirective: string | null,
+  ctx: EmitNodeCtx,
+): string {
+  if (origNode.portalTo) return emitPortalElement(origNode, extraDirective, ctx);
+  return emitElementWithExtraDirectiveInner(origNode, extraDirective, ctx);
+}
+
+function emitElementWithExtraDirectiveInner(
   origNode: TemplateElementIR,
   extraDirective: string | null,
   ctx: EmitNodeCtx,
