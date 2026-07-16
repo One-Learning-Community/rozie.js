@@ -1,7 +1,7 @@
 {
   "name": "@rozie/unplugin",
   "version": "0.1.4",
-  "description": "Universal build-tool plugin for Rozie.js — compile .rozie files in Vite, Rollup, Webpack, esbuild, Rolldown, and Rspack from one factory.",
+  "description": "Universal build-tool plugin for Rozie.js \u2014 compile .rozie files in Vite, Rollup, Webpack, esbuild, Rolldown, and Rspack from one factory.",
   "type": "module",
   "private": false,
   "main": "./dist/index.cjs",
@@ -70,11 +70,11 @@
     "magic-string": "^0.30.21",
     "picocolors": "^1.1.0",
     "postcss": "^8.5.13",
-    "unplugin": "^3.0.0"
+    "unplugin": "^3.0.0",
+    "@rozie/runtime-vue": "workspace:*",
+    "@rozie/runtime-react": "workspace:*"
   },
   "peerDependencies": {
-    "@rozie/runtime-vue": "workspace:*",
-    "@rozie/runtime-react": "workspace:*",
     "@vitejs/plugin-vue": "^5 || ^6",
     "@vitejs/plugin-react": "^4 || ^5",
     "@vitejs/plugin-react-swc": "^3 || ^4",
