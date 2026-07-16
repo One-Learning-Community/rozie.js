@@ -115,6 +115,11 @@ describe('resolveEscape — the FULL precedence table (surface-open > level-pop 
   it('closes the palette when at the list surface at the root (depth 0)', () => {
     expect(resolveEscape('list', 0)).toBe('close-palette');
   });
+
+  it('closes the sub-surface when the args surface is open (#12), regardless of depth — proves the surface-agnostic routing the args surface relies on', () => {
+    expect(resolveEscape('args', 0)).toBe('close-surface');
+    expect(resolveEscape('args', 3)).toBe('close-surface');
+  });
 });
 
 describe('matchesActionKey', () => {
