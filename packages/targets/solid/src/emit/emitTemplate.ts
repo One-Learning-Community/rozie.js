@@ -31,6 +31,13 @@ export interface EmitTemplateResult {
    */
   needsKeyedImport: boolean;
   diagnostics: Diagnostic[];
+  /**
+   * command-palette-portal-overlay phase — true when the walk emitted at
+   * least one `r-portal` element teleport as `<Portal>` (from `solid-js/web`).
+   * emitSolid reads this to inject the matching import as a bespoke shell
+   * part, mirroring `needsKeyedImport`.
+   */
+  hasElementPortal: boolean;
 }
 
 export interface EmitTemplateOptions {
@@ -51,7 +58,13 @@ export function emitTemplate(
   const diagnostics: Diagnostic[] = [];
 
   if (ir.template === null) {
-    return { jsx: 'null', scriptInjections: [], needsKeyedImport: false, diagnostics: [] };
+    return {
+      jsx: 'null',
+      scriptInjections: [],
+      needsKeyedImport: false,
+      diagnostics: [],
+      hasElementPortal: false,
+    };
   }
 
   const scriptInjections: string[] = [];
@@ -61,6 +74,9 @@ export function emitTemplate(
   // so the reference survives the spread-copy of every child ctx (mirrors how
   // `injectionCounter` / `scriptInjections` are threaded).
   const keyedImport = { needed: false };
+  // command-palette-portal-overlay phase — mirrors keyedImport's pattern for
+  // `<Portal>` (solid-js/web).
+  const elementPortalImport = { needed: false };
 
   // Phase 71 (r-keynav) — resolved ONCE per component (not per element; see
   // emitKeynav.ts's module doc comment). `null` for the overwhelming
@@ -77,6 +93,7 @@ export function emitTemplate(
     scriptInjections,
     injectionCounter,
     keyedImport,
+    elementPortalImport,
     keynav,
     ...(opts.scopeAttr !== undefined ? { scopeAttr: opts.scopeAttr } : {}),
   };
@@ -90,5 +107,11 @@ export function emitTemplate(
     scriptInjections.push(...buildKeynavScriptInjections(keynav, ir, collectors));
   }
 
-  return { jsx, scriptInjections, needsKeyedImport: keyedImport.needed, diagnostics };
+  return {
+    jsx,
+    scriptInjections,
+    needsKeyedImport: keyedImport.needed,
+    diagnostics,
+    hasElementPortal: elementPortalImport.needed,
+  };
 }

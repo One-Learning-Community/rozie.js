@@ -295,9 +295,16 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
 
   // Portal-slot primitive (Spike 003) — when the script emit synthesized a
   // portals closure, add the matching solid-js/web import for `render`.
-  const portalImport = scriptResult.hasPortals
-    ? "import { render } from 'solid-js/web';\n"
-    : '';
+  //
+  // command-palette-portal-overlay phase — a SIBLING, independent import:
+  // when the template emitted at least one `r-portal` element teleport
+  // (`templateResult.hasElementPortal`, `emitPortalWrap` in
+  // emitTemplateNode.ts), add `import { Portal } from 'solid-js/web';`. This
+  // is the NATIVE element-subtree teleport construct — orthogonal to (and may
+  // coexist with) the P33 render-into-container slot machinery above.
+  const portalImport =
+    (scriptResult.hasPortals ? "import { render } from 'solid-js/web';\n" : '') +
+    (templateResult.hasElementPortal ? "import { Portal } from 'solid-js/web';\n" : '');
 
   // Quick task 260704-mf3 — inject `Key` from @solid-primitives/keyed ONLY when
   // the template emitted a keyed `r-for` as `<Key>` (byte-identical import lines

@@ -150,6 +150,14 @@ export interface EmitNodeCtx {
    * guards on `ctx.keyedImport`).
    */
   keyedImport?: { needed: boolean };
+  /**
+   * command-palette-portal-overlay phase — mirrors `keyedImport`'s shared
+   * mutable-object-flag pattern: `emitElement`'s portal branch sets
+   * `needed = true` when it emits a `TemplateElementIR.portalTo` node, and
+   * `emitSolid.ts` reads it back through `EmitTemplateResult.hasElementPortal`
+   * to inject `import { Portal } from 'solid-js/web';`. Optional/back-compat.
+   */
+  elementPortalImport?: { needed: boolean };
 }
 
 function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
@@ -862,8 +870,39 @@ function mergeEventAttributes(
  * (so the child is never hidden) while still changing value — and thus
  * still triggering `keyed` recreation — whenever the underlying key changes.
  */
+/**
+ * command-palette-portal-overlay phase — `r-portal="<expr>"` element
+ * teleport. Wraps the element markup in Solid's native `<Show when={c}
+ * fallback={tree}><Portal mount={c}>{tree}</Portal></Show>` — falsy
+ * container renders `tree` in place via the `fallback` prop (never mounts
+ * `<Portal>` at all), matching React's `container ? createPortal(tree,
+ * container) : tree` and Vue's `<Teleport :disabled>` in-place semantics.
+ *
+ * SSR guard: `typeof document === 'undefined'` short-circuits the container
+ * expression to `null` BEFORE it is evaluated at all — some author
+ * expressions call `document.querySelector` internally (see
+ * `resolveAppendTo`/`resolveTo`), so the guard must gate evaluation, not
+ * just the result.
+ */
+function emitPortalWrap(node: TemplateElementIR, markup: string, ctx: EmitNodeCtx): string {
+  const { expression } = node.portalTo!;
+  if (ctx.elementPortalImport) ctx.elementPortalImport.needed = true;
+  const rawContainerCode = rewriteTemplateExpression(expression, ctx.ir, {
+    invokeAccessors: ctx.invokeAccessors,
+    loopValueBindings: ctx.loopValueBindings,
+    scopeAccessorParams: ctx.scopeAccessorParams,
+  });
+  const containerCode = `(typeof document === 'undefined' ? null : (${rawContainerCode}))`;
+  ctx.collectors.solid.add('Show');
+  return `<Show when={${containerCode}} fallback={${markup}}><Portal mount={${containerCode}}>${markup}</Portal></Show>`;
+}
+
 function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
   const markup = emitElementInner(origNode, ctx);
+
+  if (origNode.portalTo) {
+    return emitPortalWrap(origNode, markup, ctx);
+  }
 
   if (
     (origNode.tagKind === 'component' || origNode.tagKind === 'self') &&
