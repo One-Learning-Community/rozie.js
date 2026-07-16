@@ -1030,6 +1030,14 @@ export const EXAMPLES = [
   'DatePickerScreenshot',
   'ResizableScreenshot',
   'CommandPaletteScreenshot',
+  // command-palette-portal-overlay phase — the clipped-ancestor escape cell
+  // (loader → examples/demos/CommandPaletteClippedDemo.rozie). Self-contained
+  // wrapper: an overflow:hidden + transform:translateZ(0) ancestor traps the
+  // palette's position:fixed overlay when `appendTo` is falsy (the bug,
+  // reproduced on purpose); toggling `appendTo` to 'body' portals it out
+  // (the fix). Behavioral-only; the batched Linux Docker VR union run that
+  // closes the 0.4.0 series captures the pixel proof, not this phase.
+  'CommandPaletteClipped',
   // Phase 64 P0 — @rozie-ui/headless-core CROSS-PACKAGE `.rzts` boundary proof
   // (loader → examples/demos/HeadlessCoreSmokeDemo.rozie, which imports the smoke
   // partial via the BARE specifier `@rozie-ui/headless-core/smoke.rzts`). The
@@ -1386,6 +1394,9 @@ export const LIT_TAGS: Record<Example, string> = {
   DatePickerScreenshot: 'rozie-date-picker-screenshot',
   ResizableScreenshot: 'rozie-resizable-screenshot',
   CommandPaletteScreenshot: 'rozie-command-palette-screenshot',
+  // command-palette-portal-overlay phase — '-demo' appended on Lit → tag
+  // 'rozie-command-palette-clipped-demo' = kebab of CommandPaletteClippedDemo.
+  CommandPaletteClipped: 'rozie-command-palette-clipped',
   // @rozie-ui/date-picker RANGE-mode cells — '-demo' appended on Lit → tags
   // 'rozie-date-picker-range-complete-demo' etc. = kebab of
   // DatePickerRange{Complete,Behavior}Demo / DatePickerPresetActiveDemo.
@@ -1765,6 +1776,10 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DatePickerScreenshot: {},
   ResizableScreenshot: {},
   CommandPaletteScreenshot: {},
+  // command-palette-portal-overlay phase — self-contained wrapper (seeds
+  // `open`/`query`/`appendTo` in <data>, binds the inner CommandPalette via
+  // r-model + :append-to). No parent-supplied props.
+  CommandPaletteClipped: {},
   // @rozie-ui/date-picker RANGE-mode cells — self-contained wrappers (each seeds
   // its own range value + presets in <data> and binds the inner DatePicker via
   // r-model). No parent-supplied props; no MODEL_PROPS entry (the model is bound

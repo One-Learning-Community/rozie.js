@@ -1,0 +1,169 @@
+<!--
+  CommandPaletteClippedDemo — VR behavioral cell proving the
+  command-palette-portal-overlay fix (#11): a palette mounted inside an
+  ancestor with `overflow: hidden` + `transform: translateZ(0)` — a
+  containing block AND a clip region that traps a `position: fixed`
+  overlay (the real embedding bug: an app-shell iframe / designer-chrome
+  wrapper with its own layout). Cloned from CommandPaletteBehaviorDemo's
+  shell — do NOT touch that demo's own pinned assertions; this is a
+  SEPARATE, self-contained cell.
+
+  `appendTo` toggles between the two states the batched VR spec asserts:
+    - `appendTo: false` (default) — the overlay renders IN PLACE, inside
+      the clipping ancestor — visibly clipped (the bug, reproduced on
+      purpose so the fix has something to compare against).
+    - `appendTo: 'body'` — the overlay portals to `document.body`, escaping
+      the clip entirely (the fix).
+
+  Behavioral-only (no pixel baseline authored HERE — the Linux Docker VR
+  union run that closes the 0.4.0 series is the one batched run that
+  captures pixels; this phase authors the driving demo + spec assertions
+  only, per Dan's "wait to do expensive testing like vr until the end").
+-->
+
+<rozie name="CommandPaletteClippedDemo">
+
+<components>
+{
+  CommandPalette: '../../packages/ui/command-palette/src/CommandPalette.rozie',
+}
+</components>
+
+<data>
+{
+  open: false,
+  query: '',
+  appendTo: false,
+  lastNavigate: '',
+  lastDepth: 0,
+  backCount: 0,
+  lastActionItem: '',
+  lastAction: '',
+}
+</data>
+
+<script>
+// A minimal levels + sub-actions item set — rich enough to prove the
+// through-portal behavioral contract (Escape funnel at depth>0, the
+// action-menu focus arbitration, the breadcrumb header, the frame-relative
+// flyout anchor) WITHOUT touching CommandPaletteBehaviorDemo's own pinned
+// items/assertions. `goto` is a static `children` navigating level;
+// `new` carries a per-row `actions` array (⌘K/Right-arrow flyout).
+const items = [
+  {
+    id: 'new',
+    label: 'New File',
+    group: 'File',
+    actions: [
+      { id: 'rename', label: 'Rename', shortcut: 'F2' },
+      { id: 'duplicate', label: 'Duplicate' },
+    ],
+  },
+  { id: 'open', label: 'Open File', group: 'File' },
+  { id: 'save', label: 'Save', group: 'File' },
+  {
+    id: 'goto',
+    label: 'Go to page…',
+    title: 'Go to page',
+    children: [
+      { id: 'page-home', label: 'Home' },
+      { id: 'page-settings', label: 'Settings' },
+    ],
+  },
+]
+
+// COLLISION NOTE (mirrors CommandPaletteBehaviorDemo): `openPalette`, not
+// `open` — `open` is the local $data key AND the inner component's model,
+// and an `open`-named helper collapses onto the generated $data.open setter
+// on React/Solid (ROZ524).
+const openPalette = () => {
+  $data.open = true
+}
+
+// toggleAppendTo(): flips between the in-place (bug) and portalled (fix)
+// states the batched VR spec drives.
+const toggleAppendTo = () => {
+  $data.appendTo = $data.appendTo ? false : 'body'
+}
+
+const onNavigate = (e) => {
+  $data.lastNavigate = e && e.item && e.item.id != null ? e.item.id : ''
+  $data.lastDepth = e && typeof e.depth === 'number' ? e.depth : 0
+}
+const onBack = () => {
+  $data.backCount = $data.backCount + 1
+}
+const onActionSelect = (e) => {
+  $data.lastActionItem = e && e.item && e.item.id != null ? e.item.id : ''
+  $data.lastAction = e && e.action && e.action.id != null ? e.action.id : ''
+}
+</script>
+
+<template>
+<div class="command-palette-clipped-demo">
+  <h3>CommandPalette — clipped ancestor</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="clipped-open-palette" @click="openPalette()">Open</button>
+    <button type="button" data-testid="clipped-toggle-append-to" @click="toggleAppendTo()">Toggle appendTo</button>
+    <span class="readout" data-testid="clipped-append-to-readout">{{ $data.appendTo || 'false' }}</span>
+    <span class="readout" data-testid="clipped-readout-navigate">{{ $data.lastNavigate }}</span>
+    <span class="readout" data-testid="clipped-readout-depth">{{ $data.lastDepth }}</span>
+    <span class="readout" data-testid="clipped-readout-back-count">{{ $data.backCount }}</span>
+    <span class="readout" data-testid="clipped-readout-action-item">{{ $data.lastActionItem }}</span>
+    <span class="readout" data-testid="clipped-readout-action">{{ $data.lastAction }}</span>
+  </div>
+
+  <!--
+    The clipping ancestor — overflow:hidden + transform:translateZ(0) creates
+    BOTH a clip region (overflow) AND a new containing block (transform) for
+    any `position: fixed` descendant, which is exactly what traps the
+    palette's fixed-position overlay when appendTo is falsy. A real DOM rect
+    (data-testid) the batched VR spec compares the overlay's rect against.
+  -->
+  <div class="clipping-ancestor" data-testid="clipping-ancestor">
+    <CommandPalette
+      ref="palette"
+      r-model:open="$data.open"
+      r-model:query="$data.query"
+      :items="items"
+      :append-to="$data.appendTo"
+      placeholder="Type a command…"
+      ariaLabel="Command palette"
+      @navigate="onNavigate($event)"
+      @back="onBack()"
+      @action-select="onActionSelect($event)"
+    />
+  </div>
+</div>
+</template>
+
+<style>
+.command-palette-clipped-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.command-palette-clipped-demo .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.command-palette-clipped-demo .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+}
+.clipping-ancestor {
+  position: relative;
+  width: 320px;
+  height: 160px;
+  overflow: hidden;
+  transform: translateZ(0);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+</style>
+
+</rozie>

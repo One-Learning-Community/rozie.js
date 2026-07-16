@@ -793,3 +793,259 @@ for (const target of TARGETS) {
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
 }
+
+/**
+ * command-palette-portal-appendTo-escape (command-palette-portal-overlay
+ * phase) — the clipped-ancestor escape proof. `examples/demos/
+ * CommandPaletteClippedDemo.rozie` wraps the palette in an
+ * `overflow: hidden; transform: translateZ(0)` ancestor — a CONTAINING
+ * BLOCK (transform) for the palette's `position: fixed` overlay AND a clip
+ * region (overflow). With `appendTo: false` (default) the overlay's
+ * containing block IS that ancestor, so its rect is bounded by the
+ * ancestor's small box; `r-portal` disabled (falsy container) — the bug,
+ * reproduced on purpose. Toggling `appendTo` to `'body'` relocates the
+ * overlay to `document.body`, whose containing block is the viewport — the
+ * SAME overlay markup now escapes the ancestor's box entirely — the fix.
+ *
+ * Gated on the batched Linux Docker VR union run that closes the 0.4.0
+ * series (per `feedback_vr_linux_baselines` / Dan's "wait to do expensive
+ * testing like vr until the end") — authored here, not executed in this
+ * phase.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`command-palette-portal-appendTo-escape [${target}]: appendTo:false is bounded by the clipping ancestor; appendTo:'body' escapes it`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteClipped&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const openBtn = page.getByTestId('clipped-open-palette');
+    const toggleBtn = page.getByTestId('clipped-toggle-append-to');
+    const appendToReadout = page.getByTestId('clipped-append-to-readout');
+    const ancestor = page.getByTestId('clipping-ancestor');
+    const frame = page.getByTestId('command-palette-frame');
+
+    // ---- 1. appendTo:false (default) — the overlay's containing block IS ----
+    //         the clipping ancestor (its `transform` creates one for the
+    //         fixed-position overlay), so the frame's rendered rect is
+    //         BOUNDED by the ancestor's small box.
+    await openBtn.click();
+    await expect(frame).toBeVisible({ timeout: 15_000 });
+    const ancestorBox = await ancestor.boundingBox();
+    const clippedFrameBox = await frame.boundingBox();
+    expect(ancestorBox).not.toBeNull();
+    expect(clippedFrameBox).not.toBeNull();
+    expect(clippedFrameBox!.x).toBeGreaterThanOrEqual(ancestorBox!.x - 1);
+    expect(clippedFrameBox!.y).toBeGreaterThanOrEqual(ancestorBox!.y - 1);
+    expect(clippedFrameBox!.x + clippedFrameBox!.width).toBeLessThanOrEqual(
+      ancestorBox!.x + ancestorBox!.width + 1,
+    );
+    expect(clippedFrameBox!.y + clippedFrameBox!.height).toBeLessThanOrEqual(
+      ancestorBox!.y + ancestorBox!.height + 1,
+    );
+
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+
+    // ---- 2. appendTo:'body' — the SAME overlay markup now escapes the ----
+    //         ancestor's small box entirely (its rect is NOT contained by
+    //         the ancestor — the fix).
+    await toggleBtn.click();
+    await expect(appendToReadout).toHaveText('body');
+    await openBtn.click();
+    await expect(frame).toBeVisible({ timeout: 15_000 });
+    const escapedFrameBox = await frame.boundingBox();
+    expect(escapedFrameBox).not.toBeNull();
+    const escapes =
+      escapedFrameBox!.x < ancestorBox!.x - 1 ||
+      escapedFrameBox!.y < ancestorBox!.y - 1 ||
+      escapedFrameBox!.x + escapedFrameBox!.width > ancestorBox!.x + ancestorBox!.width + 1 ||
+      escapedFrameBox!.y + escapedFrameBox!.height > ancestorBox!.y + ancestorBox!.height + 1;
+    expect(escapes).toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+}
+
+/**
+ * command-palette-portal-through-portal (command-palette-portal-overlay
+ * phase) — proves the levels Escape funnel, the action-menu real-focus
+ * arbitration, the breadcrumb header, and the frame-relative flyout anchor
+ * (finding 1) ALL still work THROUGH the portal, with `appendTo: 'body'`
+ * active the entire test — not just in-place mode. This is the "proven, not
+ * rewritten" claim: CommandPalette.rozie roots every DOM read at
+ * `$refs.panel`/`$refs.frame` (never `$el`), so a moved node's ref identity
+ * survives the teleport with zero logic changes (verified live here, not
+ * merely asserted in a comment).
+ *
+ * Gated on the batched Linux Docker VR union run — authored here, not
+ * executed in this phase.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`command-palette-portal-through-portal [${target}]: levels Escape funnel, action-menu real focus, flyout anchor — all through appendTo:'body'`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteClipped&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const openBtn = page.getByTestId('clipped-open-palette');
+    const toggleBtn = page.getByTestId('clipped-toggle-append-to');
+    const appendToReadout = page.getByTestId('clipped-append-to-readout');
+    const readoutNavigate = page.getByTestId('clipped-readout-navigate');
+    const readoutDepth = page.getByTestId('clipped-readout-depth');
+    const readoutBackCount = page.getByTestId('clipped-readout-back-count');
+    const readoutActionItem = page.getByTestId('clipped-readout-action-item');
+    const readoutAction = page.getByTestId('clipped-readout-action');
+    const breadcrumbTitle = page.getByTestId('command-palette-title');
+
+    // ---- portal the overlay to document.body BEFORE opening it ----
+    await toggleBtn.click();
+    await expect(appendToReadout).toHaveText('body');
+
+    // ---- 1. open at root: 4 items, no breadcrumb ----
+    await openBtn.click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await input.focus();
+    await expect.poll(async () => countOptions(page), { timeout: 15_000 }).toBe(4);
+    await expect(breadcrumbTitle).toHaveCount(0);
+
+    // ---- 2. PUSH a level (selecting `goto`, a static-children navigating ----
+    //         item) — the breadcrumb header renders, @navigate fires,
+    //         depth becomes 1. Proven while the overlay lives in
+    //         document.body — the breadcrumb (a $refs.panel-rooted child)
+    //         must still render correctly.
+    await input.pressSequentially('go', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await page.locator('[role="option"]', { hasText: 'Go to page' }).click();
+    await expect(breadcrumbTitle).toHaveText('Go to page');
+    await expect
+      .poll(async () => (await readoutNavigate.textContent())?.trim() ?? '', { timeout: 10_000 })
+      .toBe('goto');
+    await expect(readoutDepth).toHaveText('1');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(2);
+
+    // ---- 3. Escape AT DEPTH>0 pops ONE level — does NOT close the palette ----
+    //         (resolveEscape's depth-aware funnel, unmodified, now running
+    //         against a node relocated to document.body).
+    await page.keyboard.press('Escape');
+    await expect(breadcrumbTitle).toHaveCount(0);
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(4);
+    await expect(readoutBackCount).toHaveText('1');
+
+    // ---- 4. action-menu real-focus arbitration + the frame-relative ----
+    //         flyout anchor (finding 1) — isolate the `new` row (carries
+    //         actions), open the menu, assert REAL DOM focus lands in a
+    //         menuitem (shadow-piercing document.activeElement walk) and
+    //         the flyout is fully hittable at its own last-item center
+    //         (deepHitAtLastMenuItem — a plain bounding-box check alone
+    //         cannot distinguish "clipped but sized" from "visible").
+    await input.pressSequentially('new', { delay: 30 });
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(1);
+    await page.keyboard.press('ControlOrMeta+k');
+    await expect.poll(async () => countByRole(page, 'menuitem'), { timeout: 10_000 }).toBe(2);
+    await expect
+      .poll(async () => activeMenuItemInfo(page), { timeout: 10_000 })
+      .toEqual({ role: 'menuitem', disabled: false });
+    await expect.poll(async () => deepHitAtLastMenuItem(page), { timeout: 10_000 }).toBe(true);
+    // keepOpen: the result list stays visible while the menu holds focus.
+    await expect(countOptions(page)).resolves.toBe(1);
+
+    // ---- 5. Enter fires @action-select through the portal ----
+    await page.keyboard.press('Enter');
+    await expect
+      .poll(async () => (await readoutActionItem.textContent())?.trim() ?? '', { timeout: 10_000 })
+      .toBe('new');
+    await expect
+      .poll(async () => (await readoutAction.textContent())?.trim() ?? '', { timeout: 10_000 })
+      .toBe('rename');
+
+    // ---- cleanup ----
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+}
+
+/**
+ * command-palette-portal-token-resolution (command-palette-portal-overlay
+ * phase, PORTAL-THEME) — a `--rozie-command-palette-*` custom property set
+ * on `:root` must resolve through the portal on ALL SIX targets. Lit is the
+ * explicit hazard cell: the relocated element leaves `static styles`'
+ * `shadowRoot.adoptedStyleSheets` reach, so `emitStyle.ts` additionally
+ * pushes the component's own scoped CSS through `injectGlobalStyles`
+ * whenever `r-portal` is in use (see the compiler docs' Lit theming-hazard
+ * note) — this test is the live proof that mechanism actually resolves the
+ * token, not just that the CSS text exists somewhere.
+ *
+ * Gated on the batched Linux Docker VR union run — authored here, not
+ * executed in this phase.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`command-palette-portal-token-resolution [${target}]: a :root-set --rozie-command-palette-backdrop-bg resolves through the portal`, async ({
+    page,
+  }) => {
+    // A :root-set token, injected BEFORE navigation so it's present on the
+    // very first paint (mirrors how a real consumer app sets theming tokens
+    // globally, not scoped to any single component's host).
+    await page.addStyleTag({
+      content: ':root { --rozie-command-palette-backdrop-bg: rgb(1, 2, 3); }',
+    });
+    await page.goto(`/?example=CommandPaletteClipped&target=${target}`);
+    // Re-apply after navigation — `addStyleTag` before `goto` does not
+    // survive a full page navigation in every browser/target harness
+    // configuration; belt-and-suspenders for a token that MUST be present
+    // at open time.
+    await page.addStyleTag({
+      content: ':root { --rozie-command-palette-backdrop-bg: rgb(1, 2, 3); }',
+    });
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const openBtn = page.getByTestId('clipped-open-palette');
+    const toggleBtn = page.getByTestId('clipped-toggle-append-to');
+    const appendToReadout = page.getByTestId('clipped-append-to-readout');
+
+    await toggleBtn.click();
+    await expect(appendToReadout).toHaveText('body');
+    await openBtn.click();
+    await expect(page.getByTestId('command-palette-frame')).toBeVisible({ timeout: 15_000 });
+
+    // The backdrop is the r-portal HOST element itself (`.rozie-command-palette`,
+    // the div carrying both r-if and r-portal) — read its computed
+    // background-color, shadow-piercing (Lit: light-DOM after relocation,
+    // but still reachable via a plain recursive walk since it is no longer
+    // inside any shadow root once portalled).
+    const backdropBg = await page.evaluate(() => {
+      const find = (root: Document | ShadowRoot): Element | null => {
+        const direct = root.querySelector('.rozie-command-palette');
+        if (direct) return direct;
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          if (sr) {
+            const found = find(sr);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      const el = find(document);
+      return el ? getComputedStyle(el).backgroundColor : null;
+    });
+    expect(backdropBg).toBe('rgb(1, 2, 3)');
+
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
+  });
+}

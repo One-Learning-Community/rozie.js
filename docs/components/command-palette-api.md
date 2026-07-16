@@ -39,6 +39,8 @@ The portal is implemented via the compiler's `r-portal` element directive — se
 
 **Theming tokens** (`--rozie-command-palette-*`) must be set on `:root` — or on the `appendTo` container itself — to reach a portalled overlay. A token set on a host-scoped ancestor (e.g. a `:host { }` rule, or a class on an ancestor that is no longer in the overlay's DOM path once portalled) does **not** cross the portal on any target.
 
+**Lit is the one target with a real mechanism to know about here** (not just a documentation caveat on the other five): a Lit component renders into a shadow root, and its scoped stylesheet is normally confined to that shadow tree via `shadowRoot.adoptedStyleSheets` — a body-portalled element would otherwise lose its styling entirely. The Lit build automatically pushes the component's own scoped CSS into a **global** stylesheet whenever `appendTo` is in play, so `:root`-set tokens (and the component's own layout/visual rules) resolve correctly on the relocated element. You don't need to do anything for this — it's automatic — but it's why the `:root`-only placement rule is not optional on Lit the way it might seem like a nice-to-have on the other five targets.
+
 ## Nested levels
 
 Selecting an item that carries `children` (a static array) or `source` (a `(query) => items | Promise<items>` function) **pushes** a child level instead of firing `select` — presence of either field is the navigation signal, no separate flag. A `source` may return a `Promise`; the level enters `loading` until it settles, and only the LATEST in-flight request's result is applied (stale resolutions are dropped). `searchDebounce` (default ~150ms) debounces an async level's keystroke refetch only — a `children` level re-ranks locally with no debounce.
