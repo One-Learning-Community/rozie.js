@@ -1313,6 +1313,17 @@ function emitElementOpenTag(
   // refs: add data-rozie-ref="<name>" attribute (matches @query selector).
   let refAttr: string | null = null;
 
+  // SEV-1 close-while-portalled sentinel: when this element carries
+  // `r-portal`, a zero-footprint `<span data-rozie-portal-anchor="…" hidden>`
+  // is stamped as a sibling IMMEDIATELY PRECEDING the element (prepended to
+  // the open tag below), inside the SAME `r-if` conditional branch. The
+  // sentinel is never relocated, so it stays under Lit's ChildPart control in
+  // the shadow root — PRESENT while the branch is alive, ABSENT the instant
+  // Lit drops it — giving `RoziePortalController` the liveness signal it needs
+  // to remove a stranded (moved-out) node on close. See the controller's
+  // module doc comment for the full rationale.
+  let portalSentinel = '';
+
   const rModelAttr = node.attributes.find((a) => attributeIsRModel(a));
 
   // Collect class-related attributes so we can merge static + binding into a
@@ -1569,17 +1580,32 @@ function emitElementOpenTag(
     // the portal's `@query` matching nothing (silently inert portal). A
     // separate attribute name avoids the collision by construction.
     parts.push(`data-rozie-portal-ref="${fieldName}"`);
+    // Sibling sentinel stamped ahead of this element (prepended to `open`
+    // below). `[data-rozie-portal-anchor="<field>"]` is a DISTINCT attribute
+    // name so it never collides with the element's own portal-ref marker; the
+    // `hidden` attribute keeps it visually + layout inert (zero footprint).
+    portalSentinel = `<span data-rozie-portal-anchor="${fieldName}" hidden></span>`;
     opts.decorators.add('query');
     opts.runtime.add('RoziePortalController');
     const containerCode = rewriteTemplateExpression(node.portalTo.expression, ir);
     opts._state.portalFieldDecls.push(
-      // `cache: true` (2nd @query arg) — REQUIRED. An uncached @query
-      // re-searches `this.shadowRoot` on every access, which no longer
-      // contains the node once `RoziePortalController` has relocated it.
-      `  @query('[data-rozie-portal-ref="${fieldName}"]', true) private ${fieldName}!: HTMLElement;`,
+      // UNCACHED @query (no 2nd arg) — REQUIRED for the sentinel design. A
+      // cached query would stay bound to the FIRST resolved node, so a
+      // close→reopen that recreates the element would never be observed. Once
+      // `RoziePortalController` relocates the node out of the shadow root this
+      // uncached query returns `null`; the controller reads the sentinel
+      // (below) as the authoritative liveness signal and falls back to its
+      // tracked moved-node reference for container re-placement.
+      `  @query('[data-rozie-portal-ref="${fieldName}"]') private ${fieldName}!: HTMLElement;`,
     );
     opts._state.portalFieldDecls.push(
-      `  private ${fieldName}Controller = new RoziePortalController(this, () => this.${fieldName}, () => (${containerCode}));`,
+      // UNCACHED sentinel query — PRESENT while the `r-if` branch is alive,
+      // `null` the instant Lit drops it (the sentinel stays under ChildPart
+      // control in the shadow root because it is never portalled out).
+      `  @query('[data-rozie-portal-anchor="${fieldName}"]') private ${fieldName}Anchor!: HTMLElement;`,
+    );
+    opts._state.portalFieldDecls.push(
+      `  private ${fieldName}Controller = new RoziePortalController(this, () => this.${fieldName}, () => this.${fieldName}Anchor, () => (${containerCode}));`,
     );
   }
 
@@ -1620,9 +1646,9 @@ function emitElementOpenTag(
   const attrsText = parts.length > 0 ? ' ' + parts.join(' ') : '';
   const isVoid = isVoidElement(node.tagName);
   if (isVoid && node.children.length === 0) {
-    return { open: `<${tagName}${attrsText} />`, selfClose: true };
+    return { open: `${portalSentinel}<${tagName}${attrsText} />`, selfClose: true };
   }
-  return { open: `<${tagName}${attrsText}>`, selfClose: false };
+  return { open: `${portalSentinel}<${tagName}${attrsText}>`, selfClose: false };
 }
 
 const VOID_ELEMENTS = new Set([

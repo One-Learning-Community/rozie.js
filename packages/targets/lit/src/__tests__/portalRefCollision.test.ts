@@ -58,7 +58,8 @@ describe('emitLit — ref= + r-portal collision (Finding 5 / R1)', () => {
     // The portal must NOT reuse data-rozie-ref for its own marker.
     expect(code).not.toMatch(/data-rozie-ref="__roziePortal0"/);
 
-    // The controller query targets the distinct portal attribute.
-    expect(code).toMatch(/@query\('\[data-rozie-portal-ref="__roziePortal0"\]', true\)/);
+    // The controller query targets the distinct portal attribute (UNCACHED —
+    // the SEV-1 sentinel design; a cached query would miss close→reopen).
+    expect(code).toMatch(/@query\('\[data-rozie-portal-ref="__roziePortal0"\]'\) private __roziePortal0!/);
   });
 });

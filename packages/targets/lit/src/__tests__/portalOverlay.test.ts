@@ -46,18 +46,27 @@ function compilePortalOverlay(): { code: string } {
 }
 
 describe('emitLit — PortalOverlay (command-palette-portal-overlay Task 3, r-portal)', () => {
-  it('emits a RoziePortalController + CACHED @query ref, and pushes scoped CSS through injectGlobalStyles', async () => {
+  it('emits a RoziePortalController + UNCACHED @query ref + sentinel anchor, and pushes scoped CSS through injectGlobalStyles', async () => {
     const { code } = compilePortalOverlay();
 
     expect(code).toMatch(/import \{[^}]*RoziePortalController[^}]*\} from '@rozie\/runtime-lit';/);
-    // CACHED query — the load-bearing fix. An uncached @query would lose
-    // the node after the first relocation (see module doc comment).
+    // UNCACHED query — the SEV-1 sentinel fix. A cached query would stay
+    // bound to the first node, so a close→reopen recreate would never be
+    // observed; and once relocated the node leaves the shadow root, so an
+    // uncached re-query returns null (the controller falls back to its
+    // tracked moved-node reference). See RoziePortalController's module doc.
     // Finding 5 (R1) — the portal marker rides a DISTINCT attribute name
     // (`data-rozie-portal-ref`) so it never collides with an author `ref=`.
-    expect(code).toMatch(/@query\('\[data-rozie-portal-ref="__roziePortal0"\]', true\)/);
+    expect(code).toMatch(/@query\('\[data-rozie-portal-ref="__roziePortal0"\]'\) private __roziePortal0!/);
+    expect(code).not.toMatch(/@query\('\[data-rozie-portal-ref="__roziePortal0"\]', true\)/);
     expect(code).toMatch(/data-rozie-portal-ref="__roziePortal0"/);
+    // Sentinel: a distinct UNCACHED `data-rozie-portal-anchor` query + a
+    // sibling `<span … hidden>` stamped ahead of the portalled element inside
+    // the SAME r-if branch (the liveness signal that fixes close-while-portalled).
+    expect(code).toMatch(/@query\('\[data-rozie-portal-anchor="__roziePortal0"\]'\) private __roziePortal0Anchor!/);
+    expect(code).toMatch(/<span data-rozie-portal-anchor="__roziePortal0" hidden><\/span><div class="rozie-portal-overlay-backdrop"/);
     expect(code).toMatch(
-      /new RoziePortalController\(this, \(\) => this\.__roziePortal0, \(\) => \(/,
+      /new RoziePortalController\(this, \(\) => this\.__roziePortal0, \(\) => this\.__roziePortal0Anchor, \(\) => \(/,
     );
 
     // The shadow-DOM hazard fix: the component's OWN scoped CSS (not just
