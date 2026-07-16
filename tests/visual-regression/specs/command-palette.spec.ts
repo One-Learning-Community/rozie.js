@@ -1068,6 +1068,23 @@ async function deepActiveElementPlaceholder(page: Page): Promise<string | null> 
 }
 
 /**
+ * After a panel-internal sub-surface closes (closeArgsSurface /
+ * closeActionMenu → reopenComboboxPopup), focus returns to the combobox
+ * search input via a rAF: reopenComboboxPopup `blur()`s the current node THEN
+ * `requestAnimationFrame(focusInput)`. A palette-closing Escape fired during
+ * that blur→rAF gap lands on `<body>` (outside the frame's onPanelKeydown
+ * funnel) and is silently lost — a synthetic-input pacing hazard (countOptions
+ * stays 3 across the whole transition, so it cannot gate this). Wait for the
+ * search input ('Type a command…') to regain real focus before the closing
+ * Escape — pacing past the documented rAF boundary, NOT a behavior change.
+ */
+async function waitListRefocused(page: Page): Promise<void> {
+  await expect
+    .poll(async () => deepActiveElementPlaceholder(page), { timeout: 10_000 })
+    .toBe('Type a command…');
+}
+
+/**
  * command-palette-inline-args (feature #12) — the panel-internal args
  * surface. `examples/demos/CommandPaletteArgsDemo.rozie` drives a dedicated
  * item set: `create-page` (a required `name` + a `default`-prefilled
@@ -1135,6 +1152,18 @@ for (const target of TARGETS) {
     // No @select yet.
     await expect(page.getByTestId('args-readout-select-item')).toHaveText('');
 
+    // Escape from the args surface returns to the LIST (closeArgsSurface —
+    // resolveEscape 'close-surface'); it does NOT close the palette. A SECOND
+    // Escape at the (depth-0) list closes it. Same two-step teardown as
+    // escape-restore below — the `command-palette-args` toHaveCount(0) gate is
+    // load-bearing: countOptions stays 3 whether the list is dimmed (args open)
+    // or restored, so it does NOT signal the transition; the surface-gone
+    // assertion waits for closeArgsSurface + reopenComboboxPopup to settle
+    // before the second Escape.
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('command-palette-args')).toHaveCount(0);
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(3);
+    await waitListRefocused(page);
     await page.keyboard.press('Escape');
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
@@ -1153,6 +1182,12 @@ for (const target of TARGETS) {
 
     await page.locator('[role="option"]', { hasText: 'Create page' }).click();
     await expect(page.getByTestId('command-palette-args')).toBeVisible({ timeout: 10_000 });
+
+    // Wait for the rAF-deferred focus to land in the first field before
+    // typing, so the subsequent Enter is funneled from within the surface.
+    await expect
+      .poll(async () => deepActiveElementPlaceholder(page), { timeout: 10_000 })
+      .toBe('Page name');
 
     const fields = page.locator('[data-command-palette-args] input');
     await fields.nth(0).fill('  My Page  ');
@@ -1183,6 +1218,12 @@ for (const target of TARGETS) {
     await page.locator('[role="option"]', { hasText: 'Create page' }).click();
     await expect(page.getByTestId('command-palette-args')).toBeVisible({ timeout: 10_000 });
 
+    // Wait for the rAF-deferred focus to land before pressing Enter, so the
+    // Enter is funneled from within the surface (submitArgs' required-gate).
+    await expect
+      .poll(async () => deepActiveElementPlaceholder(page), { timeout: 10_000 })
+      .toBe('Page name');
+
     await page.keyboard.press('Enter');
 
     await expect(page.getByTestId('args-readout-select-item')).toHaveText('');
@@ -1190,6 +1231,12 @@ for (const target of TARGETS) {
       .poll(async () => deepActiveElementPlaceholder(page), { timeout: 10_000 })
       .toBe('Page name');
 
+    // Two-step teardown: Escape → list (3), Escape → closed (0). The
+    // surface-gone gate (see auto-entry) synchronizes the transition.
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('command-palette-args')).toHaveCount(0);
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(3);
+    await waitListRefocused(page);
     await page.keyboard.press('Escape');
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
@@ -1209,10 +1256,16 @@ for (const target of TARGETS) {
     await page.locator('[role="option"]', { hasText: 'Create page' }).click();
     await expect(page.getByTestId('command-palette-args')).toBeVisible({ timeout: 10_000 });
 
+    // Wait for the rAF-deferred focus to land in the surface before Escape.
+    await expect
+      .poll(async () => deepActiveElementPlaceholder(page), { timeout: 10_000 })
+      .toBe('Page name');
+
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('command-palette-args')).toHaveCount(0);
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(3);
 
+    await waitListRefocused(page);
     await page.keyboard.press('Escape');
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
@@ -1232,10 +1285,18 @@ for (const target of TARGETS) {
     await page.locator('[role="option"]', { hasText: 'Create page' }).click();
     await expect(page.getByTestId('command-palette-args')).toBeVisible({ timeout: 10_000 });
 
+    // Backspace-on-empty-first-field pops back to the list ONLY when the
+    // keydown originates from the first field (onPanelKeydown gates on
+    // e.target === firstInput). Focus is rAF-deferred, so wait for it to land.
+    await expect
+      .poll(async () => deepActiveElementPlaceholder(page), { timeout: 10_000 })
+      .toBe('Page name');
+
     await page.keyboard.press('Backspace');
     await expect(page.getByTestId('command-palette-args')).toHaveCount(0);
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(3);
 
+    await waitListRefocused(page);
     await page.keyboard.press('Escape');
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
@@ -1257,6 +1318,16 @@ for (const target of TARGETS) {
     // The nested source item never renders — args won, no child level pushed.
     await expect(page.getByTestId('command-palette-title')).toHaveCount(0);
 
+    // Wait for the rAF-deferred focus to land in the (required) 'Search pages'
+    // field before Escape, then use the design's two-step teardown
+    // (Escape → list, Escape → closed).
+    await expect
+      .poll(async () => deepActiveElementPlaceholder(page), { timeout: 10_000 })
+      .toBe('Search pages');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('command-palette-args')).toHaveCount(0);
+    await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(3);
+    await waitListRefocused(page);
     await page.keyboard.press('Escape');
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
