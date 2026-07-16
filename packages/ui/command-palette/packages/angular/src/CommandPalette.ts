@@ -130,8 +130,11 @@ function __rozieAttr(v: unknown): string | null {
     <span class="rozie-command-palette-breadcrumb-item">
                 @if (Number(ei) > 0) {
     <span class="rozie-command-palette-breadcrumb-separator" aria-hidden="true">›</span>
-    }<span class="rozie-command-palette-breadcrumb-segment" [ngClass]="{ 'rozie-command-palette-breadcrumb-segment--current': Number(ei) === breadcrumbStack().length - 1 }" [attr.data-testid]="rozieAttr(Number(ei) === breadcrumbStack().length - 1 ? 'command-palette-title' : null)">{{ rozieDisplay(entry.title) }}</span>
-              </span>
+    }@if (Number(ei) < breadcrumbStack().length - 1) {
+    <button type="button" class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link" [attr.aria-label]="rozieAttr('Back to ' + entry.title)" data-testid="command-palette-breadcrumb-jump" (click)="jumpToLevel(Number(ei))">{{ rozieDisplay(entry.title) }}</button>
+    } @else {
+    <span class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-title">{{ rozieDisplay(entry.title) }}</span>
+    }</span>
     }
             </nav>
           
@@ -342,6 +345,19 @@ function __rozieAttr(v: unknown): string | null {
     .rozie-command-palette-breadcrumb-segment--current {
       color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
       font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+    }
+    .rozie-command-palette-breadcrumb-segment--link {
+      padding: 0;
+      font: inherit;
+      line-height: inherit;
+      background: none;
+      border: none;
+      border-radius: var(--rozie-command-palette-breadcrumb-jump-radius, 0.25rem);
+      cursor: pointer;
+    }
+    .rozie-command-palette-breadcrumb-segment--link:hover {
+      color: var(--rozie-command-palette-breadcrumb-jump-hover-color, var(--rozie-command-palette-breadcrumb-current-color, inherit));
+      text-decoration: var(--rozie-command-palette-breadcrumb-jump-hover-decoration, underline);
     }
     .rozie-command-palette-breadcrumb-separator {
       color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
@@ -781,6 +797,27 @@ export class CommandPalette {
     this.activeValue.set(null);
     this.reopenComboboxPopup();
     this.back.emit();
+  };
+  jumpToLevel = (targetDepth: any) => {
+    let stack = this.levelStack();
+    if (targetDepth < 0 || targetDepth >= stack.length) return;
+    // Level nav always resets to the list surface (spec §Composition) — mirror
+    // goBack: a jump always resets to the list surface FIRST.
+    if (this.activeSurface() !== 'list') this.closeActionMenu();
+    let restoreQuery: any = null;
+    while (stack.length > targetDepth) {
+      const popped = popFrame(stack);
+      stack = popped.stack;
+      restoreQuery = popped.restoreQuery == null ? '' : popped.restoreQuery;
+      this.back.emit();
+    }
+    this.levelStack.set(stack);
+    this.requestToken = nextRequestToken(this.requestToken);
+    const q = restoreQuery == null ? '' : restoreQuery;
+    this.query.set(q);
+    this.combobox()?.seedQuery(q);
+    this.activeValue.set(null);
+    this.reopenComboboxPopup();
   };
   openTo = async (path: any) => {
     this.open.set(true);

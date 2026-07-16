@@ -637,6 +637,49 @@ const goBack = () => {
   $emit('back')
 }
 
+// jumpToLevel(targetDepth): the breadcrumb ANCESTOR click-to-jump affordance
+// (260715-uz1). A breadcrumb index `ei` maps directly onto a target stack
+// depth (breadcrumbStack() index 0 = root/depth 0, index k = the k-th pushed
+// frame/depth k) — see breadcrumb()/depth() in internal/levelStack.ts. Pops
+// the stack from its CURRENT length down to `targetDepth`, emitting ONE
+// `@back` per popped level — the LOCKED event-sequence decision: N-T `@back`
+// emits for a depth-N→depth-T jump, byte-identical to pressing Backspace
+// (N-T) times (see the levels design spec + the VR `readout-back-count`,
+// which counts one increment per level — a single "pop-to-depth" emit would
+// under-report to consumers/counters).
+//
+// Script-internal ONLY — deliberately NOT added to $expose (keeps the
+// surface gate, surface.test.ts, byte-unchanged; see the plan's must_haves).
+//
+// The pops are threaded through a LOCAL `stack` (mirrors openTo/pushLevel)
+// rather than re-reading $data.levelStack inside the loop — the documented
+// React/Solid/Lit setState-is-async stale-read (openTo's comment above).
+// $data.levelStack is written once at the end for render reactivity; the
+// query-restore / seedQuery / reopen happen ONCE with the final restored
+// query — the final visible state is identical to N sequential goBack()
+// calls, only the intermediate restores (invisible either way) are skipped.
+const jumpToLevel = (targetDepth) => {
+  let stack = $data.levelStack
+  if (targetDepth < 0 || targetDepth >= stack.length) return
+  // Level nav always resets to the list surface (spec §Composition) — mirror
+  // goBack: a jump always resets to the list surface FIRST.
+  if ($data.activeSurface !== 'list') closeActionMenu()
+  let restoreQuery = null
+  while (stack.length > targetDepth) {
+    const popped = popFrame(stack)
+    stack = popped.stack
+    restoreQuery = popped.restoreQuery == null ? '' : popped.restoreQuery
+    $emit('back')
+  }
+  $data.levelStack = stack
+  requestToken = nextRequestToken(requestToken)
+  const q = restoreQuery == null ? '' : restoreQuery
+  $model.query = q
+  $refs.combobox?.seedQuery(q)
+  $data.activeValue = null
+  reopenComboboxPopup()
+}
+
 // openTo(path): the ⌘P deep-link (LVL-RENDER, LVL-STACK) — opens the palette,
 // resets to root, then drills through `path` (an array of item ids) one hop
 // at a time: resolve the CURRENT level's items, find the item whose `id`
@@ -1231,14 +1274,19 @@ $expose({ show, close, toggle, focus, goBack, openTo })
       root..current breadcrumb (breadcrumbStack(), internal/levelStack.ts
       breadcrumb()), `back` is goBack. The slot API itself is UNCHANGED
       (back-compat) — only the DEFAULT fill (finding 2, 260715-50l) changes:
-      it now renders the back button (the ONLY interactive affordance in v1)
-      followed by the FULL root..current trail (muted ancestors ›
-      emphasized-current), instead of a bare `‹` + the current title alone
-      (which read as a random bold label at depth, screenshot 02).
+      it now renders the back button followed by the FULL root..current trail
+      (muted ancestors › emphasized-current), instead of a bare `‹` + the
+      current title alone (which read as a random bold label at depth,
+      screenshot 02).
       `command-palette-title` stays on the CURRENT segment only, so the
       existing depth-1/root levels assertions keep passing.
-      deferred: trail-segment click-to-jump (only the back affordance is
-      interactive in v1).
+      260715-uz1 (click-to-jump, shipped): every ANCESTOR segment (index <
+      breadcrumbStack().length-1, i.e. depth < the current depth) is now a
+      real <button> wired to jumpToLevel(Number(ei)) — clicking it pops the
+      level stack straight back to that tier, emitting ONE `@back` per popped
+      level (identical to pressing Backspace that many times — see
+      jumpToLevel's header comment for the full contract). The CURRENT (last)
+      segment stays the plain, non-interactive <span> it always was.
     -->
     <div r-if="atDepth()" class="rozie-command-palette-header">
       <slot name="breadcrumb" :stack="breadcrumbStack()" :back="goBack">
@@ -1252,10 +1300,18 @@ $expose({ show, close, toggle, focus, goBack, openTo })
         <nav class="rozie-command-palette-breadcrumb-trail" data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb">
           <span r-for="entry, ei in breadcrumbStack()" :key="ei" class="rozie-command-palette-breadcrumb-item">
             <span r-if="Number(ei) > 0" class="rozie-command-palette-breadcrumb-separator" aria-hidden="true">›</span>
+            <button
+              r-if="Number(ei) < breadcrumbStack().length - 1"
+              type="button"
+              class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link"
+              :aria-label="'Back to ' + entry.title"
+              data-testid="command-palette-breadcrumb-jump"
+              @click="jumpToLevel(Number(ei))"
+            >{{ entry.title }}</button>
             <span
-              class="rozie-command-palette-breadcrumb-segment"
-              :class="{ 'rozie-command-palette-breadcrumb-segment--current': Number(ei) === breadcrumbStack().length - 1 }"
-              :data-testid="Number(ei) === breadcrumbStack().length - 1 ? 'command-palette-title' : null"
+              r-else
+              class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current"
+              data-testid="command-palette-title"
             >{{ entry.title }}</span>
           </span>
         </nav>
@@ -1615,6 +1671,28 @@ $expose({ show, close, toggle, focus, goBack, openTo })
 .rozie-command-palette-breadcrumb-segment--current {
   color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
   font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+}
+
+/*
+  260715-uz1 — ancestor segment click-to-jump: the ancestor is now a real
+  <button> carrying the base .rozie-command-palette-breadcrumb-segment class
+  (inherits the muted color/weight/white-space above) plus this --link
+  variant to reset native button chrome + add a hover affordance. Token-
+  driven with alias fallbacks — no hard-coded colors.
+*/
+.rozie-command-palette-breadcrumb-segment--link {
+  padding: 0;
+  font: inherit;
+  line-height: inherit;
+  background: none;
+  border: none;
+  border-radius: var(--rozie-command-palette-breadcrumb-jump-radius, 0.25rem);
+  cursor: pointer;
+}
+
+.rozie-command-palette-breadcrumb-segment--link:hover {
+  color: var(--rozie-command-palette-breadcrumb-jump-hover-color, var(--rozie-command-palette-breadcrumb-current-color, inherit));
+  text-decoration: var(--rozie-command-palette-breadcrumb-jump-hover-decoration, underline);
 }
 
 .rozie-command-palette-breadcrumb-separator {

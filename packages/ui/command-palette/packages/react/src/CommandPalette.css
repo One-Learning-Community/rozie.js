@@ -99,6 +99,19 @@
   color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
   font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
 }
+.rozie-command-palette-breadcrumb-segment--link[data-rozie-s-768cad96] {
+  padding: 0;
+  font: inherit;
+  line-height: inherit;
+  background: none;
+  border: none;
+  border-radius: var(--rozie-command-palette-breadcrumb-jump-radius, 0.25rem);
+  cursor: pointer;
+}
+.rozie-command-palette-breadcrumb-segment--link[data-rozie-s-768cad96]:hover {
+  color: var(--rozie-command-palette-breadcrumb-jump-hover-color, var(--rozie-command-palette-breadcrumb-current-color, inherit));
+  text-decoration: var(--rozie-command-palette-breadcrumb-jump-hover-decoration, underline);
+}
 .rozie-command-palette-breadcrumb-separator[data-rozie-s-768cad96] {
   color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
 }

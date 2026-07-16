@@ -182,6 +182,19 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
   font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
 }
+.rozie-command-palette-breadcrumb-segment--link[data-rozie-s-768cad96] {
+  padding: 0;
+  font: inherit;
+  line-height: inherit;
+  background: none;
+  border: none;
+  border-radius: var(--rozie-command-palette-breadcrumb-jump-radius, 0.25rem);
+  cursor: pointer;
+}
+.rozie-command-palette-breadcrumb-segment--link[data-rozie-s-768cad96]:hover {
+  color: var(--rozie-command-palette-breadcrumb-jump-hover-color, var(--rozie-command-palette-breadcrumb-current-color, inherit));
+  text-decoration: var(--rozie-command-palette-breadcrumb-jump-hover-decoration, underline);
+}
 .rozie-command-palette-breadcrumb-separator[data-rozie-s-768cad96] {
   color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
 }
@@ -646,8 +659,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
         <button class="rozie-command-palette-back" type="button" aria-label="Back" data-testid="command-palette-back" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.goBack(); }} data-rozie-s-768cad96>‹</button>
         <nav class="rozie-command-palette-breadcrumb-trail" data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb" data-rozie-s-768cad96>
           ${repeat<any>(this.breadcrumbStack(), (entry, ei) => ei, (entry, ei) => html`<span class="rozie-command-palette-breadcrumb-item" key=${rozieAttr(ei)} data-rozie-s-768cad96>
-            ${Number(ei) > 0 ? html`<span class="rozie-command-palette-breadcrumb-separator" aria-hidden="true" data-rozie-s-768cad96>›</span>` : nothing}<span class="${Object.entries({ "rozie-command-palette-breadcrumb-segment": true, 'rozie-command-palette-breadcrumb-segment--current': Number(ei) === this.breadcrumbStack().length - 1 }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-testid=${rozieAttr(Number(ei) === this.breadcrumbStack().length - 1 ? 'command-palette-title' : null)} data-rozie-s-768cad96>${rozieDisplay(entry.title)}</span>
-          </span>`)}
+            ${Number(ei) > 0 ? html`<span class="rozie-command-palette-breadcrumb-separator" aria-hidden="true" data-rozie-s-768cad96>›</span>` : nothing}${Number(ei) < this.breadcrumbStack().length - 1 ? html`<button class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link" type="button" aria-label=${rozieAttr('Back to ' + entry.title)} data-testid="command-palette-breadcrumb-jump" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.jumpToLevel(Number(ei)); }} data-rozie-s-768cad96>${rozieDisplay(entry.title)}</button>` : html`<span class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-title" data-rozie-s-768cad96>${rozieDisplay(entry.title)}</span>`}</span>`)}
         </nav>
       </slot>`}
     </div>` : nothing}<rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
@@ -901,6 +913,32 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
     bubbles: true,
     composed: true
   }));
+};
+
+  jumpToLevel = (targetDepth: any) => {
+  let stack = this._levelStack.value;
+  if (targetDepth < 0 || targetDepth >= stack.length) return;
+  // Level nav always resets to the list surface (spec §Composition) — mirror
+  // goBack: a jump always resets to the list surface FIRST.
+  if (this._activeSurface.value !== 'list') this.closeActionMenu();
+  let restoreQuery: any = null;
+  while (stack.length > targetDepth) {
+    const popped = popFrame(stack);
+    stack = popped.stack;
+    restoreQuery = popped.restoreQuery == null ? '' : popped.restoreQuery;
+    this.dispatchEvent(new CustomEvent("back", {
+      detail: undefined,
+      bubbles: true,
+      composed: true
+    }));
+  }
+  this._levelStack.value = stack;
+  this.requestToken = nextRequestToken(this.requestToken);
+  const q = restoreQuery == null ? '' : restoreQuery;
+  this._queryControllable.write(q);
+  this._refCombobox?.seedQuery(q);
+  this._activeValue.value = null;
+  this.reopenComboboxPopup();
 };
 
   openTo = async (path: any) => {

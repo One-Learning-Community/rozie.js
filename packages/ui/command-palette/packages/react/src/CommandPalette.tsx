@@ -188,6 +188,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   const combobox = useRef<ComboboxHandle | null>(null);
   const _watch0First = useRef(true);
 
+  const { onBack: _rozieProp_onBack } = props;
   function currentItems() {
     const frame = currentFrame(levelStack);
     if (frame) {
@@ -371,8 +372,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     // ever invoking source.
     if (isAsyncLevel(item) && levelDefaultItems(item).length === 0) beginLevelLoad(item, '');
   }
-  const { onBack: _rozieProp_onBack } = props;
-    const goBack = useCallback(() => {
+  const goBack = useCallback(() => {
     if (levelStack.length === 0) return;
     // Level nav always resets to the list surface (spec §Composition) — pop
     // closes an open action menu FIRST.
@@ -389,6 +389,27 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     setActiveValue(null);
     reopenComboboxPopup();
     _rozieProp_onBack && _rozieProp_onBack();
+  }, [_rozieProp_onBack, activeSurface, closeActionMenu, levelStack, reopenComboboxPopup, setQuery]);
+  const jumpToLevel = useCallback((targetDepth: any) => {
+    let stack = levelStack;
+    if (targetDepth < 0 || targetDepth >= stack.length) return;
+    // Level nav always resets to the list surface (spec §Composition) — mirror
+    // goBack: a jump always resets to the list surface FIRST.
+    if (activeSurface !== 'list') closeActionMenu();
+    let restoreQuery: any = null;
+    while (stack.length > targetDepth) {
+      const popped = popFrame(stack);
+      stack = popped.stack;
+      restoreQuery = popped.restoreQuery == null ? '' : popped.restoreQuery;
+      _rozieProp_onBack && _rozieProp_onBack();
+    }
+    setLevelStack(stack);
+    requestToken.current = nextRequestToken(requestToken.current);
+    const q = restoreQuery == null ? '' : restoreQuery;
+    setQuery(q);
+    combobox.current?.seedQuery(q);
+    setActiveValue(null);
+    reopenComboboxPopup();
   }, [_rozieProp_onBack, activeSurface, closeActionMenu, levelStack, reopenComboboxPopup, setQuery]);
   async function openTo(path: any) {
     setOpen(true);
@@ -768,8 +789,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
         {!!(atDepth()) && <div className={"rozie-command-palette-header"} data-rozie-s-768cad96="">
           {(props.renderBreadcrumb ?? props.slots?.['breadcrumb']) ? ((props.renderBreadcrumb ?? props.slots?.['breadcrumb']) as Function)({ stack: breadcrumbStack(), back: goBack }) : <><button type="button" className={"rozie-command-palette-back"} aria-label="Back" data-testid="command-palette-back" onClick={($event) => { goBack(); }} data-rozie-s-768cad96="">‹</button><nav className={"rozie-command-palette-breadcrumb-trail"} data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb" data-rozie-s-768cad96="">
               {breadcrumbStack().map((entry, ei) => <span key={ei} className={"rozie-command-palette-breadcrumb-item"} data-rozie-s-768cad96="">
-                {!!(Number(ei) > 0) && <span className={"rozie-command-palette-breadcrumb-separator"} aria-hidden="true" data-rozie-s-768cad96="">›</span>}<span className={clsx("rozie-command-palette-breadcrumb-segment", { "rozie-command-palette-breadcrumb-segment--current": Number(ei) === breadcrumbStack().length - 1 })} data-testid={rozieAttr(Number(ei) === breadcrumbStack().length - 1 ? 'command-palette-title' : undefined)} data-rozie-s-768cad96="">{rozieDisplay(entry.title)}</span>
-              </span>)}
+                {!!(Number(ei) > 0) && <span className={"rozie-command-palette-breadcrumb-separator"} aria-hidden="true" data-rozie-s-768cad96="">›</span>}{(Number(ei) < breadcrumbStack().length - 1) ? <button type="button" className={"rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link"} aria-label={rozieAttr('Back to ' + entry.title)} data-testid="command-palette-breadcrumb-jump" onClick={($event) => { jumpToLevel(Number(ei)); }} data-rozie-s-768cad96="">{rozieDisplay(entry.title)}</button> : <span className={"rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current"} data-testid="command-palette-title" data-rozie-s-768cad96="">{rozieDisplay(entry.title)}</span>}</span>)}
             </nav></>}
         </div>}<Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={props.groupCap} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
             {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) }) : <div className={"rozie-command-palette-option"} data-rozie-s-768cad96="">

@@ -10,8 +10,7 @@
         <button type="button" class="rozie-command-palette-back" aria-label="Back" data-testid="command-palette-back" @click="goBack()">‹</button>
         <nav class="rozie-command-palette-breadcrumb-trail" data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb">
           <span v-for="(entry, ei) in breadcrumbStack()" :key="ei" class="rozie-command-palette-breadcrumb-item">
-            <span v-if="Number(ei) > 0" class="rozie-command-palette-breadcrumb-separator" aria-hidden="true">›</span><span :class="['rozie-command-palette-breadcrumb-segment', { 'rozie-command-palette-breadcrumb-segment--current': Number(ei) === breadcrumbStack().length - 1 }]" :data-testid="Number(ei) === breadcrumbStack().length - 1 ? 'command-palette-title' : undefined">{{ entry.title }}</span>
-          </span>
+            <span v-if="Number(ei) > 0" class="rozie-command-palette-breadcrumb-separator" aria-hidden="true">›</span><button v-if="Number(ei) < breadcrumbStack().length - 1" type="button" class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link" :aria-label="'Back to ' + entry.title" data-testid="command-palette-breadcrumb-jump" @click="jumpToLevel(Number(ei))">{{ entry.title }}</button><span v-else class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-title">{{ entry.title }}</span></span>
         </nav>
       </slot>
     </div><Combobox ref="comboboxRef" :inline="true" :disable-filter="true" :close-on-select="false" :options="orderedItems()" :groups="commandGroups()" :group-cap="props.groupCap" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="currentPlaceholder()" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
@@ -501,6 +500,48 @@ const goBack = () => {
   activeValue.value = null;
   reopenComboboxPopup();
   emit('back');
+};
+// jumpToLevel(targetDepth): the breadcrumb ANCESTOR click-to-jump affordance
+// (260715-uz1). A breadcrumb index `ei` maps directly onto a target stack
+// depth (breadcrumbStack() index 0 = root/depth 0, index k = the k-th pushed
+// frame/depth k) — see breadcrumb()/depth() in internal/levelStack.ts. Pops
+// the stack from its CURRENT length down to `targetDepth`, emitting ONE
+// `@back` per popped level — the LOCKED event-sequence decision: N-T `@back`
+// emits for a depth-N→depth-T jump, byte-identical to pressing Backspace
+// (N-T) times (see the levels design spec + the VR `readout-back-count`,
+// which counts one increment per level — a single "pop-to-depth" emit would
+// under-report to consumers/counters).
+//
+// Script-internal ONLY — deliberately NOT added to $expose (keeps the
+// surface gate, surface.test.ts, byte-unchanged; see the plan's must_haves).
+//
+// The pops are threaded through a LOCAL `stack` (mirrors openTo/pushLevel)
+// rather than re-reading $data.levelStack inside the loop — the documented
+// React/Solid/Lit setState-is-async stale-read (openTo's comment above).
+// $data.levelStack is written once at the end for render reactivity; the
+// query-restore / seedQuery / reopen happen ONCE with the final restored
+// query — the final visible state is identical to N sequential goBack()
+// calls, only the intermediate restores (invisible either way) are skipped.
+const jumpToLevel = (targetDepth: any) => {
+  let stack = levelStack.value;
+  if (targetDepth < 0 || targetDepth >= stack.length) return;
+  // Level nav always resets to the list surface (spec §Composition) — mirror
+  // goBack: a jump always resets to the list surface FIRST.
+  if (activeSurface.value !== 'list') closeActionMenu();
+  let restoreQuery: any = null;
+  while (stack.length > targetDepth) {
+    const popped = popFrame(stack);
+    stack = popped.stack;
+    restoreQuery = popped.restoreQuery == null ? '' : popped.restoreQuery;
+    emit('back');
+  }
+  levelStack.value = stack;
+  requestToken = nextRequestToken(requestToken);
+  const q = restoreQuery == null ? '' : restoreQuery;
+  query.value = q;
+  comboboxRef.value?.seedQuery(q);
+  activeValue.value = null;
+  reopenComboboxPopup();
 };
 // openTo(path): the ⌘P deep-link (LVL-RENDER, LVL-STACK) — opens the palette,
 // resets to root, then drills through `path` (an array of item ids) one hop
@@ -1134,6 +1175,19 @@ defineExpose({ show, close, toggle, focus, goBack, openTo });
 .rozie-command-palette-breadcrumb-segment--current {
   color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
   font-weight: var(--rozie-command-palette-breadcrumb-current-weight, 600);
+}
+.rozie-command-palette-breadcrumb-segment--link {
+  padding: 0;
+  font: inherit;
+  line-height: inherit;
+  background: none;
+  border: none;
+  border-radius: var(--rozie-command-palette-breadcrumb-jump-radius, 0.25rem);
+  cursor: pointer;
+}
+.rozie-command-palette-breadcrumb-segment--link:hover {
+  color: var(--rozie-command-palette-breadcrumb-jump-hover-color, var(--rozie-command-palette-breadcrumb-current-color, inherit));
+  text-decoration: var(--rozie-command-palette-breadcrumb-jump-hover-decoration, underline);
 }
 .rozie-command-palette-breadcrumb-separator {
   color: var(--rozie-command-palette-breadcrumb-separator-color, rgba(0, 0, 0, 0.35));
