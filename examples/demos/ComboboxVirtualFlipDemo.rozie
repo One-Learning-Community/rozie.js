@@ -1,0 +1,114 @@
+<!--
+  ComboboxVirtualFlipDemo.rozie — LIVE-FLIPPABLE windowing fixture for the pure-Rozie
+  Combobox (combobox-virtual-reactivity phase). A clone of ComboboxVirtualDemo.rozie
+  (Phase 64 P4) that seeds `virtual: false` and adds a `flip-virtual` toggle button so
+  the VR matrix can observe a runtime `false→true`/`true→false` flip: the TanStack
+  virtualizer must be built/torn down correctly (buildVirtualizer/teardownVirtualizer +
+  a lazy $watch on $props.virtual), and the mid-flip frame must render the un-windowed
+  full slice (windowedView() fallback) rather than a blank popup.
+
+    - 1,000 options seeded in $onMount (deterministic content/ids — no clock/random
+      — so the window + measured total are stable across the six targets + the Linux
+      VR baselines).
+    - `virtual` starts `false` (unlike ComboboxVirtualDemo's always-on `:virtual="true"`)
+      and is bound to `$data.virtual`, toggled by the `flip-virtual` button.
+    - `:disable-filter="true"` keeps the full option set in view as the user types /
+      selects (no query-driven re-filtering shrinking the windowed set), and
+      `:close-on-select="false"` keeps the popup open after a commit so the
+      selection-survives-windowing behavior stays observable once virtual is on.
+    - `inline` renders the list IN FLOW (bounded by --rozie-combobox-list-max-height)
+      so the windowed scroll container exists at mount (the virtualizer attaches to
+      it whenever it is (re)built — ROZ123-safe).
+
+  combobox-virtual.spec.ts's `combobox-virtual-flip` cell asserts: opening the popup
+  non-virtual renders the flat (unwindowed) 1,000-option set; clicking `flip-virtual`
+  flips to windowed and the rendered `[role="option"]` count stays non-blank (> 0) and
+  settles small (< 100); flipping back restores the full/flat render. Static dataset
+  (no clock/random) for VR determinism.
+-->
+
+<rozie name="ComboboxVirtualFlipDemo">
+
+<components>
+{
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+
+<data>
+{
+  options: [],
+  optionCount: 0,
+  value: null,
+  virtual: false,
+}
+</data>
+
+<script>
+// Seed 1,000 deterministic options (stable ids + labels) so the window + measured
+// total are reproducible across the six targets and the Linux VR baselines.
+$onMount(() => {
+  const out = []
+  for (let i = 1; i <= 1000; i++) {
+    out.push({ id: i, label: 'Option ' + i, value: 'opt-' + i })
+  }
+  $data.options = out
+  $data.optionCount = out.length
+})
+</script>
+
+<template>
+<div class="combobox-virtual-flip-demo">
+  <h3>Combobox — virtual flip (1000 options)</h3>
+
+  <div class="controls">
+    <span class="label">options:</span>
+    <span class="readout" data-testid="option-count">{{ $data.optionCount }}</span>
+    <span class="label">value:</span>
+    <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
+    <span class="label">virtual:</span>
+    <span class="readout" data-testid="virtual-readout">{{ $data.virtual }}</span>
+    <button type="button" data-testid="flip-virtual" @click="$data.virtual = !$data.virtual">flip virtual</button>
+  </div>
+
+  <div data-testid="virtual-flip-combobox">
+    <Combobox
+      :options="$data.options"
+      r-model:value="$data.value"
+      :virtual="$data.virtual"
+      :disable-filter="true"
+      :close-on-select="false"
+      inline
+      maxHeight="320px"
+      idBase="virtual-flip-combobox"
+      ariaLabel="Pick an option"
+    >
+      <template #option="{ option, selected }">
+        <span class="opt" :class="{ 'opt-selected': selected }">{{ option.label }}</span>
+      </template>
+    </Combobox>
+  </div>
+</div>
+</template>
+
+<style>
+.combobox-virtual-flip-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.combobox-virtual-flip-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  flex-wrap: wrap;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; }
+</style>
+
+</rozie>

@@ -332,3 +332,46 @@ for (const target of TARGETS) {
       .toBe(true);
   });
 }
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// combobox-virtual-flip — LIVE runtime `virtual` flip (combobox-virtual-reactivity
+// phase). ComboboxVirtualFlipDemo seeds `virtual: false` + a `flip-virtual` toggle.
+// Open non-virtual (flat 1,000-option render), flip to virtual (the rendered slice must
+// stay non-blank and settle small), then flip back (the flat/full render returns).
+// ════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`combobox-virtual-flip [${target}]: runtime virtual flip builds/tears the window without a blank frame`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ComboboxVirtualFlip&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    await expect
+      .poll(async () => page.getByTestId('option-count').textContent(), { timeout: 20_000 })
+      .toBe('1000');
+
+    // Non-virtual at mount: opening renders the full flat set (well over 100 options).
+    await openCombobox(page);
+    await expect
+      .poll(async () => page.locator('[role="option"]').count(), { timeout: 15_000 })
+      .toBeGreaterThan(100);
+
+    // Flip to virtual — the rendered slice must never go blank and must settle small.
+    await page.getByTestId('flip-virtual').click();
+    await expect
+      .poll(async () => page.locator('[role="option"]').count(), { timeout: 15_000 })
+      .toBeGreaterThan(0);
+    await expect
+      .poll(async () => page.locator('[role="option"]').count(), { timeout: 15_000 })
+      .toBeLessThan(100);
+    await expect
+      .poll(async () => page.locator('[role="option"][data-index]').count(), { timeout: 15_000 })
+      .toBeGreaterThan(0);
+
+    // Flip back — the flat/full render is restored.
+    await page.getByTestId('flip-virtual').click();
+    await expect
+      .poll(async () => page.locator('[role="option"]').count(), { timeout: 15_000 })
+      .toBeGreaterThan(100);
+    await expect(page.locator('[role="option"][data-index]')).toHaveCount(0);
+  });
+}

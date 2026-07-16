@@ -509,6 +509,14 @@ export const EXAMPLES = [
   // headless-core src root already registered for Angular cross-tree AOT).
   'ListboxVirtual',
   'ComboboxVirtual',
+  // combobox-virtual-reactivity phase — the live-flip cell (loader →
+  // examples/demos/ComboboxVirtualFlipDemo.rozie, importing packages/ui/combobox/src/
+  // Combobox.rozie): seeds `virtual: false` + a `flip-virtual` toggle so the matrix can
+  // observe a runtime false→true/true→false flip (buildVirtualizer/teardownVirtualizer +
+  // the lazy $watch on $props.virtual + the windowedView() mid-flip fallback). Behavioral-
+  // only (DOM assert, NOT in matrix.spec.ts — no pixel baseline); lives under
+  // examples/demos/ (same Angular cross-tree coverage as ComboboxVirtual above).
+  'ComboboxVirtualFlip',
   // @rozie-ui/slider (pure-Rozie WAI-ARIA slider/range, NO engine — the engine IS
   // the native <input type="range">) — the four BEHAVIORAL cells (loaders →
   // examples/demos/Slider{Behavior,Range,Vertical,Marks}Demo.rozie, each importing
@@ -1246,6 +1254,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // / 'rozie-combobox-virtual-demo' = kebab of {Listbox,Combobox}VirtualDemo.
   ListboxVirtual: 'rozie-listbox-virtual',
   ComboboxVirtual: 'rozie-combobox-virtual',
+  // combobox-virtual-reactivity phase — '-demo' appended on Lit → tag
+  // 'rozie-combobox-virtual-flip-demo' = kebab of ComboboxVirtualFlipDemo.
+  ComboboxVirtualFlip: 'rozie-combobox-virtual-flip',
   // @rozie-ui/slider — '-demo' appended on Lit → tags 'rozie-slider-behavior-demo'
   // etc. = kebab of Slider*Demo (the wrapper component is name="Slider" →
   // 'rozie-slider'). Behavioral-only, no screenshot cell.
@@ -1663,6 +1674,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
   ListboxVirtual: {},
   ComboboxVirtual: {},
+  // combobox-virtual-reactivity phase — ComboboxVirtualFlipDemo is self-contained: it
+  // seeds its own 1,000-option list + `virtual: false` in $onMount/<data> and binds
+  // r-model:value + :virtual internally (not parent-supplied), so no MODEL_PROPS entry.
+  // No parent props needed.
+  ComboboxVirtualFlip: {},
   // @rozie-ui/slider — every Slider*Demo is self-contained: it seeds its own value
   // in <data> and binds r-model:value internally (not parent-supplied), so no
   // MODEL_PROPS entry. No parent props needed.
