@@ -11,6 +11,7 @@
   },
   "comment:combobox-devdep": "D-07/Option A (P75): the 6 @rozie-ui/combobox-<target> published per-target packages are now REAL devDependencies — this is the graduation the prior Option-B note anticipated. Declaring them here makes pnpm symlink them into command-palette/node_modules, which is exactly the surface Plan 02's resolveManifestProducer walks (node_modules UPWARD from dirname(fromFile) = command-palette/src, NOT from resolverRoot). So the authoring/codegen surface — the VR harness, the surface test, and the IDE LSP — now resolves the stable `<components>` specifier `@rozie-ui/combobox/Combobox.rozie` to the PUBLISHED per-target package rather than a vendored sibling (D-05/D-09/D-10). The plain `@rozie-ui/combobox` devDependency is kept alongside for now — Plan 04 removes vendoring, but the raw `.rozie` authoring surface may still transitively need it until that lands.",
   "comment:headless-core-devdep": "P3/D-06: the vendored Combobox imports @rozie-ui/headless-core/listCore.rzts (the shared resolver spine). That bare specifier must resolve from this package's location when codegen + the VR harness compile the vendored sibling, so headless-core is a devDependency too (the partial dissolves at compile — zero runtime dep).",
+  "comment:vue-mount-devdeps": "groupcap-actions.behavior.test.ts (mount-and-drive, the combobox seed-query.behavior.test.ts / group-cap.behavior.test.ts precedent): imports the committed leaf packages/vue/src/CommandPalette.vue and mounts it via plain `vue` createApp/h — @vitejs/plugin-vue transforms the SFC, happy-dom supplies the DOM. Versions mirror @rozie-ui/combobox's devDependencies exactly (already-resolved workspace versions, not new packages).",
   "devDependencies": {
     "@rozie-ui/combobox": "workspace:*",
     "@rozie-ui/combobox-react": "workspace:*",
@@ -21,7 +22,10 @@
     "@rozie-ui/combobox-lit": "workspace:*",
     "@rozie-ui/headless-core": "workspace:*",
     "@rozie/core": "workspace:*",
+    "@vitejs/plugin-vue": "^6",
+    "happy-dom": "^15.0.0",
     "typescript": "~5.6.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.0",
+    "vue": "^3.5"
   }
 }
