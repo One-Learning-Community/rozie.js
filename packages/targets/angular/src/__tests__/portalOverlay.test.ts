@@ -51,6 +51,14 @@ describe('emitAngular — PortalOverlay (command-palette-portal-overlay Task 3, 
     expect(code).toMatch(/private __roziePortal_0_effect = effect\(\(\) => \{/);
     expect(code).toMatch(/private __roziePortalPlace\(/);
     expect(code).toMatch(/this\.__rozieDestroyRef\.onDestroy\(/);
+    // The real bug caught during implementation: a bare user-declared script
+    // function reference (`resolveTo`) inside the effect() body MUST be
+    // `this.`-prefixed — a class field initializer has no template-implicit-
+    // `this` (unlike an Angular template binding). `this.resolveTo(this.to())`
+    // is the ONLY correct rewrite; a bare `resolveTo(...)` call is a runtime
+    // ReferenceError.
+    expect(code).toMatch(/this\.__roziePortalPlace\(el, this\.resolveTo\(this\.to\(\)\)\);/);
+    expect(code).not.toMatch(/this\.__roziePortalPlace\(el, resolveTo\(/);
 
     // AOT bans (memory project_angular_aot_no_import_meta_url /
     // project_angular_aot_no_template_arrow).
