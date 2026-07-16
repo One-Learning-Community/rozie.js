@@ -1,5 +1,12 @@
 # @rozie-ui/pdf-lit
 
+## 0.2.3
+
+### Patch Changes
+
+- Updated dependencies [364f4c5]
+  - @rozie/runtime-lit@0.2.0
+
 ## 0.2.2
 
 ### Patch Changes

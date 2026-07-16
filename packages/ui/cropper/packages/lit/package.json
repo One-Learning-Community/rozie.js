@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/cropper-lit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -70,5 +70,8 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": ["./dist/index.mjs", "./dist/index.cjs"]
+  "sideEffects": [
+    "./dist/index.mjs",
+    "./dist/index.cjs"
+  ]
 }

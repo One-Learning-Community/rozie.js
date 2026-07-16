@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/command-palette-vue",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -52,7 +52,7 @@
   },
   "peerDependencies": {
     "vue": "^3.4",
-    "@rozie-ui/combobox-vue": "^0.3.0"
+    "@rozie-ui/combobox-vue": "^0.4.0"
   },
   "peerDependenciesMeta": {
     "vue": {

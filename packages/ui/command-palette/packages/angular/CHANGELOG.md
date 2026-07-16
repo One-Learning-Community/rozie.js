@@ -1,5 +1,34 @@
 # @rozie-ui/command-palette-angular
 
+## 0.4.0
+
+### Minor Changes
+
+- e0b8383: Breadcrumb ancestor segments are now click-to-jump — clicking a muted ancestor pops the level stack straight back to that tier, emitting one `back` event per popped level (exactly like pressing Backspace that many times), keyboard-focusable with a "Back to `<title>`" aria-label. The current segment stays non-interactive. It composes with the already-staged 0.4.0 minor.
+- eaaff1d: Command items may now carry an optional `hotKey?: string` field — a display-only teaching badge advertising an app-global shortcut the consumer owns (e.g. Copy `$mod+c`, Print `$mod+p`), rendered right-aligned before the `#actions` affordance and gated on the item's `hotKey`. It reuses the same portable `$mod`/`$shift`/`$alt`/`$ctrl` modifier grammar as the existing `actionKey` hint — the palette never binds or listens for the key, it is purely visual. That grammar is now factored out into a shared `formatKeyToken` helper that `actionKey`'s own default hint also renders through. Five new `--rozie-command-palette-hotkey-*` theming tokens fall back to the existing `--rozie-command-palette-actions-hint-*` values.
+- d9ba7c2: New **inline command arguments** (Raycast-style): a command item declares `args: [{ id, placeholder?, required?, default? }]` (text inputs only in v1). Selecting an args-bearing item (Enter or click) automatically enters a panel-internal args surface — reusing the same real-focus/`pinOpen` mechanics as the existing per-row action menu, with zero new props/events. A non-interactive chip shows the pending command's label above the field(s); the result list stays visibly open but is dimmed and `aria-hidden` while the args surface is active.
+
+  Enter with every `required` field non-empty (after trim) fires the EXISTING `select` event with an added `args: { [id]: value }` key — additive and non-breaking: an argless command's `select` payload carries no `args` key at all. Enter with a missing required field instead focuses the first unfilled field. `default` prefills its field (selected on focus so typing replaces it). Escape closes the args surface and restores the list + query (same precedence tier as closing the sub-actions menu); Backspace on an empty first field also pops back to the list. `args` wins over a `source`/`children` navigation on the same item (mutually exclusive); `args` is compatible with the per-row `actions` menu (which is inactive once the args surface is open).
+
+  New optional slot `argsField` (scope `{ item, arg, value, setValue }`) replaces the default field chrome (surface 11→12 slots). New `--rozie-command-palette-args-{padding,gap,chip-bg,chip-color,field-padding,field-border,field-radius,field-bg,dim-opacity}` tokens alias the existing panel/input fallbacks. No compiler change, no `@rozie-ui/combobox` change — the args surface reuses `pinOpen`/`reopenComboboxPopup` verbatim.
+
+- 27dc962: Added a per-level `virtual` (long-list windowing) author-side API, threading three new props — `virtual` (Boolean), `virtualMaxHeight` (String), `virtualEstimateRowHeight` (Number) — onto the vendored combobox's own windowing support. Resolved PER LEVEL, exactly like `defaultItems`/`title`/`placeholder`: the top-level props window the ROOT list, while a navigating item's own `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` fields window THAT pushed child level (captured onto its frame at push time). This is unblocked by `@rozie-ui/combobox`'s `virtual` prop now being live-flippable at runtime (see that package's own changeset) — a level pushed with `virtual: true` windows immediately, no remount required.
+
+  A virtual level renders **flat**: the vendored combobox's `isGrouped` requires `!virtual`, so auto-derived groups, `groupCap`, and the `groupHeading` slot are inactive for that level. This is honestly bidirectional — popping back to a level whose `virtual` resolves `false` restores its non-windowed (and, if applicable, grouped) render.
+
+  Surface grows 15 → 18 props (`virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight`, placed after `appendTo`); models/emits/slots/expose are unchanged. All three props unset is byte-behavior-identical to today (`:virtual="false"`, `:max-height="''"`, `:estimate-row-height="36"`).
+
+- 35250cc: New `appendTo` prop (surface 14→15) lets the overlay escape an ancestor whose `overflow: hidden` / `transform` / `filter` / `contain` would otherwise clip the palette's `position: fixed` overlay — a real embedding bug (an app-shell iframe or a designer-chrome wrapper with its own layout is the common case). Defaults to `false` (render in place, today's behavior — zero change for existing consumers); set it to `true`/`'body'` to portal to `document.body`, a CSS selector string to portal to the first matching element, or an `Element` reference to portal to that element directly.
+
+  Built on a new compiler primitive (`r-portal`, see the toolchain changeset) using each target's native element-teleport construct — React `createPortal`, Vue `<Teleport>`, Solid `<Portal>`, a Svelte action, an AOT-safe Angular effect, and a Lit `ReactiveController`. Everything else about the palette works unchanged through the portal — the levels Escape funnel, combobox's own focus management, and the row-action-menu arbitration are all rooted at `$refs.panel`/`$refs.frame` (never `$el`), so a moved node's ref identity survives the relocation with zero logic changes. Theming custom properties (`--rozie-command-palette-*`) must be set on `:root` (or the `appendTo` container itself) to reach a portalled overlay — see the [API reference](/components/command-palette-api#escaping-a-clipped-ancestor-appendto) for the full value grammar and the Lit-specific theming note.
+
+  Also corrects a stale header comment in `CommandPalette.rozie` that cited an already-fixed compiler gap as the reason native `<dialog>` was avoided — the actual (unchanged) reason is that `<dialog>.showModal()`'s native focus-trap/Escape would fight the palette's own levels Escape funnel and combobox focus management.
+
+### Patch Changes
+
+- ea7c6a8: Fix `groupCap` composition with per-row `actions`: the ⌘K / Right-arrow action menu now always anchors to the exact highlighted VISIBLE row — it previously mis-anchored to the uncapped-order neighbour once any section overflowed its cap. Firing the action key on a "+N more" row is now correctly a no-op (it previously could wrongly open a menu). Composes into the already-staged `0.4.0` minor.
+- bd68fdb: Platform-aware `actionKey` hint: the row-actions affordance's default hint badge rendered the mac `⌘` glyph on every platform. It now shows `⌘K` on Apple platforms and `Ctrl+K` elsewhere (SSR-safe sniff, display-only — shortcut matching was already portable via `metaKey || ctrlKey` and is unchanged).
+
 ## 0.3.0
 
 ### Minor Changes

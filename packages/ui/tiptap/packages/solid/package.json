@@ -1,10 +1,10 @@
 {
   "name": "@rozie-ui/tiptap-solid",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "private": false,
   "license": "MIT",
-  "description": "Idiomatic Solid rich-text editor \u2014 one Rozie source compiled to Solid wrapping TipTap.",
+  "description": "Idiomatic Solid rich-text editor — one Rozie source compiled to Solid wrapping TipTap.",
   "keywords": [
     "rozie",
     "rozie-ui",

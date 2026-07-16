@@ -1,27 +1,66 @@
 {
   "name": "@rozie-ui/date-picker-solid",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "private": false,
   "license": "MIT",
   "description": "Idiomatic Solid headless WAI-ARIA single-date calendar (month grid, prev/next nav, weekStartsOn, min/max/disabledDates, roving keyboard focus) — one accessible Rozie source compiled to Solid.",
-  "keywords": ["rozie","rozie-ui","date-picker","calendar","datepicker","date","headless","accessibility","aria","component","solid"],
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "date-picker",
+    "calendar",
+    "datepicker",
+    "date",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "solid"
+  ],
   "author": "One Learning Community (https://github.com/One-Learning-Community)",
   "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
-  "repository": { "type": "git", "url": "git+https://github.com/One-Learning-Community/rozie.js.git", "directory": "packages/ui/date-picker/packages/solid" },
-  "bugs": { "url": "https://github.com/One-Learning-Community/rozie.js/issues" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/date-picker/packages/solid"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {
-    ".": { "types": "./dist/index.d.mts", "import": "./dist/index.mjs", "require": "./dist/index.cjs" },
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
     "./source": "./src/DatePicker.tsx",
     "./themes/*": "./src/themes/*"
   },
-  "files": ["dist","src"],
-  "dependencies": { "@rozie/runtime-solid": "workspace:*", "@solid-primitives/keyed": "^1.5.3" },
-  "peerDependencies": { "solid-js": "^1.8" },
-  "peerDependenciesMeta": { "solid-js": { "optional": false } },
-  "scripts": { "build": "tsdown", "typecheck": "tsc --noEmit" },
-  "publishConfig": { "access": "public" }
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-solid": "workspace:*",
+    "@solid-primitives/keyed": "^1.5.3"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.8"
+  },
+  "peerDependenciesMeta": {
+    "solid-js": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

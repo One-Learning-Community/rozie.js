@@ -1,10 +1,10 @@
 {
   "name": "@rozie-ui/tiptap-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "private": false,
   "license": "MIT",
-  "description": "Idiomatic React rich-text editor \u2014 one Rozie source compiled to React wrapping TipTap.",
+  "description": "Idiomatic React rich-text editor — one Rozie source compiled to React wrapping TipTap.",
   "keywords": [
     "rozie",
     "rozie-ui",
