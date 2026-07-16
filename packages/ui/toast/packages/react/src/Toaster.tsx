@@ -66,6 +66,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   const unmounted = useRef(false);
   const timers = useRef({});
   const exitFailsafes = useRef({});
+  const seqLocal = useRef(0);
   const paused = useRef(false);
   const [toasts, setToasts] = useState<any[]>([]);
   const [seq, setSeq] = useState(0);
@@ -155,9 +156,6 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   }, []);
   function show(input: any) {
     const t = input || {};
-    // Derive the id from the reactive $data.seq counter (persists on React, unlike
-    // a module-let referenced only here). Read seq into a local BEFORE writing it
-    // back (no read-after-write of the same key in one fn → ROZ138-safe).
     let id;
     if (t.id != null) {
       // Coerce a consumer-supplied id to a String once, at the single entry
@@ -167,8 +165,13 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       // stop matching after a hover pause/resume re-arms with the string key.
       id = String(t.id);
     } else {
-      const s = seq;
+      // Take the high-water mark of the persistent-but-tick-stale $data.seq and
+      // the synchronous-but-maybe-per-render seqLocal (see the <script> comment)
+      // so same-tick multi-show yields DISTINCT ids on React too. Read both
+      // BEFORE writing either (no read-after-write of $data.seq → ROZ138-safe).
+      const s = Math.max(seq, seqLocal.current);
       id = 't' + s;
+      seqLocal.current = s + 1;
       setSeq(s + 1);
     }
     const toast = {
@@ -177,9 +180,13 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
       type: t.type || 'info',
       duration: t.duration != null ? t.duration : props.duration
     };
-    const next = toasts.concat([toast]);
-    const max = props.max;
-    setToasts(max > 0 && next.length > max ? next.slice(next.length - max) : next);
+    // ONE self-referential assignment so the React emitter lowers it to the
+    // concurrent-safe functional updater `setToasts(prev => …)` (it only does so
+    // when the RHS reads $data.toasts DIRECTLY — a via-a-local form lowered to a
+    // stale-closure `setToasts(<value>)`, losing the first of two same-tick
+    // toasts). slice() start: keep the newest `max` when over the cap
+    // (Math.max(0, len+1-max)), else slice(0) = the whole fresh array.
+    setToasts(prev => prev.concat([toast]).slice(props.max > 0 ? Math.max(0, prev.length + 1 - props.max) : 0));
     startTimer(toast);
     return id;
   }

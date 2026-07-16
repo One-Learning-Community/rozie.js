@@ -252,6 +252,7 @@ export class Toaster {
   timers = {};
   exitFailsafes = {};
   unmounted = false;
+  seqLocal = 0;
   paused = false;
   startTimer = (toast: any) => {
     if (!toast || !toast.duration || toast.duration <= 0) return;
@@ -335,10 +336,8 @@ export class Toaster {
     this.exitFailsafes = {};
   };
   show = (input: any) => {
+    const __max = this.max();
     const t = input || {};
-    // Derive the id from the reactive $data.seq counter (persists on React, unlike
-    // a module-let referenced only here). Read seq into a local BEFORE writing it
-    // back (no read-after-write of the same key in one fn → ROZ138-safe).
     let id;
     if (t.id != null) {
       // Coerce a consumer-supplied id to a String once, at the single entry
@@ -348,8 +347,13 @@ export class Toaster {
       // stop matching after a hover pause/resume re-arms with the string key.
       id = String(t.id);
     } else {
-      const s = this.seq();
+      // Take the high-water mark of the persistent-but-tick-stale $data.seq and
+      // the synchronous-but-maybe-per-render seqLocal (see the <script> comment)
+      // so same-tick multi-show yields DISTINCT ids on React too. Read both
+      // BEFORE writing either (no read-after-write of $data.seq → ROZ138-safe).
+      const s = Math.max(this.seq(), this.seqLocal);
       id = 't' + s;
+      this.seqLocal = s + 1;
       this.seq.set(s + 1);
     }
     const toast = {
@@ -358,9 +362,13 @@ export class Toaster {
       type: t.type || 'info',
       duration: t.duration != null ? t.duration : this.duration()
     };
-    const next = this.toasts().concat([toast]);
-    const max = this.max();
-    this.toasts.set(max > 0 && next.length > max ? next.slice(next.length - max) : next);
+    // ONE self-referential assignment so the React emitter lowers it to the
+    // concurrent-safe functional updater `setToasts(prev => …)` (it only does so
+    // when the RHS reads $data.toasts DIRECTLY — a via-a-local form lowered to a
+    // stale-closure `setToasts(<value>)`, losing the first of two same-tick
+    // toasts). slice() start: keep the newest `max` when over the cap
+    // (Math.max(0, len+1-max)), else slice(0) = the whole fresh array.
+    this.toasts.set(this.toasts().concat([toast]).slice(__max > 0 ? Math.max(0, this.toasts().length + 1 - __max) : 0));
     this.startTimer(toast);
     return id;
   };

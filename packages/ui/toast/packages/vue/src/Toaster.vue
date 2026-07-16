@@ -85,6 +85,18 @@ let exitFailsafes = {};
 // a toast after the host itself is gone). A top-level `let` → React useRef
 // (it escapes into $onUnmount's effect).
 let unmounted = false;
+// Same-tick id-uniqueness guard for React. The id counter lives in reactive
+// $data.seq (persists across renders), but React batches setState so within a
+// SINGLE synchronous tick two show() calls read the SAME stale $data.seq →
+// duplicate ids. `seqLocal` is a plain counter incremented SYNCHRONOUSLY in
+// show(); it survives the same tick (and, because show() is an $expose verb,
+// the emitter hoists it to a persistent useRef on React too — but the design
+// does NOT depend on that: `Math.max($data.seq, seqLocal)` is correct whether
+// seqLocal persists OR resets per render, since the monotonic $data.seq
+// carries the high-water mark across any reset). On the other five targets
+// $data.seq is synchronous, so the two simply stay in lockstep. Result:
+// strictly-increasing, collision-free ids on all six with NO randomness.
+let seqLocal = 0;
 // Hover-pause flag: true while the pointer is over the stack (set by
 // pauseTimers, cleared by resumeTimers). Read by patch() so a duration change
 // arriving mid-hover stores the new remainder WITHOUT arming a live timer
@@ -189,9 +201,6 @@ const teardownTimers = () => {
 // ---- queue (imperative handle implementations) -------------------------
 const show = (input: any) => {
   const t = input || {};
-  // Derive the id from the reactive $data.seq counter (persists on React, unlike
-  // a module-let referenced only here). Read seq into a local BEFORE writing it
-  // back (no read-after-write of the same key in one fn → ROZ138-safe).
   let id;
   if (t.id != null) {
     // Coerce a consumer-supplied id to a String once, at the single entry
@@ -201,8 +210,13 @@ const show = (input: any) => {
     // stop matching after a hover pause/resume re-arms with the string key.
     id = String(t.id);
   } else {
-    const s = seq.value;
+    // Take the high-water mark of the persistent-but-tick-stale $data.seq and
+    // the synchronous-but-maybe-per-render seqLocal (see the <script> comment)
+    // so same-tick multi-show yields DISTINCT ids on React too. Read both
+    // BEFORE writing either (no read-after-write of $data.seq → ROZ138-safe).
+    const s = Math.max(seq.value, seqLocal);
     id = 't' + s;
+    seqLocal = s + 1;
     seq.value = s + 1;
   }
   const toast = {
@@ -211,9 +225,13 @@ const show = (input: any) => {
     type: t.type || 'info',
     duration: t.duration != null ? t.duration : props.duration
   };
-  const next = toasts.value.concat([toast]);
-  const max = props.max;
-  toasts.value = max > 0 && next.length > max ? next.slice(next.length - max) : next;
+  // ONE self-referential assignment so the React emitter lowers it to the
+  // concurrent-safe functional updater `setToasts(prev => …)` (it only does so
+  // when the RHS reads $data.toasts DIRECTLY — a via-a-local form lowered to a
+  // stale-closure `setToasts(<value>)`, losing the first of two same-tick
+  // toasts). slice() start: keep the newest `max` when over the cap
+  // (Math.max(0, len+1-max)), else slice(0) = the whole fresh array.
+  toasts.value = toasts.value.concat([toast]).slice(props.max > 0 ? Math.max(0, toasts.value.length + 1 - props.max) : 0);
   startTimer(toast);
   return id;
 };
