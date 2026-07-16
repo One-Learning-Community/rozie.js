@@ -528,6 +528,26 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   let requestToken = 0;
   let debounceTimerId: any = null;
 
+  // ---- args-surface opening-Enter guard (finding 2) -----------------------
+  // openArgsSurface flips $data.activeSurface to 'args' SYNCHRONOUSLY from inside
+  // onComboboxChange, which itself runs from the vendored <Combobox>'s Enter
+  // commit (Combobox.rozie onKeydown → selectOption → synchronous `@change`).
+  // That Enter keydown preventDefaults but does NOT stopPropagation, so the SAME
+  // keystroke keeps bubbling up to the frame's @keydown (onPanelKeydown); its
+  // args-branch would then fire submitArgs() on the very key that opened the
+  // surface — instantly @select-ing any command whose args are already valid on
+  // open (a required arg with a `default`, or all-optional args). This flag,
+  // armed in openArgsSurface and disarmed on the next microtask (after the
+  // opening keydown has finished bubbling, before any later keystroke), makes
+  // onPanelKeydown's args-branch Enter — and ONLY Enter; Escape/Backspace stay
+  // live — a no-op for exactly that opening keystroke. A module-level `let`
+  // (never $data) so the read-after-write across the synchronous bubble is exact
+  // ×6 (the requestToken/debounceTimerId precedent); the React emitter hoists it
+  // to useRef. On React the surface flip is async (setState), so onPanelKeydown
+  // reads the pre-flip 'list' surface and never reaches the args-branch on the
+  // opening event anyway — the guard is a correct no-op there.
+  let argsJustOpened = false;
+
   // command-palette-portal-overlay phase — resolveAppendTo(): normalizes the
   // `appendTo` prop into a portal container (or `null` = render in place). A
   // PLAIN function (never $computed — this is read from inside `r-portal`'s
@@ -702,6 +722,54 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // as before (defaultItems is never scored/reordered).
   function filteredItems() {
     return scoreCommands(currentBaseItems(), query(), local.score);
+  }
+
+  // ---- data-cp-index resolution (finding 7a) ------------------------------
+  // commandValue(it) falls back to the item OBJECT when a command carries no
+  // `id` — stamped through :data-cp-value it stringifies to '[object Object]'
+  // for EVERY id-less row, so they all collide and highlightedItem()'s value
+  // scan returns the FIRST match regardless of which row is highlighted (wrong
+  // action menu + wrong @action-select payload). The collision-free
+  // discriminator is the command's POSITIONAL index within filteredItems() (the
+  // pre-group, pre-cap canonical ranked list) — unique by construction, id or
+  // no id, and cap/order-independent (combobox's own row index is its CAPPED
+  // running index, which is why a positional-into-orderedItems() scheme broke
+  // once a section overflowed its cap).
+  //
+  // scoreCommands() returns a FRESH array each call, so cache an identity→index
+  // Map keyed on the (base items, query, score) inputs that fully determine the
+  // ranking — the per-row stamp is then O(1) and the whole render O(n), never
+  // O(n²). Plain module-lets: on the 5 setup-once targets they persist and the
+  // ref-keyed signature invalidates on any input change; on React (the body
+  // re-runs each render, and these are template-only — never hook-referenced —
+  // so hoistModuleLet leaves them as per-render locals) they reset per render,
+  // which is exactly the desired render-scoped cache lifetime.
+  let _cpIdxBase: any = null;
+  let _cpIdxQuery: any = null;
+  let _cpIdxScore: any = null;
+  let _cpIdxMap: any = null;
+  function cpAnchorIndexMap() {
+    const base = currentBaseItems();
+    const query$local = query();
+    const score$local = local.score;
+    if (_cpIdxMap && base === _cpIdxBase && query$local === _cpIdxQuery && score$local === _cpIdxScore) {
+      return _cpIdxMap;
+    }
+    const list = filteredItems();
+    const map = new Map();
+    for (let i = 0; i < list.length; i++) map.set(list[i], i);
+    _cpIdxBase = base;
+    _cpIdxQuery = query$local;
+    _cpIdxScore = score$local;
+    _cpIdxMap = map;
+    return map;
+  }
+  // cpAnchorIndex(option): the option's canonical filteredItems() position,
+  // stamped as data-cp-index on the option-anchor span. -1 for a stray option
+  // not present in the current ranked list (the no-op guard — never expected).
+  function cpAnchorIndex(option: any) {
+    const idx = cpAnchorIndexMap().get(option);
+    return idx === undefined ? -1 : idx;
   }
 
   // ---- native combobox groups (cp-adopts-combobox-groups) -----------------
@@ -1250,42 +1318,60 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     return null;
   }
 
-  // highlightedItem() (260715-vkr, value-keyed resolution): resolve the
+  // highlightedItem() (finding 7a, index-keyed resolution): resolve the
   // combobox's currently-highlighted row back to its command object. Combobox
   // owns `activeIndex` internally (no public model for it), so this locates the
   // ACTIVE option element (`.rozie-combobox-option--active`) off the DOM via
   // `deepQuerySelector` (ROZ123-safe: called only from post-mount handlers,
-  // never eagerly), then reads the `data-cp-value` the palette itself stamped
+  // never eagerly), then reads the `data-cp-index` the palette itself stamped
   // onto the `.rozie-command-palette-option-anchor` span wrapping its #option
-  // re-projection (see the <template #option> comment above) — an
-  // order-independent, cap-independent lookup by VALUE rather than a numeric
-  // position. filteredItems() (not orderedItems()) is the resolution source: it
-  // is the same pre-group-partition list commandValue()/commandGroups() derive
-  // from, so a value match is unambiguous.
+  // re-projection (see the <template #option> comment above) — the row's
+  // POSITIONAL index within filteredItems(), returning `filteredItems()[idx]`.
+  //
+  // This supersedes the earlier value-keyed scan (260715-vkr): `data-cp-value`
+  // stamps commandValue(), which for an id-LESS command falls back to the item
+  // object → '[object Object]' for every id-less row → they all collide and the
+  // value scan returned the FIRST match regardless of which row was highlighted
+  // (the wrong action menu + wrong @action-select payload). The positional
+  // index is unique by construction, id or no id, and — like the value scan it
+  // replaces — order-independent and cap-independent (combobox's own row index
+  // is its CAPPED running index; a positional-into-orderedItems() scheme broke
+  // once a section overflowed its cap). `data-cp-value` is retained as a
+  // secondary sanity cross-check below. filteredItems() (not orderedItems()) is
+  // the index space: it is the same pre-group-partition list
+  // commandValue()/commandGroups() derive from.
   //
   // The '+N more' row renders combobox's OWN `#groupMore` slot, which the
   // palette does not fill — it carries no anchor, so `activeEl.querySelector`
   // finds nothing and this returns null (the no-op path for Assertion B).
-  //
-  // Superseded reasoning (pre-fix): this used to parse the active element's id
-  // (`idBase + '-opt-' + i`, `i` = the combobox's CAPPED `cappedBlocks()._i`
-  // running index) and index into the UNCAPPED `orderedItems()` — correct only
-  // when groupCap left every section's visual order equal to its unfiltered
-  // order, i.e. never once any section overflowed its cap.
   function highlightedItem() {
     const panel = panelRef;
     if (!panel) return null;
     const activeEl: any = deepQuerySelector(panel, '.rozie-combobox-option--active');
+    // No active row element — e.g. a per-level-virtual level whose highlighted
+    // row is windowed out of the rendered DOM (finding 7b). Graceful null →
+    // canOpenActions(null) is false → the actionKey/Right-arrow trigger no-ops.
+    // Full support for actions on a windowed-out row needs a combobox
+    // `activeValue` exposure (a future combobox verb — not added here).
     if (!activeEl) return null;
-    const anchorEl: any = activeEl.querySelector ? activeEl.querySelector('[data-cp-value]') : null;
+    const anchorEl: any = activeEl.querySelector ? activeEl.querySelector('[data-cp-index]') : null;
+    // No anchor — combobox's own '+N more' expand row renders combobox's
+    // #groupMore (which the palette does not fill), so it carries no anchor →
+    // null (not a command).
     if (!anchorEl) return null;
-    const value = anchorEl.getAttribute('data-cp-value');
-    if (value == null) return null;
+    const rawIndex = anchorEl.getAttribute('data-cp-index');
+    if (rawIndex == null) return null;
+    const idx = Number(rawIndex);
+    if (!Number.isInteger(idx) || idx < 0) return null;
     const list = filteredItems();
-    for (let i = 0; i < list.length; i++) {
-      if (String(commandValue(list[i])) === value) return list[i];
-    }
-    return null;
+    if (idx >= list.length) return null;
+    const item = list[idx];
+    // Secondary sanity (finding 7a): the stamped value must still agree — guards
+    // a torn frame where the stamped DOM index outran a just-changed list. A
+    // mismatch degrades to null (no menu) rather than opening the wrong command.
+    const value = anchorEl.getAttribute('data-cp-value');
+    if (value != null && String(commandValue(item)) !== value) return null;
+    return item;
   }
 
   // searchInputEl(): the vendored combobox's underlying `<input role="combobox">`
@@ -1438,6 +1524,15 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
       argList
     });
     setActiveSurface('args');
+    // finding 2: arm the opening-Enter guard, disarmed on the next microtask —
+    // after the opening keydown has finished bubbling through onPanelKeydown but
+    // before any later user keystroke. Promise-based (SSR-safe, the
+    // beginLevelLoad microtask precedent); a real Enter to submit lands in a
+    // strictly later task.
+    argsJustOpened = true;
+    Promise.resolve().then(() => {
+      argsJustOpened = false;
+    });
     comboboxRef?.pinOpen(true);
     if (typeof requestAnimationFrame !== 'undefined') {
       requestAnimationFrame(() => {
@@ -1665,6 +1760,10 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     if (activeSurface() === 'args') {
       if (e.key === 'Enter') {
         e.preventDefault();
+        // finding 2: swallow the very Enter that opened this surface (it bubbled
+        // here from the vendored combobox's synchronous Enter commit). A real
+        // submit needs a fresh Enter, after the guard disarms next microtask.
+        if (argsJustOpened) return;
         submitArgs();
         return;
       }
@@ -1743,7 +1842,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
         </div></Show>}<div class={"rozie-command-palette-list-region" + " " + rozieClass({ 'rozie-command-palette-list-region--inert': activeSurface() === 'args' })} aria-hidden={!!(activeSurface() === 'args')} data-rozie-s-768cad96="">
         
         <Combobox aria-label={local.ariaLabel} ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={local.groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
-            <span class={"rozie-command-palette-option-anchor"} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96="">
+            <span class={"rozie-command-palette-option-anchor"} data-cp-index={rozieAttr(cpAnchorIndex(option))} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96="">
             {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query()) }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {<Show when={(_props.iconSlot ?? _props.slots?.['icon'])}><span class={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
                   {(_props.iconSlot ?? _props.slots?.['icon'])?.({ option })}
@@ -1798,7 +1897,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
         </div></Show>}<div class={"rozie-command-palette-list-region" + " " + rozieClass({ 'rozie-command-palette-list-region--inert': activeSurface() === 'args' })} aria-hidden={!!(activeSurface() === 'args')} data-rozie-s-768cad96="">
         
         <Combobox aria-label={local.ariaLabel} ref={(el) => { comboboxRef = el as ComboboxHandle; }} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={local.groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} idBase={local.idBase} value={activeValue()} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" optionSlot={({ option, index, active, selected, disabled }) => (<>
-            <span class={"rozie-command-palette-option-anchor"} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96="">
+            <span class={"rozie-command-palette-option-anchor"} data-cp-index={rozieAttr(cpAnchorIndex(option))} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96="">
             {(_props.optionSlot ?? _props.slots?.['option'])?.({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query()) }) ?? <div class={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {<Show when={(_props.iconSlot ?? _props.slots?.['icon'])}><span class={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
                   {(_props.iconSlot ?? _props.slots?.['icon'])?.({ option })}

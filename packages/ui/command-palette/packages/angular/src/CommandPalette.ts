@@ -152,7 +152,7 @@ function __rozieAttr(v: unknown): string | null {
     }<div class="rozie-command-palette-list-region" [ngClass]="{ 'rozie-command-palette-list-region--inert': activeSurface() === 'args' }" [attr.aria-hidden]="!!(activeSurface() === 'args')">
         
         <rozie-combobox #combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="orderedItems()" [groups]="commandGroups()" [groupCap]="groupCap()" [virtual]="currentVirtual()" [maxHeight]="currentVirtualMaxHeight()" [estimateRowHeight]="currentVirtualEstimateRowHeight()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="currentPlaceholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
-            <span class="rozie-command-palette-option-anchor" [attr.data-cp-value]="rozieAttr(commandValue(option))">
+            <span class="rozie-command-palette-option-anchor" [attr.data-cp-index]="rozieAttr(cpAnchorIndex(option))" [attr.data-cp-value]="rozieAttr(commandValue(option))">
             @if ((optionTpl ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }, option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }" />
     } @else {
@@ -727,6 +727,7 @@ export class CommandPalette {
 
   requestToken = 0;
   debounceTimerId: any = null;
+  argsJustOpened = false;
   resolveAppendTo = (to: any) => {
     if (!to) return null;
     if (typeof document === 'undefined') return null;
@@ -788,6 +789,30 @@ export class CommandPalette {
   };
   breadcrumbStack = () => buildBreadcrumb(this.levelStack(), this.ariaLabel());
   filteredItems = () => scoreCommands(this.currentBaseItems(), this.query(), this.score());
+  _cpIdxBase: any = null;
+  _cpIdxQuery: any = null;
+  _cpIdxScore: any = null;
+  _cpIdxMap: any = null;
+  cpAnchorIndexMap = () => {
+    const base = this.currentBaseItems();
+    const query = this.query();
+    const score = this.score();
+    if (this._cpIdxMap && base === this._cpIdxBase && query === this._cpIdxQuery && score === this._cpIdxScore) {
+      return this._cpIdxMap;
+    }
+    const list = this.filteredItems();
+    const map = new Map();
+    for (let i = 0; i < list.length; i++) map.set(list[i], i);
+    this._cpIdxBase = base;
+    this._cpIdxQuery = query;
+    this._cpIdxScore = score;
+    this._cpIdxMap = map;
+    return map;
+  };
+  cpAnchorIndex = (option: any) => {
+    const idx = this.cpAnchorIndexMap().get(option);
+    return idx === undefined ? -1 : idx;
+  };
   groupedView = () => deriveCommandGroups(this.filteredItems());
   orderedItems = () => this.groupedView().ordered;
   commandGroups = () => this.groupedView().groups;
@@ -1088,16 +1113,30 @@ export class CommandPalette {
     const panel = this.panel()?.nativeElement;
     if (!panel) return null;
     const activeEl: any = this.deepQuerySelector(panel, '.rozie-combobox-option--active');
+    // No active row element — e.g. a per-level-virtual level whose highlighted
+    // row is windowed out of the rendered DOM (finding 7b). Graceful null →
+    // canOpenActions(null) is false → the actionKey/Right-arrow trigger no-ops.
+    // Full support for actions on a windowed-out row needs a combobox
+    // `activeValue` exposure (a future combobox verb — not added here).
     if (!activeEl) return null;
-    const anchorEl: any = activeEl.querySelector ? activeEl.querySelector('[data-cp-value]') : null;
+    const anchorEl: any = activeEl.querySelector ? activeEl.querySelector('[data-cp-index]') : null;
+    // No anchor — combobox's own '+N more' expand row renders combobox's
+    // #groupMore (which the palette does not fill), so it carries no anchor →
+    // null (not a command).
     if (!anchorEl) return null;
-    const value = anchorEl.getAttribute('data-cp-value');
-    if (value == null) return null;
+    const rawIndex = anchorEl.getAttribute('data-cp-index');
+    if (rawIndex == null) return null;
+    const idx = Number(rawIndex);
+    if (!Number.isInteger(idx) || idx < 0) return null;
     const list = this.filteredItems();
-    for (let i = 0; i < list.length; i++) {
-      if (String(this.commandValue(list[i])) === value) return list[i];
-    }
-    return null;
+    if (idx >= list.length) return null;
+    const item = list[idx];
+    // Secondary sanity (finding 7a): the stamped value must still agree — guards
+    // a torn frame where the stamped DOM index outran a just-changed list. A
+    // mismatch degrades to null (no menu) rather than opening the wrong command.
+    const value = anchorEl.getAttribute('data-cp-value');
+    if (value != null && String(this.commandValue(item)) !== value) return null;
+    return item;
   };
   searchInputEl = () => {
     const panel = this.panel()?.nativeElement;
@@ -1200,6 +1239,15 @@ export class CommandPalette {
       argList
     });
     this.activeSurface.set('args');
+    // finding 2: arm the opening-Enter guard, disarmed on the next microtask —
+    // after the opening keydown has finished bubbling through onPanelKeydown but
+    // before any later user keystroke. Promise-based (SSR-safe, the
+    // beginLevelLoad microtask precedent); a real Enter to submit lands in a
+    // strictly later task.
+    this.argsJustOpened = true;
+    Promise.resolve().then(() => {
+      this.argsJustOpened = false;
+    });
     this.combobox()?.pinOpen(true);
     if (typeof requestAnimationFrame !== 'undefined') {
       requestAnimationFrame(() => {
@@ -1338,6 +1386,10 @@ export class CommandPalette {
     if (__activeSurface === 'args') {
       if (e.key === 'Enter') {
         e.preventDefault();
+        // finding 2: swallow the very Enter that opened this surface (it bubbled
+        // here from the vendored combobox's synchronous Enter commit). A real
+        // submit needs a fresh Enter, after the guard disarms next microtask.
+        if (this.argsJustOpened) return;
         this.submitArgs();
         return;
       }

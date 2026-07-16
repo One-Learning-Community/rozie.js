@@ -755,7 +755,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
     </div>` : nothing}<div class="${Object.entries({ "rozie-command-palette-list-region": true, 'rozie-command-palette-list-region--inert': this._activeSurface.value === 'args' }).filter(([, v]) => v).map(([k]) => k).join(' ')}" aria-hidden=${!!(this._activeSurface.value === 'args')} data-rozie-s-768cad96>
     
     <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .virtual=${this.currentVirtual()} .maxHeight=${this.currentVirtualMaxHeight()} .estimateRowHeight=${this.currentVirtualEstimateRowHeight()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
-        <span class="rozie-command-palette-option-anchor" data-cp-value=${rozieAttr(this.commandValue(scope.option))} data-rozie-s-768cad96>
+        <span class="rozie-command-palette-option-anchor" data-cp-index=${rozieAttr(this.cpAnchorIndex(scope.option))} data-cp-value=${rozieAttr(this.commandValue(scope.option))} data-rozie-s-768cad96>
         ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}); } catch { return '{}'; } })()}>
           <div class="rozie-command-palette-option" data-rozie-s-768cad96>
             ${this._hasSlotIcon || this.icon !== undefined ? html`<span class="rozie-command-palette-option-icon" data-rozie-s-768cad96>
@@ -810,6 +810,8 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   requestToken = 0;
 
   debounceTimerId: any = null;
+
+  argsJustOpened = false;
 
   resolveAppendTo = (to: any) => {
   if (!to) return null;
@@ -886,6 +888,36 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   breadcrumbStack = () => buildBreadcrumb(this._levelStack.value, this.ariaLabel);
 
   filteredItems = () => scoreCommands(this.currentBaseItems(), this.query, this.score);
+
+  _cpIdxBase: any = null;
+
+  _cpIdxQuery: any = null;
+
+  _cpIdxScore: any = null;
+
+  _cpIdxMap: any = null;
+
+  cpAnchorIndexMap = () => {
+  const base = this.currentBaseItems();
+  const query = this.query;
+  const score = this.score;
+  if (this._cpIdxMap && base === this._cpIdxBase && query === this._cpIdxQuery && score === this._cpIdxScore) {
+    return this._cpIdxMap;
+  }
+  const list = this.filteredItems();
+  const map = new Map();
+  for (let i = 0; i < list.length; i++) map.set(list[i], i);
+  this._cpIdxBase = base;
+  this._cpIdxQuery = query;
+  this._cpIdxScore = score;
+  this._cpIdxMap = map;
+  return map;
+};
+
+  cpAnchorIndex = (option: any) => {
+  const idx = this.cpAnchorIndexMap().get(option);
+  return idx === undefined ? -1 : idx;
+};
 
   groupedView = () => deriveCommandGroups(this.filteredItems());
 
@@ -1235,16 +1267,30 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   const panel = this._refPanel;
   if (!panel) return null;
   const activeEl: any = this.deepQuerySelector(panel, '.rozie-combobox-option--active');
+  // No active row element — e.g. a per-level-virtual level whose highlighted
+  // row is windowed out of the rendered DOM (finding 7b). Graceful null →
+  // canOpenActions(null) is false → the actionKey/Right-arrow trigger no-ops.
+  // Full support for actions on a windowed-out row needs a combobox
+  // `activeValue` exposure (a future combobox verb — not added here).
   if (!activeEl) return null;
-  const anchorEl: any = activeEl.querySelector ? activeEl.querySelector('[data-cp-value]') : null;
+  const anchorEl: any = activeEl.querySelector ? activeEl.querySelector('[data-cp-index]') : null;
+  // No anchor — combobox's own '+N more' expand row renders combobox's
+  // #groupMore (which the palette does not fill), so it carries no anchor →
+  // null (not a command).
   if (!anchorEl) return null;
-  const value = anchorEl.getAttribute('data-cp-value');
-  if (value == null) return null;
+  const rawIndex = anchorEl.getAttribute('data-cp-index');
+  if (rawIndex == null) return null;
+  const idx = Number(rawIndex);
+  if (!Number.isInteger(idx) || idx < 0) return null;
   const list = this.filteredItems();
-  for (let i = 0; i < list.length; i++) {
-    if (String(this.commandValue(list[i])) === value) return list[i];
-  }
-  return null;
+  if (idx >= list.length) return null;
+  const item = list[idx];
+  // Secondary sanity (finding 7a): the stamped value must still agree — guards
+  // a torn frame where the stamped DOM index outran a just-changed list. A
+  // mismatch degrades to null (no menu) rather than opening the wrong command.
+  const value = anchorEl.getAttribute('data-cp-value');
+  if (value != null && String(this.commandValue(item)) !== value) return null;
+  return item;
 };
 
   searchInputEl = () => {
@@ -1354,6 +1400,15 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
     argList
   };
   this._activeSurface.value = 'args';
+  // finding 2: arm the opening-Enter guard, disarmed on the next microtask —
+  // after the opening keydown has finished bubbling through onPanelKeydown but
+  // before any later user keystroke. Promise-based (SSR-safe, the
+  // beginLevelLoad microtask precedent); a real Enter to submit lands in a
+  // strictly later task.
+  this.argsJustOpened = true;
+  Promise.resolve().then(() => {
+    this.argsJustOpened = false;
+  });
   this._refCombobox?.pinOpen(true);
   if (typeof requestAnimationFrame !== 'undefined') {
     requestAnimationFrame(() => {
@@ -1509,6 +1564,10 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   if (this._activeSurface.value === 'args') {
     if (e.key === 'Enter') {
       e.preventDefault();
+      // finding 2: swallow the very Enter that opened this surface (it bubbled
+      // here from the vendored combobox's synchronous Enter commit). A real
+      // submit needs a fresh Enter, after the guard disarms next microtask.
+      if (this.argsJustOpened) return;
       this.submitArgs();
       return;
     }
