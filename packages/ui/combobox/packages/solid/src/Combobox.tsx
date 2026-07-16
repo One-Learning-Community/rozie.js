@@ -250,20 +250,11 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   onMount(() => {
     syncQueryToValue();
     syncRows();
-    // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-    // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
-    // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
-    // container already exists here for the virtualizer to attach to.
-    if (local.virtual) {
-      // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
-      // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
-      // node is null on Solid/Lit, leaving the virtualizer with no scroll element.
-      gridScrollEl = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-combobox-list') : null;
-      virtualizer = new Virtualizer(virtualizerOptions());
-      virtualizerCleanup = virtualizer._didMount();
-      setWindowVer(windowVer() + 1);
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
-    }
+    didMount = true;
+    // Routes through the SAME buildVirtualizer() the virtual $watch calls below
+    // (VIRT-BUILD) — one construction site, so the mount path cannot drift from the flip
+    // path.
+    if (local.virtual) buildVirtualizer();
   });
   onCleanup(() => {
     if (virtualizerCleanup) virtualizerCleanup();
@@ -279,6 +270,14 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
       virtualizer._willUpdate();
       setWindowVer(windowVer() + 1);
       scheduleRemeasure();
+    }
+  })()), { defer: true }));
+  createEffect(on(() => (() => local.virtual)(), (v) => untrack(() => (() => {
+    if (expandedGroups() && Object.keys(expandedGroups()).length) setExpandedGroups({});
+    if (local.virtual) {
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => buildVirtualizer());else setTimeout(() => buildVirtualizer(), 0);
+    } else {
+      teardownVirtualizer();
     }
   })()), { defer: true }));
   let inputElRef: HTMLElement | null = null;
@@ -576,6 +575,12 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   // (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
   // write-in-$onMount/read-in-several-others cross-function access pattern above.
   let pinned = false;
+  // Non-reactive per-instance flag (combobox-virtual-reactivity phase): set true once
+  // $onMount has run; read by windowedView() below so the blank-frame fallback (D-4) only
+  // fires on a genuine RUNTIME flip — a virtual:true-at-mount (never-flipped) consumer's
+  // first paint stays byte-stable (windowedRows()'s own pre-mount `[]` still applies before
+  // didMount flips true). Mirrors the same write-in-$onMount/read-elsewhere holder class.
+  let didMount = false;
 
   // ---- derived view (plain functions, uniform ×6) ------------------------
   // The filtered option list, each carrying its filtered-list index `_i`, a stable
@@ -669,6 +674,34 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
   // rowList[vi.index] resolves to the same wrapper the count windows over.
   function windowSource() {
     return filteredOptions();
+  }
+
+  // windowedView() (combobox-virtual-reactivity, VIRT-FALLBACK): the combobox-side
+  // blank-frame fallback for the mid-flip frame. While `virtual` is on but the virtualizer
+  // has not yet (re)attached (didMount-gated, so the never-flipped virtual:true-at-mount
+  // first paint is untouched — windowedRows()'s own pre-mount `[]` still governs it),
+  // render the UN-WINDOWED full windowSource() slice mapped to the `{ vi: { index }, row }`
+  // shape the windowed template consumes (`wr.vi.index` resolves to the wrapper's own `_i`,
+  // since windowSource() IS the filtered/indexed list navRows()/activeIndex already walk).
+  // Once the virtualizer is built, delegates to windowedRows() UNCHANGED — byte-identical
+  // to today's steady windowed state. Entirely combobox-side: @rozie-ui/headless-core/
+  // windowing.rzts is untouched, preserving data-table's B13 A==B byte-identity + its
+  // empty-diff regen.
+  function windowedView() {
+    // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}) — touch windowVer at the
+    // TOP, mirroring windowedRows()'s own subscribe-first discipline (windowing.rzts), so
+    // the accessor re-runs when buildVirtualizer()/kickWindow() bump windowVer once the
+    // virtualizer attaches — the transition OUT of this fallback and into windowedRows().
+    void windowVer();
+    if (local.virtual && !virtualizer && didMount) {
+      return windowSource().map((row: any) => ({
+        vi: {
+          index: row._i
+        },
+        row
+      }));
+    }
+    return windowedRows();
   }
 
   // ---- native option grouping render helpers (combobox-native-groups) ---------------
@@ -1040,6 +1073,41 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(attempts - 1));else setTimeout(() => kickWindow(attempts - 1), 16);
     }
   }
+
+  // buildVirtualizer() (combobox-virtual-reactivity, VIRT-BUILD): the SINGLE virtualizer
+  // construction site — called from $onMount below (mount-time virtual:true) AND from the
+  // virtual $watch further down (a runtime false→true flip), so the mount path can never
+  // drift from the flip path. Guarded so a build queued (rAF-deferred by the $watch) that
+  // fires AFTER a flip-back is a no-op (rapid-flip idempotence), and so calling it twice
+  // never double-constructs.
+  function buildVirtualizer() {
+    if (!local.virtual || virtualizer) return;
+    // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
+    // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
+    // node is null on Solid/Lit, leaving the virtualizer with no scroll element. The windowed
+    // popup stays mounted whenever virtual (r-if="$props.virtual"); it is only hidden via
+    // display:none when closed (CR-01), so the .rozie-combobox-list scroll container already
+    // exists here for the virtualizer to attach to.
+    gridScrollEl = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-combobox-list') : null;
+    virtualizer = new Virtualizer(virtualizerOptions());
+    virtualizerCleanup = virtualizer._didMount();
+    setWindowVer(windowVer() + 1);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
+  }
+
+  // teardownVirtualizer() (VIRT-TEARDOWN): runs the SAME per-instance cleanup fn
+  // $onUnmount invokes below, then nulls the instance state + bumps windowVer so the
+  // windowed template branch (still mounted while $props.virtual — CR-01) re-derives to
+  // the pre-construction fallback state instead of holding a stale virtualizer. This is
+  // the true→false ResizeObserver-leak fix: previously ONLY $onUnmount ever called
+  // virtualizerCleanup, so a runtime flip to non-virtual left the observer live.
+  function teardownVirtualizer() {
+    if (virtualizerCleanup) virtualizerCleanup();
+    virtualizer = null;
+    virtualizerCleanup = null;
+    gridScrollEl = null;
+    setWindowVer(windowVer() + 1);
+  }
   // focus() — focus the input (accepted ROZ137 Lit override). clear() — reset the
   // selection + query. seedQuery(text) — imperative-only: write the input text
   // (and therefore filteredOptions()'s filter) without touching the `value`
@@ -1109,7 +1177,7 @@ export default function Combobox(_props: ComboboxProps): JSX.Element {
         </li></Show>}</ul></Show>}{<Show when={local.virtual}><ul class={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" style={parseInlineStyle((isOpen() ? '' : 'display:none;') + (local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + local.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a="">
         <li class={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a="" />
 
-        <Key each={windowedRows() as readonly any[]} by={(wr) => wr.row.id}>{(wr) => <li data-index={rozieAttr(wr().vi.index)} role="option" aria-selected={wr().row.value === value()} aria-disabled={!!wr().row.disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': wr().vi.index === activeIndex(), 'rozie-combobox-option--selected': wr().row.value === value(), 'rozie-combobox-option--disabled': wr().row.disabled })} id={rozieAttr(optId(wr().vi.index))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(wr().row); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(wr().vi.index); }} data-rozie-s-9546115a="">
+        <Key each={windowedView() as readonly any[]} by={(wr) => wr.row.id}>{(wr) => <li data-index={rozieAttr(wr().vi.index)} role="option" aria-selected={wr().row.value === value()} aria-disabled={!!wr().row.disabled} class={"rozie-combobox-option" + " " + rozieClass({ 'rozie-combobox-option--active': wr().vi.index === activeIndex(), 'rozie-combobox-option--selected': wr().row.value === value(), 'rozie-combobox-option--disabled': wr().row.disabled })} id={rozieAttr(optId(wr().vi.index))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { $event.preventDefault(); selectOption(wr().row); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLLIElement; target: Element }) => { setActiveIndex(wr().vi.index); }} data-rozie-s-9546115a="">
           {(_props.optionSlot ?? _props.slots?.['option'])?.({ option: wr().row.option, index: wr().vi.index, active: wr().vi.index === activeIndex(), selected: wr().row.value === value(), disabled: wr().row.disabled }) ?? rozieDisplay(wr().row.label)}
         </li>}</Key>
 

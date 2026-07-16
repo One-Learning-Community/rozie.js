@@ -39,7 +39,7 @@
     </li></ul><ul v-if="props.virtual" class="rozie-combobox-list rozie-combobox-list--virtual" :id="listId()" role="listbox" :style="(isOpen ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto')">
     <li class="rozie-combobox-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></li>
 
-    <li v-for="wr in windowedRows()" :key="wr.row.id" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': wr.vi.index === activeIndex, 'rozie-combobox-option--selected': wr.row.value === value, 'rozie-combobox-option--disabled': wr.row.disabled }]" :id="optId(wr.vi.index)" :data-index="wr.vi.index" role="option" :aria-selected="wr.row.value === value" :aria-disabled="!!wr.row.disabled" @mousedown.prevent="selectOption(wr.row)" @mouseenter="activeIndex = wr.vi.index">
+    <li v-for="wr in windowedView()" :key="wr.row.id" :class="['rozie-combobox-option', { 'rozie-combobox-option--active': wr.vi.index === activeIndex, 'rozie-combobox-option--selected': wr.row.value === value, 'rozie-combobox-option--disabled': wr.row.disabled }]" :id="optId(wr.vi.index)" :data-index="wr.vi.index" role="option" :aria-selected="wr.row.value === value" :aria-disabled="!!wr.row.disabled" @mousedown.prevent="selectOption(wr.row)" @mouseenter="activeIndex = wr.vi.index">
       <slot name="option" :option="wr.row.option" :index="wr.vi.index" :active="wr.vi.index === activeIndex" :selected="wr.row.value === value" :disabled="wr.row.disabled">{{ wr.row.label }}</slot>
     </li>
 
@@ -517,6 +517,12 @@ let remeasurePending = false;
 // (e.g. command-palette's action flyout) holds real DOM focus. Mirrors the virtualizer
 // write-in-$onMount/read-in-several-others cross-function access pattern above.
 let pinned = false;
+// Non-reactive per-instance flag (combobox-virtual-reactivity phase): set true once
+// $onMount has run; read by windowedView() below so the blank-frame fallback (D-4) only
+// fires on a genuine RUNTIME flip — a virtual:true-at-mount (never-flipped) consumer's
+// first paint stays byte-stable (windowedRows()'s own pre-mount `[]` still applies before
+// didMount flips true). Mirrors the same write-in-$onMount/read-elsewhere holder class.
+let didMount = false;
 // ---- derived view (plain functions, uniform ×6) ------------------------
 // The filtered option list, each carrying its filtered-list index `_i`, a stable
 // windowing key `id`, and the RAW source option (`option`) so `@change` + the
@@ -607,6 +613,33 @@ const filteredOptions = () => {
 // list (the same wrapper rows the template iterates). Kept === $data.rows so the math's
 // rowList[vi.index] resolves to the same wrapper the count windows over.
 const windowSource = () => filteredOptions();
+// windowedView() (combobox-virtual-reactivity, VIRT-FALLBACK): the combobox-side
+// blank-frame fallback for the mid-flip frame. While `virtual` is on but the virtualizer
+// has not yet (re)attached (didMount-gated, so the never-flipped virtual:true-at-mount
+// first paint is untouched — windowedRows()'s own pre-mount `[]` still governs it),
+// render the UN-WINDOWED full windowSource() slice mapped to the `{ vi: { index }, row }`
+// shape the windowed template consumes (`wr.vi.index` resolves to the wrapper's own `_i`,
+// since windowSource() IS the filtered/indexed list navRows()/activeIndex already walk).
+// Once the virtualizer is built, delegates to windowedRows() UNCHANGED — byte-identical
+// to today's steady windowed state. Entirely combobox-side: @rozie-ui/headless-core/
+// windowing.rzts is untouched, preserving data-table's B13 A==B byte-identity + its
+// empty-diff regen.
+const windowedView = () => {
+  // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}) — touch windowVer at the
+  // TOP, mirroring windowedRows()'s own subscribe-first discipline (windowing.rzts), so
+  // the accessor re-runs when buildVirtualizer()/kickWindow() bump windowVer once the
+  // virtualizer attaches — the transition OUT of this fallback and into windowedRows().
+  void windowVer.value;
+  if (props.virtual && !virtualizer && didMount) {
+    return windowSource().map((row: any) => ({
+      vi: {
+        index: row._i
+      },
+      row
+    }));
+  }
+  return windowedRows();
+};
 // ---- native option grouping render helpers (combobox-native-groups) ---------------
 // groupBlocks(): re-partition the ALREADY group-ordered filteredOptions() wrappers into
 // CONTIGUOUS runs by wrapper.group (trivial + guarantees `_i` alignment, since `ordered`
@@ -940,6 +973,39 @@ const kickWindow = (attempts: any) => {
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(attempts - 1));else setTimeout(() => kickWindow(attempts - 1), 16);
   }
 };
+// buildVirtualizer() (combobox-virtual-reactivity, VIRT-BUILD): the SINGLE virtualizer
+// construction site — called from $onMount below (mount-time virtual:true) AND from the
+// virtual $watch further down (a runtime false→true flip), so the mount path can never
+// drift from the flip path. Guarded so a build queued (rAF-deferred by the $watch) that
+// fires AFTER a flip-back is a no-op (rapid-flip idempotence), and so calling it twice
+// never double-constructs.
+const buildVirtualizer = () => {
+  if (!props.virtual || virtualizer) return;
+  // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
+  // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
+  // node is null on Solid/Lit, leaving the virtualizer with no scroll element. The windowed
+  // popup stays mounted whenever virtual (r-if="$props.virtual"); it is only hidden via
+  // display:none when closed (CR-01), so the .rozie-combobox-list scroll container already
+  // exists here for the virtualizer to attach to.
+  gridScrollEl = __rozieRootRef.value ? __rozieRootRef.value!.querySelector('.rozie-combobox-list') : null;
+  virtualizer = new Virtualizer(virtualizerOptions());
+  virtualizerCleanup = virtualizer._didMount();
+  windowVer.value = windowVer.value + 1;
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
+};
+// teardownVirtualizer() (VIRT-TEARDOWN): runs the SAME per-instance cleanup fn
+// $onUnmount invokes below, then nulls the instance state + bumps windowVer so the
+// windowed template branch (still mounted while $props.virtual — CR-01) re-derives to
+// the pre-construction fallback state instead of holding a stale virtualizer. This is
+// the true→false ResizeObserver-leak fix: previously ONLY $onUnmount ever called
+// virtualizerCleanup, so a runtime flip to non-virtual left the observer live.
+const teardownVirtualizer = () => {
+  if (virtualizerCleanup) virtualizerCleanup();
+  virtualizer = null;
+  virtualizerCleanup = null;
+  gridScrollEl = null;
+  windowVer.value = windowVer.value + 1;
+};
 // focus() — focus the input (accepted ROZ137 Lit override). clear() — reset the
 // selection + query. seedQuery(text) — imperative-only: write the input text
 // (and therefore filteredOptions()'s filter) without touching the `value`
@@ -969,20 +1035,11 @@ const pinOpen = (v: any) => {
 onMounted(() => {
   syncQueryToValue();
   syncRows();
-  // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-  // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
-  // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
-  // container already exists here for the virtualizer to attach to.
-  if (props.virtual) {
-    // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
-    // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
-    // node is null on Solid/Lit, leaving the virtualizer with no scroll element.
-    gridScrollEl = __rozieRootRef.value ? __rozieRootRef.value!.querySelector('.rozie-combobox-list') : null;
-    virtualizer = new Virtualizer(virtualizerOptions());
-    virtualizerCleanup = virtualizer._didMount();
-    windowVer.value = windowVer.value + 1;
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
-  }
+  didMount = true;
+  // Routes through the SAME buildVirtualizer() the virtual $watch calls below
+  // (VIRT-BUILD) — one construction site, so the mount path cannot drift from the flip
+  // path.
+  if (props.virtual) buildVirtualizer();
 });
 onBeforeUnmount(() => {
   if (virtualizerCleanup) virtualizerCleanup();
@@ -999,6 +1056,14 @@ watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () =
     virtualizer._willUpdate();
     windowVer.value = windowVer.value + 1;
     scheduleRemeasure();
+  }
+});
+watch(() => props.virtual, () => {
+  if (expandedGroups.value && Object.keys(expandedGroups.value).length) expandedGroups.value = {};
+  if (props.virtual) {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => buildVirtualizer());else setTimeout(() => buildVirtualizer(), 0);
+  } else {
+    teardownVirtualizer();
   }
 });
 

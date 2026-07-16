@@ -246,6 +246,7 @@ export default class Combobox extends SignalWatcher(LitElement) {
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieWatchInitial_1 = true;
+private __rozieFirstUpdateDone = false;
 
   @state() private _hasSlotOption = false;
   @queryAssignedElements({ slot: 'option', flatten: true }) private _slotOptionElements!: Element[];
@@ -340,24 +341,26 @@ private __rozieWatchInitial_1 = true;
 
     this.syncQueryToValue();
     this.syncRows();
-    // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-    // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
-    // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
-    // container already exists here for the virtualizer to attach to.
-    // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-    // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
-    // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
-    // container already exists here for the virtualizer to attach to.
-    if (this.virtual) {
-      // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
-      // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
-      // node is null on Solid/Lit, leaving the virtualizer with no scroll element.
-      this.gridScrollEl = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rozie-combobox-list') : null;
-      this.virtualizer = new Virtualizer(this.virtualizerOptions());
-      this.virtualizerCleanup = this.virtualizer._didMount();
-      this._windowVer.value = this._windowVer.value + 1;
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(8));else setTimeout(() => this.kickWindow(8), 0);
-    }
+    this.didMount = true;
+    // Routes through the SAME buildVirtualizer() the virtual $watch calls below
+    // (VIRT-BUILD) — one construction site, so the mount path cannot drift from the flip
+    // path.
+    // Routes through the SAME buildVirtualizer() the virtual $watch calls below
+    // (VIRT-BUILD) — one construction site, so the mount path cannot drift from the flip
+    // path.
+    if (this.virtual) this.buildVirtualizer();
+  }
+
+  updated(changedProperties: Map<string, unknown>): void {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('virtual'))) { const __watchVal = (() => this.virtual)(); (() => {
+      if (this._expandedGroups.value && Object.keys(this._expandedGroups.value).length) this._expandedGroups.value = {};
+      if (this.virtual) {
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.buildVirtualizer());else setTimeout(() => this.buildVirtualizer(), 0);
+      } else {
+        this.teardownVirtualizer();
+      }
+    })(); }
+    this.__rozieFirstUpdateDone = true;
   }
 
   disconnectedCallback(): void {
@@ -419,7 +422,7 @@ private __rozieWatchInitial_1 = true;
     </li>` : nothing}</ul>` : nothing}${this.virtual ? html`<ul class="rozie-combobox-list rozie-combobox-list--virtual" id=${rozieAttr(this.listId())} role="listbox" style=${rozieStyle((this._isOpen.value ? '' : 'display:none;') + (this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + this.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a>
     <li class="rozie-combobox-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padTop() + 'px')} data-rozie-s-9546115a></li>
 
-    ${repeat<any>(this.windowedRows(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<li class="${Object.entries({ "rozie-combobox-option": true, 'rozie-combobox-option--active': wr.vi.index === this._activeIndex.value, 'rozie-combobox-option--selected': wr.row.value === this.value, 'rozie-combobox-option--disabled': wr.row.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(wr.row.id)} id=${rozieAttr(this.optId(wr.vi.index))} data-index=${rozieAttr(wr.vi.index)} role="option" aria-selected=${wr.row.value === this.value} aria-disabled=${!!wr.row.disabled} @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(wr.row); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = wr.vi.index; }} data-rozie-s-9546115a>
+    ${repeat<any>(this.windowedView(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<li class="${Object.entries({ "rozie-combobox-option": true, 'rozie-combobox-option--active': wr.vi.index === this._activeIndex.value, 'rozie-combobox-option--selected': wr.row.value === this.value, 'rozie-combobox-option--disabled': wr.row.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(wr.row.id)} id=${rozieAttr(this.optId(wr.vi.index))} data-index=${rozieAttr(wr.vi.index)} role="option" aria-selected=${wr.row.value === this.value} aria-disabled=${!!wr.row.disabled} @mousedown=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { $event.preventDefault(); this.selectOption(wr.row); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLLIElement; target: HTMLLIElement }) => { this._activeIndex.value = wr.vi.index; }} data-rozie-s-9546115a>
       ${this.option !== undefined ? this.option({option: wr.row.option, index: wr.vi.index, active: wr.vi.index === this._activeIndex.value, selected: wr.row.value === this.value, disabled: wr.row.disabled}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: wr.row.option, index: wr.vi.index, active: wr.vi.index === this._activeIndex.value, selected: wr.row.value === this.value, disabled: wr.row.disabled}); } catch { return '{}'; } })()}>${rozieDisplay(wr.row.label)}</slot>`}
     </li>`)}
 
@@ -632,6 +635,8 @@ private __rozieWatchInitial_1 = true;
 
   pinned = false;
 
+  didMount = false;
+
   foCache = {
   optsRef: null,
   q: null,
@@ -699,6 +704,23 @@ private __rozieWatchInitial_1 = true;
 };
 
   windowSource = () => this.filteredOptions();
+
+  windowedView = () => {
+  // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}) — touch windowVer at the
+  // TOP, mirroring windowedRows()'s own subscribe-first discipline (windowing.rzts), so
+  // the accessor re-runs when buildVirtualizer()/kickWindow() bump windowVer once the
+  // virtualizer attaches — the transition OUT of this fallback and into windowedRows().
+  void this._windowVer.value;
+  if (this.virtual && !this.virtualizer && this.didMount) {
+    return this.windowSource().map((row: any) => ({
+      vi: {
+        index: row._i
+      },
+      row
+    }));
+  }
+  return this.windowedRows();
+};
 
   groupBlocks = () => {
   const wrappers = this.filteredOptions();
@@ -988,6 +1010,29 @@ private __rozieWatchInitial_1 = true;
   if (this.windowedRows().length === 0 && attempts > 0) {
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(attempts - 1));else setTimeout(() => this.kickWindow(attempts - 1), 16);
   }
+};
+
+  buildVirtualizer = () => {
+  if (!this.virtual || this.virtualizer) return;
+  // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
+  // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
+  // node is null on Solid/Lit, leaving the virtualizer with no scroll element. The windowed
+  // popup stays mounted whenever virtual (r-if="$props.virtual"); it is only hidden via
+  // display:none when closed (CR-01), so the .rozie-combobox-list scroll container already
+  // exists here for the virtualizer to attach to.
+  this.gridScrollEl = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rozie-combobox-list') : null;
+  this.virtualizer = new Virtualizer(this.virtualizerOptions());
+  this.virtualizerCleanup = this.virtualizer._didMount();
+  this._windowVer.value = this._windowVer.value + 1;
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(8));else setTimeout(() => this.kickWindow(8), 0);
+};
+
+  teardownVirtualizer = () => {
+  if (this.virtualizerCleanup) this.virtualizerCleanup();
+  this.virtualizer = null;
+  this.virtualizerCleanup = null;
+  this.gridScrollEl = null;
+  this._windowVer.value = this._windowVer.value + 1;
 };
 
   focus = () => this._refInputEl?.focus();

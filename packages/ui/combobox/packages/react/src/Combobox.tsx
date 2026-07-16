@@ -143,8 +143,9 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     void value; void options; void placeholder; void disabled; void disableFilter; void ariaLabel; void idBase; void inline; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void virtual; void estimateRowHeight; void maxHeight; void groups; void groupCap; void defaultValue; void onValueChange;
     return rest;
   })();
-  const gridScrollEl = useRef<any>(null);
+  const didMount = useRef(false);
   const virtualizer = useRef<any>(null);
+  const gridScrollEl = useRef<any>(null);
   const virtualizerCleanup = useRef<any>(null);
   const remeasurePending = useRef(false);
   const pinned = useRef(false);
@@ -153,6 +154,8 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     defaultValue: props.defaultValue ?? null,
     onValueChange: props.onValueChange,
   });
+  const _virtualRef = useRef(props.virtual);
+  _virtualRef.current = props.virtual;
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -164,6 +167,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
+  const _watch2First = useRef(true);
 
   function labelOf(opt: any) {
     if (props.optionLabel !== null) return props.optionLabel(opt);
@@ -184,32 +188,34 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     const src = windowSource();
     return src && src[i] ? src[i].id : undefined;
   }
-  const virtualizerOptions = useCallback((): any => ({
-    count: windowSource().length,
-    getScrollElement: () => gridScrollEl.current,
-    estimateSize: () => props.estimateRowHeight,
-    observeElementRect,
-    observeElementOffset,
-    scrollToFn: elementScroll,
-    measureElement,
-    overscan: 8,
-    getItemKey: virtualItemKey,
-    onChange: () => {
-      setWindowVer(prev => prev + 1);
-      // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
-      // virtual-core only observe()s a node you explicitly hand to measureElement (it does
-      // NOT auto-discover rendered rows — measureElement is the SOLE caller of
-      // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
-      // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
-      // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
-      // so the new <tr> set is in the DOM before we measure. Safe from an infinite
-      // measure→onChange→measure loop: measureElement is idempotent on an already-observed
-      // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
-      // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
-      // re-measure is a no-op.
-      scheduleRemeasure();
-    }
-  }), [props.estimateRowHeight, scheduleRemeasure, virtualItemKey, windowSource]);
+  function virtualizerOptions(): any {
+    return {
+      count: windowSource().length,
+      getScrollElement: () => gridScrollEl.current,
+      estimateSize: () => props.estimateRowHeight,
+      observeElementRect,
+      observeElementOffset,
+      scrollToFn: elementScroll,
+      measureElement,
+      overscan: 8,
+      getItemKey: virtualItemKey,
+      onChange: () => {
+        setWindowVer(prev => prev + 1);
+        // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
+        // virtual-core only observe()s a node you explicitly hand to measureElement (it does
+        // NOT auto-discover rendered rows — measureElement is the SOLE caller of
+        // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
+        // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
+        // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
+        // so the new <tr> set is in the DOM before we measure. Safe from an infinite
+        // measure→onChange→measure loop: measureElement is idempotent on an already-observed
+        // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
+        // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
+        // re-measure is a no-op.
+        scheduleRemeasure();
+      }
+    };
+  }
   function pinMeasurement(pin: number): {
     start: number;
     size: number;
@@ -413,6 +419,22 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   }
   function windowSource() {
     return filteredOptions();
+  }
+  function windowedView() {
+    // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}) — touch windowVer at the
+    // TOP, mirroring windowedRows()'s own subscribe-first discipline (windowing.rzts), so
+    // the accessor re-runs when buildVirtualizer()/kickWindow() bump windowVer once the
+    // virtualizer attaches — the transition OUT of this fallback and into windowedRows().
+    void windowVer;
+    if (props.virtual && !virtualizer.current && didMount.current) {
+      return windowSource().map((row: any) => ({
+        vi: {
+          index: row._i
+        },
+        row
+      }));
+    }
+    return windowedRows();
   }
   function groupBlocks() {
     const wrappers = filteredOptions();
@@ -670,7 +692,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     // windowing, direct scrollIntoView otherwise.
     scrollActiveIntoView();
   }, [activeIndex, isOpen, navRows, nextEnabled, scrollActiveIntoView, selectOption]);
-  const kickWindow = useCallback((attempts: any) => {
+  function kickWindow(attempts: any) {
     if (!virtualizer.current) return;
     gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-combobox-list') : gridScrollEl.current;
     // Only re-feed the count from a NON-EMPTY source: on React these rAF closures capture
@@ -687,7 +709,28 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     if (windowedRows().length === 0 && attempts > 0) {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(attempts - 1));else setTimeout(() => kickWindow(attempts - 1), 16);
     }
-  }, [remeasureWindow, syncRows, virtualizerOptions, windowSource, windowedRows]);
+  }
+  const buildVirtualizer = useCallback(() => {
+    if (!props.virtual || virtualizer.current) return;
+    // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
+    // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
+    // node is null on Solid/Lit, leaving the virtualizer with no scroll element. The windowed
+    // popup stays mounted whenever virtual (r-if="$props.virtual"); it is only hidden via
+    // display:none when closed (CR-01), so the .rozie-combobox-list scroll container already
+    // exists here for the virtualizer to attach to.
+    gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-combobox-list') : null;
+    virtualizer.current = new Virtualizer(virtualizerOptions());
+    virtualizerCleanup.current = virtualizer.current._didMount();
+    setWindowVer(prev => prev + 1);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
+  }, [kickWindow, props.virtual, virtualizerOptions]);
+  function teardownVirtualizer() {
+    if (virtualizerCleanup.current) virtualizerCleanup.current();
+    virtualizer.current = null;
+    virtualizerCleanup.current = null;
+    gridScrollEl.current = null;
+    setWindowVer(prev => prev + 1);
+  }
   function focus() {
     return inputEl.current?.focus();
   }
@@ -709,20 +752,11 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   useEffect(() => {
     syncQueryToValue();
     syncRows();
-    // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-    // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
-    // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
-    // container already exists here for the virtualizer to attach to.
-    if (props.virtual) {
-      // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
-      // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
-      // node is null on Solid/Lit, leaving the virtualizer with no scroll element.
-      gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-combobox-list') : null;
-      virtualizer.current = new Virtualizer(virtualizerOptions());
-      virtualizerCleanup.current = virtualizer.current._didMount();
-      setWindowVer(prev => prev + 1);
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
-    }
+    didMount.current = true;
+    // Routes through the SAME buildVirtualizer() the virtual $watch calls below
+    // (VIRT-BUILD) — one construction site, so the mount path cannot drift from the flip
+    // path.
+    if (_virtualRef.current) buildVirtualizer();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     return () => {
@@ -744,6 +778,15 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       scheduleRemeasure();
     }
   }, [props.options, query]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch2First.current) { _watch2First.current = false; return; }
+    if (expandedGroups && Object.keys(expandedGroups).length) setExpandedGroups({});
+    if (props.virtual) {
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => buildVirtualizer());else setTimeout(() => buildVirtualizer(), 0);
+    } else {
+      teardownVirtualizer();
+    }
+  }, [props.virtual]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieExposeRef = useRef({ focus, clear, seedQuery, pinOpen });
   _rozieExposeRef.current = { focus, clear, seedQuery, pinOpen };
@@ -790,7 +833,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
         </li>}</ul>}{!!(props.virtual) && <ul className={"rozie-combobox-list rozie-combobox-list--virtual"} id={rozieAttr(listId())} role="listbox" style={parseInlineStyle((isOpen ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-combobox-list-max-height:' + props.maxHeight : 'overflow-y:auto'))} data-rozie-s-9546115a="">
         <li className={"rozie-combobox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-9546115a="" />
 
-        {windowedRows().map((wr) => <li key={wr.row.id} className={clsx("rozie-combobox-option", { "rozie-combobox-option--active": wr.vi.index === activeIndex, "rozie-combobox-option--selected": wr.row.value === value, "rozie-combobox-option--disabled": wr.row.disabled })} id={rozieAttr(optId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} role="option" aria-selected={wr.row.value === value} aria-disabled={!!wr.row.disabled} onMouseDown={($event) => { $event.preventDefault(); selectOption(wr.row); }} onMouseEnter={($event) => { setActiveIndex(wr.vi.index); }} data-rozie-s-9546115a="">
+        {windowedView().map((wr) => <li key={wr.row.id} className={clsx("rozie-combobox-option", { "rozie-combobox-option--active": wr.vi.index === activeIndex, "rozie-combobox-option--selected": wr.row.value === value, "rozie-combobox-option--disabled": wr.row.disabled })} id={rozieAttr(optId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} role="option" aria-selected={wr.row.value === value} aria-disabled={!!wr.row.disabled} onMouseDown={($event) => { $event.preventDefault(); selectOption(wr.row); }} onMouseEnter={($event) => { setActiveIndex(wr.vi.index); }} data-rozie-s-9546115a="">
           {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: wr.row.option, index: wr.vi.index, active: wr.vi.index === activeIndex, selected: wr.row.value === value, disabled: wr.row.disabled }) : rozieDisplay(wr.row.label)}
         </li>)}
 

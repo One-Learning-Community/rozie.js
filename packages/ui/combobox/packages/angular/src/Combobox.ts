@@ -175,7 +175,7 @@ function __rozieAttr(v: unknown): string | null {
     <ul class="rozie-combobox-list rozie-combobox-list--virtual" [attr.id]="rozieAttr(listId())" role="listbox" [attr.style]="__style">
         <li class="rozie-combobox-spacer" aria-hidden="true" [attr.style]="'height:' + padTop() + 'px'"></li>
 
-        @for (wr of windowedRows(); track wr.row.id) {
+        @for (wr of windowedView(); track wr.row.id) {
     <li class="rozie-combobox-option" [ngClass]="{ 'rozie-combobox-option--active': wr.vi.index === activeIndex(), 'rozie-combobox-option--selected': wr.row.value === value(), 'rozie-combobox-option--disabled': wr.row.disabled }" [attr.id]="rozieAttr(optId(wr.vi.index))" [attr.data-index]="rozieAttr(wr.vi.index)" role="option" [attr.aria-selected]="wr.row.value === value()" [attr.aria-disabled]="!!wr.row.disabled" (mousedown)="$event.preventDefault(); selectOption(wr.row)" (mouseenter)="activeIndex.set(wr.vi.index)">
           @if ((optionTpl ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: wr.row.option, index: wr.vi.index, active: wr.vi.index === activeIndex(), selected: wr.row.value === value(), disabled: wr.row.disabled }, option: wr.row.option, index: wr.vi.index, active: wr.vi.index === activeIndex(), selected: wr.row.value === value(), disabled: wr.row.disabled }" />
@@ -416,6 +416,7 @@ export class Combobox {
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
+  private __rozieWatchInitial_2 = true;
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -434,29 +435,27 @@ export class Combobox {
         this.scheduleRemeasure();
       }
     })(); }); });
+    effect(() => { const __watchVal = (() => this.virtual())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
+      if (this.expandedGroups() && Object.keys(this.expandedGroups()).length) this.expandedGroups.set({});
+      if (this.virtual()) {
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.buildVirtualizer());else setTimeout(() => this.buildVirtualizer(), 0);
+      } else {
+        this.teardownVirtualizer();
+      }
+    })(); }); });
   }
 
   ngAfterViewInit() {
     this.syncQueryToValue();
     this.syncRows();
-    // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-    // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
-    // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
-    // container already exists here for the virtualizer to attach to.
-    // ── Windowing: construct the virtualizer (ONLY when virtual) ──────────────
-    // The windowed popup stays mounted whenever virtual (r-if="$props.virtual"); it is only
-    // hidden via display:none when closed (CR-01), so the .rozie-combobox-list scroll
-    // container already exists here for the virtualizer to attach to.
-    if (this.virtual()) {
-      // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
-      // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
-      // node is null on Solid/Lit, leaving the virtualizer with no scroll element.
-      this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-combobox-list') : null;
-      this.virtualizer = new Virtualizer(this.virtualizerOptions());
-      this.virtualizerCleanup = this.virtualizer._didMount();
-      this.windowVer.set(this.windowVer() + 1);
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(8));else setTimeout(() => this.kickWindow(8), 0);
-    }
+    this.didMount = true;
+    // Routes through the SAME buildVirtualizer() the virtual $watch calls below
+    // (VIRT-BUILD) — one construction site, so the mount path cannot drift from the flip
+    // path.
+    // Routes through the SAME buildVirtualizer() the virtual $watch calls below
+    // (VIRT-BUILD) — one construction site, so the mount path cannot drift from the flip
+    // path.
+    if (this.virtual()) this.buildVirtualizer();
   }
 
   labelOf = (opt: any) => {
@@ -648,6 +647,7 @@ export class Combobox {
   gridScrollEl: any = null;
   remeasurePending = false;
   pinned = false;
+  didMount = false;
   foCache = {
     optsRef: null,
     q: null,
@@ -715,6 +715,22 @@ export class Combobox {
     return val;
   };
   windowSource = () => this.filteredOptions();
+  windowedView = () => {
+    // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}) — touch windowVer at the
+    // TOP, mirroring windowedRows()'s own subscribe-first discipline (windowing.rzts), so
+    // the accessor re-runs when buildVirtualizer()/kickWindow() bump windowVer once the
+    // virtualizer attaches — the transition OUT of this fallback and into windowedRows().
+    void this.windowVer();
+    if (this.virtual() && !this.virtualizer && this.didMount) {
+      return this.windowSource().map((row: any) => ({
+        vi: {
+          index: row._i
+        },
+        row
+      }));
+    }
+    return this.windowedRows();
+  };
   groupBlocks = () => {
     const __groups = this.groups();
     const wrappers = this.filteredOptions();
@@ -975,6 +991,27 @@ export class Combobox {
     if (this.windowedRows().length === 0 && attempts > 0) {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(attempts - 1));else setTimeout(() => this.kickWindow(attempts - 1), 16);
     }
+  };
+  buildVirtualizer = () => {
+    if (!this.virtual() || this.virtualizer) return;
+    // Capture the scroll container via $el.querySelector (the data-table gridScrollEl
+    // precedent, proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered
+    // node is null on Solid/Lit, leaving the virtualizer with no scroll element. The windowed
+    // popup stays mounted whenever virtual (r-if="$props.virtual"); it is only hidden via
+    // display:none when closed (CR-01), so the .rozie-combobox-list scroll container already
+    // exists here for the virtualizer to attach to.
+    this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-combobox-list') : null;
+    this.virtualizer = new Virtualizer(this.virtualizerOptions());
+    this.virtualizerCleanup = this.virtualizer._didMount();
+    this.windowVer.set(this.windowVer() + 1);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(8));else setTimeout(() => this.kickWindow(8), 0);
+  };
+  teardownVirtualizer = () => {
+    if (this.virtualizerCleanup) this.virtualizerCleanup();
+    this.virtualizer = null;
+    this.virtualizerCleanup = null;
+    this.gridScrollEl = null;
+    this.windowVer.set(this.windowVer() + 1);
   };
   focus = () => this.inputEl()?.nativeElement?.focus();
   clear = () => {
