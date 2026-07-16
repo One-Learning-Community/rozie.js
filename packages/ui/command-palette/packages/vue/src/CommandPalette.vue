@@ -14,6 +14,7 @@
         </nav>
       </slot>
     </div><Combobox ref="comboboxRef" :inline="true" :disable-filter="true" :close-on-select="false" :options="orderedItems()" :groups="commandGroups()" :group-cap="props.groupCap" :option-value="commandValue" :option-disabled="commandDisabled" :placeholder="currentPlaceholder()" :aria-label="props.ariaLabel" :id-base="props.idBase" v-model:value="activeValue" @change="onComboboxChange($event)" @search="onComboboxSearch($event)"><template #option="{ option, index, active, selected, disabled }">
+        <span class="rozie-command-palette-option-anchor" :data-cp-value="commandValue(option)">
         <slot name="option" :option="option" :index="index" :active="active" :selected="selected" :disabled="disabled" :matches="labelHighlight(labelText(option), query)">
           <div class="rozie-command-palette-option">
             <span v-if="$slots.icon" class="rozie-command-palette-option-icon">
@@ -31,6 +32,7 @@
               <slot name="trailing" :option="option"></slot>
             </span></div>
         </slot>
+        </span>
       </template><template #groupHeading="{ group }">
         <slot name="groupHeading" :group="group">{{ groupLabel(group) }}</slot>
       </template><template #empty="{ query }">
@@ -116,7 +118,7 @@ const props = withDefaults(
      */
     closeOnAction?: boolean;
     /**
-     * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). Note: the ⌘K/Right-arrow row action menu resolves the highlighted row by section index, which assumes the uncapped section order — combining `groupCap` with per-row `actions` is not composed in this pass.
+     * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). `groupCap` composes with per-row `actions`: the ⌘K/Right-arrow row action menu always anchors to the exact highlighted VISIBLE row (cap-aware, order-independent), and firing it on a '+N more' row is a no-op.
      */
     groupCap?: number;
   }>(),
@@ -769,28 +771,42 @@ const deepQuerySelector = (root: any, selector: any) => {
   }
   return null;
 };
-// highlightedItem(): resolve the combobox's currently-highlighted row back to
-// its command object. Combobox owns `activeIndex` internally (no public model
-// for it), so this reads the ACTIVE option element's id — `idBase + '-opt-' +
-// i`, where `i` is its position in orderedItems() (the group-visual-order
-// list combobox was fed as `:options` — cp-adopts-combobox-groups: the
-// combobox's own internal `groupOptions()` re-partition of an
-// already-group-ordered list is idempotent, so its index-based option ids
-// stay aligned with this same order) — off the DOM, via `deepQuerySelector`
-// (ROZ123-safe: called only from post-mount handlers, never eagerly).
-// Returns null when nothing is highlighted or the id can't be parsed.
+// highlightedItem() (260715-vkr, value-keyed resolution): resolve the
+// combobox's currently-highlighted row back to its command object. Combobox
+// owns `activeIndex` internally (no public model for it), so this locates the
+// ACTIVE option element (`.rozie-combobox-option--active`) off the DOM via
+// `deepQuerySelector` (ROZ123-safe: called only from post-mount handlers,
+// never eagerly), then reads the `data-cp-value` the palette itself stamped
+// onto the `.rozie-command-palette-option-anchor` span wrapping its #option
+// re-projection (see the <template #option> comment above) — an
+// order-independent, cap-independent lookup by VALUE rather than a numeric
+// position. filteredItems() (not orderedItems()) is the resolution source: it
+// is the same pre-group-partition list commandValue()/commandGroups() derive
+// from, so a value match is unambiguous.
+//
+// The '+N more' row renders combobox's OWN `#groupMore` slot, which the
+// palette does not fill — it carries no anchor, so `activeEl.querySelector`
+// finds nothing and this returns null (the no-op path for Assertion B).
+//
+// Superseded reasoning (pre-fix): this used to parse the active element's id
+// (`idBase + '-opt-' + i`, `i` = the combobox's CAPPED `cappedBlocks()._i`
+// running index) and index into the UNCAPPED `orderedItems()` — correct only
+// when groupCap left every section's visual order equal to its unfiltered
+// order, i.e. never once any section overflowed its cap.
 const highlightedItem = () => {
   const panel = panelRef.value;
   if (!panel) return null;
   const activeEl: any = deepQuerySelector(panel, '.rozie-combobox-option--active');
   if (!activeEl) return null;
-  const prefix = props.idBase + '-opt-';
-  const id = String(activeEl.id || activeEl.getAttribute('id') || '');
-  if (id.indexOf(prefix) !== 0) return null;
-  const idx = parseInt(id.slice(prefix.length), 10);
-  if (Number.isNaN(idx)) return null;
-  const list = orderedItems();
-  return idx >= 0 && idx < list.length ? list[idx] : null;
+  const anchorEl: any = activeEl.querySelector ? activeEl.querySelector('[data-cp-value]') : null;
+  if (!anchorEl) return null;
+  const value = anchorEl.getAttribute('data-cp-value');
+  if (value == null) return null;
+  const list = filteredItems();
+  for (let i = 0; i < list.length; i++) {
+    if (String(commandValue(list[i])) === value) return list[i];
+  }
+  return null;
 };
 // searchInputEl(): the vendored combobox's underlying `<input role="combobox">`
 // — needed for the caret-at-end Right-arrow trigger gate (selectionStart/End
@@ -1209,6 +1225,9 @@ defineExpose({ show, close, toggle, focus, goBack, openTo });
   padding: var(--rozie-command-palette-list-padding, 0.5rem);
   list-style: none;
   overflow-y: auto;
+}
+.rozie-command-palette-option-anchor {
+  display: contents;
 }
 .rozie-command-palette-option {
   display: flex;

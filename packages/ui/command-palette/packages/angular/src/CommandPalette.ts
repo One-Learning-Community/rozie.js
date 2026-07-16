@@ -141,6 +141,7 @@ function __rozieAttr(v: unknown): string | null {
     }
         </div>
     }<rozie-combobox #combobox [inline]="true" [disableFilter]="true" [closeOnSelect]="false" [options]="orderedItems()" [groups]="commandGroups()" [groupCap]="groupCap()" [optionValue]="commandValue" [optionDisabled]="commandDisabled" [placeholder]="currentPlaceholder()" [ariaLabel]="ariaLabel()" [idBase]="idBase()" [value]="activeValue()" (valueChange)="activeValue.set($event)" (change)="onComboboxChange($event)" (search)="onComboboxSearch($event)"><ng-template #option let-option="option" let-index="index" let-active="active" let-selected="selected" let-disabled="disabled">
+            <span class="rozie-command-palette-option-anchor" [attr.data-cp-value]="rozieAttr(commandValue(option))">
             @if ((optionTpl ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }, option: option, index: index, active: active, selected: selected, disabled: disabled, matches: labelHighlight(labelText(option), query()) }" />
     } @else {
@@ -184,6 +185,7 @@ function __rozieAttr(v: unknown): string | null {
     }</div>
             
     }
+            </span>
           </ng-template><ng-template #groupHeading let-group="group">
             @if ((groupHeadingTpl ?? templates()?.['groupHeading'])) {
     <ng-container *ngTemplateOutlet="(groupHeadingTpl ?? templates()?.['groupHeading']); context: { $implicit: { group: group }, group: group }" />
@@ -379,6 +381,9 @@ function __rozieAttr(v: unknown): string | null {
       padding: var(--rozie-command-palette-list-padding, 0.5rem);
       list-style: none;
       overflow-y: auto;
+    }
+    .rozie-command-palette-option-anchor {
+      display: contents;
     }
     .rozie-command-palette-option {
       display: flex;
@@ -576,7 +581,7 @@ export class CommandPalette {
    */
   closeOnAction = input<boolean>(true);
   /**
-   * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). Note: the ⌘K/Right-arrow row action menu resolves the highlighted row by section index, which assumes the uncapped section order — combining `groupCap` with per-row `actions` is not composed in this pass.
+   * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). `groupCap` composes with per-row `actions`: the ⌘K/Right-arrow row action menu always anchors to the exact highlighted VISIBLE row (cap-aware, order-independent), and firing it on a '+N more' row is a no-op.
    */
   groupCap = input<number>(0);
   activeValue = signal<any>(null);
@@ -961,13 +966,15 @@ export class CommandPalette {
     if (!panel) return null;
     const activeEl: any = this.deepQuerySelector(panel, '.rozie-combobox-option--active');
     if (!activeEl) return null;
-    const prefix = this.idBase() + '-opt-';
-    const id = String(activeEl.id || activeEl.getAttribute('id') || '');
-    if (id.indexOf(prefix) !== 0) return null;
-    const idx = parseInt(id.slice(prefix.length), 10);
-    if (Number.isNaN(idx)) return null;
-    const list = this.orderedItems();
-    return idx >= 0 && idx < list.length ? list[idx] : null;
+    const anchorEl: any = activeEl.querySelector ? activeEl.querySelector('[data-cp-value]') : null;
+    if (!anchorEl) return null;
+    const value = anchorEl.getAttribute('data-cp-value');
+    if (value == null) return null;
+    const list = this.filteredItems();
+    for (let i = 0; i < list.length; i++) {
+      if (String(this.commandValue(list[i])) === value) return list[i];
+    }
+    return null;
   };
   searchInputEl = () => {
     const panel = this.panel()?.nativeElement;

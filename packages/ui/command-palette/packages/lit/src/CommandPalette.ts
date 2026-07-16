@@ -216,6 +216,9 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   list-style: none;
   overflow-y: auto;
 }
+.rozie-command-palette-option-anchor[data-rozie-s-768cad96] {
+  display: contents;
+}
 .rozie-command-palette-option[data-rozie-s-768cad96] {
   display: flex;
   align-items: center;
@@ -413,7 +416,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true }) closeOnAction: boolean = true;
   /**
-   * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). Note: the ⌘K/Right-arrow row action menu resolves the highlighted row by section index, which assumes the uncapped section order — combining `groupCap` with per-row `actions` is not composed in this pass.
+   * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). `groupCap` composes with per-row `actions`: the ⌘K/Right-arrow row action menu always anchors to the exact highlighted VISIBLE row (cap-aware, order-independent), and firing it on a '+N more' row is a no-op.
    */
   @property({ type: Number, reflect: true }) groupCap: number = 0;
   private _activeValue = signal<any>(null);
@@ -663,6 +666,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
         </nav>
       </slot>`}
     </div>` : nothing}<rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
+        <span class="rozie-command-palette-option-anchor" data-cp-value=${rozieAttr(this.commandValue(scope.option))} data-rozie-s-768cad96>
         ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}); } catch { return '{}'; } })()}>
           <div class="rozie-command-palette-option" data-rozie-s-768cad96>
             ${this._hasSlotIcon || this.icon !== undefined ? html`<span class="rozie-command-palette-option-icon" data-rozie-s-768cad96>
@@ -680,6 +684,7 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
               ${this.trailing !== undefined ? this.trailing({option: scope.option}) : html`<slot name="trailing" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option}); } catch { return '{}'; } })()}></slot>`}
             </span>` : nothing}</div>
         </slot>`}
+        </span>
       `} .groupHeading=${(scope: { group: unknown }) => html`
         ${this.groupHeading !== undefined ? this.groupHeading({group: scope.group}) : html`<slot name="groupHeading" data-rozie-params=${(() => { try { return JSON.stringify({group: scope.group}); } catch { return '{}'; } })()}>${rozieDisplay(this.groupLabel(scope.group))}</slot>`}
       `} .empty=${(scope: { query: unknown }) => html`
@@ -1095,13 +1100,15 @@ ${this.open ? html`<div class="rozie-command-palette" @click=${($event: MouseEve
   if (!panel) return null;
   const activeEl: any = this.deepQuerySelector(panel, '.rozie-combobox-option--active');
   if (!activeEl) return null;
-  const prefix = this.idBase + '-opt-';
-  const id = String(activeEl.id || activeEl.getAttribute('id') || '');
-  if (id.indexOf(prefix) !== 0) return null;
-  const idx = parseInt(id.slice(prefix.length), 10);
-  if (Number.isNaN(idx)) return null;
-  const list = this.orderedItems();
-  return idx >= 0 && idx < list.length ? list[idx] : null;
+  const anchorEl: any = activeEl.querySelector ? activeEl.querySelector('[data-cp-value]') : null;
+  if (!anchorEl) return null;
+  const value = anchorEl.getAttribute('data-cp-value');
+  if (value == null) return null;
+  const list = this.filteredItems();
+  for (let i = 0; i < list.length; i++) {
+    if (String(this.commandValue(list[i])) === value) return list[i];
+  }
+  return null;
 };
 
   searchInputEl = () => {

@@ -110,7 +110,7 @@ interface CommandPaletteProps {
    */
   closeOnAction?: boolean;
   /**
-   * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). Note: the ⌘K/Right-arrow row action menu resolves the highlighted row by section index, which assumes the uncapped section order — combining `groupCap` with per-row `actions` is not composed in this pass.
+   * Pass-through to the vendored combobox's `groupCap`: cap each command section to its first `groupCap` results with an expand-in-place '+N more' row. `0`/absent = uncapped (default). `groupCap` composes with per-row `actions`: the ⌘K/Right-arrow row action menu always anchors to the exact highlighted VISIBLE row (cap-aware, order-independent), and firing it on a '+N more' row is a no-op.
    */
   groupCap?: number;
   onNavigate?: (...args: any[]) => void;
@@ -554,13 +554,15 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     if (!panel$local) return null;
     const activeEl: any = deepQuerySelector(panel$local, '.rozie-combobox-option--active');
     if (!activeEl) return null;
-    const prefix = props.idBase + '-opt-';
-    const id = String(activeEl.id || activeEl.getAttribute('id') || '');
-    if (id.indexOf(prefix) !== 0) return null;
-    const idx = parseInt(id.slice(prefix.length), 10);
-    if (Number.isNaN(idx)) return null;
-    const list = orderedItems();
-    return idx >= 0 && idx < list.length ? list[idx] : null;
+    const anchorEl: any = activeEl.querySelector ? activeEl.querySelector('[data-cp-value]') : null;
+    if (!anchorEl) return null;
+    const value = anchorEl.getAttribute('data-cp-value');
+    if (value == null) return null;
+    const list = filteredItems();
+    for (let i = 0; i < list.length; i++) {
+      if (String(commandValue(list[i])) === value) return list[i];
+    }
+    return null;
   }
   function searchInputEl() {
     const panel$local = panel.current;
@@ -792,6 +794,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
                 {!!(Number(ei) > 0) && <span className={"rozie-command-palette-breadcrumb-separator"} aria-hidden="true" data-rozie-s-768cad96="">›</span>}{(Number(ei) < breadcrumbStack().length - 1) ? <button type="button" className={"rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link"} aria-label={rozieAttr('Back to ' + entry.title)} data-testid="command-palette-breadcrumb-jump" onClick={($event) => { jumpToLevel(Number(ei)); }} data-rozie-s-768cad96="">{rozieDisplay(entry.title)}</button> : <span className={"rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current"} data-testid="command-palette-title" data-rozie-s-768cad96="">{rozieDisplay(entry.title)}</span>}</span>)}
             </nav></>}
         </div>}<Combobox ref={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={props.groupCap} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={props.ariaLabel} idBase={props.idBase} value={activeValue} onValueChange={setActiveValue} onChange={($event) => { onComboboxChange($event); }} onSearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96="" renderOption={({ option, index, active, selected, disabled }) => (<>
+            <span className={"rozie-command-palette-option-anchor"} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96="">
             {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) }) : <div className={"rozie-command-palette-option"} data-rozie-s-768cad96="">
                 {!!((props.renderIcon ?? props.slots?.['icon'])) && <span className={"rozie-command-palette-option-icon"} data-rozie-s-768cad96="">
                   {(props.renderIcon ?? props.slots?.['icon'])?.({ option })}
@@ -806,6 +809,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
                 </span>}{!!((props.renderTrailing ?? props.slots?.['trailing'])) && <span className={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
                   {(props.renderTrailing ?? props.slots?.['trailing'])?.({ option })}
                 </span>}</div>}
+            </span>
           </>)} renderGroupHeading={({ group }) => (<>
             {(props.renderGroupHeading ?? props.slots?.['groupHeading']) ? ((props.renderGroupHeading ?? props.slots?.['groupHeading']) as Function)({ group }) : rozieDisplay(groupLabel(group))}
           </>)} renderEmpty={({ query }) => (<>

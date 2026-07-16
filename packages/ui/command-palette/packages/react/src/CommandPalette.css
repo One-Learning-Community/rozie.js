@@ -133,6 +133,9 @@
   list-style: none;
   overflow-y: auto;
 }
+.rozie-command-palette-option-anchor[data-rozie-s-768cad96] {
+  display: contents;
+}
 .rozie-command-palette-option[data-rozie-s-768cad96] {
   display: flex;
   align-items: center;
