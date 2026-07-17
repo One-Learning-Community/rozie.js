@@ -309,9 +309,17 @@ for (const target of TARGETS) {
     await expect
       .poll(async () => countByClass(page, 'rozie-combobox-spacer'), { timeout: 10_000 })
       .toBe(2);
-    const windowedCount = await countOptions(page);
-    expect(windowedCount).toBeGreaterThan(0);
-    expect(windowedCount).toBeLessThan(60);
+    // Poll (never one-shot sample) the windowed count: between the spacer poll
+    // flipping to 2 and the virtualizer's rAF+kickWindow settle, windowedView()'s
+    // mid-flip fallback renders the FULL 60-row slice (by design — the non-blank
+    // guarantee). Fast hosts skip past it; the pinned Docker container reliably
+    // catches it, so a one-shot read here failed 5/6 targets in CI.
+    await expect
+      .poll(async () => countOptions(page), { timeout: 15_000 })
+      .toBeLessThan(60);
+    await expect
+      .poll(async () => countOptions(page), { timeout: 15_000 })
+      .toBeGreaterThan(0);
     await expect.poll(async () => groupHeadingTexts(page), { timeout: 10_000 }).toEqual([]);
 
     // ---- 3. POP via Backspace-on-empty: restores the grouped, non-virtual ----
