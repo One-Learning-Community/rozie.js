@@ -42,8 +42,8 @@
     </div>
 
     
-    <div v-if="activeSurface === 'args'" data-command-palette-args="" data-testid="command-palette-args" class="rozie-command-palette-args" role="group" :aria-label="'Arguments for ' + (argsState ? argsState.label : '')">
-      <span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true">{{ argsState ? argsState.label : '' }}</span>
+    <div v-if="activeSurface === 'args'" data-command-palette-args="" data-testid="command-palette-args" class="rozie-command-palette-args" role="group" :aria-label="'Arguments for ' + (argsState ? labelText(argsState.item) : '')">
+      <span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true">{{ argsState ? labelText(argsState.item) : '' }}</span>
       <span v-for="(arg, argIdx) in argsState ? argsState.argList : []" :key="arg.id" class="rozie-command-palette-args-field">
         <slot name="argsField" :item="argsState ? argsState.item : null" :arg="arg" :value="argsState ? argsState.values[arg.id] : ''" :setValue="setArgValueFor(arg.id)">
           <input type="text" class="rozie-command-palette-args-input" data-testid="command-palette-args-input" :value="argsState ? argsState.values[arg.id] : ''" :placeholder="arg.placeholder || arg.id" :aria-label="arg.placeholder || arg.id" @input="onArgFieldInput(arg.id, $event)" />
@@ -58,7 +58,7 @@
     </div></div>
 
   
-  <div v-if="atActions()" data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" :aria-label="actionAnchor ? actionAnchor.label : undefined" :style="'top:' + actionMenuTop + 'px'" @keydown="onActionMenuKeydown($event)">
+  <div v-if="atActions()" data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" :aria-label="actionAnchor ? labelText(actionAnchor.item) : undefined" :style="'top:' + actionMenuTop + 'px'" @keydown="onActionMenuKeydown($event)">
     <div v-for="(action, ai) in actionAnchor ? actionAnchor.actions : []" :key="action.id" :class="['rozie-command-palette-actions-menu-item', { 'rozie-command-palette-actions-menu-item--active': ai === actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }]" role="menuitem" data-testid="command-palette-action-item" :aria-disabled="!!action.disabled" tabindex="-1" @mouseenter="actionIndex = Number(ai)" @mousedown.prevent="selectAction(action)">
       <slot name="actionItem" :action="action" :item="actionAnchor ? actionAnchor.item : null" :active="ai === actionIndex" :disabled="!!action.disabled">
         <span v-if="actionIcon(action)" class="rozie-command-palette-actions-menu-item-icon">{{ actionIcon(action) }}</span><span class="rozie-command-palette-actions-menu-item-label">{{ actionLabel(action) }}</span>
@@ -207,7 +207,7 @@ const panelRef = ref<HTMLElement>();
 const comboboxRef = ref<InstanceType<typeof Combobox>>();
 
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
@@ -369,16 +369,18 @@ const currentVirtualEstimateRowHeight = () => {
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
 };
 // breadcrumbStack(): the full root..current breadcrumb (internal/levelStack.ts
-// breadcrumb(), imported aliased `buildBreadcrumb` — the SVELTE EMITTER
-// generates a local snippet binding named after the `breadcrumb` SLOT itself,
-// which collides with a same-named top-level import on that one target only
-// (a "slot-name == script-identifier" collision, adjacent to the
-// slot==prop-name ROZ127 class but not caught by it since `breadcrumb` isn't
-// a prop) — aliasing the import sidesteps it without renaming the public
-// slot) fed to the #breadcrumb slot's `stack` scope param — the root entry's
-// title is `ariaLabel` (the palette's own accessible name doubles as the
-// root breadcrumb label; there is no separate "root title" prop).
-const breadcrumbStack = () => buildBreadcrumb(levelStack.value, props.ariaLabel);
+// breadcrumb()) fed to the #breadcrumb slot's `stack` scope param — the root
+// entry's title is `ariaLabel` (the palette's own accessible name doubles as
+// the root breadcrumb label; there is no separate "root title" prop).
+// Quick 260717-8zb (Task 2 Item 4): the import is the NATURAL `breadcrumb`
+// name again (previously aliased `as buildBreadcrumb` to sidestep a
+// Svelte-only collision with the emitter's own `breadcrumb` slot-merge
+// binding — the same top-level `<script>` scope as this import). The Svelte
+// emitter now auto-renames its generated slot-merge binding to
+// `breadcrumb$$slot` on collision (Class 3, findRForSlotNameCollisions.ts),
+// the same mechanism that already fixes the r-for-loop-var and script-param
+// collision classes — no author-side alias needed.
+const breadcrumbStack = () => breadcrumb(levelStack.value, props.ariaLabel);
 // ---- derived views (plain functions, uniform ×6) -----------------------
 // The ranked command list fed to the vendored <Combobox> as its `:options`.
 // command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
@@ -906,19 +908,21 @@ const reopenComboboxPopup = () => {
 // reuses the identical transition shape for a future 'args' surface.
 //
 // $refs/$el usage note: bindings below use `$refs.panel` (the modal panel
-// div's existing `ref="panel"`), NOT the `$el` sigil — a directly-typed bare
-// assignment of `$el`/`$refs.<name>` (`const root: any = $el`, or even
-// `const panel: any = $refs.panel`) compiles to a LITERAL, un-lowered
-// `$refs.__rozieRoot` (or `$refs.panel`) on the Svelte target — a real
-// Svelte-only emitter gap where the `: any` type annotation on the bare
-// `$el`/`$refs.X` declarator suppresses the deconflict/lowering pass that
-// otherwise correctly rewrites `const panel = $refs.panel` (UNTYPED) to
-// Svelte's real `panel$local` binding (`deconflictAccessorShadows`, the
-// same-name-as-accessor self-shadow guard — proven ×N in date-picker/
-// dialog/pagination/tags/otp/resizable, none of which type-annotate the
-// bare assignment). Workaround (source-only, not an emitter edit): keep the
-// `$refs.panel` assignment BARE/untyped; only the DOWNSTREAM `.querySelector`
-// RESULT gets `: any` (a separate declarator, unaffected by the gap).
+// div's existing `ref="panel"`), NOT the `$el` sigil — the panel is a
+// specific descendant the flyout/args surfaces need to query, whereas `$el`
+// is the component's own root. Quick 260717-8zb (Task 2 Item 3) VERIFIED
+// this file's `$refs.panel` reads are NOT affected by a typing gap: a
+// battery of probes (typed/untyped, self-shadow/non-self-shadow local name,
+// nested/top-level scope, `$refs.X` AND `$el`) all lower correctly on the
+// Svelte target — `isInTypePosition`'s ancestry walk correctly treats a
+// declarator's `id.typeAnnotation` as a SIBLING of `init`, never an
+// ancestor, so it never suppresses the init's rewrite. The prior comment's
+// premise (a `: any` type annotation on the bare `$refs.X`/`$el` declarator
+// breaks the Svelte lowering) was stale/incorrect — see
+// packages/targets/svelte/src/__tests__/typedRefsDeclarator.test.ts for the
+// permanent regression guard. `panel`/`frame` stay untyped here only because
+// that already matches the rest of this file's house style, not to dodge
+// any emitter gap.
 
 // deepQuerySelector(root, selector): a shadow-piercing querySelector — the
 // vendored <Combobox> renders its OWN internal shadow root on the Lit
@@ -1032,17 +1036,16 @@ const focusFirstMenuItem = () => {
 const openActionMenu = (item: any) => {
   if (!canOpenActions(item)) return;
   const actions = actionsOf(item);
-  // The flyout's `:aria-label` reads `$data.actionAnchor.label` (a plain
-  // PROPERTY read, computed here in script) rather than calling
-  // `labelText(item)` directly from the template attribute binding — a bare
-  // top-level-helper CALL inside a plain (non-slot-scoped) `:attr` binding
-  // throws `labelText is not defined` on the Angular target specifically
-  // (the emitter's `this.`-qualification pass doesn't reach that binding
-  // shape) — a source-level workaround, not an emitter change.
+  // Quick 260717-8zb (Task 2 Item 2): the flyout's `:aria-label` calls
+  // `labelText($data.actionAnchor.item)` directly from the template
+  // attribute binding. The prior workaround precomputed a `label` field here
+  // to dodge an Angular emitter gap (a bare top-level-helper CALL inside a
+  // hoisted double-read ternary getter survived un-`this.`-qualified —
+  // ReferenceError at runtime); the emitter now `this.`-qualifies it, so the
+  // natural direct-call form is restored.
   actionAnchor.value = {
     item,
-    actions,
-    label: labelText(item)
+    actions
   };
   actionIndex.value = firstEnabledActionIndex(actions);
   activeSurface.value = 'actions';
@@ -1132,17 +1135,13 @@ const focusArgFieldAt = (idx: any) => {
 const openArgsSurface = (item: any) => {
   if (!hasArgs(item)) return;
   const argList = argsOf(item);
-  // The chip's :aria-label reads $data.argsState.label (a plain PROPERTY
-  // read, computed here in script) rather than calling labelText(item)
-  // directly from a template attribute binding — a bare top-level-helper
-  // CALL inside a plain (non-slot-scoped) :attr binding throws on Angular
-  // specifically (the same trap openActionMenu's actionAnchor.label
-  // precomputation dodges above) — a source-level workaround, not an
-  // emitter change.
+  // Quick 260717-8zb (Task 2 Item 2): the chip's :aria-label calls
+  // `labelText($data.argsState.item)` directly from the template (the same
+  // Angular emitter gap openActionMenu dodged above — now fixed at the
+  // emitter, so the precomputed `label` field workaround is dropped here too).
   argsState.value = {
     item,
     values: initArgValues(argList),
-    label: labelText(item),
     argList
   };
   activeSurface.value = 'args';

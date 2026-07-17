@@ -648,71 +648,65 @@ export class Combobox {
   remeasurePending = false;
   pinned = false;
   didMount = false;
-  foCache = {
-    optsRef: null,
-    q: null,
-    df: null,
-    groupsRef: null,
+  filteredOptionsCache = {
+    keys: null,
     val: null,
-    hasVal: false
+    has: false
   };
   filteredOptions = () => {
-    const __options = this.options();
-    const __query = this.query();
-    // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}): read ALL FOUR reactive inputs
-    // into locals at the TOP, BEFORE any cache-hit early return — read $data.query UNCONDITIONALLY
-    // (even when disableFilter is true, mirroring windowing.rzts windowedRows void-touch discipline)
-    // and $props.groups UNCONDITIONALLY (even when $props.virtual, so a groups change while
-    // windowed still invalidates the cache once virtual toggles off) so the r-for accessor
-    // subscribes to them on every eval. An early return that skipped reading them would leave the
-    // accessor un-subscribed → it would never re-run on a real input change → stale/blank window.
-    const opts = Array.isArray(__options) ? __options : [];
-    const df = !!this.disableFilter();
-    const q = String(__query == null ? '' : __query);
-    const groupsProp = this.groups();
-    // Reference-keyed cache HIT: same options reference, same query, same disableFilter, same
-    // groups reference → return the SAME array reference (no re-map, no new wrappers). Pure ===,
-    // NOT a reactive subscription.
-    if (this.foCache.hasVal && this.foCache.optsRef === opts && this.foCache.q === q && this.foCache.df === df && this.foCache.groupsRef === groupsProp) return this.foCache.val;
-    // MISS → run the existing filter, then (native option grouping, combobox-native-groups) a
-    // NON-VIRTUAL-ONLY stable re-partition into group-visual order, then map + store keyed on
-    // (opts ref, query, disableFilter, groups ref).
-    let list = opts;
-    if (!df) {
-      const ql = q.toLowerCase();
-      if (ql) list = opts.filter((o: any) => String(this.labelOf(o)).toLowerCase().indexOf(ql) !== -1);
+    const __rozieMemoKey = (() => {
+      const __options = this.options();
+      const __query = this.query();
+      const opts = Array.isArray(__options) ? __options : [];
+      const df = !!this.disableFilter();
+      const q = String(__query == null ? '' : __query);
+      const groupsProp = this.groups();
+      return [opts, q, df, groupsProp];
+    })();
+    if (this.filteredOptionsCache.has && this.filteredOptionsCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === this.filteredOptionsCache.keys[i])) {
+      return this.filteredOptionsCache.val;
     }
-    // Gated to !$props.virtual (groups×virtual is deferred/unsupported per design) AND to
-    // $props.groups being a NON-EMPTY array — an explicit author opt-in. This is deliberately
-    // NOT just "!$props.virtual" (groupOptions() would otherwise also fire whenever any raw
-    // option happens to carry a `.group` field, even with `groups` absent — a real collision
-    // discovered against command-palette's CommandItem.group, which is a PRE-EXISTING,
-    // unrelated per-row-badge field, not an opt-in to combobox's native grouping. The design's
-    // "Empty/absent `groups` ⇒ today's flat behavior, byte-identical" contract is about the
-    // `groups` PROP only — never inferred from incidental option shape.
-    if (!this.virtual() && Array.isArray(groupsProp) && groupsProp.length > 0) {
-      const partition = groupOptions(list, groupsProp, (o: any) => o && o.group != null ? String(o.group) : null);
-      list = partition.ordered;
-    }
-    // `_i` is assigned over the (now group-ordered) list, so the flat keyboard model
-    // (activeIndex/aria-activedescendant/nextEnabled) walks visual order unchanged.
-    // `group` carries the wrapper's normalized group id for groupBlocks() below.
-    const val = list.map((o: any, i: any) => ({
-      value: this.valueOf$local(o),
-      label: this.labelOf(o),
-      disabled: this.disabledOf(o),
-      _i: i,
-      id: this.valueOf$local(o),
-      option: o,
-      group: o && o.group != null ? String(o.group) : null
-    }));
-    this.foCache.optsRef = opts;
-    this.foCache.q = q;
-    this.foCache.df = df;
-    this.foCache.groupsRef = groupsProp;
-    this.foCache.val = val;
-    this.foCache.hasVal = true;
-    return val;
+    const __rozieMemoVal = (() => {
+      const __options = this.options();
+      const __query = this.query();
+      const opts = Array.isArray(__options) ? __options : [];
+      const df = !!this.disableFilter();
+      const q = String(__query == null ? '' : __query);
+      const groupsProp = this.groups();
+      let list = opts;
+      if (!df) {
+        const ql = q.toLowerCase();
+        if (ql) list = opts.filter((o: any) => String(this.labelOf(o)).toLowerCase().indexOf(ql) !== -1);
+      }
+      // Gated to !$props.virtual (groups×virtual is deferred/unsupported per design) AND to
+      // $props.groups being a NON-EMPTY array — an explicit author opt-in. This is deliberately
+      // NOT just "!$props.virtual" (groupOptions() would otherwise also fire whenever any raw
+      // option happens to carry a `.group` field, even with `groups` absent — a real collision
+      // discovered against command-palette's CommandItem.group, which is a PRE-EXISTING,
+      // unrelated per-row-badge field, not an opt-in to combobox's native grouping. The design's
+      // "Empty/absent `groups` ⇒ today's flat behavior, byte-identical" contract is about the
+      // `groups` PROP only — never inferred from incidental option shape.
+      if (!this.virtual() && Array.isArray(groupsProp) && groupsProp.length > 0) {
+        const partition = groupOptions(list, groupsProp, (o: any) => o && o.group != null ? String(o.group) : null);
+        list = partition.ordered;
+      }
+      // `_i` is assigned over the (now group-ordered) list, so the flat keyboard model
+      // (activeIndex/aria-activedescendant/nextEnabled) walks visual order unchanged.
+      // `group` carries the wrapper's normalized group id for groupBlocks() below.
+      return list.map((o: any, i: any) => ({
+        value: this.valueOf$local(o),
+        label: this.labelOf(o),
+        disabled: this.disabledOf(o),
+        _i: i,
+        id: this.valueOf$local(o),
+        option: o,
+        group: o && o.group != null ? String(o.group) : null
+      }));
+    })();
+    this.filteredOptionsCache.keys = __rozieMemoKey;
+    this.filteredOptionsCache.val = __rozieMemoVal;
+    this.filteredOptionsCache.has = true;
+    return __rozieMemoVal;
   };
   windowSource = () => this.filteredOptions();
   windowedView = () => {

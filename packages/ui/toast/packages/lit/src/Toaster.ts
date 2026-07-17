@@ -195,7 +195,6 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   private _toasts = signal<any[]>([]);
   private _seq = signal(0);
   private _swipe = signal<any>(null);
-  private _swipeGesture = signal<any>(null);
 
   @state() private _hasSlotToast = false;
   @queryAssignedElements({ slot: 'toast', flatten: true }) private _slotToastElements!: Element[];
@@ -267,6 +266,8 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   seqLocal = 0;
 
   paused = false;
+
+  swipeGesture: any = null;
 
   startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;
@@ -527,7 +528,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   const sign = this.swipeSignFor(this.position);
   const el = event.currentTarget;
   const size = axis === 'x' ? el.offsetWidth : el.offsetHeight;
-  this._swipeGesture.value = {
+  this.swipeGesture = {
     id: t.id,
     axis,
     sign,
@@ -548,7 +549,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 
   onToastPointerMove = (t: any, event: any) => {
   if (this.disableSwipe) return;
-  const gesture = this._swipeGesture.value;
+  const gesture = this.swipeGesture;
   if (!gesture || gesture.id !== t.id) return;
   const raw = gesture.axis === 'x' ? event.clientX - gesture.startX : event.clientY - gesture.startY;
   const towardDismiss = raw * gesture.sign > 0;
@@ -564,8 +565,8 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 
   onToastPointerUp = (t: any, event: any) => {
   if (this.disableSwipe) return;
-  const gesture = this._swipeGesture.value;
-  this._swipeGesture.value = null;
+  const gesture = this.swipeGesture;
+  this.swipeGesture = null;
   // Local named `dragState`, NOT `swipe` — a local `swipe` would shadow the
   // reactive `$data.swipe` key on Svelte 5 (top-level `let swipe = $state(…)`
   // self-shadow TDZ: `const swipe = swipe` then `swipe = null` throws
@@ -586,7 +587,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 
   onToastPointerCancel = (t: any) => {
   if (this.disableSwipe) return;
-  if (this._swipeGesture.value && this._swipeGesture.value.id === t.id) this._swipeGesture.value = null;
+  if (this.swipeGesture && this.swipeGesture.id === t.id) this.swipeGesture = null;
   if (this._swipe.value && this._swipe.value.id === t.id) this._swipe.value = null;
 };
 

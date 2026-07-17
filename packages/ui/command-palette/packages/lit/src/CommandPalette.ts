@@ -7,7 +7,7 @@ import { ref } from 'lit/directives/ref.js';
 import '@rozie-ui/combobox-lit';
 import type { Combobox } from '@rozie-ui/combobox-lit';
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
@@ -793,8 +793,8 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
     </div>
 
     
-    ${this._activeSurface.value === 'args' ? html`<div class="rozie-command-palette-args" data-command-palette-args="" data-testid="command-palette-args" role="group" aria-label=${rozieAttr('Arguments for ' + (this._argsState.value ? this._argsState.value.label : ''))} data-rozie-s-768cad96>
-      <span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true" data-rozie-s-768cad96>${rozieDisplay(this._argsState.value ? this._argsState.value.label : '')}</span>
+    ${this._activeSurface.value === 'args' ? html`<div class="rozie-command-palette-args" data-command-palette-args="" data-testid="command-palette-args" role="group" aria-label=${rozieAttr('Arguments for ' + (this._argsState.value ? this.labelText(this._argsState.value.item) : ''))} data-rozie-s-768cad96>
+      <span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true" data-rozie-s-768cad96>${rozieDisplay(this._argsState.value ? this.labelText(this._argsState.value.item) : '')}</span>
       ${repeat<any>(this._argsState.value ? this._argsState.value.argList : [], (arg, argIdx) => arg.id, (arg, argIdx) => html`<span class="rozie-command-palette-args-field" key=${rozieAttr(arg.id)} data-rozie-s-768cad96>
         ${this.argsField !== undefined ? this.argsField({item: this._argsState.value ? this._argsState.value.item : null, arg: arg, value: this._argsState.value ? this._argsState.value.values[arg.id] : '', setValue: this.setArgValueFor(arg.id)}) : html`<slot name="argsField" data-rozie-params=${(() => { try { return JSON.stringify({item: this._argsState.value ? this._argsState.value.item : null, arg: arg, value: this._argsState.value ? this._argsState.value.values[arg.id] : '', setValue: this.setArgValueFor(arg.id)}); } catch { return '{}'; } })()}>
           <input class="rozie-command-palette-args-input" type="text" data-testid="command-palette-args-input" .value=${this._argsState.value ? this._argsState.value.values[arg.id] : ''} placeholder=${rozieAttr(arg.placeholder || arg.id)} aria-label=${rozieAttr(arg.placeholder || arg.id)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onArgFieldInput(arg.id, $event); }} data-rozie-s-768cad96 />
@@ -809,7 +809,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
     </div>` : nothing}</div>
 
   
-  ${this.atActions() ? html`<div class="rozie-command-palette-actions-menu" data-command-palette-menu="" data-testid="command-palette-actions-menu" role="menu" aria-label=${rozieAttr(this._actionAnchor.value ? this._actionAnchor.value.label : null)} style=${rozieStyle('top:' + this._actionMenuTop.value + 'px')} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onActionMenuKeydown($event); }} data-rozie-s-768cad96>
+  ${this.atActions() ? html`<div class="rozie-command-palette-actions-menu" data-command-palette-menu="" data-testid="command-palette-actions-menu" role="menu" aria-label=${rozieAttr(this._actionAnchor.value ? this.labelText(this._actionAnchor.value.item) : null)} style=${rozieStyle('top:' + this._actionMenuTop.value + 'px')} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onActionMenuKeydown($event); }} data-rozie-s-768cad96>
     ${repeat<any>(this._actionAnchor.value ? this._actionAnchor.value.actions : [], (action, ai) => action.id, (action, ai) => html`<div class="${Object.entries({ "rozie-command-palette-actions-menu-item": true, 'rozie-command-palette-actions-menu-item--active': ai === this._actionIndex.value, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(action.id)} role="menuitem" data-testid="command-palette-action-item" aria-disabled=${!!action.disabled} tabindex="-1" @mouseenter=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this._actionIndex.value = Number(ai); }} @mousedown=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { $event.preventDefault(); this.selectAction(action); }} data-rozie-s-768cad96>
       ${this.actionItem !== undefined ? this.actionItem({action: action, item: this._actionAnchor.value ? this._actionAnchor.value.item : null, active: ai === this._actionIndex.value, disabled: !!action.disabled}) : html`<slot name="actionItem" data-rozie-params=${(() => { try { return JSON.stringify({action: action, item: this._actionAnchor.value ? this._actionAnchor.value.item : null, active: ai === this._actionIndex.value, disabled: !!action.disabled}); } catch { return '{}'; } })()}>
         ${this.actionIcon(action) ? html`<span class="rozie-command-palette-actions-menu-item-icon" data-rozie-s-768cad96>${rozieDisplay(this.actionIcon(action))}</span>` : nothing}<span class="rozie-command-palette-actions-menu-item-label" data-rozie-s-768cad96>${rozieDisplay(this.actionLabel(action))}</span>
@@ -891,7 +891,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
 };
 
-  breadcrumbStack = () => buildBreadcrumb(this._levelStack.value, this.ariaLabel);
+  breadcrumbStack = () => breadcrumb(this._levelStack.value, this.ariaLabel);
 
   filteredItems = () => scoreCommands(this.currentBaseItems(), this.query, this.score);
 
@@ -1314,17 +1314,16 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   openActionMenu = (item: any) => {
   if (!canOpenActions(item)) return;
   const actions = actionsOf(item);
-  // The flyout's `:aria-label` reads `$data.actionAnchor.label` (a plain
-  // PROPERTY read, computed here in script) rather than calling
-  // `labelText(item)` directly from the template attribute binding — a bare
-  // top-level-helper CALL inside a plain (non-slot-scoped) `:attr` binding
-  // throws `labelText is not defined` on the Angular target specifically
-  // (the emitter's `this.`-qualification pass doesn't reach that binding
-  // shape) — a source-level workaround, not an emitter change.
+  // Quick 260717-8zb (Task 2 Item 2): the flyout's `:aria-label` calls
+  // `labelText($data.actionAnchor.item)` directly from the template
+  // attribute binding. The prior workaround precomputed a `label` field here
+  // to dodge an Angular emitter gap (a bare top-level-helper CALL inside a
+  // hoisted double-read ternary getter survived un-`this.`-qualified —
+  // ReferenceError at runtime); the emitter now `this.`-qualifies it, so the
+  // natural direct-call form is restored.
   this._actionAnchor.value = {
     item,
-    actions,
-    label: this.labelText(item)
+    actions
   };
   this._actionIndex.value = firstEnabledActionIndex(actions);
   this._activeSurface.value = 'actions';
@@ -1392,17 +1391,13 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   openArgsSurface = (item: any) => {
   if (!hasArgs(item)) return;
   const argList = argsOf(item);
-  // The chip's :aria-label reads $data.argsState.label (a plain PROPERTY
-  // read, computed here in script) rather than calling labelText(item)
-  // directly from a template attribute binding — a bare top-level-helper
-  // CALL inside a plain (non-slot-scoped) :attr binding throws on Angular
-  // specifically (the same trap openActionMenu's actionAnchor.label
-  // precomputation dodges above) — a source-level workaround, not an
-  // emitter change.
+  // Quick 260717-8zb (Task 2 Item 2): the chip's :aria-label calls
+  // `labelText($data.argsState.item)` directly from the template (the same
+  // Angular emitter gap openActionMenu dodged above — now fixed at the
+  // emitter, so the precomputed `label` field workaround is dropped here too).
   this._argsState.value = {
     item,
     values: initArgValues(argList),
-    label: this.labelText(item),
     argList
   };
   this._activeSurface.value = 'args';

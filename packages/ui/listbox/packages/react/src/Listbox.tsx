@@ -130,6 +130,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   const virtualizerCleanup = useRef<any>(null);
   const remeasurePending = useRef(false);
   const typeTimer = useRef<any>(null);
+  const typeBuffer = useRef('');
   const [value, setValue] = useControllableState({
     value: props.value,
     defaultValue: props.defaultValue ?? null,
@@ -164,12 +165,6 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   }, [activeIndex, open$local, optionId]);
   const _watch0First = useRef(true);
 
-  // Type-ahead buffer for the select-only listbox trigger. Module-scope
-  // `let`s reassigned from handlers → the React emitter hoists them to `useRef`
-  // so they persist across renders (the setup-once guarantee); no-op elsewhere.
-  // They STAY in this host (not the shared spine) per the A==B rule: reassigned
-  // module-`let`s + sigils live in the host; the partial only closes over them.
-  let typeBuffer = '';
   function labelOf(opt: any) {
     if (props.optionLabel !== null) return props.optionLabel(opt);
     if (opt !== null && typeof opt === 'object' && 'label' in opt) return opt.label;
@@ -293,12 +288,12 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   }
   function onTypeahead(ch: any) {
     if (typeTimer.current !== null) clearTimeout(typeTimer.current);
-    typeBuffer += ch.toLowerCase();
+    typeBuffer.current += ch.toLowerCase();
     typeTimer.current = setTimeout(() => {
-      typeBuffer = '';
+      typeBuffer.current = '';
     }, 600);
     const opts = visibleOptions();
-    const idx = opts.findIndex((o: any) => !disabledOf(o) && labelOf(o).toLowerCase().startsWith(typeBuffer));
+    const idx = opts.findIndex((o: any) => !disabledOf(o) && labelOf(o).toLowerCase().startsWith(typeBuffer.current));
     if (idx !== -1) {
       if (!open$local) open();
       setActiveIndex(idx);

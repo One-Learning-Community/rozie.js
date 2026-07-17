@@ -4,7 +4,7 @@ import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { Combobox } from '@rozie-ui/combobox-angular';
 
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
@@ -216,7 +216,7 @@ function __rozieAttr(v: unknown): string | null {
         
         @if (activeSurface() === 'args') {
     <div data-command-palette-args="" data-testid="command-palette-args" class="rozie-command-palette-args" role="group" [attr.aria-label]="rozieAttr(__attr_aria_label)">
-          <span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true">{{ rozieDisplay(argsState() ? argsState().label : '') }}</span>
+          <span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true">{{ rozieDisplay(argsState() ? labelText(argsState().item) : '') }}</span>
           @for (arg of argsState() ? argsState().argList : []; track arg.id; let argIdx = $index) {
     <span class="rozie-command-palette-args-field">
             @if ((argsFieldTpl ?? templates()?.['argsField'])) {
@@ -782,7 +782,7 @@ export class CommandPalette {
     const raw = this.currentFrameField('virtualEstimateRowHeight', this.virtualEstimateRowHeight());
     return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
   };
-  breadcrumbStack = () => buildBreadcrumb(this.levelStack(), this.ariaLabel());
+  breadcrumbStack = () => breadcrumb(this.levelStack(), this.ariaLabel());
   filteredItems = () => scoreCommands(this.currentBaseItems(), this.query(), this.score());
   _cpIdxBase: any = null;
   _cpIdxQuery: any = null;
@@ -1146,17 +1146,16 @@ export class CommandPalette {
   openActionMenu = (item: any) => {
     if (!canOpenActions(item)) return;
     const actions = actionsOf(item);
-    // The flyout's `:aria-label` reads `$data.actionAnchor.label` (a plain
-    // PROPERTY read, computed here in script) rather than calling
-    // `labelText(item)` directly from the template attribute binding — a bare
-    // top-level-helper CALL inside a plain (non-slot-scoped) `:attr` binding
-    // throws `labelText is not defined` on the Angular target specifically
-    // (the emitter's `this.`-qualification pass doesn't reach that binding
-    // shape) — a source-level workaround, not an emitter change.
+    // Quick 260717-8zb (Task 2 Item 2): the flyout's `:aria-label` calls
+    // `labelText($data.actionAnchor.item)` directly from the template
+    // attribute binding. The prior workaround precomputed a `label` field here
+    // to dodge an Angular emitter gap (a bare top-level-helper CALL inside a
+    // hoisted double-read ternary getter survived un-`this.`-qualified —
+    // ReferenceError at runtime); the emitter now `this.`-qualifies it, so the
+    // natural direct-call form is restored.
     this.actionAnchor.set({
       item,
-      actions,
-      label: this.labelText(item)
+      actions
     });
     this.actionIndex.set(firstEnabledActionIndex(actions));
     this.activeSurface.set('actions');
@@ -1220,17 +1219,13 @@ export class CommandPalette {
   openArgsSurface = (item: any) => {
     if (!hasArgs(item)) return;
     const argList = argsOf(item);
-    // The chip's :aria-label reads $data.argsState.label (a plain PROPERTY
-    // read, computed here in script) rather than calling labelText(item)
-    // directly from a template attribute binding — a bare top-level-helper
-    // CALL inside a plain (non-slot-scoped) :attr binding throws on Angular
-    // specifically (the same trap openActionMenu's actionAnchor.label
-    // precomputation dodges above) — a source-level workaround, not an
-    // emitter change.
+    // Quick 260717-8zb (Task 2 Item 2): the chip's :aria-label calls
+    // `labelText($data.argsState.item)` directly from the template (the same
+    // Angular emitter gap openActionMenu dodged above — now fixed at the
+    // emitter, so the precomputed `label` field workaround is dropped here too).
     this.argsState.set({
       item,
       values: initArgValues(argList),
-      label: this.labelText(item),
       argList
     });
     this.activeSurface.set('args');
@@ -1495,12 +1490,12 @@ export class CommandPalette {
 
   protected get __attr_aria_label() {
       const __argsState = this.argsState();
-      return 'Arguments for ' + (__argsState ? __argsState.label : '');
+      return 'Arguments for ' + (__argsState ? this.labelText(__argsState.item) : '');
     }
 
   protected get __attr_aria_label_2() {
       const __actionAnchor = this.actionAnchor();
-      return __actionAnchor ? __actionAnchor.label : null;
+      return __actionAnchor ? this.labelText(__actionAnchor.item) : null;
     }
 
   protected readonly Number = Number;

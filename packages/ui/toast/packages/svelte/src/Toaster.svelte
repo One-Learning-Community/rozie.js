@@ -58,7 +58,6 @@ const toast = $derived(__toastProp ?? snippets?.toast);
 let toasts: any[] = $state([]);
 let seq = $state(0);
 let swipe: any = $state(null);
-let swipeGesture: any = $state(null);
 
 // Mutable cross-render scratch (NOT reactive): per-id timer bookkeeping. A
 // top-level `let` → React useRef (it escapes into $onUnmount's effect, so the
@@ -103,6 +102,16 @@ let seqLocal = 0;
 // startTimer) and the @mouseenter/@mouseleave handlers, so React hoists it to
 // useRef (persistent) like `timers`.
 let paused = false;
+// The ACTIVE pointer-drag gesture's non-visual bookkeeping: { id, axis, sign,
+// size, startX, startY, startTime } | null (set on @pointerdown, read on
+// @pointermove/@pointerup, cleared on @pointerup/@pointercancel). Referenced
+// ONLY from the four onToastPointer* handlers below, which are bound ONLY via
+// template `@pointerdown`/`@pointermove`/`@pointerup`/`@pointercancel` — the
+// template-@event-handler reachability root (Quick 260717-8zb Task 3 Item 6,
+// hoistModuleLet.ts) hoists this to useRef on React so it persists across the
+// re-renders the sibling `$data.swipe` write triggers mid-gesture. Never read
+// directly in the template — script-only bookkeeping.
+let swipeGesture: any = null;
 // ---- timers ------------------------------------------------------------
 const startTimer = (toast: any) => {
   if (!toast || !toast.duration || toast.duration <= 0) return;

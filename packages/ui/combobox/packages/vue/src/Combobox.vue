@@ -523,6 +523,7 @@ let pinned = false;
 // first paint stays byte-stable (windowedRows()'s own pre-mount `[]` still applies before
 // didMount flips true). Mirrors the same write-in-$onMount/read-elsewhere holder class.
 let didMount = false;
+
 // ---- derived view (plain functions, uniform ×6) ------------------------
 // The filtered option list, each carrying its filtered-list index `_i`, a stable
 // windowing key `id`, and the RAW source option (`option`) so `@change` + the
@@ -539,75 +540,88 @@ let didMount = false;
 // (no reactive subscription), so it adds zero reactivity churn — it collapses virtual-core's
 // O(count) re-maps to ONE map per real (options-ref / query / disableFilter) change.
 //
-// foCache is a member-mutated FRESH-OBJECT const (NOT a reassigned `let`): the React emitter
-// lowers `const X = {…}` that is member-mutated to `useMemo(() => ({…}), [])` (per-instance,
-// stable across renders — feedback_react_const_mutinstance_not_stabilized); on the 5 setup-once
-// targets the top-level const persists for the instance lifetime naturally. A reassigned
-// `let X = null` would NOT survive React renders (filteredOptions() is reached from the TEMPLATE,
-// not a hook-root → per-render reset trap), so it MUST be a fresh-object const.
-const foCache = {
-  optsRef: null,
-  q: null,
-  df: null,
-  groupsRef: null,
+// Quick 260717-8zb dogfood: re-expressed on the `$memo(fn, keyFn)` primitive.
+// `$memo` lowers (core, shared across all 6 targets) to a member-mutated
+// fresh-object cache const + a wrapper function — EXACTLY this foCache shape,
+// generalized. On React the emitted cache const is stabilized to
+// `useMemo(() => ({…}), [])` by the EXISTING collectMutatedInstanceBinders/
+// tryWrapMutatedInstanceUseMemo machinery (feedback_react_const_mutinstance_
+// not_stabilized) — no per-target $memo code. On the 5 setup-once targets the
+// top-level consts persist for the instance lifetime naturally.
+//
+// keyFn is the SUBSCRIBE-FIRST half (fine-grained Solid <For> / Svelte
+// {#each}): it reads ALL FOUR reactive inputs UNCONDITIONALLY — $data.query
+// even when disableFilter is true (mirrors windowing.rzts windowedRows
+// void-touch discipline) and $props.groups even when $props.virtual (so a
+// groups change while windowed still invalidates the cache once virtual
+// toggles off) — evaluated BEFORE $memo's cache-hit check, so the r-for
+// accessor subscribes to them on every eval. Deliberately NOT a $computed: a
+// $computed would re-SUBSCRIBE to the reactive `options` Proxy and re-run on
+// unrelated reactive churn (and on Vue re-trip the Proxy traps); the whole
+// point is to AVOID re-mapping when only activeIndex changed. The cache key
+// is pure VALUE/REFERENCE comparison (no reactive subscription), so it adds
+// zero reactivity churn — it collapses virtual-core's O(count) re-maps to ONE
+// map per real (options-ref / query / disableFilter / groups-ref) change.
+//
+// fn is the MISS path (unchanged from the hand-rolled foCache): run the
+// filter, then (native option grouping, combobox-native-groups) a
+// NON-VIRTUAL-ONLY stable re-partition into group-visual order, then map to
+// wrapper rows.
+const filteredOptionsCache = {
+  keys: null,
   val: null,
-  hasVal: false
+  has: false
 };
 const filteredOptions = () => {
-  // SUBSCRIBE FIRST (fine-grained Solid <For> / Svelte {#each}): read ALL FOUR reactive inputs
-  // into locals at the TOP, BEFORE any cache-hit early return — read $data.query UNCONDITIONALLY
-  // (even when disableFilter is true, mirroring windowing.rzts windowedRows void-touch discipline)
-  // and $props.groups UNCONDITIONALLY (even when $props.virtual, so a groups change while
-  // windowed still invalidates the cache once virtual toggles off) so the r-for accessor
-  // subscribes to them on every eval. An early return that skipped reading them would leave the
-  // accessor un-subscribed → it would never re-run on a real input change → stale/blank window.
-  const opts = Array.isArray(props.options) ? props.options : [];
-  const df = !!props.disableFilter;
-  const q = String(query.value == null ? '' : query.value);
-  const groupsProp = props.groups;
-  // Reference-keyed cache HIT: same options reference, same query, same disableFilter, same
-  // groups reference → return the SAME array reference (no re-map, no new wrappers). Pure ===,
-  // NOT a reactive subscription.
-  if (foCache.hasVal && foCache.optsRef === opts && foCache.q === q && foCache.df === df && foCache.groupsRef === groupsProp) return foCache.val;
-  // MISS → run the existing filter, then (native option grouping, combobox-native-groups) a
-  // NON-VIRTUAL-ONLY stable re-partition into group-visual order, then map + store keyed on
-  // (opts ref, query, disableFilter, groups ref).
-  let list = opts;
-  if (!df) {
-    const ql = q.toLowerCase();
-    if (ql) list = opts.filter((o: any) => String(labelOf(o)).toLowerCase().indexOf(ql) !== -1);
+  const __rozieMemoKey = (() => {
+    const opts = Array.isArray(props.options) ? props.options : [];
+    const df = !!props.disableFilter;
+    const q = String(query.value == null ? '' : query.value);
+    const groupsProp = props.groups;
+    return [opts, q, df, groupsProp];
+  })();
+  if (filteredOptionsCache.has && filteredOptionsCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === filteredOptionsCache.keys[i])) {
+    return filteredOptionsCache.val;
   }
-  // Gated to !$props.virtual (groups×virtual is deferred/unsupported per design) AND to
-  // $props.groups being a NON-EMPTY array — an explicit author opt-in. This is deliberately
-  // NOT just "!$props.virtual" (groupOptions() would otherwise also fire whenever any raw
-  // option happens to carry a `.group` field, even with `groups` absent — a real collision
-  // discovered against command-palette's CommandItem.group, which is a PRE-EXISTING,
-  // unrelated per-row-badge field, not an opt-in to combobox's native grouping. The design's
-  // "Empty/absent `groups` ⇒ today's flat behavior, byte-identical" contract is about the
-  // `groups` PROP only — never inferred from incidental option shape.
-  if (!props.virtual && Array.isArray(groupsProp) && groupsProp.length > 0) {
-    const partition = groupOptions(list, groupsProp, (o: any) => o && o.group != null ? String(o.group) : null);
-    list = partition.ordered;
-  }
-  // `_i` is assigned over the (now group-ordered) list, so the flat keyboard model
-  // (activeIndex/aria-activedescendant/nextEnabled) walks visual order unchanged.
-  // `group` carries the wrapper's normalized group id for groupBlocks() below.
-  const val = list.map((o: any, i: any) => ({
-    value: valueOf(o),
-    label: labelOf(o),
-    disabled: disabledOf(o),
-    _i: i,
-    id: valueOf(o),
-    option: o,
-    group: o && o.group != null ? String(o.group) : null
-  }));
-  foCache.optsRef = opts;
-  foCache.q = q;
-  foCache.df = df;
-  foCache.groupsRef = groupsProp;
-  foCache.val = val;
-  foCache.hasVal = true;
-  return val;
+  const __rozieMemoVal = (() => {
+    const opts = Array.isArray(props.options) ? props.options : [];
+    const df = !!props.disableFilter;
+    const q = String(query.value == null ? '' : query.value);
+    const groupsProp = props.groups;
+    let list = opts;
+    if (!df) {
+      const ql = q.toLowerCase();
+      if (ql) list = opts.filter((o: any) => String(labelOf(o)).toLowerCase().indexOf(ql) !== -1);
+    }
+    // Gated to !$props.virtual (groups×virtual is deferred/unsupported per design) AND to
+    // $props.groups being a NON-EMPTY array — an explicit author opt-in. This is deliberately
+    // NOT just "!$props.virtual" (groupOptions() would otherwise also fire whenever any raw
+    // option happens to carry a `.group` field, even with `groups` absent — a real collision
+    // discovered against command-palette's CommandItem.group, which is a PRE-EXISTING,
+    // unrelated per-row-badge field, not an opt-in to combobox's native grouping. The design's
+    // "Empty/absent `groups` ⇒ today's flat behavior, byte-identical" contract is about the
+    // `groups` PROP only — never inferred from incidental option shape.
+    if (!props.virtual && Array.isArray(groupsProp) && groupsProp.length > 0) {
+      const partition = groupOptions(list, groupsProp, (o: any) => o && o.group != null ? String(o.group) : null);
+      list = partition.ordered;
+    }
+    // `_i` is assigned over the (now group-ordered) list, so the flat keyboard model
+    // (activeIndex/aria-activedescendant/nextEnabled) walks visual order unchanged.
+    // `group` carries the wrapper's normalized group id for groupBlocks() below.
+    return list.map((o: any, i: any) => ({
+      value: valueOf(o),
+      label: labelOf(o),
+      disabled: disabledOf(o),
+      _i: i,
+      id: valueOf(o),
+      option: o,
+      group: o && o.group != null ? String(o.group) : null
+    }));
+  })();
+  filteredOptionsCache.keys = __rozieMemoKey;
+  filteredOptionsCache.val = __rozieMemoVal;
+  filteredOptionsCache.has = true;
+  return __rozieMemoVal;
 };
 // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
 // list (the same wrapper rows the template iterates). Kept === $data.rows so the math's

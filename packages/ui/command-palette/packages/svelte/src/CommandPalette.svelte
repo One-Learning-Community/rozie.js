@@ -158,7 +158,7 @@ let {
   ...__rozieAttrs
 }: Props = $props();
 
-const breadcrumb = $derived(__breadcrumbProp ?? snippets?.breadcrumb);
+const breadcrumb$$slot = $derived(__breadcrumbProp ?? snippets?.breadcrumb);
 const option$$slot = $derived(__optionProp ?? snippets?.option);
 const groupHeading$$slot = $derived(__groupHeadingProp ?? snippets?.groupHeading);
 const empty$$slot = $derived(__emptyProp ?? snippets?.empty);
@@ -185,7 +185,7 @@ let panel = $state<HTMLElement | undefined>(undefined);
 let combobox = $state<ReturnType<typeof Combobox> | undefined>(undefined);
 
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
@@ -347,16 +347,18 @@ const currentVirtualEstimateRowHeight = () => {
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
 };
 // breadcrumbStack(): the full root..current breadcrumb (internal/levelStack.ts
-// breadcrumb(), imported aliased `buildBreadcrumb` — the SVELTE EMITTER
-// generates a local snippet binding named after the `breadcrumb` SLOT itself,
-// which collides with a same-named top-level import on that one target only
-// (a "slot-name == script-identifier" collision, adjacent to the
-// slot==prop-name ROZ127 class but not caught by it since `breadcrumb` isn't
-// a prop) — aliasing the import sidesteps it without renaming the public
-// slot) fed to the #breadcrumb slot's `stack` scope param — the root entry's
-// title is `ariaLabel` (the palette's own accessible name doubles as the
-// root breadcrumb label; there is no separate "root title" prop).
-const breadcrumbStack = () => buildBreadcrumb(levelStack, ariaLabel);
+// breadcrumb()) fed to the #breadcrumb slot's `stack` scope param — the root
+// entry's title is `ariaLabel` (the palette's own accessible name doubles as
+// the root breadcrumb label; there is no separate "root title" prop).
+// Quick 260717-8zb (Task 2 Item 4): the import is the NATURAL `breadcrumb`
+// name again (previously aliased `as buildBreadcrumb` to sidestep a
+// Svelte-only collision with the emitter's own `breadcrumb` slot-merge
+// binding — the same top-level `<script>` scope as this import). The Svelte
+// emitter now auto-renames its generated slot-merge binding to
+// `breadcrumb$$slot` on collision (Class 3, findRForSlotNameCollisions.ts),
+// the same mechanism that already fixes the r-for-loop-var and script-param
+// collision classes — no author-side alias needed.
+const breadcrumbStack = () => breadcrumb(levelStack, ariaLabel);
 // ---- derived views (plain functions, uniform ×6) -----------------------
 // The ranked command list fed to the vendored <Combobox> as its `:options`.
 // command-palette KEEPS its own ranking (scoreCommands, fuzzy-subsequence by
@@ -884,19 +886,21 @@ const reopenComboboxPopup = () => {
 // reuses the identical transition shape for a future 'args' surface.
 //
 // $refs/$el usage note: bindings below use `$refs.panel` (the modal panel
-// div's existing `ref="panel"`), NOT the `$el` sigil — a directly-typed bare
-// assignment of `$el`/`$refs.<name>` (`const root: any = $el`, or even
-// `const panel: any = $refs.panel`) compiles to a LITERAL, un-lowered
-// `$refs.__rozieRoot` (or `$refs.panel`) on the Svelte target — a real
-// Svelte-only emitter gap where the `: any` type annotation on the bare
-// `$el`/`$refs.X` declarator suppresses the deconflict/lowering pass that
-// otherwise correctly rewrites `const panel = $refs.panel` (UNTYPED) to
-// Svelte's real `panel$local` binding (`deconflictAccessorShadows`, the
-// same-name-as-accessor self-shadow guard — proven ×N in date-picker/
-// dialog/pagination/tags/otp/resizable, none of which type-annotate the
-// bare assignment). Workaround (source-only, not an emitter edit): keep the
-// `$refs.panel` assignment BARE/untyped; only the DOWNSTREAM `.querySelector`
-// RESULT gets `: any` (a separate declarator, unaffected by the gap).
+// div's existing `ref="panel"`), NOT the `$el` sigil — the panel is a
+// specific descendant the flyout/args surfaces need to query, whereas `$el`
+// is the component's own root. Quick 260717-8zb (Task 2 Item 3) VERIFIED
+// this file's `$refs.panel` reads are NOT affected by a typing gap: a
+// battery of probes (typed/untyped, self-shadow/non-self-shadow local name,
+// nested/top-level scope, `$refs.X` AND `$el`) all lower correctly on the
+// Svelte target — `isInTypePosition`'s ancestry walk correctly treats a
+// declarator's `id.typeAnnotation` as a SIBLING of `init`, never an
+// ancestor, so it never suppresses the init's rewrite. The prior comment's
+// premise (a `: any` type annotation on the bare `$refs.X`/`$el` declarator
+// breaks the Svelte lowering) was stale/incorrect — see
+// packages/targets/svelte/src/__tests__/typedRefsDeclarator.test.ts for the
+// permanent regression guard. `panel`/`frame` stay untyped here only because
+// that already matches the rest of this file's house style, not to dodge
+// any emitter gap.
 
 // deepQuerySelector(root, selector): a shadow-piercing querySelector — the
 // vendored <Combobox> renders its OWN internal shadow root on the Lit
@@ -1010,17 +1014,16 @@ const focusFirstMenuItem = () => {
 const openActionMenu = (item: any) => {
   if (!canOpenActions(item)) return;
   const actions = actionsOf(item);
-  // The flyout's `:aria-label` reads `$data.actionAnchor.label` (a plain
-  // PROPERTY read, computed here in script) rather than calling
-  // `labelText(item)` directly from the template attribute binding — a bare
-  // top-level-helper CALL inside a plain (non-slot-scoped) `:attr` binding
-  // throws `labelText is not defined` on the Angular target specifically
-  // (the emitter's `this.`-qualification pass doesn't reach that binding
-  // shape) — a source-level workaround, not an emitter change.
+  // Quick 260717-8zb (Task 2 Item 2): the flyout's `:aria-label` calls
+  // `labelText($data.actionAnchor.item)` directly from the template
+  // attribute binding. The prior workaround precomputed a `label` field here
+  // to dodge an Angular emitter gap (a bare top-level-helper CALL inside a
+  // hoisted double-read ternary getter survived un-`this.`-qualified —
+  // ReferenceError at runtime); the emitter now `this.`-qualifies it, so the
+  // natural direct-call form is restored.
   actionAnchor = {
     item,
-    actions,
-    label: labelText(item)
+    actions
   };
   actionIndex = firstEnabledActionIndex(actions);
   activeSurface = 'actions';
@@ -1110,17 +1113,13 @@ const focusArgFieldAt = (idx: any) => {
 const openArgsSurface = (item: any) => {
   if (!hasArgs(item)) return;
   const argList = argsOf(item);
-  // The chip's :aria-label reads $data.argsState.label (a plain PROPERTY
-  // read, computed here in script) rather than calling labelText(item)
-  // directly from a template attribute binding — a bare top-level-helper
-  // CALL inside a plain (non-slot-scoped) :attr binding throws on Angular
-  // specifically (the same trap openActionMenu's actionAnchor.label
-  // precomputation dodges above) — a source-level workaround, not an
-  // emitter change.
+  // Quick 260717-8zb (Task 2 Item 2): the chip's :aria-label calls
+  // `labelText($data.argsState.item)` directly from the template (the same
+  // Angular emitter gap openActionMenu dodged above — now fixed at the
+  // emitter, so the precomputed `label` field workaround is dropped here too).
   argsState = {
     item,
     values: initArgValues(argList),
-    label: labelText(item),
     argList
   };
   activeSurface = 'args';
@@ -1442,7 +1441,7 @@ $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWa
 })(__watchVal); }); });
 </script>
 
-{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} use:roziePortal={resolveAppendTo(appendTo)} data-rozie-s-768cad96><div bind:this={frame} class="rozie-command-palette-frame" data-testid="command-palette-frame" onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} data-rozie-s-768cad96>{#if atDepth()}<div class="rozie-command-palette-header" data-rozie-s-768cad96>{#if breadcrumb}{@render breadcrumb({ stack: breadcrumbStack(), back: goBack })}{:else}<button type="button" class="rozie-command-palette-back" aria-label="Back" data-testid="command-palette-back" onclick={($event) => { goBack(); }} data-rozie-s-768cad96>‹</button><nav class="rozie-command-palette-breadcrumb-trail" data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb" data-rozie-s-768cad96>{#each breadcrumbStack() as entry, ei (ei)}<span class="rozie-command-palette-breadcrumb-item" data-rozie-s-768cad96>{#if Number(ei) > 0}<span class="rozie-command-palette-breadcrumb-separator" aria-hidden="true" data-rozie-s-768cad96>›</span>{/if}{#if Number(ei) < breadcrumbStack().length - 1}<button type="button" class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link" aria-label={rozieAttr('Back to ' + entry.title)} data-testid="command-palette-breadcrumb-jump" onclick={($event) => { jumpToLevel(Number(ei)); }} data-rozie-s-768cad96>{rozieDisplay(entry.title)}</button>{:else}<span class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-title" data-rozie-s-768cad96>{rozieDisplay(entry.title)}</span>{/if}</span>{/each}</nav>{/if}</div>{/if}<div class={["rozie-command-palette-list-region", { 'rozie-command-palette-list-region--inert': activeSurface === 'args' }]} aria-hidden={!!(activeSurface === 'args')} data-rozie-s-768cad96><Combobox bind:this={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}<span class="rozie-command-palette-option-anchor" data-cp-index={rozieAttr(cpAnchorIndex(option))} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96>{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) })}{:else}<div class="rozie-command-palette-option" data-rozie-s-768cad96>{#if icon}<span class="rozie-command-palette-option-icon" data-rozie-s-768cad96>{#if icon}{@render icon({ option })}{/if}</span>{/if}<span class="rozie-command-palette-option-main" data-rozie-s-768cad96><span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{#each labelSegments(option) as segment, si (si)}<span class={{ 'rozie-command-palette-option-label-match': segment.match }} data-rozie-s-768cad96>{rozieDisplay(segment.text)}</span>{/each}</span>{#if groupText(option) && !grouped()}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}</span>{#if hotKeyOf(option)}<span class="rozie-command-palette-option-hotkey" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(formatKeyToken(hotKeyOf(option), platformIsApple))}</span>{/if}{#if actions || actionsList(option).length > 0}<span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" onmousedown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96>{#if actions}{@render actions({ option, actions: actionsList(option) })}{:else}{#if actionsList(option).length > 0}<span class="rozie-command-palette-option-actions-hint" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(actionKeyHint())}</span>{/if}{/if}</span>{/if}{#if trailing}<span class="rozie-command-palette-option-trailing" data-rozie-s-768cad96>{#if trailing}{@render trailing({ option })}{/if}</span>{/if}</div>{/if}</span>{/snippet}{#snippet groupHeading({ group })}{#if groupHeading$$slot}{@render groupHeading$$slot({ group })}{:else}{rozieDisplay(groupLabel(group))}{/if}{/snippet}{#snippet empty({ query })}{#if currentStatus() === 'ready'}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/if}{/snippet}</Combobox></div>{#if activeSurface === 'args'}<div data-command-palette-args="" data-testid="command-palette-args" class="rozie-command-palette-args" role="group" aria-label={rozieAttr('Arguments for ' + (argsState ? argsState.label : ''))} data-rozie-s-768cad96><span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(argsState ? argsState.label : '')}</span>{#each argsState ? argsState.argList : [] as arg, argIdx (arg.id)}<span class="rozie-command-palette-args-field" data-rozie-s-768cad96>{#if argsField}{@render argsField({ item: argsState ? argsState.item : null, arg, value: argsState ? argsState.values[arg.id] : '', setValue: setArgValueFor(arg.id) })}{:else}<input type="text" class="rozie-command-palette-args-input" data-testid="command-palette-args-input" value={argsState ? argsState.values[arg.id] : ''} placeholder={rozieAttr(arg.placeholder || arg.id)} aria-label={rozieAttr(arg.placeholder || arg.id)} oninput={($event) => { onArgFieldInput(arg.id, $event); }} data-rozie-s-768cad96 />{/if}</span>{/each}</div>{/if}{#if currentStatus() === 'loading'}<div class="rozie-command-palette-loading" data-rozie-s-768cad96>{#if loading}{@render loading({ query })}{:else}Loading…{/if}</div>{:else if currentStatus() === 'error'}<div class="rozie-command-palette-error" data-rozie-s-768cad96>{@render error?.({ query, error: currentError(), retry: retryCurrentLevel })}</div>{/if}{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div>{#if atActions()}<div data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" aria-label={rozieAttr(actionAnchor ? actionAnchor.label : null)} style={rozieStyle('top:' + actionMenuTop + 'px')} onkeydown={($event) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96>{#each actionAnchor ? actionAnchor.actions : [] as action, ai (action.id)}<div class={["rozie-command-palette-actions-menu-item", { 'rozie-command-palette-actions-menu-item--active': ai === actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }]} role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action.disabled} tabindex="-1" onmouseenter={($event) => { actionIndex = Number(ai); }} onmousedown={($event) => { $event.preventDefault(); selectAction(action); }} data-rozie-s-768cad96>{#if actionItem}{@render actionItem({ action, item: actionAnchor ? actionAnchor.item : null, active: ai === actionIndex, disabled: !!action.disabled })}{:else}{#if actionIcon(action)}<span class="rozie-command-palette-actions-menu-item-icon" data-rozie-s-768cad96>{rozieDisplay(actionIcon(action))}</span>{/if}<span class="rozie-command-palette-actions-menu-item-label" data-rozie-s-768cad96>{rozieDisplay(actionLabel(action))}</span>{#if actionShortcut(action)}<span class="rozie-command-palette-actions-menu-item-shortcut" data-rozie-s-768cad96>{rozieDisplay(actionShortcut(action))}</span>{/if}{/if}</div>{/each}</div>{/if}</div></div>{/if}
+{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} use:roziePortal={resolveAppendTo(appendTo)} data-rozie-s-768cad96><div bind:this={frame} class="rozie-command-palette-frame" data-testid="command-palette-frame" onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} data-rozie-s-768cad96>{#if atDepth()}<div class="rozie-command-palette-header" data-rozie-s-768cad96>{#if breadcrumb$$slot}{@render breadcrumb$$slot({ stack: breadcrumbStack(), back: goBack })}{:else}<button type="button" class="rozie-command-palette-back" aria-label="Back" data-testid="command-palette-back" onclick={($event) => { goBack(); }} data-rozie-s-768cad96>‹</button><nav class="rozie-command-palette-breadcrumb-trail" data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb" data-rozie-s-768cad96>{#each breadcrumbStack() as entry, ei (ei)}<span class="rozie-command-palette-breadcrumb-item" data-rozie-s-768cad96>{#if Number(ei) > 0}<span class="rozie-command-palette-breadcrumb-separator" aria-hidden="true" data-rozie-s-768cad96>›</span>{/if}{#if Number(ei) < breadcrumbStack().length - 1}<button type="button" class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link" aria-label={rozieAttr('Back to ' + entry.title)} data-testid="command-palette-breadcrumb-jump" onclick={($event) => { jumpToLevel(Number(ei)); }} data-rozie-s-768cad96>{rozieDisplay(entry.title)}</button>{:else}<span class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-title" data-rozie-s-768cad96>{rozieDisplay(entry.title)}</span>{/if}</span>{/each}</nav>{/if}</div>{/if}<div class={["rozie-command-palette-list-region", { 'rozie-command-palette-list-region--inert': activeSurface === 'args' }]} aria-hidden={!!(activeSurface === 'args')} data-rozie-s-768cad96><Combobox bind:this={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}<span class="rozie-command-palette-option-anchor" data-cp-index={rozieAttr(cpAnchorIndex(option))} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96>{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) })}{:else}<div class="rozie-command-palette-option" data-rozie-s-768cad96>{#if icon}<span class="rozie-command-palette-option-icon" data-rozie-s-768cad96>{#if icon}{@render icon({ option })}{/if}</span>{/if}<span class="rozie-command-palette-option-main" data-rozie-s-768cad96><span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{#each labelSegments(option) as segment, si (si)}<span class={{ 'rozie-command-palette-option-label-match': segment.match }} data-rozie-s-768cad96>{rozieDisplay(segment.text)}</span>{/each}</span>{#if groupText(option) && !grouped()}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}</span>{#if hotKeyOf(option)}<span class="rozie-command-palette-option-hotkey" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(formatKeyToken(hotKeyOf(option), platformIsApple))}</span>{/if}{#if actions || actionsList(option).length > 0}<span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" onmousedown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96>{#if actions}{@render actions({ option, actions: actionsList(option) })}{:else}{#if actionsList(option).length > 0}<span class="rozie-command-palette-option-actions-hint" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(actionKeyHint())}</span>{/if}{/if}</span>{/if}{#if trailing}<span class="rozie-command-palette-option-trailing" data-rozie-s-768cad96>{#if trailing}{@render trailing({ option })}{/if}</span>{/if}</div>{/if}</span>{/snippet}{#snippet groupHeading({ group })}{#if groupHeading$$slot}{@render groupHeading$$slot({ group })}{:else}{rozieDisplay(groupLabel(group))}{/if}{/snippet}{#snippet empty({ query })}{#if currentStatus() === 'ready'}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/if}{/snippet}</Combobox></div>{#if activeSurface === 'args'}<div data-command-palette-args="" data-testid="command-palette-args" class="rozie-command-palette-args" role="group" aria-label={rozieAttr('Arguments for ' + (argsState ? labelText(argsState.item) : ''))} data-rozie-s-768cad96><span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(argsState ? labelText(argsState.item) : '')}</span>{#each argsState ? argsState.argList : [] as arg, argIdx (arg.id)}<span class="rozie-command-palette-args-field" data-rozie-s-768cad96>{#if argsField}{@render argsField({ item: argsState ? argsState.item : null, arg, value: argsState ? argsState.values[arg.id] : '', setValue: setArgValueFor(arg.id) })}{:else}<input type="text" class="rozie-command-palette-args-input" data-testid="command-palette-args-input" value={argsState ? argsState.values[arg.id] : ''} placeholder={rozieAttr(arg.placeholder || arg.id)} aria-label={rozieAttr(arg.placeholder || arg.id)} oninput={($event) => { onArgFieldInput(arg.id, $event); }} data-rozie-s-768cad96 />{/if}</span>{/each}</div>{/if}{#if currentStatus() === 'loading'}<div class="rozie-command-palette-loading" data-rozie-s-768cad96>{#if loading}{@render loading({ query })}{:else}Loading…{/if}</div>{:else if currentStatus() === 'error'}<div class="rozie-command-palette-error" data-rozie-s-768cad96>{@render error?.({ query, error: currentError(), retry: retryCurrentLevel })}</div>{/if}{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div>{#if atActions()}<div data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" aria-label={rozieAttr(actionAnchor ? labelText(actionAnchor.item) : null)} style={rozieStyle('top:' + actionMenuTop + 'px')} onkeydown={($event) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96>{#each actionAnchor ? actionAnchor.actions : [] as action, ai (action.id)}<div class={["rozie-command-palette-actions-menu-item", { 'rozie-command-palette-actions-menu-item--active': ai === actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }]} role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action.disabled} tabindex="-1" onmouseenter={($event) => { actionIndex = Number(ai); }} onmousedown={($event) => { $event.preventDefault(); selectAction(action); }} data-rozie-s-768cad96>{#if actionItem}{@render actionItem({ action, item: actionAnchor ? actionAnchor.item : null, active: ai === actionIndex, disabled: !!action.disabled })}{:else}{#if actionIcon(action)}<span class="rozie-command-palette-actions-menu-item-icon" data-rozie-s-768cad96>{rozieDisplay(actionIcon(action))}</span>{/if}<span class="rozie-command-palette-actions-menu-item-label" data-rozie-s-768cad96>{rozieDisplay(actionLabel(action))}</span>{#if actionShortcut(action)}<span class="rozie-command-palette-actions-menu-item-shortcut" data-rozie-s-768cad96>{rozieDisplay(actionShortcut(action))}</span>{/if}{/if}</div>{/each}</div>{/if}</div></div>{/if}
 
 <style>
 :global {

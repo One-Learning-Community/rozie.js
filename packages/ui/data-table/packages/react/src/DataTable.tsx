@@ -300,6 +300,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const committedThisSession = useRef(false);
   const editTransition = useRef(false);
   const restoringHistory = useRef<boolean>(false);
+  const rangeTransition = useRef(false);
+  const rangeClickPending = useRef(false);
+  const rangeDragMoved = useRef(false);
   const [data, setData] = useControllableState({
     value: props.data,
     defaultValue: props.defaultData ?? [],
@@ -2399,10 +2402,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // focusin that follows a Shift+Click (rangeClickPending): @mousedown already set the range
     // BEFORE this focusin fires, and a focusin carries no reliable shiftKey, so the @mousedown
     // path owns the shift case and flags it here so the collapse is skipped.
-    if (rangeTransition) {
-      rangeTransition = false;
-    } else if (rangeClickPending) {
-      rangeClickPending = false;
+    if (rangeTransition.current) {
+      rangeTransition.current = false;
+    } else if (rangeClickPending.current) {
+      rangeClickPending.current = false;
     } else {
       clearRange();
     }
@@ -2431,7 +2434,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       setActiveIsHeader(false);
       setActiveRow(row);
       setActiveColIndex(col);
-      rangeClickPending = true;
+      rangeClickPending.current = true;
       return;
     }
     // §6 plain mousedown → begin a document-level drag-select anchored at this cell. The mousedown's
@@ -2484,8 +2487,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // §6 (260709-3qt): a drag-select that MOVED must never open the editor — the editor opens only
     // on a genuine mouseup-no-drag click. beginRangeDrag resets rangeDragMoved=false per gesture, so
     // the flag is always fresh; consume it here so a subsequent plain click still edits.
-    if (rangeDragMoved) {
-      rangeDragMoved = false;
+    if (rangeDragMoved.current) {
+      rangeDragMoved.current = false;
       return;
     }
     const tgt = e.target;
@@ -2626,38 +2629,6 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       recoverGridFocus(String(recRow), recCol, null);
     }
   }, [activeColIndex, activeIsHeader, activeRow, bodyRowCount, clamp, clampRange, headerLeafLevel, isGrid, recoverGridFocus, visibleColCount]);
-  // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
-  // A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
-  // (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the
-  // highlight reattaches to the correct cells across virtualization recycling (the
-  // activeRow/activeColIndex invariant). ONE-WAY (D-07): exposed via getSelectedRange +
-  // range-change, NOT a model:true slice. Coexists with — and is visually distinct from —
-  // the row-selection slice (the two never touch each other's state).
-
-  // inRange(rIdx, cIdx): is the cell at the visible-model index pair inside the current
-  // rectangle? Pure index math (the min/max box of anchor+focus). False when no range —
-  // the byte-identical-off guard for the range markup (no anchor/focus → no :data-in-range).
-  // rangeTransition: set true while extendRange/setRangeFocus moves DOM focus to the new
-  // range-focus corner. That focus move fires @focusin → syncActiveFromEvent with NO shiftKey
-  // (a programmatic focus carries no modifier), which would otherwise clearRange() and wipe the
-  // range we just set. The flag suppresses that collapse for the in-flight focus settle (the
-  // editTransition blur-guard precedent). A top-level let → React hoists to useRef.
-  let rangeTransition = false;
-  // rangeClickPending: set by onGridMouseDown on a Shift+Click (the range is set off the
-  // pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
-  // to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
-  // rangeClickPending: set by onGridMouseDown on a Shift+Click (the range is set off the
-  // pointer event's shiftKey BEFORE the cell's focusin fires); the follow-up focusin reads it
-  // to SKIP the range-collapse (a focusin carries no reliable shiftKey). Reset on consumption.
-  let rangeClickPending = false;
-  // B19: a SYNCHRONOUS mirror of "a range currently exists" — extendRange/setRangeFocus set it
-  // true, clearRange/clampRange-to-empty set it false. clearRange is invoked TWICE in one plain-
-  // arrow keydown (the explicit collapse + the focusin that follows the programmatic focus move);
-  // on React `$data.rangeAnchor = null` is an async setState, so the SECOND clearRange's
-  // `$data.rangeAnchor == null` guard reads the STALE (pre-write) range and fires a duplicate
-  // range-change. This module-let is written synchronously (no setState async), so the second
-  // clearRange sees `rangeActive === false` and returns → exactly ONE range-change per real drop
-  // across all six targets. A top-level let → React hoists to useRef.
   function inRange(rIdx: any, cIdx: any) {
     const a = rangeAnchor;
     const f = rangeFocus;
@@ -2741,7 +2712,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setActiveColIndex(nextCol);
     // Suppress the focus-move's @focusin clearRange (no shiftKey on a programmatic focus): the
     // settle on the new focus corner is part of THIS range extension, not a fresh navigation.
-    rangeTransition = true;
+    rangeTransition.current = true;
     focusActiveCell(nextRow, nextCol, false);
     // B18: emit range-change ONLY on an actual change. A clamped no-op (a range already exists
     // and the focus corner did not move — Shift+Arrow into the grid boundary) is not a selection
@@ -3280,7 +3251,6 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       document.addEventListener('pointerup', up);
     }
   }, [cellIndexFromPoint, fillRange, normalizedRange, setRangeFocus$local, teardownFillDrag]);
-  let rangeDragMoved = false;
   const teardownRangeDrag = useCallback(() => {
     if (typeof document !== 'undefined') {
       if (rangeDragMove.current) document.removeEventListener('pointermove', rangeDragMove.current);
@@ -3299,7 +3269,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // rangeDragMoved, which is reset per-gesture immediately below.
     teardownRangeDrag();
     rangeDragging.current = true;
-    rangeDragMoved = false;
+    rangeDragMoved.current = false;
     let lastCell = {
       r: anchorR,
       c: anchorC
@@ -3309,7 +3279,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       const cell = cellIndexFromPoint(ev.clientX, ev.clientY);
       if (cell && (cell.r !== lastCell.r || cell.c !== lastCell.c)) {
         lastCell = cell;
-        rangeDragMoved = true;
+        rangeDragMoved.current = true;
         setRangeFocus$local(cell.r, cell.c);
       }
     };

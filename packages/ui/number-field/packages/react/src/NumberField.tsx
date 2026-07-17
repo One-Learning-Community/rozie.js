@@ -81,6 +81,8 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
   const scrubbing = useRef(false);
   const holdTimer = useRef<any>(null);
   const holdInterval = useRef(0);
+  const scrubStartX = useRef(0);
+  const scrubStartValue = useRef(0);
   const [modelValue, setModelValue] = useControllableState({
     value: props.modelValue,
     defaultValue: props.defaultModelValue ?? null,
@@ -90,13 +92,6 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
   const [focused, setFocused] = useState(false);
   const input = useRef<HTMLInputElement | null>(null);
 
-  let scrubStartX = 0;
-  let scrubStartValue = 0;
-
-  // ---- numeric helpers (plain functions, uniform ×6) -------------------------
-  // The current value as a real number, or null when empty. Named readValue, NOT
-  // valueOf — a `valueOf` binding cascades TS1240/1271 across the Lit class via
-  // Object.prototype.
   const readValue = useCallback(() => {
     const v = modelValue;
     return typeof v === 'number' && !Number.isNaN(v) ? v : null;
@@ -238,9 +233,9 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
   const onScrubDown = useCallback((e: any) => {
     if (!props.allowScrub || props.disabled || props.readonly) return;
     scrubbing.current = true;
-    scrubStartX = e && typeof e.clientX === 'number' ? e.clientX : 0;
+    scrubStartX.current = e && typeof e.clientX === 'number' ? e.clientX : 0;
     const cur = readValue();
-    scrubStartValue = cur === null ? hasMin() ? props.min : 0 : cur;
+    scrubStartValue.current = cur === null ? hasMin() ? props.min : 0 : cur;
     // Capture the pointer so move/up stay on this element for the whole drag.
     if (e && e.target && e.target.setPointerCapture && typeof e.pointerId === 'number') {
       try {
@@ -251,11 +246,11 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
   const onScrubMove = useCallback((e: any) => {
     if (!scrubbing.current) return;
     const x = e && typeof e.clientX === 'number' ? e.clientX : 0;
-    const dx = x - scrubStartX;
+    const dx = x - scrubStartX.current;
     const stepSize = typeof props.step === 'number' && props.step > 0 ? props.step : 1;
     // One step per 8px of horizontal travel.
     const delta = Math.round(dx / 8) * stepSize;
-    commitValue(scrubStartValue + delta);
+    commitValue(scrubStartValue.current + delta);
   }, [commitValue, props.step]);
   const onScrubUp = useCallback(() => {
     scrubbing.current = false;

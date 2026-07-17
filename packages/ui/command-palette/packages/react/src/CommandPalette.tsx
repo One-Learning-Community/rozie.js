@@ -5,7 +5,7 @@ import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState }
 import './CommandPalette.css';
 import Combobox, { type ComboboxHandle } from '@rozie-ui/combobox-react';
 import { scoreCommands, labelHighlight } from './internal/scoreCommands';
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource';
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu';
 import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
@@ -202,6 +202,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   const _cpIdxBase = useRef<any>(null);
   const _cpIdxQuery = useRef<any>(null);
   const _cpIdxScore = useRef<any>(null);
+  const argsJustOpened = useRef(false);
   const [open, setOpen] = useControllableState({
     value: props.open,
     defaultValue: props.defaultOpen ?? false,
@@ -228,39 +229,6 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   const _watch0First = useRef(true);
 
   const { onBack: _rozieProp_onBack } = props;
-  // ---- args-surface opening-Enter guard (finding 2) -----------------------
-  // openArgsSurface flips $data.activeSurface to 'args' SYNCHRONOUSLY from inside
-  // onComboboxChange, which itself runs from the vendored <Combobox>'s Enter
-  // commit (Combobox.rozie onKeydown → selectOption → synchronous `@change`).
-  // That Enter keydown preventDefaults but does NOT stopPropagation, so the SAME
-  // keystroke keeps bubbling up to the frame's @keydown (onPanelKeydown); its
-  // args-branch would then fire submitArgs() on the very key that opened the
-  // surface — instantly @select-ing any command whose args are already valid on
-  // open (a required arg with a `default`, or all-optional args). This flag,
-  // armed in openArgsSurface and disarmed on the next microtask (after the
-  // opening keydown has finished bubbling, before any later keystroke), makes
-  // onPanelKeydown's args-branch Enter — and ONLY Enter; Escape/Backspace stay
-  // live — a no-op for exactly that opening keystroke. A module-level `let`
-  // (never $data) so the read-after-write across the synchronous bubble is exact
-  // ×6 (the requestToken/debounceTimerId precedent); the React emitter hoists it
-  // to useRef. On React the surface flip is async (setState), so onPanelKeydown
-  // reads the pre-flip 'list' surface and never reaches the args-branch on the
-  // opening event anyway — the guard is a correct no-op there.
-  let argsJustOpened = false;
-
-  // command-palette-portal-overlay phase — resolveAppendTo(): normalizes the
-  // `appendTo` prop into a portal container (or `null` = render in place). A
-  // PLAIN function (never $computed — this is read from inside `r-portal`'s
-  // container expression, a runtime/reactive-effect position on every target,
-  // not a template-bare-read derived value). SSR-guarded FIRST so a falsy `to`
-  // or a missing `document` never reaches `document.querySelector` — `null`
-  // feeds `r-portal`'s falsy/disabled path, which is what makes
-  // `appendTo:false` (the default) byte-behavior-identical to no directive at
-  // all. `to === true || to === 'body'` -> `document.body`; a CSS selector
-  // string -> `document.querySelector(to)` (no match = `null`, in place — never
-  // a blank overlay); anything else (e.g. an author-passed Element reference,
-  // outside the declared Boolean|String prop type but tolerated at runtime) is
-  // returned as-is.
   function resolveAppendTo(to: any) {
     if (!to) return null;
     if (typeof document === 'undefined') return null;
@@ -325,7 +293,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
   }
   function breadcrumbStack() {
-    return buildBreadcrumb(levelStack, props.ariaLabel);
+    return breadcrumb(levelStack, props.ariaLabel);
   }
   function filteredItems() {
     return scoreCommands(currentBaseItems(), query, props.score);
@@ -717,17 +685,16 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   const openActionMenu = useCallback((item: any) => {
     if (!canOpenActions(item)) return;
     const actions = actionsOf(item);
-    // The flyout's `:aria-label` reads `$data.actionAnchor.label` (a plain
-    // PROPERTY read, computed here in script) rather than calling
-    // `labelText(item)` directly from the template attribute binding — a bare
-    // top-level-helper CALL inside a plain (non-slot-scoped) `:attr` binding
-    // throws `labelText is not defined` on the Angular target specifically
-    // (the emitter's `this.`-qualification pass doesn't reach that binding
-    // shape) — a source-level workaround, not an emitter change.
+    // Quick 260717-8zb (Task 2 Item 2): the flyout's `:aria-label` calls
+    // `labelText($data.actionAnchor.item)` directly from the template
+    // attribute binding. The prior workaround precomputed a `label` field here
+    // to dodge an Angular emitter gap (a bare top-level-helper CALL inside a
+    // hoisted double-read ternary getter survived un-`this.`-qualified —
+    // ReferenceError at runtime); the emitter now `this.`-qualifies it, so the
+    // natural direct-call form is restored.
     setActionAnchor({
       item,
-      actions,
-      label: labelText(item)
+      actions
     });
     setActionIndex(firstEnabledActionIndex(actions));
     setActiveSurface('actions');
@@ -766,7 +733,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     } else {
       focusFirstMenuItem();
     }
-  }, [actionMenuTop, deepQuerySelector, focusFirstMenuItem, labelText]);
+  }, [actionMenuTop, deepQuerySelector, focusFirstMenuItem]);
   function closeActionMenu() {
     setActiveSurface('list');
     setActionIndex(-1);
@@ -791,17 +758,13 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function openArgsSurface(item: any) {
     if (!hasArgs(item)) return;
     const argList = argsOf(item);
-    // The chip's :aria-label reads $data.argsState.label (a plain PROPERTY
-    // read, computed here in script) rather than calling labelText(item)
-    // directly from a template attribute binding — a bare top-level-helper
-    // CALL inside a plain (non-slot-scoped) :attr binding throws on Angular
-    // specifically (the same trap openActionMenu's actionAnchor.label
-    // precomputation dodges above) — a source-level workaround, not an
-    // emitter change.
+    // Quick 260717-8zb (Task 2 Item 2): the chip's :aria-label calls
+    // `labelText($data.argsState.item)` directly from the template (the same
+    // Angular emitter gap openActionMenu dodged above — now fixed at the
+    // emitter, so the precomputed `label` field workaround is dropped here too).
     setArgsState({
       item,
       values: initArgValues(argList),
-      label: labelText(item),
       argList
     });
     setActiveSurface('args');
@@ -810,9 +773,9 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     // before any later user keystroke. Promise-based (SSR-safe, the
     // beginLevelLoad microtask precedent); a real Enter to submit lands in a
     // strictly later task.
-    argsJustOpened = true;
+    argsJustOpened.current = true;
     Promise.resolve().then(() => {
-      argsJustOpened = false;
+      argsJustOpened.current = false;
     });
     combobox.current?.pinOpen(true);
     if (typeof requestAnimationFrame !== 'undefined') {
@@ -956,7 +919,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
         // finding 2: swallow the very Enter that opened this surface (it bubbled
         // here from the vendored combobox's synchronous Enter commit). A real
         // submit needs a fresh Enter, after the guard disarms next microtask.
-        if (argsJustOpened) return;
+        if (argsJustOpened.current) return;
         submitArgs();
         return;
       }
@@ -1085,8 +1048,8 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
         </div>
 
         
-        {!!(activeSurface === 'args') && <div data-command-palette-args="" data-testid="command-palette-args" className={"rozie-command-palette-args"} role="group" aria-label={rozieAttr('Arguments for ' + (argsState ? argsState.label : ''))} data-rozie-s-768cad96="">
-          <span className={"rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current"} data-testid="command-palette-args-chip" aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(argsState ? argsState.label : '')}</span>
+        {!!(activeSurface === 'args') && <div data-command-palette-args="" data-testid="command-palette-args" className={"rozie-command-palette-args"} role="group" aria-label={rozieAttr('Arguments for ' + (argsState ? labelText(argsState.item) : ''))} data-rozie-s-768cad96="">
+          <span className={"rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current"} data-testid="command-palette-args-chip" aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(argsState ? labelText(argsState.item) : '')}</span>
           {(argsState ? argsState.argList : []).map((arg, argIdx) => <span key={arg.id} className={"rozie-command-palette-args-field"} data-rozie-s-768cad96="">
             {(props.renderArgsField ?? props.slots?.['argsField']) ? ((props.renderArgsField ?? props.slots?.['argsField']) as Function)({ item: argsState ? argsState.item : null, arg, value: argsState ? argsState.values[arg.id] : '', setValue: setArgValueFor(arg.id) }) : <input type="text" className={"rozie-command-palette-args-input"} data-testid="command-palette-args-input" value={argsState ? argsState.values[arg.id] : ''} placeholder={rozieAttr(arg.placeholder || arg.id)} aria-label={rozieAttr(arg.placeholder || arg.id)} onInput={($event) => { onArgFieldInput(arg.id, $event); }} data-rozie-s-768cad96="" />}
           </span>)}
@@ -1099,7 +1062,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
         </div>}</div>
 
       
-      {!!(atActions()) && <div data-command-palette-menu="" data-testid="command-palette-actions-menu" className={"rozie-command-palette-actions-menu"} role="menu" aria-label={rozieAttr(actionAnchor ? actionAnchor.label : undefined)} style={parseInlineStyle('top:' + actionMenuTop + 'px')} onKeyDown={($event) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96="">
+      {!!(atActions()) && <div data-command-palette-menu="" data-testid="command-palette-actions-menu" className={"rozie-command-palette-actions-menu"} role="menu" aria-label={rozieAttr(actionAnchor ? labelText(actionAnchor.item) : undefined)} style={parseInlineStyle('top:' + actionMenuTop + 'px')} onKeyDown={($event) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96="">
         {(actionAnchor ? actionAnchor.actions : []).map((action, ai) => <div key={action.id} className={clsx("rozie-command-palette-actions-menu-item", { "rozie-command-palette-actions-menu-item--active": ai === actionIndex, "rozie-command-palette-actions-menu-item--disabled": !!action.disabled })} role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action.disabled} tabIndex={-1} onMouseEnter={($event) => { setActionIndex(Number(ai)); }} onMouseDown={($event) => { $event.preventDefault(); selectAction(action); }} data-rozie-s-768cad96="">
           {(props.renderActionItem ?? props.slots?.['actionItem']) ? ((props.renderActionItem ?? props.slots?.['actionItem']) as Function)({ action, item: actionAnchor ? actionAnchor.item : null, active: ai === actionIndex, disabled: !!action.disabled }) : <>{!!(actionIcon(action)) && <span className={"rozie-command-palette-actions-menu-item-icon"} data-rozie-s-768cad96="">{rozieDisplay(actionIcon(action))}</span>}<span className={"rozie-command-palette-actions-menu-item-label"} data-rozie-s-768cad96="">{rozieDisplay(actionLabel(action))}</span>{!!(actionShortcut(action)) && <span className={"rozie-command-palette-actions-menu-item-shortcut"} data-rozie-s-768cad96="">{rozieDisplay(actionShortcut(action))}</span>}</>}
         </div>)}
@@ -1140,8 +1103,8 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
         </div>
 
         
-        {!!(activeSurface === 'args') && <div data-command-palette-args="" data-testid="command-palette-args" className={"rozie-command-palette-args"} role="group" aria-label={rozieAttr('Arguments for ' + (argsState ? argsState.label : ''))} data-rozie-s-768cad96="">
-          <span className={"rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current"} data-testid="command-palette-args-chip" aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(argsState ? argsState.label : '')}</span>
+        {!!(activeSurface === 'args') && <div data-command-palette-args="" data-testid="command-palette-args" className={"rozie-command-palette-args"} role="group" aria-label={rozieAttr('Arguments for ' + (argsState ? labelText(argsState.item) : ''))} data-rozie-s-768cad96="">
+          <span className={"rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current"} data-testid="command-palette-args-chip" aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(argsState ? labelText(argsState.item) : '')}</span>
           {(argsState ? argsState.argList : []).map((arg, argIdx) => <span key={arg.id} className={"rozie-command-palette-args-field"} data-rozie-s-768cad96="">
             {(props.renderArgsField ?? props.slots?.['argsField']) ? ((props.renderArgsField ?? props.slots?.['argsField']) as Function)({ item: argsState ? argsState.item : null, arg, value: argsState ? argsState.values[arg.id] : '', setValue: setArgValueFor(arg.id) }) : <input type="text" className={"rozie-command-palette-args-input"} data-testid="command-palette-args-input" value={argsState ? argsState.values[arg.id] : ''} placeholder={rozieAttr(arg.placeholder || arg.id)} aria-label={rozieAttr(arg.placeholder || arg.id)} onInput={($event) => { onArgFieldInput(arg.id, $event); }} data-rozie-s-768cad96="" />}
           </span>)}
@@ -1154,7 +1117,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
         </div>}</div>
 
       
-      {!!(atActions()) && <div data-command-palette-menu="" data-testid="command-palette-actions-menu" className={"rozie-command-palette-actions-menu"} role="menu" aria-label={rozieAttr(actionAnchor ? actionAnchor.label : undefined)} style={parseInlineStyle('top:' + actionMenuTop + 'px')} onKeyDown={($event) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96="">
+      {!!(atActions()) && <div data-command-palette-menu="" data-testid="command-palette-actions-menu" className={"rozie-command-palette-actions-menu"} role="menu" aria-label={rozieAttr(actionAnchor ? labelText(actionAnchor.item) : undefined)} style={parseInlineStyle('top:' + actionMenuTop + 'px')} onKeyDown={($event) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96="">
         {(actionAnchor ? actionAnchor.actions : []).map((action, ai) => <div key={action.id} className={clsx("rozie-command-palette-actions-menu-item", { "rozie-command-palette-actions-menu-item--active": ai === actionIndex, "rozie-command-palette-actions-menu-item--disabled": !!action.disabled })} role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action.disabled} tabIndex={-1} onMouseEnter={($event) => { setActionIndex(Number(ai)); }} onMouseDown={($event) => { $event.preventDefault(); selectAction(action); }} data-rozie-s-768cad96="">
           {(props.renderActionItem ?? props.slots?.['actionItem']) ? ((props.renderActionItem ?? props.slots?.['actionItem']) as Function)({ action, item: actionAnchor ? actionAnchor.item : null, active: ai === actionIndex, disabled: !!action.disabled }) : <>{!!(actionIcon(action)) && <span className={"rozie-command-palette-actions-menu-item-icon"} data-rozie-s-768cad96="">{rozieDisplay(actionIcon(action))}</span>}<span className={"rozie-command-palette-actions-menu-item-label"} data-rozie-s-768cad96="">{rozieDisplay(actionLabel(action))}</span>{!!(actionShortcut(action)) && <span className={"rozie-command-palette-actions-menu-item-shortcut"} data-rozie-s-768cad96="">{rozieDisplay(actionShortcut(action))}</span>}</>}
         </div>)}
