@@ -13,6 +13,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "check:runtime-isolation": "node scripts/check-runtime-isolation.mjs",
+    "changeset:check": "node scripts/check-changeset-private-packages.mjs",
     "release:precheck": "node scripts/release-precheck.mjs",
     "format": "biome format --write .",
     "playground": "pnpm --filter rozie-playground dev",

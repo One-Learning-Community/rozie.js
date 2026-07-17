@@ -51,6 +51,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ORG_SUBSTR = 'One-Learning-Community/rozie.js';
@@ -407,6 +408,23 @@ async function checkWorkspaceDeps(entry, byName, privateNames, opts) {
 }
 
 // ---------------------------------------------------------------------------
+// Repo-wide structural check (not per-package): a .changeset/*.md naming a
+// PRIVATE family root versions nothing under the current changesets config
+// (privatePackages.version:false silently no-ops it). Deterministic,
+// network-free — belongs alongside checks (b/c/d) and runs in EVERY mode,
+// including the CI --skip-npm advisory step (quick 260716-npt Fix B).
+// ---------------------------------------------------------------------------
+function checkChangesetPrivatePackages() {
+  const scriptPath = path.join(REPO_ROOT, 'scripts', 'check-changeset-private-packages.mjs');
+  const result = spawnSync(process.execPath, [scriptPath], { encoding: 'utf8' });
+  if (result.status === 0) {
+    return { status: 'OK', detail: (result.stdout || '').trim() || 'no private-root changeset entries' };
+  }
+  const detail = ((result.stdout || '') + (result.stderr || '')).trim() || `exit code ${result.status}`;
+  return { status: 'FAIL', detail };
+}
+
+// ---------------------------------------------------------------------------
 // Output
 // ---------------------------------------------------------------------------
 const GLYPH = { OK: 'ok', WARN: 'warn', FAIL: 'FAIL', SKIP: '—' };
@@ -451,6 +469,15 @@ async function main() {
   console.log(`scope: ${opts.filters.length ? entries.map((e) => e.name).join(', ') : `all ${entries.length} publishable package(s)`}`);
   console.log('');
 
+  // Repo-wide structural check, once — not per-package (Fix B, quick 260716-npt).
+  const changesetCheck = checkChangesetPrivatePackages();
+  if (changesetCheck.status === 'FAIL') {
+    console.log(`✗ changeset private-package guard: ${changesetCheck.detail}`);
+  } else {
+    console.log(`ok changeset private-package guard: ${changesetCheck.detail}`);
+  }
+  console.log('');
+
   const rows = [];
   for (const entry of entries) {
     const checks = {
@@ -478,7 +505,7 @@ async function main() {
   console.log('');
 
   // Per-package detail for anything not fully OK.
-  let anyFail = false;
+  let anyFail = changesetCheck.status === 'FAIL';
   let anyWarn = false;
   for (const { entry, checks, verdict } of rows) {
     if (verdict === 'OK') continue;
