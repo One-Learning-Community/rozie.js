@@ -78,7 +78,18 @@ describe('analyzeAST coordinator (Plan 02-02 Task 1)', () => {
   it('all 5 reference examples produce zero ROZ100..ROZ199 diagnostics', () => {
     for (const name of ['Counter', 'Dropdown', 'Modal', 'SearchInput', 'TodoList']) {
       const { diagnostics } = analyzeSource(loadExample(name), `${name}.rozie`);
-      const semDiags = filterByCodeRange(diagnostics, 100, 199);
+      // Quick 260717-8zb — ROZ147 is EXCLUDED from this strict zero-diagnostics
+      // gate by design. Unlike the other ROZ1xx validators (which are already
+      // curated to zero corpus false positives), ROZ147 deliberately widens
+      // past ROZ142's hand-curated LIT_DOM_PROP_FOOTGUNS tier to the FULL
+      // remaining inherited-DOM-property set — Modal's `title` prop is a KNOWN,
+      // intentional, grandfathered warning-tier hit (see the quick-task SUMMARY's
+      // 28-family corpus report). It is a `warning`, never blocks compile, and
+      // is exactly the kind of corpus collision the validator's design
+      // rationale accepts rather than suppresses.
+      const semDiags = filterByCodeRange(diagnostics, 100, 199).filter(
+        (d) => d.code !== 'ROZ147',
+      );
       expect(
         semDiags,
         `${name}.rozie produced unexpected ROZ100..ROZ199 diagnostics: ${JSON.stringify(semDiags)}`,

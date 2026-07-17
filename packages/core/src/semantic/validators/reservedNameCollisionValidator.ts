@@ -107,7 +107,10 @@ const PROP_ERROR_TIER: ReadonlySet<string> = new Set<string>([
  * prop named one of these, narrow this set further rather than downgrade to the
  * full DOM chain.
  */
-const LIT_DOM_PROP_FOOTGUNS: ReadonlySet<string> = new Set<string>([
+// Exported (Quick 260717-8zb) so litInheritedPropertyValidator.ts (ROZ147) can
+// subtract this already-covered subset from its own broader property-name
+// scan — the two validators must never double-fire on the same prop name.
+export const LIT_DOM_PROP_FOOTGUNS: ReadonlySet<string> = new Set<string>([
   // Inherited HTMLElement reflected properties that became class-field collisions
   // in the port findings (otp/combobox: `inputMode`/`tabIndex`; rete `Port`:
   // `nodeType`). Curated to the high-collision names ABSENT from the corpus.

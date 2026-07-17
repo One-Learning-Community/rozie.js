@@ -60,7 +60,13 @@ describe('rForKeyValidator — ROZ300/ROZ301/ROZ302 (SEM-03)', () => {
   it('all 5 reference examples: zero ROZ100..ROZ399', () => {
     for (const name of ['Counter', 'Dropdown', 'Modal', 'SearchInput', 'TodoList']) {
       const { diagnostics } = analyzeSource(loadExample(name), `${name}.rozie`);
-      const semDiags = filterByCodeRange(diagnostics, 100, 399);
+      // Quick 260717-8zb — ROZ147 excluded by design; see the identical
+      // exclusion + rationale in tests/semantic/unknownRefValidator.test.ts
+      // (Modal's `title` prop is a known, intentional, grandfathered
+      // warning-tier corpus hit — never blocks compile).
+      const semDiags = filterByCodeRange(diagnostics, 100, 399).filter(
+        (d) => d.code !== 'ROZ147',
+      );
       expect(
         semDiags,
         `${name}.rozie produced unexpected ROZ100..ROZ399 diagnostics: ${JSON.stringify(semDiags)}`,

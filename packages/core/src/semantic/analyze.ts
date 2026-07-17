@@ -47,6 +47,7 @@ import { runDataNestedMutationValidator } from './validators/dataNestedMutationV
 import { runDataInitSigilValidator } from './validators/dataInitSigilValidator.js';
 import { runBareSigilValidator } from './validators/bareSigilValidator.js';
 import { runMemoValidator } from './validators/memoValidator.js';
+import { runLitInheritedPropertyValidator } from './validators/litInheritedPropertyValidator.js';
 
 export interface AnalyzeResult {
   bindings: BindingsTable;
@@ -98,6 +99,12 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   // slot collisions are owned by validateSlotPropCollision (ROZ127), $expose
   // verbs by the widened ROZ137 — no double-firing.
   runReservedNameCollisionValidator(ast, bindings, diagnostics);
+  // Quick 260717-8zb (Task 2 Item 5) — ROZ147 (suppressible warning): a <props>
+  // key colliding with an inherited HTMLElement/Element/Node PROPERTY name not
+  // already covered by ROZ142's curated LIT_DOM_PROP_FOOTGUNS tier. Reads
+  // bindings.props; runs immediately after ROZ142 so the ownership-split
+  // rationale (no double-firing) is legible in source order.
+  runLitInheritedPropertyValidator(ast, bindings, diagnostics);
   // Phase 46 (ITEM-4, D-03b/A3) — ROZ138 (warning): within one <script> function
   // body, a read of $data/$model/$props.x dominated by an earlier write to the
   // same key (React setState is async → the read binds the pre-write value).
