@@ -57,6 +57,7 @@ import { validateAttrFallthrough } from './validateAttrFallthrough.js';
 import { validateListenerFallthrough } from './validateListenerFallthrough.js';
 import { deconflictStateExposeCollision } from '../rewrite/deconflict.js';
 import { inlineScriptPartials } from './inlineScriptPartials.js';
+import { expandMemo } from './lowerers/expandMemo.js';
 import type { ProducerResolver } from '../resolver/index.js';
 import * as t from '@babel/types';
 
@@ -160,6 +161,20 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
       ...(opts.resolver !== undefined ? { resolver: opts.resolver } : {}),
     });
     diagnostics.push(...partialDiags);
+  }
+
+  // Quick 260717-8zb — expand the `$memo(fn, keyFn)` primitive BEFORE
+  // analyzeAST observes the body, same rationale as inlineScriptPartials
+  // above: this is the single chokepoint compile() AND @rozie/unplugin share,
+  // so every entrypoint + all six target emitters inherit the expansion.
+  // Mutates `ast.script.program` in place ONLY when a well-formed top-level
+  // `$memo` declaration is found (IR-04: SAME node as
+  // `setupBody.scriptProgram`); a script with no `$memo` call is left
+  // byte-identically untouched. Any `$memo` call expandMemo declines to
+  // expand (misuse) is left in the AST for `memoValidator` (wired into
+  // analyzeAST below) to flag as ROZ146.
+  if (ast.script) {
+    expandMemo(ast.script.program);
   }
 
   // Run semantic analysis (collectors + 3 validators) after the splice so the

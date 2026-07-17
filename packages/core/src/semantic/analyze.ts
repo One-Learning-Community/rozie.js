@@ -46,6 +46,7 @@ import { runReactStaleReadValidator } from './validators/reactStaleReadValidator
 import { runDataNestedMutationValidator } from './validators/dataNestedMutationValidator.js';
 import { runDataInitSigilValidator } from './validators/dataInitSigilValidator.js';
 import { runBareSigilValidator } from './validators/bareSigilValidator.js';
+import { runMemoValidator } from './validators/memoValidator.js';
 
 export interface AnalyzeResult {
   bindings: BindingsTable;
@@ -119,6 +120,11 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   // exempt) used across template/script/listeners expressions. Always-on,
   // independent of safeInterpolation. No binding dependency.
   runBareSigilValidator(ast, diagnostics);
+  // Quick 260717-8zb — ROZ146: any `$memo(...)` call still present after
+  // expandMemo (lowerToIR, runs BEFORE this analyzeAST call) is, by
+  // construction, a misuse expandMemo declined to expand. No binding
+  // dependency (a pure AST walk over ast.script.program).
+  runMemoValidator(ast, diagnostics);
   // Phase 19 (D-08) — final pass: a <listener> placed inside <template> is a
   // misplaced element (ROZ206). No binding dependency.
   runListenerElementValidator(ast, diagnostics);

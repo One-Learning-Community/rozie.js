@@ -493,6 +493,31 @@ export const RozieErrorCode = {
   // multi-positional-arg lowering (a portable payload tuple) is backlogged.
   EMIT_MULTIPLE_POSITIONAL_ARGS: 'ROZ145', // error — a `$emit` call with 2+ positional payload args. Lit (CustomEvent single `detail`) and Angular (output single value) silently drop every arg past the first. Pack the payload into a single object/array: `$emit('name', { a, b })`.
 
+  // Quick 260717-8zb — ROZ146 is the next free code after ROZ145 in the 100
+  // semantic-binding cluster. `$memo(fn, keyFn)` is a new author-side language
+  // primitive (uniform reference-keyed memoization ×6). `expandMemo` (core,
+  // shared lower path) recognizes and expands ONLY the well-formed top-level
+  // shape (`const X = $memo(fnArrow, keyFnArrow)`, exactly two arrow-function
+  // args) BEFORE analyzeAST runs — any `$memo(...)` call still present when
+  // this validator walks the script is therefore, by construction, one
+  // expandMemo declined to expand: not a top-level `const`, wrong arg count/
+  // shape, or nested inside a function. Fail loud with an actionable
+  // did-you-mean instead of leaving a dangling `$memo` free identifier that
+  // would ReferenceError at runtime on every target.
+  MEMO_MISUSE: 'ROZ146', // error — `$memo(...)` was not a well-formed top-level `const X = $memo(fnArrow, keyFnArrow)` call (exactly two arrow-function args). Bind it to a top-level const with exactly two arrow-function arguments.
+
+  // Quick 260717-8zb — ROZ147 is the next free code after ROZ146. The
+  // property-sibling gap of the existing ROZ142 `PUBLIC_CONTRACT_NAME_COLLISION`
+  // prop-warning tier: ROZ142's `LIT_DOM_PROP_FOOTGUNS` is a deliberately
+  // CURATED, corpus-absent subset of `LIT_DOM_MEMBERS` (methods are folded in
+  // wholesale, but reflected DATA properties are hand-curated to avoid flagging
+  // already-shipped safe names like `id`/`title`/`style`/aria*). ROZ147 widens
+  // coverage to the REMAINING inherited HTMLElement/Element/Node PROPERTY names
+  // not already covered by ROZ142 (so the two never double-fire on the same
+  // prop) — suppressible warning, not an error, because the corpus may already
+  // ship a grandfathered collision. See litInheritedPropertyValidator.ts.
+  LIT_INHERITED_PROPERTY_PROP_NAME: 'ROZ147', // warning (suppressible) — a <props> key collides with an inherited HTMLElement/Element/Node PROPERTY name that becomes a Lit class field, shadowing the base-class property.
+
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
   WRITE_TO_REF: 'ROZ201', // $refs.foo = … (refs are read-only DOM-element wrappers)
