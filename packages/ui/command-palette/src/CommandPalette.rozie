@@ -357,12 +357,22 @@
   actionMenuTop: 0,
 
   // ---- inline command arguments (ARGS-SURFACE, feature #12) -------------
-  // null (closed) or { item, values: { [id]: string }, label, argList } —
-  // the args-value state. FRESH-object writes on every mutation
-  // (setArgValue) — NOT a module-let: a module-let referenced only from
-  // template-bound handlers resets on React (the inverse of the
-  // requestToken hoist, see script top). Widened to `any` by the emitter
-  // (the actionAnchor null-initialized $data field precedent).
+  // null (closed) or { item, values: { [id]: string }, argList } — the
+  // args-value state. FRESH-object writes on every mutation (setArgValue).
+  // Quick 260717-8zb (Task 3 Item 6) VERIFIED this correctly stays reactive
+  // $data (NOT a module-let), and this is now the RIGHT call for a REASON
+  // independent of the (now-fixed) hoistModuleLet template-handler
+  // reachability gap: argsState is read DIRECTLY in the template (the args
+  // surface's r-if/r-for/interpolation/:attr bindings below all read
+  // $data.argsState), so it must be real reactive state to (a) trigger a
+  // re-render when set and (b) actually render correctly — a hoisted
+  // useRef's value is NOT reactive-read-aware in the React template
+  // renderer (a KNOWN, separate, out-of-scope gap — see
+  // .planning/quick/260717-8zb-memo-primitive-emitter-batch/deferred-items.md).
+  // Contrast with toast's swipeGesture (Toaster.rozie), which converted TO a
+  // module-let precisely because it is script-only bookkeeping, never
+  // template-read. Widened to `any` by the emitter (the actionAnchor
+  // null-initialized $data field precedent).
   argsState: null,
 
   // ---- platform sniff cache (quick 260716-npt Finding 4) -----------------
