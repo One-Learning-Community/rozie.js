@@ -100,7 +100,7 @@ export default class EngineDomEscape extends SignalWatcher(LitElement) {
   }
 }
 
-injectGlobalStyles('rozie-engine-dom-escape-global', `
+injectGlobalStyles('rozie-engine-dom-escape-ddf21e72-global', `
 :root {
   --rozie-engine-accent: #4f46e5;
 }

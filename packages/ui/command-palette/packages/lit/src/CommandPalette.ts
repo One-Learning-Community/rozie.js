@@ -1630,7 +1630,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   set query(v: string) { this._queryControllable.notifyPropertyWrite(v); }
 }
 
-injectGlobalStyles('rozie-command-palette-global', `
+injectGlobalStyles('rozie-command-palette-2b4aef0c-global', `
 .rozie-command-palette[data-rozie-s-768cad96] {
   position: fixed;
   inset: 0;

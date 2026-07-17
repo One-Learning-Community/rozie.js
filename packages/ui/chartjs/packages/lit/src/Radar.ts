@@ -507,7 +507,7 @@ private _portalContainers = new Set<HTMLElement>();
   }
 }
 
-injectGlobalStyles('rozie-radar-global', `
+injectGlobalStyles('rozie-radar-ca86a880-global', `
 .rozie-chart .rozie-chart-tooltip {
     background: rgba(0, 0, 0, 0.8);
     color: #fff;

@@ -204,7 +204,7 @@ private _portalContainers = new Set<HTMLElement>();
   }
 }
 
-injectGlobalStyles('rozie-portal-list-styled-scss-global', `
+injectGlobalStyles('rozie-portal-list-styled-scss-a90a8d11-global', `
 :root {
   --rozie-portal-list-gap: 8px;
   --rozie-portal-list-fg: #1a1a1a;

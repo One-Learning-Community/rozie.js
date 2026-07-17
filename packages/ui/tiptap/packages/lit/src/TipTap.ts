@@ -806,7 +806,7 @@ private _portalContainers = new Set<HTMLElement>();
   set html(v: string) { this._htmlControllable.notifyPropertyWrite(v); }
 }
 
-injectGlobalStyles('rozie-tip-tap-global', `
+injectGlobalStyles('rozie-tip-tap-392ab86c-global', `
 .rozie-tiptap-content .is-editor-empty:first-child::before {
     content: attr(data-placeholder);
     color: rgba(0, 0, 0, 0.4);

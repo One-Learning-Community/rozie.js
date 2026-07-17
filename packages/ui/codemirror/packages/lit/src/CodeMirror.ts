@@ -943,7 +943,7 @@ private _portalContainers = new Set<HTMLElement>();
   set value(v: string) { this._valueControllable.notifyPropertyWrite(v); }
 }
 
-injectGlobalStyles('rozie-code-mirror-global', `
+injectGlobalStyles('rozie-code-mirror-2ae4b7f1-global', `
 .rozie-codemirror .cm-editor {
     height: 100%;
     font-size: 13px;

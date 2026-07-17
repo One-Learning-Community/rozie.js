@@ -739,7 +739,7 @@ private __rozieFirstUpdateDone = false;
   }
 }
 
-injectGlobalStyles('rozie-pdf-viewer-global', `
+injectGlobalStyles('rozie-pdf-viewer-9fcb88f0-global', `
 .rozie-pdf .rozie-pdf-page {
     position: relative;
     margin: 0 auto 12px;

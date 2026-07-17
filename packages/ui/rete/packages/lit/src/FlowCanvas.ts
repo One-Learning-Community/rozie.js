@@ -4094,7 +4094,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   set mode(v: string) { this._modeControllable.notifyPropertyWrite(v); }
 }
 
-injectGlobalStyles('rozie-flow-canvas-global', `
+injectGlobalStyles('rozie-flow-canvas-0c157859-global', `
 .rozie-flow-canvas .rozie-flow-node {
     display: grid;
     grid-template-columns: auto 1fr auto;

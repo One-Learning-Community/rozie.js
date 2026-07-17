@@ -1116,7 +1116,7 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
   set pitch(v: number) { this._pitchControllable.notifyPropertyWrite(v); }
 }
 
-injectGlobalStyles('rozie-map-libre-global', `
+injectGlobalStyles('rozie-map-libre-13ad46d2-global', `
 .rozie-maplibre .rozie-maplibre-marker {
     cursor: pointer;
   }

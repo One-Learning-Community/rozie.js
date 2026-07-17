@@ -178,7 +178,7 @@ ${this.open ? html`<div class="modal-backdrop" @click=${($event: MouseEvent & { 
   set open(v: boolean) { this._openControllable.notifyPropertyWrite(v); }
 }
 
-injectGlobalStyles('rozie-modal-global', `
+injectGlobalStyles('rozie-modal-e77d60ae-global', `
 :root {
   --rozie-modal-z: 2000;
 }
