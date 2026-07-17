@@ -27,7 +27,7 @@
               </span>
               <span v-if="groupText(option) && !grouped()" class="rozie-command-palette-option-group">{{ groupText(option) }}</span></span>
             
-            <span v-if="hotKeyOf(option)" class="rozie-command-palette-option-hotkey" aria-hidden="true">{{ formatKeyToken(hotKeyOf(option), isApplePlatform()) }}</span><span v-if="$slots.actions || actionsList(option).length > 0" class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" @mousedown.stop="openActionMenu(option)">
+            <span v-if="hotKeyOf(option)" class="rozie-command-palette-option-hotkey" aria-hidden="true">{{ formatKeyToken(hotKeyOf(option), platformIsApple) }}</span><span v-if="$slots.actions || actionsList(option).length > 0" class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" @mousedown.stop="openActionMenu(option)">
               <slot name="actions" :option="option" :actions="actionsList(option)">
                 <span v-if="actionsList(option).length > 0" class="rozie-command-palette-option-actions-hint" aria-hidden="true">{{ actionKeyHint() }}</span></slot>
             </span><span v-if="$slots.trailing" class="rozie-command-palette-option-trailing">
@@ -200,6 +200,7 @@ const actionIndex = ref(-1);
 const actionAnchor = ref<any>(null);
 const actionMenuTop = ref(0);
 const argsState = ref<any>(null);
+const platformIsApple = ref(false);
 
 const frameRef = ref<HTMLElement>();
 const panelRef = ref<HTMLElement>();
@@ -302,18 +303,23 @@ const currentBaseItems = () => {
 // currentDepth(): the nesting depth (0 = root). Named to avoid shadowing the
 // imported levelStack `depth` helper (aliased `levelDepth` above).
 const currentDepth = () => levelDepth(levelStack.value);
+// currentFrameField(key, fallback): quick 260716-npt Finding 4 (reuse) —
+// the shared shape behind currentStatus/currentError/currentVirtual/
+// currentVirtualMaxHeight/currentVirtualEstimateRowHeight below (5
+// mechanically-identical `const frame = currentFrame($data.levelStack);
+// return frame ? frame.KEY : FALLBACK` blocks, collapsed into one). NOT used
+// by currentTitle/currentPlaceholder — those use a genuinely divergent
+// `frame && frame.KEY != null` nullish-check shape, left as-is.
+const currentFrameField = (key: any, fallback: any) => {
+  const frame = currentFrame(levelStack.value);
+  return frame ? frame[key] : fallback;
+};
 // currentStatus()/currentError(): the active level's async status (LVL-ASYNC)
 // off the top frame — 'ready' at root (the implicit root frame is never
 // loading/error). Drive the #loading/#error re-projection inside combobox's
 // #empty slot (below).
-const currentStatus = () => {
-  const frame = currentFrame(levelStack.value);
-  return frame ? frame.status : 'ready';
-};
-const currentError = () => {
-  const frame = currentFrame(levelStack.value);
-  return frame ? frame.error : null;
-};
+const currentStatus = () => currentFrameField('status', 'ready');
+const currentError = () => currentFrameField('error', null);
 // atDepth(): true when nested (depth>0) — gates the breadcrumb/back header
 // (LVL-RENDER). A plain function — never $computed.
 const atDepth = () => currentDepth() > 0;
@@ -346,16 +352,12 @@ const currentPlaceholder = () => {
 // root `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` props. Plain
 // functions (never $computed — the combobox value-vs-accessor split), each
 // reading currentFrame($data.levelStack) once.
-const currentVirtual = () => {
-  const frame = currentFrame(levelStack.value);
-  return frame ? frame.virtual : props.virtual === true;
-};
+const currentVirtual = () => currentFrameField('virtual', props.virtual === true);
 // combobox's own empty-string default falls back to its
 // `--rozie-combobox-list-max-height` token; maxHeight is also ignored by
 // combobox whenever `virtual` is off — so `''` here is byte-identical-off.
 const currentVirtualMaxHeight = () => {
-  const frame = currentFrame(levelStack.value);
-  const raw = frame ? frame.virtualMaxHeight : props.virtualMaxHeight;
+  const raw = currentFrameField('virtualMaxHeight', props.virtualMaxHeight);
   return currentVirtual() && raw != null ? raw : '';
 };
 // MUST fall back to a real number — combobox consumes this as
@@ -363,8 +365,7 @@ const currentVirtualMaxHeight = () => {
 // so a null binding would seed the virtualizer with null. `36` mirrors
 // combobox's own `estimateRowHeight` default.
 const currentVirtualEstimateRowHeight = () => {
-  const frame = currentFrame(levelStack.value);
-  const raw = frame ? frame.virtualEstimateRowHeight : props.virtualEstimateRowHeight;
+  const raw = currentFrameField('virtualEstimateRowHeight', props.virtualEstimateRowHeight);
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
 };
 // breadcrumbStack(): the full root..current breadcrumb (internal/levelStack.ts
@@ -495,7 +496,13 @@ const actionIcon = (a: any) => a && a.icon !== undefined ? a.icon : undefined;
 // Platform sniff for the DISPLAY of the `$mod` token only — matching is
 // platform-agnostic (`metaKey || ctrlKey`, see matchesActionKey). SSR-guarded
 // like every other browser-global read; defaults to the non-Apple form.
-const isApplePlatform = () => {
+//
+// Quick 260716-npt Finding 4 (efficiency): this used to be called directly
+// from the template ONCE PER ROW (via actionKeyHint()/hotKey badge below),
+// re-sniffing navigator on every render for every option. `navigator` never
+// changes mid-session, so sniff it ONCE in $onMount into $data.platformIsApple
+// and read that everywhere instead — see the two call sites below.
+const sniffApplePlatform = () => {
   if (typeof navigator === 'undefined') return false;
   const p = (navigator.platform || '') + ' ' + (navigator.userAgent || '');
   return /Mac|iPhone|iPad|iPod/.test(p);
@@ -505,11 +512,13 @@ const isApplePlatform = () => {
 // Apple platforms / "Ctrl+K" elsewhere; delegates the full modifier grammar
 // onto the shared formatKeyToken() helper (also used by the per-item hotKey
 // badge below) — see internal/formatKeyToken.ts for the grammar. Keeps the
-// existing typeof guard; '$mod+k' stays byte-identical (⌘K / Ctrl+K).
+// existing typeof guard; '$mod+k' stays byte-identical (⌘K / Ctrl+K). Reads
+// the mount-time-cached $data.platformIsApple (Finding 4) instead of
+// re-sniffing navigator per call.
 const actionKeyHint = () => {
   const k = props.actionKey;
   if (typeof k !== 'string') return '';
-  return formatKeyToken(k, isApplePlatform());
+  return formatKeyToken(k, platformIsApple.value);
 };
 // Split a command's visible label into ordered { text, match } segments from
 // labelHighlight's [start,end) ranges, for the default #option fill row to
@@ -1424,6 +1433,9 @@ const toggle = () => {
 };
 const focus = () => focusInput();
 
+onMounted(() => {
+  platformIsApple.value = sniffApplePlatform();
+});
 onMounted(() => {
   if (open.value) onOpen();
 });

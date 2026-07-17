@@ -364,6 +364,12 @@
   // requestToken hoist, see script top). Widened to `any` by the emitter
   // (the actionAnchor null-initialized $data field precedent).
   argsState: null,
+
+  // ---- platform sniff cache (quick 260716-npt Finding 4) -----------------
+  // Set ONCE at mount time by sniffApplePlatform, instead of re-sniffing
+  // navigator on every render for every visible row. false pre-mount / SSR
+  // mirrors the old inline sniff's SSR-guarded default.
+  platformIsApple: false,
 }
 </data>
 
@@ -473,18 +479,24 @@ const currentBaseItems = () => {
 // imported levelStack `depth` helper (aliased `levelDepth` above).
 const currentDepth = () => levelDepth($data.levelStack)
 
+// currentFrameField(key, fallback): quick 260716-npt Finding 4 (reuse) —
+// the shared shape behind currentStatus/currentError/currentVirtual/
+// currentVirtualMaxHeight/currentVirtualEstimateRowHeight below (5
+// mechanically-identical `const frame = currentFrame($data.levelStack);
+// return frame ? frame.KEY : FALLBACK` blocks, collapsed into one). NOT used
+// by currentTitle/currentPlaceholder — those use a genuinely divergent
+// `frame && frame.KEY != null` nullish-check shape, left as-is.
+const currentFrameField = (key, fallback) => {
+  const frame = currentFrame($data.levelStack)
+  return frame ? frame[key] : fallback
+}
+
 // currentStatus()/currentError(): the active level's async status (LVL-ASYNC)
 // off the top frame — 'ready' at root (the implicit root frame is never
 // loading/error). Drive the #loading/#error re-projection inside combobox's
 // #empty slot (below).
-const currentStatus = () => {
-  const frame = currentFrame($data.levelStack)
-  return frame ? frame.status : 'ready'
-}
-const currentError = () => {
-  const frame = currentFrame($data.levelStack)
-  return frame ? frame.error : null
-}
+const currentStatus = () => currentFrameField('status', 'ready')
+const currentError = () => currentFrameField('error', null)
 
 // atDepth(): true when nested (depth>0) — gates the breadcrumb/back header
 // (LVL-RENDER). A plain function — never $computed.
@@ -522,16 +534,12 @@ const currentPlaceholder = () => {
 // root `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` props. Plain
 // functions (never $computed — the combobox value-vs-accessor split), each
 // reading currentFrame($data.levelStack) once.
-const currentVirtual = () => {
-  const frame = currentFrame($data.levelStack)
-  return frame ? frame.virtual : $props.virtual === true
-}
+const currentVirtual = () => currentFrameField('virtual', $props.virtual === true)
 // combobox's own empty-string default falls back to its
 // `--rozie-combobox-list-max-height` token; maxHeight is also ignored by
 // combobox whenever `virtual` is off — so `''` here is byte-identical-off.
 const currentVirtualMaxHeight = () => {
-  const frame = currentFrame($data.levelStack)
-  const raw = frame ? frame.virtualMaxHeight : $props.virtualMaxHeight
+  const raw = currentFrameField('virtualMaxHeight', $props.virtualMaxHeight)
   return currentVirtual() && raw != null ? raw : ''
 }
 // MUST fall back to a real number — combobox consumes this as
@@ -539,8 +547,7 @@ const currentVirtualMaxHeight = () => {
 // so a null binding would seed the virtualizer with null. `36` mirrors
 // combobox's own `estimateRowHeight` default.
 const currentVirtualEstimateRowHeight = () => {
-  const frame = currentFrame($data.levelStack)
-  const raw = frame ? frame.virtualEstimateRowHeight : $props.virtualEstimateRowHeight
+  const raw = currentFrameField('virtualEstimateRowHeight', $props.virtualEstimateRowHeight)
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36
 }
 
@@ -681,22 +688,34 @@ const actionIcon = (a) => (a && a.icon !== undefined ? a.icon : undefined)
 // Platform sniff for the DISPLAY of the `$mod` token only — matching is
 // platform-agnostic (`metaKey || ctrlKey`, see matchesActionKey). SSR-guarded
 // like every other browser-global read; defaults to the non-Apple form.
-const isApplePlatform = () => {
+//
+// Quick 260716-npt Finding 4 (efficiency): this used to be called directly
+// from the template ONCE PER ROW (via actionKeyHint()/hotKey badge below),
+// re-sniffing navigator on every render for every option. `navigator` never
+// changes mid-session, so sniff it ONCE in $onMount into $data.platformIsApple
+// and read that everywhere instead — see the two call sites below.
+const sniffApplePlatform = () => {
   if (typeof navigator === 'undefined') return false
   const p = (navigator.platform || '') + ' ' + (navigator.userAgent || '')
   return /Mac|iPhone|iPad|iPod/.test(p)
 }
+
+$onMount(() => {
+  $data.platformIsApple = sniffApplePlatform()
+})
 
 // actionKeyHint(): a short display string for the actionKey prop, for the
 // #actions row affordance's default (unfilled) hint — "$mod+k" → "⌘K" on
 // Apple platforms / "Ctrl+K" elsewhere; delegates the full modifier grammar
 // onto the shared formatKeyToken() helper (also used by the per-item hotKey
 // badge below) — see internal/formatKeyToken.ts for the grammar. Keeps the
-// existing typeof guard; '$mod+k' stays byte-identical (⌘K / Ctrl+K).
+// existing typeof guard; '$mod+k' stays byte-identical (⌘K / Ctrl+K). Reads
+// the mount-time-cached $data.platformIsApple (Finding 4) instead of
+// re-sniffing navigator per call.
 const actionKeyHint = () => {
   const k = $props.actionKey
   if (typeof k !== 'string') return ''
-  return formatKeyToken(k, isApplePlatform())
+  return formatKeyToken(k, $data.platformIsApple)
 }
 
 // Split a command's visible label into ordered { text, match } segments from
@@ -1837,7 +1856,7 @@ $expose({ show, close, toggle, focus, goBack, openTo })
               r-if="hotKeyOf(option)"
               class="rozie-command-palette-option-hotkey"
               aria-hidden="true"
-            >{{ formatKeyToken(hotKeyOf(option), isApplePlatform()) }}</span>
+            >{{ formatKeyToken(hotKeyOf(option), $data.platformIsApple) }}</span>
             <!--
               ACT-TRIGGER: the #actions row region is now the INTERACTIVE
               open-the-menu affordance (was display-only) — renders whenever

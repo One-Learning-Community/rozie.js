@@ -491,6 +491,7 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   private _actionAnchor = signal<any>(null);
   private _actionMenuTop = signal(0);
   private _argsState = signal<any>(null);
+  private _platformIsApple = signal(false);
   @query('[data-rozie-ref="frame"]') private _refFrame!: HTMLElement;
   @query('[data-rozie-ref="panel"]') private _refPanel!: HTMLElement;
   @query('[data-rozie-ref="combobox"]') private _refCombobox!: Combobox;
@@ -715,6 +716,8 @@ private __rozieWatchInitial_0 = true;
       }
     })(__watchVal); }); }));
 
+    this._platformIsApple.value = this.sniffApplePlatform();
+
     if (this.open) this.onOpen();
   }
 
@@ -766,7 +769,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
               </span>
               ${this.groupText(scope.option) && !this.grouped() ? html`<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>${rozieDisplay(this.groupText(scope.option))}</span>` : nothing}</span>
             
-            ${this.hotKeyOf(scope.option) ? html`<span class="rozie-command-palette-option-hotkey" aria-hidden="true" data-rozie-s-768cad96>${rozieDisplay(formatKeyToken(this.hotKeyOf(scope.option), this.isApplePlatform()))}</span>` : nothing}${this._hasSlotActions || this.actions !== undefined || this.actionsList(scope.option).length > 0 ? html`<span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" @mousedown=${($event: MouseEvent & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { $event.stopPropagation(); this.openActionMenu(scope.option); }} data-rozie-s-768cad96>
+            ${this.hotKeyOf(scope.option) ? html`<span class="rozie-command-palette-option-hotkey" aria-hidden="true" data-rozie-s-768cad96>${rozieDisplay(formatKeyToken(this.hotKeyOf(scope.option), this._platformIsApple.value))}</span>` : nothing}${this._hasSlotActions || this.actions !== undefined || this.actionsList(scope.option).length > 0 ? html`<span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" @mousedown=${($event: MouseEvent & { currentTarget: HTMLSpanElement; target: HTMLSpanElement }) => { $event.stopPropagation(); this.openActionMenu(scope.option); }} data-rozie-s-768cad96>
               ${this.actions !== undefined ? this.actions({option: scope.option, actions: this.actionsList(scope.option)}) : html`<slot name="actions" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, actions: this.actionsList(scope.option)}); } catch { return '{}'; } })()}>
                 ${this.actionsList(scope.option).length > 0 ? html`<span class="rozie-command-palette-option-actions-hint" aria-hidden="true" data-rozie-s-768cad96>${rozieDisplay(this.actionKeyHint())}</span>` : nothing}</slot>`}
             </span>` : nothing}${this._hasSlotTrailing || this.trailing !== undefined ? html`<span class="rozie-command-palette-option-trailing" data-rozie-s-768cad96>
@@ -844,15 +847,14 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
 
   currentDepth = () => levelDepth(this._levelStack.value);
 
-  currentStatus = () => {
+  currentFrameField = (key: any, fallback: any) => {
   const frame = currentFrame(this._levelStack.value);
-  return frame ? frame.status : 'ready';
+  return frame ? frame[key] : fallback;
 };
 
-  currentError = () => {
-  const frame = currentFrame(this._levelStack.value);
-  return frame ? frame.error : null;
-};
+  currentStatus = () => this.currentFrameField('status', 'ready');
+
+  currentError = () => this.currentFrameField('error', null);
 
   atDepth = () => this.currentDepth() > 0;
 
@@ -868,20 +870,15 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   return frame && frame.placeholder != null ? frame.placeholder : this.placeholder;
 };
 
-  currentVirtual = () => {
-  const frame = currentFrame(this._levelStack.value);
-  return frame ? frame.virtual : this.virtual === true;
-};
+  currentVirtual = () => this.currentFrameField('virtual', this.virtual === true);
 
   currentVirtualMaxHeight = () => {
-  const frame = currentFrame(this._levelStack.value);
-  const raw = frame ? frame.virtualMaxHeight : this.virtualMaxHeight;
+  const raw = this.currentFrameField('virtualMaxHeight', this.virtualMaxHeight);
   return this.currentVirtual() && raw != null ? raw : '';
 };
 
   currentVirtualEstimateRowHeight = () => {
-  const frame = currentFrame(this._levelStack.value);
-  const raw = frame ? frame.virtualEstimateRowHeight : this.virtualEstimateRowHeight;
+  const raw = this.currentFrameField('virtualEstimateRowHeight', this.virtualEstimateRowHeight);
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
 };
 
@@ -947,7 +944,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
 
   actionIcon = (a: any) => a && a.icon !== undefined ? a.icon : undefined;
 
-  isApplePlatform = () => {
+  sniffApplePlatform = () => {
   if (typeof navigator === 'undefined') return false;
   const p = (navigator.platform || '') + ' ' + (navigator.userAgent || '');
   return /Mac|iPhone|iPad|iPod/.test(p);
@@ -956,7 +953,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   actionKeyHint = () => {
   const k = this.actionKey;
   if (typeof k !== 'string') return '';
-  return formatKeyToken(k, this.isApplePlatform());
+  return formatKeyToken(k, this._platformIsApple.value);
 };
 
   labelSegments = (o: any) => {

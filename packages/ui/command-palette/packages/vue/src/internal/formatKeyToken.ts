@@ -10,6 +10,12 @@
  * grammar `matchesActionKey` MATCHES against, see internal/actionMenu.ts) for
  * DISPLAY only — this module never binds or listens for a key itself.
  *
+ * Quick 260716-npt Finding 2: both this formatter and matchesActionKey now
+ * parse through the SHARED `parseKeyToken` (internal/parseKeyToken.ts) so a
+ * token that renders a badge here is always one the matcher can fire on —
+ * this module renders `parsed.segments` in AUTHOR ORDER (no canonical
+ * reordering); the modifier-matching semantics live in parseKeyToken.ts.
+ *
  * Grammar:
  *   - Non-string / empty token → ''.
  *   - Split on '+'. Each segment is matched CASE-INSENSITIVELY against the 4
@@ -23,6 +29,8 @@
  *   - Any unrecognized NON-final segment is left verbatim (untouched case).
  *   - Join: Apple = straight concatenation (no separator); non-Apple = '+'.
  */
+import { parseKeyToken } from './parseKeyToken';
+
 const MODIFIERS = {
   '$mod': { apple: '⌘', other: 'Ctrl' },
   '$shift': { apple: '⇧', other: 'Shift' },
@@ -31,15 +39,17 @@ const MODIFIERS = {
 };
 
 export const formatKeyToken = (token, isApple) => {
-  if (typeof token !== 'string' || token === '') return '';
-  const segments = token.split('+');
-  const lastIndex = segments.length - 1;
-  const rendered = segments.map((segment, i) => {
-    const mod = MODIFIERS[segment.toLowerCase()];
-    if (mod) return isApple ? mod.apple : mod.other;
-    if (i !== lastIndex) return segment;
-    if (segment.length === 1) return segment.toUpperCase();
-    return segment.charAt(0).toUpperCase() + segment.slice(1);
+  const parsed = parseKeyToken(token);
+  if (!parsed) return '';
+  const lastIndex = parsed.segments.length - 1;
+  const rendered = parsed.segments.map((segment, i) => {
+    if (segment.modifier) {
+      const mod = MODIFIERS[segment.modifier];
+      return isApple ? mod.apple : mod.other;
+    }
+    if (i !== lastIndex) return segment.raw;
+    if (segment.raw.length === 1) return segment.raw.toUpperCase();
+    return segment.raw.charAt(0).toUpperCase() + segment.raw.slice(1);
   });
   return rendered.join(isApple ? '' : '+');
 };

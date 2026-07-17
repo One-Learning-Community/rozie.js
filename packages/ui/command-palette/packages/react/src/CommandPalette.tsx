@@ -221,6 +221,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   const [actionAnchor, setActionAnchor] = useState<any>(null);
   const [actionMenuTop, setActionMenuTop] = useState(0);
   const [argsState, setArgsState] = useState<any>(null);
+  const [platformIsApple, setPlatformIsApple] = useState(false);
   const frame = useRef<HTMLDivElement | null>(null);
   const panel = useRef<HTMLDivElement | null>(null);
   const combobox = useRef<ComboboxHandle | null>(null);
@@ -288,13 +289,15 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function currentDepth() {
     return levelDepth(levelStack);
   }
-  function currentStatus() {
+  function currentFrameField(key: any, fallback: any) {
     const frame = currentFrame(levelStack);
-    return frame ? frame.status : 'ready';
+    return frame ? frame[key] : fallback;
+  }
+  function currentStatus() {
+    return currentFrameField('status', 'ready');
   }
   function currentError() {
-    const frame = currentFrame(levelStack);
-    return frame ? frame.error : null;
+    return currentFrameField('error', null);
   }
   function atDepth() {
     return currentDepth() > 0;
@@ -311,17 +314,14 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     return frame && frame.placeholder != null ? frame.placeholder : props.placeholder;
   }
   function currentVirtual() {
-    const frame = currentFrame(levelStack);
-    return frame ? frame.virtual : props.virtual === true;
+    return currentFrameField('virtual', props.virtual === true);
   }
   function currentVirtualMaxHeight() {
-    const frame = currentFrame(levelStack);
-    const raw = frame ? frame.virtualMaxHeight : props.virtualMaxHeight;
+    const raw = currentFrameField('virtualMaxHeight', props.virtualMaxHeight);
     return currentVirtual() && raw != null ? raw : '';
   }
   function currentVirtualEstimateRowHeight() {
-    const frame = currentFrame(levelStack);
-    const raw = frame ? frame.virtualEstimateRowHeight : props.virtualEstimateRowHeight;
+    const raw = currentFrameField('virtualEstimateRowHeight', props.virtualEstimateRowHeight);
     return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
   }
   function breadcrumbStack() {
@@ -392,15 +392,15 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function actionIcon(a: any) {
     return a && a.icon !== undefined ? a.icon : undefined;
   }
-  function isApplePlatform() {
+  const sniffApplePlatform = useCallback(() => {
     if (typeof navigator === 'undefined') return false;
     const p = (navigator.platform || '') + ' ' + (navigator.userAgent || '');
     return /Mac|iPhone|iPad|iPod/.test(p);
-  }
+  }, []);
   function actionKeyHint() {
     const k = props.actionKey;
     if (typeof k !== 'string') return '';
-    return formatKeyToken(k, isApplePlatform());
+    return formatKeyToken(k, platformIsApple);
   }
   function labelSegments(o: any) {
     const label = labelText(o);
@@ -1012,6 +1012,9 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   }
 
   useEffect(() => {
+    setPlatformIsApple(sniffApplePlatform());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
     if (_openRef.current) onOpen();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -1069,7 +1072,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
                   </span>
                   {!!(groupText(option) && !grouped()) && <span className={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span>}</span>
                 
-                {!!(hotKeyOf(option)) && <span className={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), isApplePlatform()))}</span>}{!!((props.renderActions ?? props.slots?.['actions']) || actionsList(option).length > 0) && <span className={"rozie-command-palette-option-actions"} data-testid="command-palette-actions-affordance" onMouseDown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
+                {!!(hotKeyOf(option)) && <span className={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), platformIsApple))}</span>}{!!((props.renderActions ?? props.slots?.['actions']) || actionsList(option).length > 0) && <span className={"rozie-command-palette-option-actions"} data-testid="command-palette-actions-affordance" onMouseDown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
                   {(props.renderActions ?? props.slots?.['actions']) ? ((props.renderActions ?? props.slots?.['actions']) as Function)({ option, actions: actionsList(option) }) : !!(actionsList(option).length > 0) && <span className={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span>}
                 </span>}{!!((props.renderTrailing ?? props.slots?.['trailing'])) && <span className={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
                   {(props.renderTrailing ?? props.slots?.['trailing'])?.({ option })}
@@ -1124,7 +1127,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
                   </span>
                   {!!(groupText(option) && !grouped()) && <span className={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span>}</span>
                 
-                {!!(hotKeyOf(option)) && <span className={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), isApplePlatform()))}</span>}{!!((props.renderActions ?? props.slots?.['actions']) || actionsList(option).length > 0) && <span className={"rozie-command-palette-option-actions"} data-testid="command-palette-actions-affordance" onMouseDown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
+                {!!(hotKeyOf(option)) && <span className={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), platformIsApple))}</span>}{!!((props.renderActions ?? props.slots?.['actions']) || actionsList(option).length > 0) && <span className={"rozie-command-palette-option-actions"} data-testid="command-palette-actions-affordance" onMouseDown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
                   {(props.renderActions ?? props.slots?.['actions']) ? ((props.renderActions ?? props.slots?.['actions']) as Function)({ option, actions: actionsList(option) }) : !!(actionsList(option).length > 0) && <span className={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span>}
                 </span>}{!!((props.renderTrailing ?? props.slots?.['trailing'])) && <span className={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
                   {(props.renderTrailing ?? props.slots?.['trailing'])?.({ option })}

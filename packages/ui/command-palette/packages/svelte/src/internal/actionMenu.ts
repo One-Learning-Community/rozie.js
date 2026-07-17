@@ -17,6 +17,7 @@
  * way: no helper here should read "menu" into its logic beyond the literal
  * string value passed in by the caller.
  */
+import { parseKeyToken } from './parseKeyToken';
 
 /** A single row-level action item (the consumer-supplied `item.actions[]` entries). */
 export interface ActionItem {
@@ -61,6 +62,8 @@ export type EscapeRoute = 'close-surface' | 'pop-level' | 'close-palette';
 export interface KeyLike {
   metaKey?: boolean;
   ctrlKey?: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
   key?: string;
 }
 
@@ -134,26 +137,30 @@ export function resolveEscape(activeSurface: string, depth: number): EscapeRoute
 }
 
 /**
- * Portable `$mod+<letter>`-style token matcher. Default `'$mod+k'` matches
- * `(metaKey || ctrlKey) && key.toLowerCase() === 'k'`; any `'$mod+<letter>'`
- * token generalizes the same way. A bare single-letter token (e.g. `'k'`)
- * matches the key alone, no modifier required. DOM-free — takes a plain
- * `{ metaKey, ctrlKey, key }`-shaped object so it is unit-testable without a
- * real KeyboardEvent.
+ * Portable `$mod+<letter>`-style token matcher — now a MULTI-modifier
+ * matcher (quick 260716-npt Finding 2). Default `'$mod+k'` matches
+ * `(metaKey || ctrlKey) && key.toLowerCase() === 'k'`; ANY combination of
+ * `$mod`/`$shift`/`$alt`/`$ctrl` (e.g. `'$mod+$shift+p'`) generalizes the
+ * same way — every modifier the token names must be held. A bare
+ * single-letter token (e.g. `'k'`) matches the key alone, no modifier
+ * required (unchanged). Parses through the SHARED `parseKeyToken` so this
+ * always agrees with formatKeyToken's badge rendering — see
+ * internal/parseKeyToken.ts. DOM-free — takes a plain
+ * `{ metaKey, ctrlKey, shiftKey, altKey, key }`-shaped object so it is
+ * unit-testable without a real KeyboardEvent.
  */
 export function matchesActionKey(ev: KeyLike | null | undefined, token?: string): boolean {
   if (!ev) return false;
-  const t = token || '$mod+k';
+  const parsed = parseKeyToken(token || '$mod+k');
+  if (!parsed || !parsed.key) return false;
   const key = String(ev.key || '').toLowerCase();
-  if (t.indexOf('$mod+') === 0) {
-    const letter = t.slice('$mod+'.length).toLowerCase();
-    return !!(ev.metaKey || ev.ctrlKey) && key === letter;
-  }
-  // Bare single-letter token — no modifier required.
-  if (t.length === 1) {
-    return key === t.toLowerCase();
-  }
-  return false;
+  if (key !== parsed.key.toLowerCase()) return false;
+  const { modifiers } = parsed;
+  if (modifiers.mod && !(ev.metaKey || ev.ctrlKey)) return false;
+  if (modifiers.shift && !ev.shiftKey) return false;
+  if (modifiers.alt && !ev.altKey) return false;
+  if (modifiers.ctrl && !ev.ctrlKey) return false;
+  return true;
 }
 
 /**

@@ -486,6 +486,10 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   const [actionAnchor, setActionAnchor] = createSignal<any>(null);
   const [actionMenuTop, setActionMenuTop] = createSignal(0);
   const [argsState, setArgsState] = createSignal<any>(null);
+  const [platformIsApple, setPlatformIsApple] = createSignal(false);
+  onMount(() => {
+    setPlatformIsApple(sniffApplePlatform());
+  });
   onMount(() => {
     if (open()) onOpen();
   });
@@ -613,17 +617,27 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     return levelDepth(levelStack());
   }
 
+  // currentFrameField(key, fallback): quick 260716-npt Finding 4 (reuse) —
+  // the shared shape behind currentStatus/currentError/currentVirtual/
+  // currentVirtualMaxHeight/currentVirtualEstimateRowHeight below (5
+  // mechanically-identical `const frame = currentFrame($data.levelStack);
+  // return frame ? frame.KEY : FALLBACK` blocks, collapsed into one). NOT used
+  // by currentTitle/currentPlaceholder — those use a genuinely divergent
+  // `frame && frame.KEY != null` nullish-check shape, left as-is.
+  function currentFrameField(key: any, fallback: any) {
+    const frame = currentFrame(levelStack());
+    return frame ? frame[key] : fallback;
+  }
+
   // currentStatus()/currentError(): the active level's async status (LVL-ASYNC)
   // off the top frame — 'ready' at root (the implicit root frame is never
   // loading/error). Drive the #loading/#error re-projection inside combobox's
   // #empty slot (below).
   function currentStatus() {
-    const frame = currentFrame(levelStack());
-    return frame ? frame.status : 'ready';
+    return currentFrameField('status', 'ready');
   }
   function currentError() {
-    const frame = currentFrame(levelStack());
-    return frame ? frame.error : null;
+    return currentFrameField('error', null);
   }
 
   // atDepth(): true when nested (depth>0) — gates the breadcrumb/back header
@@ -667,15 +681,13 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // functions (never $computed — the combobox value-vs-accessor split), each
   // reading currentFrame($data.levelStack) once.
   function currentVirtual() {
-    const frame = currentFrame(levelStack());
-    return frame ? frame.virtual : local.virtual === true;
+    return currentFrameField('virtual', local.virtual === true);
   }
   // combobox's own empty-string default falls back to its
   // `--rozie-combobox-list-max-height` token; maxHeight is also ignored by
   // combobox whenever `virtual` is off — so `''` here is byte-identical-off.
   function currentVirtualMaxHeight() {
-    const frame = currentFrame(levelStack());
-    const raw = frame ? frame.virtualMaxHeight : local.virtualMaxHeight;
+    const raw = currentFrameField('virtualMaxHeight', local.virtualMaxHeight);
     return currentVirtual() && raw != null ? raw : '';
   }
   // MUST fall back to a real number — combobox consumes this as
@@ -683,8 +695,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // so a null binding would seed the virtualizer with null. `36` mirrors
   // combobox's own `estimateRowHeight` default.
   function currentVirtualEstimateRowHeight() {
-    const frame = currentFrame(levelStack());
-    const raw = frame ? frame.virtualEstimateRowHeight : local.virtualEstimateRowHeight;
+    const raw = currentFrameField('virtualEstimateRowHeight', local.virtualEstimateRowHeight);
     return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
   }
 
@@ -857,22 +868,29 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // Platform sniff for the DISPLAY of the `$mod` token only — matching is
   // platform-agnostic (`metaKey || ctrlKey`, see matchesActionKey). SSR-guarded
   // like every other browser-global read; defaults to the non-Apple form.
-  function isApplePlatform() {
+  //
+  // Quick 260716-npt Finding 4 (efficiency): this used to be called directly
+  // from the template ONCE PER ROW (via actionKeyHint()/hotKey badge below),
+  // re-sniffing navigator on every render for every option. `navigator` never
+  // changes mid-session, so sniff it ONCE in $onMount into $data.platformIsApple
+  // and read that everywhere instead — see the two call sites below.
+  function sniffApplePlatform() {
     if (typeof navigator === 'undefined') return false;
     const p = (navigator.platform || '') + ' ' + (navigator.userAgent || '');
     return /Mac|iPhone|iPad|iPod/.test(p);
   }
-
   // actionKeyHint(): a short display string for the actionKey prop, for the
   // #actions row affordance's default (unfilled) hint — "$mod+k" → "⌘K" on
   // Apple platforms / "Ctrl+K" elsewhere; delegates the full modifier grammar
   // onto the shared formatKeyToken() helper (also used by the per-item hotKey
   // badge below) — see internal/formatKeyToken.ts for the grammar. Keeps the
-  // existing typeof guard; '$mod+k' stays byte-identical (⌘K / Ctrl+K).
+  // existing typeof guard; '$mod+k' stays byte-identical (⌘K / Ctrl+K). Reads
+  // the mount-time-cached $data.platformIsApple (Finding 4) instead of
+  // re-sniffing navigator per call.
   function actionKeyHint() {
     const k = local.actionKey;
     if (typeof k !== 'string') return '';
-    return formatKeyToken(k, isApplePlatform());
+    return formatKeyToken(k, platformIsApple());
   }
 
   // Split a command's visible label into ordered { text, match } segments from
@@ -1852,7 +1870,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
                   </span>
                   {<Show when={groupText(option) && !grouped()}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</span>
                 
-                {<Show when={hotKeyOf(option)}><span class={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), isApplePlatform()))}</span></Show>}{<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
+                {<Show when={hotKeyOf(option)}><span class={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), platformIsApple()))}</span></Show>}{<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
                   {(_props.actionsSlot ?? _props.slots?.['actions'])?.({ option, actions: actionsList(option) }) ?? <Show when={actionsList(option).length > 0}><span class={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span></Show>}
                 </span></Show>}{<Show when={(_props.trailingSlot ?? _props.slots?.['trailing'])}><span class={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
                   {(_props.trailingSlot ?? _props.slots?.['trailing'])?.({ option })}
@@ -1907,7 +1925,7 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
                   </span>
                   {<Show when={groupText(option) && !grouped()}><span class={"rozie-command-palette-option-group"} data-rozie-s-768cad96="">{rozieDisplay(groupText(option))}</span></Show>}</span>
                 
-                {<Show when={hotKeyOf(option)}><span class={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), isApplePlatform()))}</span></Show>}{<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
+                {<Show when={hotKeyOf(option)}><span class={"rozie-command-palette-option-hotkey"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(formatKeyToken(hotKeyOf(option), platformIsApple()))}</span></Show>}{<Show when={(_props.actionsSlot ?? _props.slots?.['actions']) || actionsList(option).length > 0}><span data-testid="command-palette-actions-affordance" class={"rozie-command-palette-option-actions"} onMouseDown={($event: MouseEvent & { currentTarget: HTMLSpanElement; target: Element }) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96="">
                   {(_props.actionsSlot ?? _props.slots?.['actions'])?.({ option, actions: actionsList(option) }) ?? <Show when={actionsList(option).length > 0}><span class={"rozie-command-palette-option-actions-hint"} aria-hidden="true" data-rozie-s-768cad96="">{rozieDisplay(actionKeyHint())}</span></Show>}
                 </span></Show>}{<Show when={(_props.trailingSlot ?? _props.slots?.['trailing'])}><span class={"rozie-command-palette-option-trailing"} data-rozie-s-768cad96="">
                   {(_props.trailingSlot ?? _props.slots?.['trailing'])?.({ option })}

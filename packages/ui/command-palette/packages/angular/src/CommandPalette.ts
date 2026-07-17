@@ -175,7 +175,7 @@ function __rozieAttr(v: unknown): string | null {
     }</span>
                 
                 @if (hotKeyOf(option)) {
-    <span class="rozie-command-palette-option-hotkey" aria-hidden="true">{{ rozieDisplay(formatKeyToken(hotKeyOf(option), isApplePlatform())) }}</span>
+    <span class="rozie-command-palette-option-hotkey" aria-hidden="true">{{ rozieDisplay(formatKeyToken(hotKeyOf(option), platformIsApple())) }}</span>
     }@if ((actionsTpl ?? templates()?.['actions']) || actionsList(option).length > 0) {
     <span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" (mousedown)="$event.stopPropagation(); openActionMenu(option)">
                   @if ((actionsTpl ?? templates()?.['actions'])) {
@@ -675,6 +675,7 @@ export class CommandPalette {
   actionAnchor = signal<any>(null);
   actionMenuTop = signal(0);
   argsState = signal<any>(null);
+  platformIsApple = signal(false);
   frame = viewChild<ElementRef<HTMLDivElement>>('frame');
   panel = viewChild<ElementRef<HTMLDivElement>>('panel');
   combobox = viewChild<Combobox>('combobox');
@@ -722,6 +723,7 @@ export class CommandPalette {
   }
 
   ngAfterViewInit() {
+    this.platformIsApple.set(this.sniffApplePlatform());
     if (this.open()) this.onOpen();
   }
 
@@ -755,14 +757,12 @@ export class CommandPalette {
     return this.currentItems();
   };
   currentDepth = () => levelDepth(this.levelStack());
-  currentStatus = () => {
+  currentFrameField = (key: any, fallback: any) => {
     const frame = currentFrame(this.levelStack());
-    return frame ? frame.status : 'ready';
+    return frame ? frame[key] : fallback;
   };
-  currentError = () => {
-    const frame = currentFrame(this.levelStack());
-    return frame ? frame.error : null;
-  };
+  currentStatus = () => this.currentFrameField('status', 'ready');
+  currentError = () => this.currentFrameField('error', null);
   atDepth = () => this.currentDepth() > 0;
   atActions = () => this.activeSurface() === 'actions';
   currentTitle = () => {
@@ -773,18 +773,13 @@ export class CommandPalette {
     const frame = currentFrame(this.levelStack());
     return frame && frame.placeholder != null ? frame.placeholder : this.placeholder();
   };
-  currentVirtual = () => {
-    const frame = currentFrame(this.levelStack());
-    return frame ? frame.virtual : this.virtual() === true;
-  };
+  currentVirtual = () => this.currentFrameField('virtual', this.virtual() === true);
   currentVirtualMaxHeight = () => {
-    const frame = currentFrame(this.levelStack());
-    const raw = frame ? frame.virtualMaxHeight : this.virtualMaxHeight();
+    const raw = this.currentFrameField('virtualMaxHeight', this.virtualMaxHeight());
     return this.currentVirtual() && raw != null ? raw : '';
   };
   currentVirtualEstimateRowHeight = () => {
-    const frame = currentFrame(this.levelStack());
-    const raw = frame ? frame.virtualEstimateRowHeight : this.virtualEstimateRowHeight();
+    const raw = this.currentFrameField('virtualEstimateRowHeight', this.virtualEstimateRowHeight());
     return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
   };
   breadcrumbStack = () => buildBreadcrumb(this.levelStack(), this.ariaLabel());
@@ -827,7 +822,7 @@ export class CommandPalette {
   actionLabel = (a: any) => a && a.label !== undefined ? a.label : '';
   actionShortcut = (a: any) => a && a.shortcut !== undefined ? a.shortcut : undefined;
   actionIcon = (a: any) => a && a.icon !== undefined ? a.icon : undefined;
-  isApplePlatform = () => {
+  sniffApplePlatform = () => {
     if (typeof navigator === 'undefined') return false;
     const p = (navigator.platform || '') + ' ' + (navigator.userAgent || '');
     return /Mac|iPhone|iPad|iPod/.test(p);
@@ -835,7 +830,7 @@ export class CommandPalette {
   actionKeyHint = () => {
     const k = this.actionKey();
     if (typeof k !== 'string') return '';
-    return formatKeyToken(k, this.isApplePlatform());
+    return formatKeyToken(k, this.platformIsApple());
   };
   labelSegments = (o: any) => {
     const label = this.labelText(o);

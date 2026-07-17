@@ -178,6 +178,7 @@ let actionIndex = $state(-1);
 let actionAnchor: any = $state(null);
 let actionMenuTop = $state(0);
 let argsState: any = $state(null);
+let platformIsApple = $state(false);
 
 let frame = $state<HTMLElement | undefined>(undefined);
 let panel = $state<HTMLElement | undefined>(undefined);
@@ -280,18 +281,23 @@ const currentBaseItems = () => {
 // currentDepth(): the nesting depth (0 = root). Named to avoid shadowing the
 // imported levelStack `depth` helper (aliased `levelDepth` above).
 const currentDepth = () => levelDepth(levelStack);
+// currentFrameField(key, fallback): quick 260716-npt Finding 4 (reuse) —
+// the shared shape behind currentStatus/currentError/currentVirtual/
+// currentVirtualMaxHeight/currentVirtualEstimateRowHeight below (5
+// mechanically-identical `const frame = currentFrame($data.levelStack);
+// return frame ? frame.KEY : FALLBACK` blocks, collapsed into one). NOT used
+// by currentTitle/currentPlaceholder — those use a genuinely divergent
+// `frame && frame.KEY != null` nullish-check shape, left as-is.
+const currentFrameField = (key: any, fallback: any) => {
+  const frame = currentFrame(levelStack);
+  return frame ? frame[key] : fallback;
+};
 // currentStatus()/currentError(): the active level's async status (LVL-ASYNC)
 // off the top frame — 'ready' at root (the implicit root frame is never
 // loading/error). Drive the #loading/#error re-projection inside combobox's
 // #empty slot (below).
-const currentStatus = () => {
-  const frame = currentFrame(levelStack);
-  return frame ? frame.status : 'ready';
-};
-const currentError = () => {
-  const frame = currentFrame(levelStack);
-  return frame ? frame.error : null;
-};
+const currentStatus = () => currentFrameField('status', 'ready');
+const currentError = () => currentFrameField('error', null);
 // atDepth(): true when nested (depth>0) — gates the breadcrumb/back header
 // (LVL-RENDER). A plain function — never $computed.
 const atDepth = () => currentDepth() > 0;
@@ -324,16 +330,12 @@ const currentPlaceholder = () => {
 // root `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` props. Plain
 // functions (never $computed — the combobox value-vs-accessor split), each
 // reading currentFrame($data.levelStack) once.
-const currentVirtual = () => {
-  const frame = currentFrame(levelStack);
-  return frame ? frame.virtual : virtual === true;
-};
+const currentVirtual = () => currentFrameField('virtual', virtual === true);
 // combobox's own empty-string default falls back to its
 // `--rozie-combobox-list-max-height` token; maxHeight is also ignored by
 // combobox whenever `virtual` is off — so `''` here is byte-identical-off.
 const currentVirtualMaxHeight = () => {
-  const frame = currentFrame(levelStack);
-  const raw = frame ? frame.virtualMaxHeight : virtualMaxHeight;
+  const raw = currentFrameField('virtualMaxHeight', virtualMaxHeight);
   return currentVirtual() && raw != null ? raw : '';
 };
 // MUST fall back to a real number — combobox consumes this as
@@ -341,8 +343,7 @@ const currentVirtualMaxHeight = () => {
 // so a null binding would seed the virtualizer with null. `36` mirrors
 // combobox's own `estimateRowHeight` default.
 const currentVirtualEstimateRowHeight = () => {
-  const frame = currentFrame(levelStack);
-  const raw = frame ? frame.virtualEstimateRowHeight : virtualEstimateRowHeight;
+  const raw = currentFrameField('virtualEstimateRowHeight', virtualEstimateRowHeight);
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : 36;
 };
 // breadcrumbStack(): the full root..current breadcrumb (internal/levelStack.ts
@@ -473,7 +474,13 @@ const actionIcon = (a: any) => a && a.icon !== undefined ? a.icon : undefined;
 // Platform sniff for the DISPLAY of the `$mod` token only — matching is
 // platform-agnostic (`metaKey || ctrlKey`, see matchesActionKey). SSR-guarded
 // like every other browser-global read; defaults to the non-Apple form.
-const isApplePlatform = () => {
+//
+// Quick 260716-npt Finding 4 (efficiency): this used to be called directly
+// from the template ONCE PER ROW (via actionKeyHint()/hotKey badge below),
+// re-sniffing navigator on every render for every option. `navigator` never
+// changes mid-session, so sniff it ONCE in $onMount into $data.platformIsApple
+// and read that everywhere instead — see the two call sites below.
+const sniffApplePlatform = () => {
   if (typeof navigator === 'undefined') return false;
   const p = (navigator.platform || '') + ' ' + (navigator.userAgent || '');
   return /Mac|iPhone|iPad|iPod/.test(p);
@@ -483,11 +490,13 @@ const isApplePlatform = () => {
 // Apple platforms / "Ctrl+K" elsewhere; delegates the full modifier grammar
 // onto the shared formatKeyToken() helper (also used by the per-item hotKey
 // badge below) — see internal/formatKeyToken.ts for the grammar. Keeps the
-// existing typeof guard; '$mod+k' stays byte-identical (⌘K / Ctrl+K).
+// existing typeof guard; '$mod+k' stays byte-identical (⌘K / Ctrl+K). Reads
+// the mount-time-cached $data.platformIsApple (Finding 4) instead of
+// re-sniffing navigator per call.
 const actionKeyHint = () => {
   const k = actionKey;
   if (typeof k !== 'string') return '';
-  return formatKeyToken(k, isApplePlatform());
+  return formatKeyToken(k, platformIsApple);
 };
 // Split a command's visible label into ordered { text, match } segments from
 // labelHighlight's [start,end) ranges, for the default #option fill row to
@@ -1403,6 +1412,9 @@ export const toggle = () => {
 export const focus = () => focusInput();
 
 onMount(() => {
+  platformIsApple = sniffApplePlatform();
+});
+onMount(() => {
   if (open) onOpen();
 });
 onDestroy(() => (() => {
@@ -1430,7 +1442,7 @@ $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWa
 })(__watchVal); }); });
 </script>
 
-{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} use:roziePortal={resolveAppendTo(appendTo)} data-rozie-s-768cad96><div bind:this={frame} class="rozie-command-palette-frame" data-testid="command-palette-frame" onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} data-rozie-s-768cad96>{#if atDepth()}<div class="rozie-command-palette-header" data-rozie-s-768cad96>{#if breadcrumb}{@render breadcrumb({ stack: breadcrumbStack(), back: goBack })}{:else}<button type="button" class="rozie-command-palette-back" aria-label="Back" data-testid="command-palette-back" onclick={($event) => { goBack(); }} data-rozie-s-768cad96>‹</button><nav class="rozie-command-palette-breadcrumb-trail" data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb" data-rozie-s-768cad96>{#each breadcrumbStack() as entry, ei (ei)}<span class="rozie-command-palette-breadcrumb-item" data-rozie-s-768cad96>{#if Number(ei) > 0}<span class="rozie-command-palette-breadcrumb-separator" aria-hidden="true" data-rozie-s-768cad96>›</span>{/if}{#if Number(ei) < breadcrumbStack().length - 1}<button type="button" class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link" aria-label={rozieAttr('Back to ' + entry.title)} data-testid="command-palette-breadcrumb-jump" onclick={($event) => { jumpToLevel(Number(ei)); }} data-rozie-s-768cad96>{rozieDisplay(entry.title)}</button>{:else}<span class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-title" data-rozie-s-768cad96>{rozieDisplay(entry.title)}</span>{/if}</span>{/each}</nav>{/if}</div>{/if}<div class={["rozie-command-palette-list-region", { 'rozie-command-palette-list-region--inert': activeSurface === 'args' }]} aria-hidden={!!(activeSurface === 'args')} data-rozie-s-768cad96><Combobox bind:this={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}<span class="rozie-command-palette-option-anchor" data-cp-index={rozieAttr(cpAnchorIndex(option))} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96>{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) })}{:else}<div class="rozie-command-palette-option" data-rozie-s-768cad96>{#if icon}<span class="rozie-command-palette-option-icon" data-rozie-s-768cad96>{#if icon}{@render icon({ option })}{/if}</span>{/if}<span class="rozie-command-palette-option-main" data-rozie-s-768cad96><span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{#each labelSegments(option) as segment, si (si)}<span class={{ 'rozie-command-palette-option-label-match': segment.match }} data-rozie-s-768cad96>{rozieDisplay(segment.text)}</span>{/each}</span>{#if groupText(option) && !grouped()}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}</span>{#if hotKeyOf(option)}<span class="rozie-command-palette-option-hotkey" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(formatKeyToken(hotKeyOf(option), isApplePlatform()))}</span>{/if}{#if actions || actionsList(option).length > 0}<span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" onmousedown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96>{#if actions}{@render actions({ option, actions: actionsList(option) })}{:else}{#if actionsList(option).length > 0}<span class="rozie-command-palette-option-actions-hint" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(actionKeyHint())}</span>{/if}{/if}</span>{/if}{#if trailing}<span class="rozie-command-palette-option-trailing" data-rozie-s-768cad96>{#if trailing}{@render trailing({ option })}{/if}</span>{/if}</div>{/if}</span>{/snippet}{#snippet groupHeading({ group })}{#if groupHeading$$slot}{@render groupHeading$$slot({ group })}{:else}{rozieDisplay(groupLabel(group))}{/if}{/snippet}{#snippet empty({ query })}{#if currentStatus() === 'ready'}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/if}{/snippet}</Combobox></div>{#if activeSurface === 'args'}<div data-command-palette-args="" data-testid="command-palette-args" class="rozie-command-palette-args" role="group" aria-label={rozieAttr('Arguments for ' + (argsState ? argsState.label : ''))} data-rozie-s-768cad96><span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(argsState ? argsState.label : '')}</span>{#each argsState ? argsState.argList : [] as arg, argIdx (arg.id)}<span class="rozie-command-palette-args-field" data-rozie-s-768cad96>{#if argsField}{@render argsField({ item: argsState ? argsState.item : null, arg, value: argsState ? argsState.values[arg.id] : '', setValue: setArgValueFor(arg.id) })}{:else}<input type="text" class="rozie-command-palette-args-input" data-testid="command-palette-args-input" value={argsState ? argsState.values[arg.id] : ''} placeholder={rozieAttr(arg.placeholder || arg.id)} aria-label={rozieAttr(arg.placeholder || arg.id)} oninput={($event) => { onArgFieldInput(arg.id, $event); }} data-rozie-s-768cad96 />{/if}</span>{/each}</div>{/if}{#if currentStatus() === 'loading'}<div class="rozie-command-palette-loading" data-rozie-s-768cad96>{#if loading}{@render loading({ query })}{:else}Loading…{/if}</div>{:else if currentStatus() === 'error'}<div class="rozie-command-palette-error" data-rozie-s-768cad96>{@render error?.({ query, error: currentError(), retry: retryCurrentLevel })}</div>{/if}{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div>{#if atActions()}<div data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" aria-label={rozieAttr(actionAnchor ? actionAnchor.label : null)} style={rozieStyle('top:' + actionMenuTop + 'px')} onkeydown={($event) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96>{#each actionAnchor ? actionAnchor.actions : [] as action, ai (action.id)}<div class={["rozie-command-palette-actions-menu-item", { 'rozie-command-palette-actions-menu-item--active': ai === actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }]} role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action.disabled} tabindex="-1" onmouseenter={($event) => { actionIndex = Number(ai); }} onmousedown={($event) => { $event.preventDefault(); selectAction(action); }} data-rozie-s-768cad96>{#if actionItem}{@render actionItem({ action, item: actionAnchor ? actionAnchor.item : null, active: ai === actionIndex, disabled: !!action.disabled })}{:else}{#if actionIcon(action)}<span class="rozie-command-palette-actions-menu-item-icon" data-rozie-s-768cad96>{rozieDisplay(actionIcon(action))}</span>{/if}<span class="rozie-command-palette-actions-menu-item-label" data-rozie-s-768cad96>{rozieDisplay(actionLabel(action))}</span>{#if actionShortcut(action)}<span class="rozie-command-palette-actions-menu-item-shortcut" data-rozie-s-768cad96>{rozieDisplay(actionShortcut(action))}</span>{/if}{/if}</div>{/each}</div>{/if}</div></div>{/if}
+{#if open}<div class="rozie-command-palette" onclick={($event) => { onBackdropClick($event); }} use:roziePortal={resolveAppendTo(appendTo)} data-rozie-s-768cad96><div bind:this={frame} class="rozie-command-palette-frame" data-testid="command-palette-frame" onkeydown={($event) => { onPanelKeydown($event); }} data-rozie-s-768cad96><div bind:this={panel} class="rozie-command-palette-panel" role="dialog" aria-modal="true" aria-label={ariaLabel} data-rozie-s-768cad96>{#if atDepth()}<div class="rozie-command-palette-header" data-rozie-s-768cad96>{#if breadcrumb}{@render breadcrumb({ stack: breadcrumbStack(), back: goBack })}{:else}<button type="button" class="rozie-command-palette-back" aria-label="Back" data-testid="command-palette-back" onclick={($event) => { goBack(); }} data-rozie-s-768cad96>‹</button><nav class="rozie-command-palette-breadcrumb-trail" data-testid="command-palette-breadcrumb-trail" aria-label="Breadcrumb" data-rozie-s-768cad96>{#each breadcrumbStack() as entry, ei (ei)}<span class="rozie-command-palette-breadcrumb-item" data-rozie-s-768cad96>{#if Number(ei) > 0}<span class="rozie-command-palette-breadcrumb-separator" aria-hidden="true" data-rozie-s-768cad96>›</span>{/if}{#if Number(ei) < breadcrumbStack().length - 1}<button type="button" class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--link" aria-label={rozieAttr('Back to ' + entry.title)} data-testid="command-palette-breadcrumb-jump" onclick={($event) => { jumpToLevel(Number(ei)); }} data-rozie-s-768cad96>{rozieDisplay(entry.title)}</button>{:else}<span class="rozie-command-palette-breadcrumb-segment rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-title" data-rozie-s-768cad96>{rozieDisplay(entry.title)}</span>{/if}</span>{/each}</nav>{/if}</div>{/if}<div class={["rozie-command-palette-list-region", { 'rozie-command-palette-list-region--inert': activeSurface === 'args' }]} aria-hidden={!!(activeSurface === 'args')} data-rozie-s-768cad96><Combobox bind:this={combobox} inline={true} disableFilter={true} closeOnSelect={false} options={orderedItems()} groups={commandGroups()} groupCap={groupCap} virtual={currentVirtual()} maxHeight={currentVirtualMaxHeight()} estimateRowHeight={currentVirtualEstimateRowHeight()} optionValue={commandValue} optionDisabled={commandDisabled} placeholder={currentPlaceholder()} aria-label={ariaLabel} idBase={idBase} bind:value={activeValue} onchange={($event) => { onComboboxChange($event); }} onsearch={($event) => { onComboboxSearch($event); }} data-rozie-s-768cad96>{#snippet option({ option, index, active, selected, disabled })}<span class="rozie-command-palette-option-anchor" data-cp-index={rozieAttr(cpAnchorIndex(option))} data-cp-value={rozieAttr(commandValue(option))} data-rozie-s-768cad96>{#if option$$slot}{@render option$$slot({ option, index, active, selected, disabled, matches: labelHighlight(labelText(option), query) })}{:else}<div class="rozie-command-palette-option" data-rozie-s-768cad96>{#if icon}<span class="rozie-command-palette-option-icon" data-rozie-s-768cad96>{#if icon}{@render icon({ option })}{/if}</span>{/if}<span class="rozie-command-palette-option-main" data-rozie-s-768cad96><span class="rozie-command-palette-option-label" data-rozie-s-768cad96>{#each labelSegments(option) as segment, si (si)}<span class={{ 'rozie-command-palette-option-label-match': segment.match }} data-rozie-s-768cad96>{rozieDisplay(segment.text)}</span>{/each}</span>{#if groupText(option) && !grouped()}<span class="rozie-command-palette-option-group" data-rozie-s-768cad96>{rozieDisplay(groupText(option))}</span>{/if}</span>{#if hotKeyOf(option)}<span class="rozie-command-palette-option-hotkey" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(formatKeyToken(hotKeyOf(option), platformIsApple))}</span>{/if}{#if actions || actionsList(option).length > 0}<span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" onmousedown={($event) => { $event.stopPropagation(); openActionMenu(option); }} data-rozie-s-768cad96>{#if actions}{@render actions({ option, actions: actionsList(option) })}{:else}{#if actionsList(option).length > 0}<span class="rozie-command-palette-option-actions-hint" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(actionKeyHint())}</span>{/if}{/if}</span>{/if}{#if trailing}<span class="rozie-command-palette-option-trailing" data-rozie-s-768cad96>{#if trailing}{@render trailing({ option })}{/if}</span>{/if}</div>{/if}</span>{/snippet}{#snippet groupHeading({ group })}{#if groupHeading$$slot}{@render groupHeading$$slot({ group })}{:else}{rozieDisplay(groupLabel(group))}{/if}{/snippet}{#snippet empty({ query })}{#if currentStatus() === 'ready'}{#if empty$$slot}{@render empty$$slot({ query })}{:else}{emptyText}{/if}{/if}{/snippet}</Combobox></div>{#if activeSurface === 'args'}<div data-command-palette-args="" data-testid="command-palette-args" class="rozie-command-palette-args" role="group" aria-label={rozieAttr('Arguments for ' + (argsState ? argsState.label : ''))} data-rozie-s-768cad96><span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true" data-rozie-s-768cad96>{rozieDisplay(argsState ? argsState.label : '')}</span>{#each argsState ? argsState.argList : [] as arg, argIdx (arg.id)}<span class="rozie-command-palette-args-field" data-rozie-s-768cad96>{#if argsField}{@render argsField({ item: argsState ? argsState.item : null, arg, value: argsState ? argsState.values[arg.id] : '', setValue: setArgValueFor(arg.id) })}{:else}<input type="text" class="rozie-command-palette-args-input" data-testid="command-palette-args-input" value={argsState ? argsState.values[arg.id] : ''} placeholder={rozieAttr(arg.placeholder || arg.id)} aria-label={rozieAttr(arg.placeholder || arg.id)} oninput={($event) => { onArgFieldInput(arg.id, $event); }} data-rozie-s-768cad96 />{/if}</span>{/each}</div>{/if}{#if currentStatus() === 'loading'}<div class="rozie-command-palette-loading" data-rozie-s-768cad96>{#if loading}{@render loading({ query })}{:else}Loading…{/if}</div>{:else if currentStatus() === 'error'}<div class="rozie-command-palette-error" data-rozie-s-768cad96>{@render error?.({ query, error: currentError(), retry: retryCurrentLevel })}</div>{/if}{#if footer}<div class="rozie-command-palette-footer" data-rozie-s-768cad96>{#if footer}{@render footer()}{/if}</div>{/if}</div>{#if atActions()}<div data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" aria-label={rozieAttr(actionAnchor ? actionAnchor.label : null)} style={rozieStyle('top:' + actionMenuTop + 'px')} onkeydown={($event) => { onActionMenuKeydown($event); }} data-rozie-s-768cad96>{#each actionAnchor ? actionAnchor.actions : [] as action, ai (action.id)}<div class={["rozie-command-palette-actions-menu-item", { 'rozie-command-palette-actions-menu-item--active': ai === actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }]} role="menuitem" data-testid="command-palette-action-item" aria-disabled={!!action.disabled} tabindex="-1" onmouseenter={($event) => { actionIndex = Number(ai); }} onmousedown={($event) => { $event.preventDefault(); selectAction(action); }} data-rozie-s-768cad96>{#if actionItem}{@render actionItem({ action, item: actionAnchor ? actionAnchor.item : null, active: ai === actionIndex, disabled: !!action.disabled })}{:else}{#if actionIcon(action)}<span class="rozie-command-palette-actions-menu-item-icon" data-rozie-s-768cad96>{rozieDisplay(actionIcon(action))}</span>{/if}<span class="rozie-command-palette-actions-menu-item-label" data-rozie-s-768cad96>{rozieDisplay(actionLabel(action))}</span>{#if actionShortcut(action)}<span class="rozie-command-palette-actions-menu-item-shortcut" data-rozie-s-768cad96>{rozieDisplay(actionShortcut(action))}</span>{/if}{/if}</div>{/each}</div>{/if}</div></div>{/if}
 
 <style>
 :global {
