@@ -28,11 +28,11 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
   })();
   const editor = useRef<Editor | null>(null);
   const untypedHandle = useRef<any>(null);
+  const count = useRef<number>(0);
 
-  let count: number = 0;
   let mode: Mode = 'idle';
   function inc(by: number): void {
-    count = count + by;
+    count.current = count.current + by;
   }
 
   useEffect(() => {
@@ -75,11 +75,11 @@ export default function TsPassthrough(_props: TsPassthroughProps): JSX.Element {
   })();
   const editor = useRef<any>(null);
   const untypedHandle = useRef<any>(null);
+  const count = useRef(0);
 
-  let count = 0;
   let mode = 'idle';
   function inc(by: any) {
-    count = count + by;
+    count.current = count.current + by;
   }
 
   useEffect(() => {

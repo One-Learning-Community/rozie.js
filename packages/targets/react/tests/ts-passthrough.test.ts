@@ -14,6 +14,18 @@
 //   - the synthesized `.d.ts` contains NO author `<script>` type identifier and
 //     is byte-identical to the `.d.ts` for the untyped fork of the component
 //   - untyped emit is byte-identical to today (no dist-parity drift)
+//
+// Quick 260717-8zb (Task 3 Item 6) — `count` is now hoisted too (it is
+// mutated only inside `inc`, called only from the template `@click="inc(1)"`
+// handler — the NEW template-event-handler reachability root). The
+// snapshots below bake in a KNOWN, PRE-EXISTING, OUT-OF-SCOPE gap: the
+// template's `{{ count }}` interpolation renders `{rozieDisplay(count)}`
+// (the bare `useRef` object) rather than `{rozieDisplay(count.current)}` —
+// the React template-expression renderer does not consult
+// `getHoistableModuleLetNames`, unlike the script-side renderer. Verified
+// this gap already exists for a let hoisted via the PRE-EXISTING `$onMount`
+// root too (unrelated to Item 6) — see
+// .planning/quick/260717-8zb-memo-primitive-emitter-batch/deferred-items.md.
 
 import { describe, it, expect } from 'vitest';
 import { parse } from '../../../core/src/parse.js';
@@ -103,12 +115,25 @@ describe('React ts-passthrough — author annotation survival (Phase 09 Plan 03 
     expect(code).toMatchSnapshot('typed-tsx');
   });
 
-  it('preserves the typed `let count: number` and typed `inc(by: number)` param', () => {
+  it('Quick 260717-8zb (Task 3 Item 6): typed `let count: number`, referenced ONLY from the template @click handler `inc(1)`, hoists to `useRef<number>` with the author type preserved', () => {
     const { code } = compile(TYPED_SRC);
-    // `count` is a non-lifecycle-referenced local — survives as residual emit.
-    expect(code).toContain('count: number');
+    // `count` is mutated only inside `inc`, called only from `@click="inc(1)"`
+    // — a template-event-only reachability root (hoistModuleLet.ts). Prior to
+    // Task 3 Item 6 this fell through case (c) and stayed a per-render
+    // `let count: number = 0` — reset to 0 on every React render.
+    expect(code).toContain('useRef<number>(0)');
+    expect(code).not.toContain('let count: number');
     // The typed function param survives verbatim.
     expect(code).toContain('by: number');
+  });
+
+  it('a GENUINELY unreferenced typed `let mode: Mode` stays a residual (non-hoisted) declaration, type intact', () => {
+    const { code } = compile(TYPED_SRC);
+    // `mode` is declared but never read/written anywhere else in <script> or
+    // the template — the sibling control case proving hoisting stays
+    // scope-precise (only reachable lets hoist; a merely-declared local does
+    // not).
+    expect(code).toContain("mode: Mode = 'idle'");
   });
 
   it('OQ-2: a typed module-let referenced from a lifecycle hook emits useRef<AuthorType>', () => {

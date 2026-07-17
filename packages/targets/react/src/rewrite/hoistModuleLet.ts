@@ -432,6 +432,25 @@ function analyzeModuleLetReachability(
   for (const name of collectTemplateReferencedHelperNames(ir.template, helperNames)) {
     classifyExpr(t.identifier(name));
   }
+  // Quick 260717-8zb (Task 3 Item 6) — a helper called ONLY from a template
+  // `@event` HANDLER (`ir.listeners`, both `source: 'template-event'` AND
+  // `source: 'listeners-block'`) is ALSO a reachability root — the SAME class
+  // of gap as the `$expose` verb / template-binding roots above, just for
+  // `ir.listeners[].handler` instead of a binding/directive expression or an
+  // exposed verb name. `escapingHelperNames` (emitScript.ts) already wraps
+  // the HANDLER itself in `useCallback` for exhaustive-deps compliance, but
+  // that stabilizes the handler's IDENTITY, not any module-let the handler
+  // body mutates — a DIFFERENT concern this walker owns. Without this root, a
+  // counter like `let paused = false` mutated only inside a `@mouseenter`-
+  // bound handler previously fell through to case (c) and stayed a
+  // per-render `let` — reset to its init on every render (the toast
+  // pauseTimers/resumeTimers + command-palette argsState workaround-comment
+  // claims). Scope-completeness — NO rename.
+  for (const listener of ir.listeners) {
+    for (const name of collectIdentifierRefs(listener.handler, helperNames)) {
+      classifyExpr(t.identifier(name));
+    }
+  }
 
   /** Pull every let a body reaches: its DIRECT refs plus the transitive lets
    *  of every helper it calls (at any nesting depth inside the body). */
