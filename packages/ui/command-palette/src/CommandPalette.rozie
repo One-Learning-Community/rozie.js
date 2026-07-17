@@ -375,7 +375,7 @@
 
 <script lang="ts">
 import { scoreCommands, labelHighlight } from './internal/scoreCommands'
-import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb as buildBreadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack'
+import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack'
 import { resolveChildSource, isAsyncLevel, nextRequestToken, isLatestRequest } from './internal/asyncSource'
 import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, resolveEscape, matchesActionKey, caretAtEnd } from './internal/actionMenu'
 import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface'
@@ -552,16 +552,18 @@ const currentVirtualEstimateRowHeight = () => {
 }
 
 // breadcrumbStack(): the full root..current breadcrumb (internal/levelStack.ts
-// breadcrumb(), imported aliased `buildBreadcrumb` — the SVELTE EMITTER
-// generates a local snippet binding named after the `breadcrumb` SLOT itself,
-// which collides with a same-named top-level import on that one target only
-// (a "slot-name == script-identifier" collision, adjacent to the
-// slot==prop-name ROZ127 class but not caught by it since `breadcrumb` isn't
-// a prop) — aliasing the import sidesteps it without renaming the public
-// slot) fed to the #breadcrumb slot's `stack` scope param — the root entry's
-// title is `ariaLabel` (the palette's own accessible name doubles as the
-// root breadcrumb label; there is no separate "root title" prop).
-const breadcrumbStack = () => buildBreadcrumb($data.levelStack, $props.ariaLabel)
+// breadcrumb()) fed to the #breadcrumb slot's `stack` scope param — the root
+// entry's title is `ariaLabel` (the palette's own accessible name doubles as
+// the root breadcrumb label; there is no separate "root title" prop).
+// Quick 260717-8zb (Task 2 Item 4): the import is the NATURAL `breadcrumb`
+// name again (previously aliased `as buildBreadcrumb` to sidestep a
+// Svelte-only collision with the emitter's own `breadcrumb` slot-merge
+// binding — the same top-level `<script>` scope as this import). The Svelte
+// emitter now auto-renames its generated slot-merge binding to
+// `breadcrumb$$slot` on collision (Class 3, findRForSlotNameCollisions.ts),
+// the same mechanism that already fixes the r-for-loop-var and script-param
+// collision classes — no author-side alias needed.
+const breadcrumbStack = () => breadcrumb($data.levelStack, $props.ariaLabel)
 
 // ---- derived views (plain functions, uniform ×6) -----------------------
 // The ranked command list fed to the vendored <Combobox> as its `:options`.
