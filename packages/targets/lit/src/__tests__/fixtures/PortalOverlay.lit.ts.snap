@@ -91,7 +91,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   }
 }
 
-injectGlobalStyles('rozie-portal-overlay-global', `
+injectGlobalStyles('rozie-portal-overlay-d4ddeb3b-global', `
 :root {
   --rozie-portal-overlay-z: 3000;
 }

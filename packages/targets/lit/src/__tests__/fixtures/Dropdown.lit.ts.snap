@@ -182,7 +182,7 @@ private __rozieWatchInitial_0 = true;
   }
 }
 
-injectGlobalStyles('rozie-dropdown-global', `
+injectGlobalStyles('rozie-dropdown-708ac2eb-global', `
 :root {
   --rozie-dropdown-z: 1000;
 }
