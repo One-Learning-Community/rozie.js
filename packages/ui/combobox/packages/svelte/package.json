@@ -69,6 +69,7 @@
     "access": "public"
   },
   "devDependencies": {
+    "@rozie-ui/combobox": "workspace:*",
     "@sveltejs/package": "^2",
     "@sveltejs/vite-plugin-svelte": "^5",
     "svelte": "^5",

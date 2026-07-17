@@ -78,6 +78,7 @@
     "tslib": "^2"
   },
   "devDependencies": {
+    "@rozie-ui/command-palette": "workspace:*",
     "@angular/common": "^19",
     "@angular/compiler": "^19",
     "@angular/compiler-cli": "^19",

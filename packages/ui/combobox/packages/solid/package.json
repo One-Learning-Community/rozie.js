@@ -62,6 +62,9 @@
       "optional": true
     }
   },
+  "devDependencies": {
+    "@rozie-ui/combobox": "workspace:*"
+  },
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit"

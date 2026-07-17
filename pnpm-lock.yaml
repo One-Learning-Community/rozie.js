@@ -2404,6 +2404,9 @@ importers:
       '@angular/forms':
         specifier: ^19
         version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      '@rozie-ui/combobox':
+        specifier: workspace:*
+        version: link:../..
       ng-packagr:
         specifier: ^19
         version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
@@ -2428,6 +2431,10 @@ importers:
       lit:
         specifier: ^3.2
         version: 3.3.2
+    devDependencies:
+      '@rozie-ui/combobox':
+        specifier: workspace:*
+        version: link:../..
 
   packages/ui/combobox/packages/react:
     dependencies:
@@ -2444,6 +2451,9 @@ importers:
         specifier: ^18.2 || ^19
         version: 19.2.6(react@19.2.6)
     devDependencies:
+      '@rozie-ui/combobox':
+        specifier: workspace:*
+        version: link:../..
       '@types/react':
         specifier: ^18
         version: 18.3.28
@@ -2465,6 +2475,10 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@rozie-ui/combobox':
+        specifier: workspace:*
+        version: link:../..
 
   packages/ui/combobox/packages/svelte:
     dependencies:
@@ -2475,6 +2489,9 @@ importers:
         specifier: ^3
         version: 3.17.1
     devDependencies:
+      '@rozie-ui/combobox':
+        specifier: workspace:*
+        version: link:../..
       '@sveltejs/package':
         specifier: ^2
         version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
@@ -2500,6 +2517,9 @@ importers:
         specifier: ^3
         version: 3.17.1
     devDependencies:
+      '@rozie-ui/combobox':
+        specifier: workspace:*
+        version: link:../..
       '@vitejs/plugin-vue':
         specifier: ^6
         version: 6.0.6(vite@8.1.0(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))(vue@3.5.33(typescript@5.9.3))
@@ -2585,6 +2605,9 @@ importers:
       '@angular/forms':
         specifier: ^19
         version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2)
+      '@rozie-ui/command-palette':
+        specifier: workspace:*
+        version: link:../..
       ng-packagr:
         specifier: ^19
         version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)
@@ -2609,6 +2632,10 @@ importers:
       lit:
         specifier: ^3.2
         version: 3.3.2
+    devDependencies:
+      '@rozie-ui/command-palette':
+        specifier: workspace:*
+        version: link:../..
 
   packages/ui/command-palette/packages/react:
     dependencies:
@@ -2625,6 +2652,9 @@ importers:
         specifier: ^18.2 || ^19
         version: 19.2.6(react@19.2.6)
     devDependencies:
+      '@rozie-ui/command-palette':
+        specifier: workspace:*
+        version: link:../..
       '@types/react':
         specifier: ^18
         version: 18.3.28
@@ -2646,6 +2676,10 @@ importers:
       solid-js:
         specifier: ^1.8
         version: 1.9.12
+    devDependencies:
+      '@rozie-ui/command-palette':
+        specifier: workspace:*
+        version: link:../..
 
   packages/ui/command-palette/packages/svelte:
     dependencies:
@@ -2656,6 +2690,9 @@ importers:
         specifier: workspace:^
         version: link:../../../../runtime/svelte
     devDependencies:
+      '@rozie-ui/command-palette':
+        specifier: workspace:*
+        version: link:../..
       '@sveltejs/package':
         specifier: ^2
         version: 2.5.8(svelte@5.55.5(@typescript-eslint/types@8.59.2))(typescript@5.6.3)
@@ -2681,6 +2718,9 @@ importers:
         specifier: workspace:^
         version: link:../../../../runtime/vue
     devDependencies:
+      '@rozie-ui/command-palette':
+        specifier: workspace:*
+        version: link:../..
       '@vitejs/plugin-vue':
         specifier: ^6
         version: 6.0.6(vite@8.1.0(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))(vue@3.5.33(typescript@5.9.3))

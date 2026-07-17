@@ -69,6 +69,9 @@
       "optional": false
     }
   },
+  "devDependencies": {
+    "@rozie-ui/command-palette": "workspace:*"
+  },
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit"

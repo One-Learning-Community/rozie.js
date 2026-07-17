@@ -70,6 +70,7 @@
     "access": "public"
   },
   "devDependencies": {
+    "@rozie-ui/combobox": "workspace:*",
     "@vitejs/plugin-vue": "^6",
     "vite": "^8",
     "vite-plugin-css-injected-by-js": "^5",
