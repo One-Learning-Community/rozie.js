@@ -354,9 +354,8 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     return true;
   }
   const filteredOptionsCache = useMemo(() => ({
-    keys: null,
-    val: null,
-    has: false
+    keys: null as any[] | null,
+    val: null as any
   }), []);
   function filteredOptions() {
     const __rozieMemoKey = (() => {
@@ -366,7 +365,8 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       const groupsProp = props.groups;
       return [opts, q, df, groupsProp];
     })();
-    if (filteredOptionsCache.has && filteredOptionsCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === filteredOptionsCache.keys[i])) {
+    const __rozieMemoPrev = filteredOptionsCache.keys;
+    if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return filteredOptionsCache.val;
     }
     const __rozieMemoVal = (() => {
@@ -406,7 +406,6 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     })();
     filteredOptionsCache.keys = __rozieMemoKey;
     filteredOptionsCache.val = __rozieMemoVal;
-    filteredOptionsCache.has = true;
     return __rozieMemoVal;
   }
   function windowSource() {

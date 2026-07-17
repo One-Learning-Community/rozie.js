@@ -649,9 +649,8 @@ export class Combobox {
   pinned = false;
   didMount = false;
   filteredOptionsCache = {
-    keys: null,
-    val: null,
-    has: false
+    keys: null as any[] | null,
+    val: null as any
   };
   filteredOptions = () => {
     const __rozieMemoKey = (() => {
@@ -663,7 +662,8 @@ export class Combobox {
       const groupsProp = this.groups();
       return [opts, q, df, groupsProp];
     })();
-    if (this.filteredOptionsCache.has && this.filteredOptionsCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === this.filteredOptionsCache.keys[i])) {
+    const __rozieMemoPrev = this.filteredOptionsCache.keys;
+    if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return this.filteredOptionsCache.val;
     }
     const __rozieMemoVal = (() => {
@@ -705,7 +705,6 @@ export class Combobox {
     })();
     this.filteredOptionsCache.keys = __rozieMemoKey;
     this.filteredOptionsCache.val = __rozieMemoVal;
-    this.filteredOptionsCache.has = true;
     return __rozieMemoVal;
   };
   windowSource = () => this.filteredOptions();

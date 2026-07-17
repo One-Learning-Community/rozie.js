@@ -638,9 +638,8 @@ private __rozieFirstUpdateDone = false;
   didMount = false;
 
   filteredOptionsCache = {
-  keys: null,
-  val: null,
-  has: false
+  keys: null as any[] | null,
+  val: null as any
 };
 
   filteredOptions = () => {
@@ -651,7 +650,8 @@ private __rozieFirstUpdateDone = false;
     const groupsProp = this.groups;
     return [opts, q, df, groupsProp];
   })();
-  if (this.filteredOptionsCache.has && this.filteredOptionsCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === this.filteredOptionsCache.keys[i])) {
+  const __rozieMemoPrev = this.filteredOptionsCache.keys;
+  if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
     return this.filteredOptionsCache.val;
   }
   const __rozieMemoVal = (() => {
@@ -691,7 +691,6 @@ private __rozieFirstUpdateDone = false;
   })();
   this.filteredOptionsCache.keys = __rozieMemoKey;
   this.filteredOptionsCache.val = __rozieMemoVal;
-  this.filteredOptionsCache.has = true;
   return __rozieMemoVal;
 };
 

@@ -791,13 +791,13 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   // virtual-core's getItemKey/getMeasurements walk this O(count) per pass, so an
   // unmemoized per-call re-map made every scroll tick O(N²) in wrapper allocations.
   const windowSourceCache = {
-    keys: null,
-    val: null,
-    has: false
+    keys: null as any[] | null,
+    val: null as any
   };
   function windowSource() {
     const __rozieMemoKey = [local.options, query(), local.optionValue, local.optionLabel];
-    if (windowSourceCache.has && windowSourceCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === windowSourceCache.keys[i])) {
+    const __rozieMemoPrev = windowSourceCache.keys;
+    if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return windowSourceCache.val;
     }
     const __rozieMemoVal = visibleOptions().map((o: any, i: any) => ({
@@ -807,7 +807,6 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     }));
     windowSourceCache.keys = __rozieMemoKey;
     windowSourceCache.val = __rozieMemoVal;
-    windowSourceCache.has = true;
     return __rozieMemoVal;
   }
   // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table

@@ -44,20 +44,19 @@ export default class MemoBasic extends SignalWatcher(LitElement) {
   }
 
   filteredCache = {
-  keys: null,
-  val: null,
-  has: false
+  keys: null as any[] | null,
+  val: null as any
 };
 
   filtered = () => {
   const __rozieMemoKey = [this.items, this._query.value];
-  if (this.filteredCache.has && this.filteredCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === this.filteredCache.keys[i])) {
+  const __rozieMemoPrev = this.filteredCache.keys;
+  if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
     return this.filteredCache.val;
   }
   const __rozieMemoVal = this.items.filter((item: any) => item.includes(this._query.value));
   this.filteredCache.keys = __rozieMemoKey;
   this.filteredCache.val = __rozieMemoVal;
-  this.filteredCache.has = true;
   return __rozieMemoVal;
 };
 

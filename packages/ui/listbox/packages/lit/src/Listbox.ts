@@ -772,14 +772,14 @@ private __rozieWatchInitial_0 = true;
   remeasurePending = false;
 
   windowSourceCache = {
-  keys: null,
-  val: null,
-  has: false
+  keys: null as any[] | null,
+  val: null as any
 };
 
   windowSource = () => {
   const __rozieMemoKey = [this.options, this._query.value, this.optionValue, this.optionLabel];
-  if (this.windowSourceCache.has && this.windowSourceCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === this.windowSourceCache.keys[i])) {
+  const __rozieMemoPrev = this.windowSourceCache.keys;
+  if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
     return this.windowSourceCache.val;
   }
   const __rozieMemoVal = this.visibleOptions().map((o: any, i: any) => ({
@@ -789,7 +789,6 @@ private __rozieWatchInitial_0 = true;
   }));
   this.windowSourceCache.keys = __rozieMemoKey;
   this.windowSourceCache.val = __rozieMemoVal;
-  this.windowSourceCache.has = true;
   return __rozieMemoVal;
 };
 

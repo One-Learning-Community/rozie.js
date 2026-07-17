@@ -19,19 +19,18 @@ export default function MemoBasic(_props: MemoBasicProps): JSX.Element {
   const [query, setQuery] = createSignal('');
 
   const filteredCache = {
-    keys: null,
-    val: null,
-    has: false
+    keys: null as any[] | null,
+    val: null as any
   };
   function filtered() {
     const __rozieMemoKey = [local.items, query()];
-    if (filteredCache.has && filteredCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === filteredCache.keys[i])) {
+    const __rozieMemoPrev = filteredCache.keys;
+    if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return filteredCache.val;
     }
     const __rozieMemoVal = local.items.filter((item: any) => item.includes(query()));
     filteredCache.keys = __rozieMemoKey;
     filteredCache.val = __rozieMemoVal;
-    filteredCache.has = true;
     return __rozieMemoVal;
   }
 

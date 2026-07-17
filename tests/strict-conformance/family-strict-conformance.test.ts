@@ -81,27 +81,17 @@ const FAMILIES: FamilySpec[] = [
     leaf: 'packages/ui/combobox/packages/react',
     baseline: {
       'Combobox.tsx': {
-        // combobox-virtual-reactivity: windowedView() added a 6th windowSource()
-        // call site — one more occurrence of the KNOWN Class-4 nullable-return
-        // body-noise class (TS2531), do-not-fix-here per this file's scope fence.
-        TS2531: 6,
-        // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04 (windowing.rzts pinMeasurement retype).
-        // 260714-nqe: Function-prop TS lowering flipped `unknown`→`any` (optionLabel/
-        // optionValue/optionDisabled) shifted 2 more body-passthrough nullability
-        // sites into tsc's reach (TS2322 4→5, TS18047 4→6) — inherent Class-4
-        // residual, unrelated to the emitter fix itself.
-        // Quick 260717-8zb: filteredOptions() re-expressed on $memo(fn, keyFn)
-        // shifted the null-initialized cache-object shape (`{ keys: null, val:
-        // null, has: false }` vs the old hand-rolled foCache's individually
-        // typed fields) — tsc's strict null-check narrowing sees
-        // filteredOptionsCache.keys/.val differently across the .has-gated
-        // branches, moving 3 sites from TS2322 into TS18047 (5→2, 6→8). Inherent
-        // Class-4 residual from the new cache shape, unrelated to any emitter
-        // change — do-not-fix-here per this file's scope fence.
-        TS2322: 2,
-        TS2345: 1,
-        TS18047: 8,
-        TS7006: 1,
+        // Quick 260717-8zb strict-safe $memo cache shape (keys-null sentinel +
+        // __rozieMemoPrev local capture + `null as any[] | null`/`null as any`
+        // property casts): the wrapper now returns `val: any`, which swallows
+        // the ENTIRE downstream Class-4 nullable-return body-noise chain that
+        // previously flowed out of filteredOptions() (TS2531 6→0, TS2322 2→0,
+        // TS2345 1→0, TS18047 8→0 — all cleared). The one cost: `.map`/callback
+        // params downstream of the any-returning accessor lose contextual
+        // typing, +1 Class-6 TS7006 (1→2). Net 18→2 — accepted per
+        // feedback_no_cosmetic_tsc_on_emitted_bodies (leaf-body noise, consumer
+        // surface untouched), do-not-fix-here per this file's scope fence.
+        TS7006: 2,
       },
     },
   },
@@ -109,50 +99,19 @@ const FAMILIES: FamilySpec[] = [
     name: 'combobox',
     target: 'solid',
     leaf: 'packages/ui/combobox/packages/solid',
-    baseline: {
-      'Combobox.tsx': {
-        // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
-        // 260712-a09 (Pattern D): the onMount ref-call non-null assertion
-        // shifted which downstream body-passthrough nullability sites tsc
-        // reaches (TS2349 cleared; TS2322/TS2531/TS18047/TS2769 now visible
-        // instead) — inherent Class-4 residual, unrelated to Pattern D/F
-        // itself, do-not-fix-here per this file's scope fence.
-        // 260714-nqe: Function-prop TS lowering flipped `unknown`→`any`
-        // shifted 2 more sites into tsc's reach (TS2322 4→5, TS18047 4→6).
-        // Quick 260717-8zb: same $memo(fn, keyFn) cache-shape shift as the
-        // react leaf above (TS2322 5→2, TS18047 6→8) — do-not-fix-here.
-        TS2322: 2,
-        // combobox-virtual-reactivity: windowedView() added a 6th windowSource()
-        // call site — one more occurrence of the KNOWN Class-4 nullable-return
-        // body-noise class (TS2531), do-not-fix-here per this file's scope fence.
-        TS2531: 5,
-        TS18047: 8,
-        TS2769: 1,
-      },
-    },
+    // Quick 260717-8zb strict-safe $memo cache shape: the `val: any` wrapper
+    // return swallowed the whole Class-4 chain (TS2322 2→0, TS2531 5→0,
+    // TS18047 8→0, TS2769 1→0) and Solid's fine-grained accessors add no
+    // TS7006 tail — ENFORCED-CLEAN per the harness's own graduation rule.
+    baseline: { 'Combobox.tsx': {} },
   },
   {
     name: 'combobox',
     target: 'lit',
     leaf: 'packages/ui/combobox/packages/lit',
-    baseline: {
-      'Combobox.ts': {
-        TS2769: 1,
-        // combobox-virtual-reactivity: windowedView() added a 6th windowSource()
-        // call site — one more occurrence of the KNOWN Class-4 nullable-return
-        // body-noise class (TS2531), do-not-fix-here per this file's scope fence.
-        // Quick 260717-8zb: the $memo(fn, keyFn) cache-shape shift (see the
-        // react/solid leaves above) moved 3 sites from TS2322 into TS2531 on
-        // Lit specifically (5→7) — do-not-fix-here.
-        TS2531: 7,
-        // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
-        // 260714-nqe: Function-prop TS lowering flipped `unknown`→`any`
-        // shifted 2 more sites into tsc's reach (TS2322 5→6, TS18047 4→6).
-        // Quick 260717-8zb: $memo cache-shape shift, TS2322 6→3.
-        TS2322: 3,
-        TS18047: 6,
-      },
-    },
+    // Quick 260717-8zb strict-safe $memo cache shape: same clearing as solid
+    // (TS2769 1→0, TS2531 7→0, TS2322 3→0, TS18047 6→0) — ENFORCED-CLEAN.
+    baseline: { 'Combobox.ts': {} },
   },
 
   // ── slider ── NO windowing (no Class-3). Pure Class-4 body-passthrough

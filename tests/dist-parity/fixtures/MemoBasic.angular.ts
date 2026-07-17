@@ -48,20 +48,19 @@ export class MemoBasic {
   query = signal('');
 
   filteredCache = {
-    keys: null,
-    val: null,
-    has: false
+    keys: null as any[] | null,
+    val: null as any
   };
   filtered = () => {
     const __items = this.items();
     const __rozieMemoKey = [__items, this.query()];
-    if (this.filteredCache.has && this.filteredCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === this.filteredCache.keys[i])) {
+    const __rozieMemoPrev = this.filteredCache.keys;
+    if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return this.filteredCache.val;
     }
     const __rozieMemoVal = __items.filter((item: any) => item.includes(this.query()));
     this.filteredCache.keys = __rozieMemoKey;
     this.filteredCache.val = __rozieMemoVal;
-    this.filteredCache.has = true;
     return __rozieMemoVal;
   };
 

@@ -759,13 +759,13 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   // fully determines the ranking, so a cross-render hit returns the same Map
   // a recompute would.
   const cpAnchorIndexMapCache = {
-    keys: null,
-    val: null,
-    has: false
+    keys: null as any[] | null,
+    val: null as any
   };
   function cpAnchorIndexMap() {
     const __rozieMemoKey = [currentBaseItems(), query(), local.score];
-    if (cpAnchorIndexMapCache.has && cpAnchorIndexMapCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === cpAnchorIndexMapCache.keys[i])) {
+    const __rozieMemoPrev = cpAnchorIndexMapCache.keys;
+    if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return cpAnchorIndexMapCache.val;
     }
     const __rozieMemoVal = (() => {
@@ -776,7 +776,6 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
     })();
     cpAnchorIndexMapCache.keys = __rozieMemoKey;
     cpAnchorIndexMapCache.val = __rozieMemoVal;
-    cpAnchorIndexMapCache.has = true;
     return __rozieMemoVal;
   }
   // cpAnchorIndex(option): the option's canonical filteredItems() position,

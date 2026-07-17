@@ -88,21 +88,26 @@ describe('expandMemo', () => {
     expect(code).toContain('computeFiltered(opts, q)');
     // No literal `$memo(` survives.
     expect(code).not.toContain('$memo(');
-    // JS mode (no opts / ts:false): the cache declarator carries NO TS annotation.
-    expect(code).not.toContain('any[]');
   });
 
-  it('TS mode annotates the cache holder so strict null-checks accept the shape', async () => {
+  it('casts the cache holder so strict null-checks accept the shape (all leaves are TS-flavored)', async () => {
     const { expandMemo } = await import('../lowerers/expandMemo.js');
     const src = `const filteredOptions = $memo(() => computeFiltered(opts, q), () => [opts, q]);`;
     const file = moduleFile(src);
-    const result = expandMemo(file, { ts: true });
+    const result = expandMemo(file);
     expect(result.expandedNames).toEqual(['filteredOptions']);
     const code = render(file);
-    // `keys: any[] | null` / `val: any` — `any` (not `unknown`) so the wrapper's
-    // return type doesn't leak `unknown` into downstream consumers (the
-    // null-init-$data widened-to-any precedent).
-    expect(code).toMatch(/filteredOptionsCache:\s*\{\s*keys:\s*any\[\]\s*\|\s*null;?\s*val:\s*any;?\s*\}/);
+    // `as`-casts on the PROPERTY VALUES, not a TSTypeAnnotation on the
+    // declarator id: an annotated declarator id risks defeating downstream
+    // id-shape-matching passes (the Svelte typed-declarator lesson), and the
+    // React mutated-instance useMemo stabilizer must keep seeing a plain
+    // `const X = {…}` ObjectExpression init. `any` (not `unknown`) so the
+    // wrapper's return doesn't leak `unknown` downstream (the null-init-$data
+    // widened-to-any precedent). Unconditional — every emitted leaf is
+    // TS-flavored regardless of the source script's lang (vue/svelte leaves
+    // emit lang="ts"; react/solid/angular/lit emit .tsx/.ts).
+    expect(code).toMatch(/keys:\s*null as any\[\]\s*\|\s*null/);
+    expect(code).toMatch(/val:\s*null as any/);
   });
 
   it('inlines a block-bodied keyFn/fn as an IIFE, preserving statement logic', async () => {

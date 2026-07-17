@@ -568,9 +568,8 @@ let didMount = false;
 // NON-VIRTUAL-ONLY stable re-partition into group-visual order, then map to
 // wrapper rows.
 const filteredOptionsCache = {
-  keys: null,
-  val: null,
-  has: false
+  keys: null as any[] | null,
+  val: null as any
 };
 const filteredOptions = () => {
   const __rozieMemoKey = (() => {
@@ -580,7 +579,8 @@ const filteredOptions = () => {
     const groupsProp = props.groups;
     return [opts, q, df, groupsProp];
   })();
-  if (filteredOptionsCache.has && filteredOptionsCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === filteredOptionsCache.keys[i])) {
+  const __rozieMemoPrev = filteredOptionsCache.keys;
+  if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
     return filteredOptionsCache.val;
   }
   const __rozieMemoVal = (() => {
@@ -620,7 +620,6 @@ const filteredOptions = () => {
   })();
   filteredOptionsCache.keys = __rozieMemoKey;
   filteredOptionsCache.val = __rozieMemoVal;
-  filteredOptionsCache.has = true;
   return __rozieMemoVal;
 };
 // windowSource(): the windowing.rzts host-contract row source — the FILTERED option

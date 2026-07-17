@@ -15,22 +15,38 @@
  * is REPLACED (in place, on the SAME `Program` node every emitter clones —
  * IR-04 referential preservation) with two top-level declarations:
  *
- *   const XCache = { keys: null, val: null, has: false };
+ *   const XCache = { keys: null as any[] | null, val: null as any };
  *   const X = () => {
  *     const __rozieMemoKey = [a, b, c];           // keyFn body, inlined
+ *     const __rozieMemoPrev = XCache.keys;
  *     if (
- *       XCache.has &&
- *       XCache.keys.length === __rozieMemoKey.length &&
- *       __rozieMemoKey.every((v, i) => v === XCache.keys[i])
+ *       __rozieMemoPrev !== null &&
+ *       __rozieMemoPrev.length === __rozieMemoKey.length &&
+ *       __rozieMemoKey.every((v, i) => v === __rozieMemoPrev[i])
  *     ) {
  *       return XCache.val;
  *     }
  *     const __rozieMemoVal = (...compute...);     // fn body, inlined
  *     XCache.keys = __rozieMemoKey;
  *     XCache.val = __rozieMemoVal;
- *     XCache.has = true;
  *     return __rozieMemoVal;
  *   };
+ *
+ * DESIGN — strict-null-check safety (the listbox-solid/lit lesson). keys-null
+ * IS the miss sentinel: there is deliberately NO separate `has` boolean —
+ * `has && XCache.keys.length` leaves `.keys` possibly-null to strict tsc, and
+ * member-expression narrowing does not survive into the `.every` callback
+ * (TS18047 on every strict-enforced leaf). Instead the cached key is captured
+ * to a LOCAL (`__rozieMemoPrev`) and the guard is `!== null` on that local —
+ * a `const` narrows once and stays narrowed inside the closure. The two null
+ * initializers carry `as`-casts (`null as any[] | null`, `null as any`) so the
+ * inferred property types admit the miss-path assignments — unconditionally,
+ * since every emitted leaf is TS-flavored whatever the source `lang` (vue/svelte
+ * leaves emit `lang="ts"`; the other four are .ts/.tsx files) and strict-enforced
+ * leaf tsconfigs need them. The casts sit on the PROPERTY VALUES — never a
+ * TSTypeAnnotation on the declarator id — so every downstream id-shape-matching
+ * pass (React's mutated-instance useMemo stabilizer above all) keeps seeing a
+ * bare `const XCache = {…}` ObjectExpression init.
  *
  * DESIGN — subscribe-first discipline (load-bearing): `keyFn` is evaluated
  * UNCONDITIONALLY at the top of the wrapper, BEFORE the cache-hit check. Its
@@ -42,7 +58,7 @@
  *
  * DESIGN — React needs NO per-target `$memo` code. The emitted `XCache` is a
  * top-level `const` initialized to an ObjectExpression that is then
- * MEMBER-MUTATED (`XCache.keys = …`, `XCache.val = …`, `XCache.has = true`) —
+ * MEMBER-MUTATED (`XCache.keys = …`, `XCache.val = …`) —
  * exactly the shape `collectMutatedInstanceBinders` /
  * `tryWrapMutatedInstanceUseMemo` (packages/targets/react/src/emit/emitScript.ts,
  * feedback_react_const_mutinstance_not_stabilized) already detects and wraps
@@ -88,7 +104,6 @@ const MEMO_SIGIL = '$memo';
 /** Cache-object field names — kept as named constants so the shape below reads clearly. */
 const KEYS_FIELD = 'keys';
 const VAL_FIELD = 'val';
-const HAS_FIELD = 'has';
 
 /** Internal wrapper-local names for the inlined keyFn/fn results. Namespaced
  *  `__rozieMemo*` to avoid colliding with author locals inside fn/keyFn
@@ -96,6 +111,7 @@ const HAS_FIELD = 'has';
  *  — `__rozieRoot`, `__rozieCtx*`, etc.). */
 const KEY_LOCAL = '__rozieMemoKey';
 const VAL_LOCAL = '__rozieMemoVal';
+const PREV_LOCAL = '__rozieMemoPrev';
 
 export interface ExpandMemoResult {
   /** Author-facing names of every `$memo` declarator that was expanded, in
@@ -172,11 +188,20 @@ function buildMemoExpansion(
 ): [t.VariableDeclaration, t.VariableDeclaration] {
   const cacheName = `${name}Cache`;
 
-  // const XCache = { keys: null, val: null, has: false };
+  // const XCache = { keys: null as any[] | null, val: null as any };
+  // `as`-casts on the PROPERTY VALUES only (see the strict-null-check DESIGN
+  // note above). Unconditional — EVERY emitted leaf is TS-flavored regardless
+  // of the source script's lang (vue emits `<script setup lang="ts">`, svelte
+  // `<script lang="ts">`, react/solid `.tsx`, angular/lit `.ts`), so the casts
+  // are always valid and always required by strict-null-checked leaf tsconfigs.
+  const keysInit: t.Expression = t.tsAsExpression(
+    t.nullLiteral(),
+    t.tsUnionType([t.tsArrayType(t.tsAnyKeyword()), t.tsNullKeyword()]),
+  );
+  const valInitNull: t.Expression = t.tsAsExpression(t.nullLiteral(), t.tsAnyKeyword());
   const cacheObject = t.objectExpression([
-    t.objectProperty(t.identifier(KEYS_FIELD), t.nullLiteral()),
-    t.objectProperty(t.identifier(VAL_FIELD), t.nullLiteral()),
-    t.objectProperty(t.identifier(HAS_FIELD), t.booleanLiteral(false)),
+    t.objectProperty(t.identifier(KEYS_FIELD), keysInit),
+    t.objectProperty(t.identifier(VAL_FIELD), valInitNull),
   ]);
   const cacheDecl = t.variableDeclaration('const', [
     t.variableDeclarator(t.identifier(cacheName), cacheObject),
@@ -189,13 +214,23 @@ function buildMemoExpansion(
     t.variableDeclarator(t.identifier(KEY_LOCAL), keyInit),
   ]);
 
-  // Cache-hit test: XCache.has && XCache.keys.length === __rozieMemoKey.length
-  //   && __rozieMemoKey.every((v, i) => v === XCache.keys[i])
-  const cacheHasExpr = t.memberExpression(t.identifier(cacheName), t.identifier(HAS_FIELD));
-  const cacheKeysExpr = t.memberExpression(t.identifier(cacheName), t.identifier(KEYS_FIELD));
+  // const __rozieMemoPrev = XCache.keys;
+  // Local capture — the ONLY read of `.keys` on the hit path. Strict tsc
+  // narrows a `const` once via the `!== null` guard and the narrowing survives
+  // into the `.every` closure; a member-expression read there would not.
+  const prevDecl = t.variableDeclaration('const', [
+    t.variableDeclarator(
+      t.identifier(PREV_LOCAL),
+      t.memberExpression(t.identifier(cacheName), t.identifier(KEYS_FIELD)),
+    ),
+  ]);
+
+  // Cache-hit test: __rozieMemoPrev !== null && __rozieMemoPrev.length ===
+  //   __rozieMemoKey.length && __rozieMemoKey.every((v, i) => v === __rozieMemoPrev[i])
+  const prevNotNullExpr = t.binaryExpression('!==', t.identifier(PREV_LOCAL), t.nullLiteral());
   const lengthMatchExpr = t.binaryExpression(
     '===',
-    t.memberExpression(t.cloneNode(cacheKeysExpr, true), t.identifier('length')),
+    t.memberExpression(t.identifier(PREV_LOCAL), t.identifier('length')),
     t.memberExpression(t.identifier(KEY_LOCAL), t.identifier('length')),
   );
   const everyCallback = t.arrowFunctionExpression(
@@ -203,7 +238,7 @@ function buildMemoExpansion(
     t.binaryExpression(
       '===',
       t.identifier('v'),
-      t.memberExpression(t.cloneNode(cacheKeysExpr, true), t.identifier('i'), true),
+      t.memberExpression(t.identifier(PREV_LOCAL), t.identifier('i'), true),
     ),
   );
   const everyExpr = t.callExpression(
@@ -212,7 +247,7 @@ function buildMemoExpansion(
   );
   const hitTest = t.logicalExpression(
     '&&',
-    t.logicalExpression('&&', cacheHasExpr, lengthMatchExpr),
+    t.logicalExpression('&&', prevNotNullExpr, lengthMatchExpr),
     everyExpr,
   );
   const hitReturn = t.ifStatement(
@@ -245,23 +280,15 @@ function buildMemoExpansion(
       t.identifier(VAL_LOCAL),
     ),
   );
-  const assignHas = t.expressionStatement(
-    t.assignmentExpression(
-      '=',
-      t.memberExpression(t.identifier(cacheName), t.identifier(HAS_FIELD)),
-      t.booleanLiteral(true),
-    ),
-  );
-
   const finalReturn = t.returnStatement(t.identifier(VAL_LOCAL));
 
   const wrapperBody = t.blockStatement([
     keyDecl,
+    prevDecl,
     hitReturn,
     valDecl,
     assignKeys,
     assignVal,
-    assignHas,
     finalReturn,
   ]);
   const wrapperArrow = t.arrowFunctionExpression([], wrapperBody);

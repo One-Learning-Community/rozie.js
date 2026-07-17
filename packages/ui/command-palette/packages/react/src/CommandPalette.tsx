@@ -295,13 +295,13 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     return scoreCommands(currentBaseItems(), query, props.score);
   }
   const cpAnchorIndexMapCache = useMemo(() => ({
-    keys: null,
-    val: null,
-    has: false
+    keys: null as any[] | null,
+    val: null as any
   }), []);
   function cpAnchorIndexMap() {
     const __rozieMemoKey = [currentBaseItems(), query, props.score];
-    if (cpAnchorIndexMapCache.has && cpAnchorIndexMapCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === cpAnchorIndexMapCache.keys[i])) {
+    const __rozieMemoPrev = cpAnchorIndexMapCache.keys;
+    if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return cpAnchorIndexMapCache.val;
     }
     const __rozieMemoVal = (() => {
@@ -312,7 +312,6 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     })();
     cpAnchorIndexMapCache.keys = __rozieMemoKey;
     cpAnchorIndexMapCache.val = __rozieMemoVal;
-    cpAnchorIndexMapCache.has = true;
     return __rozieMemoVal;
   }
   function cpAnchorIndex(option: any) {

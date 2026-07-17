@@ -785,13 +785,13 @@ export class CommandPalette {
   breadcrumbStack = () => breadcrumb(this.levelStack(), this.ariaLabel());
   filteredItems = () => scoreCommands(this.currentBaseItems(), this.query(), this.score());
   cpAnchorIndexMapCache = {
-    keys: null,
-    val: null,
-    has: false
+    keys: null as any[] | null,
+    val: null as any
   };
   cpAnchorIndexMap = () => {
     const __rozieMemoKey = [this.currentBaseItems(), this.query(), this.score()];
-    if (this.cpAnchorIndexMapCache.has && this.cpAnchorIndexMapCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === this.cpAnchorIndexMapCache.keys[i])) {
+    const __rozieMemoPrev = this.cpAnchorIndexMapCache.keys;
+    if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return this.cpAnchorIndexMapCache.val;
     }
     const __rozieMemoVal = (() => {
@@ -802,7 +802,6 @@ export class CommandPalette {
     })();
     this.cpAnchorIndexMapCache.keys = __rozieMemoKey;
     this.cpAnchorIndexMapCache.val = __rozieMemoVal;
-    this.cpAnchorIndexMapCache.has = true;
     return __rozieMemoVal;
   };
   cpAnchorIndex = (option: any) => {
