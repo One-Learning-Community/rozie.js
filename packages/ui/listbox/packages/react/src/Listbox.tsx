@@ -507,12 +507,25 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     for (const it of items as any) if (it.index === r) return false;
     return true;
   }
+  const windowSourceCache = useMemo(() => ({
+    keys: null,
+    val: null,
+    has: false
+  }), []);
   function windowSource() {
-    return visibleOptions().map((o: any, i: any) => ({
+    const __rozieMemoKey = [props.options, query, props.optionValue, props.optionLabel];
+    if (windowSourceCache.has && windowSourceCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === windowSourceCache.keys[i])) {
+      return windowSourceCache.val;
+    }
+    const __rozieMemoVal = visibleOptions().map((o: any, i: any) => ({
       id: valueOf(o),
       _opt: o,
       _i: i
     }));
+    windowSourceCache.keys = __rozieMemoKey;
+    windowSourceCache.val = __rozieMemoVal;
+    windowSourceCache.has = true;
+    return __rozieMemoVal;
   }
   function pinnedEditIndex() {
     return -1;

@@ -781,14 +781,35 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   // value, `_opt` the original option (read via wr.row._opt in the windowed template),
   // `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
   // the same wrapped row the count windows over.
+  //
+  // $memo, keyed on the TRUE inputs — NOT on visibleOptions() itself, which returns a
+  // FRESH filtered array whenever a query is active (a visibleOptions()-keyed cache
+  // would never hit while filtering). The key covers everything the map reads:
+  // options ref + query (visibleOptions' inputs) and the optionValue/optionLabel
+  // resolvers (valueOf in the map body; labelOf inside visibleOptions' filter path).
+  // Same reference-stability contract the sibling Combobox's filteredOptions carries —
+  // virtual-core's getItemKey/getMeasurements walk this O(count) per pass, so an
+  // unmemoized per-call re-map made every scroll tick O(N²) in wrapper allocations.
+  const windowSourceCache = {
+    keys: null,
+    val: null,
+    has: false
+  };
   function windowSource() {
-    return visibleOptions().map((o: any, i: any) => ({
+    const __rozieMemoKey = [local.options, query(), local.optionValue, local.optionLabel];
+    if (windowSourceCache.has && windowSourceCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === windowSourceCache.keys[i])) {
+      return windowSourceCache.val;
+    }
+    const __rozieMemoVal = visibleOptions().map((o: any, i: any) => ({
       id: valueOf(o),
       _opt: o,
       _i: i
     }));
+    windowSourceCache.keys = __rozieMemoKey;
+    windowSourceCache.val = __rozieMemoVal;
+    windowSourceCache.has = true;
+    return __rozieMemoVal;
   }
-
   // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
   // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
   // pinnedMeasurement() UNGUARDED by convention; a listbox has no edit-pinning, so these

@@ -735,11 +735,26 @@ export class Listbox {
   virtualizerCleanup: any = null;
   gridScrollEl: any = null;
   remeasurePending = false;
-  windowSource = () => this.visibleOptions().map((o: any, i: any) => ({
-    id: this.valueOf$local(o),
-    _opt: o,
-    _i: i
-  }));
+  windowSourceCache = {
+    keys: null,
+    val: null,
+    has: false
+  };
+  windowSource = () => {
+    const __rozieMemoKey = [this.options(), this.query(), this.optionValue(), this.optionLabel()];
+    if (this.windowSourceCache.has && this.windowSourceCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === this.windowSourceCache.keys[i])) {
+      return this.windowSourceCache.val;
+    }
+    const __rozieMemoVal = this.visibleOptions().map((o: any, i: any) => ({
+      id: this.valueOf$local(o),
+      _opt: o,
+      _i: i
+    }));
+    this.windowSourceCache.keys = __rozieMemoKey;
+    this.windowSourceCache.val = __rozieMemoVal;
+    this.windowSourceCache.has = true;
+    return __rozieMemoVal;
+  };
   pinnedEditIndex = () => -1;
   pinnedMeasurement = (pin: any) => null;
   syncRows = () => {
