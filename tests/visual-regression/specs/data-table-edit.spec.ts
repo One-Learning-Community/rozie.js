@@ -2,6 +2,13 @@ import { test, expect, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  deepQuerySelectorAllCount,
+  deepQuerySelectorAllTextInPage,
+  deepQuerySelectorFirstTextInPage,
+  deepQuerySelectorFirstAttrInPage,
+  deepActiveElementProbeInPage,
+} from './_shadow-utils';
 
 // tests/visual-regression/package.json sets "type": "module".
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -252,72 +259,25 @@ async function stepEditorPresent(page: Page): Promise<boolean> {
 
 /** The focused element's tagName (shadow-pierced), to assert the editor is focused. */
 async function focusedTag(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    let root: Document | ShadowRoot = document;
-    let active: Element | null = document.activeElement;
-    // Pierce shadow roots to the deepest active element (Lit).
-    while (active && (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot) {
-      const sr = (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot as ShadowRoot;
-      if (!sr.activeElement) break;
-      root = sr;
-      active = sr.activeElement;
-    }
-    return active ? active.tagName.toLowerCase() : null;
-  });
+  return page.evaluate(deepActiveElementProbeInPage, 'tag') as Promise<string | null>;
 }
 
 /** The first cell-display cell's text for a given visible column (the model-driven value). */
 async function cellDisplayValues(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
-    const find = (root: Document | ShadowRoot): Element[] => {
-      const out: Element[] = [];
-      out.push(...Array.from(root.querySelectorAll('[data-testid="cell-display"]')));
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) out.push(...find(sr));
-      }
-      return out;
-    };
-    return find(document).map((el) => (el.textContent || '').trim());
-  });
+  return page.evaluate(deepQuerySelectorAllTextInPage, '[data-testid="cell-display"]');
 }
 
 /** The commit-count readout (number of cell-edit-commit emits). */
 async function commitCount(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    const find = (root: Document | ShadowRoot): Element | null => {
-      const direct = root.querySelector('[data-testid="commit-count"]');
-      if (direct) return direct;
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) {
-          const inner = find(sr);
-          if (inner) return inner;
-        }
-      }
-      return null;
-    };
-    const el = find(document);
-    return el ? Number((el.textContent || '0').trim()) : -1;
-  });
+  const text = await page.evaluate(deepQuerySelectorFirstTextInPage, '[data-testid="commit-count"]');
+  return text != null ? Number(text || '0') : -1;
 }
 
 /** The number of open built-in editors ([data-editing-cell]) in the grid (shadow-pierced). In
  *  full-row mode every BUILT-IN editable cell of the active row is open at once; the custom
  *  #editor `score` column renders the stepped slot instead (counted separately). */
 async function editingCellCount(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    const out: Element[] = [];
-    const walk = (root: Document | ShadowRoot): void => {
-      out.push(...Array.from(root.querySelectorAll('[data-editing-cell]')));
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) walk(sr);
-      }
-    };
-    walk(document);
-    return out.length;
-  });
+  return deepQuerySelectorAllCount(page, '[data-editing-cell]');
 }
 
 /** The [data-col-index] of every open built-in editor's owning cell, in DOM order
@@ -344,63 +304,19 @@ async function editingColIndices(page: Page): Promise<string[]> {
 
 /** The row-commit-count readout (number of row-edit-commit emits, req-6). */
 async function rowCommitCount(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    const find = (root: Document | ShadowRoot): Element | null => {
-      const direct = root.querySelector('[data-testid="row-commit-count"]');
-      if (direct) return direct;
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) {
-          const inner = find(sr);
-          if (inner) return inner;
-        }
-      }
-      return null;
-    };
-    const el = find(document);
-    return el ? Number((el.textContent || '0').trim()) : -1;
-  });
+  const text = await page.evaluate(deepQuerySelectorFirstTextInPage, '[data-testid="row-commit-count"]');
+  return text != null ? Number(text || '0') : -1;
 }
 
 /** The row-commit readout ("col=v;col=v" of the changed columns, sorted) for the last
  *  row-edit-commit (req-6). */
 async function rowCommitReadout(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const find = (root: Document | ShadowRoot): Element | null => {
-      const direct = root.querySelector('[data-testid="row-commit-readout"]');
-      if (direct) return direct;
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) {
-          const inner = find(sr);
-          if (inner) return inner;
-        }
-      }
-      return null;
-    };
-    const el = find(document);
-    return el ? (el.textContent || '').trim() : '';
-  });
+  return (await page.evaluate(deepQuerySelectorFirstTextInPage, '[data-testid="row-commit-readout"]')) ?? '';
 }
 
 /** The commit-readout ("columnId=newValue" of the last commit). */
 async function commitReadout(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const find = (root: Document | ShadowRoot): Element | null => {
-      const direct = root.querySelector('[data-testid="commit-readout"]');
-      if (direct) return direct;
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) {
-          const inner = find(sr);
-          if (inner) return inner;
-        }
-      }
-      return null;
-    };
-    const el = find(document);
-    return el ? (el.textContent || '').trim() : '';
-  });
+  return (await page.evaluate(deepQuerySelectorFirstTextInPage, '[data-testid="commit-readout"]')) ?? '';
 }
 
 /** Focus a body cell directly by (row, col) — drives @focusin → activeRow/activeColIndex
@@ -430,21 +346,9 @@ async function focusBodyCell(page: Page, row: number, col: number): Promise<void
 /** The [data-col-index] of the cell currently flagged aria-invalid="true" (req-5), or null.
  *  Walks open shadow roots (Lit). */
 async function ariaInvalidColIndex(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    const find = (root: Document | ShadowRoot): Element | null => {
-      const direct = root.querySelector('[data-grid-cell][aria-invalid="true"]');
-      if (direct) return direct;
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) {
-          const inner = find(sr);
-          if (inner) return inner;
-        }
-      }
-      return null;
-    };
-    const el = find(document);
-    return el ? el.getAttribute('data-col-index') : null;
+  return page.evaluate(deepQuerySelectorFirstAttrInPage, {
+    selector: '[data-grid-cell][aria-invalid="true"]',
+    attr: 'data-col-index',
   });
 }
 
@@ -617,22 +521,7 @@ async function virtualRenderedRows(
 
 /** Read the readout testid's trimmed text (shadow-pierced), '' when absent. */
 async function readoutText(page: Page, testid: string): Promise<string> {
-  return page.evaluate((id) => {
-    const find = (root: Document | ShadowRoot): Element | null => {
-      const direct = root.querySelector(`[data-testid="${id}"]`);
-      if (direct) return direct;
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) {
-          const inner = find(sr);
-          if (inner) return inner;
-        }
-      }
-      return null;
-    };
-    const el = find(document);
-    return el ? (el.textContent || '').trim() : '';
-  }, testid);
+  return (await page.evaluate(deepQuerySelectorFirstTextInPage, `[data-testid="${testid}"]`)) ?? '';
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════
@@ -1203,18 +1092,7 @@ for (const target of TARGETS) {
       .poll(async () => cellDisplayValues(page).then((c) => c[15]), { timeout: 10_000 })
       .toBe(xss); // row 3, col 0 = cell-display index 15: literal text, not markup.
     // No <img> element exists anywhere in the grid (shadow-pierced) — the payload was DATA.
-    const imgCount = await page.evaluate(() => {
-      let count = 0;
-      const walk = (root: Document | ShadowRoot): void => {
-        count += root.querySelectorAll('img').length;
-        for (const el of Array.from(root.querySelectorAll('*'))) {
-          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-          if (sr) walk(sr);
-        }
-      };
-      walk(document);
-      return count;
-    });
+    const imgCount = await deepQuerySelectorAllCount(page, 'img');
     expect(imgCount, 'pasted markup must render as text — no <img> element created (T-51-01)').toBe(0);
 
     // ── Drag-fill (D-04 — VALUE-COPY ONLY, no series detection; B7 — PER-COLUMN copy, no

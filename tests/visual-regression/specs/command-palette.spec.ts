@@ -2,6 +2,12 @@ import { test, expect, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  deepQuerySelectorAllCount,
+  deepQuerySelectorAllTextInPage,
+  deepActiveElementProbeInPage,
+  type DeepActiveElementMenuItemInfo,
+} from './_shadow-utils';
 
 // tests/visual-regression/package.json sets "type": "module".
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -116,18 +122,7 @@ async function countOptions(page: Page): Promise<number> {
  * `[role="menuitem"]` (the action menu flyout, command-palette-sub-actions).
  */
 async function countByRole(page: Page, role: string): Promise<number> {
-  return page.evaluate((r) => {
-    let total = 0;
-    const walk = (root: Document | ShadowRoot): void => {
-      total += root.querySelectorAll(`[role="${r}"]`).length;
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) walk(sr);
-      }
-    };
-    walk(document);
-    return total;
-  }, role);
+  return deepQuerySelectorAllCount(page, `[role="${role}"]`);
 }
 
 /**
@@ -138,26 +133,13 @@ async function countByRole(page: Page, role: string): Promise<number> {
  * action menu takes ACTUAL DOM focus, not just an `aria-activedescendant`
  * pointer.
  */
-async function activeMenuItemInfo(page: Page): Promise<{ role: string | null; disabled: boolean } | null> {
-  return page.evaluate(() => {
-    let node: (Element & { shadowRoot?: ShadowRoot | null }) | null = document.activeElement as Element | null;
-    while (node && node.shadowRoot && node.shadowRoot.activeElement) {
-      node = node.shadowRoot.activeElement as Element & { shadowRoot?: ShadowRoot | null };
-    }
-    if (!node) return null;
-    return { role: node.getAttribute('role'), disabled: node.getAttribute('aria-disabled') === 'true' };
-  });
+async function activeMenuItemInfo(page: Page): Promise<DeepActiveElementMenuItemInfo | null> {
+  return page.evaluate(deepActiveElementProbeInPage, 'menuitem') as Promise<DeepActiveElementMenuItemInfo | null>;
 }
 
 /** The deepest REAL active element's trimmed text content (shadow-piercing). */
 async function activeElementText(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    let node: (Element & { shadowRoot?: ShadowRoot | null }) | null = document.activeElement as Element | null;
-    while (node && node.shadowRoot && node.shadowRoot.activeElement) {
-      node = node.shadowRoot.activeElement as Element & { shadowRoot?: ShadowRoot | null };
-    }
-    return node ? (node.textContent || '').trim() : '';
-  });
+  return page.evaluate(deepActiveElementProbeInPage, 'text') as Promise<string>;
 }
 
 /**
@@ -166,18 +148,7 @@ async function activeElementText(page: Page): Promise<string> {
  * (`.rozie-command-palette-option-group`, cp-adopts-combobox-groups).
  */
 async function countByClass(page: Page, className: string): Promise<number> {
-  return page.evaluate((cls) => {
-    let total = 0;
-    const walk = (root: Document | ShadowRoot): void => {
-      total += root.querySelectorAll(`.${cls}`).length;
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) walk(sr);
-      }
-    };
-    walk(document);
-    return total;
-  }, className);
+  return deepQuerySelectorAllCount(page, `.${className}`);
 }
 
 /**
@@ -192,6 +163,11 @@ async function countByClass(page: Page, className: string): Promise<number> {
  * NON-CLIPPING `.rozie-command-palette-frame` anchor (finding 1) — the
  * single-result ⌘K scenario opens a 3-item menu against a 1-row-tall panel,
  * which a naive `position: relative` panel would CLIP.
+ *
+ * NOT migrated to _shadow-utils.ts (quick 260716-npt Fix C): the `collect`
+ * walker below is entangled with FURTHER `elementFromPoint`/geometry
+ * computation in the SAME evaluate call — it does not fit the shared
+ * "walk, return a serializable value" primitives cleanly.
  */
 async function deepHitAtLastMenuItem(page: Page): Promise<boolean> {
   return page.evaluate(() => {
@@ -278,20 +254,7 @@ async function frameBottomVisible(page: Page): Promise<boolean> {
  * every open shadow root — cp-adopts-combobox-groups' section-heading proof.
  */
 async function groupHeadingTexts(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
-    const out: string[] = [];
-    const walk = (root: Document | ShadowRoot): void => {
-      for (const el of Array.from(root.querySelectorAll('.rozie-combobox-group-heading'))) {
-        out.push((el.textContent || '').trim());
-      }
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) walk(sr);
-      }
-    };
-    walk(document);
-    return out;
-  });
+  return page.evaluate(deepQuerySelectorAllTextInPage, '.rozie-combobox-group-heading');
 }
 
 /**
@@ -1285,13 +1248,7 @@ for (const target of TARGETS) {
  * 'Template' vs 'Search pages' on the CommandPaletteArgsDemo item set).
  */
 async function deepActiveElementPlaceholder(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    let node: (Element & { shadowRoot?: ShadowRoot | null }) | null = document.activeElement as Element | null;
-    while (node && node.shadowRoot && node.shadowRoot.activeElement) {
-      node = node.shadowRoot.activeElement as Element & { shadowRoot?: ShadowRoot | null };
-    }
-    return node ? node.getAttribute('placeholder') : null;
-  });
+  return page.evaluate(deepActiveElementProbeInPage, 'placeholder') as Promise<string | null>;
 }
 
 /**

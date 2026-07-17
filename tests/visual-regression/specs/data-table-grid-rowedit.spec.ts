@@ -2,6 +2,11 @@ import { test, expect, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  deepQuerySelectorAllCount,
+  deepQuerySelectorFirstTextInPage,
+  deepActiveElementProbeInPage,
+} from './_shadow-utils';
 
 // tests/visual-regression/package.json sets "type": "module".
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -111,31 +116,14 @@ async function openEditor(
 /** The number of OPEN editors ([data-editing-cell]) anywhere in the grid (shadow-pierced).
  *  In full-row edit this is the count of editable cells in the editing row. */
 async function editorCount(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    let n = 0;
-    const walk = (root: Document | ShadowRoot): void => {
-      n += root.querySelectorAll('[data-editing-cell]').length;
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) walk(sr);
-      }
-    };
-    walk(document);
-    return n;
-  });
+  return deepQuerySelectorAllCount(page, '[data-editing-cell]');
 }
 
-/** The deepest shadow-pierced active element's tagName. Copied from data-table-edit.spec.ts. */
+/** The deepest shadow-pierced active element's tagName. Shared with
+ *  data-table-edit.spec.ts / command-palette.spec.ts via _shadow-utils.ts
+ *  (quick 260716-npt Fix C — was "Copied from data-table-edit.spec.ts"). */
 async function focusedTag(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    let active: Element | null = document.activeElement;
-    while (active && (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot) {
-      const sr = (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot as ShadowRoot;
-      if (!sr.activeElement) break;
-      active = sr.activeElement;
-    }
-    return active ? active.tagName.toLowerCase() : null;
-  });
+  return page.evaluate(deepActiveElementProbeInPage, 'tag') as Promise<string | null>;
 }
 
 /** Quick 260711-i5m — the deepest shadow-pierced active element's `aria-label` (EditorText
@@ -143,15 +131,7 @@ async function focusedTag(page: Page): Promise<string | null> {
  *  the `note` #editor drop-in's own input from the grid's built-in editors, which carry no
  *  aria-label). Null when nothing is focused or the focused element has no aria-label. */
 async function focusedInputColumnLabel(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    let active: Element | null = document.activeElement;
-    while (active && (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot) {
-      const sr = (active as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot as ShadowRoot;
-      if (!sr.activeElement) break;
-      active = sr.activeElement;
-    }
-    return active ? active.getAttribute('aria-label') : null;
-  });
+  return page.evaluate(deepActiveElementProbeInPage, 'aria-label') as Promise<string | null>;
 }
 
 /** Focus the [data-editing-cell] editor inside the cell at (row, col) (shadow-pierced). */
@@ -219,22 +199,7 @@ async function cellText(page: Page, row: number, col: number): Promise<string> {
 
 /** Read a readout testid's trimmed text (shadow-pierced), '' when absent. */
 async function readoutText(page: Page, testid: string): Promise<string> {
-  return page.evaluate((id) => {
-    const find = (root: Document | ShadowRoot): Element | null => {
-      const direct = root.querySelector(`[data-testid="${id}"]`);
-      if (direct) return direct;
-      for (const el of Array.from(root.querySelectorAll('*'))) {
-        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-        if (sr) {
-          const inner = find(sr);
-          if (inner) return inner;
-        }
-      }
-      return null;
-    };
-    const el = find(document);
-    return el ? (el.textContent || '').trim() : '';
-  }, testid);
+  return (await page.evaluate(deepQuerySelectorFirstTextInPage, `[data-testid="${testid}"]`)) ?? '';
 }
 
 /** The committed model (JSON.parsed from the model-readout dump). */

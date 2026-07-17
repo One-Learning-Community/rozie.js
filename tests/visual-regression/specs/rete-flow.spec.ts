@@ -384,6 +384,14 @@ for (const target of TARGETS) {
       // Deep query across the document AND every open shadow root (Lit renders the
       // canvas + sockets + connections inside a shadow root; plain querySelectorAll
       // does NOT pierce shadow DOM, so we recurse). Returns all matches everywhere.
+      //
+      // NOT migrated to _shadow-utils.ts's shared deepQuerySelectorAll* helpers
+      // (quick 260716-npt Fix C): this deepQueryAll is called MULTIPLE times
+      // and its results feed FURTHER getBoundingClientRect/getPointAtLength/
+      // getScreenCTM geometry math, all within this SAME evaluate call, for
+      // one atomic snapshot. It is byte-identical to the other deepQueryAll
+      // in this file (below) but extracting it would require restructuring
+      // the surrounding multi-step computation, not a safe mechanical dedup.
       const deepQueryAll = (selector: string): Element[] => {
         const out: Element[] = [];
         const walk = (root: Document | ShadowRoot) => {
@@ -1147,6 +1155,9 @@ for (const target of TARGETS) {
 
     // ---- 3. ALIGNMENT: endpoints are HORIZONTALLY aligned with sockets (Y-axis offset) ----
     const result = await page.evaluate(() => {
+      // NOT migrated to _shadow-utils.ts (quick 260716-npt Fix C) — same
+      // rationale as the twin deepQueryAll above: entangled with further
+      // geometry math in this same evaluate call.
       const deepQueryAll = (selector: string): Element[] => {
         const out: Element[] = [];
         const walk = (root: Document | ShadowRoot) => {
