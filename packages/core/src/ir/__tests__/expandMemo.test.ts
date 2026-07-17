@@ -58,16 +58,29 @@ describe('expandMemo', () => {
     expect(wrapperStmt.type).toBe('VariableDeclaration');
 
     const code = render(file);
-    // Cache-object shape.
+    // Cache-object shape: keys-null IS the miss sentinel — no separate `has`
+    // flag (a boolean-gated read of `.keys` defeats strict-tsc null narrowing:
+    // `has && keys.length` leaves `.keys` possibly-null inside the `.every`
+    // closure, the exact TS18047 class that broke the strict-enforced
+    // listbox-solid/lit leaves).
     expect(code).toContain('filteredOptionsCache');
     expect(code).toMatch(/keys:\s*null/);
     expect(code).toMatch(/val:\s*null/);
-    expect(code).toMatch(/has:\s*false/);
+    expect(code).not.toMatch(/has:/);
     // Wrapper is a plain function assigned to the original name.
     expect(code).toContain('const filteredOptions = () =>');
+    // The cached key is captured to a LOCAL before the guard — member-expression
+    // narrowing does not survive into the `.every` callback, a local const does.
+    expect(code).toContain('const __rozieMemoPrev = filteredOptionsCache.keys');
+    expect(code).toContain('__rozieMemoPrev !== null');
+    expect(code).toMatch(/__rozieMemoPrev\[i\]/);
+    // No raw `filteredOptionsCache.keys` read inside the hit test (only the
+    // local capture + the miss-path assignment may touch it).
+    expect(code).not.toContain('filteredOptionsCache.keys.length');
+    expect(code).not.toContain('filteredOptionsCache.has');
     // keyFn body inlined and evaluated BEFORE the cache-hit check (subscribe-first).
     const keyIdx = code.indexOf('opts, q');
-    const hitCheckIdx = code.indexOf('filteredOptionsCache.has');
+    const hitCheckIdx = code.indexOf('__rozieMemoPrev !== null');
     expect(keyIdx).toBeGreaterThan(-1);
     expect(hitCheckIdx).toBeGreaterThan(-1);
     expect(keyIdx).toBeLessThan(hitCheckIdx);
@@ -75,6 +88,21 @@ describe('expandMemo', () => {
     expect(code).toContain('computeFiltered(opts, q)');
     // No literal `$memo(` survives.
     expect(code).not.toContain('$memo(');
+    // JS mode (no opts / ts:false): the cache declarator carries NO TS annotation.
+    expect(code).not.toContain('any[]');
+  });
+
+  it('TS mode annotates the cache holder so strict null-checks accept the shape', async () => {
+    const { expandMemo } = await import('../lowerers/expandMemo.js');
+    const src = `const filteredOptions = $memo(() => computeFiltered(opts, q), () => [opts, q]);`;
+    const file = moduleFile(src);
+    const result = expandMemo(file, { ts: true });
+    expect(result.expandedNames).toEqual(['filteredOptions']);
+    const code = render(file);
+    // `keys: any[] | null` / `val: any` — `any` (not `unknown`) so the wrapper's
+    // return type doesn't leak `unknown` into downstream consumers (the
+    // null-init-$data widened-to-any precedent).
+    expect(code).toMatch(/filteredOptionsCache:\s*\{\s*keys:\s*any\[\]\s*\|\s*null;?\s*val:\s*any;?\s*\}/);
   });
 
   it('inlines a block-bodied keyFn/fn as an IIFE, preserving statement logic', async () => {
