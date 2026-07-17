@@ -90,9 +90,17 @@ const FAMILIES: FamilySpec[] = [
         // optionValue/optionDisabled) shifted 2 more body-passthrough nullability
         // sites into tsc's reach (TS2322 4→5, TS18047 4→6) — inherent Class-4
         // residual, unrelated to the emitter fix itself.
-        TS2322: 5,
+        // Quick 260717-8zb: filteredOptions() re-expressed on $memo(fn, keyFn)
+        // shifted the null-initialized cache-object shape (`{ keys: null, val:
+        // null, has: false }` vs the old hand-rolled foCache's individually
+        // typed fields) — tsc's strict null-check narrowing sees
+        // filteredOptionsCache.keys/.val differently across the .has-gated
+        // branches, moving 3 sites from TS2322 into TS18047 (5→2, 6→8). Inherent
+        // Class-4 residual from the new cache shape, unrelated to any emitter
+        // change — do-not-fix-here per this file's scope fence.
+        TS2322: 2,
         TS2345: 1,
-        TS18047: 6,
+        TS18047: 8,
         TS7006: 1,
       },
     },
@@ -111,12 +119,14 @@ const FAMILIES: FamilySpec[] = [
         // itself, do-not-fix-here per this file's scope fence.
         // 260714-nqe: Function-prop TS lowering flipped `unknown`→`any`
         // shifted 2 more sites into tsc's reach (TS2322 4→5, TS18047 4→6).
-        TS2322: 5,
+        // Quick 260717-8zb: same $memo(fn, keyFn) cache-shape shift as the
+        // react leaf above (TS2322 5→2, TS18047 6→8) — do-not-fix-here.
+        TS2322: 2,
         // combobox-virtual-reactivity: windowedView() added a 6th windowSource()
         // call site — one more occurrence of the KNOWN Class-4 nullable-return
         // body-noise class (TS2531), do-not-fix-here per this file's scope fence.
         TS2531: 5,
-        TS18047: 6,
+        TS18047: 8,
         TS2769: 1,
       },
     },
@@ -131,11 +141,15 @@ const FAMILIES: FamilySpec[] = [
         // combobox-virtual-reactivity: windowedView() added a 6th windowSource()
         // call site — one more occurrence of the KNOWN Class-4 nullable-return
         // body-noise class (TS2531), do-not-fix-here per this file's scope fence.
-        TS2531: 5,
+        // Quick 260717-8zb: the $memo(fn, keyFn) cache-shape shift (see the
+        // react/solid leaves above) moved 3 sites from TS2322 into TS2531 on
+        // Lit specifically (5→7) — do-not-fix-here.
+        TS2531: 7,
         // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
         // 260714-nqe: Function-prop TS lowering flipped `unknown`→`any`
         // shifted 2 more sites into tsc's reach (TS2322 5→6, TS18047 4→6).
-        TS2322: 6,
+        // Quick 260717-8zb: $memo cache-shape shift, TS2322 6→3.
+        TS2322: 3,
         TS18047: 6,
       },
     },
