@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
@@ -198,10 +198,6 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   })();
   const debounceTimerId = useRef<any>(null);
   const requestToken = useRef(0);
-  const _cpIdxMap = useRef<any>(null);
-  const _cpIdxBase = useRef<any>(null);
-  const _cpIdxQuery = useRef<any>(null);
-  const _cpIdxScore = useRef<any>(null);
   const argsJustOpened = useRef(false);
   const [open, setOpen] = useControllableState({
     value: props.open,
@@ -298,21 +294,26 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
   function filteredItems() {
     return scoreCommands(currentBaseItems(), query, props.score);
   }
+  const cpAnchorIndexMapCache = useMemo(() => ({
+    keys: null,
+    val: null,
+    has: false
+  }), []);
   function cpAnchorIndexMap() {
-    const base = currentBaseItems();
-    const query$local = query;
-    const score = props.score;
-    if (_cpIdxMap.current && base === _cpIdxBase.current && query$local === _cpIdxQuery.current && score === _cpIdxScore.current) {
-      return _cpIdxMap.current;
+    const __rozieMemoKey = [currentBaseItems(), query, props.score];
+    if (cpAnchorIndexMapCache.has && cpAnchorIndexMapCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === cpAnchorIndexMapCache.keys[i])) {
+      return cpAnchorIndexMapCache.val;
     }
-    const list = filteredItems();
-    const map = new Map();
-    for (let i = 0; i < list.length; i++) map.set(list[i], i);
-    _cpIdxBase.current = base;
-    _cpIdxQuery.current = query$local;
-    _cpIdxScore.current = score;
-    _cpIdxMap.current = map;
-    return map;
+    const __rozieMemoVal = (() => {
+      const list = filteredItems();
+      const map = new Map();
+      for (let i = 0; i < list.length; i++) map.set(list[i], i);
+      return map;
+    })();
+    cpAnchorIndexMapCache.keys = __rozieMemoKey;
+    cpAnchorIndexMapCache.val = __rozieMemoVal;
+    cpAnchorIndexMapCache.has = true;
+    return __rozieMemoVal;
   }
   function cpAnchorIndex(option: any) {
     const idx = cpAnchorIndexMap().get(option);

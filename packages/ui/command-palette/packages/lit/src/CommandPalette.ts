@@ -895,29 +895,27 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
 
   filteredItems = () => scoreCommands(this.currentBaseItems(), this.query, this.score);
 
-  _cpIdxBase: any = null;
-
-  _cpIdxQuery: any = null;
-
-  _cpIdxScore: any = null;
-
-  _cpIdxMap: any = null;
+  cpAnchorIndexMapCache = {
+  keys: null,
+  val: null,
+  has: false
+};
 
   cpAnchorIndexMap = () => {
-  const base = this.currentBaseItems();
-  const query = this.query;
-  const score = this.score;
-  if (this._cpIdxMap && base === this._cpIdxBase && query === this._cpIdxQuery && score === this._cpIdxScore) {
-    return this._cpIdxMap;
+  const __rozieMemoKey = [this.currentBaseItems(), this.query, this.score];
+  if (this.cpAnchorIndexMapCache.has && this.cpAnchorIndexMapCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === this.cpAnchorIndexMapCache.keys[i])) {
+    return this.cpAnchorIndexMapCache.val;
   }
-  const list = this.filteredItems();
-  const map = new Map();
-  for (let i = 0; i < list.length; i++) map.set(list[i], i);
-  this._cpIdxBase = base;
-  this._cpIdxQuery = query;
-  this._cpIdxScore = score;
-  this._cpIdxMap = map;
-  return map;
+  const __rozieMemoVal = (() => {
+    const list = this.filteredItems();
+    const map = new Map();
+    for (let i = 0; i < list.length; i++) map.set(list[i], i);
+    return map;
+  })();
+  this.cpAnchorIndexMapCache.keys = __rozieMemoKey;
+  this.cpAnchorIndexMapCache.val = __rozieMemoVal;
+  this.cpAnchorIndexMapCache.has = true;
+  return __rozieMemoVal;
 };
 
   cpAnchorIndex = (option: any) => {

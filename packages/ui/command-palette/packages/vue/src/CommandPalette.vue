@@ -400,6 +400,7 @@ const breadcrumbStack = () => breadcrumb(levelStack.value, props.ariaLabel);
 // order for free, so a non-empty query still ranks currentItems() exactly
 // as before (defaultItems is never scored/reordered).
 const filteredItems = () => scoreCommands(currentBaseItems(), query.value, props.score);
+
 // ---- data-cp-index resolution (finding 7a) ------------------------------
 // commandValue(it) falls back to the item OBJECT when a command carries no
 // `id` — stamped through :data-cp-value it stringifies to '[object Object]'
@@ -415,30 +416,32 @@ const filteredItems = () => scoreCommands(currentBaseItems(), query.value, props
 // scoreCommands() returns a FRESH array each call, so cache an identity→index
 // Map keyed on the (base items, query, score) inputs that fully determine the
 // ranking — the per-row stamp is then O(1) and the whole render O(n), never
-// O(n²). Plain module-lets: on the 5 setup-once targets they persist and the
-// ref-keyed signature invalidates on any input change; on React (the body
-// re-runs each render, and these are template-only — never hook-referenced —
-// so hoistModuleLet leaves them as per-render locals) they reset per render,
-// which is exactly the desired render-scoped cache lifetime.
-let _cpIdxBase: any = null;
-let _cpIdxQuery: any = null;
-let _cpIdxScore: any = null;
-let _cpIdxMap: any = null;
+// O(n²). $memo's instance-lifetime cache matches what the hand-rolled
+// module-lets already did on the 5 setup-once targets; React (previously
+// render-scoped via per-render let reset) now persists across renders too —
+// safe for the same reason the 5-target persistence always was: the key
+// fully determines the ranking, so a cross-render hit returns the same Map
+// a recompute would.
+const cpAnchorIndexMapCache = {
+  keys: null,
+  val: null,
+  has: false
+};
 const cpAnchorIndexMap = () => {
-  const base = currentBaseItems();
-  const query$local = query.value;
-  const score = props.score;
-  if (_cpIdxMap && base === _cpIdxBase && query$local === _cpIdxQuery && score === _cpIdxScore) {
-    return _cpIdxMap;
+  const __rozieMemoKey = [currentBaseItems(), query.value, props.score];
+  if (cpAnchorIndexMapCache.has && cpAnchorIndexMapCache.keys.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === cpAnchorIndexMapCache.keys[i])) {
+    return cpAnchorIndexMapCache.val;
   }
-  const list = filteredItems();
-  const map = new Map();
-  for (let i = 0; i < list.length; i++) map.set(list[i], i);
-  _cpIdxBase = base;
-  _cpIdxQuery = query$local;
-  _cpIdxScore = score;
-  _cpIdxMap = map;
-  return map;
+  const __rozieMemoVal = (() => {
+    const list = filteredItems();
+    const map = new Map();
+    for (let i = 0; i < list.length; i++) map.set(list[i], i);
+    return map;
+  })();
+  cpAnchorIndexMapCache.keys = __rozieMemoKey;
+  cpAnchorIndexMapCache.val = __rozieMemoVal;
+  cpAnchorIndexMapCache.has = true;
+  return __rozieMemoVal;
 };
 // cpAnchorIndex(option): the option's canonical filteredItems() position,
 // stamped as data-cp-index on the option-anchor span. -1 for a stray option
