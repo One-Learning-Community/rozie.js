@@ -70,6 +70,23 @@ import type { ReactiveController, ReactiveControllerHost } from 'lit';
 export interface RoziePortalControllerHost extends ReactiveControllerHost {}
 
 export class RoziePortalController implements ReactiveController {
+  /**
+   * command-palette-portal-through-portal cluster (BUG A) — a STRING-VALUED
+   * brand `rozieResolvePortalledRef` checks INSTEAD OF `instanceof
+   * RoziePortalController`. Each per-target-component Vite/Rollup chunk in
+   * the real bundled build (confirmed live: the VR host's per-example code
+   * splitting) can end up with its OWN separately-bundled copy of
+   * `@rozie/runtime-lit` — a classic dual-package-hazard — so an
+   * `instanceof` check against an import from a DIFFERENT chunk's copy of
+   * this class silently fails even though the object is a genuine
+   * `RoziePortalController` (confirmed live: `constructor.name` came back
+   * minified/mangled to an unrelated short name, `.element` still worked
+   * fine when read directly by field name). A plain string property survives
+   * bundling/minification (property NAMES are not renamed by the toolchain
+   * — only declaration identifiers/class names are), so this is bundling-
+   * boundary-safe where `instanceof` is not.
+   */
+  readonly __rozieBrand = 'RoziePortalController' as const;
   private readonly host: RoziePortalControllerHost;
   private readonly getElement: () => Element | null | undefined;
   private readonly getAnchor: () => Element | null | undefined;
@@ -79,6 +96,23 @@ export class RoziePortalController implements ReactiveController {
   // Tracked as a node reference (not a boolean) so a close→reopen that
   // recreates the element is detectable (fresh query !== tracked node).
   private moved: Element | null = null;
+
+  /**
+   * command-palette-portal-through-portal cluster (BUG A) — the LIVE,
+   * currently-relocated node (or `null` when nothing is portalled right
+   * now: rendered in place, or the branch is closed). Public, additive
+   * read-only accessor for `rozieResolvePortalledRef` (`@rozie/runtime-lit`):
+   * an author `ref="x"` living INSIDE this controller's relocated subtree
+   * cannot be found via a plain `this.renderRoot.querySelector` once
+   * `place()` has moved it out — `rozieResolvePortalledRef` falls back to
+   * searching WITHIN `.element`'s subtree instead. Always reflects the
+   * CURRENT `hostUpdated()`-synced state (including the recreate-on-
+   * reopen case — see `hostUpdated()`'s "Recreate" branch below), so
+   * callers never need their own caching/staleness guard.
+   */
+  get element(): Element | null {
+    return this.moved;
+  }
 
   constructor(
     host: RoziePortalControllerHost,

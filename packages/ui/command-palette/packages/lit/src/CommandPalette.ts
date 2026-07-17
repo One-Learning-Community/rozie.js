@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { RoziePortalController, adoptConsumerStyles, createLitControllableProperty, injectGlobalStyles, rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runtime-lit';
+import { RoziePortalController, adoptConsumerStyles, createLitControllableProperty, injectGlobalStyles, rozieAttr, rozieDisplay, rozieResolvePortalledRef, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { ref } from 'lit/directives/ref.js';
 import '@rozie-ui/combobox-lit';
@@ -492,9 +492,18 @@ export default class CommandPalette extends SignalWatcher(LitElement) {
   private _actionMenuTop = signal(0);
   private _argsState = signal<any>(null);
   private _platformIsApple = signal(false);
-  @query('[data-rozie-ref="frame"]') private _refFrame!: HTMLElement;
-  @query('[data-rozie-ref="panel"]') private _refPanel!: HTMLElement;
-  @query('[data-rozie-ref="combobox"]') private _refCombobox!: Combobox;
+  @query('[data-rozie-ref="frame"]') private __rozieRawRefFrame!: HTMLElement;
+  private get _refFrame(): HTMLElement {
+    return rozieResolvePortalledRef(this, '[data-rozie-ref="frame"]', this.__rozieRawRefFrame) as HTMLElement;
+  }
+  @query('[data-rozie-ref="panel"]') private __rozieRawRefPanel!: HTMLElement;
+  private get _refPanel(): HTMLElement {
+    return rozieResolvePortalledRef(this, '[data-rozie-ref="panel"]', this.__rozieRawRefPanel) as HTMLElement;
+  }
+  @query('[data-rozie-ref="combobox"]') private __rozieRawRefCombobox!: Combobox;
+  private get _refCombobox(): Combobox {
+    return rozieResolvePortalledRef(this, '[data-rozie-ref="combobox"]', this.__rozieRawRefCombobox) as Combobox;
+  }
 private __rozieWatchInitial_0 = true;
 
   @query('[data-rozie-portal-ref="__roziePortal0"]') private __roziePortal0!: HTMLElement;

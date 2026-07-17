@@ -73,6 +73,16 @@ export interface EmitScriptOpts {
    * string / omitted when the caller has no portal slots to scope.
    */
   portalScopeHash?: string;
+  /**
+   * command-palette-portal-through-portal cluster (BUG A follow-up) —
+   * whether ANY element in this component's template carries `r-portal`
+   * (computed once in emitLit.ts via the shared `hasElementPortal` walk,
+   * NOT the unrelated `hasPortals` slot-portal-primitive result field
+   * above). Threaded into `emitRefField` below — see its doc comment.
+   * `false`/omitted is BYTE-IDENTICAL to today (the overwhelming majority
+   * of components have no `r-portal` element).
+   */
+  hasElementPortal?: boolean;
 }
 
 export interface EmitScriptResult {
@@ -481,7 +491,7 @@ function emitStateField(stateName: string, init: t.Expression): string {
   return `  private _${stateName} = signal${typeArg}(${renderExpression(init)});`;
 }
 
-function emitRefField(refName: string, elementTag: string, composedType?: string): string {
+function emitRefField(refName: string, elementTag: string, composedType?: string, hasElementPortal?: boolean): string {
   // @query targets refs by data-rozie-ref="<name>" (Plan 06.4-02 inference).
   // The selector pinned by data attribute keeps shadow-DOM scoping correct.
   // Mark with definite-assignment in case the consumer hasn't yet rendered.
@@ -498,30 +508,67 @@ function emitRefField(refName: string, elementTag: string, composedType?: string
   // the call site. INERTNESS GATE: resolveComponentRefs returns nothing for a
   // DOM ref, so `composedType` is undefined and the byte-identical
   // HTMLElement / HTMLDialogElement branch below runs unchanged.
+  let domType: string;
   if (composedType) {
-    return `  @query('[data-rozie-ref="${refName}"]') private ${field}!: ${composedType};`;
+    domType = composedType;
+  } else {
+    // LB6 SEAM 1 — gated carve-out: a ref on a native `<dialog>` types to
+    // HTMLDialogElement so `$refs.x.showModal()` / `.close()` are accessible.
+    // Emitter-hardening backlog item #4 — extended to `img`/`ul`/`li`
+    // (promoted from the dialog-only ternary to a switch; every other tag
+    // keeps the byte-identical `HTMLElement` default).
+    domType = 'HTMLElement';
+    switch (elementTag.toLowerCase()) {
+      case 'dialog':
+        domType = 'HTMLDialogElement';
+        break;
+      case 'img':
+        domType = 'HTMLImageElement';
+        break;
+      case 'ul':
+        domType = 'HTMLUListElement';
+        break;
+      case 'li':
+        domType = 'HTMLLIElement';
+        break;
+    }
   }
-  // LB6 SEAM 1 — gated carve-out: a ref on a native `<dialog>` types to
-  // HTMLDialogElement so `$refs.x.showModal()` / `.close()` are accessible.
-  // Emitter-hardening backlog item #4 — extended to `img`/`ul`/`li`
-  // (promoted from the dialog-only ternary to a switch; every other tag
-  // keeps the byte-identical `HTMLElement` default).
-  let domType = 'HTMLElement';
-  switch (elementTag.toLowerCase()) {
-    case 'dialog':
-      domType = 'HTMLDialogElement';
-      break;
-    case 'img':
-      domType = 'HTMLImageElement';
-      break;
-    case 'ul':
-      domType = 'HTMLUListElement';
-      break;
-    case 'li':
-      domType = 'HTMLLIElement';
-      break;
+  // command-palette-portal-through-portal cluster (BUG A) —
+  // `hasElementPortal` false/omitted (the overwhelming majority of Lit
+  // leaves) stays the plain, BYTE-IDENTICAL uncached `@query` field: a
+  // fresh renderRoot-scoped lookup on every access.
+  if (!hasElementPortal) {
+    return `  @query('[data-rozie-ref="${refName}"]') private ${field}!: ${domType};`;
   }
-  return `  @query('[data-rozie-ref="${refName}"]') private ${field}!: ${domType};`;
+  // hasElementPortal — this component has at least one `r-portal` element
+  // somewhere in its template, which can relocate an ANCESTOR subtree out
+  // of `this.renderRoot` (RoziePortalController's `appendChild`) at
+  // runtime. A plain `@query`, scoped to `this.renderRoot`, permanently
+  // returns null for any ref living inside that relocated subtree once the
+  // move happens — even though the node is still connected, just parked in
+  // a foreign container (confirmed live: command-palette's $refs.panel/
+  // frame/combobox all silently no-op post-portal, breaking goBack()'s
+  // seedQuery + the popup reopen + the action-menu focus arbitration).
+  //
+  // Fix: keep the fresh, uncached `@query` as the PRIMARY probe (so a
+  // close→reopen — Lit dropping and recreating the `r-if` subtree — always
+  // observes the NEW node, never a stale one), and delegate the fallback to
+  // `rozieResolvePortalledRef` (`@rozie/runtime-lit`), which searches WITHIN
+  // the LIVE relocated subtree of this instance's own
+  // `RoziePortalController`(s). A cache/sticky field seeded lazily on first
+  // read does NOT work here — `RoziePortalController.hostUpdated()`
+  // performs the relocation synchronously, strictly BEFORE the component's
+  // own `firstUpdated()`/`updated()`, so the very first render with the
+  // portal already active never gives consumer code a chance to observe the
+  // pre-relocation position even once (see `rozieResolvePortalledRef`'s doc
+  // comment for the full rationale).
+  const rawField = `__rozieRawRef${refName.charAt(0).toUpperCase()}${refName.slice(1)}`;
+  return [
+    `  @query('[data-rozie-ref="${refName}"]') private ${rawField}!: ${domType};`,
+    `  private get ${field}(): ${domType} {`,
+    `    return rozieResolvePortalledRef(this, '[data-rozie-ref="${refName}"]', this.${rawField}) as ${domType};`,
+    '  }',
+  ].join('\n');
 }
 
 function isLifecycleCall(stmt: t.Statement): {
@@ -1063,11 +1110,20 @@ export function emitScript(
   const composedTypeImports = new Set<string>();
   for (const ref of ir.refs) {
     const composedType = composedRefs.get(ref.name);
-    fieldLines.push(emitRefField(ref.name, ref.elementTag, composedType));
+    fieldLines.push(emitRefField(ref.name, ref.elementTag, composedType, opts.hasElementPortal));
     // A self-recursion ref (`<Self ref="x">`) resolves to `ir.name` — the class
     // being defined in THIS module — so it needs no import. Only cross-component
     // children (with a distinct import path) require a type import.
     if (composedType && composedType !== ir.name) composedTypeImports.add(composedType);
+  }
+  // command-palette-portal-through-portal cluster (BUG A) — register the
+  // `rozieResolvePortalledRef` runtime import ONLY when emitRefField above
+  // actually emitted at least one portal-surviving getter (hasElementPortal
+  // AND at least one ref) — mirrors the KeynavController/RoziePortalController
+  // conditional-import gates so a non-portal component's
+  // `@rozie/runtime-lit` import line stays byte-identical.
+  if (opts.hasElementPortal && ir.refs.length > 0) {
+    opts.runtime.add('rozieResolvePortalledRef');
   }
   // Build the `import type { <C> } from '<importPath>'` lines. The child is
   // ALREADY side-effect-imported by the shell (`import '<importPath>'`, custom-

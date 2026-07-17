@@ -209,7 +209,17 @@ export type RuntimeLitImport =
    * element, so a non-portal component's `@rozie/runtime-lit` import line
    * stays byte-identical (mirrors `KeynavController`'s identical gate).
    */
-  | 'RoziePortalController';
+  | 'RoziePortalController'
+  /**
+   * command-palette-portal-through-portal cluster (BUG A) —
+   * `rozieResolvePortalledRef`, shipped from `@rozie/runtime-lit`. Added by
+   * `emitScript.ts`'s `emitRefField` ONLY when the component has at least
+   * one `r-portal` element AND at least one author `ref="x"` (the SAME
+   * `hasElementPortal` gate `RoziePortalController` itself uses), so a
+   * non-portal component's `@rozie/runtime-lit` import line stays
+   * byte-identical.
+   */
+  | 'rozieResolvePortalledRef';
 
 export class RuntimeLitImportCollector {
   private symbols = new Set<RuntimeLitImport>();

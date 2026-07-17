@@ -175,6 +175,26 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   const slotResult = emitSlotDecl(ir, { decorators: decoratorImports });
   diagnostics.push(...slotResult.diagnostics);
 
+  // command-palette-portal-through-portal cluster (BUG A follow-up) — computed
+  // ONCE and shared by both emitStyle (below, pre-existing) AND emitScript
+  // (NEW): a component with at least one `r-portal` element may relocate an
+  // ENTIRE ancestor subtree out of `this.renderRoot` via
+  // `RoziePortalController`'s `appendChild`. Every plain `ref="x"` INSIDE
+  // that subtree (author refs on native elements AND on `<components>`-
+  // composed children alike) is queried via an UNCACHED, renderRoot-scoped
+  // `@query('[data-rozie-ref="x"]')` — once the node is relocated OUT of
+  // renderRoot, that query permanently returns null/undefined, even though
+  // the node is still live and connected (just parked in the portal's
+  // container). Confirmed live: @rozie-ui/command-palette's
+  // `$refs.panel`/`$refs.frame`/`$refs.combobox` (goBack()'s seedQuery,
+  // reopenComboboxPopup()'s focus(), the action-menu arbitration) all
+  // silently no-op once `appendTo` portals the panel — the popup never
+  // reopens, the query is never restored, focus falls to `<body>`. See
+  // emitScript.ts's `emitRefField` for the portal-surviving getter this
+  // flag switches on (BYTE-IDENTICAL to today whenever a component has no
+  // `r-portal` element at all — the overwhelming majority).
+  const componentHasElementPortal = hasElementPortal(ir.template);
+
   // 2. Style emission.
   const styleResult = emitStyle(ir.styles, opts.source ?? '', {
     componentName: ir.name,
@@ -183,7 +203,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     scopeHash,
     // command-palette-portal-overlay phase — see hasElementPortal's doc
     // comment + emitStyle.ts's opts.hasElementPortal doc comment.
-    hasElementPortal: hasElementPortal(ir.template),
+    hasElementPortal: componentHasElementPortal,
   });
   diagnostics.push(...styleResult.diagnostics);
 
@@ -197,6 +217,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     lit: litImports,
     context: contextImports,
     portalScopeHash: scopeHash,
+    hasElementPortal: componentHasElementPortal,
   });
   diagnostics.push(...scriptResult.diagnostics);
 

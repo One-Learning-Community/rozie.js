@@ -53,10 +53,26 @@ export default class RefEmitDedup extends SignalWatcher(LitElement) {
    * host custom element's attributes on each call so a consumer-side bound
    * attribute flows through on every render. The `rozieSpread` directive
    * (D-02) does the cross-render diff downstream.
+   *
+   * Phase 15 follow-up Bug A — declared-prop attribute names are filtered
+   * out so `$attrs` returns "rest after declared props" (semantic parity
+   * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming
+   * forms are folded into the skip set: kebab-case for model props
+   * (explicit `attribute:`) AND lowercased property name (Lit's default).
+   *
+   * command-palette-per-level-virtual / portal-through-portal cluster —
+   * `data-rozie-ref` is ALWAYS skipped too (a reserved compiler bookkeeping
+   * attribute, never a consumer prop) so a parent-assigned `ref=` on this
+   * component's own host tag can never clobber this component's OWN
+   * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
+    const __skip = new Set<string>(['data-rozie-ref']);
     const out: Record<string, string> = {};
-    for (const a of Array.from(this.attributes)) out[a.name] = a.value;
+    for (const a of Array.from(this.attributes)) {
+      if (__skip.has(a.name)) continue;
+      out[a.name] = a.value;
+    }
     return out;
   }
 
