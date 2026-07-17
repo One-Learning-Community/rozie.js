@@ -76,6 +76,71 @@ describe('emitStyle — D-LIT-15 / D-LIT-16 split', () => {
   });
 });
 
+describe('emitStyle — injectGlobalStyles id keyed by CSS content (quick 260716-npt Finding 1)', () => {
+  // Two versions of the same component on one page (e.g. during an HMR
+  // update, or two co-mounted builds) must NOT collapse onto the same
+  // runtime dedup id when their global CSS payload differs — else
+  // injectGlobalStyles silently drops the second version's styles.
+  function rootRule(source: string): {
+    selector: string;
+    isRootEscape: boolean;
+    loc: { start: number; end: number };
+  } {
+    return { selector: ':root', isRootEscape: true, loc: { start: 0, end: source.length } };
+  }
+
+  function emitForGlobalCss(componentName: string, source: string): string {
+    const result = emitStyle(
+      {
+        type: 'StyleSection',
+        scopedRules: [],
+        rootRules: [rootRule(source)],
+        portalRules: [],
+        engineRules: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
+      source,
+      {
+        componentName,
+        lit: new LitImportCollector(),
+        runtime: new RuntimeLitImportCollector(),
+      },
+    );
+    return result.globalStyleCall;
+  }
+
+  function extractId(globalStyleCall: string): string {
+    const match = globalStyleCall.match(/injectGlobalStyles\('([^']+)'/);
+    if (match === null) throw new Error(`no injectGlobalStyles id found in: ${globalStyleCall}`);
+    return match[1];
+  }
+
+  it('distinct global CSS payloads (same componentName) produce DISTINCT ids', () => {
+    const sourceA = ':root { --a: 1px; }';
+    const sourceB = ':root { --a: 2px; }';
+    const idA = extractId(emitForGlobalCss('Modal', sourceA));
+    const idB = extractId(emitForGlobalCss('Modal', sourceB));
+    expect(idA).not.toBe(idB);
+  });
+
+  it('identical global CSS payload + same componentName produces IDENTICAL id (idempotent)', () => {
+    const source = ':root { --a: 1px; }';
+    const idFirst = extractId(emitForGlobalCss('Modal', source));
+    const idSecond = extractId(emitForGlobalCss('Modal', source));
+    expect(idFirst).toBe(idSecond);
+  });
+
+  it('id keeps the readable rozie-<kebab-name>- prefix and is a valid CSS attribute-selector value', () => {
+    const source = ':root { --a: 1px; }';
+    const id = extractId(emitForGlobalCss('Modal', source));
+    expect(id.startsWith('rozie-modal-')).toBe(true);
+    expect(id.endsWith('-global')).toBe(true);
+    // No characters that would require CSS.escape() to differ from the raw
+    // string — keeps the runtime's querySelector marker simple/debuggable.
+    expect(id).toMatch(/^[a-z0-9-]+$/);
+  });
+});
+
 describe('emitStyle — ::part() cross-shadow styling bridge (Phase 17, SPEC-R1/R2/R6)', () => {
   it('PartCardConsumer: consumer ::part rule lowers to <child-tag>[scope]::part(body)', () => {
     const code = compile('PartCardConsumer');
