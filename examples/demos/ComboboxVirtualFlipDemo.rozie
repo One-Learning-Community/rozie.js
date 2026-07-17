@@ -68,7 +68,12 @@ $onMount(() => {
     <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
     <span class="label">virtual:</span>
     <span class="readout" data-testid="virtual-readout">{{ $data.virtual }}</span>
-    <button type="button" data-testid="flip-virtual" @click="$data.virtual = !$data.virtual">flip virtual</button>
+    <!-- @mousedown.prevent (the combobox option-row convention): flipping must NOT
+         steal focus from the combobox input — a plain @click button blurs the input,
+         the popup rightly closes on blur, and the spec's post-flip option counts
+         would sample a CLOSED popup (the exact all-6-target VR red this fixes).
+         Flip on mousedown so the popup stays open through the live flip. -->
+    <button type="button" data-testid="flip-virtual" @mousedown.prevent="$data.virtual = !$data.virtual">flip virtual</button>
   </div>
 
   <div data-testid="virtual-flip-combobox">
