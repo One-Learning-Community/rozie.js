@@ -380,4 +380,109 @@ const keyFor = (item) => {
     const out = generate(program).code;
     expect(out).toContain('let __rowKeySeq');
   });
+
+  it('Test 8 (Quick 260717-8zb Task 3 Item 6): a let mutated only inside a helper called from a TEMPLATE @event HANDLER (never a hook/watcher/$expose/template-binding) IS hoisted', () => {
+    // Synthetic: the toast/command-palette shape — `bump()` is called ONLY
+    // from a `@click="bump()"` template EVENT handler (ir.listeners, NOT a
+    // :key/:attr binding — Test 6 covers the binding shape). Before this fix
+    // the reachability walker never scanned `ir.listeners`, so this fell
+    // through classifyExpr case (c) and stayed a per-render `let counter = 0`
+    // — reset to 0 on every React render (the toast pauseTimers/resumeTimers
+    // + command-palette argsState claim).
+    const src = `
+let counter = 0;
+const bump = () => {
+  counter = counter + 1;
+};
+`;
+    const program = babelParse(src, { sourceType: 'module' });
+    const clickListener = {
+      type: 'Listener' as const,
+      target: { kind: 'self' as const, el: '$el' as const },
+      event: 'click',
+      modifierPipeline: [],
+      when: null,
+      handler: t.callExpression(t.identifier('bump'), []),
+      deps: [],
+      source: 'template-event' as const,
+      sourceLoc: { start: 0, end: 0 },
+    };
+    const templateEl: TemplateElementIR = {
+      type: 'TemplateElement',
+      tagName: 'div',
+      attributes: [],
+      events: [clickListener],
+      listenerSpreads: [],
+      children: [],
+      sourceLoc: { start: 0, end: 0 },
+      tagKind: 'html',
+    };
+    const syntheticIR: IRComponent = {
+      type: 'IRComponent',
+      name: 'Synth',
+      props: [],
+      state: [],
+      computed: [],
+      refs: [],
+      slots: [],
+      emits: [],
+      lifecycle: [],
+      watchers: [],
+      listeners: [clickListener],
+      setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
+      template: templateEl,
+      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      sourceLoc: { start: 0, end: 0 },
+    } as IRComponent;
+    const { hoisted } = hoistModuleLet(program, syntheticIR);
+    expect(hoisted).toHaveLength(1);
+    expect(hoisted[0]!.name).toBe('counter');
+    const out = generate(program).code;
+    expect(out).not.toContain('let counter');
+    expect(out).toMatch(/counter\.current\s*=\s*counter\.current\s*\+\s*1/);
+  });
+
+  it('Test 9 (false-positive guard): a let mutated only inside a helper called from a <listeners>-block handler is ALSO hoisted (same reachability root, different `source`)', () => {
+    // The `source: 'listeners-block'` sibling of Test 8 — the fix scans
+    // ir.listeners generally, not filtered to `template-event` only, so a
+    // <listener> block handler gets the same reachability coverage.
+    const src = `
+let counter = 0;
+const bump = () => {
+  counter = counter + 1;
+};
+`;
+    const program = babelParse(src, { sourceType: 'module' });
+    const docListener = {
+      type: 'Listener' as const,
+      target: { kind: 'global' as const, name: 'document' as const },
+      event: 'keydown',
+      modifierPipeline: [],
+      when: null,
+      handler: t.callExpression(t.identifier('bump'), []),
+      deps: [],
+      source: 'listeners-block' as const,
+      sourceLoc: { start: 0, end: 0 },
+    };
+    const syntheticIR: IRComponent = {
+      type: 'IRComponent',
+      name: 'Synth',
+      props: [],
+      state: [],
+      computed: [],
+      refs: [],
+      slots: [],
+      emits: [],
+      lifecycle: [],
+      watchers: [],
+      listeners: [docListener],
+      setupBody: { type: 'SetupBody', scriptProgram: program, annotations: [] },
+      template: null,
+      styles: { type: 'StyleSection', scopedRules: [], rootRules: [], portalRules: [], engineRules: [], sourceLoc: { start: 0, end: 0 } },
+      sourceLoc: { start: 0, end: 0 },
+    } as IRComponent;
+    const { hoisted } = hoistModuleLet(program, syntheticIR);
+    expect(hoisted).toHaveLength(1);
+    expect(hoisted[0]!.name).toBe('counter');
+  });
 });
