@@ -1101,19 +1101,21 @@ const reopenComboboxPopup = () => {
 // reuses the identical transition shape for a future 'args' surface.
 //
 // $refs/$el usage note: bindings below use `$refs.panel` (the modal panel
-// div's existing `ref="panel"`), NOT the `$el` sigil — a directly-typed bare
-// assignment of `$el`/`$refs.<name>` (`const root: any = $el`, or even
-// `const panel: any = $refs.panel`) compiles to a LITERAL, un-lowered
-// `$refs.__rozieRoot` (or `$refs.panel`) on the Svelte target — a real
-// Svelte-only emitter gap where the `: any` type annotation on the bare
-// `$el`/`$refs.X` declarator suppresses the deconflict/lowering pass that
-// otherwise correctly rewrites `const panel = $refs.panel` (UNTYPED) to
-// Svelte's real `panel$local` binding (`deconflictAccessorShadows`, the
-// same-name-as-accessor self-shadow guard — proven ×N in date-picker/
-// dialog/pagination/tags/otp/resizable, none of which type-annotate the
-// bare assignment). Workaround (source-only, not an emitter edit): keep the
-// `$refs.panel` assignment BARE/untyped; only the DOWNSTREAM `.querySelector`
-// RESULT gets `: any` (a separate declarator, unaffected by the gap).
+// div's existing `ref="panel"`), NOT the `$el` sigil — the panel is a
+// specific descendant the flyout/args surfaces need to query, whereas `$el`
+// is the component's own root. Quick 260717-8zb (Task 2 Item 3) VERIFIED
+// this file's `$refs.panel` reads are NOT affected by a typing gap: a
+// battery of probes (typed/untyped, self-shadow/non-self-shadow local name,
+// nested/top-level scope, `$refs.X` AND `$el`) all lower correctly on the
+// Svelte target — `isInTypePosition`'s ancestry walk correctly treats a
+// declarator's `id.typeAnnotation` as a SIBLING of `init`, never an
+// ancestor, so it never suppresses the init's rewrite. The prior comment's
+// premise (a `: any` type annotation on the bare `$refs.X`/`$el` declarator
+// breaks the Svelte lowering) was stale/incorrect — see
+// packages/targets/svelte/src/__tests__/typedRefsDeclarator.test.ts for the
+// permanent regression guard. `panel`/`frame` stay untyped here only because
+// that already matches the rest of this file's house style, not to dodge
+// any emitter gap.
 
 // deepQuerySelector(root, selector): a shadow-piercing querySelector — the
 // vendored <Combobox> renders its OWN internal shadow root on the Lit
