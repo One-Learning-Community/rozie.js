@@ -33,6 +33,7 @@ import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { sanitizeEventName } from './sanitizeEventName.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
+import { collectUserMethodNames } from './rewriteScript.js';
 import { collectComponentRefTypes } from './componentRefs.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
@@ -255,6 +256,31 @@ export function rewriteTemplateExpression(
     ...refNames,
     ...computedNames,
   ]);
+
+  // Quick 260717-8zb (Task 2 Item 2) — a bare top-level `<script>` HELPER
+  // reference (a plain function/const, NOT a signal-backed prop/data/ref/
+  // computed) needs a `this.` qualification ONLY in `prefixThis: true`
+  // contexts (a synthesized class-body getter — REAL TypeScript class-body
+  // code, not an Angular template; Angular's implicit-this template
+  // auto-resolution does not apply there). In ordinary template-string
+  // context (`prefixThis: false`) Angular's own template compiler already
+  // resolves a bare helper call against the component instance, so this set
+  // is intentionally EMPTY (and never computed) when `prefixThis` is false —
+  // zero-cost and zero-drift on the overwhelming majority of call sites.
+  // Signal-identifier names are excluded to avoid overlapping the `()`-wrap
+  // branch below with a plain `this.`-wrap.
+  // Defensive: some test fixtures build a partial IRComponent without a real
+  // `setupBody.scriptProgram` (cast through `as unknown as IRComponent`) —
+  // treat a missing script program as "no helper names" rather than throwing.
+  const scriptProgram = ir.setupBody?.scriptProgram;
+  const helperIdentifiers: ReadonlySet<string> =
+    prefixThis && scriptProgram
+      ? new Set(
+          [...collectUserMethodNames(scriptProgram)].filter(
+            (name) => !signalIdentifiers.has(name),
+          ),
+        )
+      : new Set();
 
   // Spike-012 R5 (C3a) — identifiers the AssignmentExpression visitor synthesises
   // as a SETTER TARGET (`X` in `X.set(...)`). After a write is lowered we let the
@@ -587,6 +613,20 @@ export function rewriteTemplateExpression(
           return;
         }
         path.replaceWith(t.callExpression(mkRef(effectiveName), []));
+        path.skip();
+        return;
+      }
+
+      // Quick 260717-8zb (Task 2 Item 2) — a bare top-level `<script>` HELPER
+      // reference (function or plain value, NOT signal-backed) inside a
+      // `prefixThis: true` class-body-getter context needs a `this.`
+      // qualification — it is real TypeScript class-body code, so a free
+      // identifier resolves lexically (undefined), not against the component
+      // instance the way an Angular TEMPLATE STRING expression would. Just
+      // `this.`-prefix the reference in place; no `()` wrap (unlike a signal,
+      // a helper's own call parens — if any — are already present in source).
+      if (helperIdentifiers.has(name)) {
+        path.replaceWith(mkRef(effectiveName));
         path.skip();
       }
     },
