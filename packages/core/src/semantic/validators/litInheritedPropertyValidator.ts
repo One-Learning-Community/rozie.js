@@ -47,13 +47,48 @@ import { LIT_DOM_PROP_FOOTGUNS } from './reservedNameCollisionValidator.js';
 import type { BindingsTable } from '../types.js';
 
 /**
+ * KNOWN-SAFE corpus names, curated per the SAME rationale ROZ142's own comment
+ * documents for `LIT_DOM_PROP_FOOTGUNS`: "the shipping corpus byte-verifiably
+ * ships a handful of DOM-member-named props (`id`, `title`, `draggable`,
+ * `autofocus`, `style`, plus the entire aria* reflection block via
+ * `ariaLabel`) cleanly across all six targets — flagging those is a FALSE
+ * POSITIVE." The 28-family corpus scan (Quick 260717-8zb SUMMARY) confirmed
+ * this empirically: `ariaLabel` alone accounted for 13/20 raw hits (every
+ * accessible-name prop in the corpus is typed `string | null | undefined`,
+ * exactly matching `HTMLElement.ariaLabel`'s reflected type, so it never
+ * actually breaks a Lit typecheck) and `id`/`autofocus`/`draggable` accounted
+ * for the rest. ROZ147 excludes this SAME known-safe set (plus the full
+ * aria* reflection block, matched by prefix so the exclusion doesn't drift
+ * out of sync with `LIT_DOM_MEMBERS`) so it widens coverage to the GENUINE
+ * gap (`baseURI`, `childNodes`, `shadowRoot`, `part`, `slot`, `role`,
+ * `tagName`, `offsetWidth`, …) without reproducing ROZ142's exact
+ * already-solved false-positive class.
+ */
+const KNOWN_SAFE_CORPUS_PROPS: ReadonlySet<string> = new Set([
+  'id',
+  'title',
+  'draggable',
+  'autofocus',
+  'style',
+]);
+
+/** Matches the aria* reflection block (`ariaLabel`, `ariaHidden`, …) by prefix
+ *  so the exclusion tracks `LIT_DOM_MEMBERS` automatically. */
+const ARIA_REFLECTION_PREFIX = /^aria[A-Z]/;
+
+/**
  * The candidate set: inherited HTMLElement/Element/Node PROPERTY names ROZ142
- * does NOT already cover. Computed once at module load (all three source sets
- * are static `ReadonlySet<string>`s).
+ * does NOT already cover AND that are not a documented known-safe corpus name.
+ * Computed once at module load (all source sets are static
+ * `ReadonlySet<string>`s).
  */
 const LIT_INHERITED_PROPERTY_CANDIDATES: ReadonlySet<string> = new Set(
   [...LIT_DOM_MEMBERS].filter(
-    (name) => !LIT_DOM_METHOD_MEMBERS.has(name) && !LIT_DOM_PROP_FOOTGUNS.has(name),
+    (name) =>
+      !LIT_DOM_METHOD_MEMBERS.has(name) &&
+      !LIT_DOM_PROP_FOOTGUNS.has(name) &&
+      !KNOWN_SAFE_CORPUS_PROPS.has(name) &&
+      !ARIA_REFLECTION_PREFIX.test(name),
   ),
 );
 
