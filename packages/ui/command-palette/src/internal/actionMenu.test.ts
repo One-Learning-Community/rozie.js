@@ -12,7 +12,9 @@ import {
   type ActionItem,
   type ActionMenuState,
   type ActionSurface,
+  type KeyLike,
 } from './actionMenu';
+import { formatKeyToken } from './formatKeyToken';
 
 const A = (id: string, disabled = false): ActionItem => ({ id, label: id.toUpperCase(), disabled });
 
@@ -147,6 +149,42 @@ describe('matchesActionKey', () => {
   it('is false for a null/undefined event', () => {
     expect(matchesActionKey(null)).toBe(false);
     expect(matchesActionKey(undefined)).toBe(false);
+  });
+
+  // Quick 260716-npt Finding 2 (drift): formatKeyToken already renders a
+  // badge for a multi-modifier token (e.g. "$mod+$shift+k" — split on '+',
+  // each segment mapped), but matchesActionKey only ever recognized
+  // `$mod+<letter>` or a bare single char — so a multi-modifier actionKey
+  // renders a badge that never actually fires. RED proof:
+  it('matches a multi-modifier token ($mod+$shift+k) when ALL modifiers are held', () => {
+    expect(matchesActionKey({ metaKey: true, shiftKey: true, key: 'k' }, '$mod+$shift+k')).toBe(true);
+  });
+
+  it('does not match a multi-modifier token when one required modifier is absent', () => {
+    expect(matchesActionKey({ metaKey: true, key: 'k' }, '$mod+$shift+k')).toBe(false);
+    expect(matchesActionKey({ shiftKey: true, key: 'k' }, '$mod+$shift+k')).toBe(false);
+  });
+
+  it('matches $alt+$ctrl+f via altKey + ctrlKey', () => {
+    expect(matchesActionKey({ altKey: true, ctrlKey: true, key: 'f' }, '$alt+$ctrl+f')).toBe(true);
+    expect(matchesActionKey({ altKey: true, key: 'f' }, '$alt+$ctrl+f')).toBe(false);
+  });
+});
+
+describe('matchesActionKey / formatKeyToken agreement — shared parseKeyToken (260716-npt)', () => {
+  it('any token formatKeyToken renders a badge for is one matchesActionKey can fire on', () => {
+    const tokens = ['$mod+k', '$mod+$shift+p', '$alt+$ctrl+f', 'k', 'Tab'];
+    for (const token of tokens) {
+      const badge = formatKeyToken(token, true);
+      expect(badge).not.toBe('');
+      // Build an event that satisfies every modifier the token names, plus the key.
+      const ev: KeyLike = { key: token.split('+').pop() };
+      if (token.indexOf('$mod') !== -1) ev.metaKey = true;
+      if (token.indexOf('$shift') !== -1) ev.shiftKey = true;
+      if (token.indexOf('$alt') !== -1) ev.altKey = true;
+      if (token.indexOf('$ctrl') !== -1) ev.ctrlKey = true;
+      expect(matchesActionKey(ev, token)).toBe(true);
+    }
   });
 });
 
