@@ -641,9 +641,15 @@ private __rozieFirstUpdateDone = false;
    * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming
    * forms are folded into the skip set: kebab-case for model props
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
+   *
+   * command-palette-per-level-virtual / portal-through-portal cluster —
+   * `data-rozie-ref` is ALWAYS skipped too (a reserved compiler bookkeeping
+   * attribute, never a consumer prop) so a parent-assigned `ref=` on this
+   * component's own host tag can never clobber this component's OWN
+   * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['src', 'peaks', 'duration', 'height', 'wave-color', 'wavecolor', 'progress-color', 'progresscolor', 'cursor-color', 'cursorcolor', 'cursor-width', 'cursorwidth', 'bar-width', 'barwidth', 'bar-gap', 'bargap', 'bar-radius', 'barradius', 'min-px-per-sec', 'minpxpersec', 'volume', 'playback-rate', 'playbackrate', 'autoplay', 'normalize-amplitude', 'normalizeamplitude', 'hide-scrollbar', 'hidescrollbar', 'disable-interaction', 'disableinteraction', 'disable-drag-to-seek', 'disabledragtoseek', 'timeline', 'hover', 'hover-color', 'hovercolor', 'regions', 'drag-to-create-regions', 'dragtocreateregions', 'region-color', 'regioncolor', 'options', 'current-time', 'currenttime']);
+    const __skip = new Set<string>(['data-rozie-ref', 'src', 'peaks', 'duration', 'height', 'wave-color', 'wavecolor', 'progress-color', 'progresscolor', 'cursor-color', 'cursorcolor', 'cursor-width', 'cursorwidth', 'bar-width', 'barwidth', 'bar-gap', 'bargap', 'bar-radius', 'barradius', 'min-px-per-sec', 'minpxpersec', 'volume', 'playback-rate', 'playbackrate', 'autoplay', 'normalize-amplitude', 'normalizeamplitude', 'hide-scrollbar', 'hidescrollbar', 'disable-interaction', 'disableinteraction', 'disable-drag-to-seek', 'disabledragtoseek', 'timeline', 'hover', 'hover-color', 'hovercolor', 'regions', 'drag-to-create-regions', 'dragtocreateregions', 'region-color', 'regioncolor', 'options', 'current-time', 'currenttime']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

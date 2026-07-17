@@ -1029,9 +1029,15 @@ export default class DatePicker extends SignalWatcher(LitElement) {
    * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming
    * forms are folded into the skip set: kebab-case for model props
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
+   *
+   * command-palette-per-level-virtual / portal-through-portal cluster —
+   * `data-rozie-ref` is ALWAYS skipped too (a reserved compiler bookkeeping
+   * attribute, never a consumer prop) so a parent-assigned `ref=` on this
+   * component's own host tag can never clobber this component's OWN
+   * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['value', 'selection-mode', 'selectionmode', 'min', 'max', 'disabled-dates', 'disableddates', 'week-starts-on', 'weekstartson', 'disabled', 'locale', 'preset-ranges', 'presetranges', 'month-year-nav', 'monthyearnav', 'number-of-months', 'numberofmonths', 'show-footer', 'showfooter', 'disabled-days-of-week', 'disableddaysofweek', 'is-date-disabled', 'isdatedisabled']);
+    const __skip = new Set<string>(['data-rozie-ref', 'value', 'selection-mode', 'selectionmode', 'min', 'max', 'disabled-dates', 'disableddates', 'week-starts-on', 'weekstartson', 'disabled', 'locale', 'preset-ranges', 'presetranges', 'month-year-nav', 'monthyearnav', 'number-of-months', 'numberofmonths', 'show-footer', 'showfooter', 'disabled-days-of-week', 'disableddaysofweek', 'is-date-disabled', 'isdatedisabled']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

@@ -632,9 +632,15 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
    * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming
    * forms are folded into the skip set: kebab-case for model props
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
+   *
+   * command-palette-per-level-virtual / portal-through-portal cluster —
+   * `data-rozie-ref` is ALWAYS skipped too (a reserved compiler bookkeeping
+   * attribute, never a consumer prop) so a parent-assigned `ref=` on this
+   * component's own host tag can never clobber this component's OWN
+   * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['position', 'duration', 'max', 'disable-pause-on-hover', 'disablepauseonhover', 'aria-label', 'arialabel', 'disable-swipe', 'disableswipe', 'stacked']);
+    const __skip = new Set<string>(['data-rozie-ref', 'position', 'duration', 'max', 'disable-pause-on-hover', 'disablepauseonhover', 'aria-label', 'arialabel', 'disable-swipe', 'disableswipe', 'stacked']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

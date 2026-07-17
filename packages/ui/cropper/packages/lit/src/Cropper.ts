@@ -409,9 +409,15 @@ private __rozieFirstUpdateDone = false;
    * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming
    * forms are folded into the skip set: kebab-case for model props
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
+   *
+   * command-palette-per-level-virtual / portal-through-portal cluster —
+   * `data-rozie-ref` is ALWAYS skipped too (a reserved compiler bookkeeping
+   * attribute, never a consumer prop) so a parent-assigned `ref=` on this
+   * component's own host tag can never clobber this component's OWN
+   * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['src', 'data', 'aspect-ratio', 'aspectratio', 'view-mode', 'viewmode', 'drag-mode', 'dragmode', 'disabled', 'guides', 'center', 'background', 'movable', 'rotatable', 'scalable', 'zoomable', 'zoom-on-wheel', 'zoomonwheel', 'crop-box-movable', 'cropboxmovable', 'crop-box-resizable', 'cropboxresizable', 'auto-crop', 'autocrop', 'auto-crop-area', 'autocroparea', 'responsive', 'preview', 'options']);
+    const __skip = new Set<string>(['data-rozie-ref', 'src', 'data', 'aspect-ratio', 'aspectratio', 'view-mode', 'viewmode', 'drag-mode', 'dragmode', 'disabled', 'guides', 'center', 'background', 'movable', 'rotatable', 'scalable', 'zoomable', 'zoom-on-wheel', 'zoomonwheel', 'crop-box-movable', 'cropboxmovable', 'crop-box-resizable', 'cropboxresizable', 'auto-crop', 'autocrop', 'auto-crop-area', 'autocroparea', 'responsive', 'preview', 'options']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

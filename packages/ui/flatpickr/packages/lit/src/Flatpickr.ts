@@ -405,9 +405,15 @@ private __rozieFirstUpdateDone = false;
    * with React/Vue/Svelte/Solid/Angular). Both Lit attribute-naming
    * forms are folded into the skip set: kebab-case for model props
    * (explicit `attribute:`) AND lowercased property name (Lit's default).
+   *
+   * command-palette-per-level-virtual / portal-through-portal cluster —
+   * `data-rozie-ref` is ALWAYS skipped too (a reserved compiler bookkeeping
+   * attribute, never a consumer prop) so a parent-assigned `ref=` on this
+   * component's own host tag can never clobber this component's OWN
+   * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['date', 'mode', 'date-format', 'dateformat', 'alt-input', 'altinput', 'alt-format', 'altformat', 'enable-time', 'enabletime', 'enable-seconds', 'enableseconds', 'time24hr', 'no-calendar', 'nocalendar', 'min-date', 'mindate', 'max-date', 'maxdate', 'placeholder', 'disabled', 'commit-on', 'commiton', 'options', 'name', 'inline', 'static-position', 'staticposition', 'position', 'append-to', 'appendto', 'show-months', 'showmonths', 'week-numbers', 'weeknumbers', 'month-selector-type', 'monthselectortype', 'prev-arrow', 'prevarrow', 'next-arrow', 'nextarrow', 'allow-input', 'allowinput', 'disable', 'enable', 'locale', 'first-day-of-week', 'firstdayofweek', 'parse-date', 'parsedate', 'format-date', 'formatdate', 'plugins']);
+    const __skip = new Set<string>(['data-rozie-ref', 'date', 'mode', 'date-format', 'dateformat', 'alt-input', 'altinput', 'alt-format', 'altformat', 'enable-time', 'enabletime', 'enable-seconds', 'enableseconds', 'time24hr', 'no-calendar', 'nocalendar', 'min-date', 'mindate', 'max-date', 'maxdate', 'placeholder', 'disabled', 'commit-on', 'commiton', 'options', 'name', 'inline', 'static-position', 'staticposition', 'position', 'append-to', 'appendto', 'show-months', 'showmonths', 'week-numbers', 'weeknumbers', 'month-selector-type', 'monthselectortype', 'prev-arrow', 'prevarrow', 'next-arrow', 'nextarrow', 'allow-input', 'allowinput', 'disable', 'enable', 'locale', 'first-day-of-week', 'firstdayofweek', 'parse-date', 'parsedate', 'format-date', 'formatdate', 'plugins']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;
