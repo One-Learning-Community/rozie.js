@@ -718,7 +718,21 @@ On a call, `$memo` first evaluates `keyFn()` and compares the result **element-b
 This is the one rule that makes `$memo` safe: **`keyFn` must read — unconditionally, every call — every piece of reactive state that `fn` reads.** `keyFn` is evaluated *before* the cache-hit check, on every single call, which is exactly what makes it the fine-grained reactive **subscription** surface on Solid/Svelte/Vue (a signal/rune/ref read only counts as a subscription if it actually executes). If `keyFn` under-reads relative to `fn` — skips a prop or data field `fn` depends on — the cache will return a stale value on a change `keyFn` never noticed, and on Solid/Svelte/Vue the memoized function will stop re-running at all for that input. Read every input `fn` touches, even ones `fn` only reads on a code path that IS taken this call — array/object references compare by identity, so passing `$props.items` (the array reference) rather than something derived from it is what makes an unmodified list a cache hit.
 :::
 
-`$memo` is deliberately **not** a `$computed`: a `$computed` re-subscribes to every reactive read inside its getter and re-runs on any of them changing (and on Vue re-trips the reactive Proxy traps on every dependent read) — the wrong shape when the goal is specifically to *avoid* re-running on unrelated reactive churn. `$memo`'s cache key is a plain value/reference comparison, not a reactive subscription, so only a real key mismatch triggers a re-run.
+### Why `$memo` and not `$computed`?
+
+They answer different questions. `$computed` asks *"which reactive values did my getter read?"* and re-runs when **any** of them changes — invalidation is decided by dependency tracking, at the granularity the framework tracks. `$memo` asks *"did my declared key change identity?"* and re-runs **only** then — invalidation is decided by you, with plain `===` checks and no reactive subscription inside the computation at all.
+
+That difference is invisible for cheap derivations and decisive for expensive ones over reactive collections. The motivating case is real: Rozie's own `Combobox` maps a 1,000-option list into windowed row wrappers, and a virtualizer calls that derivation O(count) times per scroll pass. As a dependency-tracked computed on Vue, every evaluation re-tripped a reactive Proxy trap per option read — a 60-keypress navigation batch measured **~16 seconds**. The same derivation behind a reference-keyed cache is four `===` comparisons per call and one `.map()` per *actual* input change: the trap churn and the re-maps disappear, because "the `options` array is the same reference as last time" is something dependency tracking cannot express but a `$memo` key states directly.
+
+The practical decision:
+
+| You want | Reach for |
+| --- | --- |
+| A cheap derived value (a ternary, a field read, string concat) | A **plain function** — recomputing costs less than any caching machinery |
+| A derived value that should update whenever anything it reads changes, and computing it is moderate | **`$computed`** — dependency tracking is exactly the right contract, and the framework owns invalidation |
+| An expensive derivation (O(N) map/filter over a large list) called from a hot path, whose inputs change far less often than it's called | **`$memo`** — coarse, identity-keyed invalidation you declare yourself, zero subscription overhead in the computation |
+
+Two corollaries worth internalizing. First, `$memo` trades away automatic correctness for control: if your `keyFn` under-declares the inputs (see the warning above), `$computed` would have caught the dependency for you and `$memo` will serve stale values — the key contract is the price of the speed. Second, `$memo` is also the answer when you need a **uniform access form**: its wrapper is a plain function called `()` on all six targets, so it composes with aliasing, indexing, and iteration in places where `$computed`'s per-target read form gets in the way.
 
 ### Per-target lowering
 
