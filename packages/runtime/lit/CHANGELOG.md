@@ -1,5 +1,12 @@
 # @rozie/runtime-lit
 
+## 0.2.1
+
+### Patch Changes
+
+- c279a7e: Add a new public `rozieResolvePortalledRef` helper, consumed by regenerated Lit leaves so author `ref="x"` bindings inside an `r-portal`-relocated subtree resolve correctly after `RoziePortalController` moves the subtree out of `this.renderRoot` (previously such refs resolved to `null` after the first render). Shipped as `patch` for this explicitly-scoped fix wave: the export is additive/non-breaking and is primarily consumed by our own generated leaf code, which pins `@rozie/runtime-lit` via `workspace:*` (resolved to the exact published version at publish time), so no consumer peer-range edit is required. Note for the record: strict semver would treat a new public export as `minor`; because `@rozie/runtime-lit` versions in lockstep with the rest of the fixed toolchain group, a `minor` bump here would rev the whole group from 0.2.0 to 0.3.0. Change this changeset to `minor` if strict-semver is preferred — no other file changes are needed either way.
+  - @rozie/runtime-keynav-core@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

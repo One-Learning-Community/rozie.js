@@ -1,5 +1,11 @@
 # @rozie-ui/pdf-react
 
+## 0.2.3
+
+### Patch Changes
+
+- @rozie/runtime-react@0.2.1
+
 ## 0.2.2
 
 ### Patch Changes

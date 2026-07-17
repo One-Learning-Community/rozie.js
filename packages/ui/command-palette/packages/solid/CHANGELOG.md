@@ -1,5 +1,11 @@
 # @rozie-ui/command-palette-solid
 
+## 0.4.1
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.2.1
+
 ## 0.4.0
 
 ### Minor Changes

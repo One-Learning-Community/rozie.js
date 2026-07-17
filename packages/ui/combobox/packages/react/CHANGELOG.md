@@ -1,5 +1,11 @@
 # @rozie-ui/combobox-react
 
+## 0.4.1
+
+### Patch Changes
+
+- @rozie/runtime-react@0.2.1
+
 ## 0.4.0
 
 ### Minor Changes

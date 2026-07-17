@@ -1,5 +1,12 @@
 # @rozie-ui/data-table-lit
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [c279a7e]
+  - @rozie/runtime-lit@0.2.1
+
 ## 0.2.1
 
 ### Patch Changes

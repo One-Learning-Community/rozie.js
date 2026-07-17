@@ -1,5 +1,11 @@
 # @rozie-ui/pdf-solid
 
+## 0.2.3
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.2.1
+
 ## 0.2.2
 
 ### Patch Changes

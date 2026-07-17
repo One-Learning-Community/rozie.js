@@ -1,6 +1,6 @@
 {
   "name": "@rozie/core",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "The Rozie.js compiler — turns a single .rozie component definition into idiomatic React, Vue, Svelte, Angular, Solid, and Lit source.",
   "type": "module",
   "main": "./dist/index.cjs",

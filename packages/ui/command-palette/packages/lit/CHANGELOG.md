@@ -1,5 +1,13 @@
 # @rozie-ui/command-palette-lit
 
+## 0.4.1
+
+### Patch Changes
+
+- c279a7e: Fix the `$attrs` auto-fallthrough skip-list to always exclude `data-rozie-ref` (a reserved compiler bookkeeping attribute, never a consumer prop) and fix author `ref="x"` bindings inside a `r-portal`-relocated subtree so they survive the portal's `appendChild` relocation instead of resolving to `null` after the first render. Both fixes land via the regenerated Lit leaf; no API change, no per-target behavior divergence.
+- Updated dependencies [c279a7e]
+  - @rozie/runtime-lit@0.2.1
+
 ## 0.4.0
 
 ### Minor Changes
