@@ -623,9 +623,18 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   // is depth 0; each older toast is one deeper. Corner-independent — the
   // collapsed grid overlay ignores flex-direction/column-reverse entirely, so
   // this needs no position-aware math.
-  function depth(t: any) {
-    const idx = toasts().findIndex((x: any) => x.id === t.id);
-    return idx === -1 ? 0 : toasts().length - 1 - idx;
+  //
+  // quick 260716-npt Finding 3 (perf): depth USED to be a per-toast
+  // `$data.toasts.findIndex(...)` scan invoked from toastStyle() for every row
+  // — O(n) work × n toasts rendered = O(n^2) per render. The template's r-for
+  // already computes each row's array index for free (the r-for bare-comma
+  // index form, `t, ti in ...` — see TreeNode.rozie/Table.rozie precedent), so
+  // depth(ti) is now O(1) arithmetic off that index — no scan, and `t`'s id
+  // can never be "not found" via this call path (ti IS t's own index), so the
+  // old idx===-1→0 fallback collapses to unreachable-by-construction (same
+  // observable semantics: newest=depth 0, older=length-1-idx).
+  function depth(ti: any) {
+    return toasts().length - 1 - ti;
   }
 
   // String-form `:style` for the toast row. ALWAYS carries `--rozie-toast-depth`
@@ -633,8 +642,8 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   // `.rozie-toaster--stacked`), plus EITHER the active drag transform (while
   // $data.swipe tracks this id) OR the swipe-exit sign custom property (once
   // `dismissBegin('swipe')` flipped `t.swipeExitSign`). Drag/exit never overlap.
-  function toastStyle(t: any) {
-    const depthDecl = '--rozie-toast-depth: ' + depth(t) + ';';
+  function toastStyle(t: any, ti: any) {
+    const depthDecl = '--rozie-toast-depth: ' + depth(ti) + ';';
     if (t.exiting) {
       return t.swipeExitSign != null ? depthDecl + ' --rozie-toast-swipe-exit: ' + t.swipeExitSign + ';' : depthDecl;
     }
@@ -674,7 +683,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
     <>
     <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} class={"rozie-toaster" + " " + rozieClass('rozie-toaster--' + local.position + (local.stacked ? ' rozie-toaster--stacked' : '')) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} {...mergeListeners({ onMouseEnter: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseEnter(); }, onMouseLeave: ($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onMouseLeave(); } }, attrs)} data-rozie-s-12d4265c="">
       
-      <Key each={toasts() as readonly any[]} by={(t) => t.id}>{(t) => <div role="status" aria-live={rozieAttr(liveFor(t().type))} class={"rozie-toast" + " " + rozieClass('rozie-toast--' + t().type + (t().exiting ? ' rozie-toast--exiting' : '') + (t().swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))} style={parseInlineStyle(toastStyle(t()))} onAnimationEnd={($event: AnimationEvent & { currentTarget: HTMLDivElement; target: Element }) => { t().exiting && removeToast(t().id); }} onPointerDown={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerDown(t(), $event); }} onPointerMove={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerMove(t(), $event); }} onPointerUp={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerUp(t(), $event); }} onPointerCancel={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerCancel(t()); }} data-rozie-s-12d4265c="">
+      <Key each={toasts() as readonly any[]} by={(t) => t.id}>{(t, ti) => <div role="status" aria-live={rozieAttr(liveFor(t().type))} class={"rozie-toast" + " " + rozieClass('rozie-toast--' + t().type + (t().exiting ? ' rozie-toast--exiting' : '') + (t().swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))} style={parseInlineStyle(toastStyle(t(), ti()))} onAnimationEnd={($event: AnimationEvent & { currentTarget: HTMLDivElement; target: Element }) => { t().exiting && removeToast(t().id); }} onPointerDown={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerDown(t(), $event); }} onPointerMove={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerMove(t(), $event); }} onPointerUp={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerUp(t(), $event); }} onPointerCancel={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerCancel(t()); }} data-rozie-s-12d4265c="">
         {(_props.toastSlot ?? _props.slots?.['toast'])?.({ toast: t(), dismiss }) ?? <>{<Show when={t().type === 'loading'}><span class={"rozie-toast-spinner"} aria-hidden="true" data-rozie-s-12d4265c="" /></Show>}<span class={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t().message)}</span><button type="button" aria-label="Dismiss" class={"rozie-toast-close"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { dismissBegin(t().id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
       </div>}</Key>
     </div>

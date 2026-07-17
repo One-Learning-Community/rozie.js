@@ -35,8 +35,8 @@ function __rozieAttr(v: unknown): string | null {
 
     <div class="rozie-toaster" [ngClass]="'rozie-toaster--' + position() + (stacked() ? ' rozie-toaster--stacked' : '')" role="region" [attr.aria-label]="rozieAttr(regionLabel())" #rozieSpread_0 (mouseenter)="onMouseEnter()" (mouseleave)="onMouseLeave()" #rozieListenersTarget_1>
       
-      @for (t of toasts(); track t.id) {
-    <div class="rozie-toast" [ngClass]="'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')" [style]="toastStyle(t)" role="status" [attr.aria-live]="rozieAttr(liveFor(t.type))" (animationend)="t.exiting && removeToast(t.id)" (pointerdown)="onToastPointerDown(t, $event)" (pointermove)="onToastPointerMove(t, $event)" (pointerup)="onToastPointerUp(t, $event)" (pointercancel)="onToastPointerCancel(t)">
+      @for (t of toasts(); track t.id; let ti = $index) {
+    <div class="rozie-toast" [ngClass]="'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')" [style]="toastStyle(t, ti)" role="status" [attr.aria-live]="rozieAttr(liveFor(t.type))" (animationend)="t.exiting && removeToast(t.id)" (pointerdown)="onToastPointerDown(t, $event)" (pointermove)="onToastPointerMove(t, $event)" (pointerup)="onToastPointerUp(t, $event)" (pointercancel)="onToastPointerCancel(t)">
         @if ((toastTpl ?? templates()?.['toast'])) {
     <ng-container *ngTemplateOutlet="(toastTpl ?? templates()?.['toast']); context: { $implicit: { toast: t, dismiss: dismiss }, toast: t, dismiss: dismiss }" />
     } @else {
@@ -554,13 +554,9 @@ export class Toaster {
     if (this.swipeGesture() && this.swipeGesture().id === t.id) this.swipeGesture.set(null);
     if (this.swipe() && this.swipe().id === t.id) this.swipe.set(null);
   };
-  depth = (t: any) => {
-    const __toasts = this.toasts();
-    const idx = __toasts.findIndex((x: any) => x.id === t.id);
-    return idx === -1 ? 0 : __toasts.length - 1 - idx;
-  };
-  toastStyle = (t: any) => {
-    const depthDecl = '--rozie-toast-depth: ' + this.depth(t) + ';';
+  depth = (ti: any) => this.toasts().length - 1 - ti;
+  toastStyle = (t: any, ti: any) => {
+    const depthDecl = '--rozie-toast-depth: ' + this.depth(ti) + ';';
     if (t.exiting) {
       return t.swipeExitSign != null ? depthDecl + ' --rozie-toast-swipe-exit: ' + t.swipeExitSign + ';' : depthDecl;
     }
