@@ -38,17 +38,20 @@ describe('emitStyle — D-LIT-15 / D-LIT-16 split', () => {
     expect(code).not.toContain('injectGlobalStyles');
   });
 
-  it('Modal: :root rules extract to injectGlobalStyles call with rozie-modal-global id', () => {
+  it('Modal: :root rules extract to injectGlobalStyles call with a rozie-modal-<hash>-global id', () => {
     const code = compile('Modal');
-    expect(code).toContain("injectGlobalStyles('rozie-modal-global'");
+    // Quick 260716-npt Finding 1: id now carries a CSS-content hash between
+    // the kebab-name and the `-global` suffix (was the bare name-only
+    // 'rozie-modal-global', which collided across differing CSS payloads).
+    expect(code).toMatch(/injectGlobalStyles\('rozie-modal-[a-f0-9]+-global'/);
     expect(code).toContain('static styles = css`');
     // Both blocks present — scoped portion lives in static styles, :root in
     // the module-level call.
   });
 
-  it('Dropdown: :root rules extract to injectGlobalStyles call with rozie-dropdown-global id', () => {
+  it('Dropdown: :root rules extract to injectGlobalStyles call with a rozie-dropdown-<hash>-global id', () => {
     const code = compile('Dropdown');
-    expect(code).toContain("injectGlobalStyles('rozie-dropdown-global'");
+    expect(code).toMatch(/injectGlobalStyles\('rozie-dropdown-[a-f0-9]+-global'/);
   });
 
   it('CardHeader: scoped-only CSS does NOT add injectGlobalStyles import', () => {

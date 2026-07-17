@@ -125,6 +125,24 @@ function escapeCssForTemplateLiteral(css: string): string {
     .replace(/\$\{/g, '\\${');
 }
 
+/**
+ * FNV-1a 32-bit hash, hex-encoded. Local copy — INTENTIONALLY not shared
+ * with `scopeHash.ts`'s `fnv1a32Hex` (quick 260716-npt Finding 1): that one
+ * hashes `basename::componentName` (name-derived), so two versions of the
+ * same source file collide identically on it. This hash is over the
+ * injected CSS TEXT ITSELF, so distinct global CSS payloads produce
+ * distinct `injectGlobalStyles` runtime dedup ids even when the
+ * componentName is unchanged.
+ */
+function fnv1a32HexOfCss(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
 export function emitStyle(
   styles: StyleSection,
   source: string,
@@ -196,7 +214,12 @@ export function emitStyle(
   if (globalCss.length > 0) {
     opts.runtime.add('injectGlobalStyles');
     const escaped = escapeCssForTemplateLiteral(globalCss);
-    const id = `rozie-${toKebabCase(opts.componentName)}-global`;
+    // Quick 260716-npt Finding 1: suffix with a hash of the injected CSS
+    // TEXT (not just the component name) so two versions of the same
+    // component with different global CSS payloads get distinct runtime
+    // dedup ids — see fnv1a32HexOfCss doc comment above.
+    const cssHash = fnv1a32HexOfCss(globalCss);
+    const id = `rozie-${toKebabCase(opts.componentName)}-${cssHash}-global`;
     globalStyleCall = `injectGlobalStyles('${id}', \`\n${escaped}\n\`);`;
   }
 

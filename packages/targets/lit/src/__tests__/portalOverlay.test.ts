@@ -72,12 +72,14 @@ describe('emitLit — PortalOverlay (command-palette-portal-overlay Task 3, r-po
     // The shadow-DOM hazard fix: the component's OWN scoped CSS (not just
     // :root rules) must ALSO be pushed through injectGlobalStyles, because
     // static styles' adoptedStyleSheets never reaches light-DOM content.
-    expect(code).toMatch(/injectGlobalStyles\('rozie-portal-overlay-global',/);
+    // Quick 260716-npt Finding 1: id now carries a CSS-content hash between
+    // the kebab-name and the `-global` suffix.
+    expect(code).toMatch(/injectGlobalStyles\('rozie-portal-overlay-[a-f0-9]+-global',/);
     // The globally-injected copy must be SCOPE-QUALIFIED (matches only this
     // component's own elements outside the shadow root) — assert the
     // scoped selector text appears inside the injectGlobalStyles call.
     const injectCallMatch = code.match(
-      /injectGlobalStyles\('rozie-portal-overlay-global', `([\s\S]*?)`\);/,
+      /injectGlobalStyles\('rozie-portal-overlay-[a-f0-9]+-global', `([\s\S]*?)`\);/,
     );
     expect(injectCallMatch).not.toBeNull();
     expect(injectCallMatch![1]).toMatch(/\.rozie-portal-overlay-backdrop\[data-rozie-s-/);

@@ -91,7 +91,8 @@ describe('emitLit fixtures — Plan 06.4-02 locked snapshots', () => {
   it('Modal.lit.ts.snap', async () => {
     const code = compileToLit('Modal');
     expect(code).toContain('export default class Modal extends SignalWatcher(LitElement)');
-    expect(code).toContain("injectGlobalStyles('rozie-modal-global'");
+    // Quick 260716-npt Finding 1: id carries a CSS-content hash.
+    expect(code).toMatch(/injectGlobalStyles\('rozie-modal-[a-f0-9]+-global'/);
     expect(code).toContain('_disconnectCleanups');
     // Slot presence
     expect(code).toContain('@queryAssignedElements');
