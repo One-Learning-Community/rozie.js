@@ -227,6 +227,13 @@ const EXAMPLES = [
   // r-portal emit path is taken ONLY when `portalTo` is present on an
   // element). Single-file — stays OUT of RESOLVER_ROOT.
   'PortalOverlay',
+  // Quick 260717-8zb ($memo primitive) — the reference-keyed memoization
+  // proving fixture. ONE $memo over a prop (items) + a data field (query);
+  // the committed bytes pin expandMemo's cache-const + wrapper expansion
+  // across all four entrypoints × 6 targets — the strict-bytes proof that
+  // the SHARED core lowering (not a per-target emitter change) is what every
+  // entrypoint inherits. Single-file — stays OUT of RESOLVER_ROOT.
+  'MemoBasic',
 ] as const;
 
 // Phase 07.2 Plan 06 — siblings ModalConsumer reaches via `<components>`.

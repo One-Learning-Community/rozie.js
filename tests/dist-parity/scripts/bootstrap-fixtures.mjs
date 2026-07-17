@@ -513,6 +513,16 @@ const EXAMPLES = [
   // emitter shape. Single-file; no sibling .rozie producers — stays OUT of
   // RESOLVER_ROOT (and NOT in FIXTURE_ANGULAR_CVA_OFF).
   'PortalOverlay',
+  // Quick 260717-8zb ($memo primitive) — the reference-keyed memoization
+  // proving fixture. ONE $memo over a prop (items) + a data field (query);
+  // registering it here makes the bootstrap compile() it across all six
+  // targets — the dist-parity proof that expandMemo's cache-const + wrapper
+  // expansion lowers byte-identically across all four entrypoints, and that
+  // the React member-mutated-fresh-object-const detection
+  // (collectMutatedInstanceBinders) picks up the emitted `filteredCache`
+  // const with NO per-target $memo code. Single-file; no sibling .rozie
+  // producers — stays OUT of RESOLVER_ROOT.
+  'MemoBasic',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.

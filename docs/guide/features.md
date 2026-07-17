@@ -686,6 +686,53 @@ Read a `$computed` bare (template, interpolation, simple expression) and the acc
 
 Reading `$refs` inside a `$computed` body is a compile error (`ROZ123`) for the same reason it is in a `$watch` getter — the computed evaluates eagerly, before the ref is populated. See [`$refs`](#refs-derived-from-ref) below.
 
+## `$memo(fn, keyFn)` — a memoized plain function, uniform on all six
+
+The plain-function escape hatch above (`## $computed` § "When you need to alias and index") trades memoization for a single, target-uniform access form — fine for a cheap filter, wasteful for an O(N) re-map called on every keystroke or scroll tick. `$memo(fn, keyFn)` gives you both: a plain function you call with `()` everywhere (uniform on all six, safe to alias/index/iterate), memoized against a **reference-keyed** cache so it only re-runs `fn` when `keyFn`'s inputs actually change identity:
+
+```rozie
+<props>{ items: { type: Array, default: () => [] } }</props>
+<data>{ query: '' }</data>
+
+<script>
+const filtered = $memo(
+  // fn — the expensive computation, run only on a cache MISS.
+  () => $props.items.filter((item) => item.includes($data.query)),
+  // keyFn — read EVERY reactive input fn depends on, unconditionally.
+  () => [$props.items, $data.query],
+)
+</script>
+
+<template>
+  <li r-for="item in filtered()" :key="item">{{ item }}</li>
+</template>
+```
+
+`$memo` must be bound to a **top-level `const`** with exactly **two arrow-function arguments** — `fn` (the computation) and `keyFn` (the cache key, returning an array). Anything else — a `let`-bound declaration, the wrong number of arguments, a call nested inside a function — is a compile error (`ROZ146`) rather than a silently-broken cache.
+
+### The reference-key contract
+
+On a call, `$memo` first evaluates `keyFn()` and compares the result **element-by-element by reference/value equality (`===`)** against the previous call's key. If every element matches, `fn` does **not** re-run — the previous return value is reused as-is (no re-map, no new object identities). On any mismatch, `fn()` runs and the new key + value are cached for next time.
+
+::: warning keyFn must read every reactive input fn depends on
+This is the one rule that makes `$memo` safe: **`keyFn` must read — unconditionally, every call — every piece of reactive state that `fn` reads.** `keyFn` is evaluated *before* the cache-hit check, on every single call, which is exactly what makes it the fine-grained reactive **subscription** surface on Solid/Svelte/Vue (a signal/rune/ref read only counts as a subscription if it actually executes). If `keyFn` under-reads relative to `fn` — skips a prop or data field `fn` depends on — the cache will return a stale value on a change `keyFn` never noticed, and on Solid/Svelte/Vue the memoized function will stop re-running at all for that input. Read every input `fn` touches, even ones `fn` only reads on a code path that IS taken this call — array/object references compare by identity, so passing `$props.items` (the array reference) rather than something derived from it is what makes an unmodified list a cache hit.
+:::
+
+`$memo` is deliberately **not** a `$computed`: a `$computed` re-subscribes to every reactive read inside its getter and re-runs on any of them changing (and on Vue re-trips the reactive Proxy traps on every dependent read) — the wrong shape when the goal is specifically to *avoid* re-running on unrelated reactive churn. `$memo`'s cache key is a plain value/reference comparison, not a reactive subscription, so only a real key mismatch triggers a re-run.
+
+### Per-target lowering
+
+`$memo` expands in the SHARED core compiler — before any per-target emission — into two ordinary declarations: a member-mutated cache object and the wrapper function you call. There is no per-target `$memo` runtime:
+
+| Target | Lowering |
+| --- | --- |
+| React | The cache object is a top-level `const` that gets member-mutated on every miss — the **existing** fresh-instance-stabilization pass (the same one that fixes `const seen = new Set()` dedupe guards) detects this shape automatically and wraps it in `useMemo(() => ({...}), [])`, so the cache persists across renders. The wrapper stays a plain function, called `()` — the same idiom as `filteredOptions()` today. |
+| Vue / Svelte / Solid / Angular / Lit | Setup runs once, so the cache const and the wrapper function are both ordinary top-level `const`s — no wrapping needed. |
+
+Because the expansion is a pure core AST transform, a `.rozie` file with no `$memo` call compiles **byte-identically** whether or not the pass runs — `$memo` adds zero overhead and zero drift to every existing component.
+
+Reach for `$memo` when a plain-function derivation is expensive (an O(N) filter/map over a large list, called from a hot path like windowed scrolling or keyboard navigation) and the inputs it depends on don't change every call. For a cheap derivation, the plain-function form above is simpler and the memoization overhead isn't worth it.
+
 ## `$watch(() => getter, cb)` — react to value transitions
 
 `$watch` is the primitive for "do something whenever this value changes." The getter is what the watcher subscribes to; the callback runs whenever a reactive read inside the getter flips:

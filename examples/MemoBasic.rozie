@@ -1,0 +1,54 @@
+<!--
+  MemoBasic.rozie — Quick 260717-8zb dist-parity proving fixture for the
+  `$memo(fn, keyFn)` primitive.
+
+  Single-file (no sibling `.rozie` producers) — stays OUT of RESOLVER_ROOT.
+
+  Byte-locks the 6-target × 4-entrypoint `$memo` expansion shape: a
+  reference-keyed memo over ONE prop (`items`) + ONE data field (`query`).
+  `filteredCache` is a member-mutated fresh-object const — on React it gets
+  stabilized to `useMemo(() => ({...}), [])` by the EXISTING
+  collectMutatedInstanceBinders/tryWrapMutatedInstanceUseMemo machinery
+  (packages/targets/react/src/emit/emitScript.ts); the 5 setup-once targets
+  keep both `filteredCache` and `filtered` as ordinary top-level consts.
+  `filtered()` is called from the template `r-for` iterable, mirroring the
+  Combobox `filteredOptions()` dogfood idiom.
+-->
+
+<rozie name="MemoBasic">
+
+<props>
+{ items: { type: Array, default: () => [] } }
+</props>
+
+<data>
+{ query: '' }
+</data>
+
+<script>
+// keyFn reads $props.items + $data.query UNCONDITIONALLY, before the
+// cache-hit check — the fine-grained reactive subscription surface on
+// Solid/Svelte/Vue.
+const filtered = $memo(
+  () => $props.items.filter((item) => item.includes($data.query)),
+  () => [$props.items, $data.query],
+);
+</script>
+
+<template>
+<div class="probe">
+  <input :value="$data.query" @input="$data.query = $event.target.value" />
+  <ul>
+    <li r-for="item in filtered()" :key="item">{{ item }}</li>
+  </ul>
+</div>
+</template>
+
+<style>
+.probe {
+  display: block;
+  padding: 0.5rem;
+}
+</style>
+
+</rozie>
