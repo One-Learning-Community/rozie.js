@@ -470,17 +470,15 @@ export const RozieErrorCode = {
   // free code after ROZ142 in the 100 semantic-binding cluster.
   EVENT_HANDLER_NOT_EXPRESSION: 'ROZ143', // error — a template @event handler's text failed to parse as a single expression (dominant cause: a statement-body handler, e.g. an `if`/`for`/`while`/block). Extract it into a <script> method and bind `@click="method()"`. The undefined-handler fallback is unchanged; this only adds the diagnostic.
 
-  // ROZ144 is the next free code after ROZ143 in the 100 semantic-binding
-  // cluster. Spike-012 R7-3: an ARRAY-form `:style` (`:style="[a, b]"`) is not
-  // yet supported uniformly — only Vue lowers it natively; react/solid/lit route
-  // it through the string-only `parseInlineStyle` runtime helper (silently → an
-  // empty `{}`, dropping every style) and Angular's `[style]` binding does not
-  // merge arrays either. Rather than silently miscompile on 5/6 targets, fail
-  // loud. The single-object form and a `$computed` returning a merged object both
-  // work cross-target today; a real cross-target array-merge is backlogged.
-  STYLE_BINDING_ARRAY_UNSUPPORTED: 'ROZ144', // error — an array-form `:style="[a, b]"` binding. Cross-target array-style merging is not yet supported (only Vue lowers it natively; other targets silently drop the styles). Use a single object binding `:style="{ ... }"` or a `$computed` that returns the merged style object.
+  // ROZ144 (STYLE_BINDING_ARRAY_UNSUPPORTED) was RETIRED by quick task
+  // 260717-uvk: array-form `:style="[a, b]"` merge is now uniformly supported
+  // on all 6 targets (react/solid `parseInlineStyle`, lit/svelte `rozieStyle`,
+  // angular `[attr.style]="__rozieMergeStyle(...)"`, vue native), so the
+  // fail-loud guard that used to point authors at the object/`$computed`
+  // workaround is gone. The code is intentionally left RETIRED (not reused)
+  // to avoid confusing historical diagnostics/logs that recorded ROZ144.
 
-  // ROZ145 is the next free code after ROZ144 in the 100 semantic-binding
+  // ROZ145 is the next free code after ROZ143 in the 100 semantic-binding
   // cluster. Spike-012 R9: a `$emit` call with TWO OR MORE positional payload
   // args (`$emit('change', a, b)` — idiomatic multi-arg Vue emit) is not
   // portable. React/Vue/Svelte/Solid lower it to a callback receiving `(a, b)`,
