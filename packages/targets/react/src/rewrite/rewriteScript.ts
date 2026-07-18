@@ -264,6 +264,200 @@ function rewriteSelfReadsToParam(
 }
 
 /**
+ * Detect whether `expr` reads a DISQUALIFYING reactive accessor that would be
+ * stale inside a functional updater — i.e. a `$data.<otherKey>` (any key OTHER
+ * than the one being written) or a `$props.<modelProp>`. Such reads must NOT be
+ * inlined into a `setKey(prev => …)` updater because only `<key>` is threaded
+ * through `prev`; every other reactive read would still capture the stale
+ * render-time value, so the via-a-local inlining is only behavior-preserving
+ * when the derivation is from `<key>` ALONE.
+ *
+ * Reads of non-model `$props.<x>` (lowered to `props.x`, always the current
+ * props param) and free locals are FINE — they are not stale-prone. Returns
+ * true on the first disqualifying match. Defensive (D-08): never throws.
+ */
+function readsDisqualifyingReactiveState(
+  expr: t.Expression,
+  writtenKey: string,
+  modelProps: ReadonlySet<string>,
+): boolean {
+  let found = false;
+  const file = t.file(t.program([t.expressionStatement(expr)]));
+  const check = (o: t.Node, pr: t.Node): void => {
+    if (!t.isIdentifier(o) || !t.isIdentifier(pr)) return;
+    if (o.name === '$data' && pr.name !== writtenKey) {
+      found = true;
+    } else if (o.name === '$props' && modelProps.has(pr.name)) {
+      found = true;
+    } else if (o.name === '$model' && modelProps.has(pr.name)) {
+      // $model normalizes to $props upstream, but guard defensively in case
+      // this helper ever runs before normalization.
+      found = true;
+    }
+  };
+  try {
+    traverse(file, {
+      MemberExpression(path) {
+        if (path.node.computed) return;
+        check(path.node.object, path.node.property);
+        if (found) path.stop();
+      },
+      OptionalMemberExpression(path) {
+        if (path.node.computed) return;
+        check(path.node.object, path.node.property);
+        if (found) path.stop();
+      },
+    });
+  } catch {
+    // Defensive (D-08) — treat an unusual AST as "cannot prove safe" → disqualify.
+    return true;
+  }
+  return found;
+}
+
+/**
+ * quick 260718-uvo — conservative derived-local dataflow.
+ *
+ * When a `$data.<stateName>` write's RHS is a bare local `Identifier` that was
+ * assigned by a single `const`/`let` declarator whose initializer is derived
+ * SOLELY from the SAME `$data.<stateName>` and is consumed EXACTLY ONCE (only as
+ * this write's RHS), return the inlinable initializer expression (a CLONE) plus
+ * the declarator's NodePath so the caller can remove the now-dead declarator.
+ * Otherwise return `null` and the caller falls back to the current
+ * `setKey(local)` behavior.
+ *
+ * The five conservative gates (all must hold):
+ *   1. `rhs` is a bare `Identifier` (not member/call/etc.).
+ *   2. It resolves to a SINGLE never-reassigned `const`/`let` declarator (with an
+ *      initializer) in the SAME enclosing function scope as the write.
+ *   3. The initializer READS the same `$data.<stateName>` (the derivation source).
+ *   4. The initializer is derived SOLELY from that key — it reads no OTHER
+ *      `$data.<k>` and no `$props.<modelProp>` that would itself be stale in the
+ *      updater.
+ *   5. The local is consumed EXACTLY ONCE, and that one reference is THIS write's
+ *      RHS — guaranteeing no other reader observes the pre-write value.
+ *
+ * Wrapped in try/catch (D-08): never throws on an unusual AST — returns null and
+ * falls back.
+ */
+function resolveInlinableDerivedLocal(
+  assignPath: NodePath<t.AssignmentExpression>,
+  rhs: t.Expression,
+  stateName: string,
+  modelProps: ReadonlySet<string>,
+): { init: t.Expression; declaratorPath: NodePath<t.VariableDeclarator> } | null {
+  try {
+    // (1) bare identifier RHS.
+    if (!t.isIdentifier(rhs)) return null;
+    const localName = rhs.name;
+
+    // (2) single never-reassigned const/let declarator in the same function scope.
+    const binding = assignPath.scope.getBinding(localName);
+    if (!binding) return null;
+    if (binding.kind !== 'const' && binding.kind !== 'let') return null;
+    if (!binding.constant) return null; // reassigned let → disqualify.
+    if (binding.scope.getFunctionParent() !== assignPath.scope.getFunctionParent()) {
+      return null;
+    }
+    const declPath = binding.path;
+    if (!declPath.isVariableDeclarator()) return null;
+    // The declarator id MUST be a plain Identifier binding EXACTLY this local —
+    // never a destructuring pattern (`const { stack, restoreQuery } = f(…)`).
+    // A pattern's initializer is NOT the local's value (it is the whole
+    // destructured source), and removing the declarator would also kill sibling
+    // bindings that other code still reads. Both make inlining unsafe.
+    if (!t.isIdentifier(declPath.node.id) || declPath.node.id.name !== localName) {
+      return null;
+    }
+    const init = declPath.node.init;
+    if (!init || !t.isExpression(init)) return null;
+
+    // (5) consumed exactly once, and that reference IS this write's RHS.
+    if (binding.references !== 1) return null;
+    if (binding.referencePaths.length !== 1) return null;
+    if (binding.referencePaths[0]!.node !== rhs) return null;
+
+    // (3) initializer reads the same $data.<stateName> (the derivation source).
+    if (!exprReadsAccessor(init, '$data', stateName)) return null;
+
+    // (4) derived SOLELY from that key — no other stale-prone reactive read.
+    if (readsDisqualifyingReactiveState(init, stateName, modelProps)) return null;
+
+    return { init, declaratorPath: declPath };
+  } catch {
+    // Defensive (D-08) — never throw on an unusual AST shape; fall back.
+    return null;
+  }
+}
+
+/**
+ * quick 260718-uvo — PRE-PASS: normalize the "compute-then-commit" via-a-local
+ * `$data` write into the direct-RHS shape BEFORE the main lowering traverse.
+ *
+ * This MUST run before the main `traverse` because that pass lowers every
+ * `$data.<key>` read to its bare local — which would strip the `$data.<key>`
+ * self-read out of the declarator's initializer and defeat the
+ * `exprReadsAccessor` functional-updater gate. Running here, on the still-magic
+ * AST, we transform a qualifying
+ *
+ *   const next = $data.items.concat([x]); $data.items = next
+ *
+ * into the exactly-equivalent direct-RHS form
+ *
+ *   $data.items = $data.items.concat([x])
+ *
+ * and delete the now-dead declarator. The main traverse's EXISTING literal
+ * `exprReadsAccessor` → `rewriteSelfReadsToParam` → `setKey(prev => …)` path then
+ * lowers it BYTE-IDENTICALLY to the direct-RHS control — no new emit shape, just
+ * a wider set of inputs reaching the concurrent-safe updater. Conservative: only
+ * fires under the five gates in `resolveInlinableDerivedLocal`; any deviation is
+ * left untouched. Wrapped in try/catch (D-08): never throws.
+ */
+function inlineDerivedLocalDataWrites(
+  program: File,
+  dataNames: ReadonlySet<string>,
+  modelProps: ReadonlySet<string>,
+): void {
+  try {
+    traverse(program, {
+      AssignmentExpression(path) {
+        const node = path.node;
+        if (node.operator !== '=') return;
+        const left = node.left;
+        if (!t.isMemberExpression(left) || left.computed) return;
+        const obj = left.object;
+        const prop = left.property;
+        if (!t.isIdentifier(obj) || obj.name !== '$data') return;
+        if (!t.isIdentifier(prop) || !dataNames.has(prop.name)) return;
+
+        const inlinable = resolveInlinableDerivedLocal(
+          path,
+          node.right,
+          prop.name,
+          modelProps,
+        );
+        if (!inlinable) return;
+
+        // Clone the un-lowered initializer (still contains `$data.<key>`) BEFORE
+        // removing the declarator. Guard the removal (D-08): only inline when the
+        // dead declarator is safely removed — otherwise leave the shape untouched
+        // so no orphaned `const next = …` and no double-evaluation can occur.
+        const clonedInit = t.cloneNode(inlinable.init, /* deep */ true);
+        try {
+          inlinable.declaratorPath.remove();
+        } catch {
+          return; // removal failed → do NOT inline; fall back to current behavior.
+        }
+        node.right = clonedInit;
+        path.skip();
+      },
+    });
+  } catch {
+    // Defensive (D-08) — never throw on an unusual AST; leave the program as-is.
+  }
+}
+
+/**
  * Build the per-state setter call.
  *
  *   - plain `=` with NO self-read of the same state  → `setName(rhs)`
@@ -589,6 +783,15 @@ export function rewriteRozieIdentifiers(
     },
   ];
   deconflictGeneratedSymbols(program, reactGroups, reactProtected);
+
+  // quick 260718-uvo — normalize qualifying "compute-then-commit" via-a-local
+  // `$data` writes into the direct-RHS shape BEFORE the main lowering traverse
+  // strips the `$data.<key>` self-read out of the declarator initializer. This
+  // routes the natural multi-step derivation through the identical concurrent-
+  // safe functional-updater path the direct-RHS shape already uses. Runs after
+  // the $model→$props normalization (so model reads are detectable as $props)
+  // and after deconfliction (so bindings carry their final renamed names).
+  inlineDerivedLocalDataWrites(program, dataNames, modelProps);
 
   traverse(program, {
     AssignmentExpression(path) {

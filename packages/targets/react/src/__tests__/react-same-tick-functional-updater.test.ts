@@ -82,4 +82,15 @@ describe('React same-tick derived-local `$data` write → functional updater (26
     // must stay unchanged (this assertion is expected to pass RED and GREEN).
     expect(code).toMatch(/setItems\s*\(\s*prev\s*=>\s*prev\.concat\(\s*\[\s*x\s*\]\s*\)\s*\)/);
   });
+
+  it('conservative fallback: a DESTRUCTURING declarator is NOT inlined (sibling binding preserved)', () => {
+    const code = compileFixture('ReactSameTickDerivedLocalWrite');
+    // appendDestructure: `const { head, rest } = splitItems(items, x); $data.items = head`.
+    // The declarator id is an ObjectPattern binding `rest` (read via `return rest`),
+    // so inlining would destroy the sibling. Must fall back to the plain form and
+    // keep the destructuring declarator intact.
+    expect(code).toMatch(/const\s*\{\s*head\s*,\s*rest\s*\}\s*=\s*splitItems\(/);
+    expect(code).toMatch(/setItems\s*\(\s*head\s*\)/);
+    expect(code).toMatch(/return\s+rest/);
+  });
 });

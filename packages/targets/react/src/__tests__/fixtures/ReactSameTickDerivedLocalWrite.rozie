@@ -27,7 +27,7 @@
 
 <script>
 // Via-a-local write: compute the derivation, then commit it. `next` is derived
-// solely from $data.items and consumed exactly once (as the write RHS).
+// solely from the items state and consumed exactly once (as the write RHS).
 const append = (x) => {
   const next = $data.items.concat([x])
   $data.items = next
@@ -47,6 +47,16 @@ const appendTwo = (a, b) => {
 // byte-identical.
 const appendDirect = (x) => {
   $data.items = $data.items.concat([x])
+}
+
+// NEGATIVE — destructuring declarator MUST NOT inline. `head` is written once,
+// but the declarator also binds `rest` (read below), and the initializer is the
+// whole destructured source, not the local's value. Removing it would kill the
+// sibling binding. Falls back to the plain `setItems(head)` form.
+const appendDestructure = (x) => {
+  const { head, rest } = splitItems($data.items, x)
+  $data.items = head
+  return rest
 }
 </script>
 
