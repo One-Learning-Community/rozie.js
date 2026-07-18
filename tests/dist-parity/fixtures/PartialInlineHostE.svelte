@@ -11,7 +11,6 @@ let { base = 1, ...__rozieAttrs }: Props = $props();
 const headE = (n: number): number => n + 1;
 const usedNameE = (k: number): number => k * 2;
 // leading: the inline host successor trails the spliced partial decl
-// leading: the inline host successor trails the spliced partial decl
 const hostTailE = (n: number): number => usedNameE(n) + headE(n);
 </script>
 

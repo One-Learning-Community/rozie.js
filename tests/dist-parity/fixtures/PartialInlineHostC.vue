@@ -17,8 +17,6 @@ const props = withDefaults(
 const usedName = computed(() => clamp(double(props.base)));
 
 import { clamp } from './partial-helpers.js';
-
-/* between-statement: a transitive non-exported helper pulled in as the closure of usedName */
 /* between-statement: a transitive non-exported helper pulled in as the closure of usedName */
 const double = (n: number): number => n * 2; // trailing: doubles its input
 

@@ -20,8 +20,6 @@ const setColumnFilterJ = (colId: number, value: number): number => {
   const next = colId + value;
   return next;
 };
-
-// Re-read the row model + header groups into $data
 // Re-read the row model + header groups into $data
 let refreshRowModelJ = 0;
 
