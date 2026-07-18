@@ -1,14 +1,14 @@
 // Spike-012 R9 — ROZ208 DATA_INIT_SIGIL_NOT_LOWERED.
-//
-// A member-access `$`-sigil ($props/$data/$refs/$slots) inside a `<data>`
+// SCOPED DOWN by quick 260717-uvl: `$props`/`$data` member reads in a `<data>`
 // INITIALIZER (`data: { count: $props.initial }` — the idiomatic Vue-port
-// derived-initial pattern) is carried into the emit verbatim with no
-// sigil-lowering pass, so it leaks a raw free identifier on ALL SIX targets
-// (`useState($props.initial)` / `ref($props.initial)` / `signal($props.initial)`)
-// → TS2304 + runtime ReferenceError, SILENTLY. Bare whole-object sigils are
-// ROZ978's concern; this is the member-access complement it does not cover. The
-// fix emits a loud ROZ208 steering the author to seed derived state in `$onMount`
-// (the corpus idiom), which works on all six targets.
+// derived-initial pattern) are now sigil-lowered per target (routed through
+// each target's existing rewriteTemplateExpression) and no longer flag.
+// `$refs`/`$slots` remain flagged — neither is meaningful at `<data>`-
+// initializer time (nothing has mounted yet), so a `$refs.x`/`$slots.x`
+// member access in a `<data>` initializer is still a loud ROZ208 steering the
+// author to seed from `$refs`/`$slots` in `$onMount` instead. Bare
+// whole-object sigils are ROZ978's concern; this is the member-access
+// complement it does not cover.
 //
 // Target-agnostic diagnostic (fires regardless of compile target), so a single
 // target suffices. Mirrors data-nested-mutation-diagnostics.test.ts.
@@ -48,18 +48,13 @@ function roz208(diags: Diagnostic[]): Diagnostic[] {
   return diags.filter((d) => d.code === RozieErrorCode.DATA_INIT_SIGIL_NOT_LOWERED);
 }
 
-describe('data-init sigil diagnostics (Spike-012 R9 raw-sigil-leak in <data>)', () => {
+describe('data-init sigil diagnostics (Spike-012 R9, scoped to $refs/$slots by 260717-uvl)', () => {
   const FLAGGED: Array<[string, string]> = [
-    ['$props member access', '{ count: $props.initial }'],
-    ['$props in an expression', "{ label: $props.initial + 1 }"],
-    ['$props in a ternary', "{ n: $props.initial > 0 ? $props.initial : 0 }"],
-    ['$data self-reference', '{ a: 1, b: $data.a }'],
     ['$refs member access', '{ el: $refs.box }'],
     ['$slots member access', '{ s: $slots.header }'],
-    ['computed $props member', "{ v: $props['initial'] }"],
-    ['$props nested in an array literal', '{ list: [$props.initial] }'],
-    ['$props nested in an object literal', '{ o: { x: $props.initial } }'],
-    ['$props inside an arrow-valued field', '{ get: () => $props.initial }'],
+    ['$refs nested in an array literal', '{ list: [$refs.box] }'],
+    ['$refs nested in an object literal', '{ o: { x: $refs.box } }'],
+    ['$refs inside an arrow-valued field', '{ get: () => $refs.box }'],
   ];
 
   for (const [label, dataBody] of FLAGGED) {
@@ -71,10 +66,33 @@ describe('data-init sigil diagnostics (Spike-012 R9 raw-sigil-leak in <data>)', 
   }
 
   it('fires once per offending sigil access (two accesses → two diagnostics)', () => {
-    // `$props.initial > 0 ? $props.initial : 0` has two member accesses.
-    const hits = roz208(compileDiagnostics(rozie("{ n: $props.initial > 0 ? $props.initial : 0 }")));
+    // `$refs.box ? $refs.box : null` has two member accesses.
+    const hits = roz208(compileDiagnostics(rozie('{ n: $refs.box ? $refs.box : null }')));
     expect(hits.length).toBe(2);
   });
+
+  // 260717-uvl (make-it-work) — `$props`/`$data` member reads in a `<data>`
+  // initializer are now sigil-lowered per target (routed through each
+  // target's existing rewriteTemplateExpression), so ROZ208 must NOT flag
+  // them. This is the flip side of the make-it-work fix in
+  // data-init-sigil-lowering.test.ts, which asserts the emitted per-target
+  // lowered read; this suite only asserts the diagnostic no longer fires.
+  const NOT_FLAGGED_PROPS_DATA: Array<[string, string]> = [
+    ['$props member access', '{ count: $props.initial }'],
+    ['$props in an expression', "{ label: $props.initial + 1 }"],
+    ['$props in a ternary', "{ n: $props.initial > 0 ? $props.initial : 0 }"],
+    ['$data self-reference', '{ a: 1, b: $data.a }'],
+    ['computed $props member', "{ v: $props['initial'] }"],
+    ['$props nested in an array literal', '{ list: [$props.initial] }'],
+    ['$props nested in an object literal', '{ o: { x: $props.initial } }'],
+    ['$props inside an arrow-valued field', '{ get: () => $props.initial }'],
+  ];
+
+  for (const [label, dataBody] of NOT_FLAGGED_PROPS_DATA) {
+    it(`does NOT flag ${label} (sigil-lowered per target)`, () => {
+      expect(roz208(compileDiagnostics(rozie(dataBody))).length, `unexpected ROZ208`).toBe(0);
+    });
+  }
 
   const CLEAN: Array<[string, string]> = [
     ['plain literal', '{ count: 0 }'],

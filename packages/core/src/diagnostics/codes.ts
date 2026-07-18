@@ -567,22 +567,18 @@ export const RozieErrorCode = {
   // backlogged (emitter-hardening); until it lands, fail loud here.
   DATA_NESTED_MUTATION_NOT_REACTIVE: 'ROZ207', // error — an in-place mutation of nested `$data` (member/index write, or a mutating array/Map/Set method). Not reactive on React/Solid/Angular/Lit. Replace the whole top-level value instead: `$data.X = { ...$data.X, key: … }`.
 
-  // Spike-012 R9 — a member-access `$`-sigil ($props/$data/$refs/$slots) inside a
-  // `<data>` block INITIALIZER (`data: { count: $props.initial }` — the idiomatic
-  // Vue-port derived-initial pattern). The `<data>` initializer is carried into
-  // the emit VERBATIM with no sigil-lowering pass, so the sigil leaks as a raw
-  // free identifier on ALL SIX targets (`useState($props.initial)` /
-  // `ref($props.initial)` / `signal($props.initial)`) → TS2304 + a runtime
-  // ReferenceError, SILENTLY (no diagnostic). Bare whole-object sigils here are
-  // ROZ978's concern; this is the member-access complement, which ROZ978 does not
-  // cover. Every shipped `.rozie` seeds derived state in `$onMount` instead
-  // (`$onMount(() => { $data.count = $props.initial })`), the corpus idiom — so
-  // this is corpus-safe. Note: even a correctly-lowered `data`-from-`props` init
-  // SNAPSHOTS the prop and would not track later changes (the derived-state
-  // footgun, uniform across frameworks), so steering to an explicit $onMount seed
-  // is the honest fix. A real per-target data-init sigil lowering is backlogged.
+  // Spike-012 R9, SCOPED DOWN by quick 260717-uvl — a member-access `$`-sigil
+  // inside a `<data>` block INITIALIZER (`data: { el: $refs.box }`). `$props`/
+  // `$data` member reads are now sigil-lowered per target (routed through each
+  // target's EXISTING rewriteTemplateExpression — the same machinery already
+  // used for `$props.X`/`$data.X` in templates/handlers) and no longer flag.
+  // `$refs`/`$slots` are NOT meaningful at `<data>`-initializer time (refs are
+  // only safe to read inside `$onMount` per project convention — nothing has
+  // mounted yet when the initializer runs) and remain a loud error here. Bare
+  // whole-object sigils are ROZ978's concern; this is the member-access
+  // complement, which ROZ978 does not cover.
   // ROZ208 is the next free code after ROZ207 in the 200 reactive-state cluster.
-  DATA_INIT_SIGIL_NOT_LOWERED: 'ROZ208', // error — a `$props`/`$data`/`$refs`/`$slots` member access inside a `<data>` initializer. It is not sigil-lowered and leaks a raw free identifier on all six targets. Seed derived state in `$onMount` instead: `$onMount(() => { $data.x = $props.y })`.
+  DATA_INIT_SIGIL_NOT_LOWERED: 'ROZ208', // error — a `$refs`/`$slots` member access inside a `<data>` initializer. Neither is meaningful at init time (nothing has mounted yet). Seed from `$refs` in `$onMount` instead: `$onMount(() => { $data.x = $refs.y })`.
 
   // ---- Warnings (Phase 2 Plan 02) — ROZ300..ROZ399 ----
   RFOR_MISSING_KEY: 'ROZ300', // SEM-03: r-for without :key

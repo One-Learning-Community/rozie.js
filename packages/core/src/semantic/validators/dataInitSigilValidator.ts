@@ -1,38 +1,45 @@
 /**
  * Spike-012 R9 / ROZ208 — `<data>`-initializer sigil-leak validator.
+ * SCOPED DOWN by quick 260717-uvl to `$refs`/`$slots` only.
  *
- * Detects a member-access `$`-sigil ($props/$data/$refs/$slots) inside a `<data>`
- * block INITIALIZER expression:
+ * Detects a member-access `$`-sigil ($refs/$slots) inside a `<data>` block
+ * INITIALIZER expression:
  *
  *   <data>
- *   { count: $props.initial }   // the idiomatic Vue-port derived-initial pattern
+ *   { el: $refs.box }
  *   </data>
  *
- * The `<data>` initializer is carried into the emit VERBATIM (lowerData copies the
- * Babel Expression with no sigil-lowering pass), so the sigil leaks as a raw free
- * identifier on ALL SIX targets — `useState($props.initial)` (React),
- * `ref($props.initial)` (Vue), `signal($props.initial)` (Angular/Lit), etc. → a
- * `TS2304 Cannot find name '$props'` under any config PLUS a runtime
- * ReferenceError, SILENTLY (no diagnostic today). Rozie's promise is one source →
- * six working targets, and this breaks on all six at once.
+ * `$props`/`$data` member reads in a `<data>` initializer (`{ count:
+ * $props.initial }` — the idiomatic Vue-port derived-initial pattern) are now
+ * sigil-lowered: each target's state-initializer emit routes the initializer
+ * through that target's EXISTING `rewriteTemplateExpression` (the same
+ * machinery already used to lower `$props.X`/`$data.X` in templates and
+ * handlers — reuse, not a fork), so `$props`/`$data` no longer leak a raw
+ * free identifier and no longer flag here.
  *
- * The portable fix is to seed derived state in `$onMount` (the corpus idiom —
- * every shipped `.rozie` does exactly this; 0/340 reference a sigil in a `<data>`
- * initializer):
+ * `$refs`/`$slots` remain flagged: neither is meaningful at `<data>`-
+ * initializer time — nothing has mounted yet when the initializer runs, so a
+ * `$refs.x` read at that point is always `undefined` (refs are only safe to
+ * read inside `$onMount`, per project convention), and `$slots.x` has no
+ * useful init-time meaning either. The portable fix is to seed from a ref (or
+ * slot) in `$onMount` (the corpus idiom):
  *
- *   $onMount(() => { $data.count = $props.initial })
+ *   $onMount(() => { $data.count = $refs.box.someValue })
  *
- * Note: even a correctly-lowered `data`-from-`props` initializer would SNAPSHOT
- * the prop and not track later changes (the derived-state footgun, uniform across
- * frameworks), so steering to an explicit `$onMount` seed is the honest fix — not
- * merely a lowering gap. A real per-target data-init sigil lowering is backlogged.
+ * DESIGN CAVEAT (preserved from the original R9 note): even the now-working
+ * `$props`/`$data` lowering SNAPSHOTS the prop/data value at init time and
+ * will NOT track later changes (the derived-state footgun, uniform across
+ * frameworks). The `$onMount` seed remains the honest REACTIVE form; this fix
+ * only makes the SNAPSHOT form work — it does not try to make it reactive.
  *
- * FLAGGED: any MemberExpression whose ROOT object is a bare sigil identifier
- * ($props/$data/$refs/$slots), anywhere in a `<data>` initializer subtree —
- * including nested inside object/array literals, ternaries, and arrow-valued
- * fields (none of which are lowered). Fires once per offending access.
+ * FLAGGED: any MemberExpression whose ROOT object is a bare `$refs`/`$slots`
+ * identifier, anywhere in a `<data>` initializer subtree — including nested
+ * inside object/array literals, ternaries, and arrow-valued fields. Fires
+ * once per offending access.
  *
  * NOT FLAGGED:
+ *   - a `$props`/`$data` member access — sigil-lowered per target (make-it-work,
+ *     260717-uvl);
  *   - a bare whole-object sigil (`{ p: $props }`) — ROZ978's concern, not a
  *     member access;
  *   - a member access on a NON-sigil object (`{ x: Math.PI }`);
@@ -59,9 +66,10 @@ const traverse: TraverseFn =
     ? _traverse
     : (_traverse as unknown as { default: TraverseFn }).default;
 
-// The object sigils that leak as raw free identifiers when not lowered. Matches
-// bareSigilValidator's BARE_SIGILS set ($attrs/$listeners deliberately excluded).
-const LEAKING_SIGILS = new Set(['$props', '$data', '$refs', '$slots']);
+// The sigils that are NOT meaningful in a `<data>` initializer — nothing has
+// mounted yet at init time. `$props`/`$data` were removed from this set by
+// quick 260717-uvl: both are now sigil-lowered per target and no longer leak.
+const LEAKING_SIGILS = new Set(['$refs', '$slots']);
 
 /**
  * Walk one `<data>` initializer Expression, emitting ROZ208 for each
@@ -78,9 +86,9 @@ function checkInitializer(init: t.Expression, diagnostics: Diagnostic[]): void {
       diagnostics.push({
         code: RozieErrorCode.DATA_INIT_SIGIL_NOT_LOWERED,
         severity: 'error',
-        message: `'${obj.name}' is referenced in a <data> initializer, where it is not sigil-lowered — it leaks as a raw free identifier on all six targets (TS2304 + a runtime ReferenceError).`,
+        message: `'${obj.name}' is referenced in a <data> initializer, where it is not meaningful — nothing has mounted yet at init time.`,
         loc: locFromBabel(path.node),
-        hint: `Seed derived state in $onMount instead, e.g. $onMount(() => { $data.<key> = ${obj.name}.<member> }).`,
+        hint: `Seed from ${obj.name} in $onMount instead, e.g. $onMount(() => { $data.<key> = ${obj.name}.<member> }).`,
       });
     },
   });
