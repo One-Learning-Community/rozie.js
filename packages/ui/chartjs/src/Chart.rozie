@@ -44,7 +44,7 @@
   other five targets. Every object handed to the engine is snapshotted first.
 
   $refs discipline: `$refs.canvasEl` is read ONCE inside `$onMount` and captured
-  into a plain `canvasNode` let; re-creates use the captured node (never re-read
+  into a plain `canvasEl` let; re-creates use the captured node (never re-read
   $refs outside the mount hook — ROZ123 / project_refs_only_safe_in_onmount).
 -->
 
@@ -166,11 +166,8 @@ import { Chart as ChartJS } from 'chart.js'
 
 let instance = null
 // $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
-// captured node so no $refs read ever executes outside the mount hook. Named
-// `canvasNode` (NOT `canvasEl`) so it does not collide with the template
-// `ref="canvasEl"` binding, which the per-target emitters lower to their own
-// `canvasEl` ref declaration (a same-name script local double-declares it).
-let canvasNode = null
+// captured node so no $refs read ever executes outside the mount hook.
+let canvasEl = null
 // buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
 // references are bound in the mount-lifecycle scope the per-target emitters
 // provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
@@ -178,7 +175,7 @@ let canvasNode = null
 let buildConfig = null
 
 $onMount(() => {
-  canvasNode = $refs.canvasEl
+  canvasEl = $refs.canvasEl
 
   // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
   // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
@@ -283,7 +280,7 @@ $onMount(() => {
     }
   }
 
-  instance = new ChartJS(canvasNode, buildConfig())
+  instance = new ChartJS(canvasEl, buildConfig())
   return () => {
     tooltipDispose?.()
     tooltipEl?.remove()
@@ -301,11 +298,11 @@ $onMount(() => {
 
 // Re-create the live instance. Chart.js exposes no stable runtime type-swap or
 // plugin-swap, so `type`/`plugins`/`redraw`-driven changes re-create. Uses the
-// captured canvasNode (never re-reads $refs outside $onMount).
+// captured canvasEl (never re-reads $refs outside $onMount).
 const recreate = () => {
-  if (!buildConfig || !canvasNode) return
+  if (!buildConfig || !canvasEl) return
   instance?.destroy()
-  instance = new ChartJS(canvasNode, buildConfig())
+  instance = new ChartJS(canvasEl, buildConfig())
 }
 
 // Reconcile prop changes. Mutating chart.data in place and calling update() is

@@ -20,7 +20,7 @@ interface TooltipCtx {
 
     <div class="rozie-chart" [style]="__style">
       
-      <canvas #canvasEl role="img" [attr.aria-label]="ariaLabel()"><ng-container *ngTemplateOutlet="(fallbackTpl ?? templates()?.['fallback'])" /></canvas>
+      <canvas #canvasElRef role="img" [attr.aria-label]="ariaLabel()"><ng-container *ngTemplateOutlet="(fallbackTpl ?? templates()?.['fallback'])" /></canvas>
     </div>
 
 
@@ -95,7 +95,7 @@ export class Pie {
    * Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.
    */
   destroyDelay = input<number>(0);
-  canvasEl = viewChild<ElementRef<HTMLElement>>('canvasEl');
+  canvasElRef = viewChild<ElementRef<HTMLElement>>('canvasElRef');
   click = output<unknown>();
   datasetClick = output<unknown>();
   hover = output<unknown>();
@@ -209,7 +209,7 @@ export class Pie {
         };
       },
     };
-    this.canvasNode = this.canvasEl()?.nativeElement;
+    this.canvasEl = this.canvasElRef()?.nativeElement;
 
     // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
     // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
@@ -361,7 +361,7 @@ export class Pie {
         }
       };
     };
-    this.instance = new ChartJS(this.canvasNode, this.buildConfig());
+    this.instance = new ChartJS(this.canvasEl, this.buildConfig());
     this.__rozieDestroyRef.onDestroy(() => {
       const __destroyDelay = this.destroyDelay();
       tooltipDispose?.();
@@ -383,12 +383,12 @@ export class Pie {
   }
 
   instance: any = null;
-  canvasNode: any = null;
+  canvasEl: any = null;
   buildConfig: any = null;
   recreate = () => {
-    if (!this.buildConfig || !this.canvasNode) return;
+    if (!this.buildConfig || !this.canvasEl) return;
     this.instance?.destroy();
-    this.instance = new ChartJS(this.canvasNode, this.buildConfig());
+    this.instance = new ChartJS(this.canvasEl, this.buildConfig());
   };
   getChart = () => {
     return this.instance;

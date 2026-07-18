@@ -102,9 +102,9 @@ const Radar = forwardRef<RadarHandle, RadarProps>(function Radar(_props: RadarPr
   };
   const _renderTooltipRef = useRef(props.renderTooltip);
   _renderTooltipRef.current = props.renderTooltip;
-  const canvasNode = useRef<any>(null);
   const buildConfig = useRef<any>(null);
   const instance = useRef<any>(null);
+  const canvasEl$local = useRef<any>(null);
   const _dataRef = useRef(props.data);
   _dataRef.current = props.data;
   const _optionsRef = useRef(props.options);
@@ -131,9 +131,9 @@ const Radar = forwardRef<RadarHandle, RadarProps>(function Radar(_props: RadarPr
   // The per-type components (Line/Bar/…) register their own controller set, so
   // importing one is tree-shakable by construction.
   function recreate() {
-    if (!buildConfig.current || !canvasNode.current) return;
+    if (!buildConfig.current || !canvasEl$local.current) return;
     instance.current?.destroy();
-    instance.current = new ChartJS(canvasNode.current, buildConfig.current());
+    instance.current = new ChartJS(canvasEl$local.current, buildConfig.current());
   }
   // Imperative handle (Phase 21 $expose). The lifecycle/redraw verbs are SUFFIXED
   // with `Chart` because bare `update`/`render` collide with LitElement's
@@ -221,7 +221,7 @@ const Radar = forwardRef<RadarHandle, RadarProps>(function Radar(_props: RadarPr
       };
     },
   };
-    canvasNode.current = canvasEl.current;
+    canvasEl$local.current = canvasEl.current;
 
     // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
     // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
@@ -352,7 +352,7 @@ const Radar = forwardRef<RadarHandle, RadarProps>(function Radar(_props: RadarPr
         }
       };
     };
-    instance.current = new ChartJS(canvasNode.current, buildConfig.current());
+    instance.current = new ChartJS(canvasEl$local.current, buildConfig.current());
     return () => {
       for (const root of portalRoots.current) root.unmount();
   portalRoots.current.clear();

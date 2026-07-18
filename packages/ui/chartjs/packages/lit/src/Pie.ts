@@ -177,7 +177,7 @@ private _portalContainers = new Set<HTMLElement>();
       }
     }));
 
-    this.canvasNode = this._refCanvasEl;
+    this.canvasEl = this._refCanvasEl;
 
     // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
     // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
@@ -341,7 +341,7 @@ private _portalContainers = new Set<HTMLElement>();
         }
       };
     };
-    this.instance = new ChartJS(this.canvasNode, this.buildConfig());
+    this.instance = new ChartJS(this.canvasEl, this.buildConfig());
   }
 
   updated(changedProperties: Map<string, unknown>): void {
@@ -436,14 +436,14 @@ private _portalContainers = new Set<HTMLElement>();
 
   instance: any = null;
 
-  canvasNode: any = null;
+  canvasEl: any = null;
 
   buildConfig: any = null;
 
   recreate = () => {
-  if (!this.buildConfig || !this.canvasNode) return;
+  if (!this.buildConfig || !this.canvasEl) return;
   this.instance?.destroy();
-  this.instance = new ChartJS(this.canvasNode, this.buildConfig());
+  this.instance = new ChartJS(this.canvasEl, this.buildConfig());
 };
 
   getChart() {

@@ -125,7 +125,7 @@ export default function Line(_props: LineProps): JSX.Element {
     portalDisposers.clear();
   });
   onMount(() => {
-    canvasNode = canvasElRef;
+    canvasEl = canvasElRef;
 
     // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
     // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
@@ -256,7 +256,7 @@ export default function Line(_props: LineProps): JSX.Element {
         }
       };
     };
-    instance = new ChartJS(canvasNode, buildConfig());
+    instance = new ChartJS(canvasEl, buildConfig());
     onCleanup(() => {
       tooltipDispose?.();
       tooltipEl?.remove();
@@ -354,11 +354,8 @@ export default function Line(_props: LineProps): JSX.Element {
 
   let instance: any = null;
   // $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
-  // captured node so no $refs read ever executes outside the mount hook. Named
-  // `canvasNode` (NOT `canvasEl`) so it does not collide with the template
-  // `ref="canvasEl"` binding, which the per-target emitters lower to their own
-  // `canvasEl` ref declaration (a same-name script local double-declares it).
-  let canvasNode: any = null;
+  // captured node so no $refs read ever executes outside the mount hook.
+  let canvasEl: any = null;
   // buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
   // references are bound in the mount-lifecycle scope the per-target emitters
   // provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
@@ -366,11 +363,11 @@ export default function Line(_props: LineProps): JSX.Element {
   let buildConfig: any = null;
   // Re-create the live instance. Chart.js exposes no stable runtime type-swap or
   // plugin-swap, so `type`/`plugins`/`redraw`-driven changes re-create. Uses the
-  // captured canvasNode (never re-reads $refs outside $onMount).
+  // captured canvasEl (never re-reads $refs outside $onMount).
   function recreate() {
-    if (!buildConfig || !canvasNode) return;
+    if (!buildConfig || !canvasEl) return;
     instance?.destroy();
-    instance = new ChartJS(canvasNode, buildConfig());
+    instance = new ChartJS(canvasEl, buildConfig());
   }
 
   // Reconcile prop changes. Mutating chart.data in place and calling update() is
