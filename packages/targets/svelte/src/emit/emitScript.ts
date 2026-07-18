@@ -422,6 +422,19 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
     // is already shared as prev's trailing (within-partial pairs share the same
     // objects), leave it — never double-apply.
     if (prevTrail && prevTrail.length > 0 && prevTrail[prevTrail.length - 1] === lastLead) {
+      // Quick task 260718-uvn — a within-partial between-statement comment is
+      // object-shared as prev.trailing + cur.leading (e.g. a hoisted partial import
+      // directly above a decl). Post-260714-orv the inline oracle single-prints it (its
+      // host-only dedup strips the prev-trailing copy), so the splice branch must match:
+      // strip prev.trailing of every source-match, leaving ONE copy on cur.leading,
+      // instead of the former bare `continue` that LEFT the shared copy (reproducing
+      // inline's PRE-260714-orv double-print). A genuinely independent prev-trailing
+      // comment, if any, survives. Pure comment dedup — no loc/blank arithmetic touched.
+      const curLeadAll = cur.leadingComments ?? [];
+      const dedupPrev = prevTrail.filter(
+        (c) => !curLeadAll.some((lc) => isSameSourceComment(c, lc)),
+      );
+      prev.trailingComments = dedupPrev.length > 0 ? dedupPrev : null;
       continue;
     }
     let toAppend = lead;
@@ -439,6 +452,18 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
       // stamps `cur.extra.__rozieAfterGap` (the reproduced gap; gap 2 = one blank).
       // Anchor the cloned trailing copy `afterGap` lines past PREV so the boundary blank
       // is reproduced (a gap-0 trailing seam carries no marker → +1, byte-identical).
+      // Quick task 260718-uvn (SUB-STEP B) — ENTANGLED trailing seam. Partition `lead`
+      // BEFORE the loc-clone: suppress comments CUR already prints from its own
+      // leadingComments (post-260714-orv the inline oracle single-prints, so the cloned
+      // copy is the artificial second one) — their now-orphaned R8/R11 blank-line math
+      // is dropped WITH them, never entering the arithmetic — and feed ONLY genuinely
+      // independent comments into the UNCHANGED loc-clone below. The __rozieAfterGap /
+      // anchorLine / baseLine-delta arithmetic is byte-for-byte identical, just over
+      // `independent` (an all-duplicate seam yields `[]` → the guarded append is skipped
+      // and cur.leading renders the R8/R11 blanks on its own).
+      const independent = lead.filter(
+        (c) => !(cur.leadingComments ?? []).some((lc) => isSameSourceComment(c, lc)),
+      );
       const afterGap = (curExtra as { __rozieAfterGap?: number } | undefined)?.__rozieAfterGap;
       const anchorLine =
         (prev.loc?.end.line ?? 0) + (typeof afterGap === 'number' ? afterGap : 1);
@@ -455,8 +480,8 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
       // comment (HostJ/HostE/HostI) every delta is 0 → byte-identical to the prior flatten.
       // react/angular/solid/lit are unaffected (they reconstruct/strip/whole-program-dedup the
       // comment, reading the core loc deltas directly — solid already preserves both blanks).
-      const baseLine = lead[0]?.loc?.start.line;
-      toAppend = lead.map((c) => {
+      const baseLine = independent[0]?.loc?.start.line;
+      toAppend = independent.map((c) => {
         if (!c.loc) return { ...c };
         const startLine =
           baseLine === undefined ? anchorLine : anchorLine + (c.loc.start.line - baseLine);
@@ -472,17 +497,27 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
         };
       });
     } else {
-      // Quick task 260718-uvn (SUB-STEP A) — plain LEADING seam (curSpliced, no
-      // loc rewrite): CUR already prints its OWN leadingComments, so appending a
-      // source-duplicate of them onto PREV's trailing is the artificial second copy
-      // the inline oracle no longer emits (post-260714-orv single-print). Drop any
-      // comment that source-matches one cur.leading already carries before appending.
-      toAppend = lead.filter(
-        (c) => !(cur.leadingComments ?? []).some((lc) => isSameSourceComment(c, lc)),
-      );
+      // Quick task 260718-uvn (SUB-STEP A) — plain LEADING / within-partial seam
+      // (curSpliced, no loc rewrite): CUR already prints its OWN leadingComments, so a
+      // source-duplicate of them on PREV's trailing is the artificial second copy the
+      // inline oracle no longer emits (post-260714-orv single-print). Two routes double
+      // it here: (1) an EXISTING prev.trailing copy — @babel shares a between-statement
+      // comment onto the predecessor's trailingComments, and an earlier clone pass
+      // (hoistModuleLet / rewriteRozieIdentifiers on a hoisted partial import) mints a
+      // content-identical object so the `===` identity guard above did NOT catch it —
+      // strip it by SOURCE position; and (2) the about-to-be-mirrored append — filter it.
+      // Both keyed on isSameSourceComment against cur.leading so the comment prints ONCE.
+      const curLeadNow = cur.leadingComments ?? [];
+      if (prevTrail && prevTrail.length > 0) {
+        const dedupPrev = prevTrail.filter(
+          (c) => !curLeadNow.some((lc) => isSameSourceComment(c, lc)),
+        );
+        prev.trailingComments = dedupPrev.length > 0 ? dedupPrev : null;
+      }
+      toAppend = lead.filter((c) => !curLeadNow.some((lc) => isSameSourceComment(c, lc)));
     }
     if (toAppend.length > 0) {
-      prev.trailingComments = [...(prevTrail ?? []), ...toAppend];
+      prev.trailingComments = [...(prev.trailingComments ?? []), ...toAppend];
     }
   }
 }
