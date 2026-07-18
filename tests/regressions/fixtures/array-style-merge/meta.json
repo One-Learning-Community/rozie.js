@@ -1,0 +1,9 @@
+{
+  "id": "REG-ARRAY-STYLE-001",
+  "source": "quick/260717-uvk-make-roz144-array-form-style-merge-work-",
+  "sourceKind": "deviation-log",
+  "phase": "quick-260717-uvk",
+  "desc": "Array-form :style=\"[a,b]\" merges left-to-right (later wins) on all 6 targets — react/solid via parseInlineStyle array-merge, lit/svelte via rozieStyle array-merge, angular via [attr.style]=__rozieMergeStyle(...), vue native; ROZ144 removed.",
+  "targets": ["vue", "react", "svelte", "angular", "solid", "lit"],
+  "discoveredBy": "quick/260717-uvk"
+}

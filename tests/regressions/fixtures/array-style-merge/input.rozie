@@ -1,0 +1,13 @@
+<rozie name="ArrayStyleMerge">
+<props>{
+  base: { type: Object, default: () => ({}) },
+  s: { type: String, default: '' }
+}</props>
+<template>
+  <div>
+    <span :style="[{ color: 'red' }, { color: 'blue' }]">object+object override (later wins → blue)</span>
+    <span :style="[$props.s, { fontSize: '12px' }]">string+object</span>
+    <span :style="[$props.base, $props.s]">dynamic+dynamic</span>
+  </div>
+</template>
+</rozie>
