@@ -30,6 +30,7 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import type { LitDecoratorImportCollector } from '../rewrite/collectLitImports.js';
 import { collectMethodNamesFromIR } from './methodNames.js';
 import { portalSlotMemberName } from './portalSlotMemberName.js';
+import { slotScopeParamType, slotScopeTypeObject } from './slotScopeParamType.js';
 
 export interface EmitSlotDeclOpts {
   decorators: LitDecoratorImportCollector;
@@ -155,7 +156,9 @@ function emitOneSlot(
     const anyDataTyped = slot.params.some((p) => !isFunctionTypedParam(p, methodNameSet));
     if (anyDataTyped) {
       const ifaceName = `Rozie${suffix}SlotCtx`;
-      const fields = slot.params.map((p) => `  ${p.name}: unknown;`).join('\n');
+      const fields = slot.params
+        .map((p, i) => `  ${p.name}: ${slotScopeParamType(slot.paramTypes, i)};`)
+        .join('\n');
       ctxInterfaces.push(`interface ${ifaceName} {\n${fields}\n}`);
     }
   }
@@ -187,7 +190,7 @@ function emitOneSlot(
       slot.name === '' ? '__rozieDefaultSlot__' : portalSlotMemberName(slot.name, ir);
     const scopeType =
       slot.params.length > 0
-        ? `{ ${slot.params.map((p) => `${p.name}: unknown`).join('; ')} }`
+        ? slotScopeTypeObject(slot.params, slot.paramTypes)
         : 'unknown';
     propertyField = `  @property({ attribute: false }) ${propertyFieldName}?: (scope: ${scopeType}) => unknown;`;
   }

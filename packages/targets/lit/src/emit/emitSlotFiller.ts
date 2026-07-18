@@ -75,6 +75,7 @@ import type {
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { slotScopeTypeObject } from './slotScopeParamType.js';
 // @babel/traverse ships CJS default-export; unwrap for ESM consumers.
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
@@ -572,13 +573,14 @@ export function emitSlotFiller(
 
     const body = ctx.emitChildren(filler.body);
 
-    // Scope-type TS annotation: `{ p1: unknown; p2: unknown; ... }`.
+    // Scope-type TS annotation: `{ p1: any; p2: any; ... }` (or the serialized
+    // TSType per param when the IR carries real paramTypes — quick 260717-uvm).
     // Uses filler.params.name (producer slot keys) — the scope object is keyed
     // by slot key, NOT consumer-local rename. threadParamTypes validates the
     // names against producer.SlotDecl.params for ROZ947.
     const scopeTypeStr =
       filler.params.length > 0
-        ? `{ ${filler.params.map((p) => `${p.name}: unknown`).join('; ')} }`
+        ? slotScopeTypeObject(filler.params, filler.paramTypes)
         : 'unknown';
 
     // Single-parameter form: `(scope: { close: unknown }) => html\`…body refs scope.close…\``.
