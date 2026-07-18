@@ -55,6 +55,7 @@ import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js'
 import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
+import { rewriteAngularAssetImports } from '../rewrite/rewriteAssetUrl.js';
 import {
   rewriteRozieIdentifiers,
   hoistDoubleReadAccessors,
@@ -904,6 +905,21 @@ export function emitScript(
 
   // 1. Clone Program (NEVER mutate ir.setupBody.scriptProgram).
   const cloned = cloneScriptProgram(ir.setupBody.scriptProgram);
+
+  // 1a-pre. quick 260718-uvp — rewrite `new URL(<string-literal>, import.meta.url)`
+  //     into a hoisted `?url` asset import. analogjs AOT REJECTS `import.meta.url`
+  //     (worker 404 / JIT fallback); Vite/analog's `?url` convention yields the
+  //     resolved asset URL string. The synthesized default-import declarations are
+  //     unshifted onto the cloned body BEFORE partitionUserImports so they bucket
+  //     into the module-top `userImports` string automatically; the replaced
+  //     `__rozieAsset<N>` reference remains a SCRIPT-body reference (e.g. inside
+  //     the `$onMount` callback → `ngAfterViewInit`) that resolves against the
+  //     module-scope import — NOT a template ref, so no valueImportNames alias is
+  //     involved. Angular seam ONLY (the other 5 targets tolerate `import.meta.url`).
+  //     Fires ONLY on the exact static-literal + `import.meta.url` shape; when
+  //     nothing matches it returns [] → byte-identical downstream.
+  const __assetImports = rewriteAngularAssetImports(cloned);
+  if (__assetImports.length) cloned.program.body.unshift(...__assetImports);
 
   // 1a. Phase 61 Plan 04 — auto-alias a `<script>` value-import binding whose
   //     LOCAL name collides with an author PROP (rewritten to `this.<name>()`)
