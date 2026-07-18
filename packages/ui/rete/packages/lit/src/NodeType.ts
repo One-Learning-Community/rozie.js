@@ -8,9 +8,9 @@ const __rozieCtx_rete_nodeType = createContext(Symbol.for("rozie:rete:nodeType")
 const __rozieCtx_rete_canvas = createContext(Symbol.for("rozie:rete:canvas"));
 
 interface RozieBodySlotCtx {
-  node: unknown;
-  selected: unknown;
-  emit: unknown;
+  node: any;
+  selected: any;
+  emit: any;
 }
 
 @customElement('rozie-node-type')
@@ -60,7 +60,7 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
 
   @state() private _hasSlotBody = false;
   @queryAssignedElements({ slot: 'body', flatten: true }) private _slotBodyElements!: Element[];
-  @property({ attribute: false }) body?: (scope: { node: unknown; selected: unknown; emit: unknown }) => unknown;
+  @property({ attribute: false }) body?: (scope: { node: any; selected: any; emit: any }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
 

@@ -4,8 +4,8 @@ import { SignalWatcher } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 interface RozieDefaultSlotCtx {
-  checked: unknown;
-  toggle: unknown;
+  checked: any;
+  toggle: any;
 }
 
 @customElement('rozie-switch')
@@ -85,7 +85,7 @@ export default class Switch extends SignalWatcher(LitElement) {
 
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
-  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { checked: unknown; toggle: unknown }) => unknown;
+  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { checked: any; toggle: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

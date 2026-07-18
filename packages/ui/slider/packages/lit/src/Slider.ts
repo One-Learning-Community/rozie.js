@@ -6,13 +6,13 @@ import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 interface RozieMarkSlotCtx {
-  value: unknown;
-  label: unknown;
-  position: unknown;
+  value: any;
+  label: any;
+  position: any;
 }
 
 interface RozieBubbleSlotCtx {
-  value: unknown;
+  value: any;
 }
 
 @customElement('rozie-slider')
@@ -227,10 +227,10 @@ export default class Slider extends SignalWatcher(LitElement) {
 
   @state() private _hasSlotMark = false;
   @queryAssignedElements({ slot: 'mark', flatten: true }) private _slotMarkElements!: Element[];
-  @property({ attribute: false }) mark?: (scope: { value: unknown; label: unknown; position: unknown }) => unknown;
+  @property({ attribute: false }) mark?: (scope: { value: any; label: any; position: any }) => unknown;
   @state() private _hasSlotBubble = false;
   @queryAssignedElements({ slot: 'bubble', flatten: true }) private _slotBubbleElements!: Element[];
-  @property({ attribute: false }) bubble?: (scope: { value: unknown }) => unknown;
+  @property({ attribute: false }) bubble?: (scope: { value: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

@@ -28,27 +28,27 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { basicSetup as basicSetupBundle } from 'codemirror';
 
 interface RoziePanelSlotCtx {
-  view: unknown;
+  view: any;
 }
 
 interface RozieTopPanelSlotCtx {
-  view: unknown;
+  view: any;
 }
 
 interface RozieTooltipSlotCtx {
-  view: unknown;
-  pos: unknown;
+  view: any;
+  pos: any;
 }
 
 interface RozieGutterSlotCtx {
-  line: unknown;
-  view: unknown;
+  line: any;
+  view: any;
 }
 
 interface RozieDecorationSlotCtx {
-  from: unknown;
-  to: unknown;
-  view: unknown;
+  from: any;
+  to: any;
+  view: any;
 }
 
 @customElement('rozie-code-mirror')
@@ -158,19 +158,19 @@ private _portalContainers = new Set<HTMLElement>();
 
   @state() private _hasSlotPanel = false;
   @queryAssignedElements({ slot: 'panel', flatten: true }) private _slotPanelElements!: Element[];
-  @property({ attribute: false }) panel?: (scope: { view: unknown }) => unknown;
+  @property({ attribute: false }) panel?: (scope: { view: any }) => unknown;
   @state() private _hasSlotTopPanel = false;
   @queryAssignedElements({ slot: 'topPanel', flatten: true }) private _slotTopPanelElements!: Element[];
-  @property({ attribute: false }) topPanel?: (scope: { view: unknown }) => unknown;
+  @property({ attribute: false }) topPanel?: (scope: { view: any }) => unknown;
   @state() private _hasSlotTooltip = false;
   @queryAssignedElements({ slot: 'tooltip', flatten: true }) private _slotTooltipElements!: Element[];
-  @property({ attribute: false }) tooltip?: (scope: { view: unknown; pos: unknown }) => unknown;
+  @property({ attribute: false }) tooltip?: (scope: { view: any; pos: any }) => unknown;
   @state() private _hasSlotGutter = false;
   @queryAssignedElements({ slot: 'gutter', flatten: true }) private _slotGutterElements!: Element[];
-  @property({ attribute: false }) gutter?: (scope: { line: unknown; view: unknown }) => unknown;
+  @property({ attribute: false }) gutter?: (scope: { line: any; view: any }) => unknown;
   @state() private _hasSlotDecoration = false;
   @queryAssignedElements({ slot: 'decoration', flatten: true }) private _slotDecorationElements!: Element[];
-  @property({ attribute: false }) decoration?: (scope: { from: unknown; to: unknown; view: unknown }) => unknown;
+  @property({ attribute: false }) decoration?: (scope: { from: any; to: any; view: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

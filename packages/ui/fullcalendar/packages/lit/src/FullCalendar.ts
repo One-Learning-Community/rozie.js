@@ -8,43 +8,43 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
 interface RozieEventSlotCtx {
-  arg: unknown;
+  arg: any;
 }
 
 interface RozieDayCellSlotCtx {
-  arg: unknown;
+  arg: any;
 }
 
 interface RozieDayHeaderSlotCtx {
-  arg: unknown;
+  arg: any;
 }
 
 interface RozieSlotLabelSlotCtx {
-  arg: unknown;
+  arg: any;
 }
 
 interface RozieWeekNumberSlotCtx {
-  arg: unknown;
+  arg: any;
 }
 
 interface RozieNowIndicatorContentSlotCtx {
-  arg: unknown;
+  arg: any;
 }
 
 interface RozieMoreLinkSlotCtx {
-  arg: unknown;
+  arg: any;
 }
 
 interface RozieAllDayContentSlotCtx {
-  arg: unknown;
+  arg: any;
 }
 
 interface RozieSlotLaneContentSlotCtx {
-  arg: unknown;
+  arg: any;
 }
 
 interface RozieNoEventsContentSlotCtx {
-  arg: unknown;
+  arg: any;
 }
 
 @customElement('rozie-full-calendar')
@@ -123,34 +123,34 @@ private _portalContainers = new Set<HTMLElement>();
 
   @state() private _hasSlotEvent = false;
   @queryAssignedElements({ slot: 'event', flatten: true }) private _slotEventElements!: Element[];
-  @property({ attribute: false }) event?: (scope: { arg: unknown }) => unknown;
+  @property({ attribute: false }) event?: (scope: { arg: any }) => unknown;
   @state() private _hasSlotDayCell = false;
   @queryAssignedElements({ slot: 'dayCell', flatten: true }) private _slotDayCellElements!: Element[];
-  @property({ attribute: false }) dayCell?: (scope: { arg: unknown }) => unknown;
+  @property({ attribute: false }) dayCell?: (scope: { arg: any }) => unknown;
   @state() private _hasSlotDayHeader = false;
   @queryAssignedElements({ slot: 'dayHeader', flatten: true }) private _slotDayHeaderElements!: Element[];
-  @property({ attribute: false }) dayHeader?: (scope: { arg: unknown }) => unknown;
+  @property({ attribute: false }) dayHeader?: (scope: { arg: any }) => unknown;
   @state() private _hasSlotSlotLabel = false;
   @queryAssignedElements({ slot: 'slotLabel', flatten: true }) private _slotSlotLabelElements!: Element[];
-  @property({ attribute: false }) slotLabel?: (scope: { arg: unknown }) => unknown;
+  @property({ attribute: false }) slotLabel?: (scope: { arg: any }) => unknown;
   @state() private _hasSlotWeekNumber = false;
   @queryAssignedElements({ slot: 'weekNumber', flatten: true }) private _slotWeekNumberElements!: Element[];
-  @property({ attribute: false }) weekNumber?: (scope: { arg: unknown }) => unknown;
+  @property({ attribute: false }) weekNumber?: (scope: { arg: any }) => unknown;
   @state() private _hasSlotNowIndicatorContent = false;
   @queryAssignedElements({ slot: 'nowIndicatorContent', flatten: true }) private _slotNowIndicatorContentElements!: Element[];
-  @property({ attribute: false }) nowIndicatorContent?: (scope: { arg: unknown }) => unknown;
+  @property({ attribute: false }) nowIndicatorContent?: (scope: { arg: any }) => unknown;
   @state() private _hasSlotMoreLink = false;
   @queryAssignedElements({ slot: 'moreLink', flatten: true }) private _slotMoreLinkElements!: Element[];
-  @property({ attribute: false }) moreLink?: (scope: { arg: unknown }) => unknown;
+  @property({ attribute: false }) moreLink?: (scope: { arg: any }) => unknown;
   @state() private _hasSlotAllDayContent = false;
   @queryAssignedElements({ slot: 'allDayContent', flatten: true }) private _slotAllDayContentElements!: Element[];
-  @property({ attribute: false }) allDayContent?: (scope: { arg: unknown }) => unknown;
+  @property({ attribute: false }) allDayContent?: (scope: { arg: any }) => unknown;
   @state() private _hasSlotSlotLaneContent = false;
   @queryAssignedElements({ slot: 'slotLaneContent', flatten: true }) private _slotSlotLaneContentElements!: Element[];
-  @property({ attribute: false }) slotLaneContent?: (scope: { arg: unknown }) => unknown;
+  @property({ attribute: false }) slotLaneContent?: (scope: { arg: any }) => unknown;
   @state() private _hasSlotNoEventsContent = false;
   @queryAssignedElements({ slot: 'noEventsContent', flatten: true }) private _slotNoEventsContentElements!: Element[];
-  @property({ attribute: false }) noEventsContent?: (scope: { arg: unknown }) => unknown;
+  @property({ attribute: false }) noEventsContent?: (scope: { arg: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

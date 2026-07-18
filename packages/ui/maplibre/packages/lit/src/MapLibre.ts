@@ -10,17 +10,17 @@ const __rozieCtx_maplibre_sources = createContext(Symbol.for("rozie:maplibre:sou
 const __rozieCtx_maplibre_layers = createContext(Symbol.for("rozie:maplibre:layers"));
 
 interface RozieMarkerSlotCtx {
-  marker: unknown;
-  index: unknown;
+  marker: any;
+  index: any;
 }
 
 interface RoziePopupSlotCtx {
-  popup: unknown;
-  index: unknown;
+  popup: any;
+  index: any;
 }
 
 interface RozieControlSlotCtx {
-  map: unknown;
+  map: any;
 }
 
 @customElement('rozie-map-libre')
@@ -208,13 +208,13 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
   @state() private _hasSlotMarker = false;
   @queryAssignedElements({ slot: 'marker', flatten: true }) private _slotMarkerElements!: Element[];
-  @property({ attribute: false }) marker?: (scope: { marker: unknown; index: unknown }) => unknown;
+  @property({ attribute: false }) marker?: (scope: { marker: any; index: any }) => unknown;
   @state() private _hasSlotPopup = false;
   @queryAssignedElements({ slot: 'popup', flatten: true }) private _slotPopupElements!: Element[];
-  @property({ attribute: false }) popup?: (scope: { popup: unknown; index: unknown }) => unknown;
+  @property({ attribute: false }) popup?: (scope: { popup: any; index: any }) => unknown;
   @state() private _hasSlotControl = false;
   @queryAssignedElements({ slot: 'control', flatten: true }) private _slotControlElements!: Element[];
-  @property({ attribute: false }) control?: (scope: { map: unknown }) => unknown;
+  @property({ attribute: false }) control?: (scope: { map: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

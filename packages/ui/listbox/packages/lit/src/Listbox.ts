@@ -16,20 +16,20 @@ import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, m
 // virtualizer observes; remeasurePending dedupes the deferred sweep.
 
 interface RozieSelectedSlotCtx {
-  selected: unknown;
-  value: unknown;
+  selected: any;
+  value: any;
 }
 
 interface RozieOptionSlotCtx {
-  option: unknown;
-  index: unknown;
-  active: unknown;
-  selected: unknown;
-  disabled: unknown;
+  option: any;
+  index: any;
+  active: any;
+  selected: any;
+  disabled: any;
 }
 
 interface RozieEmptySlotCtx {
-  query: unknown;
+  query: any;
 }
 
 @customElement('rozie-listbox')
@@ -209,13 +209,13 @@ private __rozieWatchInitial_0 = true;
 
   @state() private _hasSlotSelected = false;
   @queryAssignedElements({ slot: 'selected', flatten: true }) private _slotSelectedElements!: Element[];
-  @property({ attribute: false }) selected?: (scope: { selected: unknown; value: unknown }) => unknown;
+  @property({ attribute: false }) selected?: (scope: { selected: any; value: any }) => unknown;
   @state() private _hasSlotOption = false;
   @queryAssignedElements({ slot: 'option', flatten: true }) private _slotOptionElements!: Element[];
-  @property({ attribute: false }) option?: (scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => unknown;
+  @property({ attribute: false }) option?: (scope: { option: any; index: any; active: any; selected: any; disabled: any }) => unknown;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
-  @property({ attribute: false }) empty?: (scope: { query: unknown }) => unknown;
+  @property({ attribute: false }) empty?: (scope: { query: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

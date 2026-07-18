@@ -25,14 +25,14 @@ import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-
 const __rozieCtx_rete_canvas = createContext(Symbol.for("rozie:rete:canvas"));
 
 interface RozieNodeSlotCtx {
-  node: unknown;
-  selected: unknown;
-  emit: unknown;
+  node: any;
+  selected: any;
+  emit: any;
 }
 
 interface RozieToolbarSlotCtx {
-  node: unknown;
-  emit: unknown;
+  node: any;
+  emit: any;
 }
 
 @customElement('rozie-flow-canvas')
@@ -493,10 +493,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
   @state() private _hasSlotNode = false;
   @queryAssignedElements({ slot: 'node', flatten: true }) private _slotNodeElements!: Element[];
-  @property({ attribute: false }) node?: (scope: { node: unknown; selected: unknown; emit: unknown }) => unknown;
+  @property({ attribute: false }) node?: (scope: { node: any; selected: any; emit: any }) => unknown;
   @state() private _hasSlotToolbar = false;
   @queryAssignedElements({ slot: 'toolbar', flatten: true }) private _slotToolbarElements!: Element[];
-  @property({ attribute: false }) toolbar?: (scope: { node: unknown; emit: unknown }) => unknown;
+  @property({ attribute: false }) toolbar?: (scope: { node: any; emit: any }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
 

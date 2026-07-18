@@ -10,13 +10,13 @@ import Autoplay from 'embla-carousel-autoplay';
 // useRef cleanly). Do NOT annotate to a concrete EmblaCarouselType.
 
 interface RozieSlideSlotCtx {
-  slide: unknown;
-  index: unknown;
+  slide: any;
+  index: any;
 }
 
 interface RozieThumbSlotCtx {
-  slide: unknown;
-  index: unknown;
+  slide: any;
+  index: any;
 }
 
 @customElement('rozie-carousel')
@@ -191,12 +191,12 @@ private __rozieFirstUpdateDone = false;
 
   @state() private _hasSlotSlide = false;
   @queryAssignedElements({ slot: 'slide', flatten: true }) private _slotSlideElements!: Element[];
-  @property({ attribute: false }) slide?: (scope: { slide: unknown; index: unknown }) => unknown;
+  @property({ attribute: false }) slide?: (scope: { slide: any; index: any }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
   @state() private _hasSlotThumb = false;
   @queryAssignedElements({ slot: 'thumb', flatten: true }) private _slotThumbElements!: Element[];
-  @property({ attribute: false }) thumb?: (scope: { slide: unknown; index: unknown }) => unknown;
+  @property({ attribute: false }) thumb?: (scope: { slide: any; index: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

@@ -27,62 +27,62 @@ import { formatKeyToken } from './internal/formatKeyToken';
 // depth on React/Solid/Lit).
 
 interface RozieBreadcrumbSlotCtx {
-  stack: unknown;
-  back: unknown;
+  stack: any;
+  back: any;
 }
 
 interface RozieOptionSlotCtx {
-  option: unknown;
-  index: unknown;
-  active: unknown;
-  selected: unknown;
-  disabled: unknown;
-  matches: unknown;
+  option: any;
+  index: any;
+  active: any;
+  selected: any;
+  disabled: any;
+  matches: any;
 }
 
 interface RozieGroupHeadingSlotCtx {
-  group: unknown;
+  group: any;
 }
 
 interface RozieEmptySlotCtx {
-  query: unknown;
+  query: any;
 }
 
 interface RozieArgsFieldSlotCtx {
-  item: unknown;
-  arg: unknown;
-  value: unknown;
-  setValue: unknown;
+  item: any;
+  arg: any;
+  value: any;
+  setValue: any;
 }
 
 interface RozieLoadingSlotCtx {
-  query: unknown;
+  query: any;
 }
 
 interface RozieErrorSlotCtx {
-  query: unknown;
-  error: unknown;
-  retry: unknown;
+  query: any;
+  error: any;
+  retry: any;
 }
 
 interface RozieActionItemSlotCtx {
-  action: unknown;
-  item: unknown;
-  active: unknown;
-  disabled: unknown;
+  action: any;
+  item: any;
+  active: any;
+  disabled: any;
 }
 
 interface RozieIconSlotCtx {
-  option: unknown;
+  option: any;
 }
 
 interface RozieActionsSlotCtx {
-  option: unknown;
-  actions: unknown;
+  option: any;
+  actions: any;
 }
 
 interface RozieTrailingSlotCtx {
-  option: unknown;
+  option: any;
 }
 
 @customElement('rozie-command-palette')
@@ -512,39 +512,39 @@ private __rozieWatchInitial_0 = true;
 
   @state() private _hasSlotBreadcrumb = false;
   @queryAssignedElements({ slot: 'breadcrumb', flatten: true }) private _slotBreadcrumbElements!: Element[];
-  @property({ attribute: false }) breadcrumb?: (scope: { stack: unknown; back: unknown }) => unknown;
+  @property({ attribute: false }) breadcrumb?: (scope: { stack: any; back: any }) => unknown;
   @state() private _hasSlotOption = false;
   @queryAssignedElements({ slot: 'option', flatten: true }) private _slotOptionElements!: Element[];
-  @property({ attribute: false }) option?: (scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown; matches: unknown }) => unknown;
+  @property({ attribute: false }) option?: (scope: { option: any; index: any; active: any; selected: any; disabled: any; matches: any }) => unknown;
   @state() private _hasSlotGroupHeading = false;
   @queryAssignedElements({ slot: 'groupHeading', flatten: true }) private _slotGroupHeadingElements!: Element[];
-  @property({ attribute: false }) groupHeading?: (scope: { group: unknown }) => unknown;
+  @property({ attribute: false }) groupHeading?: (scope: { group: any }) => unknown;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
-  @property({ attribute: false }) empty?: (scope: { query: unknown }) => unknown;
+  @property({ attribute: false }) empty?: (scope: { query: any }) => unknown;
   @state() private _hasSlotArgsField = false;
   @queryAssignedElements({ slot: 'argsField', flatten: true }) private _slotArgsFieldElements!: Element[];
-  @property({ attribute: false }) argsField?: (scope: { item: unknown; arg: unknown; value: unknown; setValue: unknown }) => unknown;
+  @property({ attribute: false }) argsField?: (scope: { item: any; arg: any; value: any; setValue: any }) => unknown;
   @state() private _hasSlotLoading = false;
   @queryAssignedElements({ slot: 'loading', flatten: true }) private _slotLoadingElements!: Element[];
-  @property({ attribute: false }) loading?: (scope: { query: unknown }) => unknown;
+  @property({ attribute: false }) loading?: (scope: { query: any }) => unknown;
   @state() private _hasSlotError = false;
   @queryAssignedElements({ slot: 'error', flatten: true }) private _slotErrorElements!: Element[];
-  @property({ attribute: false }) error?: (scope: { query: unknown; error: unknown; retry: unknown }) => unknown;
+  @property({ attribute: false }) error?: (scope: { query: any; error: any; retry: any }) => unknown;
   @state() private _hasSlotFooter = false;
   @queryAssignedElements({ slot: 'footer', flatten: true }) private _slotFooterElements!: Element[];
   @state() private _hasSlotActionItem = false;
   @queryAssignedElements({ slot: 'actionItem', flatten: true }) private _slotActionItemElements!: Element[];
-  @property({ attribute: false }) actionItem?: (scope: { action: unknown; item: unknown; active: unknown; disabled: unknown }) => unknown;
+  @property({ attribute: false }) actionItem?: (scope: { action: any; item: any; active: any; disabled: any }) => unknown;
   @state() private _hasSlotIcon = false;
   @queryAssignedElements({ slot: 'icon', flatten: true }) private _slotIconElements!: Element[];
-  @property({ attribute: false }) icon?: (scope: { option: unknown }) => unknown;
+  @property({ attribute: false }) icon?: (scope: { option: any }) => unknown;
   @state() private _hasSlotActions = false;
   @queryAssignedElements({ slot: 'actions', flatten: true }) private _slotActionsElements!: Element[];
-  @property({ attribute: false }) actions?: (scope: { option: unknown; actions: unknown }) => unknown;
+  @property({ attribute: false }) actions?: (scope: { option: any; actions: any }) => unknown;
   @state() private _hasSlotTrailing = false;
   @queryAssignedElements({ slot: 'trailing', flatten: true }) private _slotTrailingElements!: Element[];
-  @property({ attribute: false }) trailing?: (scope: { option: unknown }) => unknown;
+  @property({ attribute: false }) trailing?: (scope: { option: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -766,7 +766,7 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
       </slot>`}
     </div>` : nothing}<div class="${Object.entries({ "rozie-command-palette-list-region": true, 'rozie-command-palette-list-region--inert': this._activeSurface.value === 'args' }).filter(([, v]) => v).map(([k]) => k).join(' ')}" aria-hidden=${!!(this._activeSurface.value === 'args')} data-rozie-s-768cad96>
     
-    <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .virtual=${this.currentVirtual()} .maxHeight=${this.currentVirtualMaxHeight()} .estimateRowHeight=${this.currentVirtualEstimateRowHeight()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => html`
+    <rozie-combobox .inline=${true} .disableFilter=${true} .closeOnSelect=${false} .options=${this.orderedItems()} .groups=${this.commandGroups()} .groupCap=${this.groupCap} .virtual=${this.currentVirtual()} .maxHeight=${this.currentVirtualMaxHeight()} .estimateRowHeight=${this.currentVirtualEstimateRowHeight()} .optionValue=${this.commandValue} .optionDisabled=${this.commandDisabled} .placeholder=${this.currentPlaceholder()} .ariaLabel=${this.ariaLabel} .idBase=${this.idBase} .value=${this._activeValue.value} @value-change=${($event: CustomEvent) => { this._activeValue.value = $event.detail; }} @change=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxChange($event); }} @search=${(__rozieEv: Event) => { const $event = __rozieEv instanceof CustomEvent ? __rozieEv.detail : __rozieEv; this.onComboboxSearch($event); }} data-rozie-ref="combobox" data-rozie-s-768cad96 .option=${(scope: { option: any; index: any; active: any; selected: any; disabled: any }) => html`
         <span class="rozie-command-palette-option-anchor" data-cp-index=${rozieAttr(this.cpAnchorIndex(scope.option))} data-cp-value=${rozieAttr(this.commandValue(scope.option))} data-rozie-s-768cad96>
         ${this.option !== undefined ? this.option({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: scope.option, index: scope.index, active: scope.active, selected: scope.selected, disabled: scope.disabled, matches: labelHighlight(this.labelText(scope.option), this.query)}); } catch { return '{}'; } })()}>
           <div class="rozie-command-palette-option" data-rozie-s-768cad96>
@@ -786,9 +786,9 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
             </span>` : nothing}</div>
         </slot>`}
         </span>
-      `} .groupHeading=${(scope: { group: unknown }) => html`
+      `} .groupHeading=${(scope: { group: any }) => html`
         ${this.groupHeading !== undefined ? this.groupHeading({group: scope.group}) : html`<slot name="groupHeading" data-rozie-params=${(() => { try { return JSON.stringify({group: scope.group}); } catch { return '{}'; } })()}>${rozieDisplay(this.groupLabel(scope.group))}</slot>`}
-      `} .empty=${(scope: { query: unknown }) => html`
+      `} .empty=${(scope: { query: any }) => html`
         ${this.currentStatus() === 'ready' ? html`${this.empty !== undefined ? this.empty({query: scope.query}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: scope.query}); } catch { return '{}'; } })()}>${this.emptyText}</slot>`}` : nothing}`} ${ref((el: Element | undefined) => el && adoptConsumerStyles(el, (this.constructor as { styles?: unknown }).styles))}></rozie-combobox>
     </div>
 

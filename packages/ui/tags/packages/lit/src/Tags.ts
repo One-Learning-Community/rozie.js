@@ -5,9 +5,9 @@ import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners,
 import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieTagSlotCtx {
-  tag: unknown;
-  index: unknown;
-  remove: unknown;
+  tag: any;
+  index: any;
+  remove: any;
 }
 
 @customElement('rozie-tags')
@@ -152,7 +152,7 @@ export default class Tags extends SignalWatcher(LitElement) {
 
   @state() private _hasSlotTag = false;
   @queryAssignedElements({ slot: 'tag', flatten: true }) private _slotTagElements!: Element[];
-  @property({ attribute: false }) tag?: (scope: { tag: unknown; index: unknown; remove: unknown }) => unknown;
+  @property({ attribute: false }) tag?: (scope: { tag: any; index: any; remove: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

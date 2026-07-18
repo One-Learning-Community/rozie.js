@@ -5,8 +5,8 @@ import { rozieAttr, rozieClass, rozieDisplay, rozieListeners, rozieSpread, rozie
 import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieToastSlotCtx {
-  toast: unknown;
-  dismiss: unknown;
+  toast: any;
+  dismiss: any;
 }
 
 @customElement('rozie-toaster')
@@ -198,7 +198,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 
   @state() private _hasSlotToast = false;
   @queryAssignedElements({ slot: 'toast', flatten: true }) private _slotToastElements!: Element[];
-  @property({ attribute: false }) toast?: (scope: { toast: unknown; dismiss: unknown }) => unknown;
+  @property({ attribute: false }) toast?: (scope: { toast: any; dismiss: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

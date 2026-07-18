@@ -21,25 +21,25 @@ import { groupOptions } from './internal/groupOptions';
 // captured .rozie-combobox-list scroll div; remeasurePending dedupes the deferred sweep.
 
 interface RozieOptionSlotCtx {
-  option: unknown;
-  index: unknown;
-  active: unknown;
-  selected: unknown;
-  disabled: unknown;
+  option: any;
+  index: any;
+  active: any;
+  selected: any;
+  disabled: any;
 }
 
 interface RozieEmptySlotCtx {
-  query: unknown;
+  query: any;
 }
 
 interface RozieGroupHeadingSlotCtx {
-  group: unknown;
+  group: any;
 }
 
 interface RozieGroupMoreSlotCtx {
-  group: unknown;
-  hidden: unknown;
-  expand: unknown;
+  group: any;
+  hidden: any;
+  expand: any;
 }
 
 @customElement('rozie-combobox')
@@ -250,16 +250,16 @@ private __rozieFirstUpdateDone = false;
 
   @state() private _hasSlotOption = false;
   @queryAssignedElements({ slot: 'option', flatten: true }) private _slotOptionElements!: Element[];
-  @property({ attribute: false }) option?: (scope: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => unknown;
+  @property({ attribute: false }) option?: (scope: { option: any; index: any; active: any; selected: any; disabled: any }) => unknown;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
-  @property({ attribute: false }) empty?: (scope: { query: unknown }) => unknown;
+  @property({ attribute: false }) empty?: (scope: { query: any }) => unknown;
   @state() private _hasSlotGroupHeading = false;
   @queryAssignedElements({ slot: 'groupHeading', flatten: true }) private _slotGroupHeadingElements!: Element[];
-  @property({ attribute: false }) groupHeading?: (scope: { group: unknown }) => unknown;
+  @property({ attribute: false }) groupHeading?: (scope: { group: any }) => unknown;
   @state() private _hasSlotGroupMore = false;
   @queryAssignedElements({ slot: 'groupMore', flatten: true }) private _slotGroupMoreElements!: Element[];
-  @property({ attribute: false }) groupMore?: (scope: { group: unknown; hidden: unknown; expand: unknown }) => unknown;
+  @property({ attribute: false }) groupMore?: (scope: { group: any; hidden: any; expand: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

@@ -7,8 +7,8 @@ import { keyed } from 'lit/directives/keyed.js';
 import { useSortableJS } from './internal/useSortableJS';
 
 interface RozieDefaultSlotCtx {
-  item: unknown;
-  index: unknown;
+  item: any;
+  index: any;
 }
 
 @customElement('rozie-sortable-list')
@@ -129,7 +129,7 @@ private __rozieFirstUpdateDone = false;
   @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
-  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { item: unknown; index: unknown }) => unknown;
+  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { item: any; index: any }) => unknown;
   @state() private _hasSlotFooter = false;
   @queryAssignedElements({ slot: 'footer', flatten: true }) private _slotFooterElements!: Element[];
 

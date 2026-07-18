@@ -19,24 +19,24 @@ import { FloatingMenu } from '@tiptap/extension-floating-menu';
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
 
 interface RozieToolbarSlotCtx {
-  editor: unknown;
+  editor: any;
 }
 
 interface RozieBubbleMenuSlotCtx {
-  editor: unknown;
+  editor: any;
 }
 
 interface RozieFloatingMenuSlotCtx {
-  editor: unknown;
+  editor: any;
 }
 
 interface RozieNodeViewSlotCtx {
-  node: unknown;
-  selected: unknown;
-  updateAttributes: unknown;
-  getPos: unknown;
-  editor: unknown;
-  contentDOM: unknown;
+  node: any;
+  selected: any;
+  updateAttributes: any;
+  getPos: any;
+  editor: any;
+  contentDOM: any;
 }
 
 @customElement('rozie-tip-tap')
@@ -155,16 +155,16 @@ private _portalContainers = new Set<HTMLElement>();
 
   @state() private _hasSlotToolbar = false;
   @queryAssignedElements({ slot: 'toolbar', flatten: true }) private _slotToolbarElements!: Element[];
-  @property({ attribute: false }) toolbar?: (scope: { editor: unknown }) => unknown;
+  @property({ attribute: false }) toolbar?: (scope: { editor: any }) => unknown;
   @state() private _hasSlotBubbleMenu = false;
   @queryAssignedElements({ slot: 'bubbleMenu', flatten: true }) private _slotBubbleMenuElements!: Element[];
-  @property({ attribute: false }) bubbleMenu?: (scope: { editor: unknown }) => unknown;
+  @property({ attribute: false }) bubbleMenu?: (scope: { editor: any }) => unknown;
   @state() private _hasSlotFloatingMenu = false;
   @queryAssignedElements({ slot: 'floatingMenu', flatten: true }) private _slotFloatingMenuElements!: Element[];
-  @property({ attribute: false }) floatingMenu?: (scope: { editor: unknown }) => unknown;
+  @property({ attribute: false }) floatingMenu?: (scope: { editor: any }) => unknown;
   @state() private _hasSlotNodeView = false;
   @queryAssignedElements({ slot: 'nodeView', flatten: true }) private _slotNodeViewElements!: Element[];
-  @property({ attribute: false }) nodeView?: (scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }) => unknown;
+  @property({ attribute: false }) nodeView?: (scope: { node: any; selected: any; updateAttributes: any; getPos: any; editor: any; contentDOM: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

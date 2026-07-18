@@ -36,57 +36,57 @@ import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, m
 const __rozieCtx_data_table_columns = createContext(Symbol.for("rozie:data-table:columns"));
 
 interface RozieGroupBarSlotCtx {
-  grouping: unknown;
-  groupableColumns: unknown;
-  applyGrouping: unknown;
-  clearGrouping: unknown;
+  grouping: any;
+  groupableColumns: any;
+  applyGrouping: any;
+  clearGrouping: any;
 }
 
 interface RozieSelectAllSlotCtx {
-  checked: unknown;
-  indeterminate: unknown;
-  toggle: unknown;
+  checked: any;
+  indeterminate: any;
+  toggle: any;
 }
 
 interface RozieColHeaderSlotCtx {
-  columnId: unknown;
-  column: unknown;
-  label: unknown;
+  columnId: any;
+  column: any;
+  label: any;
 }
 
 interface RozieFilterSlotCtx {
-  columnId: unknown;
-  value: unknown;
-  uniqueValues: unknown;
-  minMax: unknown;
-  setFilter: unknown;
+  columnId: any;
+  value: any;
+  uniqueValues: any;
+  minMax: any;
+  setFilter: any;
 }
 
 interface RozieSelectCellSlotCtx {
-  row: unknown;
-  checked: unknown;
-  toggle: unknown;
+  row: any;
+  checked: any;
+  toggle: any;
 }
 
 interface RozieCellSlotCtx {
-  columnId: unknown;
-  column: unknown;
-  row: unknown;
-  value: unknown;
+  columnId: any;
+  column: any;
+  row: any;
+  value: any;
 }
 
 interface RozieEditorSlotCtx {
-  columnId: unknown;
-  column: unknown;
-  row: unknown;
-  value: unknown;
-  commit: unknown;
-  cancel: unknown;
-  autofocus: unknown;
+  columnId: any;
+  column: any;
+  row: any;
+  value: any;
+  commit: any;
+  cancel: any;
+  autofocus: any;
 }
 
 interface RozieDetailSlotCtx {
-  row: unknown;
+  row: any;
 }
 
 @customElement('rozie-data-table')
@@ -635,28 +635,28 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
   @state() private _hasSlotGroupBar = false;
   @queryAssignedElements({ slot: 'groupBar', flatten: true }) private _slotGroupBarElements!: Element[];
-  @property({ attribute: false }) groupBar?: (scope: { grouping: unknown; groupableColumns: unknown; applyGrouping: unknown; clearGrouping: unknown }) => unknown;
+  @property({ attribute: false }) groupBar?: (scope: { grouping: any; groupableColumns: any; applyGrouping: any; clearGrouping: any }) => unknown;
   @state() private _hasSlotSelectAll = false;
   @queryAssignedElements({ slot: 'selectAll', flatten: true }) private _slotSelectAllElements!: Element[];
-  @property({ attribute: false }) selectAll?: (scope: { checked: unknown; indeterminate: unknown; toggle: unknown }) => unknown;
+  @property({ attribute: false }) selectAll?: (scope: { checked: any; indeterminate: any; toggle: any }) => unknown;
   @state() private _hasSlotColHeader = false;
   @queryAssignedElements({ slot: 'colHeader', flatten: true }) private _slotColHeaderElements!: Element[];
-  @property({ attribute: false }) colHeader?: (scope: { columnId: unknown; column: unknown; label: unknown }) => unknown;
+  @property({ attribute: false }) colHeader?: (scope: { columnId: any; column: any; label: any }) => unknown;
   @state() private _hasSlotFilter = false;
   @queryAssignedElements({ slot: 'filter', flatten: true }) private _slotFilterElements!: Element[];
-  @property({ attribute: false }) filter?: (scope: { columnId: unknown; value: unknown; uniqueValues: unknown; minMax: unknown; setFilter: unknown }) => unknown;
+  @property({ attribute: false }) filter?: (scope: { columnId: any; value: any; uniqueValues: any; minMax: any; setFilter: any }) => unknown;
   @state() private _hasSlotSelectCell = false;
   @queryAssignedElements({ slot: 'selectCell', flatten: true }) private _slotSelectCellElements!: Element[];
-  @property({ attribute: false }) selectCell?: (scope: { row: unknown; checked: unknown; toggle: unknown }) => unknown;
+  @property({ attribute: false }) selectCell?: (scope: { row: any; checked: any; toggle: any }) => unknown;
   @state() private _hasSlotCell = false;
   @queryAssignedElements({ slot: 'cell', flatten: true }) private _slotCellElements!: Element[];
-  @property({ attribute: false }) cell?: (scope: { columnId: unknown; column: unknown; row: unknown; value: unknown }) => unknown;
+  @property({ attribute: false }) cell?: (scope: { columnId: any; column: any; row: any; value: any }) => unknown;
   @state() private _hasSlotEditor = false;
   @queryAssignedElements({ slot: 'editor', flatten: true }) private _slotEditorElements!: Element[];
-  @property({ attribute: false }) editor?: (scope: { columnId: unknown; column: unknown; row: unknown; value: unknown; commit: unknown; cancel: unknown; autofocus: unknown }) => unknown;
+  @property({ attribute: false }) editor?: (scope: { columnId: any; column: any; row: any; value: any; commit: any; cancel: any; autofocus: any }) => unknown;
   @state() private _hasSlotDetail = false;
   @queryAssignedElements({ slot: 'detail', flatten: true }) private _slotDetailElements!: Element[];
-  @property({ attribute: false }) detail?: (scope: { row: unknown }) => unknown;
+  @property({ attribute: false }) detail?: (scope: { row: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

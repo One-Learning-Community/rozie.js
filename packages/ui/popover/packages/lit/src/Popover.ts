@@ -32,10 +32,10 @@ import { buildMiddleware } from './internal/middleware';
 //   via typeNeutralize.
 
 interface RozieAnchorSlotCtx {
-  open: unknown;
-  toggle: unknown;
-  show: unknown;
-  hide: unknown;
+  open: any;
+  toggle: any;
+  show: any;
+  hide: any;
 }
 
 @customElement('rozie-popover')
@@ -121,7 +121,7 @@ private __rozieFirstUpdateDone = false;
 
   @state() private _hasSlotAnchor = false;
   @queryAssignedElements({ slot: 'anchor', flatten: true }) private _slotAnchorElements!: Element[];
-  @property({ attribute: false }) anchor?: (scope: { open: unknown; toggle: unknown; show: unknown; hide: unknown }) => unknown;
+  @property({ attribute: false }) anchor?: (scope: { open: any; toggle: any; show: any; hide: any }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
 

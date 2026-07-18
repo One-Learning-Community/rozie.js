@@ -18,7 +18,7 @@ import { Chart as ChartJS } from 'chart.js';
 // importing one is tree-shakable by construction.
 
 interface RozieTooltipSlotCtx {
-  model: unknown;
+  model: any;
 }
 
 @customElement('rozie-chart')
@@ -102,7 +102,7 @@ private _portalContainers = new Set<HTMLElement>();
   @queryAssignedElements({ slot: 'fallback', flatten: true }) private _slotFallbackElements!: Element[];
   @state() private _hasSlotTooltip = false;
   @queryAssignedElements({ slot: 'tooltip', flatten: true }) private _slotTooltipElements!: Element[];
-  @property({ attribute: false }) tooltip?: (scope: { model: unknown }) => unknown;
+  @property({ attribute: false }) tooltip?: (scope: { model: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

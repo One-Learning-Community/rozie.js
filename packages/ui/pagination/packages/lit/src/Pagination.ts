@@ -13,25 +13,25 @@ import { paginationItems } from './internal/paginationItems';
 // reference-equality $watch getter.
 
 interface RoziePrevControlSlotCtx {
-  disabled: unknown;
-  goto: unknown;
-  page: unknown;
+  disabled: any;
+  goto: any;
+  page: any;
 }
 
 interface RozieEllipsisSlotCtx {
-  index: unknown;
+  index: any;
 }
 
 interface RozieItemSlotCtx {
-  page: unknown;
-  selected: unknown;
-  goto: unknown;
+  page: any;
+  selected: any;
+  goto: any;
 }
 
 interface RozieNextControlSlotCtx {
-  disabled: unknown;
-  goto: unknown;
-  page: unknown;
+  disabled: any;
+  goto: any;
+  page: any;
 }
 
 @customElement('rozie-pagination')
@@ -136,16 +136,16 @@ export default class Pagination extends SignalWatcher(LitElement) {
 
   @state() private _hasSlotPrevControl = false;
   @queryAssignedElements({ slot: 'prevControl', flatten: true }) private _slotPrevControlElements!: Element[];
-  @property({ attribute: false }) prevControl?: (scope: { disabled: unknown; goto: unknown; page: unknown }) => unknown;
+  @property({ attribute: false }) prevControl?: (scope: { disabled: any; goto: any; page: any }) => unknown;
   @state() private _hasSlotEllipsis = false;
   @queryAssignedElements({ slot: 'ellipsis', flatten: true }) private _slotEllipsisElements!: Element[];
-  @property({ attribute: false }) ellipsis?: (scope: { index: unknown }) => unknown;
+  @property({ attribute: false }) ellipsis?: (scope: { index: any }) => unknown;
   @state() private _hasSlotItem = false;
   @queryAssignedElements({ slot: 'item', flatten: true }) private _slotItemElements!: Element[];
-  @property({ attribute: false }) item?: (scope: { page: unknown; selected: unknown; goto: unknown }) => unknown;
+  @property({ attribute: false }) item?: (scope: { page: any; selected: any; goto: any }) => unknown;
   @state() private _hasSlotNextControl = false;
   @queryAssignedElements({ slot: 'nextControl', flatten: true }) private _slotNextControlElements!: Element[];
-  @property({ attribute: false }) nextControl?: (scope: { disabled: unknown; goto: unknown; page: unknown }) => unknown;
+  @property({ attribute: false }) nextControl?: (scope: { disabled: any; goto: any; page: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

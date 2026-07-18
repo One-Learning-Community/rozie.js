@@ -10,21 +10,21 @@ import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDa
 // fresh (a date picker open across midnight should follow the wall clock).
 
 interface RozieHeaderSlotCtx {
-  label: unknown;
-  prev: unknown;
-  next: unknown;
-  disabled: unknown;
+  label: any;
+  prev: any;
+  next: any;
+  disabled: any;
 }
 
 interface RozieFooterSlotCtx {
-  today: unknown;
-  clear: unknown;
-  todayIso: unknown;
+  today: any;
+  clear: any;
+  todayIso: any;
 }
 
 interface RoziePresetsSlotCtx {
-  presets: unknown;
-  apply: unknown;
+  presets: any;
+  apply: any;
 }
 
 @customElement('rozie-date-picker')
@@ -394,13 +394,13 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
   @state() private _hasSlotHeader = false;
   @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];
-  @property({ attribute: false }) header?: (scope: { label: unknown; prev: unknown; next: unknown; disabled: unknown }) => unknown;
+  @property({ attribute: false }) header?: (scope: { label: any; prev: any; next: any; disabled: any }) => unknown;
   @state() private _hasSlotFooter = false;
   @queryAssignedElements({ slot: 'footer', flatten: true }) private _slotFooterElements!: Element[];
-  @property({ attribute: false }) footer?: (scope: { today: unknown; clear: unknown; todayIso: unknown }) => unknown;
+  @property({ attribute: false }) footer?: (scope: { today: any; clear: any; todayIso: any }) => unknown;
   @state() private _hasSlotPresets = false;
   @queryAssignedElements({ slot: 'presets', flatten: true }) private _slotPresetsElements!: Element[];
-  @property({ attribute: false }) presets?: (scope: { presets: unknown; apply: unknown }) => unknown;
+  @property({ attribute: false }) presets?: (scope: { presets: any; apply: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
