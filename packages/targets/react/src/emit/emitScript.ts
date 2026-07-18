@@ -60,6 +60,7 @@ import { renderDepArray as renderDepArrayWithIR } from './renderDepArray.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -2404,10 +2405,19 @@ export function emitScript(
     // object-literal body). The redundant render-body `setX` is dropped in the
     // residual-body loop via `seedConsumedIndices`.
     const seedInit = seedInitByState.get(s.name);
+    // Quick 260717-uvl (ROZ208 make-it-work) — route a NON-seed initializer
+    // through the SAME rewriteTemplateExpression the seed branch above already
+    // uses, so a `<data>` initializer that reads `$props.x`/`$data.x` (the
+    // idiomatic Vue-port derived-initial pattern) lowers to the per-target
+    // read instead of leaking the raw `$props`/`$data` sigil (TS2304 +
+    // runtime ReferenceError). DESIGN CAVEAT: this SNAPSHOTS the prop/data
+    // value at mount — it does not track later changes (the derived-state
+    // footgun, uniform across all six targets). The `$onMount` seed above
+    // remains the honest REACTIVE form; this only makes the snapshot form work.
     hookLines.push(
       seedInit
         ? `const [${s.name}, ${setterName}] = useState${stateTypeArg}(${arrowBody(seedInit)});`
-        : `const [${s.name}, ${setterName}] = useState${stateTypeArg}(${genCode(s.initializer)});`,
+        : `const [${s.name}, ${setterName}] = useState${stateTypeArg}(${rewriteTemplateExpression(s.initializer, ir)});`,
     );
   }
 

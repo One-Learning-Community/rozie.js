@@ -22,6 +22,7 @@ import type { SolidImportCollector, RuntimeSolidImportCollector } from '../rewri
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { partitionUserImports } from '../rewrite/partitionUserImports.js';
 import { rewriteRozieIdentifiers, rewriteRozieExpressionNode as rewriteNode } from '../rewrite/rewriteScript.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { renderType, zeroValueFor } from './emitPropsInterface.js';
@@ -718,8 +719,18 @@ export function emitScript(
     ) {
       stateTypeArg = '<Record<string, any>>';
     }
+    // Quick 260717-uvl (ROZ208 make-it-work) — route the initializer through
+    // rewriteTemplateExpression (the SAME machinery already used to lower
+    // `$props.X`/`$data.X` in templates/handlers) so a `<data>` initializer
+    // that reads `$props.x`/`$data.x` (the idiomatic Vue-port derived-initial
+    // pattern) lowers to `props.x`/the local read instead of leaking the raw
+    // sigil (TS2304 + runtime ReferenceError). DESIGN CAVEAT: this SNAPSHOTS
+    // the prop/data value at mount and does not track later changes (the
+    // derived-state footgun, uniform across all six targets) — an `$onMount`
+    // seed remains the honest REACTIVE form; this only makes the snapshot
+    // form work.
     hookLines.push(
-      `const [${s.name}, ${setterName}] = createSignal${stateTypeArg}(${genCode(s.initializer)});`,
+      `const [${s.name}, ${setterName}] = createSignal${stateTypeArg}(${rewriteTemplateExpression(s.initializer, ir)});`,
     );
   }
 

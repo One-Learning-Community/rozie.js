@@ -45,6 +45,7 @@ import { isMutableLiteralFactoryDefault } from '../../../../core/src/codegen/pro
 import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers, svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 import { collectSvelteImports } from '../rewrite/collectSvelteImports.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { buildSlotTypeFields, distinctSlotsByName } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
@@ -861,7 +862,17 @@ function emitStateDecls(ir: IRComponent): string[] {
     } else if (t.isNullLiteral(s.initializer)) {
       typeAnnotation = ': any';
     }
-    lines.push(`let ${s.name}${typeAnnotation} = $state(${genCode(s.initializer)});`);
+    // Quick 260717-uvl (ROZ208 make-it-work) — route the initializer through
+    // rewriteTemplateExpression (the SAME machinery already used to lower
+    // `$props.X`/`$data.X` in templates/handlers) so a `<data>` initializer
+    // that reads `$props.x`/`$data.x` (the idiomatic Vue-port derived-initial
+    // pattern) lowers to the bare local read instead of leaking the raw sigil
+    // (TS2304 + runtime ReferenceError). DESIGN CAVEAT: this SNAPSHOTS the
+    // prop/data value at mount and does not track later changes (the
+    // derived-state footgun, uniform across all six targets) — an `$onMount`
+    // seed remains the honest REACTIVE form; this only makes the snapshot
+    // form work.
+    lines.push(`let ${s.name}${typeAnnotation} = $state(${rewriteTemplateExpression(s.initializer, ir)});`);
   }
   return lines;
 }
