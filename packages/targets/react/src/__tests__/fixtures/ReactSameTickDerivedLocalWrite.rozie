@@ -1,0 +1,55 @@
+<!--
+  ReactSameTickDerivedLocalWrite.rozie — quick 260718-uvo fixture.
+
+  The "compute-then-commit" derivation shape: a `$data.<key>` write whose RHS is
+  a same-scope LOCAL that was derived from the SAME `$data.<key>` and consumed
+  EXACTLY ONCE (only as that write's RHS). React must lower this to the
+  concurrent-safe functional updater `setItems(prev => prev.concat([x]))`, NOT
+  the stale-closure plain form `setItems(next)`.
+
+  Before the fix, the functional-updater path fired ONLY when the write's RHS
+  *literally* read `$data.items` (the `exprReadsAccessor` gate). A via-a-local
+  RHS (`const next = $data.items.concat([x]); $data.items = next`) fell through
+  to `setItems(next)`, so same-tick writes coalesced to the last only.
+
+  `appendTwo` is the same-tick coalescing proof: two derived-local appends in one
+  tick must BOTH survive — only possible if each lowers to a functional updater
+  that threads the latest `prev`.
+
+  `appendDirect` is the byte-identity control: the direct-RHS shape already
+  lowered to the functional updater and must stay unchanged.
+-->
+<rozie name="ReactSameTickDerivedLocalWrite">
+
+<data>
+{ items: [] }
+</data>
+
+<script>
+// Via-a-local write: compute the derivation, then commit it. `next` is derived
+// solely from $data.items and consumed exactly once (as the write RHS).
+const append = (x) => {
+  const next = $data.items.concat([x])
+  $data.items = next
+}
+
+// Same-tick coalescing: two derived-local appends in one tick. Both must
+// survive — each must lower to a functional updater so the second sees the
+// first's result via `prev`.
+const appendTwo = (a, b) => {
+  const first = $data.items.concat([a])
+  $data.items = first
+  const second = $data.items.concat([b])
+  $data.items = second
+}
+
+// Direct-RHS control — already lowers to the functional updater; must stay
+// byte-identical.
+const appendDirect = (x) => {
+  $data.items = $data.items.concat([x])
+}
+</script>
+
+<template><div /></template>
+
+</rozie>
