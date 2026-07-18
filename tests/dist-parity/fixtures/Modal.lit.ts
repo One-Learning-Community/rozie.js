@@ -43,13 +43,13 @@ private __rozieWatchInitial_0 = true;
 
   @state() private _hasSlotHeader = false;
   @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];
-  @property({ attribute: false }) header?: (scope: { close: unknown }) => unknown;
+  @property({ attribute: false }) header?: (scope: { close: any }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
-  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { close: unknown }) => unknown;
+  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { close: any }) => unknown;
   @state() private _hasSlotFooter = false;
   @queryAssignedElements({ slot: 'footer', flatten: true }) private _slotFooterElements!: Element[];
-  @property({ attribute: false }) footer?: (scope: { close: unknown }) => unknown;
+  @property({ attribute: false }) footer?: (scope: { close: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

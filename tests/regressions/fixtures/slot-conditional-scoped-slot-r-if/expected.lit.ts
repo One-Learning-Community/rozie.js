@@ -4,7 +4,7 @@ import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 interface RozieDefaultSlotCtx {
-  title: unknown;
+  title: any;
 }
 
 @customElement('rozie-slot-conditional-scoped-slot-rif')
@@ -18,7 +18,7 @@ export default class SlotConditionalScopedSlotRIf extends SignalWatcher(LitEleme
 
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
-  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { title: unknown }) => unknown;
+  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { title: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

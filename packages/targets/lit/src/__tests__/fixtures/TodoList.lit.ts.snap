@@ -5,14 +5,14 @@ import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners,
 import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieHeaderSlotCtx {
-  remaining: unknown;
-  total: unknown;
+  remaining: any;
+  total: any;
 }
 
 interface RozieDefaultSlotCtx {
-  item: unknown;
-  toggle: unknown;
-  remove: unknown;
+  item: any;
+  toggle: any;
+  remove: any;
 }
 
 @customElement('rozie-todo-list')
@@ -34,10 +34,10 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
 
   @state() private _hasSlotHeader = false;
   @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];
-  @property({ attribute: false }) header?: (scope: { remaining: unknown; total: unknown }) => unknown;
+  @property({ attribute: false }) header?: (scope: { remaining: any; total: any }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
-  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { item: unknown; toggle: unknown; remove: unknown }) => unknown;
+  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { item: any; toggle: any; remove: any }) => unknown;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
 

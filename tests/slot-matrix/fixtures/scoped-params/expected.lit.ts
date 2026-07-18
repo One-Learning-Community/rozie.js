@@ -4,7 +4,7 @@ import { SignalWatcher } from '@lit-labs/preact-signals';
 import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 interface RozieItemSlotCtx {
-  value: unknown;
+  value: any;
 }
 
 @customElement('rozie-scoped-params-fixture')
@@ -17,7 +17,7 @@ export default class ScopedParamsFixture extends SignalWatcher(LitElement) {
 
   @state() private _hasSlotItem = false;
   @queryAssignedElements({ slot: 'item', flatten: true }) private _slotItemElements!: Element[];
-  @property({ attribute: false }) item?: (scope: { value: unknown }) => unknown;
+  @property({ attribute: false }) item?: (scope: { value: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

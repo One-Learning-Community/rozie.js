@@ -5,7 +5,7 @@ import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieDefaultSlotCtx {
-  name: unknown;
+  name: any;
 }
 
 @customElement('rozie-loop-mustache-template-slot-rfor')
@@ -18,7 +18,7 @@ export default class LoopMustacheTemplateSlotRfor extends SignalWatcher(LitEleme
 
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
-  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { name: unknown }) => unknown;
+  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { name: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

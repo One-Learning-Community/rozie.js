@@ -4,7 +4,7 @@ import { SignalWatcher } from '@lit-labs/preact-signals';
 import { injectGlobalStyles, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 interface RozieItemSlotCtx {
-  item: unknown;
+  item: any;
 }
 
 @customElement('rozie-portal-list-styled-scss')
@@ -51,7 +51,7 @@ private _portalContainers = new Set<HTMLElement>();
 
   @state() private _hasSlotItem = false;
   @queryAssignedElements({ slot: 'item', flatten: true }) private _slotItemElements!: Element[];
-  @property({ attribute: false }) item?: (scope: { item: unknown }) => unknown;
+  @property({ attribute: false }) item?: (scope: { item: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

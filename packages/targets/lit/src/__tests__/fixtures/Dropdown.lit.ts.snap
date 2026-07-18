@@ -4,8 +4,8 @@ import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
 import { attachOutsideClickListener, createLitControllableProperty, injectGlobalStyles, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 interface RozieTriggerSlotCtx {
-  open: unknown;
-  toggle: unknown;
+  open: any;
+  toggle: any;
 }
 
 @customElement('rozie-dropdown')
@@ -33,10 +33,10 @@ private __rozieWatchInitial_0 = true;
 
   @state() private _hasSlotTrigger = false;
   @queryAssignedElements({ slot: 'trigger', flatten: true }) private _slotTriggerElements!: Element[];
-  @property({ attribute: false }) trigger?: (scope: { open: unknown; toggle: unknown }) => unknown;
+  @property({ attribute: false }) trigger?: (scope: { open: any; toggle: any }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
-  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { close: unknown }) => unknown;
+  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { close: any }) => unknown;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
