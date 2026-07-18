@@ -63,6 +63,7 @@ import {
 } from '../rewrite/rewriteScript.js';
 import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
 import { collectComponentRefTypes } from '../rewrite/componentRefs.js';
+import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import {
   reservedClassMembers,
   deconflictReservedImportBindings,
@@ -1052,7 +1053,18 @@ export function emitScript(
 
   // 6b. State signals.
   for (const s of ir.state) {
-    const initText = genCode(s.initializer);
+    // Quick 260717-uvl (ROZ208 make-it-work) — route the initializer through
+    // rewriteTemplateExpression (the SAME machinery already used to lower
+    // $props.X/$data.X in templates/handlers) so a <data> initializer that
+    // reads $props.x/$data.x (the idiomatic Vue-port derived-initial
+    // pattern) lowers to a this.-prefixed read (this.x, or this.x() for a
+    // signal input) instead of leaking the raw sigil (TS2304 + runtime
+    // ReferenceError). DESIGN CAVEAT: this SNAPSHOTS the prop/data value at
+    // class-field-initializer time and does not track later changes (the
+    // derived-state footgun, uniform across all six targets) — an $onMount
+    // seed remains the honest REACTIVE form; this only makes the snapshot
+    // form work.
+    const initText = rewriteTemplateExpression(s.initializer, ir);
     // Quick task 260520-w18 bug class 2/6(iii) — an empty-array `<data>`
     // initializer (`files: []`) types as `signal<never[]>`, so
     // `files().map(f => f.id)` fails TS2339 and an `@for` over `files()`

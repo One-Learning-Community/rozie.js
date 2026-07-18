@@ -469,7 +469,7 @@ function emitModelGetterSetter(prop: PropDecl): string {
   ].join('\n');
 }
 
-function emitStateField(stateName: string, init: t.Expression): string {
+function emitStateField(stateName: string, init: t.Expression, ir: IRComponent): string {
   // Signal-backed: `private _x = signal(<init>);`
   // Class 2 (Phase 65-02) — a NARROW-LITERAL `<data>` default makes the signal
   // infer a too-narrow type that breaks every downstream `.value` read:
@@ -488,7 +488,17 @@ function emitStateField(stateName: string, init: t.Expression): string {
   } else if (t.isObjectExpression(init) && init.properties.length === 0) {
     typeArg = '<any>';
   }
-  return `  private _${stateName} = signal${typeArg}(${renderExpression(init)});`;
+  // Quick 260717-uvl (ROZ208 make-it-work) — route the initializer through
+  // rewriteTemplateExpression (the SAME machinery already used to lower
+  // $props.X/$data.X in templates/handlers) so a <data> initializer that
+  // reads $props.x/$data.x (the idiomatic Vue-port derived-initial pattern)
+  // lowers to a this.-prefixed read instead of leaking the raw sigil (TS2304
+  // + runtime ReferenceError). DESIGN CAVEAT: this SNAPSHOTS the prop/data
+  // value at class-field-initializer time and does not track later changes
+  // (the derived-state footgun, uniform across all six targets) — an
+  // $onMount seed remains the honest REACTIVE form; this only makes the
+  // snapshot form work.
+  return `  private _${stateName} = signal${typeArg}(${rewriteTemplateExpression(init, ir)});`;
 }
 
 function emitRefField(refName: string, elementTag: string, composedType?: string, hasElementPortal?: boolean): string {
@@ -1097,7 +1107,7 @@ export function emitScript(
   }
 
   for (const state of ir.state) {
-    fieldLines.push(emitStateField(state.name, state.initializer));
+    fieldLines.push(emitStateField(state.name, state.initializer, ir));
   }
 
   // Phase 66-04 (D-2 Lit branch, SC-3) — resolve which refs point at a
