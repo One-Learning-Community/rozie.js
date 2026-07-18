@@ -279,6 +279,154 @@ function buildAngularSetterCall(
 }
 
 /**
+ * quick 260718-uvq — ROZ207 partial nested-`$data` reactive lowering (Angular).
+ *
+ * Emits a REACTIVE immutable-replace of the top-level `$data` signal for the
+ * COVERED subset via the signal `.update` idiom
+ * (`this.key.update(param => <immutable>)`). The `mkPrev()` factory returns the
+ * update param identifier (`o` for member spread, `a` for array/index) — the
+ * live prior value threaded by Angular's `.update`.
+ */
+const COVERED_ARRAY_MUTATORS = new Set(['push', 'pop', 'shift', 'unshift', 'splice']);
+
+function immutableMemberValue(
+  mkPrev: () => t.Expression,
+  field: string,
+  rhs: t.Expression,
+): t.Expression {
+  return t.objectExpression([
+    t.spreadElement(mkPrev()),
+    t.objectProperty(t.identifier(field), rhs),
+  ]);
+}
+
+function immutableIndexValue(
+  mkPrev: () => t.Expression,
+  index: t.Expression,
+  rhs: t.Expression,
+): t.Expression {
+  const arrow = t.arrowFunctionExpression(
+    [t.identifier('__v'), t.identifier('__i')],
+    t.conditionalExpression(
+      t.binaryExpression('===', t.identifier('__i'), index),
+      rhs,
+      t.identifier('__v'),
+    ),
+  );
+  return t.callExpression(t.memberExpression(mkPrev(), t.identifier('map')), [arrow]);
+}
+
+/** null → not lowerable (leave to ROZ207). */
+function immutableArrayValue(
+  mkPrev: () => t.Expression,
+  method: string,
+  args: t.Expression[],
+): t.Expression | null {
+  const slice = (...sliceArgs: t.Expression[]): t.CallExpression =>
+    t.callExpression(t.memberExpression(mkPrev(), t.identifier('slice')), sliceArgs);
+  switch (method) {
+    case 'push':
+      return t.arrayExpression([t.spreadElement(mkPrev()), ...args]);
+    case 'unshift':
+      return t.arrayExpression([...args, t.spreadElement(mkPrev())]);
+    case 'pop':
+      return slice(t.numericLiteral(0), t.unaryExpression('-', t.numericLiteral(1)));
+    case 'shift':
+      return slice(t.numericLiteral(1));
+    case 'splice': {
+      if (args.length < 2) return null;
+      const start = args[0]!;
+      const deleteCount = args[1]!;
+      const items = args.slice(2);
+      return t.arrayExpression([
+        t.spreadElement(slice(t.numericLiteral(0), t.cloneNode(start, true))),
+        ...items,
+        t.spreadElement(
+          slice(
+            t.binaryExpression('+', t.cloneNode(start, true), t.cloneNode(deleteCount, true)),
+          ),
+        ),
+      ]);
+    }
+    default:
+      return null;
+  }
+}
+
+/** `this.<key>.update(<param> => <value>)`. */
+function buildAngularUpdateCall(
+  key: string,
+  param: string,
+  value: t.Expression,
+): t.CallExpression {
+  const updateCallee = t.memberExpression(
+    t.memberExpression(t.thisExpression(), t.identifier(key)),
+    t.identifier('update'),
+  );
+  return t.callExpression(updateCallee, [
+    t.arrowFunctionExpression([t.identifier(param)], value),
+  ]);
+}
+
+/**
+ * Detect a COVERED nested `$data` assignment (CW-MEMBER / CW-INDEX). See the
+ * React target for the full predicate.
+ */
+function detectCoveredNestedAssign(
+  path: NodePath<t.AssignmentExpression>,
+  dataNames: ReadonlySet<string>,
+):
+  | { kind: 'member'; key: string; field: string }
+  | { kind: 'index'; key: string; index: t.Expression }
+  | null {
+  const node = path.node;
+  if (node.operator !== '=') return null;
+  if (!path.parentPath?.isExpressionStatement()) return null;
+  const left = node.left;
+  if (!t.isMemberExpression(left)) return null;
+  const base = left.object;
+  if (!t.isMemberExpression(base) || base.computed) return null;
+  if (!t.isIdentifier(base.object) || base.object.name !== '$data') return null;
+  if (!t.isIdentifier(base.property)) return null;
+  const key = base.property.name;
+  if (!dataNames.has(key)) return null;
+  if (!left.computed) {
+    if (!t.isIdentifier(left.property)) return null;
+    return { kind: 'member', key, field: left.property.name };
+  }
+  if (!t.isNumericLiteral(left.property)) return null;
+  return { kind: 'index', key, index: left.property };
+}
+
+/**
+ * Detect a COVERED depth-1 array mutator call (CW-ARRAY) in statement-context.
+ * See the React target for the full predicate.
+ */
+function detectCoveredArrayMutation(
+  path: NodePath<t.CallExpression>,
+  dataNames: ReadonlySet<string>,
+): { key: string; method: string; args: t.Expression[] } | null {
+  if (!path.parentPath?.isExpressionStatement()) return null;
+  const callee = path.node.callee;
+  if (!t.isMemberExpression(callee) || callee.computed) return null;
+  if (!t.isIdentifier(callee.property)) return null;
+  const method = callee.property.name;
+  if (!COVERED_ARRAY_MUTATORS.has(method)) return null;
+  const base = callee.object;
+  if (!t.isMemberExpression(base) || base.computed) return null;
+  if (!t.isIdentifier(base.object) || base.object.name !== '$data') return null;
+  if (!t.isIdentifier(base.property)) return null;
+  const key = base.property.name;
+  if (!dataNames.has(key)) return null;
+  const args: t.Expression[] = [];
+  for (const a of path.node.arguments) {
+    if (!t.isExpression(a)) return null;
+    args.push(a);
+  }
+  return { key, method, args };
+}
+
+/**
  * Pre-walk Program top-level statements to discover user-method/arrow names.
  * Returns the set of names that map to class methods/arrows in emitted output.
  */
@@ -985,6 +1133,21 @@ export function rewriteRozieIdentifiers(
       const node = path.node;
       const left = node.left;
 
+      // quick 260718-uvq — COVERED nested-$data reactive lowering (CW-MEMBER /
+      // CW-INDEX) via signal `.update`. Intercept before the shallow-write path.
+      const covered = detectCoveredNestedAssign(path, dataNames);
+      if (covered !== null) {
+        const param = covered.kind === 'member' ? 'o' : 'a';
+        const mkPrev = (): t.Expression => t.identifier(param);
+        const value =
+          covered.kind === 'member'
+            ? immutableMemberValue(mkPrev, covered.field, node.right)
+            : immutableIndexValue(mkPrev, covered.index, node.right);
+        path.replaceWith(buildAngularUpdateCall(covered.key, param, value));
+        // No skip — descend so `$data.Y` reads inside the rhs still lower.
+        return;
+      }
+
       if (!t.isMemberExpression(left)) return;
       const obj = left.object;
       const prop = left.property;
@@ -1257,6 +1420,18 @@ export function rewriteRozieIdentifiers(
      * cross-target safe (the Svelte target uses `$state.snapshot(x)`).
      */
     CallExpression(path) {
+      // quick 260718-uvq — COVERED depth-1 array-mutator reactive lowering
+      // (CW-ARRAY). `$data.<key>.push(x)` → `this.key.update(a => [...a, x])`.
+      const arrayMut = detectCoveredArrayMutation(path, dataNames);
+      if (arrayMut !== null) {
+        const mkPrev = (): t.Expression => t.identifier('a');
+        const value = immutableArrayValue(mkPrev, arrayMut.method, arrayMut.args);
+        if (value !== null) {
+          path.replaceWith(buildAngularUpdateCall(arrayMut.key, 'a', value));
+          return;
+        }
+      }
+
       const callee = path.node.callee;
       if (!t.isIdentifier(callee)) return;
 
