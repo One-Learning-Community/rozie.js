@@ -1617,6 +1617,27 @@ export function emitSingleAttr(
       return `[(ngModel)]="${expr}" [ngModelOptions]="{standalone: true}"`;
     }
     const bindingName = resolveBindingName(attr.name, ctx);
+    // Quick task 260717-uvk — array-form `:style="[a, b]"` merge. Angular's
+    // `[style]=` (`ɵɵstyleMap`) does not merge array elements (only Vue lowers
+    // an array natively), so route through the SAME `[attr.style]` setAttribute
+    // seam the provably-string carve-out below uses, calling a self-contained
+    // `__rozieMergeStyle(...)` class method (injected by emitAngular when the
+    // template contains the `__rozieMergeStyle(` sentinel — see emitTemplate.ts
+    // `detectMergeStyleUsage` + emitAngular.ts `MERGE_STYLE_CLASS_METHOD`) that
+    // merges its string/object args left-to-right into one CSS string. Checked
+    // BEFORE computing `expr` on the whole array so the double-read-accessor
+    // hoist below never runs against the ArrayExpression as a whole — each
+    // element is lowered independently instead. Reachable only for the
+    // element's SOLE style contributor, same reachability guarantee as
+    // `isProvablyStringStyleExpression` (a co-existing static `style=` or a
+    // second `:style` routes through the `[ngStyle]` multi-source merge path
+    // in emitAttributes before this function is ever called for `style`).
+    if (attr.name === 'style' && t.isArrayExpression(attr.expression)) {
+      const elementExprs = attr.expression.elements
+        .filter((el): el is t.Expression => el !== null && t.isExpression(el))
+        .map((el) => lowerBoundAttrExpression(el, ctx, bindingName));
+      return `[attr.style]="__rozieMergeStyle(${elementExprs.join(', ')})"`;
+    }
     const expr = lowerBoundAttrExpression(attr.expression, ctx, bindingName);
     // Phase 26 (SPEC-4) — wrap when the IR gate says the value may be
     // non-primitive AND the attribute position renders as text (not a

@@ -438,6 +438,56 @@ const INLINE_ATTR_FN = [
 const ATTR_CLASS_METHOD =
   'rozieAttr(v: unknown): string | null { return __rozieAttr(v); }';
 
+/**
+ * Quick task 260717-uvk — self-contained class method for an array-form
+ * `:style="[a, b]"` binding. There is no `@rozie/runtime-angular` package
+ * (convention forbids one — same reason `__rozieDisplay`/`__rozieAttr` inline
+ * above), so the merge logic lives directly in the class as a single method
+ * (no free-function indirection needed; unlike `rozieDisplay`/`rozieAttr` it
+ * has no shared dependency to delegate to).
+ *
+ * Merges its args left-to-right into ONE CSS-declaration string (a later arg
+ * overrides an earlier one for the same property — Vue `normalizeStyle`
+ * semantics): a string arg is trimmed and a trailing `;` stripped (so the
+ * join never produces a `;;` empty declaration — the corruption class
+ * `isProvablyStringStyleExpression` above already routes around for the
+ * single-string case); an object arg's own-enumerable entries are emitted as
+ * `"<kebab(key)>: <value>"` (the same camelCase→kebab rule
+ * `packages/runtime/svelte/src/rozieStyle.ts`'s `kebabizeStyleKey` applies,
+ * since the merged result is a STRING consumed via `[attr.style]`
+ * (`setAttribute` + the browser's own tolerant CSS parser), not `styleMap`).
+ * The template calls `__rozieMergeStyle(...)` directly (Angular templates
+ * resolve bare identifiers against the component instance), so no delegating
+ * wrapper method is needed. Gated on `tmplResult.usesMergeStyle` (detected by
+ * scanning the emitted template for the `__rozieMergeStyle(` token, mirroring
+ * `usesNgClass`/`usesNgStyle`), so a component with no array-form `:style`
+ * stays byte-identical to pre-feature output.
+ */
+const MERGE_STYLE_CLASS_METHOD = [
+  '__rozieMergeStyle(',
+  '  ...parts: Array<string | Record<string, string | number> | null | undefined>',
+  '): string {',
+  '  const decls: string[] = [];',
+  '  for (const part of parts) {',
+  '    if (part == null) continue;',
+  "    if (typeof part === 'string') {",
+  "      const trimmed = part.trim().replace(/;+\\s*$/, '');",
+  "      if (trimmed !== '') decls.push(trimmed);",
+  '      continue;',
+  '    }',
+  '    for (const key of Object.keys(part)) {',
+  '      const value = part[key];',
+  '      if (value == null) continue;',
+  "      const kebabKey = key.startsWith('--')",
+  '        ? key',
+  "        : key.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());",
+  '      decls.push(`${kebabKey}: ${value}`);',
+  '    }',
+  '  }',
+  "  return decls.join('; ');",
+  '}',
+].join('\n');
+
 export function emitAngular(
   ir: IRComponent,
   opts: EmitAngularOptions = {},
@@ -834,6 +884,11 @@ export function emitAngular(
     // SAME flag (a wrapped whole-value attr binding flips `hasDisplayWrap`).
     // `__rozieAttr` depends on `__rozieDisplay`, so both inline together.
     ...(tmplResult.hasDisplayWrap ? [ATTR_CLASS_METHOD] : []),
+    // Quick task 260717-uvk — the self-contained `__rozieMergeStyle` class
+    // method, synthesized ONLY when the template lowered an array-form
+    // `:style` binding (detected via the `__rozieMergeStyle(` template
+    // sentinel). Non-array-style components stay byte-identical.
+    ...(tmplResult.usesMergeStyle ? [MERGE_STYLE_CLASS_METHOD] : []),
   ];
 
   // Find the constructor block and splice the listener effects + renderer

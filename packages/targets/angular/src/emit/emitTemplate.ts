@@ -140,6 +140,15 @@ export interface EmitTemplateResult {
    * directive import the same way.
    */
   usesNgStyle: boolean;
+  /**
+   * Quick task 260717-uvk — true when the emitted template contains an
+   * array-form `:style` binding lowered to `[attr.style]="__rozieMergeStyle(...)"`.
+   * `emitAngular` reads this to conditionally inject the self-contained
+   * `__rozieMergeStyle` class method (same detection-from-template pattern as
+   * `usesNgClass`/`usesNgStyle` — a plain substring scan, since the emitter
+   * only ever writes that exact token for this lowering).
+   */
+  usesMergeStyle: boolean;
   diagnostics: Diagnostic[];
 }
 
@@ -159,6 +168,17 @@ function detectNgDirectives(template: string): {
     usesNgClass: template.includes('[ngClass]'),
     usesNgStyle: template.includes('[ngStyle]'),
   };
+}
+
+/**
+ * Quick task 260717-uvk — detect whether the emitted template lowered an
+ * array-form `:style` binding to `[attr.style]="__rozieMergeStyle(...)"`.
+ * Plain substring scan, same discipline as `detectNgDirectives` — the emitter
+ * only ever writes this exact token for this lowering, so a false positive
+ * from unrelated markup is not reachable.
+ */
+function detectMergeStyleUsage(template: string): boolean {
+  return template.includes('__rozieMergeStyle(');
 }
 
 /**
@@ -242,6 +262,7 @@ export function emitTemplate(
       usedGlobals: [],
       usesNgClass: false,
       usesNgStyle: false,
+      usesMergeStyle: false,
       diagnostics,
     };
   }
@@ -280,6 +301,7 @@ export function emitTemplate(
     hasDisplayWrap: hasDisplayWrap.value,
     usedGlobals: detectUsedGlobals(template),
     ...detectNgDirectives(template),
+    usesMergeStyle: detectMergeStyleUsage(template),
     diagnostics,
   };
 }
