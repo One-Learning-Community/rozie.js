@@ -18,18 +18,38 @@
  * MapLibre, and rete already adopted (and documented) to dodge this. Uniform (the
  * source is target-agnostic and the goal is one-source-six-working-targets): a Vue-
  * authored deep mutation silently breaks when compiled to React, so flagging it
- * everywhere upholds Rozie's cross-target promise. A real per-target nested-
- * mutation lowering is backlogged; until then, ROZ207 fails loud.
+ * everywhere upholds Rozie's cross-target promise.
+ *
+ * quick 260718-uvq — PARTIAL make-it-work: a statically-analyzable COVERED subset
+ * now LOWERS reactively on React/Solid/Angular/Lit (each target emits an
+ * immutable single-key replace), so ROZ207 EXEMPTS exactly that subset while
+ * still failing loud on everything else. The exemption predicate here MUST match
+ * the four targets' `detectCoveredNestedAssign` / `detectCoveredArrayMutation`
+ * EXACTLY (coherence invariant): no shape is exempted in core that any target
+ * leaves non-reactive.
+ *
+ * COVERED (EXEMPT — statement-context only, `<key>` a declared `<data>` key):
+ *   - CW-MEMBER `$data.<key>.<field> = <rhs>` — both non-computed identifiers,
+ *     depth-2, plain `=`.
+ *   - CW-INDEX  `$data.<key>[<n>] = <rhs>`   — `<n>` a NUMERIC LITERAL, depth-2,
+ *     plain `=`.
+ *   - CW-ARRAY  `$data.<key>.<m>(<args>)` as an ExpressionStatement — depth-1,
+ *     `<m>` ∈ push/pop/shift/unshift/splice, every arg a plain expression, and
+ *     splice with ≥ 2 args (matches where the target lowering bails).
  *
  * FLAGGED (in `<script>`, matching `propWriteValidator`'s scope):
- *   - `$data.obj.field = …`  (nested member assignment, depth ≥ 2)
- *   - `$data.arr[i] = …`     (indexed assignment, depth ≥ 2)
+ *   - `$data.a.b.c = …`      (depth ≥ 3 — not single-key-replaceable)
+ *   - `$data.reg[id] = …`    (dynamic/computed index — ambiguous array vs object)
  *   - `$data.obj.field += 1` (any compound / logical-assign operator)
  *   - `$data.obj.field++`    (UpdateExpression on a nested member)
- *   - `$data.arr.push(…)`    (a mutating array/Map/Set method on a `$data` member)
+ *   - `$data.arr.sort()` / `.reverse()` / `.fill()` / `.copyWithin()` (in-place)
+ *   - `$data.m.set(…)` / `$data.s.add()/.delete()/.clear()` (Map/Set mutators)
+ *   - a covered mutator in EXPRESSION context (`const x = $data.arr.pop()`)
+ *   - a covered array mutator at depth ≥ 2 (`$data.obj.items.push(…)`)
  *
  * NOT FLAGGED:
  *   - `$data.x = …`          (shallow reassignment — lowers to a reactive setter)
+ *   - the COVERED subset above (now lowers reactively — quick 260718-uvq)
  *   - `$data.obj.field`      (a READ — assignment/method only)
  *   - `$data.arr.map(…)` / `.filter(…)` / `.find(…)` (non-mutating methods)
  *   - `const o = $data.obj; o.field = 5` (mutation through a local alias — the
@@ -47,6 +67,7 @@
  */
 import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
+import type { NodePath } from '@babel/traverse';
 import type { RozieAST } from '../../ast/types.js';
 import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
@@ -68,6 +89,60 @@ const MUTATING_METHODS = new Set([
   'push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin',
   'set', 'add', 'delete', 'clear',
 ]);
+
+// quick 260718-uvq — the depth-1 array mutators the four targets lower to an
+// immutable single-key replace. A subset of MUTATING_METHODS; the rest
+// (sort/reverse/fill/copyWithin, set/add/delete/clear) STAY flagged everywhere.
+const COVERED_ARRAY_MUTATORS = new Set(['push', 'pop', 'shift', 'unshift', 'splice']);
+
+/**
+ * quick 260718-uvq — is this AssignmentExpression a COVERED nested-`$data` write
+ * (CW-MEMBER / CW-INDEX) that lowers reactively on all four targets? Mirrors the
+ * per-target `detectCoveredNestedAssign` EXACTLY (coherence invariant):
+ * statement-context, plain `=`, LHS `$data.<key>.<field>` (both non-computed) or
+ * `$data.<key>[<n>]` (`<n>` a NumericLiteral), `<key>` a declared `<data>` key.
+ */
+function isCoveredNestedAssign(
+  path: NodePath<t.AssignmentExpression>,
+  bindings: BindingsTable,
+): boolean {
+  const node = path.node;
+  if (node.operator !== '=') return false;
+  if (!path.parentPath?.isExpressionStatement()) return false;
+  const left = node.left;
+  if (!t.isMemberExpression(left)) return false;
+  const base = left.object;
+  if (!t.isMemberExpression(base) || base.computed) return false;
+  if (!t.isIdentifier(base.object) || base.object.name !== '$data') return false;
+  if (!t.isIdentifier(base.property)) return false;
+  if (!bindings.data.has(base.property.name)) return false;
+  if (!left.computed) return t.isIdentifier(left.property); // CW-MEMBER
+  return t.isNumericLiteral(left.property); // CW-INDEX
+}
+
+/**
+ * quick 260718-uvq — is this CallExpression a COVERED depth-1 array mutator
+ * (CW-ARRAY) that lowers reactively on all four targets? Mirrors the per-target
+ * `detectCoveredArrayMutation` EXACTLY (coherence invariant): statement-context,
+ * `<m>` ∈ push/pop/shift/unshift/splice, container `$data.<key>` at depth-1,
+ * every argument a plain expression, and splice with ≥ 2 args (the point where
+ * the target lowering can rebuild the array immutably — below that it bails, so
+ * the validator must keep flagging or the result would be silently non-reactive).
+ */
+function isCoveredArrayMutation(
+  path: NodePath<t.CallExpression>,
+  method: string,
+  depth: number,
+): boolean {
+  if (!COVERED_ARRAY_MUTATORS.has(method)) return false;
+  if (depth !== 1) return false;
+  if (!path.parentPath?.isExpressionStatement()) return false;
+  for (const a of path.node.arguments) {
+    if (!t.isExpression(a)) return false; // spread / placeholder → target bails
+  }
+  if (method === 'splice' && path.node.arguments.length < 2) return false;
+  return true;
+}
 
 /**
  * If `node` is a `$data`-rooted MemberExpression, return the first-level key and
@@ -117,24 +192,34 @@ export function runDataNestedMutationValidator(
 
   traverse(ast.script.program, {
     AssignmentExpression(path) {
+      // quick 260718-uvq — exempt the COVERED CW-MEMBER / CW-INDEX subset; it
+      // lowers reactively on all four targets. Everything else still flags.
+      if (isCoveredNestedAssign(path, bindings)) return;
       checkWriteTarget(path.node.left, path.node, 'nested assignment');
     },
     UpdateExpression(path) {
+      // UpdateExpression (`$data.obj.n++`) is NEVER covered — stays flagged.
       checkWriteTarget(path.node.argument, path.node, `${path.node.operator} on a nested member`);
     },
     CallExpression(path) {
       const callee = path.node.callee;
       if (!t.isMemberExpression(callee) || callee.computed) return;
       if (!t.isIdentifier(callee.property)) return;
-      if (!MUTATING_METHODS.has(callee.property.name)) return;
+      const method = callee.property.name;
+      if (!MUTATING_METHODS.has(method)) return;
       // The mutated container is `callee.object` — flag when it is a `$data`
       // member (depth ≥ 1: `$data.arr.push()` mutates the top-level array `arr`,
       // which is itself non-reactive under a direct method mutation).
       const info = analyzeDataAccess(callee.object);
       if (!info || info.key === null || info.depth < 1) return;
       if (!bindings.data.has(info.key)) return;
+      // quick 260718-uvq — exempt the COVERED CW-ARRAY subset (depth-1 push/pop/
+      // shift/unshift/splice in statement-context with plain-expression args);
+      // it lowers reactively on all four targets. sort/reverse/fill/copyWithin,
+      // Map/Set mutators, depth ≥ 2 and expression-context calls STAY flagged.
+      if (isCoveredArrayMutation(path, method, info.depth)) return;
       diagnostics.push(
-        makeRoz207(path.node, info.key, `.${callee.property.name}() mutates in place`),
+        makeRoz207(path.node, info.key, `.${method}() mutates in place`),
       );
     },
   });
