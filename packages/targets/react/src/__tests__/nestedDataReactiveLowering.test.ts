@@ -51,7 +51,10 @@ function emit(data: string, body: string): string {
 describe('React nested-$data reactive lowering (covered subset)', () => {
   it('CW-MEMBER: `$data.obj.field = 5` → functional-updater object spread', () => {
     const code = emit('{ obj: { field: 0 } }', '$data.obj.field = 5;');
-    expect(code).toContain('setObj(prev => ({ ...prev, field: 5 }))');
+    // Object literal pretty-prints multi-line; assert fragments, not whitespace.
+    expect(code).toMatch(/setObj\(prev =>/);
+    expect(code).toContain('...prev');
+    expect(code).toMatch(/field: 5/);
     expect(code).not.toMatch(/\bobj\.field\s*=\s*5\b/);
   });
 

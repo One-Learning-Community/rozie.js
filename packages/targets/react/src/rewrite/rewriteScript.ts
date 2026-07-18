@@ -644,6 +644,156 @@ function nestedWriteRoot(left: t.LVal | t.OptionalMemberExpression): string | nu
 }
 
 /**
+ * quick 260718-uvq — ROZ207 partial nested-`$data` reactive lowering.
+ *
+ * For the statically-analyzable COVERED subset, emit a REACTIVE immutable-
+ * replace of the top-level `$data` key instead of a silent in-place mutation.
+ * The "next value" expressions below are target-agnostic given a `mkPrev()`
+ * factory that returns a FRESH clone of the current-value expression each call
+ * (React `prev`, Solid `key()`, Angular `a`, Lit `this._key.value`). React wraps
+ * them in its functional-updater setter idiom `setKey(prev => …)`.
+ *
+ * Immutable forms (see PLAN objective):
+ *   CW-MEMBER `$data.k.f = rhs`     → `{ ...prev, f: rhs }`
+ *   CW-INDEX  `$data.k[n] = rhs`    → `prev.map((__v, __i) => __i === n ? rhs : __v)`
+ *   CW-ARRAY  push  `[...prev, ...args]`     unshift `[...args, ...prev]`
+ *             pop   `prev.slice(0, -1)`      shift   `prev.slice(1)`
+ *             splice(start, del, ...items)
+ *               `[...prev.slice(0, start), ...items, ...prev.slice(start + del)]`
+ */
+const COVERED_ARRAY_MUTATORS = new Set(['push', 'pop', 'shift', 'unshift', 'splice']);
+
+function immutableMemberValue(
+  mkPrev: () => t.Expression,
+  field: string,
+  rhs: t.Expression,
+): t.Expression {
+  return t.objectExpression([
+    t.spreadElement(mkPrev()),
+    t.objectProperty(t.identifier(field), rhs),
+  ]);
+}
+
+function immutableIndexValue(
+  mkPrev: () => t.Expression,
+  index: t.Expression,
+  rhs: t.Expression,
+): t.Expression {
+  const arrow = t.arrowFunctionExpression(
+    [t.identifier('__v'), t.identifier('__i')],
+    t.conditionalExpression(
+      t.binaryExpression('===', t.identifier('__i'), index),
+      rhs,
+      t.identifier('__v'),
+    ),
+  );
+  return t.callExpression(t.memberExpression(mkPrev(), t.identifier('map')), [arrow]);
+}
+
+/** null → not lowerable (leave to ROZ207). */
+function immutableArrayValue(
+  mkPrev: () => t.Expression,
+  method: string,
+  args: t.Expression[],
+): t.Expression | null {
+  const slice = (...sliceArgs: t.Expression[]): t.CallExpression =>
+    t.callExpression(t.memberExpression(mkPrev(), t.identifier('slice')), sliceArgs);
+  switch (method) {
+    case 'push':
+      return t.arrayExpression([t.spreadElement(mkPrev()), ...args]);
+    case 'unshift':
+      return t.arrayExpression([...args, t.spreadElement(mkPrev())]);
+    case 'pop':
+      return slice(t.numericLiteral(0), t.unaryExpression('-', t.numericLiteral(1)));
+    case 'shift':
+      return slice(t.numericLiteral(1));
+    case 'splice': {
+      if (args.length < 2) return null; // need start + deleteCount to rebuild immutably
+      const start = args[0]!;
+      const deleteCount = args[1]!;
+      const items = args.slice(2);
+      return t.arrayExpression([
+        t.spreadElement(slice(t.numericLiteral(0), t.cloneNode(start, true))),
+        ...items,
+        t.spreadElement(
+          slice(
+            t.binaryExpression('+', t.cloneNode(start, true), t.cloneNode(deleteCount, true)),
+          ),
+        ),
+      ]);
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * Detect a COVERED nested `$data` assignment (CW-MEMBER / CW-INDEX). Returns the
+ * top-level key plus the target-agnostic immutable "next value" builder input,
+ * or null when the write is NOT in the covered predicate (→ ROZ207 owns it).
+ *
+ * Predicate: plain `=` AssignmentExpression in statement-context; LHS is
+ * `$data.<key>.<field>` (both non-computed identifiers → CW-MEMBER) or
+ * `$data.<key>[<n>]` (`<key>` non-computed identifier, `<n>` a NumericLiteral →
+ * CW-INDEX). `<key>` must be a declared `<data>` key. Everything else (depth ≥ 3,
+ * computed/dynamic key or non-literal index, compound `+=`) returns null.
+ */
+function detectCoveredNestedAssign(
+  path: NodePath<t.AssignmentExpression>,
+  dataNames: ReadonlySet<string>,
+): { kind: 'member'; key: string; field: string } | { kind: 'index'; key: string; index: t.Expression } | null {
+  const node = path.node;
+  if (node.operator !== '=') return null;
+  if (!path.parentPath?.isExpressionStatement()) return null;
+  const left = node.left;
+  if (!t.isMemberExpression(left)) return null;
+  const base = left.object; // must be `$data.<key>`
+  if (!t.isMemberExpression(base) || base.computed) return null;
+  if (!t.isIdentifier(base.object) || base.object.name !== '$data') return null;
+  if (!t.isIdentifier(base.property)) return null;
+  const key = base.property.name;
+  if (!dataNames.has(key)) return null;
+  if (!left.computed) {
+    // CW-MEMBER: non-computed depth-2 field.
+    if (!t.isIdentifier(left.property)) return null;
+    return { kind: 'member', key, field: left.property.name };
+  }
+  // CW-INDEX: computed depth-2 property that is a NUMERIC LITERAL.
+  if (!t.isNumericLiteral(left.property)) return null;
+  return { kind: 'index', key, index: left.property };
+}
+
+/**
+ * Detect a COVERED depth-1 array mutator call (CW-ARRAY) in statement-context:
+ * `$data.<key>.<m>(<args>)` where `<m>` ∈ push/pop/shift/unshift/splice, `<key>`
+ * a declared non-computed `<data>` key, and every argument is a plain
+ * expression. Returns { key, method, args } or null (→ ROZ207 owns it).
+ */
+function detectCoveredArrayMutation(
+  path: NodePath<t.CallExpression>,
+  dataNames: ReadonlySet<string>,
+): { key: string; method: string; args: t.Expression[] } | null {
+  if (!path.parentPath?.isExpressionStatement()) return null;
+  const callee = path.node.callee;
+  if (!t.isMemberExpression(callee) || callee.computed) return null;
+  if (!t.isIdentifier(callee.property)) return null;
+  const method = callee.property.name;
+  if (!COVERED_ARRAY_MUTATORS.has(method)) return null;
+  const base = callee.object; // must be depth-1 `$data.<key>`
+  if (!t.isMemberExpression(base) || base.computed) return null;
+  if (!t.isIdentifier(base.object) || base.object.name !== '$data') return null;
+  if (!t.isIdentifier(base.property)) return null;
+  const key = base.property.name;
+  if (!dataNames.has(key)) return null;
+  const args: t.Expression[] = [];
+  for (const a of path.node.arguments) {
+    if (!t.isExpression(a)) return null; // spread/placeholder → not covered
+    args.push(a);
+  }
+  return { key, method, args };
+}
+
+/**
  * Rewrite Rozie magic-accessor identifiers in-place on a cloned Program.
  *
  * Strategy: single-pass @babel/traverse with multiple visitors. Replacements
@@ -797,6 +947,25 @@ export function rewriteRozieIdentifiers(
     AssignmentExpression(path) {
       const node = path.node;
       const left = node.left;
+
+      // quick 260718-uvq — COVERED nested-$data reactive lowering (CW-MEMBER /
+      // CW-INDEX). Intercept BEFORE the nestedWriteRoot/ROZ521 branch so covered
+      // writes lower to `setKey(prev => <immutable>)` (no spurious ROZ521).
+      // Non-covered nested writes fall through unchanged (ROZ207 owns them).
+      const covered = detectCoveredNestedAssign(path, dataNames);
+      if (covered !== null) {
+        const mkPrev = (): t.Expression => t.identifier('prev');
+        const value =
+          covered.kind === 'member'
+            ? immutableMemberValue(mkPrev, covered.field, node.right)
+            : immutableIndexValue(mkPrev, covered.index, node.right);
+        const setterCall = t.callExpression(t.identifier('set' + capitalize(covered.key)), [
+          t.arrowFunctionExpression([t.identifier('prev')], value),
+        ]);
+        path.replaceWith(setterCall);
+        // No skip — descend so `$data.Y` reads inside the rhs still lower.
+        return;
+      }
 
       // Detect nested writes BEFORE we attempt any rewrite. Emit ROZ521 +
       // leave AST unchanged (Pitfall 7).
@@ -1098,6 +1267,24 @@ export function rewriteRozieIdentifiers(
      * by emitScript). Leave console.log untouched (DX-03 floor).
      */
     CallExpression(path) {
+      // quick 260718-uvq — COVERED depth-1 array-mutator reactive lowering
+      // (CW-ARRAY). `$data.<key>.push(x)` → `setKey(prev => [...prev, x])`, etc.
+      // Statement-context + depth-1 only; Map/Set mutators, sort/reverse/fill/
+      // copyWithin, expression-context and depth≥2 calls stay for ROZ207.
+      const arrayMut = detectCoveredArrayMutation(path, dataNames);
+      if (arrayMut !== null) {
+        const mkPrev = (): t.Expression => t.identifier('prev');
+        const value = immutableArrayValue(mkPrev, arrayMut.method, arrayMut.args);
+        if (value !== null) {
+          const setterCall = t.callExpression(
+            t.identifier('set' + capitalize(arrayMut.key)),
+            [t.arrowFunctionExpression([t.identifier('prev')], value)],
+          );
+          path.replaceWith(setterCall);
+          return;
+        }
+      }
+
       const callee = path.node.callee;
       if (!t.isIdentifier(callee)) return;
 

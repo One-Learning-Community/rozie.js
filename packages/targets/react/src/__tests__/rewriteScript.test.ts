@@ -235,9 +235,11 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
     expect(code).toContain('$onUnmount');
   });
 
-  it('Nested member write $data.foo.bar = "x" emits ROZ521 + leaves AST unchanged', () => {
-    // Synthetic: program with `$data.todo.title = 'x';`
-    const src = `$data.todo.title = 'x';\n`;
+  it('NON-COVERED depth-3 nested write $data.todo.meta.title = "x" emits ROZ521 + leaves AST unchanged', () => {
+    // quick 260718-uvq — the depth-2 shape `$data.todo.title = 'x'` is now a
+    // COVERED CW-MEMBER write and lowers to a reactive setter (see the covered
+    // case below). A depth-3 write stays NON-COVERED → ROZ521 + AST unchanged.
+    const src = `$data.todo.meta.title = 'x';\n`;
     const program = babelParse(src, { sourceType: 'module' });
     const syntheticIR: Partial<IRComponent> & { props: IRComponent['props']; state: IRComponent['state']; refs: IRComponent['refs']; computed: IRComponent['computed']; emits: IRComponent['emits']; lifecycle: IRComponent['lifecycle']; listeners: IRComponent['listeners']; slots: IRComponent['slots'] } = {
       type: 'IRComponent',
@@ -263,13 +265,44 @@ const bump = () => { let tmp = 0; tmp++; $data.count = tmp }
     expect(roz521).toBeDefined();
     expect(roz521!.severity).toBe('warning');
     // The WRITE itself is not converted to a setter call — that's the
-    // "leave AST unchanged" guarantee for the assignment shape (Pitfall 7).
-    // The inner read of $data.todo IS rewritten (top-level state read), so
-    // the resulting expression is `todo.title = 'x'`, NOT `setTodo(...)`.
-    // The user must refactor manually; ROZ521 advises them.
+    // "leave AST unchanged" guarantee for the non-covered nested shape
+    // (Pitfall 7). The inner read of $data.todo IS rewritten (top-level state
+    // read), so the resulting expression is `todo.meta.title = 'x'`.
     const out = generate(program).code;
     expect(out).not.toContain('setTodo');
-    expect(out).toMatch(/todo\.title\s*=\s*['"]x['"]/);
+    expect(out).toMatch(/todo\.meta\.title\s*=\s*['"]x['"]/);
+  });
+
+  it('COVERED depth-2 nested write $data.todo.title = "x" lowers to a reactive setter (no ROZ521)', () => {
+    // quick 260718-uvq — CW-MEMBER covered subset: reactive immutable-replace.
+    const src = `$data.todo.title = 'x';\n`;
+    const program = babelParse(src, { sourceType: 'module' });
+    const syntheticIR: Partial<IRComponent> & { props: IRComponent['props']; state: IRComponent['state']; refs: IRComponent['refs']; computed: IRComponent['computed']; emits: IRComponent['emits']; lifecycle: IRComponent['lifecycle']; listeners: IRComponent['listeners']; slots: IRComponent['slots'] } = {
+      type: 'IRComponent',
+      name: 'Synthetic',
+      props: [],
+      state: [
+        {
+          type: 'StateDecl',
+          name: 'todo',
+          initializer: t.objectExpression([]),
+          sourceLoc: { start: 0, end: 0 },
+        },
+      ],
+      computed: [],
+      refs: [],
+      slots: [],
+      emits: [],
+      lifecycle: [],
+      listeners: [],
+    };
+    const { diagnostics } = rewriteRozieIdentifiers(program, syntheticIR as IRComponent);
+    expect(diagnostics.find((d) => d.code === 'ROZ521')).toBeUndefined();
+    const out = generate(program).code;
+    expect(out).toMatch(/setTodo\(prev =>/);
+    expect(out).toContain('...prev');
+    expect(out).toMatch(/title: 'x'/);
+    expect(out).not.toMatch(/todo\.title\s*=\s*'x'/);
   });
 
   it('§slots-X-merge — script-context $slots.header → "(props.renderHeader ?? props.slots?.[\'header\'])" (Phase 07.3.2 Plan 08, F-07.3.2-05-A)', () => {
