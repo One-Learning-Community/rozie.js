@@ -385,6 +385,18 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
     // TRAILING-seam clone below), so the shared comment objects can be reused as-is.
     if (curSpliced && !prevSpliced && (!lead || lead.length === 0) && prevTrail && prevTrail.length > 0) {
       cur.leadingComments = [...prevTrail];
+      // Quick task 260718-uvn — the boundary comment now lives on BOTH prev.trailing
+      // AND the mirrored cur.leading → artificially doubled. Post-260714-orv the inline
+      // oracle single-prints (its host-only dedup strips the prev-trailing copy), so
+      // strip from prev.trailing any comment that source-matches one cur.leading now
+      // carries — exactly the host-only branch's `deduped`/null pattern — leaving ONE
+      // copy on cur.leading. (Every mirrored comment is the same object, so all are
+      // dropped; an independent prev-trailing comment, if any, would survive.)
+      const newLead = cur.leadingComments;
+      const deduped = prevTrail.filter(
+        (c) => !newLead.some((lc) => isSameSourceComment(c, lc)),
+      );
+      prev.trailingComments = deduped.length > 0 ? deduped : null;
       continue;
     }
     // The remaining (LEADING / TRAILING) seams require CUR to carry the boundary
@@ -459,8 +471,19 @@ function mirrorSpliceBoundaryComments(stmts: t.Statement[]): void {
           },
         };
       });
+    } else {
+      // Quick task 260718-uvn (SUB-STEP A) — plain LEADING seam (curSpliced, no
+      // loc rewrite): CUR already prints its OWN leadingComments, so appending a
+      // source-duplicate of them onto PREV's trailing is the artificial second copy
+      // the inline oracle no longer emits (post-260714-orv single-print). Drop any
+      // comment that source-matches one cur.leading already carries before appending.
+      toAppend = lead.filter(
+        (c) => !(cur.leadingComments ?? []).some((lc) => isSameSourceComment(c, lc)),
+      );
     }
-    prev.trailingComments = [...(prevTrail ?? []), ...toAppend];
+    if (toAppend.length > 0) {
+      prev.trailingComments = [...(prevTrail ?? []), ...toAppend];
+    }
   }
 }
 
