@@ -1,0 +1,53 @@
+<!--
+  AngularRefLetCollision.rozie — emitter-hardening backlog item #9, Angular half.
+
+  Byte-copy of the Lit half's fixture (`packages/targets/lit/src/__tests__/fixtures/LitRefLetCollision.rozie`)
+  — same shape, same reproduction target: a module-scope capture-`let`
+  whose name is IDENTICAL to a template `ref="canvasEl"` name, populated
+  inside `$onMount` from a NON-`$refs` source (`new FakeEngine()`) and read
+  from a second lifecycle path (the `$onMount` cleanup return AND a
+  top-level `recreate()` helper invoked from `$watch`) — mirroring
+  `packages/ui/chartjs/src/Chart.rozie`'s `canvasNode`/`ref="canvasEl"`
+  shape (that file's workaround renames the let to dodge this exact bug).
+
+  On Angular, `ref="canvasEl"` lowers to a `canvasEl = viewChild('canvasEl')`
+  signal member; a colliding script-derived class field of the SAME name
+  would double-declare `canvasEl` (TS2300). This fixture pins that shape.
+-->
+<rozie name="AngularRefLetCollision">
+
+<props>
+{ kind: { type: String, default: 'line' } }
+</props>
+
+<script>
+class FakeEngine {
+  destroy() {}
+}
+
+// Populated from `new FakeEngine()`, NEVER from `$refs.canvasEl` — isolates
+// the promoted-class-field vs viewChild-ref dedup bug from any `$refs`-read
+// detection path.
+let canvasEl = null
+
+$onMount(() => {
+  canvasEl = new FakeEngine()
+  return () => {
+    canvasEl.destroy()
+  }
+})
+
+const recreate = () => {
+  if (!canvasEl) return
+  canvasEl.destroy()
+  canvasEl = new FakeEngine()
+}
+
+$watch(() => $props.kind, () => recreate())
+</script>
+
+<template>
+  <canvas ref="canvasEl"></canvas>
+</template>
+
+</rozie>
