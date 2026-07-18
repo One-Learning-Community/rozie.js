@@ -88,6 +88,23 @@ export interface PartitionedUserImports {
   bodyStmts: t.Statement[];
 }
 
+/**
+ * Quick task 260717-uvj — compare two Babel comment nodes by SOURCE POSITION
+ * (type + starting line/column) rather than object reference. Mirrors the
+ * proven `isSameSourceComment` helper in `svelte`/`vue`'s `emitScript.ts`
+ * (quick 260714-orv), reused here for the userImports↔hoistedTypeDecls
+ * partition-boundary seam.
+ */
+function isSameSourceComment(a: t.Comment, b: t.Comment): boolean {
+  if (a === b) return true;
+  if (!a.loc || !b.loc) return false;
+  return (
+    a.type === b.type &&
+    a.loc.start.line === b.loc.start.line &&
+    a.loc.start.column === b.loc.start.column
+  );
+}
+
 export function partitionUserImports(file: t.File): PartitionedUserImports {
   const userImports: t.ImportDeclaration[] = [];
   const hoistedTypeDecls: Array<
@@ -119,6 +136,29 @@ export function partitionUserImports(file: t.File): PartitionedUserImports {
       hoistedTypeDecls.push(stmt);
     } else {
       bodyStmts.push(stmt);
+    }
+  }
+  // Quick task 260717-uvj — @babel/parser attaches a comment sitting at the
+  // userImports↔hoistedTypeDecls partition boundary to BOTH neighbours as the
+  // SAME source comment (last import's `trailingComments` AND first
+  // hoisted-type-decl's `leadingComments`). Each bucket is rendered in a
+  // SEPARATE `@babel/generator` pass by emitScript, so the shared comment
+  // would otherwise print once per pass. Strip it from the last import's
+  // trailing side — the type-decl's leading side still prints it exactly
+  // once. Same `isSameSourceComment`-by-position precedent as 260714-orv's
+  // `mirrorSpliceBoundaryComments`, gated STRICTLY to this one seam.
+  if (userImports.length > 0 && hoistedTypeDecls.length > 0) {
+    const lastImport = userImports[userImports.length - 1]!;
+    const firstTypeDecl = hoistedTypeDecls[0]!;
+    const firstTypeDeclLeading = firstTypeDecl.leadingComments;
+    if (lastImport.trailingComments && firstTypeDeclLeading) {
+      const deduped = lastImport.trailingComments.filter(
+        (trailing) =>
+          !firstTypeDeclLeading.some((leading) =>
+            isSameSourceComment(trailing, leading),
+          ),
+      );
+      lastImport.trailingComments = deduped.length > 0 ? deduped : null;
     }
   }
   return { userImports, hoistedTypeDecls, bodyStmts, valueImportNames };
