@@ -160,7 +160,7 @@ const PARTIAL_HOST_C = 'PartialInlineHostC';
 const INLINE_HOST_C = 'InlineEquivHostC';
 
 // SKIP (260714-orv) — see the tracked-regression note above Phase 54's describe block.
-describe.skip('Phase 55 — comment-bearing inline-vs-partial literal byte-identity', () => {
+describe('Phase 55 — comment-bearing inline-vs-partial literal byte-identity', () => {
   describe.each(TARGETS)('%s target', (target) => {
     it('comment-bearing partial-inlined host === inline-equivalent host (literal, comments/blank lines included)', () => {
       const partial = normalizeName(loadFixture(PARTIAL_HOST_C, target), PARTIAL_HOST_C);
@@ -281,7 +281,7 @@ const PARTIAL_HOST_E = 'PartialInlineHostE';
 const INLINE_HOST_E = 'InlineEquivHostE';
 
 // SKIP (260714-orv) — see the tracked-regression note above Phase 54's describe block.
-describe.skip('Phase 56 — trailing-seam literal byte-identity (svelte/vue mirror)', () => {
+describe('Phase 56 — trailing-seam literal byte-identity (svelte/vue mirror)', () => {
   describe.each(TARGETS)('%s target', (target) => {
     it('trailing-seam partial-inlined host === inline-equivalent host (literal, commented inline successor preserved)', () => {
       const partial = normalizeName(loadFixture(PARTIAL_HOST_E, target), PARTIAL_HOST_E);
@@ -317,7 +317,7 @@ const PARTIAL_HOST_G = 'PartialInlineHostG';
 const INLINE_HOST_G = 'InlineEquivHostG';
 
 // SKIP (260714-orv) — see the tracked-regression note above Phase 54's describe block.
-describe.skip('Phase 56 — shared module-let before-side literal byte-identity', () => {
+describe('Phase 56 — shared module-let before-side literal byte-identity', () => {
   describe.each(TARGETS)('%s target', (target) => {
     it('shared-let before-side partial-inlined host === inline-equivalent host (literal, sandwiched-let comment preserved)', () => {
       const partial = normalizeName(loadFixture(PARTIAL_HOST_G, target), PARTIAL_HOST_G);
@@ -352,7 +352,7 @@ const PARTIAL_HOST_I = 'PartialInlineHostI';
 const INLINE_HOST_I = 'InlineEquivHostI';
 
 // SKIP (260714-orv) — see the tracked-regression note above Phase 54's describe block.
-describe.skip('Phase 56 — shared module-let after-side literal byte-identity (svelte/vue mirror)', () => {
+describe('Phase 56 — shared module-let after-side literal byte-identity (svelte/vue mirror)', () => {
   describe.each(TARGETS)('%s target', (target) => {
     it('shared-let after-side partial-inlined host === inline-equivalent host (literal, host-let-trailing comment preserved)', () => {
       const partial = normalizeName(loadFixture(PARTIAL_HOST_I, target), PARTIAL_HOST_I);
@@ -389,7 +389,7 @@ const PARTIAL_HOST_H = 'PartialInlineHostH';
 const INLINE_HOST_H = 'InlineEquivHostH';
 
 // SKIP (260714-orv) — see the tracked-regression note above Phase 54's describe block.
-describe.skip('Phase 56 — Shape-3 after-let import-float literal byte-identity (core inliner)', () => {
+describe('Phase 56 — Shape-3 after-let import-float literal byte-identity (core inliner)', () => {
   describe.each(TARGETS)('%s target', (target) => {
     it('after-let import-float partial-inlined host === inline-equivalent host (literal, leading comment stays with the decl)', () => {
       const partial = normalizeName(loadFixture(PARTIAL_HOST_H, target), PARTIAL_HOST_H);
@@ -434,7 +434,7 @@ const PARTIAL_HOST_MULTI = 'PartialInlineHostMulti';
 const INLINE_HOST_MULTI = 'InlineEquivHostMulti';
 
 // SKIP (260714-orv) — see the tracked-regression note above Phase 54's describe block.
-describe.skip('Phase 56 — multi-boundary literal byte-identity (DataTable-shaped permanent guard)', () => {
+describe('Phase 56 — multi-boundary literal byte-identity (DataTable-shaped permanent guard)', () => {
   describe.each(TARGETS)('%s target', (target) => {
     it('multi-boundary partial-inlined host === inline-equivalent host (literal, all four stacked shapes)', () => {
       const partial = normalizeName(loadFixture(PARTIAL_HOST_MULTI, target), PARTIAL_HOST_MULTI);
@@ -471,7 +471,7 @@ const PARTIAL_HOST_J = 'PartialInlineHostJ';
 const INLINE_HOST_J = 'InlineEquivHostJ';
 
 // SKIP (260714-orv) — see the tracked-regression note above Phase 54's describe block.
-describe.skip('Phase 56-R8 — gap-1 trailing-seam literal byte-identity (after-side host gap)', () => {
+describe('Phase 56-R8 — gap-1 trailing-seam literal byte-identity (after-side host gap)', () => {
   describe.each(TARGETS)('%s target', (target) => {
     it('gap-1 trailing-seam partial-inlined host === inline-equivalent host (literal, after-side blank preserved)', () => {
       const partial = normalizeName(loadFixture(PARTIAL_HOST_J, target), PARTIAL_HOST_J);
@@ -509,7 +509,7 @@ const PARTIAL_HOST_K = 'PartialInlineHostK';
 const INLINE_HOST_K = 'InlineEquivHostK';
 
 // SKIP (260714-orv) — see the tracked-regression note above Phase 54's describe block.
-describe.skip('Phase 56-R9 — gap-0 leading-seam literal byte-identity (before-side host gap)', () => {
+describe('Phase 56-R9 — gap-0 leading-seam literal byte-identity (before-side host gap)', () => {
   describe.each(TARGETS)('%s target', (target) => {
     it('gap-0 leading-seam partial-inlined host === inline-equivalent host (literal, no injected blank)', () => {
       const partial = normalizeName(loadFixture(PARTIAL_HOST_K, target), PARTIAL_HOST_K);
@@ -592,7 +592,7 @@ const PARTIAL_HOST_M = 'PartialInlineHostM';
 const INLINE_HOST_M = 'InlineEquivHostM';
 
 // SKIP (260714-orv) — see the tracked-regression note above Phase 54's describe block.
-describe.skip('Phase 56-R11 — after-side inter-comment-block literal byte-identity (second blank preserved)', () => {
+describe('Phase 56-R11 — after-side inter-comment-block literal byte-identity (second blank preserved)', () => {
   describe.each(TARGETS)('%s target', (target) => {
     it('after-side inter-comment-block partial-inlined host === inline-equivalent host (literal, inter-comment blank preserved)', () => {
       const partial = normalizeName(loadFixture(PARTIAL_HOST_M, target), PARTIAL_HOST_M);
