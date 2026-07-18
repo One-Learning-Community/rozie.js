@@ -352,6 +352,50 @@ function renderExpression(expr: t.Expression): string {
   return generate(expr, GEN_OPTS).code;
 }
 
+/**
+ * Quick 260717-uvl — rewriteTemplateExpression's flattenInlineCode collapses
+ * every newline to a single space WITHOUT stripping `//` line comments. A
+ * multi-line `<data>` initializer (e.g. an object literal with an inline
+ * `// comment` on one of its properties) would have that comment silently
+ * swallow the REST of the flattened line — a real, observed corpus bug (the
+ * FlowCanvas demo's `graph` initializer). Strip all comments from a cloned
+ * copy of the initializer before routing it through the per-target rewriter,
+ * scoped to ONLY this new call site (template/handler expressions elsewhere
+ * are single-line already and keep their comments untouched).
+ */
+function stripInitializerComments<T extends t.Node>(node: T): T {
+  const cloned = t.cloneNode(node, true, false);
+  t.traverseFast(cloned, (n) => {
+    delete n.leadingComments;
+    delete n.trailingComments;
+    delete n.innerComments;
+  });
+  return cloned;
+}
+
+/**
+ * Quick 260717-uvl — true when a `<data>` initializer contains a `$props`/
+ * `$data` member access anywhere in its subtree (the ONLY shapes that reach
+ * emit — `$refs`/`$slots` in a `<data>` initializer remain a ROZ208 error and
+ * never get this far). Gates the rewriteTemplateExpression routing so a
+ * PLAIN initializer (the overwhelming majority — no sigil at all) keeps its
+ * ORIGINAL renderExpression() output byte-identical (multi-line
+ * pretty-printed, comments intact). Only a sigil-bearing initializer pays
+ * the flattened-single-line cost rewriteTemplateExpression's shared
+ * flattenInlineCode imposes — scoping this quick task's snapshot diff to
+ * exactly the initializers it is meant to fix.
+ */
+function initializerHasLeakingSigil(node: t.Node): boolean {
+  let found = false;
+  t.traverseFast(node, (n) => {
+    if (found) return;
+    if (t.isMemberExpression(n) && t.isIdentifier(n.object)) {
+      if (n.object.name === '$props' || n.object.name === '$data') found = true;
+    }
+  });
+  return found;
+}
+
 function renderDefault(expr: t.Expression | null, ann: PropTypeAnnotation): string {
   if (expr) {
     // Arrow factory wrapping (Vue-style `default: () => []`) — emit the wrapped
@@ -498,7 +542,10 @@ function emitStateField(stateName: string, init: t.Expression, ir: IRComponent):
   // (the derived-state footgun, uniform across all six targets) — an
   // $onMount seed remains the honest REACTIVE form; this only makes the
   // snapshot form work.
-  return `  private _${stateName} = signal${typeArg}(${rewriteTemplateExpression(init, ir)});`;
+  const initText = initializerHasLeakingSigil(init)
+    ? rewriteTemplateExpression(stripInitializerComments(init), ir)
+    : renderExpression(init);
+  return `  private _${stateName} = signal${typeArg}(${initText});`;
 }
 
 function emitRefField(refName: string, elementTag: string, composedType?: string, hasElementPortal?: boolean): string {
