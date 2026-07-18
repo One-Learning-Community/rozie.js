@@ -91,4 +91,43 @@ const sum = $computed(() => aVal + bVal);
       expect(countOccurrences(result.code, FIRST_MARKER)).toBe(1);
     });
   });
+
+  // Quick task 260717-uvj — a comment authored between the LAST top-level
+  // `<script>` import and a following hoisted type declaration (`interface` /
+  // `type` alias) is duplicated on react/angular/solid/lit. `@babel/parser`
+  // attaches the boundary comment to BOTH the last import's
+  // `trailingComments` AND the first hoisted type-decl's `leadingComments` as
+  // the SAME source comment. `partitionUserImports()` splits these two nodes
+  // into separate buckets (`userImports` vs `hoistedTypeDecls`), and each
+  // emitScript renders the two buckets in a SEPARATE `@babel/generator` pass
+  // — so the shared comment prints once per pass (twice total). vue/svelte
+  // keep type decls in the residual body (single generate pass) and are NOT
+  // affected.
+  describe('a comment between the LAST top-level import and a following hoisted type declaration emits exactly once', () => {
+    const LAST_TYPE_MARKER = 'LAST_TYPE_MARKER_UVJ_260717';
+    const source = `<rozie name="DupLastImportTypeDecl">
+
+<script lang="ts">
+import { aVal } from './a.js';
+// ${LAST_TYPE_MARKER}
+interface Foo {
+  x: number;
+}
+
+const sum = $computed<Foo>(() => aVal);
+</script>
+
+<template>
+<div>{{ sum }}</div>
+</template>
+
+</rozie>
+`;
+
+    it.each(TARGETS)('%s emits the last-import-to-type-decl boundary comment exactly once', (target) => {
+      const { result, errors } = compileFixture(target, source);
+      expect(errors).toEqual([]);
+      expect(countOccurrences(result.code, LAST_TYPE_MARKER)).toBe(1);
+    });
+  });
 });
