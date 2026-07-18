@@ -161,56 +161,6 @@ const activeDescendant = computed(() => {
 // module-`let`s + sigils live in the host; the partial only closes over them.
 let typeBuffer = '';
 let typeTimer: any = null;
-
-// ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
-// The option resolvers, client filter, enabled-index navigation, the keyboard
-// reducer, type-ahead, single+multi selection, open/close state, and
-// activeDescendant derivation now live in the shared, focus-/input-mode
-// parameterized list spine. It is a compile-time `.rzts` script-partial: it
-// dissolves into this leaf via inlineScriptPartials() before IR lowering (zero
-// runtime dep). Listbox consumes it in focus-model `activedescendant` +
-// input-mode `select-only` + multi + type-ahead. The spine closes over this
-// host's pieces by convention: the reassigned module-`let`s typeBuffer/typeTimer
-// (above) and the impure ref fns focusControl/scrollActiveIntoView (below).
-// ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
-// Lifted verbatim from Listbox.rozie's <script> (the monolithic pure-Rozie list logic). This
-// partial holds ONLY the PURE list spine — option resolvers, the client-side filter, enabled-index
-// navigation, the arrow/home/end/enter/escape/space/tab keyboard reducer, type-ahead, single+multi
-// selection, open/close state, and activeDescendant derivation. It is a compile-time `.rzts`
-// script-partial: it dissolves into each consumer's compiled leaf via inlineScriptPartials() before
-// IR lowering — leaving zero runtime dependency (the 64-01-proven cross-package bare-specifier path).
-//
-// ── PARAMETERIZATION (D-06) ──────────────────────────────────────────────────────────────────
-// The spine is parameterized BY HOST CONVENTION (the same implicit by-convention mixin contract
-// windowing.rzts uses) along two axes:
-//   - focus-model: `activedescendant` | `roving`. Both list families default to `activedescendant`
-//     (what they use today): the highlighted option is tracked virtually via `activeDescendant`
-//     (an option id) while DOM focus stays on the control. `roving` (real per-option tabindex
-//     focus) is SUPPORTED-BUT-UNUSED — no focus rewrite is forced here; a roving host would supply
-//     its own focus mover. The `activeDescendant` / `optionId` derivation below IS the
-//     activedescendant model.
-//   - input-mode: `select-only` (Listbox — a button trigger + type-ahead) | `filter-input`
-//     (Combobox — a text <input> that filters by the typed query). The mode is by HOST CONVENTION,
-//     NOT a discriminant prop (P3 retired the Listbox `combobox`/`filterable` props): a select-only
-//     host never writes `$data.query`, so `visibleOptions` is the identity path for it and the
-//     printable-char branch of the reducer feeds type-ahead; a filter-input host writes `$data.query`
-//     from its <input>, so `visibleOptions` substring-filters and `onInput` drives the query.
-//
-// ── HOST CONTRACT (symbols the consuming host MUST define before importing) ────────────────────
-//   - the reassigned module-`let`s `typeBuffer` / `typeTimer` — type-ahead scratch state. They are
-//     reassigned from handlers → the React emitter hoists them to `useRef` (the setup-once
-//     guarantee), so per the A==B playbook rule they STAY IN THE HOST; this partial only closes
-//     over them (in `onTypeahead`).
-//   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
-//     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
-//     HOST functions; this partial only closes over them (it reads NO refs itself).
-//   - the option set + form surface (`$props.options` / `$props.value` (model) / `$props.multiple` /
-//     `$props.id` / `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
-//     `$props.closeOnSelect` / `$props.disabled`) and the reactive state (`$data.open` /
-//     `$data.activeIndex` / `$data.query`). Input-mode is by convention (the host's <input> writing
-//     `$data.query`), NOT a discriminant prop.
-
-// ---- option resolvers --------------------------------------------------
 // ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
 // Lifted verbatim from Listbox.rozie's <script> (the monolithic pure-Rozie list logic). This
 // partial holds ONLY the PURE list spine — option resolvers, the client-side filter, enabled-index
@@ -266,14 +216,6 @@ const disabledOf = (opt: any) => {
   return false;
 };
 const optionId = (index: any) => props.id + '-opt-' + index;
-
-// ---- derived state -----------------------------------------------------
-// The visible option list: identity in select-only / non-filtering mode,
-// a case-insensitive substring filter when a combobox query is present.
-// A plain function (not `$computed`) so it reads uniformly across all six
-// targets — a `$computed` is a value on React but an accessor on Solid, so
-// aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
-// plain function is identical everywhere.
 // ---- derived state -----------------------------------------------------
 // The visible option list: identity in select-only / non-filtering mode,
 // a case-insensitive substring filter when a combobox query is present.
@@ -290,8 +232,6 @@ const visibleOptions = () => {
 // The label shown in the (select-only) trigger when closed. A real `$computed`
 // — read bare in the template, never aliased in script, so the per-target
 // accessor form stays uniform.
-
-// Is a given option currently selected? Multi compares array membership.
 // Is a given option currently selected? Multi compares array membership.
 const isSelected = (opt: any) => {
   const v = valueOf(opt);
@@ -299,8 +239,6 @@ const isSelected = (opt: any) => {
   if (props.multiple) return Array.isArray(cur) && cur.includes(v);
   return cur === v;
 };
-
-// First enabled visible index, preferring the currently-selected option.
 // First enabled visible index, preferring the currently-selected option.
 const resolveInitialActive = () => {
   const opts = visibleOptions();
@@ -308,19 +246,6 @@ const resolveInitialActive = () => {
   if (sel !== -1) return sel;
   return opts.findIndex((o: any) => !disabledOf(o));
 };
-
-// ---- open / close ------------------------------------------------------
-// Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
-// $emit's directly — no longer funneled through a single wrapper. The
-// former "route every emit through ONE wrapper fn" workaround guarded
-// against a React duplicate `const {onOpenChange}=props` per emit-site
-// (TS2451); verified against the current emitter (target-react
-// `emitScript-multiEmitDedupe.test.ts`) that the shipped ITEM-1 (Phase 46)
-// hoist-once dedupe already collapses N ESCAPING helpers sharing an emit
-// target into exactly one destructure, and a non-escaping function (e.g.
-// `open`, reachable here only via `$expose`) never destructures at all — so
-// no combination of these three functions can produce the duplicate-const
-// shape. See project_next_port_listbox / project_emitter_hardening_backlog.
 // ---- open / close ------------------------------------------------------
 // Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
 // $emit's directly — no longer funneled through a single wrapper. The
@@ -353,8 +278,6 @@ const close = () => {
 const toggle = () => {
   if (open$local.value) close();else open();
 };
-
-// ---- selection ---------------------------------------------------------
 // ---- selection ---------------------------------------------------------
 const select = (opt: any) => {
   if (disabledOf(opt)) return;
@@ -391,8 +314,6 @@ const clear = () => {
     option: null
   });
 };
-
-// ---- keyboard navigation over the VISIBLE list -------------------------
 // ---- keyboard navigation over the VISIBLE list -------------------------
 const nextEnabled = (from: any, dir: any) => {
   const opts = visibleOptions();
@@ -423,9 +344,6 @@ const commitActive = () => {
   const opts = visibleOptions();
   if (activeIndex.value >= 0 && activeIndex.value < opts.length) select(opts[activeIndex.value]);
 };
-
-// Type-ahead for select-only listboxes: accumulate keystrokes and jump to the
-// first option whose label starts with the buffer.
 // Type-ahead for select-only listboxes: accumulate keystrokes and jump to the
 // first option whose label starts with the buffer.
 const onTypeahead = (ch: any) => {
@@ -442,10 +360,6 @@ const onTypeahead = (ch: any) => {
     scrollActiveIntoView();
   }
 };
-
-// Key handler shared by the trigger and the combobox input. The printable-
-// character branch is reached only in select-only mode (the combobox input
-// types through @input).
 // Key handler shared by the trigger and the combobox input. The printable-
 // character branch is reached only in select-only mode (the combobox input
 // types through @input).
@@ -489,39 +403,10 @@ const onControlKeyDown = ($event: any) => {
 
 // Combobox input handler: keep the popup open while typing, reset the active
 // highlight to the first match, and surface the query for remote filtering.
-
-// Pointer hover sets the virtual highlight (matches native <select> feel).
 // Pointer hover sets the virtual highlight (matches native <select> feel).
 const onOptionPointerMove = (index: any) => {
   if (activeIndex.value !== index) activeIndex.value = index;
 };
-
-// ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
-// Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
-// holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
-// in the host (ROZ123). It is a compile-time `.rzts` script-partial: it dissolves into each consumer's
-// compiled leaf via inlineScriptPartials() before IR lowering — leaving zero runtime dependency.
-//
-// HOST CONTRACT (symbols the consuming host MUST define before importing — the same implicit
-// by-convention mixin contract the DataTable host's other partials already use for `$data.windowVer`):
-//   - windowSource(): T[]   — the full list to window (the KEY generalization; the DataTable host
-//                             returns its pre-pagination row model, listbox/combobox return the
-//                             filtered options). This partial MUST NOT reach into the host data engine
-//                             directly — rows arrive ONLY through windowSource().
-//   - $props.estimateRowHeight — per-item size estimate (kept aliased for DataTable back-compat).
-//   - $data.windowVer / $data.editVer — window/edit-version reactivity bumps.
-//   - gridScrollEl              — the scroll-container element handle.
-//   - virtualizer               — the host virtual-core instance (built in $onMount from the ref).
-//   - observeElementRect / observeElementOffset / elementScroll / measureElement — virtual-core fns.
-//   - scheduleRemeasure()       — the host's rAF/microtask remeasure defer.
-//   - pinnedEditIndex() / pinnedMeasurement(pin) — the D-05 OPTIONAL pin-extension hook (host-provided,
-//                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
-//                             listbox passes nothing. Routing pinning through this host hook (NOT
-//                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
-
-// getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
-// React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
-// id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
 // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
 // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
 // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -552,13 +437,6 @@ const virtualItemKey = (i: any) => {
   const src = windowSource();
   return src && src[i] ? src[i].id : undefined;
 };
-
-// The FULL virtualizer options. virtual-core's setOptions REPLACES options with
-// `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
-// source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
-// Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
-// on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
-// increment the React emitter lowers to functional setState — correct even from a mount closure.
 // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
 // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
 // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
@@ -591,16 +469,6 @@ const virtualizerOptions = (): any => ({
     scheduleRemeasure();
   }
 });
-
-// pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
-// shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
-// two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
-// no-op host returns bare `null` (inferred `(pin) => null`). Calling it directly makes
-// `const pm = pinnedMeasurement(pin)` flow-narrow to `null`, so the downstream `pm && pm.start`
-// guard collapses the object branch to `never` (TS2339, Class 3). Reading the hook through this
-// thin wrapper with an EXPLICIT return type (a return-type annotation is NOT flow-narrowed)
-// gives the measurement a real object-or-null shape, so `pm && pm.start` keeps the object branch.
-// Typing-only: the runtime value (a measurement or null) is unchanged.
 // pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
 // shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
 // two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
@@ -616,12 +484,6 @@ const pinMeasurement = (pin: number): {
   index: number;
   end: number;
 } | null => pinnedMeasurement(pin);
-
-// windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
-// { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
-// $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
-// full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
-// `rows` binding → TS2448 self-shadow, line ~1149 lesson).
 // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
 // { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
 // $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
@@ -696,10 +558,6 @@ const windowedRows = () => {
   }
   return out;
 };
-
-// Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
-// the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
-// (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
 // Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
 // the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
 // (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
@@ -754,13 +612,10 @@ const padBottom = () => {
   return pad < 0 ? 0 : pad;
 };
 // pmIndexInWindow: is full-model index `idx` present in the rendered virtual window?
-// pmIndexInWindow: is full-model index `idx` present in the rendered virtual window?
 const pmIndexInWindow = (items: any, idx: any) => {
   for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true;
   return false;
 };
-// rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
-// window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
 // rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
 // window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
 const rowIsOutsideWindow = (r: any) => {
@@ -769,12 +624,6 @@ const rowIsOutsideWindow = (r: any) => {
   for (const it of items as any) if (it.index === r) return false;
   return true;
 };
-
-// virtual-core: the framework-agnostic windowing state machine (the data-table
-// precedent — NO per-framework adapter). The static import is emitted unconditionally
-// (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
-// `virtualizer` guard so the non-virtual emitted path executes none of it
-// (byte-identical-off).
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally
 // (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a

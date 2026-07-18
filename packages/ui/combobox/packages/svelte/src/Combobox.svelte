@@ -186,33 +186,6 @@ const disabledOf = (opt: any) => {
   if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled;
   return false;
 };
-
-// ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
-// Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
-// holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
-// in the host (ROZ123). It is a compile-time `.rzts` script-partial: it dissolves into each consumer's
-// compiled leaf via inlineScriptPartials() before IR lowering — leaving zero runtime dependency.
-//
-// HOST CONTRACT (symbols the consuming host MUST define before importing — the same implicit
-// by-convention mixin contract the DataTable host's other partials already use for `$data.windowVer`):
-//   - windowSource(): T[]   — the full list to window (the KEY generalization; the DataTable host
-//                             returns its pre-pagination row model, listbox/combobox return the
-//                             filtered options). This partial MUST NOT reach into the host data engine
-//                             directly — rows arrive ONLY through windowSource().
-//   - $props.estimateRowHeight — per-item size estimate (kept aliased for DataTable back-compat).
-//   - $data.windowVer / $data.editVer — window/edit-version reactivity bumps.
-//   - gridScrollEl              — the scroll-container element handle.
-//   - virtualizer               — the host virtual-core instance (built in $onMount from the ref).
-//   - observeElementRect / observeElementOffset / elementScroll / measureElement — virtual-core fns.
-//   - scheduleRemeasure()       — the host's rAF/microtask remeasure defer.
-//   - pinnedEditIndex() / pinnedMeasurement(pin) — the D-05 OPTIONAL pin-extension hook (host-provided,
-//                             defaulting to no-op): the DataTable host passes its edit-pinning hooks;
-//                             listbox passes nothing. Routing pinning through this host hook (NOT
-//                             inlining it) keeps DataTable's B13 edit-pinning behavior byte-identical.
-
-// getItemKey reads the LIVE source (never a frozen mount-render $data.rows closure — the F6
-// React stale-closure lesson) so virtual-core's measurement cache keys by stable full-model row
-// id across recycling, aligned with the windowed <tr> :key="row.id" (Pitfall 3 / req-10).
 // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
 // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
 // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -243,13 +216,6 @@ const virtualItemKey = (i: any) => {
   const src = windowSource();
   return src && src[i] ? src[i].id : undefined;
 };
-
-// The FULL virtualizer options. virtual-core's setOptions REPLACES options with
-// `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
-// source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
-// Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
-// on virtual-core's generic option inference. onChange uses the `$data.x = $data.x + 1`
-// increment the React emitter lowers to functional setState — correct even from a mount closure.
 // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
 // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
 // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
@@ -282,16 +248,6 @@ const virtualizerOptions = (): any => ({
     scheduleRemeasure();
   }
 });
-
-// pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
-// shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
-// two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
-// no-op host returns bare `null` (inferred `(pin) => null`). Calling it directly makes
-// `const pm = pinnedMeasurement(pin)` flow-narrow to `null`, so the downstream `pm && pm.start`
-// guard collapses the object branch to `never` (TS2339, Class 3). Reading the hook through this
-// thin wrapper with an EXPLICIT return type (a return-type annotation is NOT flow-narrowed)
-// gives the measurement a real object-or-null shape, so `pm && pm.start` keeps the object branch.
-// Typing-only: the runtime value (a measurement or null) is unchanged.
 // pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
 // shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
 // two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
@@ -307,12 +263,6 @@ const pinMeasurement = (pin: number): {
   index: number;
   end: number;
 } | null => pinnedMeasurement(pin);
-
-// windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
-// { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
-// $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
-// full-model row. NB the local is `rowList` (NOT `rows` — React lowers $data.rows to a bare
-// `rows` binding → TS2448 self-shadow, line ~1149 lesson).
 // windowedRows(): the rendered slice. Off / pre-mount → the full $data.rows mapped to
 // { vi:null, row } (the r-else path never calls this, but the guard keeps it total). On → read
 // $data.windowVer to SUBSCRIBE (the rowIndexOf tick discipline) then map each VirtualItem to its
@@ -387,10 +337,6 @@ const windowedRows = () => {
   }
   return out;
 };
-
-// Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
-// the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
-// (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
 // Spacer-<tr> heights (D-03): the leading spacer occupies items[0].start; the trailing spacer
 // the gap between the last rendered item's end and getTotalSize(). Both windowVer-gated reads
 // (the `$data.windowVer` touch re-derives them as the window/measurements change). 0 when off.
@@ -445,13 +391,10 @@ const padBottom = () => {
   return pad < 0 ? 0 : pad;
 };
 // pmIndexInWindow: is full-model index `idx` present in the rendered virtual window?
-// pmIndexInWindow: is full-model index `idx` present in the rendered virtual window?
 const pmIndexInWindow = (items: any, idx: any) => {
   for (let i = 0; i < items.length; i++) if (items[i].index === idx) return true;
   return false;
 };
-// rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
-// window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
 // rowIsOutsideWindow(r): is the full-model row index r absent from the currently rendered
 // window? Used by the scroll-then-focus seam (req-5 — scroll a far row in before focusing).
 const rowIsOutsideWindow = (r: any) => {
@@ -460,11 +403,6 @@ const rowIsOutsideWindow = (r: any) => {
   for (const it of items as any) if (it.index === r) return false;
   return true;
 };
-
-// virtual-core: the framework-agnostic windowing state machine (the data-table
-// precedent — NO per-framework adapter). The static import is emitted unconditionally;
-// every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
-// the non-virtual emitted path executes none of it (byte-identical-off).
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally;
 // every RUNTIME reference sits behind `if ($props.virtual)` / a `virtualizer` guard so
