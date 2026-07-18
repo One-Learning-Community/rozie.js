@@ -54,3 +54,35 @@ describe('rozieStyle (Svelte)', () => {
     expect(evaluate()).toBe('font-size: 20px');
   });
 });
+
+describe('rozieStyle — array-form merge (quick 260717-uvk)', () => {
+  it('merges two object elements left-to-right, later declaration wins in the CSS cascade', () => {
+    expect(rozieStyle([{ color: 'red' }, { color: 'blue' }])).toBe(
+      'color: red; color: blue',
+    );
+  });
+
+  it('merges a string element and an object element (camelCase→kebab for the object)', () => {
+    expect(rozieStyle(['color: red', { fontSize: '12px' }])).toBe(
+      'color: red; font-size: 12px',
+    );
+  });
+
+  it('a string element with a trailing semicolon does not produce a double semicolon', () => {
+    expect(rozieStyle(['color: red;', { fontSize: '12px' }])).toBe(
+      'color: red; font-size: 12px',
+    );
+  });
+
+  it('skips nullish elements', () => {
+    expect(rozieStyle([{ color: 'red' }, null, undefined])).toBe('color: red');
+  });
+
+  it('returns undefined for an empty array', () => {
+    expect(rozieStyle([])).toBeUndefined();
+  });
+
+  it('returns undefined when every element is nullish/empty', () => {
+    expect(rozieStyle([null, undefined, '', {}])).toBeUndefined();
+  });
+});

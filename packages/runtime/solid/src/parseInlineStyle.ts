@@ -86,6 +86,19 @@ export function toStyleObjectKey(prop: string): string {
  *   - an already-built style object (a `$computed` returning a
  *     CSS-custom-property map such as `{ '--rozie-slider-fill-start': '50%' }`,
  *     or a plain style object) → passed through verbatim;
+ *   - an ARRAY of the above (`:style="[a, b]"`, quick task 260717-uvk) → each
+ *     element is normalized to a CSS-declaration STRING (a string element
+ *     verbatim; an object element's own-enumerable entries serialized with
+ *     its keys UNCHANGED — object elements are already expected to carry
+ *     Solid-compatible keys, same contract as the single-object passthrough
+ *     above; never camelCase-converted, which would reintroduce the LB6 SEAM 3
+ *     `setProperty` drop bug) and concatenated left-to-right with `'; '`. The
+ *     merged string is handed to Solid's `cssText` application, whose
+ *     left-to-right declaration parse gives a later duplicate property
+ *     cascade-priority over an earlier one — the same "later wins" semantics
+ *     as Vue's `normalizeStyle`, just resolved by the browser's CSS parser
+ *     rather than a JS object merge (mirrors the string-passthrough rationale
+ *     above: closing ROZ144 without reintroducing the object-form bug);
  *   - `null` / `undefined` → `{}`.
  *
  * The return type `string | JSX.CSSProperties` is exactly Solid's `style` JSX
@@ -93,8 +106,31 @@ export function toStyleObjectKey(prop: string): string {
  * Returns `{}` for empty / whitespace-only input — never throws.
  */
 export function parseInlineStyle(
-  value: string | JSX.CSSProperties | Record<string, string | number> | null | undefined,
+  value:
+    | string
+    | JSX.CSSProperties
+    | Record<string, string | number>
+    | Array<string | JSX.CSSProperties | Record<string, string | number> | null | undefined>
+    | null
+    | undefined,
 ): JSX.CSSProperties | string {
+  if (Array.isArray(value)) {
+    const decls: string[] = [];
+    for (const element of value) {
+      if (element == null) continue;
+      if (typeof element === 'string') {
+        const trimmed = element.trim().replace(/;+\s*$/, '');
+        if (trimmed !== '') decls.push(trimmed);
+        continue;
+      }
+      for (const key of Object.keys(element)) {
+        const v = (element as Record<string, string | number>)[key];
+        if (v == null) continue;
+        decls.push(`${key}: ${v}`);
+      }
+    }
+    return decls.length === 0 ? {} : decls.join('; ');
+  }
   if (value == null) return {};
   // Already an object (e.g. a CSS-custom-property map from a `$computed`) —
   // pass through; Solid's `style` prop accepts custom properties.

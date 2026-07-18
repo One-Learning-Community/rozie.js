@@ -59,3 +59,35 @@ describe('rozieStyle (Lit)', () => {
     expect(mount({}).hasAttribute('style')).toBe(false);
   });
 });
+
+describe('rozieStyle — array-form merge (quick 260717-uvk)', () => {
+  it('merges two object elements left-to-right (later wins)', () => {
+    const el = mount([{ color: 'red' }, { color: 'blue' }]);
+    expect(el.getAttribute('style')?.replace(/\s+/g, '')).toBe('color:blue;');
+  });
+
+  it('merges a string element and an object element', () => {
+    const el = mount(['color: red', { fontSize: '12px' }]);
+    const style = el.getAttribute('style') ?? '';
+    expect(style.replace(/\s+/g, '')).toContain('color:red');
+    expect(style.replace(/\s+/g, '')).toContain('font-size:12px');
+  });
+
+  it('a later string element overrides an earlier object element for the same property', () => {
+    const el = mount([{ color: 'red' }, 'color: blue']);
+    expect(el.getAttribute('style')?.replace(/\s+/g, '')).toBe('color:blue;');
+  });
+
+  it('skips nullish elements', () => {
+    const el = mount([{ color: 'red' }, null, undefined]);
+    expect(el.getAttribute('style')?.replace(/\s+/g, '')).toBe('color:red;');
+  });
+
+  it('drops the style attribute for an empty array', () => {
+    expect(mount([]).hasAttribute('style')).toBe(false);
+  });
+
+  it('drops the style attribute when every element is nullish/empty', () => {
+    expect(mount([null, undefined, '']).hasAttribute('style')).toBe(false);
+  });
+});

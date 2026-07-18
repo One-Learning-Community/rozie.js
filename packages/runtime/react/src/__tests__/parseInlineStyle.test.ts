@@ -54,6 +54,40 @@ describe('parseInlineStyle (Plan 260520-8iu Task 1)', () => {
   });
 });
 
+describe('parseInlineStyle — array-form merge (quick 260717-uvk)', () => {
+  it('merges two object elements left-to-right (later wins)', () => {
+    expect(parseInlineStyle([{ color: 'red' }, { color: 'blue' }])).toEqual({
+      color: 'blue',
+    });
+  });
+
+  it('merges a string element and an object element', () => {
+    expect(
+      parseInlineStyle(['background-color: blue', { fontSize: '12px' }]),
+    ).toEqual({ backgroundColor: 'blue', fontSize: '12px' });
+  });
+
+  it('merges non-overlapping properties from multiple elements', () => {
+    expect(
+      parseInlineStyle([{ color: 'red' }, { fontSize: '12px' }]),
+    ).toEqual({ color: 'red', fontSize: '12px' });
+  });
+
+  it('skips nullish elements', () => {
+    expect(parseInlineStyle([{ color: 'red' }, null, undefined])).toEqual({
+      color: 'red',
+    });
+  });
+
+  it('an empty array → empty object', () => {
+    expect(parseInlineStyle([])).toEqual({});
+  });
+
+  it('a malformed string element does not throw', () => {
+    expect(() => parseInlineStyle(['color: ;;; }{[[', { color: 'red' }])).not.toThrow();
+  });
+});
+
 describe('toStyleObjectKey (Plan 260520-8iu Task 1)', () => {
   it('standard kebab → camel', () => {
     expect(toStyleObjectKey('background-color')).toBe('backgroundColor');

@@ -58,6 +58,55 @@ describe('parseInlineStyle (LB6 SEAM 3 — string passthrough)', () => {
   });
 });
 
+describe('parseInlineStyle — array-form merge (quick 260717-uvk)', () => {
+  // Solid's object-form path hands the object DIRECTLY to Solid's `style()`
+  // runtime, which applies it via `setProperty(key, value)` — this REQUIRES
+  // kebab-case keys (a camelCase multi-word key like `fontSize` is a silent
+  // no-op, the exact LB6 SEAM 3 bug). So array-merge normalizes everything to
+  // ONE CSS-declaration STRING (each element's own casing preserved verbatim —
+  // object elements are expected to already carry Solid-compatible keys, same
+  // contract as the existing single-object passthrough), left-to-right. The
+  // browser's own cssText application gives later-wins semantics for a
+  // duplicate property, matching Vue's normalizeStyle override behavior.
+  it('merges two object elements left-to-right (later decl wins via cssText cascade)', () => {
+    expect(parseInlineStyle([{ color: 'red' }, { color: 'blue' }])).toBe(
+      'color: red; color: blue',
+    );
+  });
+
+  it('merges a string element and an object element', () => {
+    expect(
+      parseInlineStyle(['background-color: blue', { 'font-size': '12px' }]),
+    ).toBe('background-color: blue; font-size: 12px');
+  });
+
+  it('merges non-overlapping properties from multiple elements', () => {
+    expect(
+      parseInlineStyle([{ color: 'red' }, { 'font-size': '12px' }]),
+    ).toBe('color: red; font-size: 12px');
+  });
+
+  it('skips nullish elements', () => {
+    expect(parseInlineStyle([{ color: 'red' }, null, undefined])).toBe(
+      'color: red',
+    );
+  });
+
+  it('an empty array → empty object', () => {
+    expect(parseInlineStyle([])).toEqual({});
+  });
+
+  it('a string element with a trailing semicolon does not produce a double semicolon', () => {
+    expect(parseInlineStyle(['color: red;', { 'font-size': '12px' }])).toBe(
+      'color: red; font-size: 12px',
+    );
+  });
+
+  it('a malformed string element does not throw', () => {
+    expect(() => parseInlineStyle(['color: ;;; }{[[', { color: 'red' }])).not.toThrow();
+  });
+});
+
 describe('toStyleObjectKey (Plan 260520-8iu Task 1)', () => {
   it('standard kebab → camel', () => {
     expect(toStyleObjectKey('background-color')).toBe('backgroundColor');

@@ -85,6 +85,11 @@ export function toStyleObjectKey(prop: string): string {
  *   - an already-built style object (a `$computed` returning a
  *     CSS-custom-property map such as `{ '--rozie-slider-fill-start': '50%' }`,
  *     or a plain `CSSProperties`) → passed through verbatim;
+ *   - an ARRAY of the above (`:style="[a, b]"`, quick task 260717-uvk) → each
+ *     element is normalized through the SAME single-value logic above, then
+ *     merged left-to-right via `Object.assign` (a later element overrides an
+ *     earlier one for the same property — mirrors Vue's `normalizeStyle`
+ *     array-merge semantics, closing the ROZ144 restriction);
  *   - `null` / `undefined` → `{}`.
  *
  * Returning `CSSProperties` keeps the value assignable to React's `style`
@@ -94,8 +99,21 @@ export function toStyleObjectKey(prop: string): string {
  * above).
  */
 export function parseInlineStyle(
-  value: string | CSSProperties | Record<string, string | number> | null | undefined,
+  value:
+    | string
+    | CSSProperties
+    | Record<string, string | number>
+    | Array<string | CSSProperties | Record<string, string | number> | null | undefined>
+    | null
+    | undefined,
 ): CSSProperties {
+  if (Array.isArray(value)) {
+    const merged: CSSProperties = {};
+    for (const element of value) {
+      Object.assign(merged, parseInlineStyle(element));
+    }
+    return merged;
+  }
   if (value == null) return {};
   // Already an object (e.g. a CSS-custom-property map from a `$computed`) —
   // pass through; React's `style` prop accepts custom properties.

@@ -18,6 +18,18 @@
  *     verbatim; vendor `WebkitX`→`-webkit-x` (the same kebab rule the Svelte
  *     emitter's `kebabizeStyleKey` applies to `style:` directive names). Empty
  *     result → `undefined`.
+ *   - an ARRAY of the above (`:style="[a, b]"`, quick task 260717-uvk) → each
+ *     element is normalized to its CSS-declaration string via the SAME
+ *     per-element logic above (a string element verbatim, with any trailing
+ *     `;` stripped so concatenation never produces a `;;` — the exact
+ *     corruption class documented for Angular's `ɵɵstyleMap`; an object
+ *     element via the same `kebabizeStyleKey` join), then concatenated
+ *     left-to-right with `'; '`, skipping empty elements. Svelte has no
+ *     styleMap-style per-property dedup, so a later duplicate declaration
+ *     wins via the CSS cascade (the browser applies the LAST declaration for
+ *     a given property) — the same "later wins" outcome as Vue's
+ *     `normalizeStyle`, resolved by the browser rather than a JS merge.
+ *     Empty result → `undefined`.
  *
  * Object keys are iterated via `Object.keys` (own-enumerable only) so a
  * `__proto__`/`constructor` literal key on a plain object is non-enumerable and
@@ -47,10 +59,18 @@ function kebabizeStyleKey(key: string): string {
   return key.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase());
 }
 
-export function rozieStyle(v: StyleValue): string | undefined {
-  if (v == null) return undefined;
+/**
+ * Normalize a single `:style` element (string | object | nullish) to its CSS
+ * declaration string, or `''` when the element contributes nothing. Byte-
+ * identical to the pre-array-merge single-value behavior below (a string
+ * element is returned VERBATIM, not trimmed) — shared by the single-value
+ * path and the array-merge branch so there is exactly one parse (no
+ * duplicated logic).
+ */
+function normalizeStyleElement(v: StyleValue): string {
+  if (v == null) return '';
   if (typeof v === 'string') {
-    return v.trim() === '' ? undefined : v;
+    return v.trim() === '' ? '' : v;
   }
   const decls: string[] = [];
   for (const key of Object.keys(v)) {
@@ -58,5 +78,23 @@ export function rozieStyle(v: StyleValue): string | undefined {
     if (value == null) continue;
     decls.push(`${kebabizeStyleKey(key)}: ${value}`);
   }
-  return decls.length === 0 ? undefined : decls.join('; ');
+  return decls.join('; ');
+}
+
+export function rozieStyle(v: StyleValue | Array<StyleValue>): string | undefined {
+  if (Array.isArray(v)) {
+    const decls = v
+      .map((element) => normalizeStyleElement(element))
+      // Strip a trailing `;` from each element's own declaration text ONLY
+      // for the join — never left in place, or concatenating with the next
+      // element's decl would produce a `;;` empty declaration (the exact
+      // corruption class documented for Angular's `ɵɵstyleMap`). This only
+      // affects the array-merge join; the single-value path below returns a
+      // string element verbatim, unchanged from pre-array-merge behavior.
+      .map((decl) => decl.trim().replace(/;+\s*$/, ''))
+      .filter((decl) => decl !== '');
+    return decls.length === 0 ? undefined : decls.join('; ');
+  }
+  const decl = normalizeStyleElement(v);
+  return decl === '' ? undefined : decl;
 }
