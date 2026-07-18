@@ -48,14 +48,32 @@ function roz207(diags: Diagnostic[]): Diagnostic[] {
 }
 
 describe('nested-$data-mutation diagnostics (Spike-012 R8 silent reactivity break)', () => {
+  // quick 260718-uvq — the COVERED subset (statement-context depth-2 literal-key
+  // member write, depth-2 numeric-literal index write, and depth-1 push/pop/
+  // shift/unshift/splice) now LOWERS reactively on React/Solid/Angular/Lit, so
+  // ROZ207 no longer fires on it. Every OTHER nested/mutating shape STILL fires
+  // fail-loud (the honesty rule — the compiler never silently ships a
+  // non-reactive result for an uncovered shape).
   const FLAGGED: Array<[string, string, string]> = [
-    ['nested member assignment', '{ obj: { field: 0 } }', '$data.obj.field = 5;'],
-    ['indexed assignment', '{ arr: [1, 2] }', '$data.arr[0] = 9;'],
+    // depth ≥ 3 — not statically single-key-replaceable.
+    ['deep member assignment (depth-3)', '{ a: { b: { c: 0 } } }', '$data.a.b.c = 1;'],
+    // dynamic / computed index (ambiguous array-index vs object-dynamic-key).
+    ['dynamic/computed index', '{ reg: {} }', 'const id = "k"; $data.reg[id] = 5;'],
+    // compound / UpdateExpression on a nested member.
     ['compound nested assignment', '{ obj: { n: 0 } }', '$data.obj.n += 1;'],
     ['UpdateExpression on a nested member', '{ obj: { n: 0 } }', '$data.obj.n++;'],
-    ['mutating array method (push)', '{ items: [1] }', '$data.items.push(2);'],
-    ['mutating array method (splice)', '{ items: [1, 2] }', '$data.items.splice(0, 1);'],
-    ['deep member assignment', '{ a: { b: { c: 0 } } }', '$data.a.b.c = 1;'],
+    // in-place array mutators (no immutable single-expression equivalent).
+    ['in-place array mutator (sort)', '{ items: [2, 1] }', '$data.items.sort();'],
+    ['in-place array mutator (reverse)', '{ items: [1, 2] }', '$data.items.reverse();'],
+    ['in-place array mutator (fill)', '{ items: [1, 2] }', '$data.items.fill(0);'],
+    // Map/Set mutators.
+    ['Map mutator (set)', '{ m: new Map() }', "$data.m.set('k', 1);"],
+    ['Set mutator (add)', '{ s: new Set() }', '$data.s.add(1);'],
+    ['Set mutator (delete)', '{ s: new Set() }', '$data.s.delete(1);'],
+    ['Set mutator (clear)', '{ s: new Set() }', '$data.s.clear();'],
+    // covered mutator used in EXPRESSION context — the return value is consumed,
+    // so it is not statement-context-lowerable and stays flagged.
+    ['expression-context covered mutator (pop return used)', '{ items: [1, 2] }', 'const removed = $data.items.pop(); void removed;'],
   ];
 
   for (const [label, data, body] of FLAGGED) {
@@ -73,6 +91,14 @@ describe('nested-$data-mutation diagnostics (Spike-012 R8 silent reactivity brea
     ['shallow UpdateExpression', '{ n: 0 }', '$data.n++;'],
     ['mutation through a local alias', '{ obj: { field: 0 } }', 'const o = $data.obj; o.field = 5;'],
     ['non-mutating array method read', '{ items: [1] }', 'const x = $data.items.map((v) => v + 1); void x;'],
+    // quick 260718-uvq — COVERED subset now lowers reactively → no ROZ207.
+    ['CW-MEMBER covered nested member write', '{ obj: { field: 0 } }', '$data.obj.field = 5;'],
+    ['CW-INDEX covered numeric-literal index write', '{ arr: [1, 2] }', '$data.arr[0] = 9;'],
+    ['CW-ARRAY covered push', '{ items: [1] }', '$data.items.push(2);'],
+    ['CW-ARRAY covered pop', '{ items: [1, 2] }', '$data.items.pop();'],
+    ['CW-ARRAY covered shift', '{ items: [1, 2] }', '$data.items.shift();'],
+    ['CW-ARRAY covered unshift', '{ items: [1] }', '$data.items.unshift(2);'],
+    ['CW-ARRAY covered splice', '{ items: [1, 2] }', '$data.items.splice(0, 1);'],
   ];
 
   for (const [label, data, body] of CLEAN) {
