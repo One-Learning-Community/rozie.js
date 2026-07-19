@@ -5,8 +5,9 @@
  * array, this globs every `src/*.rozie` source, so the later waves (plugins,
  * toolbar, @mention decorator) drop new sources in without editing codegen. Loop
  * shape is OUTER-targets, INNER-components: parse+lower each discovered component
- * ONCE up front, then for each of the 5 v1.0 targets
- * (react / vue / svelte / angular / solid — NO Lit, deferred to v1.1 per D-10)
+ * ONCE up front, then for each of the 6 targets
+ * (react / vue / svelte / angular / solid / lit — Lit graduated from v1.1 staging
+ * into the shipped family in 76-09 per D-10)
  * emit every component's leaf file + do the per-leaf one-time work exactly once.
  *
  * The PRIMARY component is `LexicalEditor` (the editor shell) — it owns each
@@ -53,13 +54,15 @@ const STYLED = true;
 const ROOT = resolve(import.meta.dirname, '..');
 const REPO_ROOT = resolve(ROOT, '..', '..', '..');
 
-// Per-component file extension by target. NO lit (v1.0 = 5 targets, D-01/D-10).
+// Per-component file extension by target. Lit graduated into the shipped family
+// in 76-09 (6 targets, D-01/D-10) — it emits a `.ts` LitElement per component.
 const EXT = {
   react: 'tsx',
   vue: 'vue',
   svelte: 'svelte',
   angular: 'ts',
   solid: 'tsx',
+  lit: 'ts',
 };
 
 const TARGETS = {
@@ -86,6 +89,13 @@ const TARGETS = {
   svelte: { dir: 'svelte', build: 'source' },
   angular: { dir: 'angular', build: 'source' },
   solid: { dir: 'solid', build: 'tsdown' },
+  // Lit (76-09): tsdown-built like react/solid. Its D-08 external list lives in the
+  // committed leaf tsdown.config.ts (lit + lit/decorators.js + @lit/context +
+  // @lit-labs/preact-signals + @preact/signals-core + @rozie/runtime-lit + lexical +
+  // /^@lexical\//). The emitted LitElement inlines its styles via `static styles`
+  // (no sibling .css files) and routes the `:root` global escape hatch through
+  // runtime-lit `injectGlobalStyles`, so no css external/copy is needed.
+  lit: { dir: 'lit', build: 'tsdown' },
 };
 
 // slug = 'lexical' for the primary; kebab-case for any secondary component.
@@ -441,9 +451,10 @@ function main() {
     console.log('codegen: docs props-table validation SKIPPED — no docs/components/' + SLUG + '.md');
   }
 
+  const targetCount = Object.keys(TARGETS).length;
   console.log(
-    'codegen: done — 5 targets × ' + comps.length + ' component' + (comps.length > 1 ? 's' : '') +
-      ' emitted, 5 READMEs rendered.',
+    'codegen: done — ' + targetCount + ' targets × ' + comps.length + ' component' +
+      (comps.length > 1 ? 's' : '') + ' emitted, ' + targetCount + ' READMEs rendered.',
   );
 }
 

@@ -5,8 +5,9 @@
  * GENERIC per-source (run BEFORE any leaf work): it globs EVERY `src/*.rozie`, so
  * later waves add plugin/toolbar/decorator sources without editing this gate. For
  * each source it asserts:
- *   1. lowerToIR() + compile()×5 (react/vue/svelte/angular/solid — NO Lit, v1.0
- *      per D-01/D-10) emit ZERO error-severity diagnostics + non-empty code.
+ *   1. lowerToIR() + compile()×6 (react/vue/svelte/angular/solid/lit — Lit
+ *      graduated into the shipped family in 76-09 per D-01/D-10) emit ZERO
+ *      error-severity diagnostics + non-empty code.
  *   2. THE D-05/REQ-37 ACCEPTANCE CHECK: the emitted Svelte output compiles clean
  *      under the repo's Svelte 5 compiler (`generate: 'client'`) with NO
  *      `dollar_prefix_invalid` (and no other error). This proves every authored
@@ -24,8 +25,8 @@ import { compile as svelteCompile } from 'svelte/compiler';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SRC_DIR = resolve(ROOT, 'src');
-// v1.0 targets — NO Lit (deferred to v1.1 per D-10).
-const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid'];
+// 6 targets — Lit graduated from v1.1 staging into the shipped family in 76-09 (D-10).
+const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'];
 
 const fail = (msg) => {
   console.error(`✗ ${msg}`);
@@ -95,6 +96,6 @@ if (process.exitCode) {
   console.error('\n✗ compile-lexical-check FAILED');
 } else {
   console.log(
-    `✓ lexical surface OK: ${sources.length} source(s) — compile()×5 zero-error + emitted Svelte compiles clean (no dollar_prefix_invalid).`,
+    `✓ lexical surface OK: ${sources.length} source(s) — compile()×${TARGETS.length} zero-error + emitted Svelte compiles clean (no dollar_prefix_invalid).`,
   );
 }
