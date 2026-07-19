@@ -35,6 +35,7 @@ Peer dependencies: the `@tiptap/core` + `@tiptap/starter-kit` engine (`^3`) + `s
 | `editorProps` | `Object` | `{}` |  |
 | `extensions` | `Array` | `[]` |  |
 | `starterKit` | `Object` | `{}` |  |
+| `nodeSpecs` | `Array` | `[]` |  |
 
 ## Events
 

@@ -44,6 +44,12 @@ interface Props {
    * StarterKit config passthrough — spread into `StarterKit.configure(...)`. Accepts per-extension option objects or `false` to disable an extension, e.g. `{ heading:false }`, `{ heading:{ levels:[1,2] } }`, `{ link:false }`. A StarterKit-bundled node/mark is auto-disabled when a same-named custom extension is supplied via `extensions`; an explicitly-set key here is always respected and never overridden by that auto-disable scan.
    */
   starterKit?: any;
+  /**
+   * Custom ProseMirror node registration for the reactive `nodeView` portal slot — general facility, read ONCE at mount (setup-once construction, not reactive). Each entry: `{ name, tag, group, inline, atom, content, selectable, defining, attrs }` — `name` (required, unique node name), `tag` (required, parseHTML selector string | string[]), `group` (default `'block'`), `inline` (default `false`), `atom` (default `false` — no contentDOM), `content` (e.g. `'inline*'`; presence ⇒ the node gets an editable contentDOM), `selectable` (default `true`), `defining` (default `false`), `attrs` (`{ key: { default } }`, ProseMirror `addAttributes` shape). One `Node.create` is built per entry; all render through the SAME `nodeView` fragment, which dispatches on `scope.node.type.name`. An empty array (default) registers no custom nodes — zero overhead.
+   * @example
+   * <TipTap :node-specs="[{ name: 'mention', tag: 'span[data-mention]', group: 'inline', inline: true, atom: true, attrs: { id: { default: null } } }]"><template #nodeView="{ node }">…</template></TipTap>
+   */
+  nodeSpecs?: any[];
   toolbar?: Snippet<[{ editor: any }]>;
   bubbleMenu?: Snippet<[{ editor: any }]>;
   floatingMenu?: Snippet<[{ editor: any }]>;
@@ -58,6 +64,7 @@ interface Props {
 let __defaultEditorProps = (() => ({}))();
 let __defaultExtensions = (() => [])();
 let __defaultStarterKit = (() => ({}))();
+let __defaultNodeSpecs = (() => [])();
 
 let {
   html = $bindable('<p>Start writing…</p>'),
@@ -69,6 +76,7 @@ let {
   editorProps = __defaultEditorProps,
   extensions = __defaultExtensions,
   starterKit = __defaultStarterKit,
+  nodeSpecs = __defaultNodeSpecs,
   toolbar: __toolbarProp,
   bubbleMenu: __bubbleMenuProp,
   floatingMenu: __floatingMenuProp,
@@ -221,41 +229,51 @@ const dedupeExtensionsByName = (exts: any) => {
   return [...byKey.values()];
 };
 // ── Reactive node-view portal slot (Phase 33 — the FIRST shipped `reactive`
-// portal slot, the marquee TipTap differentiator). When the consumer fills the
-// `nodeView` slot, two custom ProseMirror nodes render the consumer fragment as
-// a custom node *in-engine*, re-rendering it in place on every transaction via
-// the reactive handle `$portals.nodeView(dom, scope) => { update, dispose }`
-// (REQ-22). Both halves of the primitive are proven and shipped here:
+// portal slot, the marquee TipTap differentiator; generalized in Phase
+// 260719-d9e / ask B). When the consumer fills the `nodeView` slot AND
+// supplies one or more `nodeSpecs`, each spec becomes its own custom
+// ProseMirror node rendering the SAME consumer fragment as a custom node
+// *in-engine*, re-rendering it in place on every transaction via the
+// reactive handle `$portals.nodeView(dom, scope) => { update, dispose }`
+// (REQ-22). The fragment dispatches on `scope.node.type.name` to tell the
+// specs apart (D-03 — single-slot-dispatch, no dynamic per-type slot names).
 //
-//   1. `mention` — a NON-EDITABLE inline ATOM (selectable:true, no contentDOM,
-//      Spike 009 / REQ-26). selectNode/deselectNode/update(node) → handle.update
-//      so the chip re-renders in place (engine-driven; no Rozie reactive loop).
+// A spec with NO `content` (typically `atom:true`) is a NON-EDITABLE node —
+// no contentDOM — driven purely by selectNode/deselectNode/update(node) →
+// handle.update so the fragment re-renders in place (engine-driven; no Rozie
+// reactive loop). Proven originally by the @mention-chip recipe (Spike 009 /
+// REQ-26), now shipped as a `nodeSpecs` entry in the example demos.
 //
-//   2. `callout` — an EDITABLE BLOCK (content:'inline*', so it HAS a contentDOM,
-//      Spike 008 / REQ-23). ProseMirror owns the editable hole; the consumer
-//      fragment renders chrome wrapping a [data-rozie-hole] placeholder and the
-//      per-target portal bridge grafts contentDOM into that hole — native-ref on
-//      React/Solid/Lit, querySelector-after-render on Vue/Svelte/Angular. The
-//      .rozie source merely passes `contentDOM` in scope; the graft mechanism is
-//      PER-TARGET and lives in the emitted portal bridge, not here.
+// A spec WITH `content` (e.g. `'inline*'`) is an EDITABLE BLOCK — it HAS a
+// contentDOM. ProseMirror owns the editable hole; the consumer fragment
+// renders chrome wrapping a [data-rozie-hole] placeholder and the per-target
+// portal bridge grafts contentDOM into that hole — native-ref on
+// React/Solid/Lit, querySelector-after-render on Vue/Svelte/Angular. The
+// .rozie source merely passes `contentDOM` in scope; the graft mechanism is
+// PER-TARGET and lives in the emitted portal bridge, not here. Proven
+// originally by the editable-callout recipe (Spike 008 / REQ-23), now shipped
+// as a `nodeSpecs` entry in the example demos.
 //
 // $portals.nodeView is referenced ONLY inside $onMount/the addNodeView closures
 // (the $refs-only-in-onMount + bundled-leaf strict-typecheck discipline — the
 // same constraint the toolbar slot follows). `makeNodeViewExtensions` is invoked
 // from inside $onMount so the `nv` closure (capturing $portals.nodeView) is
 // constructed within the mount lifecycle.
-const makeNodeView = (nv: any, editable: any) => (props: any) => {
+const makeNodeView = (nv: any, spec: any) => (props: any) => {
   const {
     node,
     getPos,
     editor: ed
   } = props;
+  // hasContentDOM derives from the spec, not a bare boolean: an editable node
+  // is one that is NOT an atom and declares `content` (e.g. 'inline*').
+  const hasContentDOM = !spec.atom && !!spec.content;
   // engine-owned outer host the consumer fragment mounts into.
-  const dom = document.createElement(editable ? 'div' : 'span');
-  dom.className = editable ? 'rozie-tiptap-nodeview rozie-tiptap-nodeview--block' : 'rozie-tiptap-nodeview rozie-tiptap-nodeview--inline';
+  const dom = document.createElement(hasContentDOM ? 'div' : 'span');
+  dom.className = hasContentDOM ? 'rozie-tiptap-nodeview rozie-tiptap-nodeview--block' : 'rozie-tiptap-nodeview rozie-tiptap-nodeview--inline';
   // EDITABLE nodes own a ProseMirror-managed contentDOM; the bridge grafts it
   // into the consumer fragment's [data-rozie-hole]. ATOM nodes have none.
-  const contentDOM = editable ? document.createElement(dom.tagName === 'DIV' ? 'div' : 'span') : null;
+  const contentDOM = hasContentDOM ? document.createElement(dom.tagName === 'DIV' ? 'div' : 'span') : null;
   if (contentDOM) contentDOM.className = 'rozie-tiptap-nodeview-content';
   const updateAttributes = (attrs: any) => {
     if (typeof getPos !== 'function') return;
@@ -337,65 +355,79 @@ const makeNodeView = (nv: any, editable: any) => (props: any) => {
     }
   };
 };
-// Build the two custom Nodes bound to the reactive nodeView portal. Takes the
-// per-target `$portals.nodeView` (captured here so the reference stays inside
-// the mount lifecycle — never top-level, per the bundled-leaf typecheck rule).
-const makeNodeViewExtensions = (nv: any) => {
-  // (1) NON-EDITABLE inline atom @mention chip (Spike 009 / REQ-26).
-  const Mention = Node.create({
-    name: 'rozieMention',
-    group: 'inline',
-    inline: true,
-    atom: true,
-    selectable: true,
-    addAttributes: () => ({
-      id: {
-        default: null
-      },
-      label: {
-        default: ''
-      }
-    }),
-    parseHTML: () => [{
-      tag: 'span[data-rozie-mention]'
-    }],
-    // ATOM nodes are leaf nodes — their renderHTML must NOT include a `0` content
-    // hole (ProseMirror's DOMSerializer throws "Content hole not allowed in a leaf
-    // node spec"). The chip's visible content is supplied by the node view; the
-    // serialized form is just the marker span carrying the attrs.
-    renderHTML: ({
-      HTMLAttributes
-    }: any) => ['span', {
-      'data-rozie-mention': '',
-      ...HTMLAttributes
-    }],
-    addNodeView: () => makeNodeView(nv, false)
-  });
-
-  // (2) EDITABLE block callout with a contentDOM hole (Spike 008 / REQ-23).
-  const Callout = Node.create({
-    name: 'rozieCallout',
-    group: 'block',
-    content: 'inline*',
-    defining: true,
-    addAttributes: () => ({
-      tone: {
-        default: 'info'
-      }
-    }),
-    parseHTML: () => [{
-      tag: 'div[data-rozie-callout]'
-    }],
-    renderHTML: ({
-      HTMLAttributes
-    }: any) => ['div', {
-      'data-rozie-callout': '',
-      ...HTMLAttributes
-    }, 0],
-    addNodeView: () => makeNodeView(nv, true)
-  });
-  return [Mention, Callout];
+// Pure helper (ask B, D-02) — extracts { el, attr, value } from a parseHTML
+// tag selector string, e.g. 'span[data-x]' → { el: 'span', attr: 'data-x',
+// value: '' } or 'div[data-x=y]' → { el: 'div', attr: 'data-x', value: 'y' }.
+// Drives renderHTML's marker attribute so the serialized element reproduces
+// the exact shape the parseHTML rule expects. MUST NOT throw on a
+// malformed/empty selector (T-d9e-01 — a bad selector degrades only that one
+// node's render, never crashes the editor): falls back to el = the raw
+// selector (or 'span' if falsy), attr = null (no marker), value = ''.
+const parseTagSelector = (selector: any) => {
+  const raw = typeof selector === 'string' ? selector : '';
+  const elMatch = raw.match(/^[a-zA-Z][a-zA-Z0-9-]*/);
+  const el = elMatch ? elMatch[0] : raw || 'span';
+  const attrMatch = raw.match(/\[([^\]=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\]]*)))?\]/);
+  if (!attrMatch) return {
+    el,
+    attr: null,
+    value: ''
+  };
+  const attr = (attrMatch[1] ?? '').trim();
+  const value = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? '';
+  return {
+    el,
+    attr,
+    value
+  };
 };
+// Build ONE custom Node per consumer-supplied spec, all bound to the SAME
+// reactive nodeView portal (ask B, D-02). Takes the per-target
+// `$portals.nodeView` (captured here so the reference stays inside the mount
+// lifecycle — never top-level, per the bundled-leaf typecheck rule) and the
+// `nodeSpecs` prop array (read once at mount — setup-once, not reactive).
+const makeNodeViewExtensions = (nv: any, specs: any) => specs.map((spec: any) => {
+  // hasContentDOM decides the renderHTML hole: an editable (non-atom,
+  // content-bearing) node gets a trailing `0` content hole; a leaf/atom node
+  // must NOT (ProseMirror's DOMSerializer throws "Content hole not allowed in
+  // a leaf node spec" otherwise).
+  const hasContentDOM = !spec.atom && !!spec.content;
+  const firstTag = Array.isArray(spec.tag) ? spec.tag[0] : spec.tag;
+  const {
+    el,
+    attr,
+    value
+  } = parseTagSelector(firstTag);
+  return Node.create({
+    name: spec.name,
+    group: spec.group ?? 'block',
+    inline: spec.inline ?? false,
+    atom: spec.atom ?? false,
+    selectable: spec.selectable ?? true,
+    defining: spec.defining ?? false,
+    ...(spec.content ? {
+      content: spec.content
+    } : {}),
+    addAttributes: () => spec.attrs ?? {},
+    parseHTML: () => (Array.isArray(spec.tag) ? spec.tag : [spec.tag]).map((t: any) => ({
+      tag: t
+    })),
+    renderHTML: ({
+      HTMLAttributes
+    }: any) => hasContentDOM ? [el, {
+      ...(attr ? {
+        [attr]: value
+      } : {}),
+      ...HTMLAttributes
+    }, 0] : [el, {
+      ...(attr ? {
+        [attr]: value
+      } : {}),
+      ...HTMLAttributes
+    }],
+    addNodeView: () => makeNodeView(nv, spec)
+  });
+});
 // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
 // the marquee surface: 14 verbs over the live Editor, uniform across all 6
 // targets. Each guards the pre-mount / destroyed `editor = null`.
@@ -583,11 +615,14 @@ onMount(() => {
   lastHtml = html;
 
   // Register the reactive node-view nodes ONLY when the consumer fills the
-  // `nodeView` slot — an unfilled slot adds no custom nodes (zero overhead, no
-  // unused $portals.nodeView reference fired). $portals.nodeView is captured
+  // `nodeView` slot AND supplies one or more `nodeSpecs` (D-05 — BOTH halves
+  // required). A stock <TipTap> with no nodeSpecs (or an unfilled slot) adds
+  // NO custom nodes — zero overhead, no consumer-node-shaped parse rules
+  // registered, no unused $portals.nodeView reference fired. $props.nodeSpecs is
+  // read ONCE here (setup-once — NOT a $watch); $portals.nodeView is captured
   // here inside the mount body and passed into the node factory, keeping the
   // reference scoped to the mount lifecycle (the toolbar-slot discipline).
-  const nodeViewExtensions = nodeView ? makeNodeViewExtensions(portals.nodeView) : [];
+  const nodeViewExtensions = nodeView && nodeSpecs.length ? makeNodeViewExtensions(portals.nodeView, nodeSpecs) : [];
 
   // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
   // (setup-once, like content/editable/autofocus — no reactivity required). The

@@ -69,6 +69,7 @@ The accessor contract: only real user interaction dirties the control — progra
 | `editorProps` | `Object` | `{}` |  |
 | `extensions` | `Array` | `[]` |  |
 | `starterKit` | `Object` | `{}` |  |
+| `nodeSpecs` | `Array` | `[]` |  |
 
 ## Events
 

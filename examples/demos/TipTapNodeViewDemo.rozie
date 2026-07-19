@@ -36,6 +36,11 @@
   falls back to the wrapper's exposed verbs surfaced via the host element's
   rozie handle (documented per-target ref idiom). The transactions themselves are
   pure ProseMirror and identical on all 6.
+
+  Phase 260719-d9e (ask B): TipTap's node-view primitive is now GENERAL — the
+  two custom nodes are no longer built into the component. This demo registers
+  them itself via the `nodeSpecs` prop (NODE_SPECS below), a reference recipe
+  for a consumer registering their own custom nodes.
 -->
 
 <rozie name="TipTapNodeViewDemo">
@@ -57,6 +62,15 @@
 </data>
 
 <script>
+// nodeSpecs recipe (ask B) — the inline-atom @mention chip + the editable
+// contentDOM callout, registered via TipTap's general custom-node facility
+// instead of being built into the component. Tag/attrs match the seed content
+// above byte-for-byte so the engine DOM is unchanged.
+const NODE_SPECS = [
+  { name: 'rozieMention', tag: 'span[data-rozie-mention]', group: 'inline', inline: true, atom: true, selectable: true, attrs: { id: { default: null }, label: { default: '' } } },
+  { name: 'rozieCallout', tag: 'div[data-rozie-callout]', group: 'block', content: 'inline*', defining: true, attrs: { tone: { default: 'info' } } },
+]
+
 // Drive engine transactions through the live editor. The reactive nodeView slot
 // scope carries the live `editor` on EVERY target uniformly (it's a portal-scope
 // param), so the slot fill stashes it via `captureEditor(editor)` the moment a
@@ -168,7 +182,7 @@ const handleTypeInHole = () => {
        control-flow block start and breaks AOT (same class as the slot CSS-::before fix). -->
   <h3>TipTap — reactive node view (mention)</h3>
 
-  <TipTap ref="ed" r-model:html="$data.content" :editable="true">
+  <TipTap ref="ed" r-model:html="$data.content" :editable="true" :node-specs="NODE_SPECS">
     <!--
       nodeView REACTIVE portal slot fill. The chip re-renders in place on every
       engine transaction. `data-identity` is computed ONCE per fragment mount

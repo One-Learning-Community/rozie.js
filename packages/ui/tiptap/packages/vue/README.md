@@ -38,6 +38,7 @@ const html = ref('<p>Hello <strong>world</strong></p>');
 | `editorProps` | `Object` | `{}` |  |
 | `extensions` | `Array` | `[]` |  |
 | `starterKit` | `Object` | `{}` |  |
+| `nodeSpecs` | `Array` | `[]` |  |
 
 ## Events
 

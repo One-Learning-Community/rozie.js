@@ -35,6 +35,7 @@ export function Demo() {
 | `editorProps` | `Object` | `{}` |  |
 | `extensions` | `Array` | `[]` |  |
 | `starterKit` | `Object` | `{}` |  |
+| `nodeSpecs` | `Array` | `[]` |  |
 
 ## Events
 

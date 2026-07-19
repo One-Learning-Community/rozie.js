@@ -14,6 +14,11 @@
   The nodeView slot renders NATIVE markup inline (the proven Spike-009 pattern;
   the reactive portal re-renders native elements in place across all 6 targets).
 
+  Phase 260719-d9e (ask B): TipTap's node-view primitive is now GENERAL — the
+  two custom nodes are no longer built into the component. This demo registers
+  them itself via the `nodeSpecs` prop (NODE_SPECS below), a reference recipe
+  for a consumer registering their own custom nodes.
+
   One .rozie source compiles to six per-framework screenshot consumers; the Linux
   PNG baseline is generated in pinned Linux Docker (NOT here — macOS baselines are
   forbidden, feedback_vr_linux_baselines). Until it lands the matrix cell
@@ -34,6 +39,15 @@ const FIXED_HTML = '<h2>Node views</h2><p>Mention <span data-rozie-mention id="u
 
 // Belt-and-suspenders caret neutralization — autofocus stays false; never clicked.
 const stableEditorProps = { attributes: { style: 'caret-color: transparent' } }
+
+// nodeSpecs recipe (ask B) — the inline-atom @mention chip + the editable
+// contentDOM callout, registered via TipTap's general custom-node facility
+// instead of being built into the component. Tag/attrs match the FIXED_HTML
+// above byte-for-byte so the engine DOM (and the pixel baseline) is unchanged.
+const NODE_SPECS = [
+  { name: 'rozieMention', tag: 'span[data-rozie-mention]', group: 'inline', inline: true, atom: true, selectable: true, attrs: { id: { default: null }, label: { default: '' } } },
+  { name: 'rozieCallout', tag: 'div[data-rozie-callout]', group: 'block', content: 'inline*', defining: true, attrs: { tone: { default: 'info' } } },
+]
 </script>
 
 <template>
@@ -42,6 +56,7 @@ const stableEditorProps = { attributes: { style: 'caret-color: transparent' } }
     :html="FIXED_HTML"
     :autofocus="false"
     :editorProps="stableEditorProps"
+    :node-specs="NODE_SPECS"
   >
     <!--
       ONE unified node-view fragment serves both custom node types, selected by

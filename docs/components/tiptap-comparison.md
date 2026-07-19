@@ -1,5 +1,5 @@
 ---
-surface_hash: f9c7bcda966a
+surface_hash: 5f05e99bf13b
 ---
 
 # TipTap libraries comparison
@@ -126,7 +126,7 @@ JSON output is **available today** through `getJSON()` on the `$expose` handle �
 ## Honest caveats
 
 - **Feature-complete vs the official wrappers, on six targets** — node views (G1), bubble / floating menus (G2), bundled Placeholder (G3), and reactive-forms / CVA (G5) all ship. The only intentionally-unmatched item is the JSON two-way model payload (G4), covered by `getJSON()` on the handle (above). Rozie's wedge is the **uniform cross-framework editor + toolbar + node views + selection menus + command handle + two-way binding**, and especially **reach into Solid and Lit** where the ecosystem is thin-to-absent.
-- **`@rozie-ui/tiptap` is `0.1.0`** — the surface (9 props / 4 events / 18-verb handle / `toolbar` + `bubbleMenu` + `floatingMenu` mount-once slots + `nodeView` reactive slot) is stable and gate-verified, but it is younger than the multi-year official wrappers.
+- **`@rozie-ui/tiptap` is `0.1.0`** — the surface (10 props / 4 events / 18-verb handle / `toolbar` + `bubbleMenu` + `floatingMenu` mount-once slots + `nodeView` reactive slot) is stable and gate-verified, but it is younger than the multi-year official wrappers.
 - **Single StarterKit baseline, now honestly config-aware** — the bundled extension set is StarterKit; everything else comes through `:extensions`. A `starterKit` config passthrough (`StarterKit.configure(...)`) plus a collision-aware auto-disable scan mean a consumer swapping in a custom same-named extension (e.g. a custom `Link`) genuinely wins with no duplicate-extension warning, without needing to know the `StarterKit.configure({ link:false })` incantation. Richer setups still carry more consumer wiring than a batteries-everything wrapper would — that remains by design.
 
 ## Cross-references

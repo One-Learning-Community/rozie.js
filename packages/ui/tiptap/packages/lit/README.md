@@ -35,6 +35,7 @@ el.addEventListener('html-change', (e) => console.log(e.detail));
 | `editorProps` | `Object` | `{}` |  |
 | `extensions` | `Array` | `[]` |  |
 | `starterKit` | `Object` | `{}` |  |
+| `nodeSpecs` | `Array` | `[]` |  |
 
 ## Events
 
