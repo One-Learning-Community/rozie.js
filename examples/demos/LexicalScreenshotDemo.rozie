@@ -1,0 +1,74 @@
+<!--
+  LexicalScreenshotDemo.rozie — the content-STABLE screenshot cell for the
+  @rozie-ui/lexical family (D-09). Composes the v1.0 showcase: the <LexicalEditor>
+  shell wrapping the selection-reading <Toolbar> + the History/List/Link plugins,
+  plus the LexicalMentionDriver seeding a FIXED document (a bold run + an @mention
+  chip + a bullet list).
+
+  Where LexicalBehaviorDemo.rozie is the BEHAVIORAL cell (drives typing / bold /
+  list / link / @mention insertion), THIS is the SEPARATE deterministic SCREENSHOT
+  cell — never extend it for behavior, and never bolt pixels onto the behavioral
+  one. Determinism (VR discipline):
+    1. `:seed="true"` builds a FIXED document (no wall-clock / random content) once,
+       one microtask after mount (LexicalMentionDriver).
+    2. The editor is NEVER focused, so no caret / selection is painted (the TipTap
+       screenshot precedent — contenteditable paints no caret unfocused).
+    3. The toolbar reads a null selection at rest → every button renders inactive.
+
+  One .rozie source compiles to the 5 v1.0 per-framework screenshot consumers; the
+  Linux PNG baseline is generated SEPARATELY in pinned Linux Docker (never here —
+  feedback_vr_linux_baselines). Until it lands the matrix cell auto-fixmes on
+  baselineExists(). NO Lit cell (v1.1, D-10). The @mention pill renders identically
+  across the 5 targets via each target's mount bridge into the shared
+  `.rozie-mention-host` span — the cross-target byte-identity the human checkpoint
+  verifies.
+-->
+<rozie name="LexicalScreenshotDemo">
+
+<components>
+{
+  LexicalEditor: '../../packages/ui/lexical/src/LexicalEditor.rozie',
+  Toolbar: '../../packages/ui/lexical/src/Toolbar.rozie',
+  HistoryPlugin: '../../packages/ui/lexical/src/HistoryPlugin.rozie',
+  ListPlugin: '../../packages/ui/lexical/src/ListPlugin.rozie',
+  LinkPlugin: '../../packages/ui/lexical/src/LinkPlugin.rozie',
+  LexicalMentionDriver: './LexicalMentionDriver.rozie',
+}
+</components>
+
+<template>
+<div class="lexical-screenshot-demo">
+  <LexicalEditor ariaLabel="Rich text editor">
+    <Toolbar />
+    <HistoryPlugin />
+    <ListPlugin />
+    <LinkPlugin />
+    <LexicalMentionDriver :seed="true" />
+  </LexicalEditor>
+</div>
+</template>
+
+<style>
+.lexical-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 420px;
+}
+/* The @mention pill (rendered by each target's bridge into `.rozie-mention-host`)
+   is deliberately given ONE shared, unopinionated inline-chip style so the pixel
+   baseline is byte-identical across the 5 targets. Emitted global via the nested
+   :root escape hatch so it reaches the engine-rendered (scope-attribute-less)
+   decorator span on the scoped-CSS targets (React/Solid) — the LexicalEditor
+   strong/ul precedent. */
+:root {
+  .lexical-screenshot-demo .rozie-mention {
+    background: #e0e7ff;
+    border-radius: 6px;
+    padding: 1px 6px;
+    font-size: 0.875rem;
+  }
+}
+</style>
+
+</rozie>

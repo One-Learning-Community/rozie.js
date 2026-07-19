@@ -1,0 +1,72 @@
+<!--
+  LexicalBehaviorDemo.rozie — the BEHAVIORAL cell for the @rozie-ui/lexical family
+  (D-09 runtime proof). Composes the v1.0 showcase — the <LexicalEditor> shell
+  wrapping the selection-reading <Toolbar> + the History/List/Link plugins + the
+  LexicalMentionDriver (with `:controls="true"` for its insert / remove @mention
+  buttons) — and lets lexical.spec.ts drive it to PROVE, per target, the runtime
+  behaviors that waves 2–4 could only confirm statically (compile-only):
+
+    - the editor MOUNTS + accepts typed input (contenteditable),
+    - History undo/redo (the plugin's registerHistory listener actually activates),
+    - the List plugin toggles a <ul> (node-transform mechanism),
+    - the Link plugin toggles an <a> (command mechanism),
+    - Bold dispatch → <strong> AND the toolbar's active-state reflects the caret
+      (the bidirectional dispatch→mutation + registerUpdateListener loop),
+    - @mousedown.prevent preserves the caret selection across a toolbar press,
+    - the @mention DecoratorNode renders its target-native pill (the bridge
+      activates) and tears down on removal (no leak).
+
+  The editor starts EMPTY (no seed) so the spec types its own content; the FIRST
+  <strong>/<ul>/<a>/.rozie-mention that appears is an unambiguous signal the
+  corresponding command / plugin / bridge ran. Behavioral-only — no pixel baseline
+  (the SEPARATE LexicalScreenshotDemo owns the deterministic capture). NO Lit cell
+  (v1.1, D-10).
+-->
+<rozie name="LexicalBehaviorDemo">
+
+<components>
+{
+  LexicalEditor: '../../packages/ui/lexical/src/LexicalEditor.rozie',
+  Toolbar: '../../packages/ui/lexical/src/Toolbar.rozie',
+  HistoryPlugin: '../../packages/ui/lexical/src/HistoryPlugin.rozie',
+  ListPlugin: '../../packages/ui/lexical/src/ListPlugin.rozie',
+  LinkPlugin: '../../packages/ui/lexical/src/LinkPlugin.rozie',
+  LexicalMentionDriver: './LexicalMentionDriver.rozie',
+}
+</components>
+
+<template>
+<div class="lexical-behavior-demo">
+  <h3>Lexical — behavioral</h3>
+  <LexicalEditor ariaLabel="Rich text editor">
+    <Toolbar />
+    <HistoryPlugin />
+    <ListPlugin />
+    <LinkPlugin />
+    <LexicalMentionDriver :controls="true" />
+  </LexicalEditor>
+</div>
+</template>
+
+<style>
+.lexical-behavior-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 560px;
+}
+.lexical-behavior-demo h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+:root {
+  .lexical-behavior-demo .rozie-mention {
+    background: #e0e7ff;
+    border-radius: 6px;
+    padding: 1px 6px;
+    font-size: 0.875rem;
+  }
+}
+</style>
+
+</rozie>

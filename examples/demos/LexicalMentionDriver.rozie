@@ -1,0 +1,162 @@
+<!--
+  LexicalMentionDriver.rozie — a VR-harness DRIVER child for the @rozie-ui/lexical
+  family (D-09 runtime proof). It is NOT part of the shipped family surface — it
+  lives under examples/demos/ purely to give the VR specs a way to reach the
+  editor from INSIDE the <LexicalEditor> slot.
+
+  WHY THIS EXISTS (the injection boundary): the demo cells compose <LexicalEditor>
+  as a PARENT, so the demo's own script sits OUTSIDE the shell's $provide scope and
+  cannot $inject the editor. The shell also exposes no imperative handle (no
+  $expose). The ONLY way to seed deterministic content or imperatively insert /
+  remove an @mention node is a component that mounts INSIDE the shell's <slot /> and
+  $injects the shared editor (spike 010 token) — exactly what the D-02 plugins do.
+  This driver is that child: on `seed` it builds a fixed rich document (a bold run +
+  an @mention chip + a bullet list) for the pixel-baseline cell; on `controls` it
+  renders insert / remove @mention buttons the behavior spec drives.
+
+  D-05 / REQ-37 (HARD): every Lexical `$`-API is authored in the NAMESPACE-import
+  form (`import * as lexical`, `import * as lexicalList`, `import * as mention`), so
+  no bare `$`-identifier reaches the Svelte compiler. The @mention helpers
+  ($createMentionNode / the MentionNode class) come through the `mention` namespace
+  binding rather than a `$`-named import for the same reason.
+
+  MOUNT ORDERING (76-02/76-03 precedent): a child's $onMount fires BEFORE the parent
+  shell's on React/Vue/Solid, and the shell creates the editor + registers the
+  decorator bridge in ITS $onMount — so the seed/insert is deferred one
+  `queueMicrotask` so the editor (and its mountDecorators listener) exist first.
+
+  COLLISION DISCIPLINE (this is a .rozie): all state-applying helpers are named
+  `apply*` (NOT `set*`, which would collide with a generated $data setter = ROZ524).
+  The driver declares NO reactive $data, so there is no setter to collide with.
+-->
+<rozie name="LexicalMentionDriver">
+
+<props>
+{
+  seed: {
+    type: Boolean,
+    default: false,
+  },
+  controls: {
+    type: Boolean,
+    default: false,
+  },
+}
+</props>
+
+<script>
+// NAMESPACE imports (D-05): the `$`-API + the @mention helpers all come through
+// namespace bindings so no bare `$`-identifier ever reaches the Svelte compiler.
+import * as lexical from 'lexical'
+import * as lexicalList from '@lexical/list'
+// The reference @mention DecoratorNode (D-07) from the family source — imported as
+// a NAMESPACE so `$createMentionNode` is a property access (Svelte-safe), and the
+// `MentionNode` CLASS is reached the same way for the $nodesOfType removal read.
+import * as mention from '../../packages/ui/lexical/src/MentionNode'
+
+// The shared editor context ({ get instance() {…} }, spike 010). Bind $inject to a
+// const (ROZ132), then alias through a null-let so `.instance` type-checks on the
+// strict leaves (the Toolbar/plugin idiom). TOP-LEVEL so the Solid-split teardown
+// can reach it.
+const editorCtx = $inject('rozie-lexical-editor')
+let ctx = null
+ctx = editorCtx
+
+let disposed = false
+
+// Seed a FIXED, deterministic document for the screenshot cell: a paragraph with a
+// plain run + a BOLD run + an @mention chip, followed by a two-item bullet list.
+// No wall-clock / random content (VR time-bomb discipline). Runs inside a single
+// editor.update() so Lexical reconciles once.
+const applySeed = () => {
+  const editor = ctx && ctx.instance
+  if (!editor) return
+  editor.update(() => {
+    const root = lexical.$getRoot()
+    root.clear()
+
+    const p = lexical.$createParagraphNode()
+    p.append(lexical.$createTextNode('Hello '))
+    const boldRun = lexical.$createTextNode('world')
+    boldRun.toggleFormat('bold')
+    p.append(boldRun)
+    p.append(lexical.$createTextNode(' '))
+    p.append(mention.$createMentionNode('Ada Lovelace'))
+    root.append(p)
+
+    const list = lexicalList.$createListNode('bullet')
+    const li1 = lexicalList.$createListItemNode()
+    li1.append(lexical.$createTextNode('First item'))
+    const li2 = lexicalList.$createListItemNode()
+    li2.append(lexical.$createTextNode('Second item'))
+    list.append(li1)
+    list.append(li2)
+    root.append(list)
+  })
+}
+
+// Insert an @mention chip at the current selection (the behavior spec types first,
+// so a range selection exists). focus() defensively re-anchors the caret.
+const applyInsertMention = () => {
+  const editor = ctx && ctx.instance
+  if (!editor) return
+  editor.focus()
+  editor.update(() => {
+    lexical.$insertNodes([mention.$createMentionNode('Ada Lovelace')])
+  })
+}
+
+// Remove every @mention node (node-level removal isolates the bridge's unmount path
+// from fragile caret navigation over an atomic inline decorator — spike 015).
+const applyRemoveMention = () => {
+  const editor = ctx && ctx.instance
+  if (!editor) return
+  editor.update(() => {
+    const nodes = lexical.$nodesOfType(mention.MentionNode)
+    for (const n of nodes) {
+      n.remove()
+    }
+  })
+}
+
+$onMount(() => {
+  // Defer one microtask so the parent shell's $onMount has created the editor and
+  // registered the decorator bridge (child mount hooks fire before the parent's on
+  // React/Vue/Solid — see header).
+  queueMicrotask(() => {
+    if (disposed) return
+    if ($props.seed) applySeed()
+  })
+  return () => {
+    disposed = true
+  }
+})
+</script>
+
+<template>
+<div class="lexical-mention-driver">
+  <div r-if="$props.controls" class="lexical-mention-driver-controls">
+    <button type="button" data-testid="insert-mention" @click="applyInsertMention">Insert mention</button>
+    <button type="button" data-testid="remove-mention" @click="applyRemoveMention">Remove mention</button>
+  </div>
+</div>
+</template>
+
+<style>
+.lexical-mention-driver-controls {
+  display: flex;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+.lexical-mention-driver-controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+</style>
+
+</rozie>
