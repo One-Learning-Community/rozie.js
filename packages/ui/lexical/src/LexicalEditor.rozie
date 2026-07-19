@@ -152,7 +152,7 @@ $onMount(() => {
 <div class="rozie-lexical">
   <!-- The single contenteditable host Lexical owns via setRootElement($refs.rootEl).
        :aria-label drops from the DOM when ariaLabel is null (rozieAttr nullish-drop). -->
-  <div ref="rootEl" class="rozie-lexical-content" contenteditable="true" :aria-label="$props.ariaLabel"></div>
+  <div ref="rootEl" class="rozie-lexical-content" :contenteditable="true" :aria-label="$props.ariaLabel"></div>
   <!-- Compositional model: plugin/toolbar children mount here and $inject the
        $provided editor. Non-visual plugins render nothing; the toolbar (D-03)
        renders its own controls. Toolbar is a SEPARATE component — never inlined. -->

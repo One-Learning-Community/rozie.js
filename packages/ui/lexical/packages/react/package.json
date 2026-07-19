@@ -1,0 +1,96 @@
+{
+  "name": "@rozie-ui/lexical-react",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic React cross-framework Lexical rich-text editor — editor shell, RichText/History/List/Link plugins, selection-reading toolbar, and an @mention DecoratorNode — one Rozie source compiled to React wrapping Meta's Lexical.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "lexical",
+    "editor",
+    "rich-text-editor",
+    "wysiwyg",
+    "contenteditable",
+    "mention",
+    "component",
+    "react"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/lexical/packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./source": "./src/LexicalEditor.tsx"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-react": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.2 || ^19",
+    "react-dom": "^18.2 || ^19",
+    "lexical": "^0.48.0",
+    "@lexical/rich-text": "^0.48.0",
+    "@lexical/history": "^0.48.0",
+    "@lexical/list": "^0.48.0",
+    "@lexical/link": "^0.48.0",
+    "@lexical/utils": "^0.48.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": false
+    },
+    "react-dom": {
+      "optional": false
+    },
+    "lexical": {
+      "optional": false
+    },
+    "@lexical/rich-text": {
+      "optional": false
+    },
+    "@lexical/utils": {
+      "optional": false
+    },
+    "@lexical/history": {
+      "optional": true
+    },
+    "@lexical/list": {
+      "optional": true
+    },
+    "@lexical/link": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@rozie-ui/lexical": "workspace:*",
+    "@types/react": "^18",
+    "@types/react-dom": "^18"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

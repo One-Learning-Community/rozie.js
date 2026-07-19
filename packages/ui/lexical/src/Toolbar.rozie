@@ -12,13 +12,16 @@
        bold/italic/link/list booleans into reactive $data.active, so each button shows
        its active state live as the caret moves through formatted content.
 
-  CARET PRESERVATION (D-03): every button carries `@mousedown.prevent`. Focusing a
-  button on mousedown would otherwise blur the contenteditable and COLLAPSE the text
-  selection before the click's command runs. preventing the mousedown default keeps
-  the caret/selection intact so the dispatched command applies to the right range.
-  This lowers per-target to a real preventDefault (React/Svelte/Angular/Solid emit
-  `$event.preventDefault()`; Vue uses its native `.prevent` modifier) — NOT a document
-  listener. (Combobox option-row `@mousedown.prevent` precedent.)
+  CARET PRESERVATION (D-03): every button carries an explicit
+  `@mousedown="$event.preventDefault()"`. Focusing a button on mousedown would
+  otherwise blur the contenteditable and COLLAPSE the text selection before the
+  click's command runs. Preventing the mousedown default keeps the caret/selection
+  intact so the dispatched command applies to the right range — NOT a document
+  listener. (Combobox option-row `@mousedown.prevent` precedent — but authored here as
+  an explicit inline handler rather than the bare `.prevent` modifier: a handler-LESS
+  `@mousedown.prevent` lowers on Solid to a crashing `undefined()` invocation after
+  the preventDefault — an emitter gap for modifier-only handlers — so the explicit
+  `$event.preventDefault()` body is the cross-target-safe form.)
 
   MOUNT ORDERING (76-02 precedent, load-bearing): on React/Vue/Solid a CHILD's
   $onMount fires BEFORE the parent shell's, and the shell creates the editor in ITS
@@ -169,8 +172,8 @@ $onMount(() => {
     type="button"
     class="rozie-lexical-toolbar-btn"
     :class="{ active: $data.active.bold }"
-    :aria-pressed="$data.active.bold"
-    @mousedown.prevent
+    :aria-pressed="!!$data.active.bold"
+    @mousedown="$event.preventDefault()"
     @click="formatBold"
     aria-label="Bold"
   ><strong>B</strong></button>
@@ -178,8 +181,8 @@ $onMount(() => {
     type="button"
     class="rozie-lexical-toolbar-btn"
     :class="{ active: $data.active.italic }"
-    :aria-pressed="$data.active.italic"
-    @mousedown.prevent
+    :aria-pressed="!!$data.active.italic"
+    @mousedown="$event.preventDefault()"
     @click="formatItalic"
     aria-label="Italic"
   ><em>I</em></button>
@@ -187,8 +190,8 @@ $onMount(() => {
     type="button"
     class="rozie-lexical-toolbar-btn"
     :class="{ active: $data.active.link }"
-    :aria-pressed="$data.active.link"
-    @mousedown.prevent
+    :aria-pressed="!!$data.active.link"
+    @mousedown="$event.preventDefault()"
     @click="toggleLink"
     aria-label="Link"
   >Link</button>
@@ -196,8 +199,8 @@ $onMount(() => {
     type="button"
     class="rozie-lexical-toolbar-btn"
     :class="{ active: $data.active.list }"
-    :aria-pressed="$data.active.list"
-    @mousedown.prevent
+    :aria-pressed="!!$data.active.list"
+    @mousedown="$event.preventDefault()"
     @click="insertList"
     aria-label="Bullet list"
   >&bull; List</button>

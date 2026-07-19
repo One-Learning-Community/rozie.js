@@ -1,0 +1,14 @@
+.rozie-lexical[data-rozie-s-f679124a] {
+  display: block;
+}
+.rozie-lexical-content[data-rozie-s-f679124a] {
+  min-height: 6rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  outline: none;
+  font: inherit;
+}
+.rozie-lexical-content[data-rozie-s-f679124a]:focus {
+  border-color: #4f46e5;
+}

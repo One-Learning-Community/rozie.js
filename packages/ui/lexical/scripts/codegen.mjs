@@ -32,6 +32,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  rmSync,
   writeFileSync,
   existsSync,
 } from 'node:fs';
@@ -63,7 +64,25 @@ const EXT = {
 
 const TARGETS = {
   react: { dir: 'react', build: 'tsdown' },
-  vue: { dir: 'vue', build: 'source', externals: ['vue', 'lexical', /^@lexical\//, /^vue\//] },
+  vue: {
+    dir: 'vue',
+    build: 'source',
+    // D-08 externals (the vue-leaf external-drift precedent lives in this list):
+    // enumerate every peer explicitly AND keep the `/^@lexical\//` + `/^vue\//`
+    // regex backstops so a missed @lexical/* subpackage cannot silently inline a
+    // second Lexical instance into dist.
+    externals: [
+      'vue',
+      /^vue\//,
+      'lexical',
+      '@lexical/rich-text',
+      '@lexical/history',
+      '@lexical/list',
+      '@lexical/link',
+      '@lexical/utils',
+      /^@lexical\//,
+    ],
+  },
   svelte: { dir: 'svelte', build: 'source' },
   angular: { dir: 'angular', build: 'source' },
   solid: { dir: 'solid', build: 'tsdown' },
@@ -76,6 +95,32 @@ function componentSlug(name) {
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
     .toLowerCase();
+}
+
+/**
+ * EMITTER-BACKLOG WORKAROUND (codegen-path, NOT an emitter edit — SCOPE FENCE).
+ *
+ * A behavior-only, PROP-LESS Solid component (the D-02 plugins + the Toolbar, whose
+ * props all carry `<data>`/defaults but no bare declared prop) emits
+ * `splitProps(_props, [])` against an empty `interface <Name>Props {}`. Solid's typed
+ * `splitProps<T, K extends [readonly (keyof T)[], ...]>` signature infers the empty
+ * array literal `[]` as `undefined[]` (not `never[]`) in that rest-tuple position, so
+ * the leaf `tsc` rejects it (TS2345: `undefined[]` not assignable to `readonly never[]`)
+ * — and NO tsconfig relaxation clears it (it is an argument-assignability error, not a
+ * strict-mode check). No shipped @rozie-ui Solid leaf hit this before because none had
+ * a prop-less component; the lexical plugins are the first.
+ *
+ * Surgical fix: cast the empty key-array to the empty TUPLE `[]` (`[] as []`), which
+ * IS assignable to `readonly never[]`. Matches ONLY the empty-key form (`, [])`), so a
+ * real keyed split like `splitProps(_merged, ['delay'])` is untouched. Solid-only.
+ *
+ * This is a documented emitter gap owed a red-first fix in @rozie/core (the Solid
+ * emitter should emit the prop-less split in a `tsc`-clean form). Until then this
+ * codegen post-process keeps the plugins genuinely prop-less (no phantom API prop).
+ */
+function patchSolidEmptySplitProps(target, code) {
+  if (target !== 'solid') return code;
+  return code.replace(/splitProps\((\w+), \[\]\)/g, 'splitProps($1, [] as [])');
 }
 
 /** Discover every src/*.rozie, PRIMARY first, then the rest alphabetically. */
@@ -282,7 +327,7 @@ function main() {
         );
       }
 
-      writeFileSync(resolve(leafSrc, comp.name + '.' + ext), r.code);
+      writeFileSync(resolve(leafSrc, comp.name + '.' + ext), patchSolidEmptySplitProps(target, r.code));
 
       if (target === 'react') {
         if (r.css) {
@@ -292,6 +337,17 @@ function main() {
             );
           }
           writeFileSync(resolve(leafSrc, comp.name + '.css'), r.css);
+        }
+        // React-only: the emitter hoists `:root`-scoped rules (the global escape
+        // hatch) into `r.globalCss` and emits a sibling `import './<Name>.global.css';`
+        // side effect in the `.tsx`. Write it so that import resolves + the leaf's
+        // tsdown copy can ship it to dist. When a future emit drops all :root rules
+        // r.globalCss goes null — delete a stale sibling in lockstep (sidecar hygiene).
+        const globalCssPath = resolve(leafSrc, comp.name + '.global.css');
+        if (r.globalCss) {
+          writeFileSync(globalCssPath, r.globalCss);
+        } else if (existsSync(globalCssPath)) {
+          rmSync(globalCssPath);
         }
         if (r.types) writeFileSync(resolve(leafSrc, comp.name + '.d.ts'), r.types);
       }
