@@ -1,0 +1,84 @@
+<!--
+  LinkPlugin.rozie — link insert/edit/remove for @rozie-ui/lexical (D-02). A
+  behavior-only plugin child of <LexicalEditor>: it $injects the SHARED editor (the
+  shell's $provide token, spike 010) and registers a TOGGLE_LINK_COMMAND handler in
+  $onMount via `editor.registerCommand(...)`, tearing down via the $onMount return.
+
+  EXTENSION MECHANISM — COMMAND: this follows @lexical/link's documented plugin
+  pattern — the LinkNode CLASS is declared at the shell's createEditor (76-01, D-04),
+  and the plugin adds the COMMAND handler that turns a dispatched TOGGLE_LINK_COMMAND
+  into a `$toggleLink` mutation over the current selection. It is the COMMAND member of
+  the D-02 set (command = Link, listener = History, node-transform = List). The payload
+  contract mirrors @lexical/link's own `registerLink`: `null` removes the link, a
+  `string` sets the url, an object `{ url, target, rel, title }` sets url + attributes.
+
+  D-05 / REQ-37 (HARD): every Lexical `$`-API is authored in the NAMESPACE-import form
+  — `import * as lexical from 'lexical'` (COMMAND_PRIORITY_EDITOR) and
+  `import * as lexicalLink from '@lexical/link'` (TOGGLE_LINK_COMMAND + $toggleLink).
+  A named `$`-import (`import { $toggleLink } from '@lexical/link'`) would break the
+  Svelte compiler (`dollar_prefix_invalid`); the namespace form makes `$toggleLink` a
+  PROPERTY access, which Svelte does not reserve. Gated by compile-lexical-check.mjs.
+-->
+<rozie name="LinkPlugin">
+
+<script>
+// NAMESPACE imports (D-05): both the priority constant and the `$`-API come through
+// namespace bindings so no bare `$`-identifier ever reaches the Svelte compiler.
+import * as lexical from 'lexical'
+import * as lexicalLink from '@lexical/link'
+
+// The shared editor context object provided by the shell. `$inject` binds to a
+// `const` (ROZ132), then aliases through a null-`let` (typeNeutralize) so `.instance`
+// type-checks on the strict bundled leaves; TOP-LEVEL scope so the hoisted Solid
+// teardown can reach it (see RichTextPlugin header for the full rationale).
+const editorCtx = $inject('rozie-lexical-editor')
+let ctx = null
+ctx = editorCtx
+
+let teardown = null
+let disposed = false
+
+const activate = () => {
+  if (teardown || disposed) return
+  const editor = ctx && ctx.instance
+  if (!editor) return
+  // COMMAND mechanism: register the TOGGLE_LINK_COMMAND handler. Mirrors
+  // @lexical/link's registerLink payload handling (null = unlink, string = url,
+  // object = url + link attributes). Runs at EDITOR priority so it wins the
+  // toggle before lower-priority handlers. registerCommand returns its own cleanup.
+  teardown = editor.registerCommand(
+    lexicalLink.TOGGLE_LINK_COMMAND,
+    (payload) => {
+      if (payload === null) {
+        lexicalLink.$toggleLink(null)
+        return true
+      } else if (typeof payload === 'string') {
+        lexicalLink.$toggleLink(payload)
+        return true
+      }
+      const { url, target, rel, title } = payload
+      lexicalLink.$toggleLink(url, { rel, target, title })
+      return true
+    },
+    lexical.COMMAND_PRIORITY_EDITOR,
+  )
+}
+
+$onMount(() => {
+  // Defer one microtask so the parent shell's $onMount has created the editor —
+  // child mount hooks fire before the parent's on React/Vue/Solid (see RichTextPlugin
+  // header for the full ordering note).
+  queueMicrotask(activate)
+  return () => {
+    disposed = true
+    if (teardown) {
+      teardown()
+      teardown = null
+    }
+  }
+})
+</script>
+
+<template></template>
+
+</rozie>
