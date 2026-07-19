@@ -164,14 +164,13 @@ function lowerLitDecoratorsWithEsbuild(): Plugin {
  * is unresolvable and every lexical cell fails to bundle.
  *
  * This `enforce: 'pre'` resolver rewrites that one specifier (only when imported from
- * inside the lexical family src) to the target-matched bridge for the 5 v1.0 targets.
- * For the LIT sub-build there is no bridge (Lit is deferred to v1.1, D-10) and no Lit
- * CELL is tested — but the demos still compile to lit as a target, so it hands the
- * shell a harmless no-op `mountDecorators` (via a virtual module) to keep the lit
- * sub-build green without authoring a throwaway lit bridge.
+ * inside the lexical family src) to the target-matched bridge for all SIX targets —
+ * Lit graduated from v1.1 staging into the shipped family in 76-09 (D-10), so the lit
+ * sub-build now resolves the real hand-written `bridges/mountDecorators.lit.ts` (a Lit
+ * `render(html`…`, host)` bridge) exactly like the other five, and the lexical lit
+ * CELL is a full runtime-proof cell in lexical.spec.ts.
  */
 function resolveLexicalDecoratorBridge(target: Target, lexicalSrcDir: string): Plugin {
-  const NOOP_ID = '\0rozie-vr:lexical-mount-noop';
   const requireFromHere = createRequire(import.meta.url);
   // The vendored bridges live in the cross-tree family src (`packages/ui/lexical/src/
   // bridges/`), outside the rig's `node_modules`. Vite's root-fallback resolves most
@@ -199,6 +198,19 @@ function resolveLexicalDecoratorBridge(target: Target, lexicalSrcDir: string): P
       // rather than silently mis-resolve).
     }
   }
+  // 76-09: the cross-tree LIT bridge (`bridges/mountDecorators.lit.ts`) imports bare
+  // `lit` (render/html/nothing). Rolldown's root-fallback resolves the react-dom/vue/
+  // svelte/@angular bridge imports but NOT `lit` from this cross-tree importer (the
+  // same class as the solid-js/web case above). Precompute the rig's installed `lit`
+  // entry at config time and redirect the bridge's `lit` import to it.
+  let litBuild: string | null = null;
+  if (target === 'lit') {
+    try {
+      litBuild = requireFromHere.resolve('lit');
+    } catch {
+      // Fall through — the default resolver will try (and fail loudly if it can't).
+    }
+  }
   return {
     name: 'rozie-vr:lexical-decorator-bridge',
     enforce: 'pre',
@@ -214,20 +226,22 @@ function resolveLexicalDecoratorBridge(target: Target, lexicalSrcDir: string): P
         if (source === 'solid-js/web' && solidWebBuild) return solidWebBuild;
         if (source === 'solid-js' && solidCoreBuild) return solidCoreBuild;
       }
+      // Redirect the cross-tree LIT bridge's bare `lit` import to the rig's install.
+      if (
+        target === 'lit' &&
+        cleanImporter.includes('/packages/ui/lexical/src/bridges/') &&
+        source === 'lit' &&
+        litBuild
+      ) {
+        return litBuild;
+      }
       // Match the shell's `./mountDecorators` (or any `.../mountDecorators`) import,
       // scoped to files inside the lexical family src so no other family is touched.
       const isMountDecorators =
         source === './mountDecorators' || /(^|\/)mountDecorators$/.test(source);
       if (!isMountDecorators) return null;
       if (!cleanImporter.includes('/packages/ui/lexical/')) return null;
-      if (target === 'lit') return NOOP_ID;
       return resolve(lexicalSrcDir, 'bridges', `mountDecorators.${target}.ts`);
-    },
-    load(id) {
-      if (id === NOOP_ID) {
-        return 'export function mountDecorators() { return () => {}; }\n';
-      }
-      return null;
     },
   };
 }

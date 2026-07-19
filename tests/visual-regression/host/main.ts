@@ -1090,23 +1090,23 @@ export const EXAMPLES = [
   'KeynavMenu',
   'KeynavCombobox',
   // Phase 76 (@rozie-ui/lexical, D-09) — the cross-framework Lexical rich-text
-  // editor family. FIVE-target family (react/vue/svelte/angular/solid; NO Lit —
-  // that is v1.1, D-10), so these cells are exercised on 5 targets only
-  // (lexical.spec.ts iterates those five and never routes to lit). LexicalBehavior
-  // (loader → examples/demos/LexicalBehaviorDemo.rozie, which composes the
-  // packages/ui/lexical/src shell + toolbar + History/List/Link plugins + the
-  // LexicalMentionDriver) is the BEHAVIORAL runtime-proof cell (type / undo-redo /
-  // bold+active / list / link / @mention insert+remove) — deliberately NOT in
-  // matrix.spec.ts EXAMPLES (behavioral-only; no pixel baseline). LexicalScreenshot
-  // (LexicalScreenshotDemo.rozie) is the content-STABLE showcase pixel cell (a fixed
-  // seeded doc: bold run + @mention chip + bullet list, never focused); its shared
-  // Linux baseline is owned by lexical.spec.ts's screenshot leg (auto-fixme on
-  // baselineExists() until the Linux-Docker PNG lands — feedback_vr_linux_baselines).
-  // Angular cells mount NON-EMPTY via the three-file cross-tree registration
-  // (vite.config.ts lexicalSrc + tsconfig.app.json include + build-cells.mjs
-  // LEXICAL_SRC sweep). The LIT_TAGS/DEFAULT_PROPS entries below exist only to
-  // satisfy the Record<Example> types — the lit cell is never built/routed for this
-  // v1.0 family.
+  // editor family. SIX-target family (react/vue/svelte/angular/solid/lit — Lit
+  // graduated from v1.1 staging into the shipped family in 76-09, D-10), so these
+  // cells are exercised on all 6 targets (lexical.spec.ts iterates all six; the lit
+  // cell mounts the emitted LitElement host and proves the editor lives in its OPEN
+  // shadow root). LexicalBehavior (loader → examples/demos/LexicalBehaviorDemo.rozie,
+  // which composes the packages/ui/lexical/src shell + toolbar + History/List/Link
+  // plugins + the LexicalMentionDriver) is the BEHAVIORAL runtime-proof cell (type /
+  // undo-redo / bold+active / list / link / @mention insert+remove) — deliberately
+  // NOT in matrix.spec.ts EXAMPLES (behavioral-only; no pixel baseline).
+  // LexicalScreenshot (LexicalScreenshotDemo.rozie) is the content-STABLE showcase
+  // pixel cell (a fixed seeded doc: bold run + @mention chip + bullet list, never
+  // focused); its shared Linux baseline is owned by lexical.spec.ts's screenshot leg
+  // (all 6 targets share the ONE byte-identical LexicalScreenshot.png — feedback_vr_
+  // linux_baselines). Angular cells mount NON-EMPTY via the three-file cross-tree
+  // registration (vite.config.ts lexicalSrc + tsconfig.app.json include +
+  // build-cells.mjs LEXICAL_SRC sweep); the lit cell resolves the real hand-written
+  // bridges/mountDecorators.lit.ts (76-09) instead of the old v1.1 no-op.
   'LexicalBehavior',
   'LexicalScreenshot',
 ] as const;
@@ -1468,9 +1468,10 @@ export const LIT_TAGS: Record<Example, string> = {
   // KeynavMenuDemo / KeynavComboboxDemo.
   KeynavMenu: 'rozie-keynav-menu',
   KeynavCombobox: 'rozie-keynav-combobox',
-  // Phase 76 (@rozie-ui/lexical) — 5-target family, NO Lit cell (v1.1, D-10). These
-  // tags exist only to satisfy the Record<Example> type; the lit entry is never
-  // routed for these cells (lexical.spec.ts iterates react/vue/svelte/angular/solid).
+  // Phase 76 (@rozie-ui/lexical) — 6-target family incl. Lit (graduated in 76-09,
+  // D-10). The lit entry IS routed for these cells; lexical.spec.ts iterates all six
+  // (react/vue/svelte/angular/solid/lit) and the lit build resolves the real
+  // bridges/mountDecorators.lit.ts.
   LexicalBehavior: 'rozie-lexical-behavior',
   LexicalScreenshot: 'rozie-lexical-screenshot',
 };

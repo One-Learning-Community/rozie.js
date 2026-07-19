@@ -10,8 +10,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * @rozie-ui/lexical — the cross-framework Lexical rich-text-editor family (Phase 76,
  * D-09). This spec is the RUNTIME PROOF that closes the compile-only caveats waves
  * 2–4 left standing (each of those plans could only confirm the wiring was PRESENT
- * in all five emits, not that it ACTIVATES in a browser). Per target
- * (react/vue/svelte/angular/solid — NO Lit; that is v1.1, D-10) it drives the
+ * in all six emits, not that it ACTIVATES in a browser). Per target
+ * (react/vue/svelte/angular/solid/lit — Lit graduated from v1.1 staging into the
+ * shipped family in 76-09, D-10; the lit cell mounts the emitted LitElement host and
+ * proves the editor lives in its OPEN shadow root — typing, selection across the
+ * shadow boundary via getComposedRanges, and the decorator bridge all run without
+ * LitElement's render() clobbering the contenteditable) it drives the
  * LexicalBehaviorDemo cell (the shell + selection-reading Toolbar + History/List/Link
  * plugins + the LexicalMentionDriver) and asserts the DOM outcome of every mechanism:
  *
@@ -36,7 +40,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * toolbar buttons are queried by aria-label; driver buttons by data-testid.
  */
 
-const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid'] as const;
+const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
 const KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set<
   (typeof TARGETS)[number]
