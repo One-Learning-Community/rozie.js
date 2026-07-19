@@ -39,6 +39,7 @@ const html = ref('<p>Hello <strong>world</strong></p>');
 | `extensions` | `Array` | `[]` |  |
 | `starterKit` | `Object` | `{}` |  |
 | `nodeSpecs` | `Array` | `[]` |  |
+| `uploadImage` | `Function` | `null` |  |
 
 ## Events
 

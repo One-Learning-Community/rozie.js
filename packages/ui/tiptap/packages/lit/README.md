@@ -36,6 +36,7 @@ el.addEventListener('html-change', (e) => console.log(e.detail));
 | `extensions` | `Array` | `[]` |  |
 | `starterKit` | `Object` | `{}` |  |
 | `nodeSpecs` | `Array` | `[]` |  |
+| `uploadImage` | `Function` | `null` |  |
 
 ## Events
 

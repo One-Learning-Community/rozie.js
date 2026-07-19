@@ -1,5 +1,5 @@
 ---
-surface_hash: 77056ffede8e
+surface_hash: 4fab841d9798
 ---
 
 # TipTap libraries comparison

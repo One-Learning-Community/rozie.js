@@ -13,6 +13,12 @@ import { Placeholder } from '@tiptap/extensions';
 // editor's parent automatically (no manual document insertion needed).
 import { BubbleMenu } from '@tiptap/extension-bubble-menu';
 import { FloatingMenu } from '@tiptap/extension-floating-menu';
+// Image node extension (ask D). Not part of StarterKit. Version-pinned in
+// lockstep with @tiptap/core (3.23.5). Named export `Image` — verified against
+// the installed dist `.d.ts` (also carries a default export; we use the named
+// form to match the BubbleMenu/FloatingMenu import style). Gated on
+// $props.uploadImage — an absent hook registers NO Image extension.
+import { Image } from '@tiptap/extension-image';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
@@ -150,6 +156,12 @@ export default class TipTap extends SignalWatcher(LitElement) {
    * <TipTap :node-specs="[{ name: 'mention', tag: 'span[data-mention]', group: 'inline', inline: true, atom: true, attrs: { id: { default: null } } }]"><template #nodeView="{ node }">…</template></TipTap>
    */
   @property({ type: Array }) nodeSpecs: any[] = [];
+  /**
+   * An async image-upload hook, signature `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.
+   * @example
+   * <TipTap :upload-image="uploadFn" />
+   */
+  @property({ type: Function }) uploadImage: ((...args: any[]) => any) | null = null;
   private _active = signal({
   bold: false,
   italic: false,
@@ -398,6 +410,33 @@ private _portalContainers = new Set<HTMLElement>();
     })] : []), ...(this.floatingMenuEl ? [FloatingMenu.configure({
       element: this.floatingMenuEl
     })] : [])];
+
+    // Image-upload hook (ask D). Setup-once, gated on $props.uploadImage — read
+    // ONCE here (not a $watch — mirrors autofocus/placeholder/nodeSpecs). When
+    // absent: no Image extension, no paste/drop handlers (zero overhead, the
+    // unfilled-slot discipline). Conditional SPREAD (not `const x = []; x.push`)
+    // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
+    // Image-upload hook (ask D). Setup-once, gated on $props.uploadImage — read
+    // ONCE here (not a $watch — mirrors autofocus/placeholder/nodeSpecs). When
+    // absent: no Image extension, no paste/drop handlers (zero overhead, the
+    // unfilled-slot discipline). Conditional SPREAD (not `const x = []; x.push`)
+    // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
+    const imageExtensions = this.uploadImage ? [Image] : [];
+
+    // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
+    // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
+    // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
+    // functions declared above (see their doc comment for why they live at the
+    // top level rather than as closures nested in this ternary).
+    // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
+    // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
+    // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
+    // functions declared above (see their doc comment for why they live at the
+    // top level rather than as closures nested in this ternary).
+    const uploadHandlers = this.uploadImage ? {
+      handlePaste: this.handlePaste,
+      handleDrop: this.handleDrop
+    } : {};
     this.editor = new Editor({
       element: this._refEditorEl,
       content: this.html,
@@ -410,7 +449,7 @@ private _portalContainers = new Set<HTMLElement>();
       // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
       // of the config-level auto-disable (D-02), which is what actually silences
       // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-      extensions: this.dedupeExtensionsByName([StarterKit.configure(this.buildStarterKitConfig(this.starterKit, this.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...this.extensions]),
+      extensions: this.dedupeExtensionsByName([StarterKit.configure(this.buildStarterKitConfig(this.starterKit, this.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...this.extensions]),
       editorProps: {
         attributes: {
           'aria-label': this.ariaLabel,
@@ -422,6 +461,10 @@ private _portalContainers = new Set<HTMLElement>();
             'aria-placeholder': this.placeholder
           } : {})
         },
+        // uploadImage paste/drop fallbacks (D-04) — spread BEFORE the consumer's
+        // own editorProps so a consumer-supplied handlePaste/handleDrop wins.
+        // `{}` (no-op) when $props.uploadImage is unset.
+        ...uploadHandlers,
         // Consumer editorProps spread LAST — full ProseMirror editorProps control
         // (handleKeyDown, handlePaste, a custom `attributes`, …) wins.
         ...this.editorProps
@@ -790,6 +833,60 @@ private _portalContainers = new Set<HTMLElement>();
     addNodeView: () => this.makeNodeView(nv, spec)
   });
 });
+
+  findImageFile = (files: any) => {
+  if (!files) return undefined;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    if (f && typeof f.type === 'string' && f.type.indexOf('image/') === 0) return f;
+  }
+  return undefined;
+};
+
+  handlePaste(view: any, event: any, slice: any) {
+    // Captured into a local (not repeated `$props.uploadImage` member reads) so
+    // the null-check narrows the type on every target — including Lit, where
+    // the Function prop lowers to a nullable function type and a bare
+    // `$props.uploadImage(file)` call trips strict-null under bundled-leaf
+    // typecheck (TS2721) even though this handler is only ever wired into
+    // editorProps when uploadImage is truthy (belt-and-suspenders — the D-03
+    // gate already guarantees this in practice).
+    const upload = this.uploadImage;
+    if (!upload) return false;
+    const file = this.findImageFile(event.clipboardData ? event.clipboardData.files : undefined);
+    if (!file) return false;
+    event.preventDefault();
+    upload(file).then((url: any) => {
+      this.editor?.chain().focus().setImage({
+        src: url
+      }).run();
+    }).catch(() => {});
+    return true;
+  }
+
+  handleDrop(view: any, event: any, slice: any, moved: any) {
+    if (moved) return false;
+    // See handlePaste — local capture for the same cross-target null-narrowing.
+    const upload = this.uploadImage;
+    if (!upload) return false;
+    const file = this.findImageFile(event.dataTransfer ? event.dataTransfer.files : undefined);
+    if (!file) return false;
+    event.preventDefault();
+    const pos = view.posAtCoords({
+      left: event.clientX,
+      top: event.clientY
+    });
+    upload(file).then((url: any) => {
+      const insertPos = pos ? pos.pos : this.editor ? this.editor.state.selection.head : 0;
+      this.editor?.chain().focus().insertContentAt(insertPos, {
+        type: 'image',
+        attrs: {
+          src: url
+        }
+      }).run();
+    }).catch(() => {});
+    return true;
+  }
 
   getEditor() {
     return this.editor;

@@ -70,6 +70,7 @@ The accessor contract: only real user interaction dirties the control — progra
 | `extensions` | `Array` | `[]` |  |
 | `starterKit` | `Object` | `{}` |  |
 | `nodeSpecs` | `Array` | `[]` |  |
+| `uploadImage` | `Function` | `null` |  |
 
 ## Events
 

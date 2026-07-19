@@ -50,6 +50,12 @@ interface Props {
    * <TipTap :node-specs="[{ name: 'mention', tag: 'span[data-mention]', group: 'inline', inline: true, atom: true, attrs: { id: { default: null } } }]"><template #nodeView="{ node }">…</template></TipTap>
    */
   nodeSpecs?: any[];
+  /**
+   * An async image-upload hook, signature `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.
+   * @example
+   * <TipTap :upload-image="uploadFn" />
+   */
+  uploadImage?: ((...args: any[]) => any) | null;
   toolbar?: Snippet<[{ editor: any }]>;
   bubbleMenu?: Snippet<[{ editor: any }]>;
   floatingMenu?: Snippet<[{ editor: any }]>;
@@ -77,6 +83,7 @@ let {
   extensions = __defaultExtensions,
   starterKit = __defaultStarterKit,
   nodeSpecs = __defaultNodeSpecs,
+  uploadImage = null,
   toolbar: __toolbarProp,
   bubbleMenu: __bubbleMenuProp,
   floatingMenu: __floatingMenuProp,
@@ -117,6 +124,12 @@ import { Placeholder } from '@tiptap/extensions';
 // editor's parent automatically (no manual document insertion needed).
 import { BubbleMenu } from '@tiptap/extension-bubble-menu';
 import { FloatingMenu } from '@tiptap/extension-floating-menu';
+// Image node extension (ask D). Not part of StarterKit. Version-pinned in
+// lockstep with @tiptap/core (3.23.5). Named export `Image` — verified against
+// the installed dist `.d.ts` (also carries a default export; we use the named
+// form to match the BubbleMenu/FloatingMenu import style). Gated on
+// $props.uploadImage — an absent hook registers NO Image extension.
+import { Image } from '@tiptap/extension-image';
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
@@ -432,6 +445,77 @@ const makeNodeViewExtensions = (nv: any, specs: any) => specs.map((spec: any) =>
     addNodeView: () => makeNodeView(nv, spec)
   });
 });
+// Shared image-file finder for the upload handlers below — the first
+// `image/*` File in a FileList, else undefined. Guards a missing FileList.
+const findImageFile = (files: any) => {
+  if (!files) return undefined;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    if (f && typeof f.type === 'string' && f.type.indexOf('image/') === 0) return f;
+  }
+  return undefined;
+};
+// uploadImage paste/drop fallbacks (ask D / D-04) — ProseMirror `editorProps`
+// handlers. TOP-LEVEL functions (siblings of `refreshActive`/the $expose
+// verbs below), NOT nested inside $onMount's ternary/object-literal — a
+// closure reading the component-scope `editor` from several function-levels
+// deep inside $onMount (object-literal method → `.then` callback) hits a
+// `this`-rebinding gap on the class-based targets (Angular/Lit) that the
+// emitter's nested-`this` repair does not reach at that depth
+// (emitter-backlog). A top-level function is only ONE level removed from the
+// promoted-`this` boundary — the same shallow depth as the `onUpdate` /
+// `$watch` callbacks elsewhere in this file, which already compile clean —
+// so referencing `editor` here needs no repair at all. Each handler claims
+// ONLY an image/* payload: returns `true` SYNCHRONOUSLY (claiming the
+// paste/drop now — never awaits inside the handler) and inserts the resolved
+// URL once the consumer's uploadImage promise settles; a rejection is
+// swallowed (`.catch(() => {})`) so a failed upload never crashes the editor
+// (T-e7i-01). Returns `false` for a non-image payload — or, for drop, an
+// internal node move — so ProseMirror (or a consumer editorProps handler,
+// which still wins via the LAST spread) processes it normally.
+function handlePaste(view: any, event: any, slice: any) {
+  // Captured into a local (not repeated `$props.uploadImage` member reads) so
+  // the null-check narrows the type on every target — including Lit, where
+  // the Function prop lowers to a nullable function type and a bare
+  // `$props.uploadImage(file)` call trips strict-null under bundled-leaf
+  // typecheck (TS2721) even though this handler is only ever wired into
+  // editorProps when uploadImage is truthy (belt-and-suspenders — the D-03
+  // gate already guarantees this in practice).
+  const upload = uploadImage;
+  if (!upload) return false;
+  const file = findImageFile(event.clipboardData ? event.clipboardData.files : undefined);
+  if (!file) return false;
+  event.preventDefault();
+  upload(file).then((url: any) => {
+    editor?.chain().focus().setImage({
+      src: url
+    }).run();
+  }).catch(() => {});
+  return true;
+}
+function handleDrop(view: any, event: any, slice: any, moved: any) {
+  if (moved) return false;
+  // See handlePaste — local capture for the same cross-target null-narrowing.
+  const upload = uploadImage;
+  if (!upload) return false;
+  const file = findImageFile(event.dataTransfer ? event.dataTransfer.files : undefined);
+  if (!file) return false;
+  event.preventDefault();
+  const pos = view.posAtCoords({
+    left: event.clientX,
+    top: event.clientY
+  });
+  upload(file).then((url: any) => {
+    const insertPos = pos ? pos.pos : editor ? editor.state.selection.head : 0;
+    editor?.chain().focus().insertContentAt(insertPos, {
+      type: 'image',
+      attrs: {
+        src: url
+      }
+    }).run();
+  }).catch(() => {});
+  return true;
+}
 // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
 // the marquee surface: 16 verbs over the live Editor, uniform across all 6
 // targets. Each guards the pre-mount / destroyed `editor = null`.
@@ -671,6 +755,23 @@ onMount(() => {
   })] : []), ...(floatingMenuEl ? [FloatingMenu.configure({
     element: floatingMenuEl
   })] : [])];
+
+  // Image-upload hook (ask D). Setup-once, gated on $props.uploadImage — read
+  // ONCE here (not a $watch — mirrors autofocus/placeholder/nodeSpecs). When
+  // absent: no Image extension, no paste/drop handlers (zero overhead, the
+  // unfilled-slot discipline). Conditional SPREAD (not `const x = []; x.push`)
+  // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
+  const imageExtensions = uploadImage ? [Image] : [];
+
+  // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
+  // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
+  // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
+  // functions declared above (see their doc comment for why they live at the
+  // top level rather than as closures nested in this ternary).
+  const uploadHandlers = uploadImage ? {
+    handlePaste,
+    handleDrop
+  } : {};
   editor = new Editor({
     element: editorEl!,
     content: html,
@@ -683,7 +784,7 @@ onMount(() => {
     // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
     // of the config-level auto-disable (D-02), which is what actually silences
     // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-    extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(starterKit, extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...extensions]),
+    extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(starterKit, extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...extensions]),
     editorProps: {
       attributes: {
         'aria-label': ariaLabel,
@@ -695,6 +796,10 @@ onMount(() => {
           'aria-placeholder': placeholder
         } : {})
       },
+      // uploadImage paste/drop fallbacks (D-04) — spread BEFORE the consumer's
+      // own editorProps so a consumer-supplied handlePaste/handleDrop wins.
+      // `{}` (no-op) when $props.uploadImage is unset.
+      ...uploadHandlers,
       // Consumer editorProps spread LAST — full ProseMirror editorProps control
       // (handleKeyDown, handlePaste, a custom `attributes`, …) wins.
       ...editorProps

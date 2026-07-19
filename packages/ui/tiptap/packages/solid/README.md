@@ -36,6 +36,7 @@ export function Demo() {
 | `extensions` | `Array` | `[]` |  |
 | `starterKit` | `Object` | `{}` |  |
 | `nodeSpecs` | `Array` | `[]` |  |
+| `uploadImage` | `Function` | `null` |  |
 
 ## Events
 

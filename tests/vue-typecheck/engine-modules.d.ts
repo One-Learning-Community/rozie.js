@@ -11,6 +11,7 @@ declare module '@tiptap/core';
 declare module '@tiptap/extensions';
 declare module '@tiptap/extension-bubble-menu';
 declare module '@tiptap/extension-floating-menu';
+declare module '@tiptap/extension-image';
 declare module '@tiptap/starter-kit';
 declare module 'flatpickr';
 declare module '@uppy/core';
