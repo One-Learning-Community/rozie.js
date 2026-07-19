@@ -27,6 +27,7 @@ export default defineConfig({
     '@rozie/runtime-react',
     '@tiptap/core',
     '@tiptap/starter-kit',
+    '@tiptap/extension-image',
     /\.css$/,
   ],
   copy: [{ from: 'src/TipTap.css', to: 'dist', flatten: true }],

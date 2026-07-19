@@ -16,5 +16,6 @@ export default defineConfig({
     '@rozie/runtime-solid',
     '@tiptap/core',
     '@tiptap/starter-kit',
+    '@tiptap/extension-image',
   ],
 });

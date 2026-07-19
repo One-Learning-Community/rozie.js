@@ -6147,6 +6147,9 @@ importers:
       '@tiptap/extension-floating-menu':
         specifier: ^3
         version: 3.23.5(@floating-ui/dom@1.7.6)(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
+      '@tiptap/extension-image':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))
       '@tiptap/extensions':
         specifier: ^3
         version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
@@ -6199,6 +6202,9 @@ importers:
       '@tiptap/extension-floating-menu':
         specifier: ^3
         version: 3.23.5(@floating-ui/dom@1.7.6)(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
+      '@tiptap/extension-image':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))
       '@tiptap/extensions':
         specifier: ^3
         version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
@@ -6223,6 +6229,9 @@ importers:
       '@tiptap/extension-floating-menu':
         specifier: ^3
         version: 3.23.5(@floating-ui/dom@1.7.6)(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
+      '@tiptap/extension-image':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))
       '@tiptap/extensions':
         specifier: ^3
         version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
@@ -6257,6 +6266,9 @@ importers:
       '@tiptap/extension-floating-menu':
         specifier: ^3
         version: 3.23.5(@floating-ui/dom@1.7.6)(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
+      '@tiptap/extension-image':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))
       '@tiptap/extensions':
         specifier: ^3
         version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
@@ -6281,6 +6293,9 @@ importers:
       '@tiptap/extension-floating-menu':
         specifier: ^3
         version: 3.23.5(@floating-ui/dom@1.7.6)(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
+      '@tiptap/extension-image':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))
       '@tiptap/extensions':
         specifier: ^3
         version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
@@ -6315,6 +6330,9 @@ importers:
       '@tiptap/extension-floating-menu':
         specifier: ^3
         version: 3.23.5(@floating-ui/dom@1.7.6)(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)
+      '@tiptap/extension-image':
+        specifier: ^3
+        version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))
       '@tiptap/extensions':
         specifier: ^3
         version: 3.23.5(@tiptap/core@3.23.5(@tiptap/pm@3.23.5))(@tiptap/pm@3.23.5)

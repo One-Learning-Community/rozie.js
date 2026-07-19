@@ -25,6 +25,7 @@ export default defineConfig({
         '@tiptap/extensions',
         '@tiptap/extension-bubble-menu',
         '@tiptap/extension-floating-menu',
+        '@tiptap/extension-image',
         '@tiptap/starter-kit',
       ],
     },
