@@ -1,0 +1,200 @@
+<!--
+  LexicalEditor.rozie — the editor SHELL for @rozie-ui/lexical (D-04). The
+  substrate every later wave builds on: it creates a Lexical editor in $onMount,
+  binds it to a contenteditable host via $refs + setRootElement, registers the
+  RichText baseline, and $provides the live instance so plugin/toolbar components
+  (waves 2–4) $inject the SAME identity and drive it imperatively (spike 010).
+
+  D-05 / REQ-37 (HARD, spike 013): ALL Lexical `$`-API is authored in the
+  NAMESPACE-import form — `import * as lexical from 'lexical'; lexical.$getRoot()`.
+  Named `$`-imports (`import { $getRoot } from 'lexical'`) break the Svelte
+  compiler (`dollar_prefix_invalid`); the namespace form makes every `$`-call a
+  PROPERTY access, which Svelte does not reserve. This is the ONE cross-target-safe
+  form and is gated by scripts/compile-lexical-check.mjs.
+
+  The shell registers the full v1.0 node CLASS set up front (Lexical requires all
+  node classes declared at editor creation); the plugin components register only
+  BEHAVIOR. MentionNode is added to `nodes` by plan 76-04.
+-->
+<rozie name="LexicalEditor">
+
+<props>
+{
+  nodes: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'Extra Lexical node classes to register at editor creation. Lexical requires every node class to be declared up front, so consumer node extensions are passed here and composed after the built-in RichText/List/Link node set. Plan 76-04 adds the `@mention` `MentionNode` through this prop.',
+    },
+  },
+  namespace: {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        "The Lexical editor `namespace` (scopes clipboard/collaboration). Falls back to `rozie-lexical` when left empty.",
+    },
+  },
+  ariaLabel: {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'Accessible name (`aria-label`) applied to the contenteditable host. Omitted from the DOM when unset — supply one for a labelled editing region.',
+    },
+  },
+  theme: {
+    type: Object,
+    default: () => ({}),
+    docs: {
+      description:
+        'Lexical `theme` object mapping node/format types to CSS class names. The styling hook for this deliberately-unstyled primitive (D-12) — bring your own design-system classes.',
+    },
+  },
+}
+</props>
+
+<script>
+// D-05 / REQ-37: the namespace-import form is the ONLY cross-target-safe way to
+// use Lexical's `$`-prefixed API. Every `$`-call below is `lexical.$…` (a property
+// access), never a bare `$`-identifier — that is what keeps the emitted Svelte
+// clean of `dollar_prefix_invalid`.
+import * as lexical from 'lexical'
+// Non-`$` helpers use ordinary named imports (unaffected by the Svelte reservation).
+import { registerRichText, HeadingNode, QuoteNode } from '@lexical/rich-text'
+import { ListNode, ListItemNode } from '@lexical/list'
+import { LinkNode, AutoLinkNode } from '@lexical/link'
+import { mergeRegister } from '@lexical/utils'
+
+// The live editor instance — null before mount / after teardown. Declared at
+// TOP-LEVEL script scope (NOT inside $onMount) so it is reachable from BOTH the
+// $provide getter below AND the Solid-split onCleanup teardown, which the Solid
+// emitter hoists OUTSIDE the mount-body IIFE (the ADDING-A-FAMILY cross-phase-scope
+// gotcha — a mount-local `let` would be TS2304 in the teardown).
+let editor = null
+
+// $provide the editor at INIT (top-level setup), NOT inside $onMount. Context
+// tokens must be established during component init on Svelte (setContext is
+// init-only — REQ-32) and Vue; providing inside $onMount would land setContext
+// after init and fail. The value is a GETTER object so the identity is fixed at
+// init while the live `editor` late-binds once $onMount assigns it — a plugin that
+// mounts after the shell reads the current instance through the getter (the exact
+// spike 010 `{ get color() {…} }` late-binding pattern). The token string is the
+// stable cross-file identity the plugin/toolbar `$inject('rozie-lexical-editor')`
+// reads (spike 010 cross-file token contract); plugins read the live editor via
+// `.instance`.
+//
+// The getter key is `instance`, NOT `editor`: naming it `editor` collides with the
+// top-level `let editor`, and the emitter's reactive-identifier rewrite pass then
+// tries to rewrite the ObjectMethod KEY `editor` into a member expression and
+// crashes (@babel/types ObjectMethod-key invariant). Renaming the key sidesteps
+// that compile-path gap while the getter BODY `return editor` still late-binds to
+// the live instance. (SCOPE FENCE: source workaround, no emitter edit.)
+$provide('rozie-lexical-editor', {
+  get instance() {
+    return editor
+  },
+})
+
+$onMount(() => {
+  editor = lexical.createEditor({
+    namespace: $props.namespace || 'rozie-lexical',
+    // The full v1.0 node CLASS set is declared here (Lexical requires all node
+    // classes up front); consumer `nodes` are composed LAST so they win.
+    nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, AutoLinkNode, ...$props.nodes],
+    // Fail-loud: rethrow rather than swallow editor-state corruption (T-76-01).
+    onError: (e) => {
+      throw e
+    },
+    theme: $props.theme,
+  })
+
+  // Bind the editor to the authored contenteditable host.
+  editor.setRootElement($refs.rootEl)
+
+  // Register the RichText baseline and keep the cleanup handle. Plugin components
+  // (wave 2) add History/List/Link BEHAVIOR against the same $injected editor.
+  const cleanup = mergeRegister(registerRichText(editor))
+
+  // Seed an empty paragraph so the caret has a block to land in when the document
+  // is empty (the spike 015 seed pattern, in the `lexical.$…` namespace form).
+  editor.update(() => {
+    const root = lexical.$getRoot()
+    if (root.getFirstChild() === null) {
+      const paragraph = lexical.$createParagraphNode()
+      root.append(paragraph)
+    }
+  })
+
+  // Teardown colocated in the $onMount return (D-04): unregister everything, then
+  // null the instance so a late teardown read sees a defined value.
+  return () => {
+    cleanup()
+    editor = null
+  }
+})
+</script>
+
+<template>
+<div class="rozie-lexical">
+  <!-- The single contenteditable host Lexical owns via setRootElement($refs.rootEl).
+       :aria-label drops from the DOM when ariaLabel is null (rozieAttr nullish-drop). -->
+  <div ref="rootEl" class="rozie-lexical-content" contenteditable="true" :aria-label="$props.ariaLabel"></div>
+  <!-- Compositional model: plugin/toolbar children mount here and $inject the
+       $provided editor. Non-visual plugins render nothing; the toolbar (D-03)
+       renders its own controls. Toolbar is a SEPARATE component — never inlined. -->
+  <slot />
+</div>
+</template>
+
+<style>
+.rozie-lexical {
+  display: block;
+}
+.rozie-lexical-content {
+  min-height: 6rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  outline: none;
+  font: inherit;
+}
+.rozie-lexical-content:focus {
+  border-color: #4f46e5;
+}
+
+/* The formatted nodes Lexical renders inside the contenteditable host (strong / em
+   / ul / ol / headings) are ENGINE-rendered — they carry NO Rozie [data-rozie-s-*]
+   scope attribute, so a plain scoped descendant rule would silently fail to match
+   on the scoped-CSS targets (React/Solid/Lit). The nested :root { } escape hatch
+   emits its children UNSCOPED/global on all targets, reaching the engine nodes.
+   (Not :global() — that is a ROZ128 hard error; :root { nested } is canonical —
+   the TipTap placeholder-ghost lesson, D-12.) */
+:root {
+  .rozie-lexical-content strong {
+    font-weight: 700;
+  }
+  .rozie-lexical-content em {
+    font-style: italic;
+  }
+  .rozie-lexical-content ul {
+    margin: 0.25rem 0;
+    padding-left: 1.5rem;
+  }
+  .rozie-lexical-content ol {
+    margin: 0.25rem 0;
+    padding-left: 1.5rem;
+  }
+  .rozie-lexical-content h1 {
+    font-size: 1.5rem;
+    margin: 0.5rem 0 0.375rem;
+  }
+  .rozie-lexical-content h2 {
+    font-size: 1.25rem;
+    margin: 0.5rem 0 0.375rem;
+  }
+}
+</style>
+
+</rozie>

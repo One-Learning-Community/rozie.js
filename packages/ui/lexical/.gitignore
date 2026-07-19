@@ -1,0 +1,7 @@
+# Generated per-framework leaf output. codegen.mjs emits src/<Name>.<ext> +
+# README/LICENSE into packages/<fw>/ as proof-of-emit, but the REAL leaf packages
+# (package.json, build configs, dist) land in the distribution wave (a later plan).
+# Until then this tree is pure regenerable build artifact — ignore it. The
+# distribution wave will replace this ignore with tracked leaf packages on the
+# @rozie-ui dist+source standard.
+/packages/
