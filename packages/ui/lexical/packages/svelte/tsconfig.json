@@ -1,0 +1,29 @@
+{
+  // Present so @sveltejs/package (svelte2tsx emitDts) can locate a tsconfig and
+  // generate the dist .svelte.d.ts files. The repo only carries a differently-named
+  // tsconfig.base.json, which svelte2tsx's upward search does NOT match, so the
+  // d.ts emit silently no-ops without this file (the ADDING-A-FAMILY gotcha).
+  // Relaxed strictness: this drives DECLARATION emit over the generated SFCs (the
+  // multi-component family + the vendored MentionChip.svelte sidecar), not an
+  // author-strictness gate.
+  "extends": "../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "strict": false,
+    "strictNullChecks": false,
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": false,
+    "verbatimModuleSyntax": false,
+    "isolatedModules": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules"]
+}

@@ -1,0 +1,95 @@
+{
+  "name": "@rozie-ui/lexical-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte cross-framework Lexical rich-text editor — editor shell, RichText/History/List/Link plugins, selection-reading toolbar, and an @mention DecoratorNode — one Rozie source compiled to Svelte wrapping Meta's Lexical.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "lexical",
+    "editor",
+    "rich-text-editor",
+    "wysiwyg",
+    "contenteditable",
+    "mention",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/lexical/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./dist/LexicalEditor.svelte",
+      "types": "./dist/LexicalEditor.svelte.d.ts",
+      "default": "./dist/LexicalEditor.svelte"
+    },
+    "./source": {
+      "svelte": "./src/LexicalEditor.svelte",
+      "default": "./src/LexicalEditor.svelte"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:^"
+  },
+  "peerDependencies": {
+    "svelte": "^5",
+    "lexical": "^0.48.0",
+    "@lexical/rich-text": "^0.48.0",
+    "@lexical/history": "^0.48.0",
+    "@lexical/list": "^0.48.0",
+    "@lexical/link": "^0.48.0",
+    "@lexical/utils": "^0.48.0"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    },
+    "lexical": {
+      "optional": false
+    },
+    "@lexical/rich-text": {
+      "optional": false
+    },
+    "@lexical/utils": {
+      "optional": false
+    },
+    "@lexical/history": {
+      "optional": true
+    },
+    "@lexical/list": {
+      "optional": true
+    },
+    "@lexical/link": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@rozie-ui/lexical": "workspace:*",
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
+  }
+}
