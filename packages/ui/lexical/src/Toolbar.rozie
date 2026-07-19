@@ -1,0 +1,238 @@
+<!--
+  Toolbar.rozie — the selection-reading formatting toolbar for @rozie-ui/lexical
+  (D-03). A behavior-AND-UI child of <LexicalEditor>: it $injects the SHARED editor
+  (the shell's $provide token, spike 010) and is BIDIRECTIONAL —
+
+    1. WRITE (dispatch): each button dispatches a Lexical command against the shared
+       editor — bold/italic → FORMAT_TEXT_COMMAND, list → INSERT_UNORDERED_LIST_COMMAND,
+       link → TOGGLE_LINK_COMMAND. The corresponding plugin (or the RichText baseline
+       the shell registers) turns the dispatched command into the actual mutation.
+    2. READ (reflect): a registerUpdateListener reads the CURRENT selection on every
+       editor update (via lexical.$getSelection / lexical.$isRangeSelection) and writes
+       bold/italic/link/list booleans into reactive $data.active, so each button shows
+       its active state live as the caret moves through formatted content.
+
+  CARET PRESERVATION (D-03): every button carries `@mousedown.prevent`. Focusing a
+  button on mousedown would otherwise blur the contenteditable and COLLAPSE the text
+  selection before the click's command runs. preventing the mousedown default keeps
+  the caret/selection intact so the dispatched command applies to the right range.
+  This lowers per-target to a real preventDefault (React/Svelte/Angular/Solid emit
+  `$event.preventDefault()`; Vue uses its native `.prevent` modifier) — NOT a document
+  listener. (Combobox option-row `@mousedown.prevent` precedent.)
+
+  MOUNT ORDERING (76-02 precedent, load-bearing): on React/Vue/Solid a CHILD's
+  $onMount fires BEFORE the parent shell's, and the shell creates the editor in ITS
+  $onMount — so `ctx.instance` is still null at the toolbar's $onMount. The
+  registerUpdateListener is therefore registered inside a `queueMicrotask(activate)`
+  (same as the D-02 plugins) so the shell has created the editor first; a bare
+  in-$onMount register against the still-null instance would silently no-op.
+
+  D-05 / REQ-37 (HARD): every Lexical `$`-API is authored in the NAMESPACE-import form
+  — `import * as lexical from 'lexical'` (`$getSelection`/`$isRangeSelection`),
+  `import * as lexicalList from '@lexical/list'`, `import * as lexicalLink from
+  '@lexical/link'`, `import * as lexicalUtils from '@lexical/utils'`
+  (`$getNearestNodeOfType`). The command constants (FORMAT_TEXT_COMMAND,
+  INSERT_UNORDERED_LIST_COMMAND, TOGGLE_LINK_COMMAND) come through the SAME namespaces
+  (LinkPlugin's `lexical.COMMAND_PRIORITY_EDITOR` precedent) so no bare `$`-identifier
+  ever reaches the Svelte compiler. Gated by scripts/compile-lexical-check.mjs.
+
+  UI POSTURE (D-12): deliberately-unstyled primitive — a functional baseline only
+  (padding, gap, an `.active` state). Consumers restyle via the button/toolbar
+  classes; no design-system opinion.
+-->
+<rozie name="Toolbar">
+
+<data>
+{
+  active: {
+    bold:   false,
+    italic: false,
+    link:   false,
+    list:   false,
+  },
+}
+</data>
+
+<script>
+// NAMESPACE imports (D-05): both the `$`-API selection reads AND the command
+// constants come through namespace bindings, so no bare `$`-identifier ever reaches
+// the Svelte compiler (spike 013 / compile-lexical-check.mjs).
+import * as lexical from 'lexical'
+import * as lexicalList from '@lexical/list'
+import * as lexicalLink from '@lexical/link'
+import * as lexicalUtils from '@lexical/utils'
+
+// The shared editor context object provided by the shell ({ get instance() {…} },
+// spike 010 late-binding getter). `$inject` binds to a `const` (ROZ132), then aliases
+// through a null-`let` (typeNeutralize) so `.instance` type-checks on the strict
+// bundled leaves; TOP-LEVEL scope so the hoisted Solid teardown can reach it (see
+// RichTextPlugin header for the full rationale).
+const editorCtx = $inject('rozie-lexical-editor')
+let ctx = null
+ctx = editorCtx
+
+// The registerUpdateListener cleanup, captured once we register. null = not yet /
+// torn down. `disposed` guards the deferred activation against an unmount that races
+// ahead of the microtask below.
+let teardown = null
+let disposed = false
+
+// Recompute the toolbar's active booleans from the CURRENT selection. MUST be called
+// inside an editorState.read() (the registerUpdateListener callback / getEditorState
+// read below) so the `$`-API resolves against the live editor state. Named
+// `refreshActive` — NOT `setActive`, which would collide with the React/Solid
+// generated `$data.active` setter (ROZ524, the TipTap toolbar precedent).
+const refreshActive = () => {
+  const sel = lexical.$getSelection()
+  if (!lexical.$isRangeSelection(sel)) {
+    $data.active = { bold: false, italic: false, link: false, list: false }
+    return
+  }
+  const anchorNode = sel.anchor.getNode()
+  // Ancestor-type reads via the namespace `$`-API: a ListNode / LinkNode anywhere
+  // above the caret means the current selection is inside a list / link.
+  const listNode = lexicalUtils.$getNearestNodeOfType(anchorNode, lexicalList.ListNode)
+  const linkNode = lexicalUtils.$getNearestNodeOfType(anchorNode, lexicalLink.LinkNode)
+  $data.active = {
+    bold:   sel.hasFormat('bold'),
+    italic: sel.hasFormat('italic'),
+    link:   linkNode !== null,
+    list:   listNode !== null,
+  }
+}
+
+// Register the selection-reading update listener against the shared editor and seed
+// the initial active state. Deferred one microtask from $onMount (see header).
+const activate = () => {
+  if (teardown || disposed) return
+  const editor = ctx && ctx.instance
+  if (!editor) return
+  // READ side: on every editor update, read the current selection and reflect it into
+  // $data.active so each button's active styling tracks the caret live. registerUpdateListener
+  // returns its own cleanup.
+  teardown = editor.registerUpdateListener(({ editorState }) => {
+    editorState.read(() => {
+      refreshActive()
+    })
+  })
+  // Seed the initial state so the buttons render correct active styling before the
+  // first user-driven update fires.
+  editor.getEditorState().read(() => {
+    refreshActive()
+  })
+}
+
+// WRITE side — button command dispatchers. Each reads the LIVE editor instance fresh
+// through the getter (never a stale handle) and guards the pre-mount / torn-down null.
+const formatBold = () => {
+  const editor = ctx && ctx.instance
+  if (!editor) return
+  editor.dispatchCommand(lexical.FORMAT_TEXT_COMMAND, 'bold')
+}
+const formatItalic = () => {
+  const editor = ctx && ctx.instance
+  if (!editor) return
+  editor.dispatchCommand(lexical.FORMAT_TEXT_COMMAND, 'italic')
+}
+const insertList = () => {
+  const editor = ctx && ctx.instance
+  if (!editor) return
+  editor.dispatchCommand(lexicalList.INSERT_UNORDERED_LIST_COMMAND, undefined)
+}
+// Unopinionated toggle: if the selection is already a link, unlink (dispatch null);
+// otherwise link it to a fixed sample href. A fixed href (over a prompt) keeps the
+// primitive dependency-free and SSR/test-safe — consumers wire their own URL UX
+// against the LinkPlugin's TOGGLE_LINK_COMMAND (D-12).
+const toggleLink = () => {
+  const editor = ctx && ctx.instance
+  if (!editor) return
+  editor.dispatchCommand(lexicalLink.TOGGLE_LINK_COMMAND, $data.active.link ? null : 'https://example.com')
+}
+
+$onMount(() => {
+  // Defer one microtask so the parent shell's $onMount has created the editor —
+  // child mount hooks fire before the parent's on React/Vue/Solid (see header).
+  queueMicrotask(activate)
+  return () => {
+    disposed = true
+    if (teardown) {
+      teardown()
+      teardown = null
+    }
+  }
+})
+</script>
+
+<template>
+<div class="rozie-lexical-toolbar" role="toolbar" aria-label="Text formatting">
+  <button
+    type="button"
+    class="rozie-lexical-toolbar-btn"
+    :class="{ active: $data.active.bold }"
+    :aria-pressed="$data.active.bold"
+    @mousedown.prevent
+    @click="formatBold"
+    aria-label="Bold"
+  ><strong>B</strong></button>
+  <button
+    type="button"
+    class="rozie-lexical-toolbar-btn"
+    :class="{ active: $data.active.italic }"
+    :aria-pressed="$data.active.italic"
+    @mousedown.prevent
+    @click="formatItalic"
+    aria-label="Italic"
+  ><em>I</em></button>
+  <button
+    type="button"
+    class="rozie-lexical-toolbar-btn"
+    :class="{ active: $data.active.link }"
+    :aria-pressed="$data.active.link"
+    @mousedown.prevent
+    @click="toggleLink"
+    aria-label="Link"
+  >Link</button>
+  <button
+    type="button"
+    class="rozie-lexical-toolbar-btn"
+    :class="{ active: $data.active.list }"
+    :aria-pressed="$data.active.list"
+    @mousedown.prevent
+    @click="insertList"
+    aria-label="Bullet list"
+  >&bull; List</button>
+</div>
+</template>
+
+<style>
+/* Deliberately-unstyled primitive (D-12): a functional baseline only — consumers
+   restyle via .rozie-lexical-toolbar / .rozie-lexical-toolbar-btn / .active. No
+   design-system opinion (colors kept token-neutral / low-contrast). */
+.rozie-lexical-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin-bottom: 0.375rem;
+}
+.rozie-lexical-toolbar-btn {
+  padding: 0.25rem 0.5rem;
+  min-width: 1.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.rozie-lexical-toolbar-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.rozie-lexical-toolbar-btn.active {
+  background: #1a1a1a;
+  color: #ffffff;
+  border-color: #1a1a1a;
+}
+</style>
+
+</rozie>
