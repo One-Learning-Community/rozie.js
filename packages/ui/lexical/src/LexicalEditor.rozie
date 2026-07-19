@@ -25,7 +25,7 @@
     default: () => [],
     docs: {
       description:
-        'Extra Lexical node classes to register at editor creation. Lexical requires every node class to be declared up front, so consumer node extensions are passed here and composed after the built-in RichText/List/Link node set. Plan 76-04 adds the `@mention` `MentionNode` through this prop.',
+        'Extra Lexical node classes to register at editor creation. Lexical requires every node class to be declared up front, so consumer node extensions are passed here and composed after the built-in RichText/List/Link + `@mention` `MentionNode` set (the reference DecoratorNode is registered by the shell itself; these consumer nodes are composed last so they win).',
     },
   },
   namespace: {
@@ -66,6 +66,15 @@ import { registerRichText, HeadingNode, QuoteNode } from '@lexical/rich-text'
 import { ListNode, ListItemNode } from '@lexical/list'
 import { LinkNode, AutoLinkNode } from '@lexical/link'
 import { mergeRegister } from '@lexical/utils'
+// The reference @mention DecoratorNode (D-07) + the per-target mount bridge
+// (D-06/REQ-39). BOTH are VENDORED by codegen into every leaf: `./MentionNode`
+// resolves to the shared neutral node, and `./mountDecorators` resolves to the
+// leaf's target-matched hand-written bridge (one import specifier, 5 different
+// vendored files). Only the non-`$` `MentionNode` CLASS + `mountDecorators` fn are
+// imported here — never a `$`-prefixed named import (that would trip Svelte's
+// dollar_prefix_invalid, D-05).
+import { MentionNode } from './MentionNode'
+import { mountDecorators } from './mountDecorators'
 
 // The live editor instance — null before mount / after teardown. Declared at
 // TOP-LEVEL script scope (NOT inside $onMount) so it is reachable from BOTH the
@@ -102,7 +111,7 @@ $onMount(() => {
     namespace: $props.namespace || 'rozie-lexical',
     // The full v1.0 node CLASS set is declared here (Lexical requires all node
     // classes up front); consumer `nodes` are composed LAST so they win.
-    nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, AutoLinkNode, ...$props.nodes],
+    nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, AutoLinkNode, MentionNode, ...$props.nodes],
     // Fail-loud: rethrow rather than swallow editor-state corruption (T-76-01).
     onError: (e) => {
       throw e
@@ -113,9 +122,12 @@ $onMount(() => {
   // Bind the editor to the authored contenteditable host.
   editor.setRootElement($refs.rootEl)
 
-  // Register the RichText baseline and keep the cleanup handle. Plugin components
-  // (wave 2) add History/List/Link BEHAVIOR against the same $injected editor.
-  const cleanup = mergeRegister(registerRichText(editor))
+  // Register the RichText baseline AND wire the per-target @mention decorator bridge
+  // (D-06): mountDecorators returns an unregister fn, folded into the same
+  // mergeRegister so the decorator listener tears down with everything else. Plugin
+  // components (wave 2) add History/List/Link BEHAVIOR against the same $injected
+  // editor. mountDecorators runs AFTER setRootElement so getElementByKey resolves.
+  const cleanup = mergeRegister(registerRichText(editor), mountDecorators(editor))
 
   // Seed an empty paragraph so the caret has a block to land in when the document
   // is empty (the spike 015 seed pattern, in the `lexical.$…` namespace form).

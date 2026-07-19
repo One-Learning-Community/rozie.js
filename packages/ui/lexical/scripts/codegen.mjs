@@ -103,6 +103,26 @@ function copyInternal(leafSrc) {
   });
 }
 
+/**
+ * Vendor the decorator escape hatch (D-06/D-07/REQ-39) into a leaf's src/:
+ *   - src/MentionNode.ts            -> <leaf>/src/MentionNode.ts     (shared, neutral)
+ *   - src/bridges/mountDecorators.<target>.ts -> <leaf>/src/mountDecorators.ts
+ *   - (svelte only) src/bridges/MentionChip.svelte -> <leaf>/src/MentionChip.svelte
+ * Copied VERBATIM — NEVER routed through compile() (hand-written per D-06/REQ-39).
+ */
+function vendorDecoratorBridge(leafSrc, target) {
+  const mentionNode = resolve(ROOT, 'src/MentionNode.ts');
+  if (existsSync(mentionNode)) cpSync(mentionNode, resolve(leafSrc, 'MentionNode.ts'));
+
+  const bridge = resolve(ROOT, 'src/bridges/mountDecorators.' + target + '.ts');
+  if (existsSync(bridge)) cpSync(bridge, resolve(leafSrc, 'mountDecorators.ts'));
+
+  if (target === 'svelte') {
+    const chip = resolve(ROOT, 'src/bridges/MentionChip.svelte');
+    if (existsSync(chip)) cpSync(chip, resolve(leafSrc, 'MentionChip.svelte'));
+  }
+}
+
 /** The leaf package name — read from an existing leaf package.json, else synthesized. */
 function leafPkgName(dir) {
   const pkgPath = resolve(ROOT, 'packages', dir, 'package.json');
@@ -279,6 +299,17 @@ function main() {
 
     // Per-leaf ONE-TIME work (after the inner component loop) — exactly once.
     copyInternal(leafSrc);
+
+    // Vendor the decorator escape hatch (D-06/D-07/REQ-39) into this leaf:
+    //   (1) the SHARED framework-neutral MentionNode (same file in every leaf), and
+    //   (2) the target-MATCHED hand-written mount bridge, renamed to the stable
+    //       `mountDecorators.ts` the shell imports (`./mountDecorators`).
+    // These are HAND-WRITTEN escape hatches — copied VERBATIM, NEVER routed through
+    // compile() (D-06/REQ-39, same principle as portal slots). Svelte's bridge
+    // additionally needs its `MentionChip.svelte` sidecar (Svelte 5 `mount()`
+    // requires a compiled component). WR-03 sidecar-hygiene: if a future emit drops
+    // the shell's bridge import, delete these vendored files in lockstep.
+    vendorDecoratorBridge(leafSrc, target);
 
     // Combined barrel (primary = default + named; subsequent = named-only).
     if (cfg.build === 'tsdown') {
