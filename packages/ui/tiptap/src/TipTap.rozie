@@ -24,10 +24,10 @@
                   editorClass / ariaLabel / editorProps / extensions /
                   starterKit / nodeSpecs
     - events (4): update / selectionUpdate / focus / blur
-    - $expose (18): getEditor, focusEditor, blurEditor, getHTML, getJSON,
+    - $expose (20): getEditor, focusEditor, blurEditor, getHTML, getJSON,
                   getText, setContent, clearContent, toggleBold, toggleItalic,
-                  toggleHeading, toggleBulletList, undo, redo, chain,
-                  isActive, can, isEmpty
+                  toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList,
+                  undo, redo, chain, isActive, can, isEmpty
     - slots (4):  3 mount-once portal slots — `toolbar` (consumer toolbar bound
                   to the editor), `bubbleMenu` + `floatingMenu` (selection-anchored
                   menus over @tiptap/extension-bubble-menu / -floating-menu, each
@@ -157,6 +157,8 @@
     h1:     false,
     h2:     false,
     bulletList: false,
+    underline: false,
+    orderedList: false,
   },
 }
 </data>
@@ -216,6 +218,8 @@ const refreshActive = () => {
     h1:         editor.isActive('heading', { level: 1 }),
     h2:         editor.isActive('heading', { level: 2 }),
     bulletList: editor.isActive('bulletList'),
+    underline:  editor.isActive('underline'),
+    orderedList: editor.isActive('orderedList'),
   }
 }
 
@@ -609,7 +613,7 @@ $watch(() => $props.html, (v) => {
 $watch(() => $props.editable, (v) => editor?.setEditable(v, false))
 
 // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
-// the marquee surface: 14 verbs over the live Editor, uniform across all 6
+// the marquee surface: 16 verbs over the live Editor, uniform across all 6
 // targets. Each guards the pre-mount / destroyed `editor = null`.
 //
 // Collision discipline:
@@ -661,6 +665,8 @@ function toggleHeading(level) {
   refreshActive()
 }
 function toggleBulletList() { editor?.chain().focus().toggleBulletList().run(); refreshActive() }
+function toggleUnderline()  { editor?.chain().focus().toggleUnderline().run(); refreshActive() }
+function toggleOrderedList() { editor?.chain().focus().toggleOrderedList().run(); refreshActive() }
 function undo()             { editor?.chain().focus().undo().run(); refreshActive() }
 function redo()             { editor?.chain().focus().redo().run(); refreshActive() }
 // Power-user escape hatch — returns a pre-focused command chain (TipTap idiom:
@@ -681,7 +687,7 @@ function isEmpty()             { return editor ? editor.isEmpty : true }
 
 $expose({
   getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent,
-  toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain,
+  toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain,
   isActive, can, isEmpty,
 })
 </script>
@@ -699,6 +705,11 @@ $expose({
     <button type="button" :class="{ active: $data.active.h2 }"         @click="toggleHeading(2)"  aria-label="Heading 2">H2</button>
     <span class="sep" />
     <button type="button" :class="{ active: $data.active.bulletList }" @click="toggleBulletList"  aria-label="Bullet list">• List</button>
+    <button type="button" :class="{ active: $data.active.underline }" @click="toggleUnderline"    aria-label="Underline"><u>U</u></button>
+    <button type="button" :class="{ active: $data.active.orderedList }" @click="toggleOrderedList" aria-label="Ordered list">1. List</button>
+    <span class="sep" />
+    <button type="button" @click="undo" aria-label="Undo">↺</button>
+    <button type="button" @click="redo" aria-label="Redo">↻</button>
   </div>
   <!-- Consumer toolbar portal host — rendered when editable AND the `toolbar`
        slot is filled. $portals.toolbar (in $onMount) mounts the consumer's
