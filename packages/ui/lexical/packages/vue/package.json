@@ -1,0 +1,93 @@
+{
+  "name": "@rozie-ui/lexical-vue",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Vue cross-framework Lexical rich-text editor — editor shell, RichText/History/List/Link plugins, selection-reading toolbar, and an @mention DecoratorNode — one Rozie source compiled to Vue wrapping Meta's Lexical.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "lexical",
+    "editor",
+    "rich-text-editor",
+    "wysiwyg",
+    "contenteditable",
+    "mention",
+    "component",
+    "vue"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/lexical/packages/vue"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "peerDependencies": {
+    "vue": "^3.4",
+    "lexical": "^0.48.0",
+    "@lexical/rich-text": "^0.48.0",
+    "@lexical/history": "^0.48.0",
+    "@lexical/list": "^0.48.0",
+    "@lexical/link": "^0.48.0",
+    "@lexical/utils": "^0.48.0"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": false
+    },
+    "lexical": {
+      "optional": false
+    },
+    "@lexical/rich-text": {
+      "optional": false
+    },
+    "@lexical/utils": {
+      "optional": false
+    },
+    "@lexical/history": {
+      "optional": true
+    },
+    "@lexical/list": {
+      "optional": true
+    },
+    "@lexical/link": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@rozie-ui/lexical": "workspace:*",
+    "@vitejs/plugin-vue": "^6",
+    "vite": "^8",
+    "vite-plugin-css-injected-by-js": "^5",
+    "vue": "^3.5",
+    "vue-tsc": "^3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./source": {
+      "vue": "./src/LexicalEditor.vue",
+      "default": "./src/LexicalEditor.vue"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "vite build && vue-tsc --declaration --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit"
+  }
+}
