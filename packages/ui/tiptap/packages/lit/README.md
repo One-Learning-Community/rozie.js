@@ -34,6 +34,7 @@ el.addEventListener('html-change', (e) => console.log(e.detail));
 | `ariaLabel` | `String` | `"Rich text editor"` |  |
 | `editorProps` | `Object` | `{}` |  |
 | `extensions` | `Array` | `[]` |  |
+| `starterKit` | `Object` | `{}` |  |
 
 ## Events
 

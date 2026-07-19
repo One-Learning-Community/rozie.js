@@ -137,7 +137,8 @@ el.addEventListener('html-change', (e) => {
 | `editorClass` | `String` | `""` | | A CSS class applied to the contenteditable element (`editorProps.attributes.class`). |
 | `ariaLabel` | `String` | `"Rich text editor"` | | The `aria-label` applied to the contenteditable element. |
 | `editorProps` | `Object` | `{}` | | ProseMirror [`editorProps`](https://prosemirror.net/docs/ref/#view.EditorProps) passthrough — `handleKeyDown`, `handlePaste`, custom `attributes`, etc. Spread **last** so consumer `editorProps` win the wrapper's attribute defaults. |
-| `extensions` | `Array` | `[]` | | Extra TipTap extensions composed onto `StarterKit` — the consumer-extensibility passthrough (TipTap's analog of an options bag). Composed **last** so consumer extensions win. Add Placeholder, Link, Image, Mention, custom nodes/marks, etc. |
+| `extensions` | `Array` | `[]` | | Extra TipTap extensions composed onto `StarterKit` — the consumer-extensibility passthrough (TipTap's analog of an options bag). Consumer extensions genuinely win for a StarterKit-bundled node/mark: a same-named custom extension (e.g. a custom `Link`) auto-disables the corresponding `StarterKit` key, and the final extension array is name-deduped keeping the last (consumer) occurrence — no "Duplicate extension names" warning. Add Placeholder, Link, Image, Mention, custom nodes/marks, etc. |
+| `starterKit` | `Object` | `{}` | | `StarterKit` config passthrough — spread into `StarterKit.configure(...)`. Accepts per-extension option objects or `false` to disable an extension, e.g. `{ heading: false }`, `{ link: { openOnClick: false } }`. An explicitly-set key here is always respected and never overridden by the `extensions` auto-disable scan. |
 
 ### Events
 
@@ -416,7 +417,7 @@ const editor = useRef<TipTapHandle>(null);
 
 ### Adding extensions via `:extensions`
 
-StarterKit is the bundled baseline. Everything else — Placeholder, Link, Image, TextAlign, Mention, custom nodes/marks — comes through the `:extensions` passthrough. Because the wrapper composes consumer extensions **last**, they win for the same node/mark:
+StarterKit is the bundled baseline. Everything else — Placeholder, Link, Image, TextAlign, Mention, custom nodes/marks — comes through the `:extensions` passthrough. The wrapper composes consumer extensions **last** so they win for the same node/mark — and when your extension replaces one StarterKit already bundles (e.g. a custom `Link`), the wrapper auto-disables StarterKit's copy via `StarterKit.configure({ link: false })` so you get no "Duplicate extension names" warning and your extension's schema/attrs are the ones that render:
 
 ```bash
 npm i @tiptap/extension-placeholder @tiptap/extension-link
@@ -430,13 +431,36 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
 
 const html = ref('<p></p>');
-const extensions = [Placeholder.configure({ placeholder: 'Write something…' }), Link];
+// A custom Link replaces StarterKit's bundled Link automatically — no
+// `starterKit={{ link: false }}` needed, and no duplicate-extension warning.
+const extensions = [Placeholder.configure({ placeholder: 'Write something…' }), Link.configure({ openOnClick: false })];
 </script>
 
 <template>
   <TipTap v-model:html="html" :extensions="extensions" />
 </template>
 ```
+
+### Configuring StarterKit via `:starterKit`
+
+Reach into any bundled StarterKit extension directly — no need to know which extension needs disabling for a custom replacement (the `extensions` auto-disable scan above already handles that case). Use `starterKit` when you just want to reconfigure or turn off a StarterKit-native extension in place:
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import TipTap from '@rozie-ui/tiptap-vue';
+
+const html = ref('<p></p>');
+// Restrict headings to H1/H2 and turn off the bundled horizontal rule.
+const starterKit = { heading: { levels: [1, 2] }, horizontalRule: false };
+</script>
+
+<template>
+  <TipTap v-model:html="html" :starter-kit="starterKit" />
+</template>
+```
+
+An explicit key in `starterKit` is always respected — it is never overridden by the `extensions` auto-disable scan, even if you also pass a same-named custom extension.
 
 ### Customizing ProseMirror behavior via `:editorProps`
 

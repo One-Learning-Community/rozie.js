@@ -34,6 +34,7 @@ export function Demo() {
 | `ariaLabel` | `String` | `"Rich text editor"` |  |
 | `editorProps` | `Object` | `{}` |  |
 | `extensions` | `Array` | `[]` |  |
+| `starterKit` | `Object` | `{}` |  |
 
 ## Events
 

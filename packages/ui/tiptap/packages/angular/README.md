@@ -68,6 +68,7 @@ The accessor contract: only real user interaction dirties the control — progra
 | `ariaLabel` | `String` | `"Rich text editor"` |  |
 | `editorProps` | `Object` | `{}` |  |
 | `extensions` | `Array` | `[]` |  |
+| `starterKit` | `Object` | `{}` |  |
 
 ## Events
 

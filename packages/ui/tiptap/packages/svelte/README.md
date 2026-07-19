@@ -34,6 +34,7 @@ Peer dependencies: the `@tiptap/core` + `@tiptap/starter-kit` engine (`^3`) + `s
 | `ariaLabel` | `String` | `"Rich text editor"` |  |
 | `editorProps` | `Object` | `{}` |  |
 | `extensions` | `Array` | `[]` |  |
+| `starterKit` | `Object` | `{}` |  |
 
 ## Events
 

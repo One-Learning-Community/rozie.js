@@ -37,6 +37,7 @@ const html = ref('<p>Hello <strong>world</strong></p>');
 | `ariaLabel` | `String` | `"Rich text editor"` |  |
 | `editorProps` | `Object` | `{}` |  |
 | `extensions` | `Array` | `[]` |  |
+| `starterKit` | `Object` | `{}` |  |
 
 ## Events
 

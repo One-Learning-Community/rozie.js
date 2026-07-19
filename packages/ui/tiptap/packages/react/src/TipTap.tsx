@@ -63,9 +63,13 @@ interface TipTapProps {
    */
   editorProps?: Record<string, any>;
   /**
-   * Extra TipTap extensions composed onto `StarterKit` — the consumer-extensibility passthrough (Link, Image, Mention, custom nodes/marks, …). Composed **last** so consumer extensions win for the same node or mark.
+   * Extra TipTap extensions composed onto `StarterKit` — the consumer-extensibility passthrough (Link, Image, Mention, custom nodes/marks, …). Consumer extensions genuinely win for a StarterKit-bundled node or mark: a same-named custom extension (e.g. a custom `Link`) auto-disables the corresponding StarterKit key (unless explicitly configured via `starterKit`), and the final extension array is name-deduped keeping the last (consumer) occurrence — so a custom Link/Underline/OrderedList replaces StarterKit's without a "Duplicate extension names" warning.
    */
   extensions?: any[];
+  /**
+   * StarterKit config passthrough — spread into `StarterKit.configure(...)`. Accepts per-extension option objects or `false` to disable an extension, e.g. `{ heading:false }`, `{ heading:{ levels:[1,2] } }`, `{ link:false }`. A StarterKit-bundled node/mark is auto-disabled when a same-named custom extension is supplied via `extensions`; an explicitly-set key here is always respected and never overridden by that auto-disable scan.
+   */
+  starterKit?: Record<string, any>;
   onUpdate?: (...args: any[]) => void;
   onSelectionUpdate?: (...args: any[]) => void;
   onFocus?: (...args: any[]) => void;
@@ -102,7 +106,8 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   const portalRoots = useRef<Set<Root>>(new Set());
   const __defaultEditorProps = useState(() => (() => ({}))())[0];
   const __defaultExtensions = useState(() => (() => [])())[0];
-  const props: Omit<TipTapProps, 'editable' | 'placeholder' | 'autofocus' | 'editorClass' | 'ariaLabel' | 'editorProps' | 'extensions'> & { editable: boolean; placeholder: string; autofocus: boolean; editorClass: string; ariaLabel: string; editorProps: Record<string, any>; extensions: any[] } = {
+  const __defaultStarterKit = useState(() => (() => ({}))())[0];
+  const props: Omit<TipTapProps, 'editable' | 'placeholder' | 'autofocus' | 'editorClass' | 'ariaLabel' | 'editorProps' | 'extensions' | 'starterKit'> & { editable: boolean; placeholder: string; autofocus: boolean; editorClass: string; ariaLabel: string; editorProps: Record<string, any>; extensions: any[]; starterKit: Record<string, any> } = {
     ..._props,
     editable: _props.editable ?? true,
     placeholder: _props.placeholder ?? '',
@@ -111,6 +116,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     ariaLabel: _props.ariaLabel ?? 'Rich text editor',
     editorProps: _props.editorProps ?? __defaultEditorProps,
     extensions: _props.extensions ?? __defaultExtensions,
+    starterKit: _props.starterKit ?? __defaultStarterKit,
   };
   const _renderToolbarRef = useRef(props.renderToolbar);
   _renderToolbarRef.current = props.renderToolbar;
@@ -161,6 +167,71 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       }),
       bulletList: editor.current.isActive('bulletList')
     });
+  }, []);
+  // ── StarterKit collision-aware config (ask A). StarterKit bundles several
+  // node/mark extensions INTERNALLY (invisible to a top-level array dedup) —
+  // e.g. its own `Link`. A consumer supplying a custom same-named extension via
+  // `extensions` therefore collides with StarterKit's copy and TipTap warns
+  // "Duplicate extension names found" while keeping BOTH; only
+  // `StarterKit.configure({ link:false })` actually disables StarterKit's. This
+  // map + helper make "consumer wins" true by auto-disabling the StarterKit key
+  // whenever the consumer supplies a same-named extension AND has not already
+  // decided that key's fate via the `starterKit` prop. Identity for the 15
+  // node/mark keys StarterKit exposes as `Partial<Options> | false`, plus the
+  // undo/redo option key `undoRedo` — mapped from BOTH its actual installed
+  // `.name` (`'undoRedo'`, verified against `@tiptap/extensions@3.23.5`) and the
+  // TipTap v2 alias `'history'` as a safety net for a consumer porting a v2
+  // History extension. Structural/plumbing StarterKit keys (document, text,
+  // dropcursor, gapcursor, listKeymap, trailingNode) are NOT node/mark
+  // replacements and are intentionally excluded.
+  const STARTERKIT_COLLISION_MAP = {
+    bold: 'bold',
+    italic: 'italic',
+    strike: 'strike',
+    code: 'code',
+    heading: 'heading',
+    paragraph: 'paragraph',
+    blockquote: 'blockquote',
+    codeBlock: 'codeBlock',
+    hardBreak: 'hardBreak',
+    horizontalRule: 'horizontalRule',
+    bulletList: 'bulletList',
+    orderedList: 'orderedList',
+    listItem: 'listItem',
+    link: 'link',
+    underline: 'underline',
+    undoRedo: 'undoRedo',
+    history: 'undoRedo'
+  };
+
+  // Pure helper — returns `userConfig` extended so any StarterKit-bundled
+  // node/mark the consumer replaced (a same-named entry in `exts`) is disabled
+  // UNLESS the consumer already decided that key's fate in `userConfig` (an `in`
+  // presence check, so an explicit `false` OR an explicit options object both
+  // count as "consumer decided" — D-02, consumer wins unless configured
+  // explicitly). Never invokes consumer code — only reads `.name` and does key
+  // presence checks (guards a non-object/missing `.name` entry by skipping it).
+  const buildStarterKitConfig = useCallback((userConfig: any, exts: any) => {
+    const effective = {
+      ...userConfig
+    };
+    for (const ext of exts as any) {
+      const name = ext && typeof ext === 'object' ? ext.name : undefined;
+      if (typeof name !== 'string') continue;
+      const optionKey = STARTERKIT_COLLISION_MAP[name];
+      if (optionKey && !(optionKey in effective)) effective[optionKey] = false;
+    }
+    return effective;
+  }, []);
+  const dedupeExtensionsByName = useCallback((exts: any) => {
+    const byKey = new Map();
+    let anonSeq = 0;
+    for (const ext of exts as any) {
+      const name = ext && typeof ext === 'object' ? ext.name : undefined;
+      const key = typeof name === 'string' ? name : `__rozie_anon_${anonSeq++}`;
+      byKey.set(key, ext);
+    }
+    return [...byKey.values()];
   }, []);
   function makeNodeView(nv: any, editable: any) {
     return (props: any) => {
@@ -562,10 +633,14 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       content: _htmlRef.current,
       editable: _editableRef.current,
       autofocus: props.autofocus,
-      // StarterKit first; the Placeholder ext next; the reactive node-view nodes
-      // next; consumer extensions LAST so they win (TipTap applies later-registered
-      // extensions over earlier ones for the same node/mark).
-      extensions: [StarterKit, ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...props.extensions],
+      // StarterKit first (config-disabled per the collision scan below); the
+      // Placeholder ext next; the reactive node-view nodes next; consumer
+      // extensions LAST so they win (TipTap applies later-registered extensions
+      // over earlier ones for the same node/mark) — and the whole array is
+      // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
+      // of the config-level auto-disable (D-02), which is what actually silences
+      // StarterKit's internal same-named extension (e.g. its bundled `Link`).
+      extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(props.starterKit, props.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...props.extensions]),
       editorProps: {
         attributes: {
           'aria-label': props.ariaLabel,
