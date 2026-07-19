@@ -270,6 +270,17 @@ const POPOVER_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'popover', 'src');
 const DATE_PICKER_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'date-picker', 'src');
 const RESIZABLE_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'resizable', 'src');
 const COMMAND_PALETTE_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'command-palette', 'src');
+// Same packaging move for @rozie-ui/lexical (Phase 76, D-09): the family src
+// (LexicalEditor shell + RichText/History/List/Link plugins + Toolbar) lives in the
+// package src; the Angular sub-build walks it via `prebuildExtraRoots` and drops the
+// cross-tree `.rozie.ts` disk-cache + one `<Name>.ts` composition shim PER referenced
+// component (the Lexical{Screenshot,Behavior}Demo cells compose the shell + toolbar +
+// the 3 plugins via <components>, so FIVE shims: LexicalEditor/Toolbar/HistoryPlugin/
+// ListPlugin/LinkPlugin). These must be swept after the Angular build (see
+// cleanupCrossTreeAngularArtifacts). MentionNode.ts + bridges/mountDecorators.*.ts are
+// REAL vendored files (not shims) and are left untouched — the sweep only globs the
+// top-level `.rozie.ts` + rm's the enumerated shim names.
+const LEXICAL_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'lexical', 'src');
 // Phase 64 (D-08): @rozie-ui/headless-core is a SOURCE-ONLY package of shared
 // `.rzts` partials. UNLIKE the component families above it emits NO `.rozie.ts`
 // and NO `<Name>.ts` shim (the partial inlines into the CONSUMER's `.rozie.ts`),
@@ -682,6 +693,29 @@ function cleanupCrossTreeAngularArtifacts() {
     }
     rmSync(resolve(src, shim), { force: true });
   }
+  // Phase 76 (D-09): @rozie-ui/lexical sweep. The Lexical{Screenshot,Behavior}Demo
+  // cells compose the shell + toolbar + 3 plugins via <components>, so the Angular
+  // sub-build emits `<Name>.rozie.ts` for each + a `<Name>.ts` composition shim here.
+  // Glob-remove the `.rozie.ts` disk-cache + rm the FIVE enumerated shims. MentionNode.ts
+  // (real neutral node) + bridges/mountDecorators.*.ts (real vendored bridges, in a
+  // subdir the top-level readdir never reaches) are left untouched.
+  try {
+    for (const entry of readdirSync(LEXICAL_SRC)) {
+      if (entry.endsWith('.rozie.ts')) {
+        rmSync(resolve(LEXICAL_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // lexical src always exists post-Phase-76 — defensive only
+  }
+  for (const shim of ['LexicalEditor.ts', 'Toolbar.ts', 'HistoryPlugin.ts', 'ListPlugin.ts', 'LinkPlugin.ts']) {
+    rmSync(resolve(LEXICAL_SRC, shim), { force: true });
+  }
+  // The LexicalMentionDriver demo-helper lives under examples/demos/ and is composed
+  // by both lexical demos via <components>, so its `LexicalMentionDriver.ts` shim lands
+  // beside it in demos/. The DEMOS_DIR `.rozie.ts` glob above sweeps its disk-cache; rm
+  // the shim explicitly (the glob only matches `.rozie.ts`, not the `.ts` shim).
+  rmSync(resolve(DEMOS_DIR, 'LexicalMentionDriver.ts'), { force: true });
   // Phase 64 (D-08): @rozie-ui/headless-core sweep — DEFENSIVE no-op. It is a
   // SOURCE-ONLY package of shared `.rzts` partials with NO component, so the
   // Angular sub-build emits NO `<Name>.rozie.ts` and NO `<Name>.ts` shim here

@@ -1089,6 +1089,26 @@ export const EXAMPLES = [
   // sweep) and import no cross-tree package.
   'KeynavMenu',
   'KeynavCombobox',
+  // Phase 76 (@rozie-ui/lexical, D-09) — the cross-framework Lexical rich-text
+  // editor family. FIVE-target family (react/vue/svelte/angular/solid; NO Lit —
+  // that is v1.1, D-10), so these cells are exercised on 5 targets only
+  // (lexical.spec.ts iterates those five and never routes to lit). LexicalBehavior
+  // (loader → examples/demos/LexicalBehaviorDemo.rozie, which composes the
+  // packages/ui/lexical/src shell + toolbar + History/List/Link plugins + the
+  // LexicalMentionDriver) is the BEHAVIORAL runtime-proof cell (type / undo-redo /
+  // bold+active / list / link / @mention insert+remove) — deliberately NOT in
+  // matrix.spec.ts EXAMPLES (behavioral-only; no pixel baseline). LexicalScreenshot
+  // (LexicalScreenshotDemo.rozie) is the content-STABLE showcase pixel cell (a fixed
+  // seeded doc: bold run + @mention chip + bullet list, never focused); its shared
+  // Linux baseline is owned by lexical.spec.ts's screenshot leg (auto-fixme on
+  // baselineExists() until the Linux-Docker PNG lands — feedback_vr_linux_baselines).
+  // Angular cells mount NON-EMPTY via the three-file cross-tree registration
+  // (vite.config.ts lexicalSrc + tsconfig.app.json include + build-cells.mjs
+  // LEXICAL_SRC sweep). The LIT_TAGS/DEFAULT_PROPS entries below exist only to
+  // satisfy the Record<Example> types — the lit cell is never built/routed for this
+  // v1.0 family.
+  'LexicalBehavior',
+  'LexicalScreenshot',
 ] as const;
 
 export type Example = (typeof EXAMPLES)[number];
@@ -1448,6 +1468,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // KeynavMenuDemo / KeynavComboboxDemo.
   KeynavMenu: 'rozie-keynav-menu',
   KeynavCombobox: 'rozie-keynav-combobox',
+  // Phase 76 (@rozie-ui/lexical) — 5-target family, NO Lit cell (v1.1, D-10). These
+  // tags exist only to satisfy the Record<Example> type; the lit entry is never
+  // routed for these cells (lexical.spec.ts iterates react/vue/svelte/angular/solid).
+  LexicalBehavior: 'rozie-lexical-behavior',
+  LexicalScreenshot: 'rozie-lexical-screenshot',
 };
 
 export interface HostQuery {
@@ -1843,6 +1868,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // in <script>, active index in <data>); no parent-supplied props.
   KeynavMenu: {},
   KeynavCombobox: {},
+  // Phase 76 (@rozie-ui/lexical) — both are demo cells (isDemo → mounted with `{}`,
+  // DEFAULT_PROPS skipped); these entries exist only to satisfy the Record<Example>
+  // type. State is composed inside the demo (seed / controls props on the driver).
+  LexicalBehavior: {},
+  LexicalScreenshot: {},
 };
 
 /**

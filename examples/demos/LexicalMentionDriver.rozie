@@ -119,6 +119,22 @@ const applyRemoveMention = () => {
   })
 }
 
+// Undo / redo dispatch the Lexical UNDO/REDO commands — the HistoryPlugin's
+// registerHistory is what handles them, so a successful undo/redo is the runtime
+// proof that the History plugin actually ACTIVATED (the RichText baseline alone
+// does not handle these commands). registerRichText does NOT wire the Ctrl+Z
+// keyboard shortcut in 0.48, hence the explicit dispatch buttons.
+const applyUndo = () => {
+  const editor = ctx && ctx.instance
+  if (!editor) return
+  editor.dispatchCommand(lexical.UNDO_COMMAND, undefined)
+}
+const applyRedo = () => {
+  const editor = ctx && ctx.instance
+  if (!editor) return
+  editor.dispatchCommand(lexical.REDO_COMMAND, undefined)
+}
+
 $onMount(() => {
   // Defer one microtask so the parent shell's $onMount has created the editor and
   // registered the decorator bridge (child mount hooks fire before the parent's on
@@ -138,6 +154,8 @@ $onMount(() => {
   <div r-if="$props.controls" class="lexical-mention-driver-controls">
     <button type="button" data-testid="insert-mention" @click="applyInsertMention">Insert mention</button>
     <button type="button" data-testid="remove-mention" @click="applyRemoveMention">Remove mention</button>
+    <button type="button" data-testid="undo" @click="applyUndo">Undo</button>
+    <button type="button" data-testid="redo" @click="applyRedo">Redo</button>
   </div>
 </div>
 </template>

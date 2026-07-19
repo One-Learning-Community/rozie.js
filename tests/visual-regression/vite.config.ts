@@ -151,6 +151,87 @@ function lowerLitDecoratorsWithEsbuild(): Plugin {
   };
 }
 
+/**
+ * Phase 76 (D-09): the @rozie-ui/lexical shell (`LexicalEditor.rozie`) imports its
+ * per-target `@mention` decorator bridge under a STABLE specifier —
+ * `import { mountDecorators } from './mountDecorators'` — which `codegen.mjs` vendors
+ * into each published leaf as the target-matched `bridges/mountDecorators.<target>.ts`
+ * (one specifier → 5 different vendored files; the hand-written escape hatch, D-06/
+ * REQ-39). But the VR rig builds the family FROM SOURCE (the demos import
+ * `packages/ui/lexical/src/LexicalEditor.rozie` directly, not a published leaf), and
+ * the source tree has NO `src/mountDecorators.ts` — only `src/bridges/mountDecorators.
+ * <target>.ts`. So without this redirect the source shell's `./mountDecorators` import
+ * is unresolvable and every lexical cell fails to bundle.
+ *
+ * This `enforce: 'pre'` resolver rewrites that one specifier (only when imported from
+ * inside the lexical family src) to the target-matched bridge for the 5 v1.0 targets.
+ * For the LIT sub-build there is no bridge (Lit is deferred to v1.1, D-10) and no Lit
+ * CELL is tested — but the demos still compile to lit as a target, so it hands the
+ * shell a harmless no-op `mountDecorators` (via a virtual module) to keep the lit
+ * sub-build green without authoring a throwaway lit bridge.
+ */
+function resolveLexicalDecoratorBridge(target: Target, lexicalSrcDir: string): Plugin {
+  const NOOP_ID = '\0rozie-vr:lexical-mount-noop';
+  const requireFromHere = createRequire(import.meta.url);
+  // The vendored bridges live in the cross-tree family src (`packages/ui/lexical/src/
+  // bridges/`), outside the rig's `node_modules`. Vite's root-fallback resolves most
+  // of their bare framework imports (react-dom/vue/svelte/@angular), but the SOLID
+  // bridge's `solid-js/web` uses a NESTED `./web` subpath export (`web/dist/web.js`)
+  // that rolldown fails to resolve from the cross-tree importer. Precompute the
+  // BROWSER-build absolute paths here (config time) so the redirect below points at
+  // `web/dist/web.js` — NEVER the `node`/`require` condition's `server.js` (the
+  // "Client-only API called on the server side" trap the createRequire resolver hits).
+  let solidWebBuild: string | null = null;
+  let solidCoreBuild: string | null = null;
+  if (target === 'solid') {
+    try {
+      const pkgPath = requireFromHere.resolve('solid-js/package.json');
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
+        exports: Record<string, { browser?: { import?: string } }>;
+      };
+      const pkgDir = dirname(pkgPath);
+      const web = pkg.exports['./web']?.browser?.import;
+      const core = pkg.exports['.']?.browser?.import;
+      if (web) solidWebBuild = resolve(pkgDir, web);
+      if (core) solidCoreBuild = resolve(pkgDir, core);
+    } catch {
+      // Fall through — the default resolver will try (and the build will fail loudly
+      // rather than silently mis-resolve).
+    }
+  }
+  return {
+    name: 'rozie-vr:lexical-decorator-bridge',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      if (!importer) return null;
+      const cleanImporter = importer.split('?', 1)[0];
+      // Redirect the cross-tree SOLID bridge's `solid-js`/`solid-js/web` imports to
+      // the rig's BROWSER build (see the config-time note above).
+      if (
+        target === 'solid' &&
+        cleanImporter.includes('/packages/ui/lexical/src/bridges/')
+      ) {
+        if (source === 'solid-js/web' && solidWebBuild) return solidWebBuild;
+        if (source === 'solid-js' && solidCoreBuild) return solidCoreBuild;
+      }
+      // Match the shell's `./mountDecorators` (or any `.../mountDecorators`) import,
+      // scoped to files inside the lexical family src so no other family is touched.
+      const isMountDecorators =
+        source === './mountDecorators' || /(^|\/)mountDecorators$/.test(source);
+      if (!isMountDecorators) return null;
+      if (!cleanImporter.includes('/packages/ui/lexical/')) return null;
+      if (target === 'lit') return NOOP_ID;
+      return resolve(lexicalSrcDir, 'bridges', `mountDecorators.${target}.ts`);
+    },
+    load(id) {
+      if (id === NOOP_ID) {
+        return 'export function mountDecorators() { return () => {}; }\n';
+      }
+      return null;
+    },
+  };
+}
+
 async function frameworkPlugins(target: Target) {
   switch (target) {
     case 'vue': {
@@ -542,6 +623,19 @@ export default defineConfig(async () => {
   const datePickerSrc = resolve(__dirname, '..', '..', 'packages', 'ui', 'date-picker', 'src');
   const resizableSrc = resolve(__dirname, '..', '..', 'packages', 'ui', 'resizable', 'src');
   const commandPaletteSrc = resolve(__dirname, '..', '..', 'packages', 'ui', 'command-palette', 'src');
+  // Same move for @rozie-ui/lexical (Phase 76, D-09): the family src (LexicalEditor
+  // shell + RichText/History/List/Link plugins + Toolbar + the @mention MentionNode)
+  // lives in the package src, so the Angular sub-build must walk it too (the
+  // Lexical{Screenshot,Behavior}Demo cells' `imports: [LexicalEditor, Toolbar, …]`
+  // would otherwise collapse to `any[]` → empty mount + "JIT compiler unavailable").
+  // Lockstep with build-cells.mjs `LEXICAL_SRC` sweep + tsconfig.app.json `include`.
+  // NO ESM-interop alias needed — lexical + @lexical/* ship clean ESM resolved by
+  // Vite. (The `./mountDecorators` per-target bridge import is redirected separately
+  // by the `resolveLexicalDecoratorBridge` plugin below — the family's source shell
+  // imports a stable `./mountDecorators` specifier that codegen vendors per leaf, so
+  // building it FROM SOURCE in the rig needs that specifier resolved to the
+  // target-matched hand-written bridge.)
+  const lexicalSrc = resolve(__dirname, '..', '..', 'packages', 'ui', 'lexical', 'src');
   // (data-table→popover composition is Option-A as of 260713-iiy; the Angular
   // source-alias lives in `resolve.alias` below. The old vendored-copy alias +
   // its `dataTablePopoverSrc = dataTableSrc` shim were removed with the vendoring.)
@@ -658,10 +752,16 @@ export default defineConfig(async () => {
     // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
     // own resolver, which honors `browser` via vite-plugin-solid's
     // `configEnvironment` hook (and the equivalent for other plugins).
-    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, wavesurferSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc])] : []),
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, wavesurferSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc, lexicalSrc])] : []),
+    // Redirect the lexical shell's stable `./mountDecorators` source import to the
+    // target-matched hand-written bridge (all 5 v1.0 targets), or a harmless no-op
+    // for the Lit sub-build (no Lit bridge until v1.1, D-10; no Lit CELL is tested,
+    // but the demos still COMPILE to lit as a target so the sub-build must stay
+    // green). See resolveLexicalDecoratorBridge for the full rationale.
+    resolveLexicalDecoratorBridge(TARGET, lexicalSrc),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, wavesurferSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc] } : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, wavesurferSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc, lexicalSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
     ...(TARGET === 'lit' ? [lowerLitDecoratorsWithEsbuild()] : []),
