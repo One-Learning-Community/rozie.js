@@ -1,6 +1,6 @@
-# @rozie-ui/tiptap-solid
+# @rozie-ui/tiptap-vue
 
-## 0.1.3
+## 0.1.1
 
 ### Patch Changes
 
@@ -9,15 +9,3 @@
   - **Custom node views** — new `nodeSpecs` prop lets you register your own ProseMirror nodes (`{ name, tag, group, inline, atom, content, attrs }`), rendered through the `nodeView` slot by dispatching on `node.type.name`. Note: the previously built-in `rozieMention` / `rozieCallout` demo nodes have been removed from the component — a stock `<TipTap>` no longer registers them. If you relied on them, declare them via `nodeSpecs` (see the example recipes).
   - **Richer default toolbar** — added Underline, Ordered List, Undo, and Redo buttons (all StarterKit-native; no new engine dependencies).
   - **Image upload** — new `uploadImage` prop, `(file: File) => Promise<string>`. When provided, pasted or dropped images are uploaded through your callback and inserted at the caret; when omitted, there is zero overhead. Requires `@tiptap/extension-image` (now declared as an optional peer dependency and externalized from the bundle).
-
-## 0.1.2
-
-### Patch Changes
-
-- @rozie/runtime-solid@0.2.1
-
-## 0.1.1
-
-### Patch Changes
-
-- @rozie/runtime-solid@0.2.0
