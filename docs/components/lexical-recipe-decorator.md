@@ -1,6 +1,6 @@
 # Recipe — authoring a custom decorator node
 
-Lexical's marquee extensibility feature is the **`DecoratorNode`**: a node whose visual representation is a framework component rendered *into* the document — a `@mention` chip, an embed, a poll, an inline reference card. `@rozie-ui/lexical` ships **one reference decorator node** (the `@mention` chip) and the infrastructure to render it across all five targets. This page is the recipe for authoring **your own** decorator node.
+Lexical's marquee extensibility feature is the **`DecoratorNode`**: a node whose visual representation is a framework component rendered *into* the document — a `@mention` chip, an embed, a poll, an inline reference card. `@rozie-ui/lexical` ships **one reference decorator node** (the `@mention` chip) and the infrastructure to render it across all six targets (including Lit through an open shadow root). This page is the recipe for authoring **your own** decorator node.
 
 The pattern has **two halves**, and the split is the whole trick to making it cross-framework:
 
@@ -127,8 +127,9 @@ The **only** thing that changes per target is the render primitive — the liste
 | **Solid** | `render(() => domNode, el)` (`solid-js/web`) — chip is a `textContent`-escaped DOM node | `dispose()` |
 | **Svelte** | `mount(MentionChip, { target: el, props })` (Svelte 5) + a vendored `MentionChip.svelte` sidecar | `unmount(inst)` |
 | **Angular** | `createApplication()` → `createComponent(Cmp, { environmentInjector, hostElement })` + `attachView` | `destroy()` |
+| **Lit** | ``render(html`<span class="rozie-mention">@${label}</span>`, el)`` (`lit`) — the host lives inside the editor's open shadow root | ``render(nothing, el)`` |
 
-Svelte is the one target that needs a small companion `.svelte` file, because Svelte 5's `mount()` requires a *compiled* component (you cannot render an inline chip authored inside a `.ts`). The other four keep the chip self-contained in the `.ts` bridge. Angular obtains a root injector via `createApplication()` — the only public way to render a standalone component with no existing app — so its chip renders one microtask later (fine for a static pill; zone.js is left to the consumer's app polyfills).
+Svelte is the one target that needs a small companion `.svelte` file, because Svelte 5's `mount()` requires a *compiled* component (you cannot render an inline chip authored inside a `.ts`). The other five keep the chip self-contained in the `.ts` bridge. Angular obtains a root injector via `createApplication()` — the only public way to render a standalone component with no existing app — so its chip renders one microtask later (fine for a static pill; zone.js is left to the consumer's app polyfills).
 
 ### The safe-text rendering rule {#the-safe-text-rendering-rule}
 
@@ -161,23 +162,21 @@ Two small edits in the editor shell tie it together (this is exactly what `Lexic
 
 To author **your own** node, follow the same three parts: write a neutral `DecoratorNode`, add a bridge branch (or a new bridge) that renders your `component` key, register your node class via the shell's `nodes` prop, and render it with a custom child that inserts your node through `editor.update(() => …)`.
 
+## Lit — the open shadow root target {#lit-the-open-shadow-root-target}
+
+Lit is the **sixth shipped target**. Its bridge is the same shape as the other five (see the table above) — ``render(html`…`, host)`` on mount, ``render(nothing, host)`` on teardown — but the Lit editor hosts the whole editor **inside an open shadow root**, which adds a small set of obligations the light-DOM targets don't carry. The emitted `LexicalEditor` LitElement honors all of them; if you author your own Lit host, honor them too:
+
+- **Open shadow root only** — `mode: 'open'`. Selection across the shadow boundary needs no special handling: Lexical 0.48 resolves it via `Selection.getComposedRanges`. (Closed shadow roots are unsupported.)
+- **Theme CSS injected per shadow root** — shadow trees don't inherit document styles, so the editor's theme classes must live inside each root. The emitted host does this via Lit `static styles` (adopted into every shadow root); the `:root { }` global escape hatch additionally routes through `@rozie/runtime-lit`'s `injectGlobalStyles`.
+- **`mousedown`-preventDefault toolbar** — same caret-preservation rule as the other targets, applied inside the shadow tree.
+- **Browser floor: Chrome 137+ / Firefox 142+ / Safari 17+** — the one parity caveat for the Lit build (`getComposedRanges` is gated on those versions). This is the sibling of the Lit async-context edge; older browsers are out of support for the Lit target specifically. Every other target has no such floor.
+
+A design note on the host: the emitted `LexicalEditor` keeps the `contenteditable` region as a **static element** in its Lit template (attribute bindings only, no child-content expressions) and calls `setRootElement` in `firstUpdated`, so LitElement's `render()` reconciliation never touches the DOM Lexical owns inside it. (This is the one Lit-specific subtlety a naive host gets wrong — putting the editable region under a dynamic template part lets a re-render wipe it.)
+
 ## Roadmap / v1.1 staging {#roadmap-v1-1-staging}
 
-Everything above is **v1.0** (React / Vue / Svelte / Angular / Solid). The following are explicitly **out of v1.0** and land in **v1.1** — documented here so the current five-target surface is never a surprise.
+All six targets — **React / Vue / Svelte / Angular / Solid / Lit** — plus the `@mention` decorator node and its six per-target bridges are shipping today. The following remain explicitly deferred to **v1.1**, documented here so the current surface is never a surprise:
 
-### Lit target + Lit decorator bridge (v1.1)
-
-Lit is deferred to v1.1 because it carries a browser floor and shadow-DOM obligations the other five targets don't. When it lands, the Lit target must honor:
-
-- **Open shadow root only** — `mode: 'open'` (selection across the shadow boundary needs no special handling; Lexical 0.48 owns `getComposedRanges`).
-- **Theme CSS injected per shadow root** — the editor's theme classes must be reachable inside each component's shadow tree.
-- **`setRootElement(null)` on `disconnectedCallback`, and re-set on reconnect** — so the editor releases and re-binds its contenteditable host across DOM moves.
-- **`mousedown`-preventDefault toolbar** — same caret-preservation rule as the other targets, required inside the shadow tree.
-- **Documented browser floor: Chrome 137+ / Firefox 142+ / Safari 17+** — the one parity caveat for the Lit target (sibling to the Lit async-context edge). Older browsers are out of support for the Lit build specifically.
-
-### Other v1.1 scope
-
-- **Lit decorator bridge** — the sixth per-target bridge (open-shadow render + teardown), completing the decorator story on Lit.
 - **Markdown-shortcuts plugin** — deferred.
 - **Tables plugin** — deferred.
 
