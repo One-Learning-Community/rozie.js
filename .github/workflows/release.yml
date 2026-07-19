@@ -3,10 +3,12 @@ name: Release (early subset)
 # Manual, provenance-backed npm publish for the FIRST release wave ONLY:
 #   - 9 @rozie/* toolchain packages (core, cli, unplugin, babel-plugin,
 #     runtime-{react,vue,svelte,solid,lit})
-#   - 6 @rozie-ui Vue leaves: flatpickr / sortable-list / cropper /
-#     fullcalendar / pdf / captcha (the `-vue` packages). captcha-vue was added
-#     to dogfood it; like the others it is self-contained (zero @rozie/* deps,
-#     dist externalizes only vue), so it publishes standalone.
+#   - 7 @rozie-ui Vue leaves: flatpickr / sortable-list / cropper /
+#     fullcalendar / pdf / captcha / tiptap (the `-vue` packages). captcha-vue was
+#     added to dogfood it; like the others it is self-contained (zero @rozie/* deps,
+#     dist externalizes only vue), so it publishes standalone. tiptap-vue was added
+#     to dogfood it (2026-07-18, first-time @ 0.1.0) — also self-contained (dist
+#     externalizes only vue + the @tiptap/* peers), so it publishes standalone.
 #   - 5 non-vue @rozie-ui captcha leaves: captcha-{react,solid,lit,svelte,angular}.
 #     These are now IN scope: they depend on @rozie/runtime-* (react/solid/lit/svelte),
 #     and that prerequisite is satisfied — @rozie/runtime-* is live on npm at 0.1.1,
@@ -189,6 +191,7 @@ jobs:
           --filter=@rozie-ui/fullcalendar-vue
           --filter=@rozie-ui/pdf-vue
           --filter=@rozie-ui/captcha-vue
+          --filter=@rozie-ui/tiptap-vue
           build
 
       # Build the 5 non-vue captcha leaves into their compiled dist/ drop-in. Each
@@ -385,6 +388,7 @@ jobs:
           --filter @rozie-ui/fullcalendar-vue
           --filter @rozie-ui/pdf-vue
           --filter @rozie-ui/captcha-vue
+          --filter @rozie-ui/tiptap-vue
           --filter @rozie-ui/captcha-react
           --filter @rozie-ui/captcha-solid
           --filter @rozie-ui/captcha-lit
@@ -447,6 +451,7 @@ jobs:
           --filter=@rozie-ui/fullcalendar-vue
           --filter=@rozie-ui/pdf-vue
           --filter=@rozie-ui/captcha-vue
+          --filter=@rozie-ui/tiptap-vue
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
