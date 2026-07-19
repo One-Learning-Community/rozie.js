@@ -159,6 +159,8 @@ export interface TipTapHandle {
   toggleItalic: (...args: any[]) => any;
   toggleHeading: (...args: any[]) => any;
   toggleBulletList: (...args: any[]) => any;
+  toggleUnderline: (...args: any[]) => any;
+  toggleOrderedList: (...args: any[]) => any;
   undo: (...args: any[]) => any;
   redo: (...args: any[]) => any;
   chain: (...args: any[]) => any;
@@ -170,7 +172,7 @@ export interface TipTapHandle {
 export default function TipTap(_props: TipTapProps): JSX.Element {
   const _merged = mergeProps({ editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: (() => ({}))() as Record<string, any>, extensions: (() => [])() as any[], starterKit: (() => ({}))() as Record<string, any>, nodeSpecs: (() => [])() as any[] }, _props);
   const [local, attrs] = splitProps(_merged, ['html', 'editable', 'placeholder', 'autofocus', 'editorClass', 'ariaLabel', 'editorProps', 'extensions', 'starterKit', 'nodeSpecs', 'ref']);
-  onMount(() => { local.ref?.({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain, isActive, can, isEmpty }); });
+  onMount(() => { local.ref?.({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty }); });
 
   const [html, setHtml] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'html', '<p>Start writing…</p>');
   const [active, setActive] = createSignal({
@@ -178,7 +180,9 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     italic: false,
     h1: false,
     h2: false,
-    bulletList: false
+    bulletList: false,
+    underline: false,
+    orderedList: false
   });
   interface ReactivePortalHandle {
     update(scope: unknown): void;
@@ -440,7 +444,9 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
       h2: editor.isActive('heading', {
         level: 2
       }),
-      bulletList: editor.isActive('bulletList')
+      bulletList: editor.isActive('bulletList'),
+      underline: editor.isActive('underline'),
+      orderedList: editor.isActive('orderedList')
     });
   }
 
@@ -723,7 +729,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     });
   }
   // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
-  // the marquee surface: 14 verbs over the live Editor, uniform across all 6
+  // the marquee surface: 16 verbs over the live Editor, uniform across all 6
   // targets. Each guards the pre-mount / destroyed `editor = null`.
   //
   // Collision discipline:
@@ -800,6 +806,14 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     editor?.chain().focus().toggleBulletList().run();
     refreshActive();
   }
+  function toggleUnderline() {
+    editor?.chain().focus().toggleUnderline().run();
+    refreshActive();
+  }
+  function toggleOrderedList() {
+    editor?.chain().focus().toggleOrderedList().run();
+    refreshActive();
+  }
   function undo() {
     editor?.chain().focus().undo().run();
     refreshActive();
@@ -844,6 +858,11 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
         <button type="button" aria-label="Heading 2" class={rozieClass({ active: active().h2 })} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { toggleHeading(2); }} data-rozie-s-2aeee876="">H2</button>
         <span class={"sep"} data-rozie-s-2aeee876="" />
         <button type="button" aria-label="Bullet list" class={rozieClass({ active: active().bulletList })} onClick={toggleBulletList} data-rozie-s-2aeee876="">• List</button>
+        <button type="button" aria-label="Underline" class={rozieClass({ active: active().underline })} onClick={toggleUnderline} data-rozie-s-2aeee876=""><u data-rozie-s-2aeee876="">U</u></button>
+        <button type="button" aria-label="Ordered list" class={rozieClass({ active: active().orderedList })} onClick={toggleOrderedList} data-rozie-s-2aeee876="">1. List</button>
+        <span class={"sep"} data-rozie-s-2aeee876="" />
+        <button type="button" aria-label="Undo" onClick={undo} data-rozie-s-2aeee876="">↺</button>
+        <button type="button" aria-label="Redo" onClick={redo} data-rozie-s-2aeee876="">↻</button>
       </div></Show>}{<Show when={local.editable && (_props.toolbarSlot ?? _props.slots?.['toolbar'])}><div class={"rozie-tiptap-toolbar rozie-tiptap-toolbar--slot"} ref={(el) => { toolbarElRef = el as HTMLElement; }} data-rozie-s-2aeee876="" /></Show>}<div ref={(el) => { editorElRef = el as HTMLElement; }} class={"rozie-tiptap-content"} data-placeholder={local.placeholder} data-rozie-s-2aeee876="" />
     </div>
 

@@ -60,6 +60,11 @@ interface NodeViewCtx {
         <button type="button" [class]="{ active: active().h2 }" aria-label="Heading 2" (click)="toggleHeading(2)">H2</button>
         <span class="sep"></span>
         <button type="button" [class]="{ active: active().bulletList }" aria-label="Bullet list" (click)="toggleBulletList()">• List</button>
+        <button type="button" [class]="{ active: active().underline }" aria-label="Underline" (click)="toggleUnderline()"><u>U</u></button>
+        <button type="button" [class]="{ active: active().orderedList }" aria-label="Ordered list" (click)="toggleOrderedList()">1. List</button>
+        <span class="sep"></span>
+        <button type="button" aria-label="Undo" (click)="undo()">↺</button>
+        <button type="button" aria-label="Redo" (click)="redo()">↻</button>
       </div>
     }@if (editable() && (toolbarTpl ?? templates()?.['toolbar'])) {
     <div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" #toolbarEl></div>
@@ -197,7 +202,9 @@ export class TipTap {
     italic: false,
     h1: false,
     h2: false,
-    bulletList: false
+    bulletList: false,
+    underline: false,
+    orderedList: false
   });
   toolbarEl = viewChild<ElementRef<HTMLDivElement>>('toolbarEl');
   editorEl = viewChild<ElementRef<HTMLDivElement>>('editorEl');
@@ -506,7 +513,9 @@ export class TipTap {
       h2: this.editor.isActive('heading', {
         level: 2
       }),
-      bulletList: this.editor.isActive('bulletList')
+      bulletList: this.editor.isActive('bulletList'),
+      underline: this.editor.isActive('underline'),
+      orderedList: this.editor.isActive('orderedList')
     });
   };
   STARTERKIT_COLLISION_MAP = {
@@ -758,6 +767,14 @@ export class TipTap {
   };
   toggleBulletList = () => {
     this.editor?.chain().focus().toggleBulletList().run();
+    this.refreshActive();
+  };
+  toggleUnderline = () => {
+    this.editor?.chain().focus().toggleUnderline().run();
+    this.refreshActive();
+  };
+  toggleOrderedList = () => {
+    this.editor?.chain().focus().toggleOrderedList().run();
     this.refreshActive();
   };
   undo = () => {

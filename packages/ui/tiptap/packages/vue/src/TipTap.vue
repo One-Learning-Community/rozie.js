@@ -10,6 +10,11 @@
     <button type="button" :class="{ active: active.h2 }" aria-label="Heading 2" @click="toggleHeading(2)">H2</button>
     <span class="sep"></span>
     <button type="button" :class="{ active: active.bulletList }" aria-label="Bullet list" @click="toggleBulletList">• List</button>
+    <button type="button" :class="{ active: active.underline }" aria-label="Underline" @click="toggleUnderline"><u>U</u></button>
+    <button type="button" :class="{ active: active.orderedList }" aria-label="Ordered list" @click="toggleOrderedList">1. List</button>
+    <span class="sep"></span>
+    <button type="button" aria-label="Undo" @click="undo">↺</button>
+    <button type="button" aria-label="Redo" @click="redo">↻</button>
   </div><div v-if="props.editable && $slots.toolbar" class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" ref="toolbarElRef"></div><div ref="editorElRef" class="rozie-tiptap-content" :data-placeholder="props.placeholder"></div>
 </div>
 
@@ -97,7 +102,9 @@ const active = ref({
   italic: false,
   h1: false,
   h2: false,
-  bulletList: false
+  bulletList: false,
+  underline: false,
+  orderedList: false
 });
 
 const toolbarElRef = ref<HTMLElement>();
@@ -155,7 +162,9 @@ const refreshActive = () => {
     h2: editor.isActive('heading', {
       level: 2
     }),
-    bulletList: editor.isActive('bulletList')
+    bulletList: editor.isActive('bulletList'),
+    underline: editor.isActive('underline'),
+    orderedList: editor.isActive('orderedList')
   };
 };
 // ── StarterKit collision-aware config (ask A). StarterKit bundles several
@@ -428,7 +437,7 @@ const makeNodeViewExtensions = (nv: any, specs: any) => specs.map((spec: any) =>
   });
 });
 // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
-// the marquee surface: 14 verbs over the live Editor, uniform across all 6
+// the marquee surface: 16 verbs over the live Editor, uniform across all 6
 // targets. Each guards the pre-mount / destroyed `editor = null`.
 //
 // Collision discipline:
@@ -503,6 +512,14 @@ function toggleHeading(level: any) {
 }
 function toggleBulletList() {
   editor?.chain().focus().toggleBulletList().run();
+  refreshActive();
+}
+function toggleUnderline() {
+  editor?.chain().focus().toggleUnderline().run();
+  refreshActive();
+}
+function toggleOrderedList() {
+  editor?.chain().focus().toggleOrderedList().run();
   refreshActive();
 }
 function undo() {
@@ -762,7 +779,7 @@ watch(() => html.value, (v: any) => {
 });
 watch(() => props.editable, (v: any) => editor?.setEditable(v, false));
 
-defineExpose({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain, isActive, can, isEmpty });
+defineExpose({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty });
 </script>
 
 <style scoped>

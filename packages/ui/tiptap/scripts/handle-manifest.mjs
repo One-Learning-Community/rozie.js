@@ -13,7 +13,7 @@
  *   - The focus/blur COMMANDS are `focusEditor`/`blurEditor`, NOT `focus`/`blur`
  *     — the component emits `focus`/`blur` EVENTS, and on class-based targets
  *     (Angular) an output field and a method cannot share a name (ROZ121).
- *   - None of the 18 names collides with the 8 props or LitElement lifecycle.
+ *   - None of the 20 names collides with the 9 props or LitElement lifecycle.
  */
 export const handleManifest = {
   getEditor:
@@ -32,6 +32,8 @@ export const handleManifest = {
   toggleHeading:
     'Toggle a heading at the given level — `toggleHeading(level)` (defaults to 1).',
   toggleBulletList: 'Toggle a bullet list at the current selection.',
+  toggleUnderline: 'Toggle underline on the current selection.',
+  toggleOrderedList: 'Toggle an ordered (numbered) list at the current selection.',
   undo: 'Undo the last change.',
   redo: 'Redo the last undone change.',
   chain:

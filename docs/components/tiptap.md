@@ -167,6 +167,8 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `toggleItalic` | Toggle italic on the current selection. |
 | `toggleHeading` | Toggle a heading at a level — `toggleHeading(level)` (defaults to 1). |
 | `toggleBulletList` | Toggle a bullet list at the current selection. |
+| `toggleUnderline` | Toggle underline on the current selection. |
+| `toggleOrderedList` | Toggle an ordered (numbered) list at the current selection. |
 | `undo` | Undo the last change. |
 | `redo` | Redo the last undone change. |
 | `chain` | Return a focused TipTap command chain for composing commands — `chain().toggleBold().toggleItalic().run()`. `null` before mount. |
@@ -190,7 +192,7 @@ editor.current?.chain()?.toggleItalic().toggleBulletList().run();
 
 ## Slots
 
-The wrapper surfaces **four** portal slots. Three are **mount-once** — `toolbar`, `bubbleMenu`, `floatingMenu` — each handed the live `editor` so its buttons can drive `editor.chain().focus()…run()`. The fourth, `nodeView`, is a **reactive** slot covered in [Node-view slots](#node-view-slots) below. Fill `toolbar` and your toolbar UI replaces the internal one; leave it unfilled and the **batteries-included internal toolbar** (Bold / Italic / H1 / H2 / Bullet list, with live active-state highlighting) renders.
+The wrapper surfaces **four** portal slots. Three are **mount-once** — `toolbar`, `bubbleMenu`, `floatingMenu` — each handed the live `editor` so its buttons can drive `editor.chain().focus()…run()`. The fourth, `nodeView`, is a **reactive** slot covered in [Node-view slots](#node-view-slots) below. Fill `toolbar` and your toolbar UI replaces the internal one; leave it unfilled and the **batteries-included internal toolbar** (Bold / Italic / H1 / H2 / Bullet list / Underline / Ordered list, with live active-state highlighting, plus Undo / Redo) renders.
 
 | Slot | Renders | Scope param |
 | --- | --- | --- |

@@ -100,6 +100,8 @@ export interface TipTapHandle {
   toggleItalic: (...args: any[]) => any;
   toggleHeading: (...args: any[]) => any;
   toggleBulletList: (...args: any[]) => any;
+  toggleUnderline: (...args: any[]) => any;
+  toggleOrderedList: (...args: any[]) => any;
   undo: (...args: any[]) => any;
   redo: (...args: any[]) => any;
   chain: (...args: any[]) => any;
@@ -155,7 +157,9 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     italic: false,
     h1: false,
     h2: false,
-    bulletList: false
+    bulletList: false,
+    underline: false,
+    orderedList: false
   });
   const toolbarEl = useRef<HTMLDivElement | null>(null);
   const editorEl = useRef<HTMLDivElement | null>(null);
@@ -173,7 +177,9 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       h2: editor.current.isActive('heading', {
         level: 2
       }),
-      bulletList: editor.current.isActive('bulletList')
+      bulletList: editor.current.isActive('bulletList'),
+      underline: editor.current.isActive('underline'),
+      orderedList: editor.current.isActive('orderedList')
     });
   }, []);
   // ── StarterKit collision-aware config (ask A). StarterKit bundles several
@@ -400,7 +406,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     });
   }), [makeNodeView, parseTagSelector]);
   // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
-  // the marquee surface: 14 verbs over the live Editor, uniform across all 6
+  // the marquee surface: 16 verbs over the live Editor, uniform across all 6
   // targets. Each guards the pre-mount / destroyed `editor = null`.
   //
   // Collision discipline:
@@ -481,6 +487,14 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   }
   function toggleBulletList() {
     editor.current?.chain().focus().toggleBulletList().run();
+    refreshActive();
+  }
+  function toggleUnderline() {
+    editor.current?.chain().focus().toggleUnderline().run();
+    refreshActive();
+  }
+  function toggleOrderedList() {
+    editor.current?.chain().focus().toggleOrderedList().run();
     refreshActive();
   }
   function undo() {
@@ -751,9 +765,9 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     editor.current?.setEditable(v, false);
   }, [props.editable]);
 
-  const _rozieExposeRef = useRef({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain, isActive, can, isEmpty });
-  _rozieExposeRef.current = { getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, undo, redo, chain, isActive, can, isEmpty };
-  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => _rozieExposeRef.current.getEditor(...args), focusEditor: (...args: Parameters<typeof focusEditor>): ReturnType<typeof focusEditor> => _rozieExposeRef.current.focusEditor(...args), blurEditor: (...args: Parameters<typeof blurEditor>): ReturnType<typeof blurEditor> => _rozieExposeRef.current.blurEditor(...args), getHTML: (...args: Parameters<typeof getHTML>): ReturnType<typeof getHTML> => _rozieExposeRef.current.getHTML(...args), getJSON: (...args: Parameters<typeof getJSON>): ReturnType<typeof getJSON> => _rozieExposeRef.current.getJSON(...args), getText: (...args: Parameters<typeof getText>): ReturnType<typeof getText> => _rozieExposeRef.current.getText(...args), setContent: (...args: Parameters<typeof setContent>): ReturnType<typeof setContent> => _rozieExposeRef.current.setContent(...args), clearContent: (...args: Parameters<typeof clearContent>): ReturnType<typeof clearContent> => _rozieExposeRef.current.clearContent(...args), toggleBold: (...args: Parameters<typeof toggleBold>): ReturnType<typeof toggleBold> => _rozieExposeRef.current.toggleBold(...args), toggleItalic: (...args: Parameters<typeof toggleItalic>): ReturnType<typeof toggleItalic> => _rozieExposeRef.current.toggleItalic(...args), toggleHeading: (...args: Parameters<typeof toggleHeading>): ReturnType<typeof toggleHeading> => _rozieExposeRef.current.toggleHeading(...args), toggleBulletList: (...args: Parameters<typeof toggleBulletList>): ReturnType<typeof toggleBulletList> => _rozieExposeRef.current.toggleBulletList(...args), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => _rozieExposeRef.current.undo(...args), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => _rozieExposeRef.current.redo(...args), chain: (...args: Parameters<typeof chain>): ReturnType<typeof chain> => _rozieExposeRef.current.chain(...args), isActive: (...args: Parameters<typeof isActive>): ReturnType<typeof isActive> => _rozieExposeRef.current.isActive(...args), can: (...args: Parameters<typeof can>): ReturnType<typeof can> => _rozieExposeRef.current.can(...args), isEmpty: (...args: Parameters<typeof isEmpty>): ReturnType<typeof isEmpty> => _rozieExposeRef.current.isEmpty(...args) }), []);
+  const _rozieExposeRef = useRef({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty });
+  _rozieExposeRef.current = { getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty };
+  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => _rozieExposeRef.current.getEditor(...args), focusEditor: (...args: Parameters<typeof focusEditor>): ReturnType<typeof focusEditor> => _rozieExposeRef.current.focusEditor(...args), blurEditor: (...args: Parameters<typeof blurEditor>): ReturnType<typeof blurEditor> => _rozieExposeRef.current.blurEditor(...args), getHTML: (...args: Parameters<typeof getHTML>): ReturnType<typeof getHTML> => _rozieExposeRef.current.getHTML(...args), getJSON: (...args: Parameters<typeof getJSON>): ReturnType<typeof getJSON> => _rozieExposeRef.current.getJSON(...args), getText: (...args: Parameters<typeof getText>): ReturnType<typeof getText> => _rozieExposeRef.current.getText(...args), setContent: (...args: Parameters<typeof setContent>): ReturnType<typeof setContent> => _rozieExposeRef.current.setContent(...args), clearContent: (...args: Parameters<typeof clearContent>): ReturnType<typeof clearContent> => _rozieExposeRef.current.clearContent(...args), toggleBold: (...args: Parameters<typeof toggleBold>): ReturnType<typeof toggleBold> => _rozieExposeRef.current.toggleBold(...args), toggleItalic: (...args: Parameters<typeof toggleItalic>): ReturnType<typeof toggleItalic> => _rozieExposeRef.current.toggleItalic(...args), toggleHeading: (...args: Parameters<typeof toggleHeading>): ReturnType<typeof toggleHeading> => _rozieExposeRef.current.toggleHeading(...args), toggleBulletList: (...args: Parameters<typeof toggleBulletList>): ReturnType<typeof toggleBulletList> => _rozieExposeRef.current.toggleBulletList(...args), toggleUnderline: (...args: Parameters<typeof toggleUnderline>): ReturnType<typeof toggleUnderline> => _rozieExposeRef.current.toggleUnderline(...args), toggleOrderedList: (...args: Parameters<typeof toggleOrderedList>): ReturnType<typeof toggleOrderedList> => _rozieExposeRef.current.toggleOrderedList(...args), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => _rozieExposeRef.current.undo(...args), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => _rozieExposeRef.current.redo(...args), chain: (...args: Parameters<typeof chain>): ReturnType<typeof chain> => _rozieExposeRef.current.chain(...args), isActive: (...args: Parameters<typeof isActive>): ReturnType<typeof isActive> => _rozieExposeRef.current.isActive(...args), can: (...args: Parameters<typeof can>): ReturnType<typeof can> => _rozieExposeRef.current.can(...args), isEmpty: (...args: Parameters<typeof isEmpty>): ReturnType<typeof isEmpty> => _rozieExposeRef.current.isEmpty(...args) }), []);
 
   return (
     <>
@@ -767,6 +781,11 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         <button type="button" className={clsx({ active: active.h2 })} aria-label="Heading 2" onClick={($event) => { toggleHeading(2); }} data-rozie-s-2aeee876="">H2</button>
         <span className={"sep"} data-rozie-s-2aeee876="" />
         <button type="button" className={clsx({ active: active.bulletList })} aria-label="Bullet list" onClick={toggleBulletList} data-rozie-s-2aeee876="">• List</button>
+        <button type="button" className={clsx({ active: active.underline })} aria-label="Underline" onClick={toggleUnderline} data-rozie-s-2aeee876=""><u data-rozie-s-2aeee876="">U</u></button>
+        <button type="button" className={clsx({ active: active.orderedList })} aria-label="Ordered list" onClick={toggleOrderedList} data-rozie-s-2aeee876="">1. List</button>
+        <span className={"sep"} data-rozie-s-2aeee876="" />
+        <button type="button" aria-label="Undo" onClick={undo} data-rozie-s-2aeee876="">↺</button>
+        <button type="button" aria-label="Redo" onClick={redo} data-rozie-s-2aeee876="">↻</button>
       </div>}{!!(props.editable && (props.renderToolbar ?? props.slots?.['toolbar'])) && <div className={"rozie-tiptap-toolbar rozie-tiptap-toolbar--slot"} ref={toolbarEl} data-rozie-s-2aeee876="" />}<div ref={editorEl} className={"rozie-tiptap-content"} data-placeholder={props.placeholder} data-rozie-s-2aeee876="" />
     </div>
 

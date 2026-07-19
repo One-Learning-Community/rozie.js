@@ -155,7 +155,9 @@ export default class TipTap extends SignalWatcher(LitElement) {
   italic: false,
   h1: false,
   h2: false,
-  bulletList: false
+  bulletList: false,
+  underline: false,
+  orderedList: false
 });
   @query('[data-rozie-ref="toolbarEl"]') private _refToolbarEl!: HTMLElement;
   @query('[data-rozie-ref="editorEl"]') private _refEditorEl!: HTMLElement;
@@ -538,6 +540,11 @@ private _portalContainers = new Set<HTMLElement>();
     <button class="${Object.entries({ active: this._active.value.h2 }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" aria-label="Heading 2" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.toggleHeading(2); }} data-rozie-s-2aeee876>H2</button>
     <span class="sep" data-rozie-s-2aeee876></span>
     <button class="${Object.entries({ active: this._active.value.bulletList }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" aria-label="Bullet list" @click=${this.toggleBulletList} data-rozie-s-2aeee876>• List</button>
+    <button class="${Object.entries({ active: this._active.value.underline }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" aria-label="Underline" @click=${this.toggleUnderline} data-rozie-s-2aeee876><u data-rozie-s-2aeee876>U</u></button>
+    <button class="${Object.entries({ active: this._active.value.orderedList }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" aria-label="Ordered list" @click=${this.toggleOrderedList} data-rozie-s-2aeee876>1. List</button>
+    <span class="sep" data-rozie-s-2aeee876></span>
+    <button type="button" aria-label="Undo" @click=${this.undo} data-rozie-s-2aeee876>↺</button>
+    <button type="button" aria-label="Redo" @click=${this.redo} data-rozie-s-2aeee876>↻</button>
   </div>` : nothing}${this.editable && this.toolbar !== undefined ? html`<div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" data-rozie-ref="toolbarEl" data-rozie-s-2aeee876></div>` : nothing}<div class="rozie-tiptap-content" data-placeholder=${this.placeholder} data-rozie-ref="editorEl" data-rozie-s-2aeee876></div>
 </div>
 
@@ -575,7 +582,9 @@ private _portalContainers = new Set<HTMLElement>();
     h2: this.editor.isActive('heading', {
       level: 2
     }),
-    bulletList: this.editor.isActive('bulletList')
+    bulletList: this.editor.isActive('bulletList'),
+    underline: this.editor.isActive('underline'),
+    orderedList: this.editor.isActive('orderedList')
   };
 };
 
@@ -845,6 +854,16 @@ private _portalContainers = new Set<HTMLElement>();
 
   toggleBulletList() {
     this.editor?.chain().focus().toggleBulletList().run();
+    this.refreshActive();
+  }
+
+  toggleUnderline() {
+    this.editor?.chain().focus().toggleUnderline().run();
+    this.refreshActive();
+  }
+
+  toggleOrderedList() {
+    this.editor?.chain().focus().toggleOrderedList().run();
     this.refreshActive();
   }
 

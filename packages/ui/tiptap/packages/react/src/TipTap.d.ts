@@ -73,6 +73,8 @@ export interface TipTapHandle {
   toggleItalic: (...args: any[]) => any;
   toggleHeading: (...args: any[]) => any;
   toggleBulletList: (...args: any[]) => any;
+  toggleUnderline: (...args: any[]) => any;
+  toggleOrderedList: (...args: any[]) => any;
   undo: (...args: any[]) => any;
   redo: (...args: any[]) => any;
   chain: (...args: any[]) => any;

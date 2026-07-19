@@ -74,6 +74,8 @@ const html = editor.current?.getHTML();
 | `toggleItalic` | Toggle italic on the current selection. |
 | `toggleHeading` | Toggle a heading at the given level — `toggleHeading(level)` (defaults to 1). |
 | `toggleBulletList` | Toggle a bullet list at the current selection. |
+| `toggleUnderline` | Toggle underline on the current selection. |
+| `toggleOrderedList` | Toggle an ordered (numbered) list at the current selection. |
 | `undo` | Undo the last change. |
 | `redo` | Redo the last undone change. |
 | `chain` | Return a focused TipTap command chain for composing commands — e.g. `chain().toggleBold().toggleItalic().run()` (null before mount). |
