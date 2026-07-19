@@ -1,0 +1,106 @@
+{
+  "name": "@rozie-ui/lexical-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Angular cross-framework Lexical rich-text editor — editor shell, RichText/History/List/Link plugins, selection-reading toolbar, and an @mention DecoratorNode — one Rozie source compiled to Angular wrapping Meta's Lexical.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "lexical",
+    "editor",
+    "rich-text-editor",
+    "wysiwyg",
+    "contenteditable",
+    "mention",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/lexical/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/fesm2022/rozie-ui-lexical-angular.mjs"
+    },
+    "./source": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "module": "./dist/fesm2022/rozie-ui-lexical-angular.mjs",
+  "types": "./dist/index.d.ts",
+  "peerDependencies": {
+    "@angular/core": "^19",
+    "@angular/common": "^19",
+    "@angular/platform-browser": "^19",
+    "lexical": "^0.48.0",
+    "@lexical/rich-text": "^0.48.0",
+    "@lexical/history": "^0.48.0",
+    "@lexical/list": "^0.48.0",
+    "@lexical/link": "^0.48.0",
+    "@lexical/utils": "^0.48.0"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "@angular/platform-browser": {
+      "optional": false
+    },
+    "lexical": {
+      "optional": false
+    },
+    "@lexical/rich-text": {
+      "optional": false
+    },
+    "@lexical/utils": {
+      "optional": false
+    },
+    "@lexical/history": {
+      "optional": true
+    },
+    "@lexical/list": {
+      "optional": true
+    },
+    "@lexical/link": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json",
+    "typecheck": "echo 'source+dist; ng-packagr declaration emit at build'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "tslib": "^2"
+  },
+  "devDependencies": {
+    "@rozie-ui/lexical": "workspace:*",
+    "@angular/common": "^19",
+    "@angular/compiler": "^19",
+    "@angular/compiler-cli": "^19",
+    "@angular/core": "^19",
+    "@angular/platform-browser": "^19",
+    "ng-packagr": "^19",
+    "typescript": "~5.6.0"
+  }
+}
