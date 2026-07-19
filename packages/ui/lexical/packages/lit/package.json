@@ -1,0 +1,104 @@
+{
+  "name": "@rozie-ui/lexical-lit",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Lit cross-framework Lexical rich-text editor — editor shell, RichText/History/List/Link plugins, selection-reading toolbar, and an @mention DecoratorNode — one Rozie source compiled to a Lit web component wrapping Meta's Lexical. Hosts the editor in an OPEN shadow root; browser floor Chrome 137+ / FF 142+ / Safari 17+ (Lexical getComposedRanges).",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "lexical",
+    "editor",
+    "rich-text-editor",
+    "wysiwyg",
+    "contenteditable",
+    "mention",
+    "component",
+    "lit",
+    "web-component",
+    "shadow-dom"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/lexical/packages/lit"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./source": "./src/LexicalEditor.ts"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-lit": "workspace:*"
+  },
+  "peerDependencies": {
+    "lit": "^3.2",
+    "@lit/context": "^1.1",
+    "@lit-labs/preact-signals": "^1.0.0",
+    "@preact/signals-core": "^1.3.0",
+    "lexical": "^0.48.0",
+    "@lexical/rich-text": "^0.48.0",
+    "@lexical/history": "^0.48.0",
+    "@lexical/list": "^0.48.0",
+    "@lexical/link": "^0.48.0",
+    "@lexical/utils": "^0.48.0"
+  },
+  "peerDependenciesMeta": {
+    "lit": {
+      "optional": false
+    },
+    "@lit/context": {
+      "optional": false
+    },
+    "@lit-labs/preact-signals": {
+      "optional": false
+    },
+    "@preact/signals-core": {
+      "optional": false
+    },
+    "lexical": {
+      "optional": false
+    },
+    "@lexical/rich-text": {
+      "optional": false
+    },
+    "@lexical/utils": {
+      "optional": false
+    },
+    "@lexical/history": {
+      "optional": true
+    },
+    "@lexical/list": {
+      "optional": true
+    },
+    "@lexical/link": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@rozie-ui/lexical": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

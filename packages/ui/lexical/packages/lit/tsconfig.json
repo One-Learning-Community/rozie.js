@@ -1,0 +1,29 @@
+{
+  // experimentalDecorators/useDefineForClassFields/noImplicitOverride: the
+  // documented Lit + TS decorator config (root base sets noImplicitOverride:true
+  // but the generated Lit code does not emit `override`).
+  // strictNullChecks/exactOptionalPropertyTypes/noImplicitAny relaxed: the
+  // emitted Lit output is bundler-built (tsdown/oxc), not strict-tsc-authored.
+  //
+  // No `paths` alias for `lexical`/`@lexical/*`: the published Lexical packages
+  // ship real types.
+  "extends": "../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "noImplicitOverride": false,
+    "skipLibCheck": true,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules"]
+}
