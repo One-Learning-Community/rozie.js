@@ -1,0 +1,24 @@
+{
+  "name": "@rozie-ui/lexical",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/codegen.mjs",
+    "test": "vitest run",
+    "typecheck": "echo 'meta-pkg: the .rozie is codegen-compiled; the leaves typecheck the emitted output'"
+  },
+  "devDependencies": {
+    "@lexical/history": "0.48.0",
+    "@lexical/link": "0.48.0",
+    "@lexical/list": "0.48.0",
+    "@lexical/rich-text": "0.48.0",
+    "@lexical/utils": "0.48.0",
+    "@rozie/core": "workspace:*",
+    "lexical": "0.48.0",
+    "svelte": "^5",
+    "typescript": "~5.6.0",
+    "vitest": "^4.1.0"
+  }
+}
