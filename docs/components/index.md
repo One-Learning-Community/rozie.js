@@ -23,6 +23,7 @@ Grouped by what they do. Most wrap a vanilla-JS engine; the **headless** group a
 | --- | --- | --- |
 | **CodeMirror** | [CodeMirror 6](https://codemirror.net/) code editor | [/components/codemirror](/components/codemirror) |
 | **TipTap** | [TipTap](https://tiptap.dev/) rich-text editor (ProseMirror) | [/components/tiptap](/components/tiptap) |
+| **Lexical** | [Lexical](https://lexical.dev/) rich-text editor (Meta) | [/components/lexical](/components/lexical) |
 
 ### Dates & scheduling
 

@@ -182,6 +182,18 @@ export default defineConfig({
           ],
         },
         {
+          text: '@rozie-ui/lexical',
+          collapsed: true,
+          items: [
+            { text: 'Lexical — showcase & API', link: '/components/lexical' },
+            { text: 'API reference', link: '/components/lexical-api' },
+            { text: 'Usage examples', link: '/components/lexical-usage' },
+            { text: 'Lexical libraries comparison', link: '/components/lexical-comparison' },
+            { text: 'Decorator node recipe', link: '/components/lexical-recipe-decorator' },
+            { text: 'Lexical — live demo', link: '/components/lexical-demo' },
+          ],
+        },
+        {
           text: '@rozie-ui/tiptap',
           collapsed: true,
           items: [

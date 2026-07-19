@@ -45,7 +45,7 @@ The clearest proof that one source can ship six idiomatic targets is a shelf of 
 
 **Engine-backed** — a battle-tested vanilla-JS engine wrapped once, where the existing per-framework bindings are uneven, community-maintained, or (for Lit) missing entirely:
 
-[DataTable](/components/data-table) · [SortableList](/components/sortable-list) · [Flatpickr](/components/flatpickr) · [FullCalendar](/components/fullcalendar) · [CodeMirror](/components/codemirror) · [Chart.js](/components/chartjs) · [TipTap](/components/tiptap) · [MapLibre](/components/maplibre) · [Cropper](/components/cropper) · [Waveform](/components/wavesurfer) · [PdfViewer](/components/pdf) · [FlowCanvas](/components/rete) · [Carousel](/components/embla) · [Popover & Tooltip](/components/popover)
+[DataTable](/components/data-table) · [SortableList](/components/sortable-list) · [Flatpickr](/components/flatpickr) · [FullCalendar](/components/fullcalendar) · [CodeMirror](/components/codemirror) · [Chart.js](/components/chartjs) · [TipTap](/components/tiptap) · [Lexical](/components/lexical) · [MapLibre](/components/maplibre) · [Cropper](/components/cropper) · [Waveform](/components/wavesurfer) · [PdfViewer](/components/pdf) · [FlowCanvas](/components/rete) · [Carousel](/components/embla) · [Popover & Tooltip](/components/popover)
 
 **No-engine, pure Rozie** — headless, fully accessible interaction authored from scratch in a single `.rozie` file, proving Rozie carries rich behavior on its own:
 

@@ -69,6 +69,7 @@ export function propsCodegen(
       'codemirror',
       'chartjs',
       'tiptap',
+      'lexical',
       'maplibre',
       'cropper',
       'wavesurfer',
