@@ -41,6 +41,17 @@ import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
+import { buildWebTypes } from './web-types.mjs';
+
+// JetBrains web-types sidecar copy (component description + docs URL). PhpStorm/
+// WebStorm read this — NOT vue-tsc's `__VLS_` .d.ts (WEB-57769) — for prop/event/
+// slot/v-model completion. See scripts/web-types.mjs.
+const WEB_TYPES_DOC_URL = 'https://github.com/One-Learning-Community/rozie.js#readme';
+const WEB_TYPES_DESCRIPTION =
+  'Idiomatic Vue `TipTap` — a cross-framework rich-text editor compiled from one ' +
+  'Rozie source wrapping TipTap (the ProseMirror-based headless editor). Two-way ' +
+  '`v-model:html`, a batteries-included toolbar (or the `toolbar` slot), node-view ' +
+  'slots, and an imperative command handle.';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/tiptap
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
@@ -138,6 +149,33 @@ function main() {
     const pkgName = leafPkgName(cfg.dir);
     const readme = renderReadme(target, ir, pkgName, handleManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
+
+    // JetBrains web-types sidecar for the Vue leaf — emitted from the same IR the
+    // README uses so it never drifts. PhpStorm/WebStorm read this (NOT vue-tsc's
+    // `__VLS_` .d.ts, WEB-57769) for prop/event/slot/v-model completion. TipTap's
+    // Vue codegen does not rewrite the leaf package.json, so wire it idempotently.
+    if (target === 'vue') {
+      const leafDir = resolve(ROOT, 'packages', cfg.dir);
+      const vuePkgPath = resolve(leafDir, 'package.json');
+      const vuePkg = JSON.parse(readFileSync(vuePkgPath, 'utf8'));
+      const webTypesDoc = buildWebTypes({
+        ir,
+        pkgName: vuePkg.name,
+        version: vuePkg.version,
+        componentName: cfg.file.replace(/\.vue$/, ''),
+        description: WEB_TYPES_DESCRIPTION,
+        docUrl: WEB_TYPES_DOC_URL,
+      });
+      writeFileSync(
+        resolve(leafDir, 'web-types.json'),
+        `${JSON.stringify(webTypesDoc, null, 2)}\n`,
+      );
+      vuePkg['web-types'] = './web-types.json';
+      if (!vuePkg.files.includes('web-types.json')) {
+        vuePkg.files = [...vuePkg.files, 'web-types.json'];
+      }
+      writeFileSync(vuePkgPath, `${JSON.stringify(vuePkg, null, 2)}\n`);
+    }
 
     // Vendor the repo LICENSE into each published leaf (root LICENSE does not
     // propagate into per-package tarballs).

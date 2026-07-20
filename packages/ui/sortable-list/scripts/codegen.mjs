@@ -37,6 +37,16 @@ import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
+import { buildWebTypes } from './web-types.mjs';
+
+// JetBrains web-types sidecar copy (component description + docs URL). PhpStorm/
+// WebStorm read this — NOT vue-tsc's `__VLS_` .d.ts (WEB-57769) — for prop/event/
+// slot/v-model completion. See scripts/web-types.mjs.
+const WEB_TYPES_DOC_URL = 'https://github.com/One-Learning-Community/rozie.js#readme';
+const WEB_TYPES_DESCRIPTION =
+  'Idiomatic Vue `SortableList` — a cross-framework drag-and-drop list compiled ' +
+  'from one Rozie source via SortableJS. Two-way `v-model:items`, keyboard ' +
+  'reordering, cross-list drag, and a 4-verb imperative handle.';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/sortable-list
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
@@ -91,7 +101,16 @@ const COMMON_VUE_BUILD_DEV_DEPS = {
  * the workspace:^ normalization below (a no-op for Vue, which has zero
  * @rozie/runtime-* deps).
  */
-function emitVueDualPackaging({ leafDir, componentName, externals, engineDevDeps }) {
+function emitVueDualPackaging({
+  leafDir,
+  componentName,
+  externals,
+  engineDevDeps,
+  ir,
+  eventManifest,
+  description,
+  docUrl,
+}) {
   const renderExternal = (e) => (e instanceof RegExp ? e.toString() : `'${e}'`);
   const externalsLiteral = `[${externals.map(renderExternal).join(', ')}]`;
 
@@ -180,7 +199,24 @@ export { default } from './${componentName}.vue';
       default: `./src/${componentName}.vue`,
     },
   };
-  pkg.files = ['dist', 'src'];
+
+  // JetBrains web-types sidecar — emitted from the same IR the READMEs use, so it
+  // never drifts. Wired into package.json (`web-types` field + `files`) HERE, inside
+  // the dual-packaging write, so a codegen regen (which rewrites this manifest)
+  // preserves it — the natural release cycle then ships it in every leaf tarball.
+  const webTypesDoc = buildWebTypes({
+    ir,
+    pkgName: pkg.name,
+    version: pkg.version,
+    componentName,
+    description,
+    docUrl,
+    eventManifest,
+  });
+  writeFileSync(resolve(leafDir, 'web-types.json'), `${JSON.stringify(webTypesDoc, null, 2)}\n`);
+  pkg['web-types'] = './web-types.json';
+
+  pkg.files = ['dist', 'src', 'web-types.json'];
   pkg.sideEffects = false;
   pkg.scripts = {
     ...pkg.scripts,
@@ -273,6 +309,10 @@ function main() {
         componentName: cfg.file.replace(/\.vue$/, ''),
         externals: cfg.externals,
         engineDevDeps: cfg.engineDevDeps,
+        ir,
+        eventManifest,
+        description: WEB_TYPES_DESCRIPTION,
+        docUrl: WEB_TYPES_DOC_URL,
       });
     }
 

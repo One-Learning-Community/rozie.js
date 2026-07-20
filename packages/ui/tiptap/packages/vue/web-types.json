@@ -1,0 +1,170 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JetBrains/web-types/master/schema/web-types.json",
+  "name": "@rozie-ui/tiptap-vue",
+  "version": "0.1.1",
+  "description-markup": "markdown",
+  "framework": "vue",
+  "contributions": {
+    "html": {
+      "vue-components": [
+        {
+          "name": "TipTap",
+          "source": {
+            "module": "@rozie-ui/tiptap-vue",
+            "symbol": "TipTap"
+          },
+          "description": "Idiomatic Vue `TipTap` — a cross-framework rich-text editor compiled from one Rozie source wrapping TipTap (the ProseMirror-based headless editor). Two-way `v-model:html`, a batteries-included toolbar (or the `toolbar` slot), node-view slots, and an imperative command handle.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "html",
+              "description": "The editor's document content as an HTML string — the sole `model: true` prop (two-way `r-model`). Typing writes the new HTML back through the model path (TipTap's `onUpdate`); a consumer write reflects into the live document, echo-guarded so a programmatic set does not reset the selection or re-emit `update`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"<p>Start writing…</p>\""
+            },
+            {
+              "name": "editable",
+              "description": "Whether the document is editable. Toggling it calls TipTap's `setEditable` with `emitUpdate: false` (no spurious `update`). When `false`, the internal toolbar is hidden and the wrapper gets an `is-readonly` class.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "true"
+            },
+            {
+              "name": "placeholder",
+              "description": "Placeholder text, forwarded to the editor host as `data-placeholder` + `aria-placeholder` and painted as ghost text on the first empty node via the bundled Placeholder extension. An empty string adds no placeholder.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            },
+            {
+              "name": "autofocus",
+              "description": "Whether to place the caret in the document on mount (TipTap's `autofocus` option).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "editor-class",
+              "description": "A CSS class applied to the contenteditable element (`editorProps.attributes.class`).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            },
+            {
+              "name": "aria-label",
+              "description": "The accessible name (`aria-label`) applied to the contenteditable element.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"Rich text editor\""
+            },
+            {
+              "name": "editor-props",
+              "description": "ProseMirror `editorProps` passthrough — `handleKeyDown`, `handlePaste`, a custom `attributes`, etc. Spread **last** so consumer `editorProps` win the wrapper's attribute defaults.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "extensions",
+              "description": "Extra TipTap extensions composed onto `StarterKit` — the consumer-extensibility passthrough (Link, Image, Mention, custom nodes/marks, …). Consumer extensions genuinely win for a StarterKit-bundled node or mark: a same-named custom extension (e.g. a custom `Link`) auto-disables the corresponding StarterKit key (unless explicitly configured via `starterKit`), and the final extension array is name-deduped keeping the last (consumer) occurrence — so a custom Link/Underline/OrderedList replaces StarterKit's without a \"Duplicate extension names\" warning.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "starter-kit",
+              "description": "StarterKit config passthrough — spread into `StarterKit.configure(...)`. Accepts per-extension option objects or `false` to disable an extension, e.g. `{ heading:false }`, `{ heading:{ levels:[1,2] } }`, `{ link:false }`. A StarterKit-bundled node/mark is auto-disabled when a same-named custom extension is supplied via `extensions`; an explicitly-set key here is always respected and never overridden by that auto-disable scan.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "node-specs",
+              "description": "Custom ProseMirror node registration for the reactive `nodeView` portal slot — general facility, read ONCE at mount (setup-once construction, not reactive). Each entry: `{ name, tag, group, inline, atom, content, selectable, defining, attrs }` — `name` (required, unique node name), `tag` (required, parseHTML selector string | string[]), `group` (default `'block'`), `inline` (default `false`), `atom` (default `false` — no contentDOM), `content` (e.g. `'inline*'`; presence ⇒ the node gets an editable contentDOM), `selectable` (default `true`), `defining` (default `false`), `attrs` (`{ key: { default } }`, ProseMirror `addAttributes` shape). One `Node.create` is built per entry; all render through the SAME `nodeView` fragment, which dispatches on `scope.node.type.name`. An empty array (default) registers no custom nodes — zero overhead.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "upload-image",
+              "description": "An async image-upload hook, signature `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "function"
+              ],
+              "default": "null"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "update",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "selectionUpdate",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "focus",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "blur",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "update:html",
+                "description": "Emitted with the updated `html` value; powers `v-model:html`.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "toolbar",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ editor: any }"
+            },
+            {
+              "name": "bubbleMenu",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ editor: any }"
+            },
+            {
+              "name": "floatingMenu",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ editor: any }"
+            },
+            {
+              "name": "nodeView",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ node: any; selected: any; updateAttributes: any; getPos: any; editor: any; contentDOM: any }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

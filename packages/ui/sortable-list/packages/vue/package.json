@@ -38,7 +38,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "web-types.json"
   ],
   "peerDependencies": {
     "vue": "^3.4",
@@ -68,5 +69,6 @@
     "vite-plugin-css-injected-by-js": "^5",
     "vue": "^3.5",
     "vue-tsc": "^3"
-  }
+  },
+  "web-types": "./web-types.json"
 }
