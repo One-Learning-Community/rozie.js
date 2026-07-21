@@ -37,6 +37,7 @@ import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
+import { buildCustomElementsManifest } from './cem.mjs';
 import { buildWebTypes } from './web-types.mjs';
 
 // JetBrains web-types sidecar copy (component description + docs URL). PhpStorm/
@@ -47,6 +48,14 @@ const WEB_TYPES_DESCRIPTION =
   'Idiomatic Vue `SortableList` — a cross-framework drag-and-drop list compiled ' +
   'from one Rozie source via SortableJS. Two-way `v-model:items`, keyboard ' +
   'reordering, cross-list drag, and a 4-verb imperative handle.';
+
+// Custom Elements Manifest description for the LIT leaf (`<rozie-sortable-list>`).
+// Both VS Code (lit-plugin) and JetBrains read the CEM via the package.json
+// `customElements` field. See scripts/cem.mjs.
+const CEM_DESCRIPTION =
+  'Idiomatic Lit `<rozie-sortable-list>` — a cross-framework drag-and-drop list ' +
+  'compiled from one Rozie source via SortableJS. Two-way `items` (with an ' +
+  '`items-change` event), keyboard reordering, cross-list drag, and a 4-verb handle.';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/sortable-list
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
@@ -358,6 +367,34 @@ function main() {
     // does not propagate into per-package tarballs). Copy-from-root keeps the
     // 6 leaf copies from drifting.
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
+
+    // Lit leaf: emit a Custom Elements Manifest (`custom-elements.json`) from the
+    // same IR + wire the leaf package.json (`customElements` field + files entry).
+    // Both VS Code (lit-plugin) and JetBrains read it for `<rozie-sortable-list>`
+    // attribute/property/event/slot completion. The lit codegen does not otherwise
+    // rewrite this package.json, so wire it idempotently — a regen preserves it and
+    // the natural release cycle ships it in the tarball.
+    if (target === 'lit') {
+      const leafDir = resolve(ROOT, 'packages', cfg.dir);
+      const litPkgPath = resolve(leafDir, 'package.json');
+      const litPkg = JSON.parse(readFileSync(litPkgPath, 'utf8'));
+      const cem = buildCustomElementsManifest({
+        ir,
+        componentName: cfg.file.replace(/\.ts$/, ''),
+        description: CEM_DESCRIPTION,
+        eventManifest,
+        handleManifest,
+      });
+      writeFileSync(
+        resolve(leafDir, 'custom-elements.json'),
+        `${JSON.stringify(cem, null, 2)}\n`,
+      );
+      litPkg.customElements = 'custom-elements.json';
+      if (!litPkg.files.includes('custom-elements.json')) {
+        litPkg.files = [...litPkg.files, 'custom-elements.json'];
+      }
+      writeFileSync(litPkgPath, `${JSON.stringify(litPkg, null, 2)}\n`);
+    }
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);

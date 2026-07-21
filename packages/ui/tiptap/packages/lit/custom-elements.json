@@ -1,0 +1,413 @@
+{
+  "schemaVersion": "2.1.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "dist/index.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Idiomatic Lit `<rozie-tip-tap>` — a cross-framework rich-text editor compiled from one Rozie source wrapping TipTap (ProseMirror). Two-way `html` (with an `html-change` event), a batteries-included toolbar (or the `toolbar` slot), node-view slots, and an imperative command handle.",
+          "name": "TipTap",
+          "tagName": "rozie-tip-tap",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "html",
+              "description": "The editor's document content as an HTML string — the sole `model: true` prop (two-way `r-model`). Typing writes the new HTML back through the model path (TipTap's `onUpdate`); a consumer write reflects into the live document, echo-guarded so a programmatic set does not reset the selection or re-emit `update`.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "html",
+              "default": "\"<p>Start writing…</p>\""
+            },
+            {
+              "kind": "field",
+              "name": "editable",
+              "description": "Whether the document is editable. Toggling it calls TipTap's `setEditable` with `emitUpdate: false` (no spurious `update`). When `false`, the internal toolbar is hidden and the wrapper gets an `is-readonly` class.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "editable",
+              "default": "true"
+            },
+            {
+              "kind": "field",
+              "name": "placeholder",
+              "description": "Placeholder text, forwarded to the editor host as `data-placeholder` + `aria-placeholder` and painted as ghost text on the first empty node via the bundled Placeholder extension. An empty string adds no placeholder.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "placeholder",
+              "default": "\"\""
+            },
+            {
+              "kind": "field",
+              "name": "autofocus",
+              "description": "Whether to place the caret in the document on mount (TipTap's `autofocus` option).",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "autofocus",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "editorClass",
+              "description": "A CSS class applied to the contenteditable element (`editorProps.attributes.class`).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "editorclass",
+              "default": "\"\""
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "The accessible name (`aria-label`) applied to the contenteditable element.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "arialabel",
+              "default": "\"Rich text editor\""
+            },
+            {
+              "kind": "field",
+              "name": "editorProps",
+              "description": "ProseMirror `editorProps` passthrough — `handleKeyDown`, `handlePaste`, a custom `attributes`, etc. Spread **last** so consumer `editorProps` win the wrapper's attribute defaults.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "editorprops",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "extensions",
+              "description": "Extra TipTap extensions composed onto `StarterKit` — the consumer-extensibility passthrough (Link, Image, Mention, custom nodes/marks, …). Consumer extensions genuinely win for a StarterKit-bundled node or mark: a same-named custom extension (e.g. a custom `Link`) auto-disables the corresponding StarterKit key (unless explicitly configured via `starterKit`), and the final extension array is name-deduped keeping the last (consumer) occurrence — so a custom Link/Underline/OrderedList replaces StarterKit's without a \"Duplicate extension names\" warning.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "extensions",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "starterKit",
+              "description": "StarterKit config passthrough — spread into `StarterKit.configure(...)`. Accepts per-extension option objects or `false` to disable an extension, e.g. `{ heading:false }`, `{ heading:{ levels:[1,2] } }`, `{ link:false }`. A StarterKit-bundled node/mark is auto-disabled when a same-named custom extension is supplied via `extensions`; an explicitly-set key here is always respected and never overridden by that auto-disable scan.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "starterkit",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "nodeSpecs",
+              "description": "Custom ProseMirror node registration for the reactive `nodeView` portal slot — general facility, read ONCE at mount (setup-once construction, not reactive). Each entry: `{ name, tag, group, inline, atom, content, selectable, defining, attrs }` — `name` (required, unique node name), `tag` (required, parseHTML selector string | string[]), `group` (default `'block'`), `inline` (default `false`), `atom` (default `false` — no contentDOM), `content` (e.g. `'inline*'`; presence ⇒ the node gets an editable contentDOM), `selectable` (default `true`), `defining` (default `false`), `attrs` (`{ key: { default } }`, ProseMirror `addAttributes` shape). One `Node.create` is built per entry; all render through the SAME `nodeView` fragment, which dispatches on `scope.node.type.name`. An empty array (default) registers no custom nodes — zero overhead.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "nodespecs",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "uploadImage",
+              "description": "An async image-upload hook, signature `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.",
+              "type": {
+                "text": "((...args: any[]) => any)"
+              },
+              "attribute": "uploadimage",
+              "default": "null"
+            },
+            {
+              "kind": "method",
+              "name": "getEditor",
+              "description": "Return the underlying TipTap `Editor` instance for direct API access (commands, state, schema, extension storage)."
+            },
+            {
+              "kind": "method",
+              "name": "focusEditor",
+              "description": "Focus the editor — place the caret in the document."
+            },
+            {
+              "kind": "method",
+              "name": "blurEditor",
+              "description": "Blur the editor — remove focus from the document."
+            },
+            {
+              "kind": "method",
+              "name": "getHTML",
+              "description": "Return the current document serialized as an HTML string."
+            },
+            {
+              "kind": "method",
+              "name": "getJSON",
+              "description": "Return the current document as a ProseMirror JSON object (`JSONContent`)."
+            },
+            {
+              "kind": "method",
+              "name": "getText",
+              "description": "Return the current document as a plain-text string (word/char counts, search indexing, plaintext export)."
+            },
+            {
+              "kind": "method",
+              "name": "setContent",
+              "description": "Replace the document content — `setContent(html)`. Echo-guarded: reflects into the bound `html` model without bouncing an extra `update`."
+            },
+            {
+              "kind": "method",
+              "name": "clearContent",
+              "description": "Clear the document to an empty paragraph (reflects the empty value into the bound `html` model)."
+            },
+            {
+              "kind": "method",
+              "name": "toggleBold",
+              "description": "Toggle bold on the current selection."
+            },
+            {
+              "kind": "method",
+              "name": "toggleItalic",
+              "description": "Toggle italic on the current selection."
+            },
+            {
+              "kind": "method",
+              "name": "toggleHeading",
+              "description": "Toggle a heading at the given level — `toggleHeading(level)` (defaults to 1)."
+            },
+            {
+              "kind": "method",
+              "name": "toggleBulletList",
+              "description": "Toggle a bullet list at the current selection."
+            },
+            {
+              "kind": "method",
+              "name": "toggleUnderline",
+              "description": "Toggle underline on the current selection."
+            },
+            {
+              "kind": "method",
+              "name": "toggleOrderedList",
+              "description": "Toggle an ordered (numbered) list at the current selection."
+            },
+            {
+              "kind": "method",
+              "name": "undo",
+              "description": "Undo the last change."
+            },
+            {
+              "kind": "method",
+              "name": "redo",
+              "description": "Redo the last undone change."
+            },
+            {
+              "kind": "method",
+              "name": "chain",
+              "description": "Return a focused TipTap command chain for composing commands — e.g. `chain().toggleBold().toggleItalic().run()` (null before mount)."
+            },
+            {
+              "kind": "method",
+              "name": "isActive",
+              "description": "Whether a mark/node is active in the current selection — `isActive(name, attrs?)` (e.g. `isActive(\"heading\", { level: 2 })`). Drives custom-toolbar active styling. False before mount."
+            },
+            {
+              "kind": "method",
+              "name": "can",
+              "description": "Return the command-availability chain — `can().chain().focus().toggleBold().run()` returns a boolean — for enabling/disabling custom-toolbar buttons. null before mount."
+            },
+            {
+              "kind": "method",
+              "name": "isEmpty",
+              "description": "Whether the document is empty — drives empty-state UI and submit-gating. true before mount."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "html",
+              "description": "The editor's document content as an HTML string — the sole `model: true` prop (two-way `r-model`). Typing writes the new HTML back through the model path (TipTap's `onUpdate`); a consumer write reflects into the live document, echo-guarded so a programmatic set does not reset the selection or re-emit `update`.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "html",
+              "default": "\"<p>Start writing…</p>\""
+            },
+            {
+              "name": "editable",
+              "description": "Whether the document is editable. Toggling it calls TipTap's `setEditable` with `emitUpdate: false` (no spurious `update`). When `false`, the internal toolbar is hidden and the wrapper gets an `is-readonly` class.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "editable",
+              "default": "true"
+            },
+            {
+              "name": "placeholder",
+              "description": "Placeholder text, forwarded to the editor host as `data-placeholder` + `aria-placeholder` and painted as ghost text on the first empty node via the bundled Placeholder extension. An empty string adds no placeholder.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "placeholder",
+              "default": "\"\""
+            },
+            {
+              "name": "autofocus",
+              "description": "Whether to place the caret in the document on mount (TipTap's `autofocus` option).",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "autofocus",
+              "default": "false"
+            },
+            {
+              "name": "editorclass",
+              "description": "A CSS class applied to the contenteditable element (`editorProps.attributes.class`).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "editorClass",
+              "default": "\"\""
+            },
+            {
+              "name": "arialabel",
+              "description": "The accessible name (`aria-label`) applied to the contenteditable element.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "\"Rich text editor\""
+            },
+            {
+              "name": "editorprops",
+              "description": "ProseMirror `editorProps` passthrough — `handleKeyDown`, `handlePaste`, a custom `attributes`, etc. Spread **last** so consumer `editorProps` win the wrapper's attribute defaults.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "editorProps",
+              "default": "{}"
+            },
+            {
+              "name": "extensions",
+              "description": "Extra TipTap extensions composed onto `StarterKit` — the consumer-extensibility passthrough (Link, Image, Mention, custom nodes/marks, …). Consumer extensions genuinely win for a StarterKit-bundled node or mark: a same-named custom extension (e.g. a custom `Link`) auto-disables the corresponding StarterKit key (unless explicitly configured via `starterKit`), and the final extension array is name-deduped keeping the last (consumer) occurrence — so a custom Link/Underline/OrderedList replaces StarterKit's without a \"Duplicate extension names\" warning.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "extensions",
+              "default": "[]"
+            },
+            {
+              "name": "starterkit",
+              "description": "StarterKit config passthrough — spread into `StarterKit.configure(...)`. Accepts per-extension option objects or `false` to disable an extension, e.g. `{ heading:false }`, `{ heading:{ levels:[1,2] } }`, `{ link:false }`. A StarterKit-bundled node/mark is auto-disabled when a same-named custom extension is supplied via `extensions`; an explicitly-set key here is always respected and never overridden by that auto-disable scan.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "starterKit",
+              "default": "{}"
+            },
+            {
+              "name": "nodespecs",
+              "description": "Custom ProseMirror node registration for the reactive `nodeView` portal slot — general facility, read ONCE at mount (setup-once construction, not reactive). Each entry: `{ name, tag, group, inline, atom, content, selectable, defining, attrs }` — `name` (required, unique node name), `tag` (required, parseHTML selector string | string[]), `group` (default `'block'`), `inline` (default `false`), `atom` (default `false` — no contentDOM), `content` (e.g. `'inline*'`; presence ⇒ the node gets an editable contentDOM), `selectable` (default `true`), `defining` (default `false`), `attrs` (`{ key: { default } }`, ProseMirror `addAttributes` shape). One `Node.create` is built per entry; all render through the SAME `nodeView` fragment, which dispatches on `scope.node.type.name`. An empty array (default) registers no custom nodes — zero overhead.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "nodeSpecs",
+              "default": "[]"
+            },
+            {
+              "name": "uploadimage",
+              "description": "An async image-upload hook, signature `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.",
+              "type": {
+                "text": "((...args: any[]) => any)"
+              },
+              "fieldName": "uploadImage",
+              "default": "null"
+            }
+          ],
+          "events": [
+            {
+              "name": "update",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "selectionUpdate",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "focus",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "blur",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "html-change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired with the updated `html` (`event.detail`) when it changes."
+            }
+          ],
+          "slots": [
+            {
+              "name": "toolbar",
+              "description": "Scoped slot — props: editor."
+            },
+            {
+              "name": "bubbleMenu",
+              "description": "Scoped slot — props: editor."
+            },
+            {
+              "name": "floatingMenu",
+              "description": "Scoped slot — props: editor."
+            },
+            {
+              "name": "nodeView",
+              "description": "Scoped slot — props: node, selected, updateAttributes, getPos, editor, contentDOM."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "TipTap",
+          "declaration": {
+            "name": "TipTap",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "TipTap",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-tip-tap",
+          "declaration": {
+            "name": "TipTap",
+            "module": "dist/index.mjs"
+          }
+        }
+      ]
+    }
+  ]
+}

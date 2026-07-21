@@ -41,7 +41,17 @@ import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
+import { buildCustomElementsManifest } from './cem.mjs';
 import { buildWebTypes } from './web-types.mjs';
+
+// Custom Elements Manifest description for the LIT leaf (`<rozie-tip-tap>`). Both
+// VS Code (lit-plugin) and JetBrains read the CEM via the package.json
+// `customElements` field. See scripts/cem.mjs.
+const CEM_DESCRIPTION =
+  'Idiomatic Lit `<rozie-tip-tap>` — a cross-framework rich-text editor compiled ' +
+  'from one Rozie source wrapping TipTap (ProseMirror). Two-way `html` (with an ' +
+  '`html-change` event), a batteries-included toolbar (or the `toolbar` slot), ' +
+  'node-view slots, and an imperative command handle.';
 
 // JetBrains web-types sidecar copy (component description + docs URL). PhpStorm/
 // WebStorm read this — NOT vue-tsc's `__VLS_` .d.ts (WEB-57769) — for prop/event/
@@ -180,6 +190,33 @@ function main() {
     // Vendor the repo LICENSE into each published leaf (root LICENSE does not
     // propagate into per-package tarballs).
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
+
+    // Lit leaf: emit a Custom Elements Manifest (`custom-elements.json`) from the
+    // same IR + wire the leaf package.json (`customElements` field + files entry).
+    // Both VS Code (lit-plugin) and JetBrains read it for `<rozie-tip-tap>`
+    // attribute/property/event/slot completion. The lit codegen does not otherwise
+    // rewrite this package.json, so wire it idempotently — a regen preserves it and
+    // the natural release cycle ships it in the tarball.
+    if (target === 'lit') {
+      const leafDir = resolve(ROOT, 'packages', cfg.dir);
+      const litPkgPath = resolve(leafDir, 'package.json');
+      const litPkg = JSON.parse(readFileSync(litPkgPath, 'utf8'));
+      const cem = buildCustomElementsManifest({
+        ir,
+        componentName: cfg.file.replace(/\.ts$/, ''),
+        description: CEM_DESCRIPTION,
+        handleManifest,
+      });
+      writeFileSync(
+        resolve(leafDir, 'custom-elements.json'),
+        `${JSON.stringify(cem, null, 2)}\n`,
+      );
+      litPkg.customElements = 'custom-elements.json';
+      if (!litPkg.files.includes('custom-elements.json')) {
+        litPkg.files = [...litPkg.files, 'custom-elements.json'];
+      }
+      writeFileSync(litPkgPath, `${JSON.stringify(litPkg, null, 2)}\n`);
+    }
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
     console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓`);
