@@ -953,75 +953,75 @@ $effect(() => { const __watchVal = (() => editable)(); untrack(() => { if (__roz
 <style>
 :global {
   .rozie-tiptap[data-rozie-s-2aeee876] {
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    border-radius: 6px;
+    border: var(--rozie-tiptap-border, 1px solid rgba(0, 0, 0, 0.15));
+    border-radius: var(--rozie-tiptap-radius, 6px);
     overflow: hidden;
-    background: white;
+    background: var(--rozie-tiptap-bg, white);
   }
   .rozie-tiptap.is-readonly[data-rozie-s-2aeee876] {
-    background: #fafafa;
+    background: var(--rozie-tiptap-readonly-bg, #fafafa);
   }
   .rozie-tiptap-toolbar[data-rozie-s-2aeee876] {
     display: flex;
     align-items: center;
-    gap: 0.125rem;
-    padding: 0.25rem 0.375rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-    background: #f5f5f7;
+    gap: var(--rozie-tiptap-toolbar-gap, 0.125rem);
+    padding: var(--rozie-tiptap-toolbar-padding, 0.25rem 0.375rem);
+    border-bottom: var(--rozie-tiptap-toolbar-border, 1px solid rgba(0, 0, 0, 0.08));
+    background: var(--rozie-tiptap-toolbar-bg, #f5f5f7);
   }
   .rozie-tiptap-toolbar[data-rozie-s-2aeee876] button[data-rozie-s-2aeee876] {
-    padding: 0.25rem 0.5rem;
-    border: 1px solid transparent;
-    background: transparent;
-    border-radius: 3px;
+    padding: var(--rozie-tiptap-button-padding, 0.25rem 0.5rem);
+    border: var(--rozie-tiptap-button-border, 1px solid transparent);
+    background: var(--rozie-tiptap-button-bg, transparent);
+    border-radius: var(--rozie-tiptap-button-radius, 3px);
     cursor: pointer;
     font: inherit;
-    font-size: 0.8125rem;
-    min-width: 1.75rem;
-    color: rgba(0, 0, 0, 0.65);
+    font-size: var(--rozie-tiptap-button-font-size, 0.8125rem);
+    min-width: var(--rozie-tiptap-button-min-width, 1.75rem);
+    color: var(--rozie-tiptap-button-color, rgba(0, 0, 0, 0.65));
   }
   .rozie-tiptap-toolbar[data-rozie-s-2aeee876] button[data-rozie-s-2aeee876]:hover {
-    background: rgba(0, 0, 0, 0.06);
+    background: var(--rozie-tiptap-button-hover-bg, rgba(0, 0, 0, 0.06));
   }
   .rozie-tiptap-toolbar[data-rozie-s-2aeee876] button.active[data-rozie-s-2aeee876] {
-    background: #1a1a1a;
-    color: white;
-    border-color: #1a1a1a;
+    background: var(--rozie-tiptap-button-active-bg, #1a1a1a);
+    color: var(--rozie-tiptap-button-active-color, white);
+    border-color: var(--rozie-tiptap-button-active-border-color, #1a1a1a);
   }
   .rozie-tiptap-toolbar[data-rozie-s-2aeee876] .sep[data-rozie-s-2aeee876] {
-    width: 1px;
-    height: 1rem;
-    background: rgba(0, 0, 0, 0.1);
-    margin: 0 0.25rem;
+    width: var(--rozie-tiptap-toolbar-sep-width, 1px);
+    height: var(--rozie-tiptap-toolbar-sep-height, 1rem);
+    background: var(--rozie-tiptap-toolbar-sep-bg, rgba(0, 0, 0, 0.1));
+    margin: var(--rozie-tiptap-toolbar-sep-margin, 0 0.25rem);
   }
   .rozie-tiptap-content[data-rozie-s-2aeee876] {
-    padding: 0.625rem 0.875rem;
-    min-height: 6rem;
+    padding: var(--rozie-tiptap-content-padding, 0.625rem 0.875rem);
+    min-height: var(--rozie-tiptap-content-min-height, 6rem);
     font: inherit;
     outline: none;
   }
-  .rozie-tiptap-content[data-rozie-s-2aeee876] p[data-rozie-s-2aeee876] { margin: 0 0 0.5rem; }
+  .rozie-tiptap-content[data-rozie-s-2aeee876] p[data-rozie-s-2aeee876] { margin: var(--rozie-tiptap-content-p-margin, 0 0 0.5rem); }
   .rozie-tiptap-content[data-rozie-s-2aeee876] p[data-rozie-s-2aeee876]:last-child { margin-bottom: 0; }
-  .rozie-tiptap-content[data-rozie-s-2aeee876] h1[data-rozie-s-2aeee876] { font-size: 1.5rem; margin: 0.5rem 0 0.375rem; }
-  .rozie-tiptap-content[data-rozie-s-2aeee876] h2[data-rozie-s-2aeee876] { font-size: 1.25rem; margin: 0.5rem 0 0.375rem; }
-  .rozie-tiptap-content[data-rozie-s-2aeee876] ul[data-rozie-s-2aeee876] { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+  .rozie-tiptap-content[data-rozie-s-2aeee876] h1[data-rozie-s-2aeee876] { font-size: var(--rozie-tiptap-content-h1-font-size, 1.5rem); margin: var(--rozie-tiptap-content-h1-margin, 0.5rem 0 0.375rem); }
+  .rozie-tiptap-content[data-rozie-s-2aeee876] h2[data-rozie-s-2aeee876] { font-size: var(--rozie-tiptap-content-h2-font-size, 1.25rem); margin: var(--rozie-tiptap-content-h2-margin, 0.5rem 0 0.375rem); }
+  .rozie-tiptap-content[data-rozie-s-2aeee876] ul[data-rozie-s-2aeee876] { margin: var(--rozie-tiptap-content-list-margin, 0 0 0.5rem); padding-left: var(--rozie-tiptap-content-list-indent, 1.5rem); }
   .rozie-tiptap-count[data-rozie-s-2aeee876] {
     display: flex;
     justify-content: flex-end;
-    padding: 0.25rem 0.625rem;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
-    font-size: 0.75rem;
-    color: rgba(0, 0, 0, 0.5);
+    padding: var(--rozie-tiptap-count-padding, 0.25rem 0.625rem);
+    border-top: var(--rozie-tiptap-count-border, 1px solid rgba(0, 0, 0, 0.08));
+    font-size: var(--rozie-tiptap-count-font-size, 0.75rem);
+    color: var(--rozie-tiptap-count-color, rgba(0, 0, 0, 0.5));
   }
   .rozie-tiptap-count-value.over[data-rozie-s-2aeee876] {
-    color: #c0392b;
+    color: var(--rozie-tiptap-count-over-color, #c0392b);
   }
 }
 
 :global {
   .rozie-tiptap-content .is-editor-empty:first-child::before {
       content: attr(data-placeholder);
-      color: rgba(0, 0, 0, 0.4);
+      color: var(--rozie-tiptap-placeholder-color, rgba(0, 0, 0, 0.4));
       float: left;
       height: 0;
       pointer-events: none;
