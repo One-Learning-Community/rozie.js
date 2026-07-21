@@ -24,6 +24,7 @@ export default defineConfig({
         '@tiptap/core',
         '@tiptap/extensions',
         '@tiptap/extension-bubble-menu',
+        '@tiptap/extension-character-count',
         '@tiptap/extension-floating-menu',
         '@tiptap/extension-image',
         '@tiptap/starter-kit',

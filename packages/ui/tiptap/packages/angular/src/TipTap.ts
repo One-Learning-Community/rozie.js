@@ -19,10 +19,25 @@ import { FloatingMenu } from '@tiptap/extension-floating-menu';
 // form to match the BubbleMenu/FloatingMenu import style). Gated on
 // $props.uploadImage — an absent hook registers NO Image extension.
 import { Image } from '@tiptap/extension-image';
+// Character/word count storage extension (D-01/D-02). SEPARATE package, not part
+// of StarterKit, version-pinned in lockstep with core (3.23.5). Named export
+// `CharacterCount` — verified against the installed dist `.d.ts` (re-exported
+// from `@tiptap/extensions`, matching Placeholder's home package; also carries a
+// default export, but the named form matches this file's import style). Gated on
+// $props.maxLength / the `count` slot — an unfilled gate registers NO extension.
+import { CharacterCount } from '@tiptap/extension-character-count';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
+
+interface CountCtx {
+  $implicit: { characters: any; words: any; maxLength: any; over: any };
+  characters: any;
+  words: any;
+  maxLength: any;
+  over: any;
+}
 
 interface ToolbarCtx {
   $implicit: { editor: any };
@@ -47,6 +62,26 @@ interface NodeViewCtx {
   getPos: any;
   editor: any;
   contentDOM: any;
+}
+
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') {
+    try {
+      return JSON.stringify(v, null, 2);
+    } catch {
+      // Circular structure or a non-serialisable value (BigInt nested in an
+      // object). Degrade to a non-throwing form so the wrap never crashes the
+      // render — that is the entire point of "safe" interpolation (SPEC-1).
+      return String(v);
+    }
+  }
+  return String(v);
+}
+
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
 }
 
 @Component({
@@ -75,7 +110,18 @@ interface NodeViewCtx {
     }@if (editable() && (toolbarTpl ?? templates()?.['toolbar'])) {
     <div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" #toolbarEl></div>
     }<div #editorEl class="rozie-tiptap-content" [attr.data-placeholder]="placeholder()"></div>
-    </div>
+      
+      @if (maxLength() != null || (countTpl ?? templates()?.['count'])) {
+    <div class="rozie-tiptap-count">
+        @if ((countTpl ?? templates()?.['count'])) {
+    <ng-container *ngTemplateOutlet="(countTpl ?? templates()?.['count']); context: { $implicit: { characters: count().characters, words: count().words, maxLength: maxLength(), over: maxLength() != null && count().characters > maxLength() }, characters: count().characters, words: count().words, maxLength: maxLength(), over: maxLength() != null && count().characters > maxLength() }" />
+    } @else {
+
+          <span class="rozie-tiptap-count-value" [ngClass]="{ over: maxLength() != null && count().characters > maxLength() }">{{ rozieDisplay(count().characters) }} / {{ maxLength() }}</span>
+        
+    }
+      </div>
+    }</div>
 
 
 
@@ -140,6 +186,17 @@ interface NodeViewCtx {
     .rozie-tiptap-content h1 { font-size: 1.5rem; margin: 0.5rem 0 0.375rem; }
     .rozie-tiptap-content h2 { font-size: 1.25rem; margin: 0.5rem 0 0.375rem; }
     .rozie-tiptap-content ul { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+    .rozie-tiptap-count {
+      display: flex;
+      justify-content: flex-end;
+      padding: 0.25rem 0.625rem;
+      border-top: 1px solid rgba(0, 0, 0, 0.08);
+      font-size: 0.75rem;
+      color: rgba(0, 0, 0, 0.5);
+    }
+    .rozie-tiptap-count-value.over {
+      color: #c0392b;
+    }
 
     ::ng-deep .rozie-tiptap-content .is-editor-empty:first-child::before {
         content: attr(data-placeholder);
@@ -209,6 +266,16 @@ export class TipTap {
    * <TipTap :upload-image="uploadFn" />
    */
   uploadImage = input<((...args: any[]) => any) | null>(null);
+  /**
+   * A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.
+   * @example
+   * <TipTap :max-length="500" />
+   */
+  maxLength = input<(number) | null>(null);
+  /**
+   * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
+   */
+  enforceMaxLength = input<boolean>(false);
   active = signal({
     bold: false,
     italic: false,
@@ -218,12 +285,17 @@ export class TipTap {
     underline: false,
     orderedList: false
   });
+  count = signal({
+    characters: 0,
+    words: 0
+  });
   toolbarEl = viewChild<ElementRef<HTMLDivElement>>('toolbarEl');
   editorEl = viewChild<ElementRef<HTMLDivElement>>('editorEl');
   update = output<unknown>();
   selectionUpdate = output<void>();
   focus = output<void>();
   blur = output<void>();
+  @ContentChild('count', { read: TemplateRef }) countTpl?: TemplateRef<CountCtx>;
   @ContentChild('toolbar', { read: TemplateRef }) toolbarTpl?: TemplateRef<ToolbarCtx>;
   @ContentChild('bubbleMenu', { read: TemplateRef }) bubbleMenuTpl?: TemplateRef<BubbleMenuCtx>;
   @ContentChild('floatingMenu', { read: TemplateRef }) floatingMenuTpl?: TemplateRef<FloatingMenuCtx>;
@@ -248,6 +320,7 @@ export class TipTap {
         emitUpdate: false
       });
       this.refreshActive();
+      this.refreshCount();
     })(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.editable())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => this.editor?.setEditable(v, false))(__watchVal); }); });
   }
@@ -328,6 +401,7 @@ export class TipTap {
     const __nodeSpecs = this.nodeSpecs();
     const __placeholder = this.placeholder();
     const __uploadImage = this.uploadImage();
+    const __maxLength = this.maxLength();
     const __extensions = this.extensions();
     const __editorClass = this.editorClass();
     this.lastHtml = this.html();
@@ -416,6 +490,27 @@ export class TipTap {
     // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
     const imageExtensions = __uploadImage ? [Image] : [];
 
+    // Character/word count (D-01..D-03). Gated on maxLength being set OR the
+    // `count` slot being filled — a stock <TipTap> with neither registers NO
+    // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
+    // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
+    // cap); otherwise CharacterCount tracks with no limit (soft — overflow
+    // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
+    // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
+    // never[]-inference reason as placeholderExtensions/imageExtensions.
+    // Character/word count (D-01..D-03). Gated on maxLength being set OR the
+    // `count` slot being filled — a stock <TipTap> with neither registers NO
+    // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
+    // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
+    // cap); otherwise CharacterCount tracks with no limit (soft — overflow
+    // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
+    // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
+    // never[]-inference reason as placeholderExtensions/imageExtensions.
+    const needsCount = __maxLength != null || (this.countTpl ?? this.templates()?.['count']);
+    const characterCountExtensions = needsCount ? [CharacterCount.configure(this.enforceMaxLength() && __maxLength != null ? {
+      limit: __maxLength
+    } : {})] : [];
+
     // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
     // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
     // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
@@ -442,7 +537,7 @@ export class TipTap {
       // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
       // of the config-level auto-disable (D-02), which is what actually silences
       // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-      extensions: this.dedupeExtensionsByName([StarterKit.configure(this.buildStarterKitConfig(this.starterKit(), __extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...__extensions]),
+      extensions: this.dedupeExtensionsByName([StarterKit.configure(this.buildStarterKitConfig(this.starterKit(), __extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...__extensions]),
       editorProps: {
         attributes: {
           'aria-label': this.ariaLabel(),
@@ -469,6 +564,7 @@ export class TipTap {
         this.lastHtml = next;
         // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
         if (next !== this.html()) this.html.set(next), this.__rozieCvaOnChange(next);
+        this.refreshCount();
         this.update.emit(next);
       },
       onSelectionUpdate: () => {
@@ -479,6 +575,7 @@ export class TipTap {
       onBlur: () => this.blur.emit()
     });
     this.refreshActive();
+    this.refreshCount();
 
     // `toolbar` portal slot — when the consumer fills it, mount their toolbar
     // fragment into the engine-adjacent host node, handing them the live editor
@@ -560,6 +657,14 @@ export class TipTap {
       bulletList: this.editor.isActive('bulletList'),
       underline: this.editor.isActive('underline'),
       orderedList: this.editor.isActive('orderedList')
+    });
+  };
+  refreshCount = () => {
+    if (!this.editor) return;
+    const storage = this.editor.storage.characterCount;
+    this.count.set({
+      characters: storage ? storage.characters() : this.editor.getText().length,
+      words: storage ? storage.words() : this.editor.getText().split(/\s+/).filter(Boolean).length
     });
   };
   STARTERKIT_COLLISION_MAP = {
@@ -838,6 +943,7 @@ export class TipTap {
     });
     this.html.set(v), this.__rozieCvaOnChange(v);
     this.refreshActive();
+    this.refreshCount();
   };
   clearContent = () => {
     if (!this.editor) return;
@@ -845,6 +951,7 @@ export class TipTap {
     this.lastHtml = this.editor.getHTML();
     this.html.set(this.lastHtml), this.__rozieCvaOnChange(this.lastHtml);
     this.refreshActive();
+    this.refreshCount();
   };
   toggleBold = () => {
     this.editor?.chain().focus().toggleBold().run();
@@ -892,6 +999,14 @@ export class TipTap {
   isEmpty = () => {
     return this.editor ? this.editor.isEmpty : true;
   };
+  getCharacterCount = () => {
+    if (!this.editor) return 0;
+    return this.editor.storage.characterCount ? this.editor.storage.characterCount.characters() : this.editor.getText().length;
+  };
+  getWordCount = () => {
+    if (!this.editor) return 0;
+    return this.editor.storage.characterCount ? this.editor.storage.characterCount.words() : this.editor.getText().split(/\s+/).filter(Boolean).length;
+  };
 
   private __rozieCvaOnChange: (v: string) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
@@ -916,9 +1031,13 @@ export class TipTap {
   static ngTemplateContextGuard(
     _dir: TipTap,
     _ctx: unknown,
-  ): _ctx is ToolbarCtx | BubbleMenuCtx | FloatingMenuCtx | NodeViewCtx {
+  ): _ctx is CountCtx | ToolbarCtx | BubbleMenuCtx | FloatingMenuCtx | NodeViewCtx {
     return true;
   }
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default TipTap;

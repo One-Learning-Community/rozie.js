@@ -16,7 +16,12 @@
     <button type="button" aria-label="Undo" @click="undo">↺</button>
     <button type="button" aria-label="Redo" @click="redo">↻</button>
   </div><div v-if="props.editable && $slots.toolbar" class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" ref="toolbarElRef"></div><div ref="editorElRef" class="rozie-tiptap-content" :data-placeholder="props.placeholder"></div>
-</div>
+  
+  <div v-if="props.maxLength != null || $slots.count" class="rozie-tiptap-count">
+    <slot name="count" :characters="count.characters" :words="count.words" :maxLength="props.maxLength" :over="props.maxLength != null && count.characters > props.maxLength">
+      <span :class="['rozie-tiptap-count-value', { over: props.maxLength != null && count.characters > props.maxLength }]">{{ count.characters }} / {{ props.maxLength }}</span>
+    </slot>
+  </div></div>
 
 
 
@@ -76,8 +81,18 @@ const props = withDefaults(
      * <TipTap :upload-image="uploadFn" />
      */
     uploadImage?: ((...args: any[]) => any) | null;
+    /**
+     * A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.
+     * @example
+     * <TipTap :max-length="500" />
+     */
+    maxLength?: number | null;
+    /**
+     * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
+     */
+    enforceMaxLength?: boolean;
   }>(),
-  { editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: () => ({}), extensions: () => [], starterKit: () => ({}), nodeSpecs: () => [], uploadImage: null }
+  { editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: () => ({}), extensions: () => [], starterKit: () => ({}), nodeSpecs: () => [], uploadImage: null, maxLength: null, enforceMaxLength: false }
 );
 
 /**
@@ -95,6 +110,7 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
+  count(props: { characters: any; words: any; maxLength: any; over: any }): any;
   toolbar(props: { editor: any }): any;
   bubbleMenu(props: { editor: any }): any;
   floatingMenu(props: { editor: any }): any;
@@ -111,6 +127,10 @@ const active = ref({
   bulletList: false,
   underline: false,
   orderedList: false
+});
+const count = ref({
+  characters: 0,
+  words: 0
 });
 
 const toolbarElRef = ref<HTMLElement>();
@@ -133,6 +153,13 @@ import { FloatingMenu } from '@tiptap/extension-floating-menu';
 // form to match the BubbleMenu/FloatingMenu import style). Gated on
 // $props.uploadImage — an absent hook registers NO Image extension.
 import { Image } from '@tiptap/extension-image';
+// Character/word count storage extension (D-01/D-02). SEPARATE package, not part
+// of StarterKit, version-pinned in lockstep with core (3.23.5). Named export
+// `CharacterCount` — verified against the installed dist `.d.ts` (re-exported
+// from `@tiptap/extensions`, matching Placeholder's home package; also carries a
+// default export, but the named form matches this file's import style). Gated on
+// $props.maxLength / the `count` slot — an unfilled gate registers NO extension.
+import { CharacterCount } from '@tiptap/extension-character-count';
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
@@ -177,6 +204,19 @@ const refreshActive = () => {
     bulletList: editor.isActive('bulletList'),
     underline: editor.isActive('underline'),
     orderedList: editor.isActive('orderedList')
+  };
+};
+// Recompute the character/word counter from the live editor (D-05). Robust to
+// CharacterCount being absent (maxLength unset, no #count slot): reads
+// `editor.storage.characterCount` when the extension is registered, else falls
+// back to a plain text derivation so `getCharacterCount`/`getWordCount` and the
+// #count slot's numbers are never stale.
+const refreshCount = () => {
+  if (!editor) return;
+  const storage = editor.storage.characterCount;
+  count.value = {
+    characters: storage ? storage.characters() : editor.getText().length,
+    words: storage ? storage.words() : editor.getText().split(/\s+/).filter(Boolean).length
   };
 };
 // ── StarterKit collision-aware config (ask A). StarterKit bundles several
@@ -571,6 +611,7 @@ function setContent(next: any) {
   });
   html.value = v;
   refreshActive();
+  refreshCount();
 }
 function clearContent() {
   if (!editor) return;
@@ -578,6 +619,7 @@ function clearContent() {
   lastHtml = editor.getHTML();
   html.value = lastHtml;
   refreshActive();
+  refreshCount();
 }
 function toggleBold() {
   editor?.chain().focus().toggleBold().run();
@@ -635,6 +677,18 @@ function can() {
 }
 function isEmpty() {
   return editor ? editor.isEmpty : true;
+}
+// Character/word count reads (D-04). Prefer the CharacterCount extension's live
+// storage when registered (maxLength set or #count slot filled); otherwise a
+// text-based fallback so these ALWAYS return a number — 0 before mount, and a
+// correct count even on a stock <TipTap> that never registered CharacterCount.
+function getCharacterCount() {
+  if (!editor) return 0;
+  return editor.storage.characterCount ? editor.storage.characterCount.characters() : editor.getText().length;
+}
+function getWordCount() {
+  if (!editor) return 0;
+  return editor.storage.characterCount ? editor.storage.characterCount.words() : editor.getText().split(/\s+/).filter(Boolean).length;
 }
 
 interface ReactivePortalHandle {
@@ -771,6 +825,19 @@ onMounted(() => {
   // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
   const imageExtensions = props.uploadImage ? [Image] : [];
 
+  // Character/word count (D-01..D-03). Gated on maxLength being set OR the
+  // `count` slot being filled — a stock <TipTap> with neither registers NO
+  // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
+  // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
+  // cap); otherwise CharacterCount tracks with no limit (soft — overflow
+  // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
+  // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
+  // never[]-inference reason as placeholderExtensions/imageExtensions.
+  const needsCount = props.maxLength != null || slots.count;
+  const characterCountExtensions = needsCount ? [CharacterCount.configure(props.enforceMaxLength && props.maxLength != null ? {
+    limit: props.maxLength
+  } : {})] : [];
+
   // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
   // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
   // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
@@ -792,7 +859,7 @@ onMounted(() => {
     // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
     // of the config-level auto-disable (D-02), which is what actually silences
     // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-    extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(props.starterKit, props.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...props.extensions]),
+    extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(props.starterKit, props.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...props.extensions]),
     editorProps: {
       attributes: {
         'aria-label': props.ariaLabel,
@@ -819,6 +886,7 @@ onMounted(() => {
       lastHtml = next;
       // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
       if (next !== html.value) html.value = next;
+      refreshCount();
       emit('update', next);
     },
     onSelectionUpdate: () => {
@@ -829,6 +897,7 @@ onMounted(() => {
     onBlur: () => emit('blur')
   });
   refreshActive();
+  refreshCount();
 
   // `toolbar` portal slot — when the consumer fills it, mount their toolbar
   // fragment into the engine-adjacent host node, handing them the live editor
@@ -880,10 +949,11 @@ watch(() => html.value, (v: any) => {
     emitUpdate: false
   });
   refreshActive();
+  refreshCount();
 });
 watch(() => props.editable, (v: any) => editor?.setEditable(v, false));
 
-defineExpose({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty });
+defineExpose({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount });
 </script>
 
 <style scoped>
@@ -940,6 +1010,17 @@ defineExpose({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, se
 .rozie-tiptap-content h1 { font-size: 1.5rem; margin: 0.5rem 0 0.375rem; }
 .rozie-tiptap-content h2 { font-size: 1.25rem; margin: 0.5rem 0 0.375rem; }
 .rozie-tiptap-content ul { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+.rozie-tiptap-count {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.25rem 0.625rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.5);
+}
+.rozie-tiptap-count-value.over {
+  color: #c0392b;
+}
 </style>
 
 <style>

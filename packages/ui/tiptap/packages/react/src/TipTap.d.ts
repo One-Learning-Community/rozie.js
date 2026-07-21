@@ -55,10 +55,21 @@ export interface TipTapProps {
    * <TipTap :upload-image="uploadFn" />
    */
   uploadImage?: ((...args: any[]) => any) | null;
+  /**
+   * A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.
+   * @example
+   * <TipTap :max-length="500" />
+   */
+  maxLength?: (number) | null;
+  /**
+   * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
+   */
+  enforceMaxLength?: boolean;
   onUpdate?: (...args: unknown[]) => void;
   onSelectionUpdate?: (...args: unknown[]) => void;
   onFocus?: (...args: unknown[]) => void;
   onBlur?: (...args: unknown[]) => void;
+  renderCount?: (params: { characters: unknown; words: unknown; maxLength: number; over: unknown }) => ReactNode;
   renderToolbar?: (params: { editor: () => void }) => ReactNode;
   renderBubbleMenu?: (params: { editor: () => void }) => ReactNode;
   renderFloatingMenu?: (params: { editor: () => void }) => ReactNode;
@@ -87,6 +98,8 @@ export interface TipTapHandle {
   isActive: (...args: any[]) => any;
   can: (...args: any[]) => any;
   isEmpty: (...args: any[]) => any;
+  getCharacterCount: (...args: any[]) => any;
+  getWordCount: (...args: any[]) => any;
 }
 
 declare const TipTap: React.ForwardRefExoticComponent<TipTapProps & React.RefAttributes<TipTapHandle>>;

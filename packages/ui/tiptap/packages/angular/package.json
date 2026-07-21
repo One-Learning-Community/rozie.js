@@ -47,6 +47,7 @@
     "@tiptap/core": "^3",
     "@tiptap/extensions": "^3",
     "@tiptap/extension-bubble-menu": "^3",
+    "@tiptap/extension-character-count": "^3",
     "@tiptap/extension-floating-menu": "^3",
     "@tiptap/extension-image": "^3",
     "@tiptap/starter-kit": "^3"
@@ -68,6 +69,9 @@
       "optional": false
     },
     "@tiptap/extension-bubble-menu": {
+      "optional": true
+    },
+    "@tiptap/extension-character-count": {
       "optional": true
     },
     "@tiptap/extension-floating-menu": {

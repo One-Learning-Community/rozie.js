@@ -19,15 +19,18 @@
       Floating-UI menu extensions (receive the live editor).
     - A uniform imperative command handle across all six targets ($expose).
 
-  Surface (Phase 32, feature-rich expansion from the original 4 props):
-    - props (11): html[model] / editable / placeholder / autofocus /
+  Surface (Phase 32, feature-rich expansion from the original 4 props;
+  character/word count added quick 260720-tzw):
+    - props (13): html[model] / editable / placeholder / autofocus /
                   editorClass / ariaLabel / editorProps / extensions /
-                  starterKit / nodeSpecs / uploadImage
+                  starterKit / nodeSpecs / uploadImage / maxLength /
+                  enforceMaxLength
     - events (4): update / selectionUpdate / focus / blur
-    - $expose (20): getEditor, focusEditor, blurEditor, getHTML, getJSON,
+    - $expose (22): getEditor, focusEditor, blurEditor, getHTML, getJSON,
                   getText, setContent, clearContent, toggleBold, toggleItalic,
                   toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList,
-                  undo, redo, chain, isActive, can, isEmpty
+                  undo, redo, chain, isActive, can, isEmpty, getCharacterCount,
+                  getWordCount
     - slots (4):  3 mount-once portal slots — `toolbar` (consumer toolbar bound
                   to the editor), `bubbleMenu` + `floatingMenu` (selection-anchored
                   menus over @tiptap/extension-bubble-menu / -floating-menu, each
@@ -155,6 +158,23 @@
       example: '<TipTap :upload-image="uploadFn" />',
     },
   },
+  maxLength: {
+    type: Number,
+    default: null,
+    docs: {
+      description:
+        'A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.',
+      example: '<TipTap :max-length="500" />',
+    },
+  },
+  enforceMaxLength: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.',
+    },
+  },
 }
 </props>
 
@@ -168,6 +188,10 @@
     bulletList: false,
     underline: false,
     orderedList: false,
+  },
+  count: {
+    characters: 0,
+    words: 0,
   },
 }
 </data>
@@ -190,6 +214,13 @@ import { FloatingMenu } from '@tiptap/extension-floating-menu'
 // form to match the BubbleMenu/FloatingMenu import style). Gated on
 // $props.uploadImage — an absent hook registers NO Image extension.
 import { Image } from '@tiptap/extension-image'
+// Character/word count storage extension (D-01/D-02). SEPARATE package, not part
+// of StarterKit, version-pinned in lockstep with core (3.23.5). Named export
+// `CharacterCount` — verified against the installed dist `.d.ts` (re-exported
+// from `@tiptap/extensions`, matching Placeholder's home package; also carries a
+// default export, but the named form matches this file's import style). Gated on
+// $props.maxLength / the `count` slot — an unfilled gate registers NO extension.
+import { CharacterCount } from '@tiptap/extension-character-count'
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
@@ -235,6 +266,20 @@ const refreshActive = () => {
     bulletList: editor.isActive('bulletList'),
     underline:  editor.isActive('underline'),
     orderedList: editor.isActive('orderedList'),
+  }
+}
+
+// Recompute the character/word counter from the live editor (D-05). Robust to
+// CharacterCount being absent (maxLength unset, no #count slot): reads
+// `editor.storage.characterCount` when the extension is registered, else falls
+// back to a plain text derivation so `getCharacterCount`/`getWordCount` and the
+// #count slot's numbers are never stale.
+const refreshCount = () => {
+  if (!editor) return
+  const storage = editor.storage.characterCount
+  $data.count = {
+    characters: storage ? storage.characters() : editor.getText().length,
+    words: storage ? storage.words() : editor.getText().split(/\s+/).filter(Boolean).length,
   }
 }
 
@@ -597,6 +642,19 @@ $onMount(() => {
   // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
   const imageExtensions = $props.uploadImage ? [Image] : []
 
+  // Character/word count (D-01..D-03). Gated on maxLength being set OR the
+  // `count` slot being filled — a stock <TipTap> with neither registers NO
+  // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
+  // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
+  // cap); otherwise CharacterCount tracks with no limit (soft — overflow
+  // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
+  // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
+  // never[]-inference reason as placeholderExtensions/imageExtensions.
+  const needsCount = $props.maxLength != null || $slots.count
+  const characterCountExtensions = needsCount
+    ? [CharacterCount.configure(($props.enforceMaxLength && $props.maxLength != null) ? { limit: $props.maxLength } : {})]
+    : []
+
   // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
   // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
   // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
@@ -622,6 +680,7 @@ $onMount(() => {
       ...nodeViewExtensions,
       ...menuExtensions,
       ...imageExtensions,
+      ...characterCountExtensions,
       ...$props.extensions,
     ]),
     editorProps: {
@@ -643,6 +702,7 @@ $onMount(() => {
       lastHtml = next
       // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
       if (next !== $props.html) $model.html = next
+      refreshCount()
       $emit('update', next)
     },
     onSelectionUpdate: () => {
@@ -653,6 +713,7 @@ $onMount(() => {
     onBlur:  () => $emit('blur'),
   })
   refreshActive()
+  refreshCount()
 
   // `toolbar` portal slot — when the consumer fills it, mount their toolbar
   // fragment into the engine-adjacent host node, handing them the live editor
@@ -703,6 +764,7 @@ $watch(() => $props.html, (v) => {
   lastHtml = v
   editor.commands.setContent(v, { emitUpdate: false })
   refreshActive()
+  refreshCount()
 })
 
 // setEditable's 2nd arg is `emitUpdate` (defaults to true in TipTap v3). Pass
@@ -749,6 +811,7 @@ function setContent(next) {
   editor.commands.setContent(v, { emitUpdate: false })
   $model.html = v
   refreshActive()
+  refreshCount()
 }
 function clearContent() {
   if (!editor) return
@@ -756,6 +819,7 @@ function clearContent() {
   lastHtml = editor.getHTML()
   $model.html = lastHtml
   refreshActive()
+  refreshCount()
 }
 function toggleBold()       { editor?.chain().focus().toggleBold().run();   refreshActive() }
 function toggleItalic()     { editor?.chain().focus().toggleItalic().run(); refreshActive() }
@@ -783,11 +847,17 @@ function chain()            { return editor ? editor.chain().focus() : null }
 function isActive(name, attrs) { return editor ? editor.isActive(name, attrs) : false }
 function can()                 { return editor ? editor.can() : null }
 function isEmpty()             { return editor ? editor.isEmpty : true }
+// Character/word count reads (D-04). Prefer the CharacterCount extension's live
+// storage when registered (maxLength set or #count slot filled); otherwise a
+// text-based fallback so these ALWAYS return a number — 0 before mount, and a
+// correct count even on a stock <TipTap> that never registered CharacterCount.
+function getCharacterCount() { if (!editor) return 0; return editor.storage.characterCount ? editor.storage.characterCount.characters() : editor.getText().length }
+function getWordCount()      { if (!editor) return 0; return editor.storage.characterCount ? editor.storage.characterCount.words() : editor.getText().split(/\s+/).filter(Boolean).length }
 
 $expose({
   getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent,
   toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain,
-  isActive, can, isEmpty,
+  isActive, can, isEmpty, getCharacterCount, getWordCount,
 })
 </script>
 
@@ -815,6 +885,24 @@ $expose({
        fragment here with the live editor in scope. -->
   <div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" ref="toolbarEl" r-if="$props.editable && $slots.toolbar"></div>
   <div ref="editorEl" class="rozie-tiptap-content" :data-placeholder="$props.placeholder" />
+  <!-- Character/word counter (D-05/D-06, quick 260720-tzw). r-if-gated so a
+       stock <TipTap> (no maxLength, no #count slot) renders ZERO markup here —
+       zero overhead, no VR drift. A PLAIN reactive scoped slot (RD-01, the
+       combobox/listbox `<slot name="option" :option=… >` pattern) whose
+       DEFAULT content is the built-in counter; a filled #count slot overrides
+       the display, receiving the SAME reactive numbers. Scope-key names are
+       authored directly in camelCase (`:maxLength`, not `:max-length`) —
+       lowerSlots reads the binding attribute name verbatim with no
+       kebab->camel step, matching this file's/the repo's existing multi-word
+       binding convention (`:columnId`-style bindings elsewhere). ROZ127-clean:
+       `count` ≠ any prop name (html/editable/placeholder/autofocus/
+       editorClass/ariaLabel/editorProps/extensions/starterKit/nodeSpecs/
+       uploadImage/maxLength/enforceMaxLength). -->
+  <div class="rozie-tiptap-count" r-if="$props.maxLength != null || $slots.count">
+    <slot name="count" :characters="$data.count.characters" :words="$data.count.words" :maxLength="$props.maxLength" :over="$props.maxLength != null && $data.count.characters > $props.maxLength">
+      <span class="rozie-tiptap-count-value" :class="{ over: $props.maxLength != null && $data.count.characters > $props.maxLength }">{{ $data.count.characters }} / {{ $props.maxLength }}</span>
+    </slot>
+  </div>
 </div>
 <!--
   Portal-slot primitive (Spike 003). The `toolbar` slot is declared but NOT
@@ -925,6 +1013,18 @@ $expose({
 .rozie-tiptap-content h1 { font-size: 1.5rem; margin: 0.5rem 0 0.375rem; }
 .rozie-tiptap-content h2 { font-size: 1.25rem; margin: 0.5rem 0 0.375rem; }
 .rozie-tiptap-content ul { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+
+.rozie-tiptap-count {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.25rem 0.625rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.5);
+}
+.rozie-tiptap-count-value.over {
+  color: #c0392b;
+}
 
 /* Placeholder ghost-text (G3) via the :root { } engine-DOM escape hatch (Phase
    34). The Placeholder extension adds `.is-editor-empty` + a `data-placeholder`

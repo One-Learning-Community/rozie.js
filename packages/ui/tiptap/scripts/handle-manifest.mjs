@@ -13,7 +13,7 @@
  *   - The focus/blur COMMANDS are `focusEditor`/`blurEditor`, NOT `focus`/`blur`
  *     — the component emits `focus`/`blur` EVENTS, and on class-based targets
  *     (Angular) an output field and a method cannot share a name (ROZ121).
- *   - None of the 20 names collides with the 9 props or LitElement lifecycle.
+ *   - None of the 22 names collides with the 11 props or LitElement lifecycle.
  */
 export const handleManifest = {
   getEditor:
@@ -44,6 +44,10 @@ export const handleManifest = {
     'Return the command-availability chain — `can().chain().focus().toggleBold().run()` returns a boolean — for enabling/disabling custom-toolbar buttons. null before mount.',
   isEmpty:
     'Whether the document is empty — drives empty-state UI and submit-gating. true before mount.',
+  getCharacterCount:
+    'Return the current character count. Reads the CharacterCount extension\'s live storage when registered (`maxLength` set or the `#count` slot filled), else falls back to `getText().length`. Always a number — 0 before mount.',
+  getWordCount:
+    'Return the current word count. Reads the CharacterCount extension\'s live storage when registered, else falls back to a whitespace-split count of `getText()`. Always a number — 0 before mount.',
 };
 
 export default handleManifest;

@@ -28,6 +28,7 @@ export default defineConfig({
     '@tiptap/core',
     '@tiptap/starter-kit',
     '@tiptap/extension-image',
+    '@tiptap/extension-character-count',
     /\.css$/,
   ],
   copy: [{ from: 'src/TipTap.css', to: 'dist', flatten: true }],

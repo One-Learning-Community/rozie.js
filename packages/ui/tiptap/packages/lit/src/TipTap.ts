@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, render } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { adoptDocumentStyles, createLitControllableProperty, injectGlobalStyles } from '@rozie/runtime-lit';
+import { adoptDocumentStyles, createLitControllableProperty, injectGlobalStyles, rozieDisplay } from '@rozie/runtime-lit';
 import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
@@ -19,10 +19,24 @@ import { FloatingMenu } from '@tiptap/extension-floating-menu';
 // form to match the BubbleMenu/FloatingMenu import style). Gated on
 // $props.uploadImage — an absent hook registers NO Image extension.
 import { Image } from '@tiptap/extension-image';
+// Character/word count storage extension (D-01/D-02). SEPARATE package, not part
+// of StarterKit, version-pinned in lockstep with core (3.23.5). Named export
+// `CharacterCount` — verified against the installed dist `.d.ts` (re-exported
+// from `@tiptap/extensions`, matching Placeholder's home package; also carries a
+// default export, but the named form matches this file's import style). Gated on
+// $props.maxLength / the `count` slot — an unfilled gate registers NO extension.
+import { CharacterCount } from '@tiptap/extension-character-count';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
+
+interface RozieCountSlotCtx {
+  characters: any;
+  words: any;
+  maxLength: any;
+  over: any;
+}
 
 interface RozieToolbarSlotCtx {
   editor: any;
@@ -102,6 +116,17 @@ export default class TipTap extends SignalWatcher(LitElement) {
 .rozie-tiptap-content[data-rozie-s-2aeee876] h1[data-rozie-s-2aeee876] { font-size: 1.5rem; margin: 0.5rem 0 0.375rem; }
 .rozie-tiptap-content[data-rozie-s-2aeee876] h2[data-rozie-s-2aeee876] { font-size: 1.25rem; margin: 0.5rem 0 0.375rem; }
 .rozie-tiptap-content[data-rozie-s-2aeee876] ul[data-rozie-s-2aeee876] { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+.rozie-tiptap-count[data-rozie-s-2aeee876] {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.25rem 0.625rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.5);
+}
+.rozie-tiptap-count-value.over[data-rozie-s-2aeee876] {
+  color: #c0392b;
+}
 .rozie-tiptap-content .is-editor-empty:first-child::before {
     content: attr(data-placeholder);
     color: rgba(0, 0, 0, 0.4);
@@ -162,6 +187,16 @@ export default class TipTap extends SignalWatcher(LitElement) {
    * <TipTap :upload-image="uploadFn" />
    */
   @property({ type: Function }) uploadImage: ((...args: any[]) => any) | null = null;
+  /**
+   * A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.
+   * @example
+   * <TipTap :max-length="500" />
+   */
+  @property({ type: Number, reflect: true }) maxLength: number | null = null;
+  /**
+   * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
+   */
+  @property({ type: Boolean, reflect: true }) enforceMaxLength: boolean = false;
   private _active = signal({
   bold: false,
   italic: false,
@@ -171,12 +206,19 @@ export default class TipTap extends SignalWatcher(LitElement) {
   underline: false,
   orderedList: false
 });
+  private _count = signal({
+  characters: 0,
+  words: 0
+});
   @query('[data-rozie-ref="toolbarEl"]') private _refToolbarEl!: HTMLElement;
   @query('[data-rozie-ref="editorEl"]') private _refEditorEl!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieFirstUpdateDone = false;
 private _portalContainers = new Set<HTMLElement>();
 
+  @state() private _hasSlotCount = false;
+  @queryAssignedElements({ slot: 'count', flatten: true }) private _slotCountElements!: Element[];
+  @property({ attribute: false }) count?: (scope: { characters: any; words: any; maxLength: any; over: any }) => unknown;
   @state() private _hasSlotToolbar = false;
   @queryAssignedElements({ slot: 'toolbar', flatten: true }) private _slotToolbarElements!: Element[];
   @property({ attribute: false }) toolbar?: (scope: { editor: any }) => unknown;
@@ -196,6 +238,17 @@ private _portalContainers = new Set<HTMLElement>();
   private _rozieTornDown = false;
 
   private _armListeners(): void {
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="count"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotCount = this._slotCountElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
+
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="toolbar"]');
       if (slotEl !== null && slotEl !== undefined) {
@@ -243,6 +296,7 @@ private _portalContainers = new Set<HTMLElement>();
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotCount = Array.from(this.children).some((el) => el.getAttribute('slot') === 'count');
     this._hasSlotToolbar = Array.from(this.children).some((el) => el.getAttribute('slot') === 'toolbar');
     this._hasSlotBubbleMenu = Array.from(this.children).some((el) => el.getAttribute('slot') === 'bubbleMenu');
     this._hasSlotFloatingMenu = Array.from(this.children).some((el) => el.getAttribute('slot') === 'floatingMenu');
@@ -335,6 +389,7 @@ private _portalContainers = new Set<HTMLElement>();
         emitUpdate: false
       });
       this.refreshActive();
+      this.refreshCount();
     })(__watchVal); }); }));
 
     this.lastHtml = this.html;
@@ -423,6 +478,27 @@ private _portalContainers = new Set<HTMLElement>();
     // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
     const imageExtensions = this.uploadImage ? [Image] : [];
 
+    // Character/word count (D-01..D-03). Gated on maxLength being set OR the
+    // `count` slot being filled — a stock <TipTap> with neither registers NO
+    // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
+    // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
+    // cap); otherwise CharacterCount tracks with no limit (soft — overflow
+    // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
+    // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
+    // never[]-inference reason as placeholderExtensions/imageExtensions.
+    // Character/word count (D-01..D-03). Gated on maxLength being set OR the
+    // `count` slot being filled — a stock <TipTap> with neither registers NO
+    // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
+    // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
+    // cap); otherwise CharacterCount tracks with no limit (soft — overflow
+    // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
+    // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
+    // never[]-inference reason as placeholderExtensions/imageExtensions.
+    const needsCount = this.maxLength != null || this._hasSlotCount || this.count !== undefined;
+    const characterCountExtensions = needsCount ? [CharacterCount.configure(this.enforceMaxLength && this.maxLength != null ? {
+      limit: this.maxLength
+    } : {})] : [];
+
     // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
     // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
     // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
@@ -449,7 +525,7 @@ private _portalContainers = new Set<HTMLElement>();
       // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
       // of the config-level auto-disable (D-02), which is what actually silences
       // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-      extensions: this.dedupeExtensionsByName([StarterKit.configure(this.buildStarterKitConfig(this.starterKit, this.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...this.extensions]),
+      extensions: this.dedupeExtensionsByName([StarterKit.configure(this.buildStarterKitConfig(this.starterKit, this.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...this.extensions]),
       editorProps: {
         attributes: {
           'aria-label': this.ariaLabel,
@@ -476,6 +552,7 @@ private _portalContainers = new Set<HTMLElement>();
         this.lastHtml = next;
         // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
         if (next !== this.html) this._htmlControllable.write(next);
+        this.refreshCount();
         this.dispatchEvent(new CustomEvent("update", {
           detail: next,
           bubbles: true,
@@ -502,6 +579,7 @@ private _portalContainers = new Set<HTMLElement>();
       }))
     });
     this.refreshActive();
+    this.refreshCount();
 
     // `toolbar` portal slot — when the consumer fills it, mount their toolbar
     // fragment into the engine-adjacent host node, handing them the live editor
@@ -589,7 +667,12 @@ private _portalContainers = new Set<HTMLElement>();
     <button type="button" aria-label="Undo" @click=${this.undo} data-rozie-s-2aeee876>↺</button>
     <button type="button" aria-label="Redo" @click=${this.redo} data-rozie-s-2aeee876>↻</button>
   </div>` : nothing}${this.editable && this.toolbar !== undefined ? html`<div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" data-rozie-ref="toolbarEl" data-rozie-s-2aeee876></div>` : nothing}<div class="rozie-tiptap-content" data-placeholder=${this.placeholder} data-rozie-ref="editorEl" data-rozie-s-2aeee876></div>
-</div>
+  
+  ${this.maxLength != null || this._hasSlotCount || this.count !== undefined ? html`<div class="rozie-tiptap-count" data-rozie-s-2aeee876>
+    ${this.count !== undefined ? this.count({characters: this._count.value.characters, words: this._count.value.words, maxLength: this.maxLength, over: this.maxLength != null && this._count.value.characters > this.maxLength}) : html`<slot name="count" data-rozie-params=${(() => { try { return JSON.stringify({characters: this._count.value.characters, words: this._count.value.words, maxLength: this.maxLength, over: this.maxLength != null && this._count.value.characters > this.maxLength}); } catch { return '{}'; } })()}>
+      <span class="${Object.entries({ "rozie-tiptap-count-value": true, over: this.maxLength != null && this._count.value.characters > this.maxLength }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-rozie-s-2aeee876>${rozieDisplay(this._count.value.characters)} / ${this.maxLength}</span>
+    </slot>`}
+  </div>` : nothing}</div>
 
 <slot name="toolbar"></slot>
 
@@ -628,6 +711,15 @@ private _portalContainers = new Set<HTMLElement>();
     bulletList: this.editor.isActive('bulletList'),
     underline: this.editor.isActive('underline'),
     orderedList: this.editor.isActive('orderedList')
+  };
+};
+
+  refreshCount = () => {
+  if (!this.editor) return;
+  const storage = this.editor.storage.characterCount;
+  this._count.value = {
+    characters: storage ? storage.characters() : this.editor.getText().length,
+    words: storage ? storage.words() : this.editor.getText().split(/\s+/).filter(Boolean).length
   };
 };
 
@@ -922,6 +1014,7 @@ private _portalContainers = new Set<HTMLElement>();
     });
     this._htmlControllable.write(v);
     this.refreshActive();
+    this.refreshCount();
   }
 
   clearContent() {
@@ -930,6 +1023,7 @@ private _portalContainers = new Set<HTMLElement>();
     this.lastHtml = this.editor.getHTML();
     this._htmlControllable.write(this.lastHtml);
     this.refreshActive();
+    this.refreshCount();
   }
 
   toggleBold() {
@@ -988,6 +1082,16 @@ private _portalContainers = new Set<HTMLElement>();
 
   isEmpty() {
     return this.editor ? this.editor.isEmpty : true;
+  }
+
+  getCharacterCount() {
+    if (!this.editor) return 0;
+    return this.editor.storage.characterCount ? this.editor.storage.characterCount.characters() : this.editor.getText().length;
+  }
+
+  getWordCount() {
+    if (!this.editor) return 0;
+    return this.editor.storage.characterCount ? this.editor.storage.characterCount.words() : this.editor.getText().split(/\s+/).filter(Boolean).length;
   }
 
   get html(): string { return this._htmlControllable.read(); }

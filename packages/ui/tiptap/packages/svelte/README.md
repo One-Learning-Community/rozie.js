@@ -37,6 +37,8 @@ Peer dependencies: the `@tiptap/core` + `@tiptap/starter-kit` engine (`^3`) + `s
 | `starterKit` | `Object` | `{}` |  |
 | `nodeSpecs` | `Array` | `[]` |  |
 | `uploadImage` | `Function` | `null` |  |
+| `maxLength` | `Number` | `null` |  |
+| `enforceMaxLength` | `Boolean` | `false` |  |
 
 ## Events
 
@@ -82,6 +84,8 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | `isActive` | Whether a mark/node is active in the current selection — `isActive(name, attrs?)` (e.g. `isActive("heading", { level: 2 })`). Drives custom-toolbar active styling. False before mount. |
 | `can` | Return the command-availability chain — `can().chain().focus().toggleBold().run()` returns a boolean — for enabling/disabling custom-toolbar buttons. null before mount. |
 | `isEmpty` | Whether the document is empty — drives empty-state UI and submit-gating. true before mount. |
+| `getCharacterCount` | Return the current character count. Reads the CharacterCount extension's live storage when registered (`maxLength` set or the `#count` slot filled), else falls back to `getText().length`. Always a number — 0 before mount. |
+| `getWordCount` | Return the current word count. Reads the CharacterCount extension's live storage when registered, else falls back to a whitespace-split count of `getText()`. Always a number — 0 before mount. |
 
 ## Slots
 
@@ -93,6 +97,7 @@ When you fill the `toolbar` slot the internal toolbar is replaced by your own UI
 
 | Slot | Params |
 | --- | --- |
+| count | characters, words, maxLength, over |
 | toolbar | editor |
 | bubbleMenu | editor |
 | floatingMenu | editor |

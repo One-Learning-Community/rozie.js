@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import type { ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { clsx, useControllableState } from '@rozie/runtime-react';
+import { clsx, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './TipTap.css';
 import './TipTap.global.css';
 import { Editor, Node } from '@tiptap/core';
@@ -22,10 +22,19 @@ import { FloatingMenu } from '@tiptap/extension-floating-menu';
 // form to match the BubbleMenu/FloatingMenu import style). Gated on
 // $props.uploadImage — an absent hook registers NO Image extension.
 import { Image } from '@tiptap/extension-image';
+// Character/word count storage extension (D-01/D-02). SEPARATE package, not part
+// of StarterKit, version-pinned in lockstep with core (3.23.5). Named export
+// `CharacterCount` — verified against the installed dist `.d.ts` (re-exported
+// from `@tiptap/extensions`, matching Placeholder's home package; also carries a
+// default export, but the named form matches this file's import style). Gated on
+// $props.maxLength / the `count` slot — an unfilled gate registers NO extension.
+import { CharacterCount } from '@tiptap/extension-character-count';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
+
+interface CountCtx { characters: any; words: any; maxLength: any; over: any; }
 
 interface ToolbarCtx { editor: any; }
 
@@ -88,10 +97,21 @@ interface TipTapProps {
    * <TipTap :upload-image="uploadFn" />
    */
   uploadImage?: ((...args: any[]) => any) | null;
+  /**
+   * A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.
+   * @example
+   * <TipTap :max-length="500" />
+   */
+  maxLength?: (number) | null;
+  /**
+   * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
+   */
+  enforceMaxLength?: boolean;
   onUpdate?: (...args: any[]) => void;
   onSelectionUpdate?: (...args: any[]) => void;
   onFocus?: (...args: any[]) => void;
   onBlur?: (...args: any[]) => void;
+  renderCount?: (ctx: CountCtx) => ReactNode;
   renderToolbar?: (ctx: ToolbarCtx) => ReactNode;
   renderBubbleMenu?: (ctx: BubbleMenuCtx) => ReactNode;
   renderFloatingMenu?: (ctx: FloatingMenuCtx) => ReactNode;
@@ -120,6 +140,8 @@ export interface TipTapHandle {
   isActive: (...args: any[]) => any;
   can: (...args: any[]) => any;
   isEmpty: (...args: any[]) => any;
+  getCharacterCount: (...args: any[]) => any;
+  getWordCount: (...args: any[]) => any;
 }
 
 const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: TipTapProps, ref): JSX.Element {
@@ -128,7 +150,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   const __defaultExtensions = useState(() => (() => [])())[0];
   const __defaultStarterKit = useState(() => (() => ({}))())[0];
   const __defaultNodeSpecs = useState(() => (() => [])())[0];
-  const props: Omit<TipTapProps, 'editable' | 'placeholder' | 'autofocus' | 'editorClass' | 'ariaLabel' | 'editorProps' | 'extensions' | 'starterKit' | 'nodeSpecs' | 'uploadImage'> & { editable: boolean; placeholder: string; autofocus: boolean; editorClass: string; ariaLabel: string; editorProps: Record<string, any>; extensions: any[]; starterKit: Record<string, any>; nodeSpecs: any[]; uploadImage: ((...args: any[]) => any) | null } = {
+  const props: Omit<TipTapProps, 'editable' | 'placeholder' | 'autofocus' | 'editorClass' | 'ariaLabel' | 'editorProps' | 'extensions' | 'starterKit' | 'nodeSpecs' | 'uploadImage' | 'maxLength' | 'enforceMaxLength'> & { editable: boolean; placeholder: string; autofocus: boolean; editorClass: string; ariaLabel: string; editorProps: Record<string, any>; extensions: any[]; starterKit: Record<string, any>; nodeSpecs: any[]; uploadImage: ((...args: any[]) => any) | null; maxLength: (number) | null; enforceMaxLength: boolean } = {
     ..._props,
     editable: _props.editable ?? true,
     placeholder: _props.placeholder ?? '',
@@ -140,6 +162,8 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     starterKit: _props.starterKit ?? __defaultStarterKit,
     nodeSpecs: _props.nodeSpecs ?? __defaultNodeSpecs,
     uploadImage: _props.uploadImage ?? null,
+    maxLength: _props.maxLength ?? null,
+    enforceMaxLength: _props.enforceMaxLength ?? false,
   };
   const _renderToolbarRef = useRef(props.renderToolbar);
   _renderToolbarRef.current = props.renderToolbar;
@@ -174,6 +198,10 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     underline: false,
     orderedList: false
   });
+  const [count, setCount] = useState({
+    characters: 0,
+    words: 0
+  });
   const toolbarEl = useRef<HTMLDivElement | null>(null);
   const editorEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
@@ -193,6 +221,14 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       bulletList: editor.current.isActive('bulletList'),
       underline: editor.current.isActive('underline'),
       orderedList: editor.current.isActive('orderedList')
+    });
+  }, []);
+  const refreshCount = useCallback(() => {
+    if (!editor.current) return;
+    const storage = editor.current.storage.characterCount;
+    setCount({
+      characters: storage ? storage.characters() : editor.current.getText().length,
+      words: storage ? storage.words() : editor.current.getText().split(/\s+/).filter(Boolean).length
     });
   }, []);
   // ── StarterKit collision-aware config (ask A). StarterKit bundles several
@@ -545,6 +581,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     });
     setHtml(v);
     refreshActive();
+    refreshCount();
   }
   function clearContent() {
     if (!editor.current) return;
@@ -552,6 +589,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     lastHtml.current = editor.current.getHTML();
     setHtml(lastHtml.current);
     refreshActive();
+    refreshCount();
   }
   function toggleBold() {
     editor.current?.chain().focus().toggleBold().run();
@@ -620,6 +658,22 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   }
   function isEmpty() {
     return editor.current ? editor.current.isEmpty : true;
+  }
+  // Character/word count reads (D-04). Prefer the CharacterCount extension's live
+  // storage when registered (maxLength set or #count slot filled); otherwise a
+  // text-based fallback so these ALWAYS return a number — 0 before mount, and a
+  // correct count even on a stock <TipTap> that never registered CharacterCount.
+  // Character/word count reads (D-04). Prefer the CharacterCount extension's live
+  // storage when registered (maxLength set or #count slot filled); otherwise a
+  // text-based fallback so these ALWAYS return a number — 0 before mount, and a
+  // correct count even on a stock <TipTap> that never registered CharacterCount.
+  function getCharacterCount() {
+    if (!editor.current) return 0;
+    return editor.current.storage.characterCount ? editor.current.storage.characterCount.characters() : editor.current.getText().length;
+  }
+  function getWordCount() {
+    if (!editor.current) return 0;
+    return editor.current.storage.characterCount ? editor.current.storage.characterCount.words() : editor.current.getText().split(/\s+/).filter(Boolean).length;
   }
 
   useEffect(() => {
@@ -750,6 +804,19 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
     const imageExtensions = props.uploadImage ? [Image] : [];
 
+    // Character/word count (D-01..D-03). Gated on maxLength being set OR the
+    // `count` slot being filled — a stock <TipTap> with neither registers NO
+    // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
+    // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
+    // cap); otherwise CharacterCount tracks with no limit (soft — overflow
+    // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
+    // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
+    // never[]-inference reason as placeholderExtensions/imageExtensions.
+    const needsCount = props.maxLength != null || (props.renderCount ?? props.slots?.["count"]);
+    const characterCountExtensions = needsCount ? [CharacterCount.configure(props.enforceMaxLength && props.maxLength != null ? {
+      limit: props.maxLength
+    } : {})] : [];
+
     // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
     // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
     // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
@@ -771,7 +838,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
       // of the config-level auto-disable (D-02), which is what actually silences
       // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-      extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(props.starterKit, props.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...props.extensions]),
+      extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(props.starterKit, props.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...props.extensions]),
       editorProps: {
         attributes: {
           'aria-label': props.ariaLabel,
@@ -798,6 +865,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         lastHtml.current = next;
         // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
         if (next !== _htmlRef.current) setHtml(next);
+        refreshCount();
         props.onUpdate && props.onUpdate(next);
       },
       onSelectionUpdate: () => {
@@ -808,6 +876,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       onBlur: () => props.onBlur && props.onBlur()
     });
     refreshActive();
+    refreshCount();
 
     // `toolbar` portal slot — when the consumer fills it, mount their toolbar
     // fragment into the engine-adjacent host node, handing them the live editor
@@ -861,6 +930,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       emitUpdate: false
     });
     refreshActive();
+    refreshCount();
   }, [html]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
@@ -868,9 +938,9 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     editor.current?.setEditable(v, false);
   }, [props.editable]);
 
-  const _rozieExposeRef = useRef({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty });
-  _rozieExposeRef.current = { getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty };
-  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => _rozieExposeRef.current.getEditor(...args), focusEditor: (...args: Parameters<typeof focusEditor>): ReturnType<typeof focusEditor> => _rozieExposeRef.current.focusEditor(...args), blurEditor: (...args: Parameters<typeof blurEditor>): ReturnType<typeof blurEditor> => _rozieExposeRef.current.blurEditor(...args), getHTML: (...args: Parameters<typeof getHTML>): ReturnType<typeof getHTML> => _rozieExposeRef.current.getHTML(...args), getJSON: (...args: Parameters<typeof getJSON>): ReturnType<typeof getJSON> => _rozieExposeRef.current.getJSON(...args), getText: (...args: Parameters<typeof getText>): ReturnType<typeof getText> => _rozieExposeRef.current.getText(...args), setContent: (...args: Parameters<typeof setContent>): ReturnType<typeof setContent> => _rozieExposeRef.current.setContent(...args), clearContent: (...args: Parameters<typeof clearContent>): ReturnType<typeof clearContent> => _rozieExposeRef.current.clearContent(...args), toggleBold: (...args: Parameters<typeof toggleBold>): ReturnType<typeof toggleBold> => _rozieExposeRef.current.toggleBold(...args), toggleItalic: (...args: Parameters<typeof toggleItalic>): ReturnType<typeof toggleItalic> => _rozieExposeRef.current.toggleItalic(...args), toggleHeading: (...args: Parameters<typeof toggleHeading>): ReturnType<typeof toggleHeading> => _rozieExposeRef.current.toggleHeading(...args), toggleBulletList: (...args: Parameters<typeof toggleBulletList>): ReturnType<typeof toggleBulletList> => _rozieExposeRef.current.toggleBulletList(...args), toggleUnderline: (...args: Parameters<typeof toggleUnderline>): ReturnType<typeof toggleUnderline> => _rozieExposeRef.current.toggleUnderline(...args), toggleOrderedList: (...args: Parameters<typeof toggleOrderedList>): ReturnType<typeof toggleOrderedList> => _rozieExposeRef.current.toggleOrderedList(...args), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => _rozieExposeRef.current.undo(...args), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => _rozieExposeRef.current.redo(...args), chain: (...args: Parameters<typeof chain>): ReturnType<typeof chain> => _rozieExposeRef.current.chain(...args), isActive: (...args: Parameters<typeof isActive>): ReturnType<typeof isActive> => _rozieExposeRef.current.isActive(...args), can: (...args: Parameters<typeof can>): ReturnType<typeof can> => _rozieExposeRef.current.can(...args), isEmpty: (...args: Parameters<typeof isEmpty>): ReturnType<typeof isEmpty> => _rozieExposeRef.current.isEmpty(...args) }), []);
+  const _rozieExposeRef = useRef({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount });
+  _rozieExposeRef.current = { getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount };
+  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => _rozieExposeRef.current.getEditor(...args), focusEditor: (...args: Parameters<typeof focusEditor>): ReturnType<typeof focusEditor> => _rozieExposeRef.current.focusEditor(...args), blurEditor: (...args: Parameters<typeof blurEditor>): ReturnType<typeof blurEditor> => _rozieExposeRef.current.blurEditor(...args), getHTML: (...args: Parameters<typeof getHTML>): ReturnType<typeof getHTML> => _rozieExposeRef.current.getHTML(...args), getJSON: (...args: Parameters<typeof getJSON>): ReturnType<typeof getJSON> => _rozieExposeRef.current.getJSON(...args), getText: (...args: Parameters<typeof getText>): ReturnType<typeof getText> => _rozieExposeRef.current.getText(...args), setContent: (...args: Parameters<typeof setContent>): ReturnType<typeof setContent> => _rozieExposeRef.current.setContent(...args), clearContent: (...args: Parameters<typeof clearContent>): ReturnType<typeof clearContent> => _rozieExposeRef.current.clearContent(...args), toggleBold: (...args: Parameters<typeof toggleBold>): ReturnType<typeof toggleBold> => _rozieExposeRef.current.toggleBold(...args), toggleItalic: (...args: Parameters<typeof toggleItalic>): ReturnType<typeof toggleItalic> => _rozieExposeRef.current.toggleItalic(...args), toggleHeading: (...args: Parameters<typeof toggleHeading>): ReturnType<typeof toggleHeading> => _rozieExposeRef.current.toggleHeading(...args), toggleBulletList: (...args: Parameters<typeof toggleBulletList>): ReturnType<typeof toggleBulletList> => _rozieExposeRef.current.toggleBulletList(...args), toggleUnderline: (...args: Parameters<typeof toggleUnderline>): ReturnType<typeof toggleUnderline> => _rozieExposeRef.current.toggleUnderline(...args), toggleOrderedList: (...args: Parameters<typeof toggleOrderedList>): ReturnType<typeof toggleOrderedList> => _rozieExposeRef.current.toggleOrderedList(...args), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => _rozieExposeRef.current.undo(...args), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => _rozieExposeRef.current.redo(...args), chain: (...args: Parameters<typeof chain>): ReturnType<typeof chain> => _rozieExposeRef.current.chain(...args), isActive: (...args: Parameters<typeof isActive>): ReturnType<typeof isActive> => _rozieExposeRef.current.isActive(...args), can: (...args: Parameters<typeof can>): ReturnType<typeof can> => _rozieExposeRef.current.can(...args), isEmpty: (...args: Parameters<typeof isEmpty>): ReturnType<typeof isEmpty> => _rozieExposeRef.current.isEmpty(...args), getCharacterCount: (...args: Parameters<typeof getCharacterCount>): ReturnType<typeof getCharacterCount> => _rozieExposeRef.current.getCharacterCount(...args), getWordCount: (...args: Parameters<typeof getWordCount>): ReturnType<typeof getWordCount> => _rozieExposeRef.current.getWordCount(...args) }), []);
 
   return (
     <>
@@ -890,7 +960,10 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         <button type="button" aria-label="Undo" onClick={undo} data-rozie-s-2aeee876="">↺</button>
         <button type="button" aria-label="Redo" onClick={redo} data-rozie-s-2aeee876="">↻</button>
       </div>}{!!(props.editable && (props.renderToolbar ?? props.slots?.['toolbar'])) && <div className={"rozie-tiptap-toolbar rozie-tiptap-toolbar--slot"} ref={toolbarEl} data-rozie-s-2aeee876="" />}<div ref={editorEl} className={"rozie-tiptap-content"} data-placeholder={props.placeholder} data-rozie-s-2aeee876="" />
-    </div>
+      
+      {!!(props.maxLength != null || (props.renderCount ?? props.slots?.['count'])) && <div className={"rozie-tiptap-count"} data-rozie-s-2aeee876="">
+        {(props.renderCount ?? props.slots?.['count']) ? ((props.renderCount ?? props.slots?.['count']) as Function)({ characters: count.characters, words: count.words, maxLength: props.maxLength, over: props.maxLength != null && count.characters > props.maxLength }) : <span className={clsx("rozie-tiptap-count-value", { over: props.maxLength != null && count.characters > props.maxLength })} data-rozie-s-2aeee876="">{rozieDisplay(count.characters)} / {props.maxLength}</span>}
+      </div>}</div>
 
 
 

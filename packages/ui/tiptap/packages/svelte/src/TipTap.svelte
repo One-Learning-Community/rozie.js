@@ -1,4 +1,6 @@
 <script lang="ts">
+import { rozieDisplay } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
 import { mount, unmount } from 'svelte';
 import PortalHost from '@rozie/runtime-svelte/PortalHost.svelte';
@@ -56,6 +58,17 @@ interface Props {
    * <TipTap :upload-image="uploadFn" />
    */
   uploadImage?: ((...args: any[]) => any) | null;
+  /**
+   * A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.
+   * @example
+   * <TipTap :max-length="500" />
+   */
+  maxLength?: (number) | null;
+  /**
+   * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
+   */
+  enforceMaxLength?: boolean;
+  count?: Snippet<[{ characters: any; words: any; maxLength: any; over: any }]>;
   toolbar?: Snippet<[{ editor: any }]>;
   bubbleMenu?: Snippet<[{ editor: any }]>;
   floatingMenu?: Snippet<[{ editor: any }]>;
@@ -84,6 +97,9 @@ let {
   starterKit = __defaultStarterKit,
   nodeSpecs = __defaultNodeSpecs,
   uploadImage = null,
+  maxLength = null,
+  enforceMaxLength = false,
+  count: __countProp,
   toolbar: __toolbarProp,
   bubbleMenu: __bubbleMenuProp,
   floatingMenu: __floatingMenuProp,
@@ -95,6 +111,7 @@ let {
   onblur
 }: Props = $props();
 
+const countSlot = $derived(__countProp ?? snippets?.count);
 const toolbar = $derived(__toolbarProp ?? snippets?.toolbar);
 const bubbleMenu = $derived(__bubbleMenuProp ?? snippets?.bubbleMenu);
 const floatingMenu = $derived(__floatingMenuProp ?? snippets?.floatingMenu);
@@ -108,6 +125,10 @@ let active = $state({
   bulletList: false,
   underline: false,
   orderedList: false
+});
+let count = $state({
+  characters: 0,
+  words: 0
 });
 
 let toolbarEl = $state<HTMLElement | undefined>(undefined);
@@ -130,6 +151,13 @@ import { FloatingMenu } from '@tiptap/extension-floating-menu';
 // form to match the BubbleMenu/FloatingMenu import style). Gated on
 // $props.uploadImage — an absent hook registers NO Image extension.
 import { Image } from '@tiptap/extension-image';
+// Character/word count storage extension (D-01/D-02). SEPARATE package, not part
+// of StarterKit, version-pinned in lockstep with core (3.23.5). Named export
+// `CharacterCount` — verified against the installed dist `.d.ts` (re-exported
+// from `@tiptap/extensions`, matching Placeholder's home package; also carries a
+// default export, but the named form matches this file's import style). Gated on
+// $props.maxLength / the `count` slot — an unfilled gate registers NO extension.
+import { CharacterCount } from '@tiptap/extension-character-count';
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
 // declaration trap (the Chart.js canvasEl/canvasNode lesson).
@@ -174,6 +202,19 @@ const refreshActive = () => {
     bulletList: editor.isActive('bulletList'),
     underline: editor.isActive('underline'),
     orderedList: editor.isActive('orderedList')
+  };
+};
+// Recompute the character/word counter from the live editor (D-05). Robust to
+// CharacterCount being absent (maxLength unset, no #count slot): reads
+// `editor.storage.characterCount` when the extension is registered, else falls
+// back to a plain text derivation so `getCharacterCount`/`getWordCount` and the
+// #count slot's numbers are never stale.
+const refreshCount = () => {
+  if (!editor) return;
+  const storage = editor.storage.characterCount;
+  count = {
+    characters: storage ? storage.characters() : editor.getText().length,
+    words: storage ? storage.words() : editor.getText().split(/\s+/).filter(Boolean).length
   };
 };
 // ── StarterKit collision-aware config (ask A). StarterKit bundles several
@@ -568,6 +609,7 @@ export function setContent(next: any) {
   });
   html = v;
   refreshActive();
+  refreshCount();
 }
 export function clearContent() {
   if (!editor) return;
@@ -575,6 +617,7 @@ export function clearContent() {
   lastHtml = editor.getHTML();
   html = lastHtml;
   refreshActive();
+  refreshCount();
 }
 export function toggleBold() {
   editor?.chain().focus().toggleBold().run();
@@ -632,6 +675,18 @@ export function can() {
 }
 export function isEmpty() {
   return editor ? editor.isEmpty : true;
+}
+// Character/word count reads (D-04). Prefer the CharacterCount extension's live
+// storage when registered (maxLength set or #count slot filled); otherwise a
+// text-based fallback so these ALWAYS return a number — 0 before mount, and a
+// correct count even on a stock <TipTap> that never registered CharacterCount.
+export function getCharacterCount() {
+  if (!editor) return 0;
+  return editor.storage.characterCount ? editor.storage.characterCount.characters() : editor.getText().length;
+}
+export function getWordCount() {
+  if (!editor) return 0;
+  return editor.storage.characterCount ? editor.storage.characterCount.words() : editor.getText().split(/\s+/).filter(Boolean).length;
 }
 
 interface ReactivePortalHandle {
@@ -763,6 +818,19 @@ onMount(() => {
   // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
   const imageExtensions = uploadImage ? [Image] : [];
 
+  // Character/word count (D-01..D-03). Gated on maxLength being set OR the
+  // `count` slot being filled — a stock <TipTap> with neither registers NO
+  // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
+  // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
+  // cap); otherwise CharacterCount tracks with no limit (soft — overflow
+  // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
+  // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
+  // never[]-inference reason as placeholderExtensions/imageExtensions.
+  const needsCount = maxLength != null || countSlot;
+  const characterCountExtensions = needsCount ? [CharacterCount.configure(enforceMaxLength && maxLength != null ? {
+    limit: maxLength
+  } : {})] : [];
+
   // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
   // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
   // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
@@ -784,7 +852,7 @@ onMount(() => {
     // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
     // of the config-level auto-disable (D-02), which is what actually silences
     // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-    extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(starterKit, extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...extensions]),
+    extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(starterKit, extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...extensions]),
     editorProps: {
       attributes: {
         'aria-label': ariaLabel,
@@ -811,6 +879,7 @@ onMount(() => {
       lastHtml = next;
       // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
       if (next !== html) html = next;
+      refreshCount();
       onupdate?.(next);
     },
     onSelectionUpdate: () => {
@@ -821,6 +890,7 @@ onMount(() => {
     onBlur: () => onblur?.()
   });
   refreshActive();
+  refreshCount();
 
   // `toolbar` portal slot — when the consumer fills it, mount their toolbar
   // fragment into the engine-adjacent host node, handing them the live editor
@@ -872,12 +942,13 @@ $effect(() => { const __watchVal = (() => html)(); untrack(() => { if (__rozieWa
     emitUpdate: false
   });
   refreshActive();
+  refreshCount();
 })(__watchVal); }); });
 let __rozieWatchInitial_1 = true;
 $effect(() => { const __watchVal = (() => editable)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } ((v: any) => editor?.setEditable(v, false))(__watchVal); }); });
 </script>
 
-<div class={["rozie-tiptap", { 'is-readonly': !editable }]} data-rozie-s-2aeee876>{#if editable && !toolbar}<div class="rozie-tiptap-toolbar" data-rozie-s-2aeee876><button type="button" class={{ active: active.bold }} aria-label="Bold" onclick={toggleBold} data-rozie-s-2aeee876><strong data-rozie-s-2aeee876>B</strong></button><button type="button" class={{ active: active.italic }} aria-label="Italic" onclick={toggleItalic} data-rozie-s-2aeee876><em data-rozie-s-2aeee876>I</em></button><span class="sep" data-rozie-s-2aeee876></span><button type="button" class={{ active: active.h1 }} aria-label="Heading 1" onclick={($event) => { toggleHeading(1); }} data-rozie-s-2aeee876>H1</button><button type="button" class={{ active: active.h2 }} aria-label="Heading 2" onclick={($event) => { toggleHeading(2); }} data-rozie-s-2aeee876>H2</button><span class="sep" data-rozie-s-2aeee876></span><button type="button" class={{ active: active.bulletList }} aria-label="Bullet list" onclick={toggleBulletList} data-rozie-s-2aeee876>• List</button><button type="button" class={{ active: active.underline }} aria-label="Underline" onclick={toggleUnderline} data-rozie-s-2aeee876><u data-rozie-s-2aeee876>U</u></button><button type="button" class={{ active: active.orderedList }} aria-label="Ordered list" onclick={toggleOrderedList} data-rozie-s-2aeee876>1. List</button><span class="sep" data-rozie-s-2aeee876></span><button type="button" aria-label="Undo" onclick={undo} data-rozie-s-2aeee876>↺</button><button type="button" aria-label="Redo" onclick={redo} data-rozie-s-2aeee876>↻</button></div>{/if}{#if editable && toolbar}<div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" bind:this={toolbarEl} data-rozie-s-2aeee876></div>{/if}<div bind:this={editorEl} class="rozie-tiptap-content" data-placeholder={placeholder} data-rozie-s-2aeee876></div></div>
+<div class={["rozie-tiptap", { 'is-readonly': !editable }]} data-rozie-s-2aeee876>{#if editable && !toolbar}<div class="rozie-tiptap-toolbar" data-rozie-s-2aeee876><button type="button" class={{ active: active.bold }} aria-label="Bold" onclick={toggleBold} data-rozie-s-2aeee876><strong data-rozie-s-2aeee876>B</strong></button><button type="button" class={{ active: active.italic }} aria-label="Italic" onclick={toggleItalic} data-rozie-s-2aeee876><em data-rozie-s-2aeee876>I</em></button><span class="sep" data-rozie-s-2aeee876></span><button type="button" class={{ active: active.h1 }} aria-label="Heading 1" onclick={($event) => { toggleHeading(1); }} data-rozie-s-2aeee876>H1</button><button type="button" class={{ active: active.h2 }} aria-label="Heading 2" onclick={($event) => { toggleHeading(2); }} data-rozie-s-2aeee876>H2</button><span class="sep" data-rozie-s-2aeee876></span><button type="button" class={{ active: active.bulletList }} aria-label="Bullet list" onclick={toggleBulletList} data-rozie-s-2aeee876>• List</button><button type="button" class={{ active: active.underline }} aria-label="Underline" onclick={toggleUnderline} data-rozie-s-2aeee876><u data-rozie-s-2aeee876>U</u></button><button type="button" class={{ active: active.orderedList }} aria-label="Ordered list" onclick={toggleOrderedList} data-rozie-s-2aeee876>1. List</button><span class="sep" data-rozie-s-2aeee876></span><button type="button" aria-label="Undo" onclick={undo} data-rozie-s-2aeee876>↺</button><button type="button" aria-label="Redo" onclick={redo} data-rozie-s-2aeee876>↻</button></div>{/if}{#if editable && toolbar}<div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" bind:this={toolbarEl} data-rozie-s-2aeee876></div>{/if}<div bind:this={editorEl} class="rozie-tiptap-content" data-placeholder={placeholder} data-rozie-s-2aeee876></div>{#if maxLength != null || countSlot}<div class="rozie-tiptap-count" data-rozie-s-2aeee876>{#if countSlot}{@render countSlot({ characters: count.characters, words: count.words, maxLength, over: maxLength != null && count.characters > maxLength })}{:else}<span class={["rozie-tiptap-count-value", { over: maxLength != null && count.characters > maxLength }]} data-rozie-s-2aeee876>{rozieDisplay(count.characters)} / {maxLength}</span>{/if}</div>{/if}</div>
 
 <style>
 :global {
@@ -934,6 +1005,17 @@ $effect(() => { const __watchVal = (() => editable)(); untrack(() => { if (__roz
   .rozie-tiptap-content[data-rozie-s-2aeee876] h1[data-rozie-s-2aeee876] { font-size: 1.5rem; margin: 0.5rem 0 0.375rem; }
   .rozie-tiptap-content[data-rozie-s-2aeee876] h2[data-rozie-s-2aeee876] { font-size: 1.25rem; margin: 0.5rem 0 0.375rem; }
   .rozie-tiptap-content[data-rozie-s-2aeee876] ul[data-rozie-s-2aeee876] { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+  .rozie-tiptap-count[data-rozie-s-2aeee876] {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.25rem 0.625rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    font-size: 0.75rem;
+    color: rgba(0, 0, 0, 0.5);
+  }
+  .rozie-tiptap-count-value.over[data-rozie-s-2aeee876] {
+    color: #c0392b;
+  }
 }
 
 :global {

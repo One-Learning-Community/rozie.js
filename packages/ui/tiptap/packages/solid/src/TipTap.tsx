@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { Show, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { render } from 'solid-js/web';
-import { __rozieInjectStyle, createControllableSignal, rozieClass } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
@@ -19,6 +19,13 @@ import { FloatingMenu } from '@tiptap/extension-floating-menu';
 // form to match the BubbleMenu/FloatingMenu import style). Gated on
 // $props.uploadImage — an absent hook registers NO Image extension.
 import { Image } from '@tiptap/extension-image';
+// Character/word count storage extension (D-01/D-02). SEPARATE package, not part
+// of StarterKit, version-pinned in lockstep with core (3.23.5). Named export
+// `CharacterCount` — verified against the installed dist `.d.ts` (re-exported
+// from `@tiptap/extensions`, matching Placeholder's home package; also carries a
+// default export, but the named form matches this file's import style). Gated on
+// $props.maxLength / the `count` slot — an unfilled gate registers NO extension.
+import { CharacterCount } from '@tiptap/extension-character-count';
 
 // The live editor instance — null before mount / after destroy. Named `editor`
 // (distinct from any template `ref="X"` name) so no capture-var-vs-ref double
@@ -77,6 +84,17 @@ __rozieInjectStyle('TipTap-2aeee876', `.rozie-tiptap[data-rozie-s-2aeee876] {
 .rozie-tiptap-content[data-rozie-s-2aeee876] h1[data-rozie-s-2aeee876] { font-size: 1.5rem; margin: 0.5rem 0 0.375rem; }
 .rozie-tiptap-content[data-rozie-s-2aeee876] h2[data-rozie-s-2aeee876] { font-size: 1.25rem; margin: 0.5rem 0 0.375rem; }
 .rozie-tiptap-content[data-rozie-s-2aeee876] ul[data-rozie-s-2aeee876] { margin: 0 0 0.5rem; padding-left: 1.5rem; }
+.rozie-tiptap-count[data-rozie-s-2aeee876] {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.25rem 0.625rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.5);
+}
+.rozie-tiptap-count-value.over[data-rozie-s-2aeee876] {
+  color: #c0392b;
+}
 .rozie-tiptap-content .is-editor-empty:first-child::before {
     content: attr(data-placeholder);
     color: rgba(0, 0, 0, 0.4);
@@ -84,6 +102,8 @@ __rozieInjectStyle('TipTap-2aeee876', `.rozie-tiptap[data-rozie-s-2aeee876] {
     height: 0;
     pointer-events: none;
   }`);
+
+interface CountSlotCtx { characters: any; words: any; maxLength: any; over: any; }
 
 interface ToolbarSlotCtx { editor: any; }
 
@@ -146,10 +166,21 @@ interface TipTapProps {
    * <TipTap :upload-image="uploadFn" />
    */
   uploadImage?: ((...args: any[]) => any) | null;
+  /**
+   * A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.
+   * @example
+   * <TipTap :max-length="500" />
+   */
+  maxLength?: (number) | null;
+  /**
+   * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
+   */
+  enforceMaxLength?: boolean;
   onUpdate?: (...args: unknown[]) => void;
   onSelectionUpdate?: (...args: unknown[]) => void;
   onFocus?: (...args: unknown[]) => void;
   onBlur?: (...args: unknown[]) => void;
+  countSlot?: (ctx: CountSlotCtx) => JSX.Element;
   toolbarSlot?: (ctx: ToolbarSlotCtx) => JSX.Element;
   bubbleMenuSlot?: (ctx: BubbleMenuSlotCtx) => JSX.Element;
   floatingMenuSlot?: (ctx: FloatingMenuSlotCtx) => JSX.Element;
@@ -179,12 +210,14 @@ export interface TipTapHandle {
   isActive: (...args: any[]) => any;
   can: (...args: any[]) => any;
   isEmpty: (...args: any[]) => any;
+  getCharacterCount: (...args: any[]) => any;
+  getWordCount: (...args: any[]) => any;
 }
 
 export default function TipTap(_props: TipTapProps): JSX.Element {
-  const _merged = mergeProps({ editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: (() => ({}))() as Record<string, any>, extensions: (() => [])() as any[], starterKit: (() => ({}))() as Record<string, any>, nodeSpecs: (() => [])() as any[], uploadImage: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['html', 'editable', 'placeholder', 'autofocus', 'editorClass', 'ariaLabel', 'editorProps', 'extensions', 'starterKit', 'nodeSpecs', 'uploadImage', 'ref']);
-  onMount(() => { local.ref?.({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty }); });
+  const _merged = mergeProps({ editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: (() => ({}))() as Record<string, any>, extensions: (() => [])() as any[], starterKit: (() => ({}))() as Record<string, any>, nodeSpecs: (() => [])() as any[], uploadImage: null, maxLength: null, enforceMaxLength: false }, _props);
+  const [local, attrs] = splitProps(_merged, ['html', 'editable', 'placeholder', 'autofocus', 'editorClass', 'ariaLabel', 'editorProps', 'extensions', 'starterKit', 'nodeSpecs', 'uploadImage', 'maxLength', 'enforceMaxLength', 'ref']);
+  onMount(() => { local.ref?.({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount }); });
 
   const [html, setHtml] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'html', '<p>Start writing…</p>');
   const [active, setActive] = createSignal({
@@ -195,6 +228,10 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     bulletList: false,
     underline: false,
     orderedList: false
+  });
+  const [count, setCount] = createSignal({
+    characters: 0,
+    words: 0
   });
   interface ReactivePortalHandle {
     update(scope: unknown): void;
@@ -318,6 +355,19 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
     const imageExtensions = local.uploadImage ? [Image] : [];
 
+    // Character/word count (D-01..D-03). Gated on maxLength being set OR the
+    // `count` slot being filled — a stock <TipTap> with neither registers NO
+    // CharacterCount extension (zero overhead, no VR drift). `limit` is ONLY
+    // configured when BOTH enforceMaxLength is true AND maxLength is set (hard
+    // cap); otherwise CharacterCount tracks with no limit (soft — overflow
+    // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
+    // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
+    // never[]-inference reason as placeholderExtensions/imageExtensions.
+    const needsCount = local.maxLength != null || (_props.countSlot ?? _props.slots?.["count"]);
+    const characterCountExtensions = needsCount ? [CharacterCount.configure(local.enforceMaxLength && local.maxLength != null ? {
+      limit: local.maxLength ?? undefined
+    } : {})] : [];
+
     // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
     // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
     // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
@@ -339,7 +389,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
       // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
       // of the config-level auto-disable (D-02), which is what actually silences
       // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-      extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(local.starterKit, local.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...local.extensions]),
+      extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(local.starterKit, local.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...local.extensions]),
       editorProps: {
         attributes: {
           'aria-label': local.ariaLabel,
@@ -366,6 +416,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
         lastHtml = next;
         // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
         if (next !== html()) setHtml(next);
+        refreshCount();
         _props.onUpdate?.(next);
       },
       onSelectionUpdate: () => {
@@ -376,6 +427,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
       onBlur: () => _props.onBlur?.()
     });
     refreshActive();
+    refreshCount();
 
     // `toolbar` portal slot — when the consumer fills it, mount their toolbar
     // fragment into the engine-adjacent host node, handing them the live editor
@@ -427,6 +479,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
       emitUpdate: false
     });
     refreshActive();
+    refreshCount();
   })(v)), { defer: true }));
   createEffect(on(() => (() => local.editable)(), (v) => untrack(() => ((v: any) => editor?.setEditable(v, false))(v)), { defer: true }));
   let toolbarElRef: HTMLElement | null = null;
@@ -480,6 +533,20 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
       bulletList: editor.isActive('bulletList'),
       underline: editor.isActive('underline'),
       orderedList: editor.isActive('orderedList')
+    });
+  }
+
+  // Recompute the character/word counter from the live editor (D-05). Robust to
+  // CharacterCount being absent (maxLength unset, no #count slot): reads
+  // `editor.storage.characterCount` when the extension is registered, else falls
+  // back to a plain text derivation so `getCharacterCount`/`getWordCount` and the
+  // #count slot's numbers are never stale.
+  function refreshCount() {
+    if (!editor) return;
+    const storage = editor.storage.characterCount;
+    setCount({
+      characters: storage ? storage.characters() : editor.getText().length,
+      words: storage ? storage.words() : editor.getText().split(/\s+/).filter(Boolean).length
     });
   }
 
@@ -886,6 +953,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     });
     setHtml(v);
     refreshActive();
+    refreshCount();
   }
   function clearContent() {
     if (!editor) return;
@@ -893,6 +961,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     lastHtml = editor.getHTML();
     setHtml(lastHtml);
     refreshActive();
+    refreshCount();
   }
   function toggleBold() {
     editor?.chain().focus().toggleBold().run();
@@ -951,6 +1020,18 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
   function isEmpty() {
     return editor ? editor.isEmpty : true;
   }
+  // Character/word count reads (D-04). Prefer the CharacterCount extension's live
+  // storage when registered (maxLength set or #count slot filled); otherwise a
+  // text-based fallback so these ALWAYS return a number — 0 before mount, and a
+  // correct count even on a stock <TipTap> that never registered CharacterCount.
+  function getCharacterCount() {
+    if (!editor) return 0;
+    return editor.storage.characterCount ? editor.storage.characterCount.characters() : editor.getText().length;
+  }
+  function getWordCount() {
+    if (!editor) return 0;
+    return editor.storage.characterCount ? editor.storage.characterCount.words() : editor.getText().split(/\s+/).filter(Boolean).length;
+  }
 
   return (
     <>
@@ -970,7 +1051,10 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
         <button type="button" aria-label="Undo" onClick={undo} data-rozie-s-2aeee876="">↺</button>
         <button type="button" aria-label="Redo" onClick={redo} data-rozie-s-2aeee876="">↻</button>
       </div></Show>}{<Show when={local.editable && (_props.toolbarSlot ?? _props.slots?.['toolbar'])}><div class={"rozie-tiptap-toolbar rozie-tiptap-toolbar--slot"} ref={(el) => { toolbarElRef = el as HTMLElement; }} data-rozie-s-2aeee876="" /></Show>}<div ref={(el) => { editorElRef = el as HTMLElement; }} class={"rozie-tiptap-content"} data-placeholder={local.placeholder} data-rozie-s-2aeee876="" />
-    </div>
+      
+      {<Show when={local.maxLength != null || (_props.countSlot ?? _props.slots?.['count'])}><div class={"rozie-tiptap-count"} data-rozie-s-2aeee876="">
+        {(_props.countSlot ?? _props.slots?.['count'])?.({ characters: count().characters, words: count().words, maxLength: local.maxLength, over: local.maxLength != null && count().characters > local.maxLength }) ?? <span class={"rozie-tiptap-count-value" + " " + rozieClass({ over: local.maxLength != null && count().characters > local.maxLength })} data-rozie-s-2aeee876="">{rozieDisplay(count().characters)} / {local.maxLength}</span>}
+      </div></Show>}</div>
 
 
 

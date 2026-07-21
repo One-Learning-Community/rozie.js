@@ -128,6 +128,26 @@
               "default": "null"
             },
             {
+              "kind": "field",
+              "name": "maxLength",
+              "description": "A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "maxlength",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "enforceMaxLength",
+              "description": "Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "enforcemaxlength",
+              "default": "false"
+            },
+            {
               "kind": "method",
               "name": "getEditor",
               "description": "Return the underlying TipTap `Editor` instance for direct API access (commands, state, schema, extension storage)."
@@ -226,6 +246,16 @@
               "kind": "method",
               "name": "isEmpty",
               "description": "Whether the document is empty — drives empty-state UI and submit-gating. true before mount."
+            },
+            {
+              "kind": "method",
+              "name": "getCharacterCount",
+              "description": "Return the current character count. Reads the CharacterCount extension's live storage when registered (`maxLength` set or the `#count` slot filled), else falls back to `getText().length`. Always a number — 0 before mount."
+            },
+            {
+              "kind": "method",
+              "name": "getWordCount",
+              "description": "Return the current word count. Reads the CharacterCount extension's live storage when registered, else falls back to a whitespace-split count of `getText()`. Always a number — 0 before mount."
             }
           ],
           "attributes": [
@@ -327,6 +357,24 @@
               },
               "fieldName": "uploadImage",
               "default": "null"
+            },
+            {
+              "name": "maxlength",
+              "description": "A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "maxLength",
+              "default": "null"
+            },
+            {
+              "name": "enforcemaxlength",
+              "description": "Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "enforceMaxLength",
+              "default": "false"
             }
           ],
           "events": [
@@ -363,6 +411,10 @@
             }
           ],
           "slots": [
+            {
+              "name": "count",
+              "description": "Scoped slot — props: characters, words, maxLength, over."
+            },
             {
               "name": "toolbar",
               "description": "Scoped slot — props: editor."

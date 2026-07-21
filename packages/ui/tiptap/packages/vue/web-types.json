@@ -114,6 +114,24 @@
                 "function"
               ],
               "default": "null"
+            },
+            {
+              "name": "max-length",
+              "description": "A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "enforce-max-length",
+              "description": "Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
             }
           ],
           "js": {
@@ -142,6 +160,11 @@
             ]
           },
           "slots": [
+            {
+              "name": "count",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ characters: any; words: any; maxLength: any; over: any }"
+            },
             {
               "name": "toolbar",
               "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",

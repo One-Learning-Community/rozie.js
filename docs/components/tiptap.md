@@ -141,6 +141,8 @@ el.addEventListener('html-change', (e) => {
 | `starterKit` | `Object` | `{}` | | `StarterKit` config passthrough — spread into `StarterKit.configure(...)`. Accepts per-extension option objects or `false` to disable an extension, e.g. `{ heading: false }`, `{ link: { openOnClick: false } }`. An explicitly-set key here is always respected and never overridden by the `extensions` auto-disable scan. |
 | `nodeSpecs` | `Array` | `[]` | | Custom ProseMirror node registration for the reactive `nodeView` portal slot — a general facility, read once at mount. Each entry: `{ name, tag, group, inline, atom, content, selectable, defining, attrs }`. One `Node.create` is built per entry; all render through the SAME `nodeView` fragment, dispatching on `scope.node.type.name`. An empty array (default) registers no custom nodes — zero overhead. |
 | `uploadImage` | `Function` | `null` | | An async image-upload hook, `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) `Image` extension is registered and pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), no `Image` extension and paste/drop are unchanged — zero overhead. Acts as a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins. |
+| `maxLength` | `Number` | `null` | | A soft character-count threshold. `null` (default) registers no `CharacterCount` extension and renders no counter — zero overhead. A number registers `CharacterCount` (see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once the character count exceeds it, the counter gets the `over` state. Overflow is still allowed unless `enforceMaxLength` is also set. |
+| `enforceMaxLength` | `Boolean` | `false` | | Opts into a hard cap at `maxLength`. When `true` and `maxLength` is set, `CharacterCount` is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`. |
 
 ### Events
 
@@ -173,6 +175,11 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `undo` | Undo the last change. |
 | `redo` | Redo the last undone change. |
 | `chain` | Return a focused TipTap command chain for composing commands — `chain().toggleBold().toggleItalic().run()`. `null` before mount. |
+| `isActive` | Whether a mark/node is active in the current selection — `isActive(name, attrs?)`. Drives custom-toolbar active styling. `false` before mount. |
+| `can` | Return the command-availability chain — `can().chain().focus().toggleBold().run()` returns a boolean — for enabling/disabling custom-toolbar buttons. `null` before mount. |
+| `isEmpty` | Whether the document is empty — drives empty-state UI and submit-gating. `true` before mount. |
+| `getCharacterCount` | Return the current character count. Reads the `CharacterCount` extension's live storage when registered (`maxLength` set or the `#count` slot filled), else falls back to `getText().length`. Always a number — `0` before mount. |
+| `getWordCount` | Return the current word count. Reads the `CharacterCount` extension's live storage when registered, else falls back to a whitespace-split count of `getText()`. Always a number — `0` before mount. |
 
 ::: tip The focus/blur verbs are `focusEditor` / `blurEditor`, not `focus` / `blur`
 The component emits `focus` and `blur` **events**, and on class-based targets (Angular) an output field and a method cannot share a name (ROZ121). The imperative verbs are therefore named `focusEditor` / `blurEditor`, keeping the event names idiomatic for consumers. Likewise the content setter is `setContent`, not `setHtml` — an `html` model prop makes the React target auto-generate a `setHtml` state setter (ROZ524).
@@ -193,13 +200,28 @@ editor.current?.chain()?.toggleItalic().toggleBulletList().run();
 
 ## Slots
 
-The wrapper surfaces **four** portal slots. Three are **mount-once** — `toolbar`, `bubbleMenu`, `floatingMenu` — each handed the live `editor` so its buttons can drive `editor.chain().focus()…run()`. The fourth, `nodeView`, is a **reactive** slot covered in [Node-view slots](#node-view-slots) below. Fill `toolbar` and your toolbar UI replaces the internal one; leave it unfilled and the **batteries-included internal toolbar** (Bold / Italic / H1 / H2 / Bullet list / Underline / Ordered list, with live active-state highlighting, plus Undo / Redo) renders.
+The wrapper surfaces **four** portal slots plus a **reactive scoped slot**. Three of the portal slots are **mount-once** — `toolbar`, `bubbleMenu`, `floatingMenu` — each handed the live `editor` so its buttons can drive `editor.chain().focus()…run()`. The fourth, `nodeView`, is a **reactive** portal slot covered in [Node-view slots](#node-view-slots) below. Fill `toolbar` and your toolbar UI replaces the internal one; leave it unfilled and the **batteries-included internal toolbar** (Bold / Italic / H1 / H2 / Bullet list / Underline / Ordered list, with live active-state highlighting, plus Undo / Redo) renders.
 
 | Slot | Renders | Scope param |
 | --- | --- | --- |
 | `toolbar` | A consumer toolbar above the editor (replaces the internal one) | `editor` |
 | `bubbleMenu` | A consumer menu shown on a non-empty text selection (over `@tiptap/extension-bubble-menu`) | `editor` |
 | `floatingMenu` | A consumer menu shown on an empty line (over `@tiptap/extension-floating-menu`) | `editor` |
+| `count` | A consumer character/word-counter display (replaces the built-in `characters / maxLength` counter) — a plain reactive scoped slot, not a portal; renders whenever `maxLength` is set or the slot is filled | `characters`, `words`, `maxLength`, `over` |
+
+### Character/word count slot
+
+Set `:max-length` to get a live, batteries-included `characters / maxLength` counter under the document — no `#count` slot required. It renders zero markup when `maxLength` is unset and the slot is unfilled (zero overhead, no VR drift). Soft mode (the default) tracks past the limit and adds the `over` state; `:enforce-max-length="true"` opts into a hard cap so overflow never reaches the document.
+
+```vue
+<TipTap v-model:html="html" :max-length="500" enforce-max-length>
+  <template #count="{ characters, words, maxLength, over }">
+    <span :class="{ over }">{{ characters }} / {{ maxLength }} chars · {{ words }} words</span>
+  </template>
+</TipTap>
+```
+
+Read the same numbers imperatively at any time via the `getCharacterCount()` / `getWordCount()` handle methods (both return `0` before mount).
 
 Each target fills `#toolbar` through its native imperative-render API:
 
