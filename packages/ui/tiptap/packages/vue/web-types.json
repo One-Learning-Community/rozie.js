@@ -132,6 +132,15 @@
                 "boolean"
               ],
               "default": "false"
+            },
+            {
+              "name": "bubble-menu-should-show",
+              "description": "A custom `shouldShow` predicate for the GENERAL `bubbleMenu` slot — the TipTap signature `({ editor, view, state, oldState, from, to }) => boolean`. When provided, it REPLACES the general bubbleMenu's default predicate (show on a non-empty text selection), turning the `bubbleMenu` slot into a fully consumer-controllable selection-tooling surface (e.g. show only inside a table, or only for a specific mark). When `null` (default), the default non-empty-selection behavior applies. Orthogonal to the built-in link editor, which is its own bubble-menu surface with a link-aware trigger. NOTE: as a Function prop it lowers to a loosely-typed callable on some targets (React `any` / Angular `unknown`) — pass a correctly-typed predicate; the wrapper forwards it verbatim to `BubbleMenu.configure({ shouldShow })`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "function"
+              ],
+              "default": "null"
             }
           ],
           "js": {
@@ -179,6 +188,11 @@
               "name": "floatingMenu",
               "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
               "type": "{ editor: any }"
+            },
+            {
+              "name": "linkEditor",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ editor: any; href: any; attrs: any; setLink: any; unsetLink: any; close: any }"
             },
             {
               "name": "nodeView",

@@ -68,10 +68,17 @@ interface Props {
    * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
    */
   enforceMaxLength?: boolean;
+  /**
+   * A custom `shouldShow` predicate for the GENERAL `bubbleMenu` slot — the TipTap signature `({ editor, view, state, oldState, from, to }) => boolean`. When provided, it REPLACES the general bubbleMenu's default predicate (show on a non-empty text selection), turning the `bubbleMenu` slot into a fully consumer-controllable selection-tooling surface (e.g. show only inside a table, or only for a specific mark). When `null` (default), the default non-empty-selection behavior applies. Orthogonal to the built-in link editor, which is its own bubble-menu surface with a link-aware trigger. NOTE: as a Function prop it lowers to a loosely-typed callable on some targets (React `any` / Angular `unknown`) — pass a correctly-typed predicate; the wrapper forwards it verbatim to `BubbleMenu.configure({ shouldShow })`.
+   * @example
+   * <TipTap :bubble-menu-should-show="({ editor }) => editor.isActive('table')"><template #bubbleMenu="{ editor }">…</template></TipTap>
+   */
+  bubbleMenuShouldShow?: ((...args: any[]) => any) | null;
   count?: Snippet<[{ characters: any; words: any; maxLength: any; over: any }]>;
   toolbar?: Snippet<[{ editor: any }]>;
   bubbleMenu?: Snippet<[{ editor: any }]>;
   floatingMenu?: Snippet<[{ editor: any }]>;
+  linkEditor?: Snippet<[{ editor: any; href: any; attrs: any; setLink: any; unsetLink: any; close: any }]>;
   nodeView?: Snippet<[{ node: any; selected: any; updateAttributes: any; getPos: any; editor: any; contentDOM: any }]>;
   snippets?: Record<string, any>;
   onupdate?: (...args: unknown[]) => void;
@@ -99,10 +106,12 @@ let {
   uploadImage = null,
   maxLength = null,
   enforceMaxLength = false,
+  bubbleMenuShouldShow = null,
   count: __countProp,
   toolbar: __toolbarProp,
   bubbleMenu: __bubbleMenuProp,
   floatingMenu: __floatingMenuProp,
+  linkEditor: __linkEditorProp,
   nodeView: __nodeViewProp,
   snippets,
   onupdate,
@@ -115,6 +124,7 @@ const countSlot = $derived(__countProp ?? snippets?.count);
 const toolbar = $derived(__toolbarProp ?? snippets?.toolbar);
 const bubbleMenu = $derived(__bubbleMenuProp ?? snippets?.bubbleMenu);
 const floatingMenu = $derived(__floatingMenuProp ?? snippets?.floatingMenu);
+const linkEditor = $derived(__linkEditorProp ?? snippets?.linkEditor);
 const nodeView = $derived(__nodeViewProp ?? snippets?.nodeView);
 
 let active = $state({
@@ -124,11 +134,16 @@ let active = $state({
   h2: false,
   bulletList: false,
   underline: false,
-  orderedList: false
+  orderedList: false,
+  link: false
 });
 let count = $state({
   characters: 0,
   words: 0
+});
+let link = $state({
+  href: '',
+  attrs: {}
 });
 
 let toolbarEl = $state<HTMLElement | undefined>(undefined);
@@ -187,6 +202,27 @@ let bubbleMenuEl: any = null;
 let bubbleMenuDispose: any = null;
 let floatingMenuEl: any = null;
 let floatingMenuDispose: any = null;
+// ── Link editor (#2) surface. Its OWN dedicated bubble-menu instance (distinct
+// `pluginKey: 'rozieLinkEditor'`) with a link-aware trigger, orthogonal to the
+// general `bubbleMenu` slot. `linkEditorEl` is the imperatively-created host handed
+// to that BubbleMenu extension (the bubbleMenuEl discipline — engine owns
+// positioning). COMPONENT-scope for the same hoist reason as the menu els.
+//   - When the consumer fills the `#linkEditor` slot → `linkEditorHandle` is the
+//     REACTIVE portal handle ({ update, dispose }); refreshLink() re-renders it in
+//     place (Spike 016 proved a reactive portal survives the bubble-menu
+//     extension's element.remove()/appendChild detach-reattach cycles).
+//   - Otherwise → the component builds its OWN default form imperatively into
+//     `linkEditorEl` (`linkInputEl` = its URL <input>); refreshLink() imperatively
+//     refreshes the input value. Pure-script ⇒ byte-identical across all 6 targets,
+//     no framework-reconciliation risk, and no portal default-content (the emitter
+//     renders none for an unfilled portal slot).
+// `openFlag` = the toolbar Link button's create-mode trigger (set true on click,
+// cleared on Apply/Remove/Cancel/blur); the link-aware shouldShow shows the editor
+// when `editor.isActive('link')` (edit mode) OR `openFlag` (create mode).
+let linkEditorEl: any = null;
+let linkEditorHandle: any = null;
+let linkInputEl: any = null;
+let openFlag = false;
 // Recompute the internal toolbar's active-mark booleans from the live editor.
 const refreshActive = () => {
   if (!editor) return;
@@ -201,8 +237,126 @@ const refreshActive = () => {
     }),
     bulletList: editor.isActive('bulletList'),
     underline: editor.isActive('underline'),
-    orderedList: editor.isActive('orderedList')
+    orderedList: editor.isActive('orderedList'),
+    link: editor.isActive('link')
   };
+};
+// ── Link editor (#2) command helpers + reactive refresh. TOP-LEVEL const arrows
+// (siblings of refreshActive/refreshCount) so every `editor` read sits at the same
+// shallow, proven-safe depth — never nested inside an object-literal method (the
+// redirectNestedThis gap [[project_emitter_redirect_nested_this_gap]]). The link
+// scope's setLink/unsetLink/close are these top-level fns, referenced by identity
+// from buildLinkScope so the consumer fragment (and the built-in form) call the
+// SAME verbs. `extendMarkRange('link')` widens the selection to the whole link so
+// an edit/removal applies to the entire mark, not just the caret word.
+//
+// DECLARATION ORDER IS LOAD-BEARING (topological, leaves first): apply/remove/close
+// → buildLinkScope → refreshLink → openLinkEditor. The React/Solid/Lit emitters lift
+// reactive closures into useCallback/memo with eager dependency ARRAYS, so a forward
+// reference to a later-declared reactive const is a hard TS2448 (use-before-decl) —
+// unlike a deferred function BODY, which is fine. apply/removeLink therefore do NOT
+// call refreshLink (which would make them depend on it and re-introduce a cycle):
+// the setLink/unsetLink chain dispatches a transaction that fires onSelectionUpdate +
+// onUpdate, both of which already call refreshLink. Only openLinkEditor (safely last)
+// calls it, for immediate prefill on the create affordance.
+const applyLink = (attrs: any) => {
+  editor?.chain().focus().extendMarkRange('link').setLink(attrs).run();
+  openFlag = false;
+};
+const removeLink = () => {
+  editor?.chain().focus().extendMarkRange('link').unsetLink().run();
+  openFlag = false;
+};
+const closeLink = () => {
+  openFlag = false;
+  editor?.commands.focus();
+};
+// The reactive `#linkEditor` slot scope — keys EXACTLY { editor, href, attrs,
+// setLink, unsetLink, close } (spec §5.3). `attrs` is the raw link mark attrs
+// object so a consumer can read custom attrs (e.g. data-course-link); setLink
+// forwards whatever attrs object it is handed VERBATIM (REQ-42 — persistence of a
+// custom attr is the consumer's Link.extend concern, not this wrapper's).
+const buildLinkScope = () => ({
+  editor,
+  href: link.href,
+  attrs: link.attrs,
+  setLink: applyLink,
+  unsetLink: removeLink,
+  close: closeLink
+});
+// Recompute link state from the live editor + drive the surface. Called from
+// onSelectionUpdate + onUpdate (and after content sets). When the consumer slot is
+// filled, re-render the reactive portal in place; otherwise refresh the built-in
+// form's input value — but NOT while the user is typing in it (don't stomp mid-edit).
+const refreshLink = () => {
+  if (!editor) return;
+  const a = editor.getAttributes('link');
+  link = {
+    href: a.href || '',
+    attrs: a
+  };
+  if (linkEditorHandle) {
+    linkEditorHandle.update(buildLinkScope());
+  } else if (linkInputEl && document.activeElement !== linkInputEl) {
+    linkInputEl.value = a.href || '';
+  }
+};
+// Toolbar Link button (create affordance, ask C's deferred button): flip the
+// open flag so the link-aware shouldShow surfaces the editor on the current
+// selection, prefilled with any existing href. Declared AFTER refreshLink so its
+// reactive dep array references an already-declared const (see order note above).
+export const openLinkEditor = () => {
+  openFlag = true;
+  editor?.commands.focus();
+  refreshLink();
+};
+// Build the batteries-included default link-editor form imperatively into the
+// engine-managed host (the bubble-menu extension owns positioning). Vanilla DOM
+// so it is byte-identical across all 6 targets and the framework never reconciles
+// it. Enter = Apply, Escape = Cancel. Used ONLY when the `#linkEditor` slot is
+// unfilled; a filled slot renders the consumer fragment via the reactive portal.
+const buildDefaultLinkEditor = (el: any) => {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'rozie-tiptap-link-input';
+  input.placeholder = 'https://…';
+  const apply = document.createElement('button');
+  apply.type = 'button';
+  apply.className = 'rozie-tiptap-link-apply';
+  apply.textContent = 'Apply';
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'rozie-tiptap-link-remove';
+  remove.textContent = 'Remove';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'rozie-tiptap-link-cancel';
+  cancel.textContent = 'Cancel';
+  // Keep the caret/selection in the document when a control is pressed (a plain
+  // click would blur the editor and collapse the selection before the command runs).
+  const keepFocus = (e: any) => e.preventDefault();
+  for (const b of [apply, remove, cancel] as any) b.addEventListener('mousedown', keepFocus);
+  apply.addEventListener('click', () => applyLink({
+    href: input.value
+  }));
+  remove.addEventListener('click', removeLink);
+  cancel.addEventListener('click', closeLink);
+  input.addEventListener('keydown', (e: any) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyLink({
+        href: input.value
+      });
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeLink();
+    }
+  });
+  el.appendChild(input);
+  el.appendChild(apply);
+  el.appendChild(remove);
+  el.appendChild(cancel);
+  linkInputEl = input;
 };
 // Recompute the character/word counter from the live editor (D-05). Robust to
 // CharacterCount being absent (maxLength unset, no #count slot): reads
@@ -610,6 +764,7 @@ export function setContent(next: any) {
   html = v;
   refreshActive();
   refreshCount();
+  refreshLink();
 }
 export function clearContent() {
   if (!editor) return;
@@ -618,6 +773,7 @@ export function clearContent() {
   html = lastHtml;
   refreshActive();
   refreshCount();
+  refreshLink();
 }
 export function toggleBold() {
   editor?.chain().focus().toggleBold().run();
@@ -737,6 +893,25 @@ const portals = {
       portalInstances.delete(inst as Record<string, unknown>);
     };
   },
+  linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
+    if (!linkEditor) return { update() {}, dispose() {} };
+    // Spike 004: portal-scope attribute injection.
+    container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
+    const inst = mount(PortalHostReactive, {
+      target: container,
+      props: { snippet: linkEditor, initialScope: scope },
+    });
+    portalInstances.add(inst as Record<string, unknown>);
+    return {
+      update: (s: unknown): void => {
+        (inst as unknown as { update(s: unknown): void }).update(s);
+      },
+      dispose: (): void => {
+        unmount(inst as Parameters<typeof unmount>[0]);
+        portalInstances.delete(inst as Record<string, unknown>);
+      },
+    };
+  },
   nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
     if (!nodeView) return { update() {}, dispose() {} };
     // Spike 004: portal-scope attribute injection.
@@ -805,10 +980,34 @@ onMount(() => {
     floatingMenuEl = document.createElement('div');
     floatingMenuEl.className = 'rozie-tiptap-floating-menu';
   }
+  // Link editor (#2) host — a dedicated, always-on (when editable) bubble-menu
+  // surface, orthogonal to the general `bubbleMenu` slot. Created imperatively
+  // (bubbleMenuEl discipline). Gated on editability — no link editing in readonly.
+  if (editable) {
+    linkEditorEl = document.createElement('div');
+    linkEditorEl.className = 'rozie-tiptap-link-editor';
+  }
+  // Each BubbleMenu instance REQUIRES a unique pluginKey (REQ-41) so the two
+  // Floating-UI plugins (the general bubbleMenu + the link editor) don't collide.
+  // The general bubbleMenu's `shouldShow` is the consumer-controllable predicate
+  // ($props.bubbleMenuShouldShow, #4) when provided, else the extension default
+  // (non-empty text selection). The link editor's shouldShow is link-aware: show
+  // on a link (edit) OR when the toolbar Link button set openFlag (create) — NARROW
+  // by design so it never fires on a bare selection and collide with the general one.
   const menuExtensions = [...(bubbleMenuEl ? [BubbleMenu.configure({
-    element: bubbleMenuEl
+    pluginKey: 'rozieBubbleMenu',
+    element: bubbleMenuEl,
+    ...(bubbleMenuShouldShow ? {
+      shouldShow: bubbleMenuShouldShow
+    } : {})
   })] : []), ...(floatingMenuEl ? [FloatingMenu.configure({
     element: floatingMenuEl
+  })] : []), ...(linkEditorEl ? [BubbleMenu.configure({
+    pluginKey: 'rozieLinkEditor',
+    element: linkEditorEl,
+    shouldShow: ({
+      editor
+    }: any) => editor.isActive('link') || openFlag
   })] : [])];
 
   // Image-upload hook (ask D). Setup-once, gated on $props.uploadImage — read
@@ -880,10 +1079,12 @@ onMount(() => {
       // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
       if (next !== html) html = next;
       refreshCount();
+      refreshLink();
       onupdate?.(next);
     },
     onSelectionUpdate: () => {
       refreshActive();
+      refreshLink();
       onselectionupdate?.();
     },
     onFocus: () => onfocus?.(),
@@ -891,6 +1092,7 @@ onMount(() => {
   });
   refreshActive();
   refreshCount();
+  refreshLink();
 
   // `toolbar` portal slot — when the consumer fills it, mount their toolbar
   // fragment into the engine-adjacent host node, handing them the live editor
@@ -922,6 +1124,20 @@ onMount(() => {
       editor
     });
   }
+
+  // Link editor (#2) — mount the surface into its engine-managed host. When the
+  // consumer fills `#linkEditor`, the REACTIVE portal renders their fragment
+  // (re-rendered in place by refreshLink()'s handle.update() — Spike 016 proved
+  // this survives the bubble-menu extension's detach-reattach). Otherwise the
+  // component's own default form is built imperatively into the same host.
+  // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
+  if (linkEditorEl) {
+    if (linkEditor) {
+      linkEditorHandle = portals.linkEditor(linkEditorEl, buildLinkScope());
+    } else {
+      buildDefaultLinkEditor(linkEditorEl);
+    }
+  }
   return () => {
     toolbarDispose?.();
     toolbarDispose = null;
@@ -929,6 +1145,10 @@ onMount(() => {
     bubbleMenuDispose = null;
     floatingMenuDispose?.();
     floatingMenuDispose = null;
+    linkEditorHandle?.dispose();
+    linkEditorHandle = null;
+    linkEditorEl = null;
+    linkInputEl = null;
     editor?.destroy();
   };
 });
@@ -943,12 +1163,13 @@ $effect(() => { const __watchVal = (() => html)(); untrack(() => { if (__rozieWa
   });
   refreshActive();
   refreshCount();
+  refreshLink();
 })(__watchVal); }); });
 let __rozieWatchInitial_1 = true;
 $effect(() => { const __watchVal = (() => editable)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } ((v: any) => editor?.setEditable(v, false))(__watchVal); }); });
 </script>
 
-<div class={["rozie-tiptap", { 'is-readonly': !editable }]} data-rozie-s-2aeee876>{#if editable && !toolbar}<div class="rozie-tiptap-toolbar" data-rozie-s-2aeee876><button type="button" class={{ active: active.bold }} aria-label="Bold" onclick={toggleBold} data-rozie-s-2aeee876><strong data-rozie-s-2aeee876>B</strong></button><button type="button" class={{ active: active.italic }} aria-label="Italic" onclick={toggleItalic} data-rozie-s-2aeee876><em data-rozie-s-2aeee876>I</em></button><span class="sep" data-rozie-s-2aeee876></span><button type="button" class={{ active: active.h1 }} aria-label="Heading 1" onclick={($event) => { toggleHeading(1); }} data-rozie-s-2aeee876>H1</button><button type="button" class={{ active: active.h2 }} aria-label="Heading 2" onclick={($event) => { toggleHeading(2); }} data-rozie-s-2aeee876>H2</button><span class="sep" data-rozie-s-2aeee876></span><button type="button" class={{ active: active.bulletList }} aria-label="Bullet list" onclick={toggleBulletList} data-rozie-s-2aeee876>• List</button><button type="button" class={{ active: active.underline }} aria-label="Underline" onclick={toggleUnderline} data-rozie-s-2aeee876><u data-rozie-s-2aeee876>U</u></button><button type="button" class={{ active: active.orderedList }} aria-label="Ordered list" onclick={toggleOrderedList} data-rozie-s-2aeee876>1. List</button><span class="sep" data-rozie-s-2aeee876></span><button type="button" aria-label="Undo" onclick={undo} data-rozie-s-2aeee876>↺</button><button type="button" aria-label="Redo" onclick={redo} data-rozie-s-2aeee876>↻</button></div>{/if}{#if editable && toolbar}<div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" bind:this={toolbarEl} data-rozie-s-2aeee876></div>{/if}<div bind:this={editorEl} class="rozie-tiptap-content" data-placeholder={placeholder} data-rozie-s-2aeee876></div>{#if maxLength != null || countSlot}<div class="rozie-tiptap-count" data-rozie-s-2aeee876>{#if countSlot}{@render countSlot({ characters: count.characters, words: count.words, maxLength, over: maxLength != null && count.characters > maxLength })}{:else}<span class={["rozie-tiptap-count-value", { over: maxLength != null && count.characters > maxLength }]} data-rozie-s-2aeee876>{rozieDisplay(count.characters)} / {maxLength}</span>{/if}</div>{/if}</div>
+<div class={["rozie-tiptap", { 'is-readonly': !editable }]} data-rozie-s-2aeee876>{#if editable && !toolbar}<div class="rozie-tiptap-toolbar" data-rozie-s-2aeee876><button type="button" class={{ active: active.bold }} aria-label="Bold" onclick={toggleBold} data-rozie-s-2aeee876><strong data-rozie-s-2aeee876>B</strong></button><button type="button" class={{ active: active.italic }} aria-label="Italic" onclick={toggleItalic} data-rozie-s-2aeee876><em data-rozie-s-2aeee876>I</em></button><span class="sep" data-rozie-s-2aeee876></span><button type="button" class={{ active: active.h1 }} aria-label="Heading 1" onclick={($event) => { toggleHeading(1); }} data-rozie-s-2aeee876>H1</button><button type="button" class={{ active: active.h2 }} aria-label="Heading 2" onclick={($event) => { toggleHeading(2); }} data-rozie-s-2aeee876>H2</button><span class="sep" data-rozie-s-2aeee876></span><button type="button" class={{ active: active.bulletList }} aria-label="Bullet list" onclick={toggleBulletList} data-rozie-s-2aeee876>• List</button><button type="button" class={{ active: active.underline }} aria-label="Underline" onclick={toggleUnderline} data-rozie-s-2aeee876><u data-rozie-s-2aeee876>U</u></button><button type="button" class={{ active: active.orderedList }} aria-label="Ordered list" onclick={toggleOrderedList} data-rozie-s-2aeee876>1. List</button><span class="sep" data-rozie-s-2aeee876></span><button type="button" class={{ active: active.link }} aria-label="Link" onclick={openLinkEditor} data-rozie-s-2aeee876>Link</button><span class="sep" data-rozie-s-2aeee876></span><button type="button" aria-label="Undo" onclick={undo} data-rozie-s-2aeee876>↺</button><button type="button" aria-label="Redo" onclick={redo} data-rozie-s-2aeee876>↻</button></div>{/if}{#if editable && toolbar}<div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" bind:this={toolbarEl} data-rozie-s-2aeee876></div>{/if}<div bind:this={editorEl} class="rozie-tiptap-content" data-placeholder={placeholder} data-rozie-s-2aeee876></div>{#if maxLength != null || countSlot}<div class="rozie-tiptap-count" data-rozie-s-2aeee876>{#if countSlot}{@render countSlot({ characters: count.characters, words: count.words, maxLength, over: maxLength != null && count.characters > maxLength })}{:else}<span class={["rozie-tiptap-count-value", { over: maxLength != null && count.characters > maxLength }]} data-rozie-s-2aeee876>{rozieDisplay(count.characters)} / {maxLength}</span>{/if}</div>{/if}</div>
 
 <style>
 :global {
@@ -1025,6 +1246,42 @@ $effect(() => { const __watchVal = (() => editable)(); untrack(() => { if (__roz
       float: left;
       height: 0;
       pointer-events: none;
+    }
+  .rozie-tiptap-link-editor {
+      display: flex;
+      align-items: center;
+      gap: var(--rozie-tiptap-link-gap, 0.25rem);
+      padding: var(--rozie-tiptap-link-padding, 0.3125rem 0.375rem);
+      background: var(--rozie-tiptap-link-bg, #1a1a1a);
+      border: var(--rozie-tiptap-link-border, 1px solid rgba(0, 0, 0, 0.2));
+      border-radius: var(--rozie-tiptap-link-radius, 6px);
+      box-shadow: var(--rozie-tiptap-link-shadow, 0 4px 16px rgba(0, 0, 0, 0.25));
+    }
+  .rozie-tiptap-link-input {
+      font: inherit;
+      font-size: var(--rozie-tiptap-link-input-font-size, 0.8125rem);
+      padding: var(--rozie-tiptap-link-input-padding, 0.1875rem 0.375rem);
+      min-width: var(--rozie-tiptap-link-input-min-width, 11rem);
+      border: var(--rozie-tiptap-link-input-border, 1px solid #444);
+      border-radius: var(--rozie-tiptap-link-input-radius, 4px);
+      background: var(--rozie-tiptap-link-input-bg, #fff);
+      color: var(--rozie-tiptap-link-input-color, #000);
+    }
+  .rozie-tiptap-link-editor button {
+      font: inherit;
+      font-size: var(--rozie-tiptap-link-button-font-size, 0.8125rem);
+      padding: var(--rozie-tiptap-link-button-padding, 0.1875rem 0.5rem);
+      border: var(--rozie-tiptap-link-button-border, 1px solid transparent);
+      border-radius: var(--rozie-tiptap-link-button-radius, 4px);
+      background: var(--rozie-tiptap-link-button-bg, rgba(255, 255, 255, 0.12));
+      color: var(--rozie-tiptap-link-button-color, #fff);
+      cursor: pointer;
+    }
+  .rozie-tiptap-link-editor button:hover {
+      background: var(--rozie-tiptap-link-button-hover-bg, rgba(255, 255, 255, 0.22));
+    }
+  .rozie-tiptap-link-editor .rozie-tiptap-link-remove {
+      color: var(--rozie-tiptap-link-remove-color, #ff9b9b);
     }
 }
 </style>

@@ -148,6 +148,16 @@
               "default": "false"
             },
             {
+              "kind": "field",
+              "name": "bubbleMenuShouldShow",
+              "description": "A custom `shouldShow` predicate for the GENERAL `bubbleMenu` slot — the TipTap signature `({ editor, view, state, oldState, from, to }) => boolean`. When provided, it REPLACES the general bubbleMenu's default predicate (show on a non-empty text selection), turning the `bubbleMenu` slot into a fully consumer-controllable selection-tooling surface (e.g. show only inside a table, or only for a specific mark). When `null` (default), the default non-empty-selection behavior applies. Orthogonal to the built-in link editor, which is its own bubble-menu surface with a link-aware trigger. NOTE: as a Function prop it lowers to a loosely-typed callable on some targets (React `any` / Angular `unknown`) — pass a correctly-typed predicate; the wrapper forwards it verbatim to `BubbleMenu.configure({ shouldShow })`.",
+              "type": {
+                "text": "((...args: any[]) => any)"
+              },
+              "attribute": "bubblemenushouldshow",
+              "default": "null"
+            },
+            {
               "kind": "method",
               "name": "getEditor",
               "description": "Return the underlying TipTap `Editor` instance for direct API access (commands, state, schema, extension storage)."
@@ -256,6 +266,11 @@
               "kind": "method",
               "name": "getWordCount",
               "description": "Return the current word count. Reads the CharacterCount extension's live storage when registered, else falls back to a whitespace-split count of `getText()`. Always a number — 0 before mount."
+            },
+            {
+              "kind": "method",
+              "name": "openLinkEditor",
+              "description": "Open the link editor on the current selection (create mode) — the imperative equivalent of clicking the toolbar Link button. Surfaces the editor prefilled with any existing link href; no-op before mount."
             }
           ],
           "attributes": [
@@ -375,6 +390,15 @@
               },
               "fieldName": "enforceMaxLength",
               "default": "false"
+            },
+            {
+              "name": "bubblemenushouldshow",
+              "description": "A custom `shouldShow` predicate for the GENERAL `bubbleMenu` slot — the TipTap signature `({ editor, view, state, oldState, from, to }) => boolean`. When provided, it REPLACES the general bubbleMenu's default predicate (show on a non-empty text selection), turning the `bubbleMenu` slot into a fully consumer-controllable selection-tooling surface (e.g. show only inside a table, or only for a specific mark). When `null` (default), the default non-empty-selection behavior applies. Orthogonal to the built-in link editor, which is its own bubble-menu surface with a link-aware trigger. NOTE: as a Function prop it lowers to a loosely-typed callable on some targets (React `any` / Angular `unknown`) — pass a correctly-typed predicate; the wrapper forwards it verbatim to `BubbleMenu.configure({ shouldShow })`.",
+              "type": {
+                "text": "((...args: any[]) => any)"
+              },
+              "fieldName": "bubbleMenuShouldShow",
+              "default": "null"
             }
           ],
           "events": [
@@ -426,6 +450,10 @@
             {
               "name": "floatingMenu",
               "description": "Scoped slot — props: editor."
+            },
+            {
+              "name": "linkEditor",
+              "description": "Scoped slot — props: editor, href, attrs, setLink, unsetLink, close."
             },
             {
               "name": "nodeView",

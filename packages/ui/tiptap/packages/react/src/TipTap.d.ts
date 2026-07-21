@@ -65,6 +65,12 @@ export interface TipTapProps {
    * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
    */
   enforceMaxLength?: boolean;
+  /**
+   * A custom `shouldShow` predicate for the GENERAL `bubbleMenu` slot — the TipTap signature `({ editor, view, state, oldState, from, to }) => boolean`. When provided, it REPLACES the general bubbleMenu's default predicate (show on a non-empty text selection), turning the `bubbleMenu` slot into a fully consumer-controllable selection-tooling surface (e.g. show only inside a table, or only for a specific mark). When `null` (default), the default non-empty-selection behavior applies. Orthogonal to the built-in link editor, which is its own bubble-menu surface with a link-aware trigger. NOTE: as a Function prop it lowers to a loosely-typed callable on some targets (React `any` / Angular `unknown`) — pass a correctly-typed predicate; the wrapper forwards it verbatim to `BubbleMenu.configure({ shouldShow })`.
+   * @example
+   * <TipTap :bubble-menu-should-show="({ editor }) => editor.isActive('table')"><template #bubbleMenu="{ editor }">…</template></TipTap>
+   */
+  bubbleMenuShouldShow?: ((...args: any[]) => any) | null;
   onUpdate?: (...args: unknown[]) => void;
   onSelectionUpdate?: (...args: unknown[]) => void;
   onFocus?: (...args: unknown[]) => void;
@@ -73,6 +79,7 @@ export interface TipTapProps {
   renderToolbar?: (params: { editor: () => void }) => ReactNode;
   renderBubbleMenu?: (params: { editor: () => void }) => ReactNode;
   renderFloatingMenu?: (params: { editor: () => void }) => ReactNode;
+  renderLinkEditor?: (params: { editor: () => void; href: () => void; attrs: () => void; setLink: () => void; unsetLink: () => void; close: () => void }) => ReactNode;
   renderNodeView?: (params: { node: () => void; selected: () => void; updateAttributes: () => void; getPos: () => void; editor: () => void; contentDOM: () => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
@@ -100,6 +107,7 @@ export interface TipTapHandle {
   isEmpty: (...args: any[]) => any;
   getCharacterCount: (...args: any[]) => any;
   getWordCount: (...args: any[]) => any;
+  openLinkEditor: (...args: any[]) => any;
 }
 
 declare const TipTap: React.ForwardRefExoticComponent<TipTapProps & React.RefAttributes<TipTapHandle>>;

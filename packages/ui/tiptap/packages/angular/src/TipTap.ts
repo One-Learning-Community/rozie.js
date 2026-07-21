@@ -54,6 +54,16 @@ interface FloatingMenuCtx {
   editor: any;
 }
 
+interface LinkEditorCtx {
+  $implicit: { editor: any; href: any; attrs: any; setLink: any; unsetLink: any; close: any };
+  editor: any;
+  href: any;
+  attrs: any;
+  setLink: any;
+  unsetLink: any;
+  close: any;
+}
+
 interface NodeViewCtx {
   $implicit: { node: any; selected: any; updateAttributes: any; getPos: any; editor: any; contentDOM: any };
   node: any;
@@ -104,6 +114,8 @@ function __rozieAttr(v: unknown): string | null {
         <button type="button" [class]="{ active: active().underline }" aria-label="Underline" (click)="toggleUnderline()"><u>U</u></button>
         <button type="button" [class]="{ active: active().orderedList }" aria-label="Ordered list" (click)="toggleOrderedList()">1. List</button>
         <span class="sep"></span>
+        <button type="button" [class]="{ active: active().link }" aria-label="Link" (click)="openLinkEditor()">Link</button>
+        <span class="sep"></span>
         <button type="button" aria-label="Undo" (click)="undo()">↺</button>
         <button type="button" aria-label="Redo" (click)="redo()">↻</button>
       </div>
@@ -122,6 +134,8 @@ function __rozieAttr(v: unknown): string | null {
     }
       </div>
     }</div>
+
+
 
 
 
@@ -205,6 +219,42 @@ function __rozieAttr(v: unknown): string | null {
         height: 0;
         pointer-events: none;
       }
+    ::ng-deep .rozie-tiptap-link-editor {
+        display: flex;
+        align-items: center;
+        gap: var(--rozie-tiptap-link-gap, 0.25rem);
+        padding: var(--rozie-tiptap-link-padding, 0.3125rem 0.375rem);
+        background: var(--rozie-tiptap-link-bg, #1a1a1a);
+        border: var(--rozie-tiptap-link-border, 1px solid rgba(0, 0, 0, 0.2));
+        border-radius: var(--rozie-tiptap-link-radius, 6px);
+        box-shadow: var(--rozie-tiptap-link-shadow, 0 4px 16px rgba(0, 0, 0, 0.25));
+      }
+    ::ng-deep .rozie-tiptap-link-input {
+        font: inherit;
+        font-size: var(--rozie-tiptap-link-input-font-size, 0.8125rem);
+        padding: var(--rozie-tiptap-link-input-padding, 0.1875rem 0.375rem);
+        min-width: var(--rozie-tiptap-link-input-min-width, 11rem);
+        border: var(--rozie-tiptap-link-input-border, 1px solid #444);
+        border-radius: var(--rozie-tiptap-link-input-radius, 4px);
+        background: var(--rozie-tiptap-link-input-bg, #fff);
+        color: var(--rozie-tiptap-link-input-color, #000);
+      }
+    ::ng-deep .rozie-tiptap-link-editor button {
+        font: inherit;
+        font-size: var(--rozie-tiptap-link-button-font-size, 0.8125rem);
+        padding: var(--rozie-tiptap-link-button-padding, 0.1875rem 0.5rem);
+        border: var(--rozie-tiptap-link-button-border, 1px solid transparent);
+        border-radius: var(--rozie-tiptap-link-button-radius, 4px);
+        background: var(--rozie-tiptap-link-button-bg, rgba(255, 255, 255, 0.12));
+        color: var(--rozie-tiptap-link-button-color, #fff);
+        cursor: pointer;
+      }
+    ::ng-deep .rozie-tiptap-link-editor button:hover {
+        background: var(--rozie-tiptap-link-button-hover-bg, rgba(255, 255, 255, 0.22));
+      }
+    ::ng-deep .rozie-tiptap-link-editor .rozie-tiptap-link-remove {
+        color: var(--rozie-tiptap-link-remove-color, #ff9b9b);
+      }
   `],
   providers: [
     {
@@ -276,6 +326,12 @@ export class TipTap {
    * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
    */
   enforceMaxLength = input<boolean>(false);
+  /**
+   * A custom `shouldShow` predicate for the GENERAL `bubbleMenu` slot — the TipTap signature `({ editor, view, state, oldState, from, to }) => boolean`. When provided, it REPLACES the general bubbleMenu's default predicate (show on a non-empty text selection), turning the `bubbleMenu` slot into a fully consumer-controllable selection-tooling surface (e.g. show only inside a table, or only for a specific mark). When `null` (default), the default non-empty-selection behavior applies. Orthogonal to the built-in link editor, which is its own bubble-menu surface with a link-aware trigger. NOTE: as a Function prop it lowers to a loosely-typed callable on some targets (React `any` / Angular `unknown`) — pass a correctly-typed predicate; the wrapper forwards it verbatim to `BubbleMenu.configure({ shouldShow })`.
+   * @example
+   * <TipTap :bubble-menu-should-show="({ editor }) => editor.isActive('table')"><template #bubbleMenu="{ editor }">…</template></TipTap>
+   */
+  bubbleMenuShouldShow = input<((...args: any[]) => any) | null>(null);
   active = signal({
     bold: false,
     italic: false,
@@ -283,11 +339,16 @@ export class TipTap {
     h2: false,
     bulletList: false,
     underline: false,
-    orderedList: false
+    orderedList: false,
+    link: false
   });
   count = signal({
     characters: 0,
     words: 0
+  });
+  link = signal({
+    href: '',
+    attrs: {}
   });
   toolbarEl = viewChild<ElementRef<HTMLDivElement>>('toolbarEl');
   editorEl = viewChild<ElementRef<HTMLDivElement>>('editorEl');
@@ -299,6 +360,7 @@ export class TipTap {
   @ContentChild('toolbar', { read: TemplateRef }) toolbarTpl?: TemplateRef<ToolbarCtx>;
   @ContentChild('bubbleMenu', { read: TemplateRef }) bubbleMenuTpl?: TemplateRef<BubbleMenuCtx>;
   @ContentChild('floatingMenu', { read: TemplateRef }) floatingMenuTpl?: TemplateRef<FloatingMenuCtx>;
+  @ContentChild('linkEditor', { read: TemplateRef }) linkEditorTpl?: TemplateRef<LinkEditorCtx>;
   @ContentChild('nodeView', { read: TemplateRef }) nodeViewTpl?: TemplateRef<NodeViewCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
@@ -306,6 +368,7 @@ export class TipTap {
   private _toolbarTpl = contentChild('toolbar', { read: TemplateRef });
   private _bubbleMenuTpl = contentChild('bubbleMenu', { read: TemplateRef });
   private _floatingMenuTpl = contentChild('floatingMenu', { read: TemplateRef });
+  private _linkEditorTpl = contentChild('linkEditor', { read: TemplateRef });
   private _nodeViewTpl = contentChild('nodeView', { read: TemplateRef });
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
@@ -321,6 +384,7 @@ export class TipTap {
       });
       this.refreshActive();
       this.refreshCount();
+      this.refreshLink();
     })(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.editable())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => this.editor?.setEditable(v, false))(__watchVal); }); });
   }
@@ -376,6 +440,27 @@ export class TipTap {
           this._portalViews.delete(view as EmbeddedViewRef<unknown>);
         };
       },
+      linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
+        const tpl = this._linkEditorTpl();
+        const vcr = this._portalAnchor();
+        if (!tpl || !vcr) return { update() {}, dispose() {} };
+        // Spike 004: portal-scope attribute injection.
+        container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
+        const view = vcr.createEmbeddedView(tpl, scope as unknown as Record<string, unknown>);
+        view.detectChanges();
+        for (const node of view.rootNodes as globalThis.Node[]) container.appendChild(node);
+        this._portalViews.add(view as EmbeddedViewRef<unknown>);
+        return {
+          update: (s: unknown): void => {
+            Object.assign(view.context as object, s as object);
+            view.detectChanges();
+          },
+          dispose: (): void => {
+            view.destroy();
+            this._portalViews.delete(view as EmbeddedViewRef<unknown>);
+          },
+        };
+      },
       nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
         const tpl = this._nodeViewTpl();
         const vcr = this._portalAnchor();
@@ -400,6 +485,8 @@ export class TipTap {
     };
     const __nodeSpecs = this.nodeSpecs();
     const __placeholder = this.placeholder();
+    const __editable = this.editable();
+    const __bubbleMenuShouldShow = this.bubbleMenuShouldShow();
     const __uploadImage = this.uploadImage();
     const __maxLength = this.maxLength();
     const __extensions = this.extensions();
@@ -472,10 +559,44 @@ export class TipTap {
       this.floatingMenuEl = document.createElement('div');
       this.floatingMenuEl.className = 'rozie-tiptap-floating-menu';
     }
+    // Link editor (#2) host — a dedicated, always-on (when editable) bubble-menu
+    // surface, orthogonal to the general `bubbleMenu` slot. Created imperatively
+    // (bubbleMenuEl discipline). Gated on editability — no link editing in readonly.
+    // Link editor (#2) host — a dedicated, always-on (when editable) bubble-menu
+    // surface, orthogonal to the general `bubbleMenu` slot. Created imperatively
+    // (bubbleMenuEl discipline). Gated on editability — no link editing in readonly.
+    if (__editable) {
+      this.linkEditorEl = document.createElement('div');
+      this.linkEditorEl.className = 'rozie-tiptap-link-editor';
+    }
+    // Each BubbleMenu instance REQUIRES a unique pluginKey (REQ-41) so the two
+    // Floating-UI plugins (the general bubbleMenu + the link editor) don't collide.
+    // The general bubbleMenu's `shouldShow` is the consumer-controllable predicate
+    // ($props.bubbleMenuShouldShow, #4) when provided, else the extension default
+    // (non-empty text selection). The link editor's shouldShow is link-aware: show
+    // on a link (edit) OR when the toolbar Link button set openFlag (create) — NARROW
+    // by design so it never fires on a bare selection and collide with the general one.
+    // Each BubbleMenu instance REQUIRES a unique pluginKey (REQ-41) so the two
+    // Floating-UI plugins (the general bubbleMenu + the link editor) don't collide.
+    // The general bubbleMenu's `shouldShow` is the consumer-controllable predicate
+    // ($props.bubbleMenuShouldShow, #4) when provided, else the extension default
+    // (non-empty text selection). The link editor's shouldShow is link-aware: show
+    // on a link (edit) OR when the toolbar Link button set openFlag (create) — NARROW
+    // by design so it never fires on a bare selection and collide with the general one.
     const menuExtensions = [...(this.bubbleMenuEl ? [BubbleMenu.configure({
-      element: this.bubbleMenuEl
+      pluginKey: 'rozieBubbleMenu',
+      element: this.bubbleMenuEl,
+      ...(__bubbleMenuShouldShow ? {
+        shouldShow: __bubbleMenuShouldShow
+      } : {})
     })] : []), ...(this.floatingMenuEl ? [FloatingMenu.configure({
       element: this.floatingMenuEl
+    })] : []), ...(this.linkEditorEl ? [BubbleMenu.configure({
+      pluginKey: 'rozieLinkEditor',
+      element: this.linkEditorEl,
+      shouldShow: ({
+        editor
+      }: any) => editor.isActive('link') || this.openFlag
     })] : [])];
 
     // Image-upload hook (ask D). Setup-once, gated on $props.uploadImage — read
@@ -528,7 +649,7 @@ export class TipTap {
     this.editor = new Editor({
       element: this.editorEl()!.nativeElement,
       content: this.html(),
-      editable: this.editable(),
+      editable: __editable,
       autofocus: this.autofocus(),
       // StarterKit first (config-disabled per the collision scan below); the
       // Placeholder ext next; the reactive node-view nodes next; consumer
@@ -565,10 +686,12 @@ export class TipTap {
         // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
         if (next !== this.html()) this.html.set(next), this.__rozieCvaOnChange(next);
         this.refreshCount();
+        this.refreshLink();
         this.update.emit(next);
       },
       onSelectionUpdate: () => {
         this.refreshActive();
+        this.refreshLink();
         this.selectionUpdate.emit();
       },
       onFocus: () => this.focus.emit(),
@@ -576,6 +699,7 @@ export class TipTap {
     });
     this.refreshActive();
     this.refreshCount();
+    this.refreshLink();
 
     // `toolbar` portal slot — when the consumer fills it, mount their toolbar
     // fragment into the engine-adjacent host node, handing them the live editor
@@ -621,6 +745,26 @@ export class TipTap {
         editor: this.editor
       });
     }
+
+    // Link editor (#2) — mount the surface into its engine-managed host. When the
+    // consumer fills `#linkEditor`, the REACTIVE portal renders their fragment
+    // (re-rendered in place by refreshLink()'s handle.update() — Spike 016 proved
+    // this survives the bubble-menu extension's detach-reattach). Otherwise the
+    // component's own default form is built imperatively into the same host.
+    // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
+    // Link editor (#2) — mount the surface into its engine-managed host. When the
+    // consumer fills `#linkEditor`, the REACTIVE portal renders their fragment
+    // (re-rendered in place by refreshLink()'s handle.update() — Spike 016 proved
+    // this survives the bubble-menu extension's detach-reattach). Otherwise the
+    // component's own default form is built imperatively into the same host.
+    // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
+    if (this.linkEditorEl) {
+      if ((this.linkEditorTpl ?? this.templates()?.['linkEditor'])) {
+        this.linkEditorHandle = portals.linkEditor(this.linkEditorEl, this.buildLinkScope());
+      } else {
+        this.buildDefaultLinkEditor(this.linkEditorEl);
+      }
+    }
     this.__rozieDestroyRef.onDestroy(() => {
       this.toolbarDispose?.();
       this.toolbarDispose = null;
@@ -628,6 +772,10 @@ export class TipTap {
       this.bubbleMenuDispose = null;
       this.floatingMenuDispose?.();
       this.floatingMenuDispose = null;
+      this.linkEditorHandle?.dispose();
+      this.linkEditorHandle = null;
+      this.linkEditorEl = null;
+      this.linkInputEl = null;
       this.editor?.destroy();
     });
     this.__rozieDestroyRef.onDestroy(() => {
@@ -643,6 +791,10 @@ export class TipTap {
   bubbleMenuDispose: any = null;
   floatingMenuEl: any = null;
   floatingMenuDispose: any = null;
+  linkEditorEl: any = null;
+  linkEditorHandle: any = null;
+  linkInputEl: any = null;
+  openFlag = false;
   refreshActive = () => {
     if (!this.editor) return;
     this.active.set({
@@ -656,8 +808,90 @@ export class TipTap {
       }),
       bulletList: this.editor.isActive('bulletList'),
       underline: this.editor.isActive('underline'),
-      orderedList: this.editor.isActive('orderedList')
+      orderedList: this.editor.isActive('orderedList'),
+      link: this.editor.isActive('link')
     });
+  };
+  applyLink = (attrs: any) => {
+    this.editor?.chain().focus().extendMarkRange('link').setLink(attrs).run();
+    this.openFlag = false;
+  };
+  removeLink = () => {
+    this.editor?.chain().focus().extendMarkRange('link').unsetLink().run();
+    this.openFlag = false;
+  };
+  closeLink = () => {
+    this.openFlag = false;
+    this.editor?.commands.focus();
+  };
+  buildLinkScope = () => ({
+    editor: this.editor,
+    href: this.link().href,
+    attrs: this.link().attrs,
+    setLink: this.applyLink,
+    unsetLink: this.removeLink,
+    close: this.closeLink
+  });
+  refreshLink = () => {
+    if (!this.editor) return;
+    const a = this.editor.getAttributes('link');
+    this.link.set({
+      href: a.href || '',
+      attrs: a
+    });
+    if (this.linkEditorHandle) {
+      this.linkEditorHandle.update(this.buildLinkScope());
+    } else if (this.linkInputEl && document.activeElement !== this.linkInputEl) {
+      this.linkInputEl.value = a.href || '';
+    }
+  };
+  openLinkEditor = () => {
+    this.openFlag = true;
+    this.editor?.commands.focus();
+    this.refreshLink();
+  };
+  buildDefaultLinkEditor = (el: any) => {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'rozie-tiptap-link-input';
+    input.placeholder = 'https://…';
+    const apply = document.createElement('button');
+    apply.type = 'button';
+    apply.className = 'rozie-tiptap-link-apply';
+    apply.textContent = 'Apply';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'rozie-tiptap-link-remove';
+    remove.textContent = 'Remove';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'rozie-tiptap-link-cancel';
+    cancel.textContent = 'Cancel';
+    // Keep the caret/selection in the document when a control is pressed (a plain
+    // click would blur the editor and collapse the selection before the command runs).
+    const keepFocus = (e: any) => e.preventDefault();
+    for (const b of [apply, remove, cancel] as any) b.addEventListener('mousedown', keepFocus);
+    apply.addEventListener('click', () => this.applyLink({
+      href: input.value
+    }));
+    remove.addEventListener('click', this.removeLink);
+    cancel.addEventListener('click', this.closeLink);
+    input.addEventListener('keydown', (e: any) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.applyLink({
+          href: input.value
+        });
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeLink();
+      }
+    });
+    el.appendChild(input);
+    el.appendChild(apply);
+    el.appendChild(remove);
+    el.appendChild(cancel);
+    this.linkInputEl = input;
   };
   refreshCount = () => {
     if (!this.editor) return;
@@ -944,6 +1178,7 @@ export class TipTap {
     this.html.set(v), this.__rozieCvaOnChange(v);
     this.refreshActive();
     this.refreshCount();
+    this.refreshLink();
   };
   clearContent = () => {
     if (!this.editor) return;
@@ -952,6 +1187,7 @@ export class TipTap {
     this.html.set(this.lastHtml), this.__rozieCvaOnChange(this.lastHtml);
     this.refreshActive();
     this.refreshCount();
+    this.refreshLink();
   };
   toggleBold = () => {
     this.editor?.chain().focus().toggleBold().run();
@@ -1031,7 +1267,7 @@ export class TipTap {
   static ngTemplateContextGuard(
     _dir: TipTap,
     _ctx: unknown,
-  ): _ctx is CountCtx | ToolbarCtx | BubbleMenuCtx | FloatingMenuCtx | NodeViewCtx {
+  ): _ctx is CountCtx | ToolbarCtx | BubbleMenuCtx | FloatingMenuCtx | LinkEditorCtx | NodeViewCtx {
     return true;
   }
 

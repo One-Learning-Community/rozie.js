@@ -143,6 +143,7 @@ el.addEventListener('html-change', (e) => {
 | `uploadImage` | `Function` | `null` | | An async image-upload hook, `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) `Image` extension is registered and pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), no `Image` extension and paste/drop are unchanged — zero overhead. Acts as a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins. |
 | `maxLength` | `Number` | `null` | | A soft character-count threshold. `null` (default) registers no `CharacterCount` extension and renders no counter — zero overhead. A number registers `CharacterCount` (see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once the character count exceeds it, the counter gets the `over` state. Overflow is still allowed unless `enforceMaxLength` is also set. |
 | `enforceMaxLength` | `Boolean` | `false` | | Opts into a hard cap at `maxLength`. When `true` and `maxLength` is set, `CharacterCount` is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`. |
+| `bubbleMenuShouldShow` | `Function` | `null` | | A custom `shouldShow` predicate for the **general** `bubbleMenu` slot — the TipTap signature `({ editor, view, state, oldState, from, to }) => boolean`. When provided it replaces the default (show on a non-empty text selection), making `bubbleMenu` a fully consumer-controllable selection-tooling surface; when `null` (default) the default behavior applies. Orthogonal to the built-in link editor, which is its own bubble-menu surface with a link-aware trigger. As a `Function` prop it lowers to a loosely-typed callable on some targets — pass a correctly-typed predicate; the wrapper forwards it verbatim to `BubbleMenu.configure({ shouldShow })`. |
 
 ### Events
 
@@ -180,6 +181,7 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `isEmpty` | Whether the document is empty — drives empty-state UI and submit-gating. `true` before mount. |
 | `getCharacterCount` | Return the current character count. Reads the `CharacterCount` extension's live storage when registered (`maxLength` set or the `#count` slot filled), else falls back to `getText().length`. Always a number — `0` before mount. |
 | `getWordCount` | Return the current word count. Reads the `CharacterCount` extension's live storage when registered, else falls back to a whitespace-split count of `getText()`. Always a number — `0` before mount. |
+| `openLinkEditor` | Open the link editor on the current selection (create mode) — the imperative equivalent of clicking the toolbar Link button. Surfaces the editor prefilled with any existing link href; no-op before mount. |
 
 ::: tip The focus/blur verbs are `focusEditor` / `blurEditor`, not `focus` / `blur`
 The component emits `focus` and `blur` **events**, and on class-based targets (Angular) an output field and a method cannot share a name (ROZ121). The imperative verbs are therefore named `focusEditor` / `blurEditor`, keeping the event names idiomatic for consumers. Likewise the content setter is `setContent`, not `setHtml` — an `html` model prop makes the React target auto-generate a `setHtml` state setter (ROZ524).
@@ -200,13 +202,14 @@ editor.current?.chain()?.toggleItalic().toggleBulletList().run();
 
 ## Slots
 
-The wrapper surfaces **four** portal slots plus a **reactive scoped slot**. Three of the portal slots are **mount-once** — `toolbar`, `bubbleMenu`, `floatingMenu` — each handed the live `editor` so its buttons can drive `editor.chain().focus()…run()`. The fourth, `nodeView`, is a **reactive** portal slot covered in [Node-view slots](#node-view-slots) below. Fill `toolbar` and your toolbar UI replaces the internal one; leave it unfilled and the **batteries-included internal toolbar** (Bold / Italic / H1 / H2 / Bullet list / Underline / Ordered list, with live active-state highlighting, plus Undo / Redo) renders.
+The wrapper surfaces **five** portal slots plus a **reactive scoped slot**. Three of the portal slots are **mount-once** — `toolbar`, `bubbleMenu`, `floatingMenu` — each handed the live `editor` so its buttons can drive `editor.chain().focus()…run()`. The other two, `nodeView` and `linkEditor`, are **reactive** portal slots (covered in [Node-view slots](#node-view-slots) and [Link editor](#link-editor) below). Fill `toolbar` and your toolbar UI replaces the internal one; leave it unfilled and the **batteries-included internal toolbar** (Bold / Italic / H1 / H2 / Bullet list / Underline / Ordered list / **Link**, with live active-state highlighting, plus Undo / Redo) renders.
 
 | Slot | Renders | Scope param |
 | --- | --- | --- |
 | `toolbar` | A consumer toolbar above the editor (replaces the internal one) | `editor` |
-| `bubbleMenu` | A consumer menu shown on a non-empty text selection (over `@tiptap/extension-bubble-menu`) | `editor` |
+| `bubbleMenu` | A consumer menu shown on a non-empty text selection (over `@tiptap/extension-bubble-menu`); the trigger is customisable via `:bubble-menu-should-show` | `editor` |
 | `floatingMenu` | A consumer menu shown on an empty line (over `@tiptap/extension-floating-menu`) | `editor` |
+| `linkEditor` | A consumer link-editing form in the link editor's bubble-menu surface (replaces the built-in form); reactive — reflects the current link | `editor`, `href`, `attrs`, `setLink`, `unsetLink`, `close` |
 | `count` | A consumer character/word-counter display (replaces the built-in `characters / maxLength` counter) — a plain reactive scoped slot, not a portal; renders whenever `maxLength` is set or the slot is filled | `characters`, `words`, `maxLength`, `over` |
 
 ### Character/word count slot
@@ -222,6 +225,39 @@ Set `:max-length` to get a live, batteries-included `characters / maxLength` cou
 ```
 
 Read the same numbers imperatively at any time via the `getCharacterCount()` / `getWordCount()` handle methods (both return `0` before mount).
+
+### Link editor
+
+TipTap is headless — it ships the link *behavior* (the `Link` mark bundled in StarterKit) but no link-editing UI. The wrapper adds a **batteries-included link editor**: a small floating form anchored to the selection over its own dedicated bubble-menu surface (a distinct `pluginKey`, orthogonal to the general `bubbleMenu` slot). It surfaces two ways:
+
+- **Toolbar Link button** — the internal toolbar's `Link` button opens the editor on the current selection (create), and shows active when the cursor is on a link.
+- **Cursor-on-link** — moving the caret into an existing link surfaces the editor, prefilled with its `href`; **Remove** clears it. Enter applies, Escape cancels.
+
+A stock `<TipTap>` gets all of this with zero configuration. To **replace** the built-in form with your own UI, fill the reactive `#linkEditor` slot — it renders in the same bubble-menu surface and re-renders as the selection/link changes, with `{ editor, href, attrs, setLink, unsetLink, close }` in scope:
+
+```vue
+<TipTap v-model:html="html">
+  <template #linkEditor="{ href, attrs, setLink, unsetLink, close }">
+    <input :value="href" @keydown.enter="e => setLink({ href: e.target.value })" />
+    <button @click="unsetLink">Remove</button>
+    <button @click="close">Done</button>
+  </template>
+</TipTap>
+```
+
+`setLink(attrs)` forwards its `attrs` object **verbatim** to TipTap, so you can attach custom data to a link — e.g. a course-link picker writing `setLink({ href, 'data-course-link': id })`. Note: the **stock** `Link` mark only persists `href`/`target`/`rel`/`class`/`title` — to persist a custom attribute like `data-course-link`, register an extended Link that declares it in its schema via `:extensions`:
+
+```ts
+import Link from '@tiptap/extension-link';
+const CourseLink = Link.extend({
+  addAttributes() {
+    return { ...this.parent?.(), 'data-course-link': { default: null } };
+  },
+});
+// <TipTap :extensions="[CourseLink]"> … setLink({ href, 'data-course-link': id }) now persists
+```
+
+Open the editor imperatively (e.g. from your own toolbar) with the `openLinkEditor()` handle method. The **general** `bubbleMenu` slot stays independent — give it a custom trigger with `:bubble-menu-should-show` and it coexists with the link editor without collision.
 
 Each target fills `#toolbar` through its native imperative-render API:
 

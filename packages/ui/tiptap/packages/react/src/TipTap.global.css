@@ -5,3 +5,39 @@
     height: 0;
     pointer-events: none;
   }
+.rozie-tiptap-link-editor {
+    display: flex;
+    align-items: center;
+    gap: var(--rozie-tiptap-link-gap, 0.25rem);
+    padding: var(--rozie-tiptap-link-padding, 0.3125rem 0.375rem);
+    background: var(--rozie-tiptap-link-bg, #1a1a1a);
+    border: var(--rozie-tiptap-link-border, 1px solid rgba(0, 0, 0, 0.2));
+    border-radius: var(--rozie-tiptap-link-radius, 6px);
+    box-shadow: var(--rozie-tiptap-link-shadow, 0 4px 16px rgba(0, 0, 0, 0.25));
+  }
+.rozie-tiptap-link-input {
+    font: inherit;
+    font-size: var(--rozie-tiptap-link-input-font-size, 0.8125rem);
+    padding: var(--rozie-tiptap-link-input-padding, 0.1875rem 0.375rem);
+    min-width: var(--rozie-tiptap-link-input-min-width, 11rem);
+    border: var(--rozie-tiptap-link-input-border, 1px solid #444);
+    border-radius: var(--rozie-tiptap-link-input-radius, 4px);
+    background: var(--rozie-tiptap-link-input-bg, #fff);
+    color: var(--rozie-tiptap-link-input-color, #000);
+  }
+.rozie-tiptap-link-editor button {
+    font: inherit;
+    font-size: var(--rozie-tiptap-link-button-font-size, 0.8125rem);
+    padding: var(--rozie-tiptap-link-button-padding, 0.1875rem 0.5rem);
+    border: var(--rozie-tiptap-link-button-border, 1px solid transparent);
+    border-radius: var(--rozie-tiptap-link-button-radius, 4px);
+    background: var(--rozie-tiptap-link-button-bg, rgba(255, 255, 255, 0.12));
+    color: var(--rozie-tiptap-link-button-color, #fff);
+    cursor: pointer;
+  }
+.rozie-tiptap-link-editor button:hover {
+    background: var(--rozie-tiptap-link-button-hover-bg, rgba(255, 255, 255, 0.22));
+  }
+.rozie-tiptap-link-editor .rozie-tiptap-link-remove {
+    color: var(--rozie-tiptap-link-remove-color, #ff9b9b);
+  }

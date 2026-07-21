@@ -42,6 +42,8 @@ interface BubbleMenuCtx { editor: any; }
 
 interface FloatingMenuCtx { editor: any; }
 
+interface LinkEditorCtx { editor: any; href: any; attrs: any; setLink: any; unsetLink: any; close: any; }
+
 interface NodeViewCtx { node: any; selected: any; updateAttributes: any; getPos: any; editor: any; contentDOM: any; }
 
 interface TipTapProps {
@@ -107,6 +109,12 @@ interface TipTapProps {
    * Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.
    */
   enforceMaxLength?: boolean;
+  /**
+   * A custom `shouldShow` predicate for the GENERAL `bubbleMenu` slot — the TipTap signature `({ editor, view, state, oldState, from, to }) => boolean`. When provided, it REPLACES the general bubbleMenu's default predicate (show on a non-empty text selection), turning the `bubbleMenu` slot into a fully consumer-controllable selection-tooling surface (e.g. show only inside a table, or only for a specific mark). When `null` (default), the default non-empty-selection behavior applies. Orthogonal to the built-in link editor, which is its own bubble-menu surface with a link-aware trigger. NOTE: as a Function prop it lowers to a loosely-typed callable on some targets (React `any` / Angular `unknown`) — pass a correctly-typed predicate; the wrapper forwards it verbatim to `BubbleMenu.configure({ shouldShow })`.
+   * @example
+   * <TipTap :bubble-menu-should-show="({ editor }) => editor.isActive('table')"><template #bubbleMenu="{ editor }">…</template></TipTap>
+   */
+  bubbleMenuShouldShow?: ((...args: any[]) => any) | null;
   onUpdate?: (...args: any[]) => void;
   onSelectionUpdate?: (...args: any[]) => void;
   onFocus?: (...args: any[]) => void;
@@ -115,6 +123,7 @@ interface TipTapProps {
   renderToolbar?: (ctx: ToolbarCtx) => ReactNode;
   renderBubbleMenu?: (ctx: BubbleMenuCtx) => ReactNode;
   renderFloatingMenu?: (ctx: FloatingMenuCtx) => ReactNode;
+  renderLinkEditor?: (ctx: LinkEditorCtx) => ReactNode;
   renderNodeView?: (ctx: NodeViewCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
 }
@@ -142,6 +151,7 @@ export interface TipTapHandle {
   isEmpty: (...args: any[]) => any;
   getCharacterCount: (...args: any[]) => any;
   getWordCount: (...args: any[]) => any;
+  openLinkEditor: (...args: any[]) => any;
 }
 
 const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: TipTapProps, ref): JSX.Element {
@@ -150,7 +160,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   const __defaultExtensions = useState(() => (() => [])())[0];
   const __defaultStarterKit = useState(() => (() => ({}))())[0];
   const __defaultNodeSpecs = useState(() => (() => [])())[0];
-  const props: Omit<TipTapProps, 'editable' | 'placeholder' | 'autofocus' | 'editorClass' | 'ariaLabel' | 'editorProps' | 'extensions' | 'starterKit' | 'nodeSpecs' | 'uploadImage' | 'maxLength' | 'enforceMaxLength'> & { editable: boolean; placeholder: string; autofocus: boolean; editorClass: string; ariaLabel: string; editorProps: Record<string, any>; extensions: any[]; starterKit: Record<string, any>; nodeSpecs: any[]; uploadImage: ((...args: any[]) => any) | null; maxLength: (number) | null; enforceMaxLength: boolean } = {
+  const props: Omit<TipTapProps, 'editable' | 'placeholder' | 'autofocus' | 'editorClass' | 'ariaLabel' | 'editorProps' | 'extensions' | 'starterKit' | 'nodeSpecs' | 'uploadImage' | 'maxLength' | 'enforceMaxLength' | 'bubbleMenuShouldShow'> & { editable: boolean; placeholder: string; autofocus: boolean; editorClass: string; ariaLabel: string; editorProps: Record<string, any>; extensions: any[]; starterKit: Record<string, any>; nodeSpecs: any[]; uploadImage: ((...args: any[]) => any) | null; maxLength: (number) | null; enforceMaxLength: boolean; bubbleMenuShouldShow: ((...args: any[]) => any) | null } = {
     ..._props,
     editable: _props.editable ?? true,
     placeholder: _props.placeholder ?? '',
@@ -164,6 +174,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     uploadImage: _props.uploadImage ?? null,
     maxLength: _props.maxLength ?? null,
     enforceMaxLength: _props.enforceMaxLength ?? false,
+    bubbleMenuShouldShow: _props.bubbleMenuShouldShow ?? null,
   };
   const _renderToolbarRef = useRef(props.renderToolbar);
   _renderToolbarRef.current = props.renderToolbar;
@@ -171,15 +182,21 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   _renderBubbleMenuRef.current = props.renderBubbleMenu;
   const _renderFloatingMenuRef = useRef(props.renderFloatingMenu);
   _renderFloatingMenuRef.current = props.renderFloatingMenu;
+  const _renderLinkEditorRef = useRef(props.renderLinkEditor);
+  _renderLinkEditorRef.current = props.renderLinkEditor;
   const _renderNodeViewRef = useRef(props.renderNodeView);
   _renderNodeViewRef.current = props.renderNodeView;
   const lastHtml = useRef<any>(null);
   const bubbleMenuEl = useRef<any>(null);
   const floatingMenuEl = useRef<any>(null);
+  const linkEditorEl = useRef<any>(null);
   const editor = useRef<any>(null);
+  const openFlag = useRef(false);
   const toolbarDispose = useRef<any>(null);
   const bubbleMenuDispose = useRef<any>(null);
   const floatingMenuDispose = useRef<any>(null);
+  const linkEditorHandle = useRef<any>(null);
+  const linkInputEl = useRef<any>(null);
   const [html, setHtml] = useControllableState({
     value: props.html,
     defaultValue: props.defaultHtml ?? '<p>Start writing…</p>',
@@ -196,11 +213,16 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     h2: false,
     bulletList: false,
     underline: false,
-    orderedList: false
+    orderedList: false,
+    link: false
   });
   const [count, setCount] = useState({
     characters: 0,
     words: 0
+  });
+  const [link, setLink] = useState({
+    href: '',
+    attrs: {}
   });
   const toolbarEl = useRef<HTMLDivElement | null>(null);
   const editorEl = useRef<HTMLDivElement | null>(null);
@@ -220,9 +242,91 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       }),
       bulletList: editor.current.isActive('bulletList'),
       underline: editor.current.isActive('underline'),
-      orderedList: editor.current.isActive('orderedList')
+      orderedList: editor.current.isActive('orderedList'),
+      link: editor.current.isActive('link')
     });
   }, []);
+  function applyLink(attrs: any) {
+    editor.current?.chain().focus().extendMarkRange('link').setLink(attrs).run();
+    openFlag.current = false;
+  }
+  function removeLink() {
+    editor.current?.chain().focus().extendMarkRange('link').unsetLink().run();
+    openFlag.current = false;
+  }
+  function closeLink() {
+    openFlag.current = false;
+    editor.current?.commands.focus();
+  }
+  const buildLinkScope = useCallback(() => ({
+    editor: editor.current,
+    href: link.href,
+    attrs: link.attrs,
+    setLink: applyLink,
+    unsetLink: removeLink,
+    close: closeLink
+  }), [applyLink, closeLink, link, removeLink]);
+  const refreshLink = useCallback(() => {
+    if (!editor.current) return;
+    const a = editor.current.getAttributes('link');
+    setLink({
+      href: a.href || '',
+      attrs: a
+    });
+    if (linkEditorHandle.current) {
+      linkEditorHandle.current.update(buildLinkScope());
+    } else if (linkInputEl.current && document.activeElement !== linkInputEl.current) {
+      linkInputEl.current.value = a.href || '';
+    }
+  }, [buildLinkScope]);
+  const openLinkEditor = useCallback(() => {
+    openFlag.current = true;
+    editor.current?.commands.focus();
+    refreshLink();
+  }, [refreshLink]);
+  const buildDefaultLinkEditor = useCallback((el: any) => {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'rozie-tiptap-link-input';
+    input.placeholder = 'https://…';
+    const apply = document.createElement('button');
+    apply.type = 'button';
+    apply.className = 'rozie-tiptap-link-apply';
+    apply.textContent = 'Apply';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'rozie-tiptap-link-remove';
+    remove.textContent = 'Remove';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'rozie-tiptap-link-cancel';
+    cancel.textContent = 'Cancel';
+    // Keep the caret/selection in the document when a control is pressed (a plain
+    // click would blur the editor and collapse the selection before the command runs).
+    const keepFocus = (e: any) => e.preventDefault();
+    for (const b of [apply, remove, cancel] as any) b.addEventListener('mousedown', keepFocus);
+    apply.addEventListener('click', () => applyLink({
+      href: input.value
+    }));
+    remove.addEventListener('click', removeLink);
+    cancel.addEventListener('click', closeLink);
+    input.addEventListener('keydown', (e: any) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applyLink({
+          href: input.value
+        });
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeLink();
+      }
+    });
+    el.appendChild(input);
+    el.appendChild(apply);
+    el.appendChild(remove);
+    el.appendChild(cancel);
+    linkInputEl.current = input;
+  }, [applyLink, closeLink, removeLink]);
   const refreshCount = useCallback(() => {
     if (!editor.current) return;
     const storage = editor.current.storage.characterCount;
@@ -582,6 +686,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     setHtml(v);
     refreshActive();
     refreshCount();
+    refreshLink();
   }
   function clearContent() {
     if (!editor.current) return;
@@ -590,6 +695,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     setHtml(lastHtml.current);
     refreshActive();
     refreshCount();
+    refreshLink();
   }
   function toggleBold() {
     editor.current?.chain().focus().toggleBold().run();
@@ -727,6 +833,27 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         portalRoots.current.delete(root);
       };
     },
+    linkEditor: (container: HTMLElement, scope: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): ReactivePortalHandle => {
+      const slot = _renderLinkEditorRef.current ?? props.slots?.['linkEditor'];
+      if (typeof slot !== 'function') return { update() {}, dispose() {} };
+      // Spike 004: portal-scope attribute injection.
+      // Cascades the @portal linkEditor { … } selectors from the
+      // component's .module.css into the engine-owned subtree.
+      container.setAttribute('data-rozie-portal-linkEditor', '2aeee876');
+      const root = createRoot(container);
+      const renderScope = (s: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): void => {
+        flushSync(() => root.render(slot(s)));
+      };
+      renderScope(scope);
+      portalRoots.current.add(root);
+      return {
+        update: (s: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }): void => renderScope(s),
+        dispose: (): void => {
+          root.unmount();
+          portalRoots.current.delete(root);
+        },
+      };
+    },
     nodeView: (container: HTMLElement, scope: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }): ReactivePortalHandle => {
       const slot = _renderNodeViewRef.current ?? props.slots?.['nodeView'];
       if (typeof slot !== 'function') return { update() {}, dispose() {} };
@@ -791,10 +918,34 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       floatingMenuEl.current = document.createElement('div');
       floatingMenuEl.current.className = 'rozie-tiptap-floating-menu';
     }
+    // Link editor (#2) host — a dedicated, always-on (when editable) bubble-menu
+    // surface, orthogonal to the general `bubbleMenu` slot. Created imperatively
+    // (bubbleMenuEl discipline). Gated on editability — no link editing in readonly.
+    if (_editableRef.current) {
+      linkEditorEl.current = document.createElement('div');
+      linkEditorEl.current.className = 'rozie-tiptap-link-editor';
+    }
+    // Each BubbleMenu instance REQUIRES a unique pluginKey (REQ-41) so the two
+    // Floating-UI plugins (the general bubbleMenu + the link editor) don't collide.
+    // The general bubbleMenu's `shouldShow` is the consumer-controllable predicate
+    // ($props.bubbleMenuShouldShow, #4) when provided, else the extension default
+    // (non-empty text selection). The link editor's shouldShow is link-aware: show
+    // on a link (edit) OR when the toolbar Link button set openFlag (create) — NARROW
+    // by design so it never fires on a bare selection and collide with the general one.
     const menuExtensions = [...(bubbleMenuEl.current ? [BubbleMenu.configure({
-      element: bubbleMenuEl.current
+      pluginKey: 'rozieBubbleMenu',
+      element: bubbleMenuEl.current,
+      ...(props.bubbleMenuShouldShow ? {
+        shouldShow: props.bubbleMenuShouldShow
+      } : {})
     })] : []), ...(floatingMenuEl.current ? [FloatingMenu.configure({
       element: floatingMenuEl.current
+    })] : []), ...(linkEditorEl.current ? [BubbleMenu.configure({
+      pluginKey: 'rozieLinkEditor',
+      element: linkEditorEl.current,
+      shouldShow: ({
+        editor
+      }: any) => editor.isActive('link') || openFlag.current
     })] : [])];
 
     // Image-upload hook (ask D). Setup-once, gated on $props.uploadImage — read
@@ -866,10 +1017,12 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
         if (next !== _htmlRef.current) setHtml(next);
         refreshCount();
+        refreshLink();
         props.onUpdate && props.onUpdate(next);
       },
       onSelectionUpdate: () => {
         refreshActive();
+        refreshLink();
         props.onSelectionUpdate && props.onSelectionUpdate();
       },
       onFocus: () => props.onFocus && props.onFocus(),
@@ -877,6 +1030,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     });
     refreshActive();
     refreshCount();
+    refreshLink();
 
     // `toolbar` portal slot — when the consumer fills it, mount their toolbar
     // fragment into the engine-adjacent host node, handing them the live editor
@@ -908,6 +1062,20 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         editor: editor.current
       });
     }
+
+    // Link editor (#2) — mount the surface into its engine-managed host. When the
+    // consumer fills `#linkEditor`, the REACTIVE portal renders their fragment
+    // (re-rendered in place by refreshLink()'s handle.update() — Spike 016 proved
+    // this survives the bubble-menu extension's detach-reattach). Otherwise the
+    // component's own default form is built imperatively into the same host.
+    // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
+    if (linkEditorEl.current) {
+      if ((props.renderLinkEditor ?? props.slots?.["linkEditor"])) {
+        linkEditorHandle.current = portals.linkEditor(linkEditorEl.current, buildLinkScope());
+      } else {
+        buildDefaultLinkEditor(linkEditorEl.current);
+      }
+    }
     return () => {
       for (const root of portalRoots.current) root.unmount();
   portalRoots.current.clear();
@@ -917,6 +1085,10 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       bubbleMenuDispose.current = null;
       floatingMenuDispose.current?.();
       floatingMenuDispose.current = null;
+      linkEditorHandle.current?.dispose();
+      linkEditorHandle.current = null;
+      linkEditorEl.current = null;
+      linkInputEl.current = null;
       editor.current?.destroy();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -931,6 +1103,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     });
     refreshActive();
     refreshCount();
+    refreshLink();
   }, [html]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
@@ -938,9 +1111,9 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     editor.current?.setEditable(v, false);
   }, [props.editable]);
 
-  const _rozieExposeRef = useRef({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount });
-  _rozieExposeRef.current = { getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount };
-  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => _rozieExposeRef.current.getEditor(...args), focusEditor: (...args: Parameters<typeof focusEditor>): ReturnType<typeof focusEditor> => _rozieExposeRef.current.focusEditor(...args), blurEditor: (...args: Parameters<typeof blurEditor>): ReturnType<typeof blurEditor> => _rozieExposeRef.current.blurEditor(...args), getHTML: (...args: Parameters<typeof getHTML>): ReturnType<typeof getHTML> => _rozieExposeRef.current.getHTML(...args), getJSON: (...args: Parameters<typeof getJSON>): ReturnType<typeof getJSON> => _rozieExposeRef.current.getJSON(...args), getText: (...args: Parameters<typeof getText>): ReturnType<typeof getText> => _rozieExposeRef.current.getText(...args), setContent: (...args: Parameters<typeof setContent>): ReturnType<typeof setContent> => _rozieExposeRef.current.setContent(...args), clearContent: (...args: Parameters<typeof clearContent>): ReturnType<typeof clearContent> => _rozieExposeRef.current.clearContent(...args), toggleBold: (...args: Parameters<typeof toggleBold>): ReturnType<typeof toggleBold> => _rozieExposeRef.current.toggleBold(...args), toggleItalic: (...args: Parameters<typeof toggleItalic>): ReturnType<typeof toggleItalic> => _rozieExposeRef.current.toggleItalic(...args), toggleHeading: (...args: Parameters<typeof toggleHeading>): ReturnType<typeof toggleHeading> => _rozieExposeRef.current.toggleHeading(...args), toggleBulletList: (...args: Parameters<typeof toggleBulletList>): ReturnType<typeof toggleBulletList> => _rozieExposeRef.current.toggleBulletList(...args), toggleUnderline: (...args: Parameters<typeof toggleUnderline>): ReturnType<typeof toggleUnderline> => _rozieExposeRef.current.toggleUnderline(...args), toggleOrderedList: (...args: Parameters<typeof toggleOrderedList>): ReturnType<typeof toggleOrderedList> => _rozieExposeRef.current.toggleOrderedList(...args), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => _rozieExposeRef.current.undo(...args), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => _rozieExposeRef.current.redo(...args), chain: (...args: Parameters<typeof chain>): ReturnType<typeof chain> => _rozieExposeRef.current.chain(...args), isActive: (...args: Parameters<typeof isActive>): ReturnType<typeof isActive> => _rozieExposeRef.current.isActive(...args), can: (...args: Parameters<typeof can>): ReturnType<typeof can> => _rozieExposeRef.current.can(...args), isEmpty: (...args: Parameters<typeof isEmpty>): ReturnType<typeof isEmpty> => _rozieExposeRef.current.isEmpty(...args), getCharacterCount: (...args: Parameters<typeof getCharacterCount>): ReturnType<typeof getCharacterCount> => _rozieExposeRef.current.getCharacterCount(...args), getWordCount: (...args: Parameters<typeof getWordCount>): ReturnType<typeof getWordCount> => _rozieExposeRef.current.getWordCount(...args) }), []);
+  const _rozieExposeRef = useRef({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor });
+  _rozieExposeRef.current = { getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor };
+  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => _rozieExposeRef.current.getEditor(...args), focusEditor: (...args: Parameters<typeof focusEditor>): ReturnType<typeof focusEditor> => _rozieExposeRef.current.focusEditor(...args), blurEditor: (...args: Parameters<typeof blurEditor>): ReturnType<typeof blurEditor> => _rozieExposeRef.current.blurEditor(...args), getHTML: (...args: Parameters<typeof getHTML>): ReturnType<typeof getHTML> => _rozieExposeRef.current.getHTML(...args), getJSON: (...args: Parameters<typeof getJSON>): ReturnType<typeof getJSON> => _rozieExposeRef.current.getJSON(...args), getText: (...args: Parameters<typeof getText>): ReturnType<typeof getText> => _rozieExposeRef.current.getText(...args), setContent: (...args: Parameters<typeof setContent>): ReturnType<typeof setContent> => _rozieExposeRef.current.setContent(...args), clearContent: (...args: Parameters<typeof clearContent>): ReturnType<typeof clearContent> => _rozieExposeRef.current.clearContent(...args), toggleBold: (...args: Parameters<typeof toggleBold>): ReturnType<typeof toggleBold> => _rozieExposeRef.current.toggleBold(...args), toggleItalic: (...args: Parameters<typeof toggleItalic>): ReturnType<typeof toggleItalic> => _rozieExposeRef.current.toggleItalic(...args), toggleHeading: (...args: Parameters<typeof toggleHeading>): ReturnType<typeof toggleHeading> => _rozieExposeRef.current.toggleHeading(...args), toggleBulletList: (...args: Parameters<typeof toggleBulletList>): ReturnType<typeof toggleBulletList> => _rozieExposeRef.current.toggleBulletList(...args), toggleUnderline: (...args: Parameters<typeof toggleUnderline>): ReturnType<typeof toggleUnderline> => _rozieExposeRef.current.toggleUnderline(...args), toggleOrderedList: (...args: Parameters<typeof toggleOrderedList>): ReturnType<typeof toggleOrderedList> => _rozieExposeRef.current.toggleOrderedList(...args), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => _rozieExposeRef.current.undo(...args), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => _rozieExposeRef.current.redo(...args), chain: (...args: Parameters<typeof chain>): ReturnType<typeof chain> => _rozieExposeRef.current.chain(...args), isActive: (...args: Parameters<typeof isActive>): ReturnType<typeof isActive> => _rozieExposeRef.current.isActive(...args), can: (...args: Parameters<typeof can>): ReturnType<typeof can> => _rozieExposeRef.current.can(...args), isEmpty: (...args: Parameters<typeof isEmpty>): ReturnType<typeof isEmpty> => _rozieExposeRef.current.isEmpty(...args), getCharacterCount: (...args: Parameters<typeof getCharacterCount>): ReturnType<typeof getCharacterCount> => _rozieExposeRef.current.getCharacterCount(...args), getWordCount: (...args: Parameters<typeof getWordCount>): ReturnType<typeof getWordCount> => _rozieExposeRef.current.getWordCount(...args), openLinkEditor: (...args: Parameters<typeof openLinkEditor>): ReturnType<typeof openLinkEditor> => _rozieExposeRef.current.openLinkEditor(...args) }), []);
 
   return (
     <>
@@ -957,6 +1130,8 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         <button type="button" className={clsx({ active: active.underline })} aria-label="Underline" onClick={toggleUnderline} data-rozie-s-2aeee876=""><u data-rozie-s-2aeee876="">U</u></button>
         <button type="button" className={clsx({ active: active.orderedList })} aria-label="Ordered list" onClick={toggleOrderedList} data-rozie-s-2aeee876="">1. List</button>
         <span className={"sep"} data-rozie-s-2aeee876="" />
+        <button type="button" className={clsx({ active: active.link })} aria-label="Link" onClick={openLinkEditor} data-rozie-s-2aeee876="">Link</button>
+        <span className={"sep"} data-rozie-s-2aeee876="" />
         <button type="button" aria-label="Undo" onClick={undo} data-rozie-s-2aeee876="">↺</button>
         <button type="button" aria-label="Redo" onClick={redo} data-rozie-s-2aeee876="">↻</button>
       </div>}{!!(props.editable && (props.renderToolbar ?? props.slots?.['toolbar'])) && <div className={"rozie-tiptap-toolbar rozie-tiptap-toolbar--slot"} ref={toolbarEl} data-rozie-s-2aeee876="" />}<div ref={editorEl} className={"rozie-tiptap-content"} data-placeholder={props.placeholder} data-rozie-s-2aeee876="" />
@@ -964,6 +1139,8 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       {!!(props.maxLength != null || (props.renderCount ?? props.slots?.['count'])) && <div className={"rozie-tiptap-count"} data-rozie-s-2aeee876="">
         {(props.renderCount ?? props.slots?.['count']) ? ((props.renderCount ?? props.slots?.['count']) as Function)({ characters: count.characters, words: count.words, maxLength: props.maxLength, over: props.maxLength != null && count.characters > props.maxLength }) : <span className={clsx("rozie-tiptap-count-value", { over: props.maxLength != null && count.characters > props.maxLength })} data-rozie-s-2aeee876="">{rozieDisplay(count.characters)} / {props.maxLength}</span>}
       </div>}</div>
+
+
 
 
 

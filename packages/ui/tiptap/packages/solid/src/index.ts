@@ -1,5 +1,5 @@
 export { default as TipTap } from './TipTap';
 export { default } from './TipTap';
 
-/** The `$expose` imperative handle received via `ref` — { getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount }. */
+/** The `$expose` imperative handle received via `ref` — { getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor }. */
 export type { TipTapHandle } from './TipTap';

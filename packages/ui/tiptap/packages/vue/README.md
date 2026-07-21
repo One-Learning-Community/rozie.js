@@ -42,6 +42,7 @@ const html = ref('<p>Hello <strong>world</strong></p>');
 | `uploadImage` | `Function` | `null` |  |
 | `maxLength` | `Number` | `null` |  |
 | `enforceMaxLength` | `Boolean` | `false` |  |
+| `bubbleMenuShouldShow` | `Function` | `null` |  |
 
 ## Events
 
@@ -92,6 +93,7 @@ const editor = ref();        // template ref
 | `isEmpty` | Whether the document is empty — drives empty-state UI and submit-gating. true before mount. |
 | `getCharacterCount` | Return the current character count. Reads the CharacterCount extension's live storage when registered (`maxLength` set or the `#count` slot filled), else falls back to `getText().length`. Always a number — 0 before mount. |
 | `getWordCount` | Return the current word count. Reads the CharacterCount extension's live storage when registered, else falls back to a whitespace-split count of `getText()`. Always a number — 0 before mount. |
+| `openLinkEditor` | Open the link editor on the current selection (create mode) — the imperative equivalent of clicking the toolbar Link button. Surfaces the editor prefilled with any existing link href; no-op before mount. |
 
 ## Slots
 
@@ -107,4 +109,5 @@ When you fill the `toolbar` slot the internal toolbar is replaced by your own UI
 | toolbar | editor |
 | bubbleMenu | editor |
 | floatingMenu | editor |
+| linkEditor | editor, href, attrs, setLink, unsetLink, close |
 | nodeView | node, selected, updateAttributes, getPos, editor, contentDOM |
