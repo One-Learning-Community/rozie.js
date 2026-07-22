@@ -196,6 +196,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   const bubbleMenuDispose = useRef<any>(null);
   const floatingMenuDispose = useRef<any>(null);
   const linkEditorHandle = useRef<any>(null);
+  const lastLinkKey = useRef<any>(null);
   const linkInputEl = useRef<any>(null);
   const [html, setHtml] = useControllableState({
     value: props.html,
@@ -247,6 +248,9 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     });
   }, []);
   function applyLink(attrs: any) {
+    // A link mark requires a non-empty href — ignore an empty Apply (built-in form)
+    // or a hrefless consumer setLink rather than writing a degenerate `<a href="">`.
+    if (!attrs || typeof attrs.href !== 'string' || !attrs.href.trim()) return;
     editor.current?.chain().focus().extendMarkRange('link').setLink(attrs).run();
     openFlag.current = false;
   }
@@ -256,6 +260,11 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   }
   function closeLink() {
     openFlag.current = false;
+    // "Cancel" = discard the unsaved edit: revert the built-in form's input to the
+    // current link href. The surface itself is link-anchored (like Google Docs) — it
+    // stays while the caret is on a link and hides once openFlag is clear and the
+    // caret is off any link (or the doc is not editable).
+    if (linkInputEl.current) linkInputEl.current.value = link.href;
     editor.current?.commands.focus();
   }
   const buildLinkScope = useCallback(() => ({
@@ -269,14 +278,27 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   const refreshLink = useCallback(() => {
     if (!editor.current) return;
     const a = editor.current.getAttributes('link');
+    const href = a.href || '';
+    // Early-return when the link mark is unchanged — collapses the twice-per-keystroke
+    // onUpdate+onSelectionUpdate double-fire to one effective refresh (no redundant
+    // reactive-portal re-render of the #linkEditor fragment on caret moves that don't
+    // change the link).
+    const key = href + ' ' + JSON.stringify(a);
+    if (key === lastLinkKey.current) return;
+    lastLinkKey.current = key;
     setLink({
-      href: a.href || '',
+      href,
       attrs: a
     });
     if (linkEditorHandle.current) {
       linkEditorHandle.current.update(buildLinkScope());
-    } else if (linkInputEl.current && document.activeElement !== linkInputEl.current) {
-      linkInputEl.current.value = a.href || '';
+    } else if (linkInputEl.current && !linkInputEl.current.matches(':focus')) {
+      // `matches(':focus')` (NOT `document.activeElement === linkInputEl`) so the "is
+      // the user typing in this input?" guard holds inside a shadow root — on the Lit
+      // target document.activeElement is the shadow HOST, so a document.activeElement
+      // check would always miss and stomp the user's in-progress URL. `:focus` is
+      // per-element and shadow-boundary-agnostic.
+      linkInputEl.current.value = href;
     }
   }, [buildLinkScope]);
   const openLinkEditor = useCallback(() => {
@@ -918,13 +940,17 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       floatingMenuEl.current = document.createElement('div');
       floatingMenuEl.current.className = 'rozie-tiptap-floating-menu';
     }
-    // Link editor (#2) host — a dedicated, always-on (when editable) bubble-menu
-    // surface, orthogonal to the general `bubbleMenu` slot. Created imperatively
-    // (bubbleMenuEl discipline). Gated on editability — no link editing in readonly.
-    if (_editableRef.current) {
-      linkEditorEl.current = document.createElement('div');
-      linkEditorEl.current.className = 'rozie-tiptap-link-editor';
-    }
+    // Link editor (#2) host — a dedicated bubble-menu surface, orthogonal to the
+    // general `bubbleMenu` slot. Created imperatively (bubbleMenuEl discipline).
+    // ALWAYS created (not gated on editable at mount): editability is a REACTIVE prop
+    // ($watch(editable) → setEditable), so SHOWING is gated on `editor.isEditable` in
+    // the link-editor shouldShow below — a live check that follows a runtime toggle.
+    // This closes both directions of the mount-time-gate bug: a doc mounted readonly
+    // that later becomes editable gets a working link editor, and a doc toggled TO
+    // readonly can no longer be link-edited (isEditable false → never shows, so no
+    // Apply/Remove on a read-only document).
+    linkEditorEl.current = document.createElement('div');
+    linkEditorEl.current.className = 'rozie-tiptap-link-editor';
     // Each BubbleMenu instance REQUIRES a unique pluginKey (REQ-41) so the two
     // Floating-UI plugins (the general bubbleMenu + the link editor) don't collide.
     // The general bubbleMenu's `shouldShow` is the consumer-controllable predicate
@@ -943,9 +969,12 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     })] : []), ...(linkEditorEl.current ? [BubbleMenu.configure({
       pluginKey: 'rozieLinkEditor',
       element: linkEditorEl.current,
+      // `editor.isEditable` gates the whole surface reactively (readonly ⇒ never
+      // shows). NARROW otherwise: show on a link (edit) OR when the toolbar Link
+      // button set openFlag (create) — never on a bare selection.
       shouldShow: ({
         editor
-      }: any) => editor.isActive('link') || openFlag.current
+      }: any) => editor.isEditable && (editor.isActive('link') || openFlag.current)
     })] : [])];
 
     // Image-upload hook (ask D). Setup-once, gated on $props.uploadImage — read
@@ -1026,7 +1055,19 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         props.onSelectionUpdate && props.onSelectionUpdate();
       },
       onFocus: () => props.onFocus && props.onFocus(),
-      onBlur: () => props.onBlur && props.onBlur()
+      onBlur: ({
+        event
+      }: any) => {
+        // Clear the create-mode latch when focus truly leaves the editor + its link
+        // surface — but NOT when it moves INTO the link editor host (clicking the URL
+        // input blurs the editor; the buttons are already covered by their keepFocus
+        // mousedown). Without this, openFlag stays true after the user dismisses the
+        // create affordance by clicking away, so the editor spuriously re-surfaces on
+        // the next unrelated selection.
+        const to = event && event.relatedTarget;
+        if (!(to instanceof Node && linkEditorEl.current && linkEditorEl.current.contains(to))) openFlag.current = false;
+        props.onBlur && props.onBlur();
+      }
     });
     refreshActive();
     refreshCount();

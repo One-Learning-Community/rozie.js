@@ -226,6 +226,11 @@ let linkEditorEl: any = null;
 let linkEditorHandle: any = null;
 let linkInputEl: any = null;
 let openFlag = false;
+// Last link state refreshLink() reflected, as a compare key — lets refreshLink
+// early-return when the link mark is unchanged (a keystroke fires BOTH onUpdate
+// and onSelectionUpdate, so refreshLink would otherwise run — and re-render the
+// #linkEditor fragment — twice per keystroke).
+let lastLinkKey: any = null;
 // Recompute the internal toolbar's active-mark booleans from the live editor.
 const refreshActive = () => {
   if (!editor) return;
@@ -263,6 +268,9 @@ const refreshActive = () => {
 // onUpdate, both of which already call refreshLink. Only openLinkEditor (safely last)
 // calls it, for immediate prefill on the create affordance.
 const applyLink = (attrs: any) => {
+  // A link mark requires a non-empty href — ignore an empty Apply (built-in form)
+  // or a hrefless consumer setLink rather than writing a degenerate `<a href="">`.
+  if (!attrs || typeof attrs.href !== 'string' || !attrs.href.trim()) return;
   editor?.chain().focus().extendMarkRange('link').setLink(attrs).run();
   openFlag = false;
 };
@@ -272,6 +280,11 @@ const removeLink = () => {
 };
 const closeLink = () => {
   openFlag = false;
+  // "Cancel" = discard the unsaved edit: revert the built-in form's input to the
+  // current link href. The surface itself is link-anchored (like Google Docs) — it
+  // stays while the caret is on a link and hides once openFlag is clear and the
+  // caret is off any link (or the doc is not editable).
+  if (linkInputEl) linkInputEl.value = link.value.href;
   editor?.commands.focus();
 };
 // The reactive `#linkEditor` slot scope — keys EXACTLY { editor, href, attrs,
@@ -294,14 +307,27 @@ const buildLinkScope = () => ({
 const refreshLink = () => {
   if (!editor) return;
   const a = editor.getAttributes('link');
+  const href = a.href || '';
+  // Early-return when the link mark is unchanged — collapses the twice-per-keystroke
+  // onUpdate+onSelectionUpdate double-fire to one effective refresh (no redundant
+  // reactive-portal re-render of the #linkEditor fragment on caret moves that don't
+  // change the link).
+  const key = href + ' ' + JSON.stringify(a);
+  if (key === lastLinkKey) return;
+  lastLinkKey = key;
   link.value = {
-    href: a.href || '',
+    href,
     attrs: a
   };
   if (linkEditorHandle) {
     linkEditorHandle.update(buildLinkScope());
-  } else if (linkInputEl && document.activeElement !== linkInputEl) {
-    linkInputEl.value = a.href || '';
+  } else if (linkInputEl && !linkInputEl.matches(':focus')) {
+    // `matches(':focus')` (NOT `document.activeElement === linkInputEl`) so the "is
+    // the user typing in this input?" guard holds inside a shadow root — on the Lit
+    // target document.activeElement is the shadow HOST, so a document.activeElement
+    // check would always miss and stomp the user's in-progress URL. `:focus` is
+    // per-element and shadow-boundary-agnostic.
+    linkInputEl.value = href;
   }
 };
 // Toolbar Link button (create affordance, ask C's deferred button): flip the
@@ -989,13 +1015,17 @@ onMounted(() => {
     floatingMenuEl = document.createElement('div');
     floatingMenuEl.className = 'rozie-tiptap-floating-menu';
   }
-  // Link editor (#2) host — a dedicated, always-on (when editable) bubble-menu
-  // surface, orthogonal to the general `bubbleMenu` slot. Created imperatively
-  // (bubbleMenuEl discipline). Gated on editability — no link editing in readonly.
-  if (props.editable) {
-    linkEditorEl = document.createElement('div');
-    linkEditorEl.className = 'rozie-tiptap-link-editor';
-  }
+  // Link editor (#2) host — a dedicated bubble-menu surface, orthogonal to the
+  // general `bubbleMenu` slot. Created imperatively (bubbleMenuEl discipline).
+  // ALWAYS created (not gated on editable at mount): editability is a REACTIVE prop
+  // ($watch(editable) → setEditable), so SHOWING is gated on `editor.isEditable` in
+  // the link-editor shouldShow below — a live check that follows a runtime toggle.
+  // This closes both directions of the mount-time-gate bug: a doc mounted readonly
+  // that later becomes editable gets a working link editor, and a doc toggled TO
+  // readonly can no longer be link-edited (isEditable false → never shows, so no
+  // Apply/Remove on a read-only document).
+  linkEditorEl = document.createElement('div');
+  linkEditorEl.className = 'rozie-tiptap-link-editor';
   // Each BubbleMenu instance REQUIRES a unique pluginKey (REQ-41) so the two
   // Floating-UI plugins (the general bubbleMenu + the link editor) don't collide.
   // The general bubbleMenu's `shouldShow` is the consumer-controllable predicate
@@ -1014,9 +1044,12 @@ onMounted(() => {
   })] : []), ...(linkEditorEl ? [BubbleMenu.configure({
     pluginKey: 'rozieLinkEditor',
     element: linkEditorEl,
+    // `editor.isEditable` gates the whole surface reactively (readonly ⇒ never
+    // shows). NARROW otherwise: show on a link (edit) OR when the toolbar Link
+    // button set openFlag (create) — never on a bare selection.
     shouldShow: ({
       editor
-    }: any) => editor.isActive('link') || openFlag
+    }: any) => editor.isEditable && (editor.isActive('link') || openFlag)
   })] : [])];
 
   // Image-upload hook (ask D). Setup-once, gated on $props.uploadImage — read
@@ -1097,7 +1130,19 @@ onMounted(() => {
       emit('selectionUpdate');
     },
     onFocus: () => emit('focus'),
-    onBlur: () => emit('blur')
+    onBlur: ({
+      event
+    }: any) => {
+      // Clear the create-mode latch when focus truly leaves the editor + its link
+      // surface — but NOT when it moves INTO the link editor host (clicking the URL
+      // input blurs the editor; the buttons are already covered by their keepFocus
+      // mousedown). Without this, openFlag stays true after the user dismisses the
+      // create affordance by clicking away, so the editor spuriously re-surfaces on
+      // the next unrelated selection.
+      const to = event && event.relatedTarget;
+      if (!(to instanceof Node && linkEditorEl && linkEditorEl.contains(to))) openFlag = false;
+      emit('blur');
+    }
   });
   refreshActive();
   refreshCount();

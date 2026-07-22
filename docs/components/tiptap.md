@@ -257,7 +257,7 @@ const CourseLink = Link.extend({
 // <TipTap :extensions="[CourseLink]"> … setLink({ href, 'data-course-link': id }) now persists
 ```
 
-Open the editor imperatively (e.g. from your own toolbar) with the `openLinkEditor()` handle method. The **general** `bubbleMenu` slot stays independent — give it a custom trigger with `:bubble-menu-should-show` and it coexists with the link editor without collision.
+Open the editor imperatively (e.g. from your own toolbar) with the `openLinkEditor()` handle method. The link editor only shows on a link (edit) or after the Link button/`openLinkEditor()` (create), and never on a bare selection, so it stays out of the way of the **general** `bubbleMenu` slot's default (non-empty-selection) trigger. The one overlap: if you fill `#bubbleMenu` **and** invoke the create affordance on a non-empty selection, both surfaces can appear over that selection — give your `#bubbleMenu` a `:bubble-menu-should-show` that excludes it (e.g. only show inside a table, or only when no link is being created) to keep them fully disjoint.
 
 Each target fills `#toolbar` through its native imperative-render API:
 
