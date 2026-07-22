@@ -296,6 +296,17 @@
 @jsonjoy.com/util
 @kurkle/color
 @leichtgewicht/ip-codec
+@lexical/clipboard
+@lexical/dragon
+@lexical/extension
+@lexical/history
+@lexical/html
+@lexical/internal
+@lexical/link
+@lexical/list
+@lexical/rich-text
+@lexical/selection
+@lexical/utils
 @lezer/common
 @lezer/css
 @lezer/highlight
@@ -544,6 +555,7 @@
 @tiptap/extension-bold
 @tiptap/extension-bubble-menu
 @tiptap/extension-bullet-list
+@tiptap/extension-character-count
 @tiptap/extension-code
 @tiptap/extension-code-block
 @tiptap/extension-document
@@ -553,6 +565,7 @@
 @tiptap/extension-hard-break
 @tiptap/extension-heading
 @tiptap/extension-horizontal-rule
+@tiptap/extension-image
 @tiptap/extension-italic
 @tiptap/extension-link
 @tiptap/extension-list
@@ -1079,6 +1092,7 @@ leaflet
 less
 less-loader
 levn
+lexical
 license-webpack-plugin
 lightningcss
 lightningcss-android-arm64
