@@ -71,6 +71,12 @@ export default class LexicalEditor extends SignalWatcher(LitElement) {
     font-size: 1.25rem;
     margin: 0.5rem 0 0.375rem;
   }
+.rozie-lexical-content .rozie-mention {
+    background: var(--rozie-lexical-mention-bg, #e0e7ff);
+    border-radius: var(--rozie-lexical-mention-radius, 6px);
+    padding: var(--rozie-lexical-mention-padding, 1px 6px);
+    font-size: var(--rozie-lexical-mention-font-size, 0.875rem);
+  }
 `;
 
   /**
@@ -242,7 +248,7 @@ private __rozieCtxProvider_rozie_lexical_editor = new ContextProvider(this, { co
   }
 }
 
-injectGlobalStyles('rozie-lexical-editor-c1dc68a5-global', `
+injectGlobalStyles('rozie-lexical-editor-0bf26d9c-global', `
 .rozie-lexical-content strong {
     font-weight: 700;
   }
@@ -264,5 +270,11 @@ injectGlobalStyles('rozie-lexical-editor-c1dc68a5-global', `
 .rozie-lexical-content h2 {
     font-size: 1.25rem;
     margin: 0.5rem 0 0.375rem;
+  }
+.rozie-lexical-content .rozie-mention {
+    background: var(--rozie-lexical-mention-bg, #e0e7ff);
+    border-radius: var(--rozie-lexical-mention-radius, 6px);
+    padding: var(--rozie-lexical-mention-padding, 1px 6px);
+    font-size: var(--rozie-lexical-mention-font-size, 0.875rem);
   }
 `);
