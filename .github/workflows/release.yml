@@ -9,6 +9,14 @@ name: Release (early subset)
 #     dist externalizes only vue), so it publishes standalone. tiptap-vue was added
 #     to dogfood it (2026-07-18, first-time @ 0.1.0) — also self-contained (dist
 #     externalizes only vue + the @tiptap/* peers), so it publishes standalone.
+#   - 5 non-vue @rozie-ui tiptap leaves: tiptap-{react,solid,lit,svelte,angular}.
+#     Now IN scope alongside tiptap-vue — all six aligned at 0.2.0 (the FIRST
+#     all-targets tiptap release line; 0.2.0 ships char-count + bubble-menu link
+#     editor + themeable CSS-custom-property styling, all additive/minor). react/solid/
+#     lit carry @rozie/runtime-<fw> and svelte carries @rozie/runtime-svelte (rewritten
+#     from `workspace:` at publish; live on npm at 0.2.1); angular carries no @rozie dep
+#     (tslib only). All six take the @tiptap/* v3 peers. Self-contained — no @rozie-ui
+#     workspace peer, so no ordering coupling to any other leaf family.
 #   - 5 non-vue @rozie-ui captcha leaves: captcha-{react,solid,lit,svelte,angular}.
 #     These are now IN scope: they depend on @rozie/runtime-* (react/solid/lit/svelte),
 #     and that prerequisite is satisfied — @rozie/runtime-* is live on npm at 0.1.1,
@@ -256,6 +264,23 @@ jobs:
           --filter=@rozie-ui/pdf-angular
           build
 
+      # Build the 5 non-vue tiptap leaves into their compiled dist/ drop-in (tiptap-vue is
+      # built in the "Build Vue leaves" step above). Mixed per-target toolchain (react/solid/lit
+      # tsdown, svelte @sveltejs/package, angular ng-packagr APF). Sits AFTER the toolchain build
+      # so the local @rozie/runtime-* dist exists for the react/solid/lit/svelte leaf type
+      # resolution (angular = tslib only, no @rozie dep). Self-contained — no @rozie-ui workspace
+      # peer, so it has NO ordering dependency on combobox, popover, or data-table. This is the
+      # FIRST all-targets tiptap release line (all six aligned at 0.2.0).
+      - name: Build non-vue tiptap leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/tiptap-react
+          --filter=@rozie-ui/tiptap-solid
+          --filter=@rozie-ui/tiptap-lit
+          --filter=@rozie-ui/tiptap-svelte
+          --filter=@rozie-ui/tiptap-angular
+          build
+
       # Build all six toast leaves into their compiled dist/ drop-in. Same mixed per-target
       # toolchain as captcha/sortable-list/flatpickr/pdf (react/solid/lit tsdown, vue Vite lib +
       # vue-tsc, svelte @sveltejs/package, angular ng-packagr APF). Sits AFTER the toolchain
@@ -389,6 +414,11 @@ jobs:
           --filter @rozie-ui/pdf-vue
           --filter @rozie-ui/captcha-vue
           --filter @rozie-ui/tiptap-vue
+          --filter @rozie-ui/tiptap-react
+          --filter @rozie-ui/tiptap-solid
+          --filter @rozie-ui/tiptap-lit
+          --filter @rozie-ui/tiptap-svelte
+          --filter @rozie-ui/tiptap-angular
           --filter @rozie-ui/captcha-react
           --filter @rozie-ui/captcha-solid
           --filter @rozie-ui/captcha-lit
@@ -638,6 +668,27 @@ jobs:
           --filter=@rozie-ui/toast-lit
           --filter=@rozie-ui/toast-svelte
           --filter=@rozie-ui/toast-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # The 5 non-vue tiptap leaves (FIRST all-targets tiptap release line, all six aligned at
+      # 0.2.0 — tiptap-vue is published in the "Publish Vue leaves" step above, previously at
+      # 0.1.1). pnpm rewrites their `workspace:` deps to the concrete @rozie/runtime-* versions
+      # (live on npm at 0.2.1) in the tarball: react/solid/lit carry @rozie/runtime-<fw>
+      # (workspace:* -> 0.2.1 exact), svelte carries @rozie/runtime-svelte (workspace:^ -> ^0.2.1);
+      # angular carries no @rozie dep (tslib only). Self-contained — no @rozie-ui workspace peer,
+      # so this has NO ordering dependency on any other leaf family. Inherits dry_run (default
+      # TRUE) via steps.flags.outputs.extra and the skip-if-already-published behavior (no --force).
+      - name: Publish non-vue tiptap leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/tiptap-react
+          --filter=@rozie-ui/tiptap-solid
+          --filter=@rozie-ui/tiptap-lit
+          --filter=@rozie-ui/tiptap-svelte
+          --filter=@rozie-ui/tiptap-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
