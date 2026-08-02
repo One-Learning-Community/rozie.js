@@ -94,10 +94,34 @@ name: Release (early subset)
 #     build/publish profile as captcha: builds after the toolchain step (so local
 #     @rozie/runtime-* dist exists for type resolution) with no ordering coupling to combobox or
 #     any other leaf family.
+#   - 6 @rozie-ui date-picker leaves: date-picker-{react,vue,solid,lit,svelte,angular}
+#     (all six DEBUTING at 0.1.2 — the family has never been published; verified 0/6 via a direct
+#     registry GET, since `npm view` lags on first-ever names). The 0.1.0/0.1.1/0.1.2 on-disk
+#     spread is a changesets ripple artifact from @rozie/runtime-* bumps, not release history —
+#     lockstep-aligned to 0.1.2 for the debut. NOTE (load-bearing): unlike the self-contained
+#     -vue leaves in "Build Vue leaves" below, date-picker-vue DOES carry @rozie/runtime-vue, so
+#     all six build together in their own step, placed AFTER the toolchain build so the local
+#     @rozie/runtime-* dist exists for react/solid/lit/svelte/vue type resolution (angular =
+#     tslib only) — same rationale as data-table / toast. Self-contained — no @rozie-ui workspace
+#     peer, so no ordering coupling to popover / combobox / data-table / command-palette.
+#     date-picker is a pure-Rozie family (no external engine peer) — framework peer only. 0.1.2
+#     ships today's keyboard/a11y hardening: focusable-but-inert disabled cells per the ARIA grid
+#     pattern, roving-tabindex fallback, drill focus continuity, and multi-month Home/End fixes.
+#   - 6 @rozie-ui tags leaves: tags-{react,vue,solid,lit,svelte,angular}
+#     (all six DEBUTING at 0.1.2 — the family has never been published; verified 0/6 via a direct
+#     registry GET). The 0.1.0/0.1.1/0.1.2 on-disk spread is a changesets ripple artifact from
+#     @rozie/runtime-* bumps, not release history — lockstep-aligned to 0.1.2 for the debut.
+#     NOTE (load-bearing): unlike the self-contained -vue leaves in "Build Vue leaves" below,
+#     tags-vue DOES carry @rozie/runtime-vue, so all six build together in their own step, placed
+#     AFTER the toolchain build so the local @rozie/runtime-* dist exists for
+#     react/solid/lit/svelte/vue type resolution (angular = tslib only) — same rationale as
+#     data-table / toast. Self-contained — no @rozie-ui workspace peer, so no ordering coupling to
+#     popover / combobox / data-table / command-palette. tags is a pure-Rozie family (no external
+#     engine peer) — framework peer only.
 #
 # Everything else is DELIBERATELY out of scope: any @rozie-ui family not enumerated
 # above (maplibre, codemirror, lexical, chartjs, embla, rete, uppy, dialog, slider,
-# tags, …) is not release-verified. Do NOT widen the --filter lists below to other
+# …) is not release-verified. Do NOT widen the --filter lists below to other
 # families without updating the release runbook.
 #
 # Prerequisites:
@@ -353,6 +377,48 @@ jobs:
           --filter=@rozie-ui/toast-angular
           build
 
+      # Build all six date-picker leaves into their compiled dist/ drop-in. Mixed
+      # per-target toolchain (react/solid/lit tsdown, vue Vite lib + vue-tsc, svelte
+      # @sveltejs/package, angular ng-packagr APF). NOTE: unlike the self-contained
+      # -vue leaves in "Build Vue leaves" above, date-picker-vue DOES carry
+      # @rozie/runtime-vue, so all six build together here — AFTER the toolchain
+      # build, so the local @rozie/runtime-* dist exists for the
+      # react/solid/lit/svelte/vue leaf type resolution (angular = tslib only).
+      # The COMMITTED leaf src/ is the build input — codegen is NOT run in CI.
+      # Self-contained — no @rozie-ui workspace peer, so NO ordering dependency on
+      # popover, data-table, combobox, or command-palette.
+      - name: Build date-picker leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/date-picker-react
+          --filter=@rozie-ui/date-picker-vue
+          --filter=@rozie-ui/date-picker-solid
+          --filter=@rozie-ui/date-picker-lit
+          --filter=@rozie-ui/date-picker-svelte
+          --filter=@rozie-ui/date-picker-angular
+          build
+
+      # Build all six tags leaves into their compiled dist/ drop-in. Mixed
+      # per-target toolchain (react/solid/lit tsdown, vue Vite lib + vue-tsc, svelte
+      # @sveltejs/package, angular ng-packagr APF). NOTE: unlike the self-contained
+      # -vue leaves in "Build Vue leaves" above, tags-vue DOES carry
+      # @rozie/runtime-vue, so all six build together here — AFTER the toolchain
+      # build, so the local @rozie/runtime-* dist exists for the
+      # react/solid/lit/svelte/vue leaf type resolution (angular = tslib only).
+      # The COMMITTED leaf src/ is the build input — codegen is NOT run in CI.
+      # Self-contained — no @rozie-ui workspace peer, so NO ordering dependency on
+      # popover, data-table, combobox, or command-palette.
+      - name: Build tags leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/tags-react
+          --filter=@rozie-ui/tags-vue
+          --filter=@rozie-ui/tags-solid
+          --filter=@rozie-ui/tags-lit
+          --filter=@rozie-ui/tags-svelte
+          --filter=@rozie-ui/tags-angular
+          build
+
       # Build all six popover leaves into their compiled dist/ drop-in. Mixed per-target
       # toolchain (react/solid/lit tsdown, vue Vite lib + vue-tsc, svelte @sveltejs/package,
       # angular ng-packagr APF). Sits AFTER the toolchain build so the local @rozie/runtime-*
@@ -534,6 +600,18 @@ jobs:
           --filter @rozie-ui/toast-lit
           --filter @rozie-ui/toast-svelte
           --filter @rozie-ui/toast-angular
+          --filter @rozie-ui/date-picker-react
+          --filter @rozie-ui/date-picker-vue
+          --filter @rozie-ui/date-picker-solid
+          --filter @rozie-ui/date-picker-lit
+          --filter @rozie-ui/date-picker-svelte
+          --filter @rozie-ui/date-picker-angular
+          --filter @rozie-ui/tags-react
+          --filter @rozie-ui/tags-vue
+          --filter @rozie-ui/tags-solid
+          --filter @rozie-ui/tags-lit
+          --filter @rozie-ui/tags-svelte
+          --filter @rozie-ui/tags-angular
 
       # Then the 6 Vue leaves. They carry zero @rozie/* deps so they don't
       # actually depend on the step above — ordering just keeps the log readable.
@@ -797,6 +875,52 @@ jobs:
           --filter=@rozie-ui/fullcalendar-lit
           --filter=@rozie-ui/fullcalendar-svelte
           --filter=@rozie-ui/fullcalendar-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # All six date-picker leaves (DEBUT all-targets date-picker release line, aligned
+      # at 0.1.2 — the family has never been published; the earlier 0.1.0/0.1.1 numbers
+      # were changesets ripples from @rozie/runtime-* bumps, never a publish). pnpm
+      # rewrites their `workspace:` deps to the concrete @rozie/runtime-* versions (live
+      # on npm at 0.2.1) in the tarball: react/solid/lit/vue carry @rozie/runtime-<fw>,
+      # svelte carries @rozie/runtime-svelte; angular carries no @rozie dep (tslib only).
+      # Self-contained — no @rozie-ui workspace peer, so NO ordering dependency on any
+      # other leaf family. Inherits dry_run (default TRUE) via steps.flags.outputs.extra
+      # and the skip-if-already-published behavior (no --force).
+      - name: Publish date-picker leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/date-picker-react
+          --filter=@rozie-ui/date-picker-vue
+          --filter=@rozie-ui/date-picker-solid
+          --filter=@rozie-ui/date-picker-lit
+          --filter=@rozie-ui/date-picker-svelte
+          --filter=@rozie-ui/date-picker-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # All six tags leaves (DEBUT all-targets tags release line, aligned at 0.1.2 — the
+      # family has never been published; the earlier 0.1.0/0.1.1 numbers were changesets
+      # ripples from @rozie/runtime-* bumps, never a publish). pnpm rewrites their
+      # `workspace:` deps to the concrete @rozie/runtime-* versions (live on npm at
+      # 0.2.1) in the tarball: react/solid/lit/vue carry @rozie/runtime-<fw>, svelte
+      # carries @rozie/runtime-svelte; angular carries no @rozie dep (tslib only).
+      # Self-contained — no @rozie-ui workspace peer, so NO ordering dependency on any
+      # other leaf family. Inherits dry_run (default TRUE) via steps.flags.outputs.extra
+      # and the skip-if-already-published behavior (no --force).
+      - name: Publish tags leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/tags-react
+          --filter=@rozie-ui/tags-vue
+          --filter=@rozie-ui/tags-solid
+          --filter=@rozie-ui/tags-lit
+          --filter=@rozie-ui/tags-svelte
+          --filter=@rozie-ui/tags-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

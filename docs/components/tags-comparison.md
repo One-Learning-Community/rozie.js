@@ -70,7 +70,7 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 - **Inline token editing + drag-reorder.** Tagify lets you double-click a chip to edit it and drag to reorder. Rozie models add/remove, not in-place edit or reorder.
 - **Rich token objects.** Several libraries support `{ id, label, … }` token objects with per-token color/avatar. `@rozie-ui/tags` is a `string[]` model; render richness via the `#tag` slot, but the committed value is strings.
 - **It's a single component, not a form/primitive kit.** PrimeVue/PrimeNG, Angular Material, and Mantine ship chips alongside whole families of inputs and form controls. Rozie ships `Tags` (alongside its other `@rozie-ui` components), not a unified primitive suite.
-- **`@rozie-ui/tags` is `0.1.0`.** The surface (9 props / 3 events / 2-verb handle / scoped slot / paste-bulk-add / validate / dedup / cap) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established per-framework libraries.
+- **`@rozie-ui/tags` is `0.1.2`.** The surface (9 props / 3 events / 2-verb handle / scoped slot / paste-bulk-add / validate / dedup / cap) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established per-framework libraries.
 
 ## Try it
 
