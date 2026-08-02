@@ -467,6 +467,88 @@ export function buildYearGrid(viewIso: string, input: DrillInput): YearGrid {
   return { rangeLabel: start + '–' + (start + 11), years };
 }
 
+/** Input to {@link resolveRovingIso}: the day-grid gate object (same shape
+ * already threaded to {@link isDayDisabled}) plus the roving-specific fields. */
+export interface RovingDayInput extends MonthGridInput {
+  /** How many month panels are rendered side by side (defaults to 1). */
+  numberOfMonths?: number;
+  /**
+   * The tab-stop candidate to prefer when it is in view: the selected value's
+   * ISO in single mode, or the in-progress range anchor in range mode. `''`
+   * when there is nothing to prefer.
+   */
+  anchor: string;
+}
+
+/**
+ * Resolve the SINGLE roving tabindex tab-stop for the day grid, across one or
+ * more rendered month panels. Resolution order: **anchor-in-view → today-in-
+ * view → first enabled in-month day (scanning panel 0…N-1) → `''`** (no tab
+ * stop at all, which only happens when the whole control is `disabled` — a
+ * disabled native control must not be tabbable).
+ *
+ * Arithmetic only — never rebuilds a grid. Called once per day cell per
+ * render (42×N), so it stays O(1) in the anchor/today-hit common case; only
+ * the fallback path walks the days of each panel month once.
+ */
+export function resolveRovingIso(input: RovingDayInput): string {
+  if (input.disabled) return '';
+
+  const n = Math.max(1, Math.floor(input.numberOfMonths ?? 1));
+  const viewIso = input.viewIso;
+
+  const inView = (iso: string): boolean => {
+    if (!isIsoDate(iso)) return false;
+    const target = iso.slice(0, 7);
+    for (let i = 0; i < n; i++) {
+      if (addMonths(viewIso, i).slice(0, 7) === target) return true;
+    }
+    return false;
+  };
+
+  if (input.anchor !== '' && inView(input.anchor)) return input.anchor;
+  if (input.today !== '' && inView(input.today)) return input.today;
+
+  // First enabled in-month day, scanning panel 0…N-1. Walks each panel's own
+  // days directly (never a leading/trailing spill day from buildMonthGrid).
+  for (let i = 0; i < n; i++) {
+    const panelIso = addMonths(viewIso, i);
+    const t = isoToUtc(panelIso);
+    if (t == null) continue;
+    const d = new Date(t);
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth();
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    for (let day = 1; day <= lastDay; day++) {
+      const iso = toIso(year, month, day);
+      if (!isDayDisabled(iso, input)) return iso;
+    }
+  }
+  return '';
+}
+
+/** The minimal cell shape {@link resolveRovingDrillIso} resolves over — both
+ * `MonthCell` and `YearCell` already satisfy it structurally. */
+export interface RovingDrillCell {
+  iso: string;
+  selected: boolean;
+  current: boolean;
+  disabled: boolean;
+}
+
+/**
+ * Resolve the SINGLE roving tabindex tab-stop for a 12-cell drill panel
+ * (months or years). Generic over `{ iso, selected, current, disabled }[]` so
+ * one helper serves both `MonthCell[]` and `YearCell[]`. Resolution order:
+ * `selected` → `current` → first `!disabled` → `''`.
+ */
+export function resolveRovingDrillIso<T extends RovingDrillCell>(cells: T[]): string {
+  for (const c of cells) if (c.selected) return c.iso;
+  for (const c of cells) if (c.current) return c.iso;
+  for (const c of cells) if (!c.disabled) return c.iso;
+  return '';
+}
+
 /**
  * The seven weekday header labels, ordered from `weekStartsOn`. Localized via
  * `Intl` (short names) with an English fallback.

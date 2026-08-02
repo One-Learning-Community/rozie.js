@@ -17,7 +17,7 @@
 
     <div v-for="(week, wk) in g.weeks" :key="wk" class="rozie-datepicker-week" role="row">
       <span v-for="day in week" :key="day.iso" class="rozie-datepicker-cell" role="gridcell" :aria-selected="!!(day.selected || day.rangeStart || day.rangeEnd)">
-        <button type="button" :class="['rozie-datepicker-day', { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]" :data-day="day.iso" :tabindex="(dayTabIndex(day)) ?? undefined" :disabled="!!day.disabled" :aria-disabled="!!day.disabled" :aria-label="day.iso" :aria-current="day.today ? 'date' : undefined" @click="onDaySelect(day.iso)" @mouseenter="onDayHover(day.iso)" @focus="onDayHover(day.iso)" @keydown="onDayKeydown(day.iso, $event)">{{ day.day }}</button>
+        <button type="button" :class="['rozie-datepicker-day', { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]" :data-day="day.iso" :tabindex="(dayTabIndex(day)) ?? undefined" :disabled="!!props.disabled" :aria-disabled="!!day.disabled" :aria-label="day.iso" :aria-current="day.today ? 'date' : undefined" @click="onDaySelect(day.iso)" @mouseenter="onDayHover(day.iso)" @focus="onDayHover(day.iso)" @keydown="onDayKeydown(day.iso, $event)">{{ day.day }}</button>
       </span>
     </div>
   </div>
@@ -28,14 +28,14 @@
       <button type="button" class="rozie-datepicker-drill-label" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" aria-label="Change year" @click="enterYearsView">{{ monthList().year }}</button>
     </div>
     <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose month">
-      <button v-for="cell in monthList().months" :key="cell.iso" type="button" :class="['rozie-datepicker-month', { 'is-selected': cell.selected, 'is-current': cell.current }]" role="gridcell" :data-month="cell.iso" :tabindex="(monthTabIndex(cell)) ?? undefined" :disabled="!!cell.disabled" :aria-disabled="!!cell.disabled" :aria-selected="!!cell.selected" @click="selectMonth(cell.iso)" @keydown="onMonthKeydown(cell.iso, $event)">{{ cell.label }}</button>
+      <button v-for="cell in monthList().months" :key="cell.iso" type="button" :class="['rozie-datepicker-month', { 'is-selected': cell.selected, 'is-current': cell.current }]" role="gridcell" :data-month="cell.iso" :tabindex="(monthTabIndex(cell)) ?? undefined" :aria-disabled="!!cell.disabled" :aria-selected="!!cell.selected" @click="selectMonth(cell.iso)" @keydown="onMonthKeydown(cell.iso, $event)">{{ cell.label }}</button>
     </div>
   </div><div v-if="showsYearsView()" class="rozie-datepicker-years">
     <div class="rozie-datepicker-drill-header">
       <span class="rozie-datepicker-drill-label" aria-live="polite">{{ yearRangeLabel() }}</span>
     </div>
     <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year">
-      <button v-for="cell in yearGrid().years" :key="cell.iso" type="button" :class="['rozie-datepicker-year', { 'is-selected': cell.selected, 'is-current': cell.current }]" role="gridcell" :data-year="cell.iso" :tabindex="(yearTabIndex(cell)) ?? undefined" :disabled="!!cell.disabled" :aria-disabled="!!cell.disabled" :aria-selected="!!cell.selected" @click="selectYear(cell.iso)" @keydown="onYearKeydown(cell.iso, $event)">{{ cell.year }}</button>
+      <button v-for="cell in yearGrid().years" :key="cell.iso" type="button" :class="['rozie-datepicker-year', { 'is-selected': cell.selected, 'is-current': cell.current }]" role="gridcell" :data-year="cell.iso" :tabindex="(yearTabIndex(cell)) ?? undefined" :aria-disabled="!!cell.disabled" :aria-selected="!!cell.selected" @click="selectYear(cell.iso)" @keydown="onYearKeydown(cell.iso, $event)">{{ cell.year }}</button>
     </div>
   </div><slot name="footer" :today="selectToday" :clear="clear" :todayIso="todayIso()">
     <div v-if="showsFooter()" class="rozie-datepicker-footer">
@@ -137,7 +137,7 @@ const viewMode = ref('days');
 
 const rootRef = ref<HTMLElement>();
 
-import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDrillIso, resolveRovingIso, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
 // fresh (a date picker open across midnight should follow the wall clock).
@@ -242,14 +242,36 @@ const yearRangeLabel = () => yearGrid().rangeLabel;
 // element free of an r-if+r-for combo, and at numberOfMonths === 1 it yields a
 // single grid with NO extra wrapper element (the byte-identical single-month path).
 const daysGrids = () => showsDaysView() ? grids() : [];
-// Roving-tabindex value for a day cell: the selected day (or today, when nothing
-// is selected) is the single tab stop (0), the rest are -1. The return type is
-// annotated `number | undefined` ON PURPOSE — the React emitter wraps every
-// numeric `:attr` binding in `(expr) ?? undefined`, and a PROVABLY non-null
-// value (a bare `0`/`-1` ternary) trips TS2869 "right operand of ?? is
-// unreachable". Routing tabindex through this nullable-typed helper keeps the
-// `?? undefined` reachable (the pagination `tabIndexFor` precedent).
-const dayTabIndex = (day: any): number | undefined => day.selected || selected() === '' && day.today ? 0 : -1;
+// The single roving tab stop for the day grid: the resolved anchor-in-view →
+// today-in-view → first-enabled-in-month-day fallback (resolveRovingIso,
+// buildMonthGrid.ts), scanning every rendered panel under numberOfMonths > 1.
+// `anchor` mirrors the existing viewAnchor() funnel — the selected value in
+// single mode, else the in-progress range anchor — so a range picker gets a
+// tab stop too.
+const rovingDayIso = (): string => resolveRovingIso({
+  viewIso: viewMonthGrid(),
+  value: selected(),
+  today: todayIso(),
+  min: props.min,
+  max: props.max,
+  disabledDates: props.disabledDates,
+  disabledDaysOfWeek: props.disabledDaysOfWeek,
+  isDateDisabled: props.isDateDisabled,
+  weekStartsOn: props.weekStartsOn,
+  disabled: props.disabled,
+  numberOfMonths: props.numberOfMonths,
+  anchor: selected() !== '' ? selected() : props.selectionMode === 'range' ? readRange().start : ''
+});
+// Roving-tabindex value for a day cell: the resolved single tab stop (0), the
+// rest are -1. `inMonth` is what guarantees a SINGLE tab stop under
+// `numberOfMonths > 1` — a spill cell carrying the same ISO in the
+// neighbouring panel has `inMonth === false`. The return type is annotated
+// `number | undefined` ON PURPOSE — the React emitter wraps every numeric
+// `:attr` binding in `(expr) ?? undefined`, and a PROVABLY non-null value (a
+// bare `0`/`-1` ternary) trips TS2869 "right operand of ?? is unreachable".
+// Routing tabindex through this nullable-typed helper keeps the `?? undefined`
+// reachable (the pagination `tabIndexFor` precedent).
+const dayTabIndex = (day: any): number | undefined => day.inMonth && day.iso === rovingDayIso() ? 0 : -1;
 // The localized month-year heading. NAMED `monthHeading`, NOT `label` — a bare
 // `label` helper becomes a class field on the Lit custom element and a `title`
 // would collide with the inherited HTMLElement.title; `monthHeading` is clear.
@@ -360,29 +382,49 @@ const goNextMonth = () => goToMonth(1);
 const showsDaysView = (): boolean => viewMode.value === 'days';
 const showsMonthsView = (): boolean => viewMode.value === 'months';
 const showsYearsView = (): boolean => viewMode.value === 'years';
-// Drill DOWN into the month picker (from the days heading).
+// Drill DOWN into the month picker (from the days heading). Schedules focus
+// onto the SAME cell the roving tabindex would land on (resolveRovingDrillIso),
+// so entry focus and the tab stop can never disagree.
 const enterMonthsView = () => {
   if (props.disabled) return;
+  const target = resolveRovingDrillIso(monthList().months);
   viewMode.value = 'months';
+  scheduleFocus('month', target);
 };
 // Drill DOWN into the year picker (from the months-panel year label).
 const enterYearsView = () => {
   if (props.disabled) return;
+  const target = resolveRovingDrillIso(yearGrid().years);
   viewMode.value = 'years';
+  scheduleFocus('year', target);
 };
-// Pick a month → move the view anchor to it and drill back UP toward days.
+// Pick a month → move the view anchor to it, drill back UP toward days, and
+// schedule focus onto the resolved day tab stop (the new month's grid commits
+// asynchronously on some targets, same defer reasoning as moveFocus).
 const selectMonth = (iso: any) => {
   if (props.disabled) return;
   if (!isIsoDate(iso)) return;
+  if (!monthEnabled(iso)) return;
   viewIso.value = iso;
   viewMode.value = 'days';
+  scheduleFocus('day', rovingDayIso());
 };
-// Pick a year → move the view anchor's year and drill back UP toward months.
+// Pick a year → move the view anchor's year, drill back UP toward months, and
+// schedule focus onto the resolved month tab stop.
 const selectYear = (iso: any) => {
   if (props.disabled) return;
   if (!isIsoDate(iso)) return;
+  if (!yearEnabled(iso)) return;
   viewIso.value = iso;
   viewMode.value = 'months';
+  scheduleFocus('month', resolveRovingDrillIso(monthList().months));
+};
+// Shared Escape-to-days exit for both drill keydown handlers: returns to the
+// days view AND schedules day focus, so Escape returns focus into the grid
+// instead of dropping it to <body>.
+const exitToDaysView = () => {
+  viewMode.value = 'days';
+  scheduleFocus('day', rovingDayIso());
 };
 // ---- focus choreography (container ref, post-mount only) ---------------
 // Read $refs.root only here / in handlers / in $expose verbs (all post-mount →
@@ -393,14 +435,17 @@ const dayCells = () => {
   if (!root) return [];
   return Array.from(root.querySelectorAll('[data-day]')) as HTMLElement[];
 };
+// Returns whether a matching cell was found + focused — scheduleFocus uses
+// this to know whether a deferred pass actually LANDED (see below).
 const focusDayIso = (iso: any) => {
   const cells = dayCells();
   for (let i = 0; i < cells.length; i++) {
     if (cells[i].getAttribute('data-day') === iso) {
       cells[i].focus();
-      return;
+      return true;
     }
   }
+  return false;
 };
 // ---- drill focus choreography (months / years panels) ------------------
 // Mirror dayCells/focusDayIso, swapping [data-day] → [data-month]/[data-year].
@@ -416,9 +461,10 @@ const focusMonthIso = (iso: any) => {
   for (let i = 0; i < cells.length; i++) {
     if (cells[i].getAttribute('data-month') === iso) {
       cells[i].focus();
-      return;
+      return true;
     }
   }
+  return false;
 };
 const yearCells = () => {
   const root = rootRef.value;
@@ -430,16 +476,88 @@ const focusYearIso = (iso: any) => {
   for (let i = 0; i < cells.length; i++) {
     if (cells[i].getAttribute('data-year') === iso) {
       cells[i].focus();
-      return;
+      return true;
     }
   }
+  return false;
+};
+// ---- deferred focus scheduling (D-5) ------------------------------------
+// A guarded double pass (microtask THEN rAF) behind a stale-request TOKEN —
+// the listbox/src/Listbox.rozie scheduleRemeasure pattern, adapted with a
+// token instead of a boolean guard so a NEWER navigation invalidates an
+// in-flight pass rather than merely re-running the latest one blind
+// (project_datatable_raf_focus_poll_steal — a late pass must not stomp a
+// newer navigation). Top-level `let` lowers to a PER-INSTANCE ref on every
+// target (verified: listbox/packages/react/src/Listbox.tsx:131 useRef), so an
+// instance-scoped guard is safe here. The microtask pass catches Solid's /
+// Svelte's synchronous commit; the rAF pass catches the remaining targets'
+// async commit. Both are idempotent — `.focus()` on the already-focused
+// element is a no-op.
+//
+// The rAF pass is a NESTED (double) rAF, not a single one: our rAF callback
+// is registered synchronously inside the same call that triggers the state
+// write, so if the target's OWN commit is also rAF-scheduled, same-frame
+// callback ORDER between two independently-registered rAF callbacks is not
+// guaranteed — a single rAF can race the target's paint and run first,
+// finding no cell yet (observed on Angular's zoneless change-detection
+// commit). Nesting guarantees this pass runs on the frame AFTER the one the
+// new DOM was, at latest, painted in — a standard "wait for paint" browser
+// idiom, applied uniformly to all six targets (not a per-target branch, and
+// not a third independently-scheduled pass — it is the SAME rAF pass made
+// commit-safe).
+//
+// CONSUME-ON-LAND: the moment EITHER pass actually finds + focuses its cell,
+// it clears `focusRequest` so the OTHER still-pending pass becomes a no-op.
+// Without this, a request that lands on the FIRST (microtask) pass leaves its
+// token live for the SECOND (rAF) pass, which then fires later in the frame —
+// by which point a fast-follow user/keyboard action may have validly moved
+// focus elsewhere, and the late rAF pass would silently stomp it right back
+// (the exact "late poll steals focus" hazard). A pass that finds NO cell (the
+// target hasn't committed the new DOM yet) leaves the token live so the other
+// pass still gets a chance.
+let focusRequest = '';
+const dispatchFocus = (kind: any, iso: any) => {
+  if (kind === 'day') return focusDayIso(iso);
+  if (kind === 'month') return focusMonthIso(iso);
+  return focusYearIso(iso);
+};
+const scheduleFocus = (kind: any, iso: any) => {
+  if (!iso) return;
+  const token = kind + ':' + iso;
+  focusRequest = token;
+  const pass = () => {
+    if (focusRequest !== token) return;
+    if (dispatchFocus(kind, iso)) focusRequest = '';
+  };
+  let scheduled = false;
+  if (typeof queueMicrotask !== 'undefined') {
+    scheduled = true;
+    queueMicrotask(pass);
+  }
+  if (typeof requestAnimationFrame === 'function') {
+    scheduled = true;
+    requestAnimationFrame(pass);
+  }
+  if (!scheduled) setTimeout(pass, 0);
 };
 // Roving tabindex for the drill cells — nullable-typed `number | undefined` ON
 // PURPOSE (the dayTabIndex precedent): keeps React's `(expr) ?? undefined` wrap
-// reachable, avoiding TS2869. The selected cell (or the current month/year when
-// nothing is selected) is the single tab stop.
-const monthTabIndex = (cell: any): number | undefined => cell.selected || selected() === '' && cell.current ? 0 : -1;
-const yearTabIndex = (cell: any): number | undefined => cell.selected || selected() === '' && cell.current ? 0 : -1;
+// reachable, avoiding TS2869. The single tab stop is resolved via
+// resolveRovingDrillIso (selected → current → first enabled → '').
+const monthTabIndex = (cell: any): number | undefined => cell.iso === resolveRovingDrillIso(monthList().months) ? 0 : -1;
+const yearTabIndex = (cell: any): number | undefined => cell.iso === resolveRovingDrillIso(yearGrid().years) ? 0 : -1;
+// The native `disabled` attribute is gone from the month/year drill buttons
+// (D-3 — focusable-but-inert, matching the day cells), so selectMonth/
+// selectYear must gate on the cell's own `disabled` flag themselves — today the
+// native attribute was the only guard.
+const monthEnabled = (iso: any) => {
+  const cell = monthList().months.find((m: any) => m.iso === iso);
+  return !cell || !cell.disabled;
+};
+const yearEnabled = (iso: any) => {
+  const cell = yearGrid().years.find((y: any) => y.iso === iso);
+  return !cell || !cell.disabled;
+};
 // Move the roving focus by `days`, crossing into an adjacent month when the
 // target leaves the displayed grid. Skips nothing — disabled days are still
 // focusable (standard grid pattern) but not selectable.
@@ -450,8 +568,15 @@ const moveFocus = (fromIso: any, days: any) => {
   // the displayed grids, arrow focus can cross month columns without swinging
   // the view. Only when it leaves every rendered month do we move the anchor.
   const present = grids().some((g: any) => g.weeks.some((row: any) => row.some((d: any) => d.iso === next)));
-  if (!present) viewIso.value = next;
-  focusDayIso(next);
+  if (present) {
+    // Already rendered — focus synchronously, exactly as before.
+    focusDayIso(next);
+  } else {
+    // The view must swing to show `next` — today's synchronous focusDayIso
+    // ran BEFORE the new month committed and silently dropped focus. Defer.
+    viewIso.value = next;
+    scheduleFocus('day', next);
+  }
 };
 // ---- keyboard ----------------------------------------------------------
 // Arrow keys move a day, Home/End to the week bounds, PageUp/PageDown change the
@@ -526,7 +651,7 @@ const onMonthKeydown = (iso: any, e: any) => {
     return;
   } else if (key === 'Escape') {
     e.preventDefault();
-    viewMode.value = 'days';
+    exitToDaysView();
     return;
   } else return;
   e.preventDefault();
@@ -546,18 +671,23 @@ const onYearKeydown = (iso: any, e: any) => {
     return;
   } else if (key === 'Escape') {
     e.preventDefault();
-    viewMode.value = 'days';
+    exitToDaysView();
     return;
   } else return;
   e.preventDefault();
   focusYearIso(cells[next].iso);
 };
 // Column index (0..6) of `iso` within its rendered week, honoring weekStartsOn.
+// Scans EVERY rendered panel (grids(), mirroring the already-widened
+// moveFocus) so Home/End resolve correctly in month 2+ of a multi-month view —
+// column indices agree across panels (all panels share weekStartsOn), so
+// first-match is unambiguous.
 const weekdayOffset = (iso: any) => {
-  const g = grid();
-  for (const row of g.weeks as any) {
-    for (let c = 0; c < row.length; c++) {
-      if (row[c].iso === iso) return c;
+  for (const g of grids() as any) {
+    for (const row of g.weeks as any) {
+      for (let c = 0; c < row.length; c++) {
+        if (row[c].iso === iso) return c;
+      }
     }
   }
   return 0;
@@ -615,21 +745,14 @@ const isPresetActive = (range: any) => {
 
 // ---- lifecycle + imperative handle -------------------------------------
 // Seed the view month from value / today on mount.
-// focus() — focus the selected day, or today, or the first day of the view.
-// DELIBERATELY overrides HTMLElement.focus on Lit (ROZ137 warn, accepted).
+// focus() — focus the selected day, or today, or the first enabled day of the
+// view (the SAME roving-tabindex resolution as the tab stop, so this handle
+// can never disagree with keyboard Tab — and it is multi-month aware, unlike
+// the old grid()-only walk). DELIBERATELY overrides HTMLElement.focus on Lit
+// (ROZ137 warn, accepted).
 const focus = () => {
-  const sel = selected();
-  const t = todayIso();
-  const g = grid();
-  const present = (iso: any) => g.weeks.some((row: any) => row.some((d: any) => d.iso === iso));
-  if (sel && present(sel)) {
-    focusDayIso(sel);
-  } else if (present(t)) {
-    focusDayIso(t);
-  } else {
-    const first = g.weeks[0] && g.weeks[0][0] ? g.weeks[0][0].iso : '';
-    if (first) focusDayIso(first);
-  }
+  const iso = rovingDayIso();
+  if (iso) focusDayIso(iso);
 };
 // goToToday() — swing the view to the current month (no selection change).
 const goToToday = () => {
@@ -772,7 +895,7 @@ defineExpose({ focus, goToToday, clear });
   user-select: none;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
-.rozie-datepicker-day:hover:not(:disabled) {
+.rozie-datepicker-day:hover:not([aria-disabled='true']) {
   background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
 }
 .rozie-datepicker-day.is-outside {
@@ -810,7 +933,7 @@ defineExpose({ focus, goToToday, clear });
   border-top-right-radius: var(--rozie-datepicker-day-radius, 6px);
   border-bottom-right-radius: var(--rozie-datepicker-day-radius, 6px);
 }
-.rozie-datepicker-day:disabled {
+.rozie-datepicker-day[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
   pointer-events: none;
@@ -918,8 +1041,8 @@ defineExpose({ focus, goToToday, clear });
   user-select: none;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
-.rozie-datepicker-month:hover:not(:disabled),
-.rozie-datepicker-year:hover:not(:disabled) {
+.rozie-datepicker-month:hover:not([aria-disabled='true']),
+.rozie-datepicker-year:hover:not([aria-disabled='true']) {
   background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
 }
 .rozie-datepicker-month.is-current:not(.is-selected),
@@ -938,8 +1061,8 @@ defineExpose({ focus, goToToday, clear });
   outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
   outline-offset: var(--rozie-datepicker-ring-offset, 1px);
 }
-.rozie-datepicker-month:disabled,
-.rozie-datepicker-year:disabled {
+.rozie-datepicker-month[aria-disabled='true'],
+.rozie-datepicker-year[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
   pointer-events: none;

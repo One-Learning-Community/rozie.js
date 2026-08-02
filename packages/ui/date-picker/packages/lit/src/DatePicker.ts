@@ -3,7 +3,7 @@ import { customElement, property, query, queryAssignedElements, state } from 'li
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
-import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDrillIso, resolveRovingIso, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
@@ -116,7 +116,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   user-select: none;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
-.rozie-datepicker-day[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled) {
+.rozie-datepicker-day[data-rozie-s-6800c7a2]:hover:not([aria-disabled='true'][data-rozie-s-6800c7a2]) {
   background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
 }
 .rozie-datepicker-day.is-outside[data-rozie-s-6800c7a2] {
@@ -154,7 +154,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   border-top-right-radius: var(--rozie-datepicker-day-radius, 6px);
   border-bottom-right-radius: var(--rozie-datepicker-day-radius, 6px);
 }
-.rozie-datepicker-day[data-rozie-s-6800c7a2]:disabled {
+.rozie-datepicker-day[aria-disabled='true'][data-rozie-s-6800c7a2] {
   cursor: not-allowed;
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
   pointer-events: none;
@@ -262,8 +262,8 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   user-select: none;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
-.rozie-datepicker-month[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled),
-.rozie-datepicker-year[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled) {
+.rozie-datepicker-month[data-rozie-s-6800c7a2]:hover:not([aria-disabled='true'][data-rozie-s-6800c7a2]),
+.rozie-datepicker-year[data-rozie-s-6800c7a2]:hover:not([aria-disabled='true'][data-rozie-s-6800c7a2]) {
   background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
 }
 .rozie-datepicker-month.is-current[data-rozie-s-6800c7a2]:not(.is-selected[data-rozie-s-6800c7a2]),
@@ -282,8 +282,8 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
   outline-offset: var(--rozie-datepicker-ring-offset, 1px);
 }
-.rozie-datepicker-month[data-rozie-s-6800c7a2]:disabled,
-.rozie-datepicker-year[data-rozie-s-6800c7a2]:disabled {
+.rozie-datepicker-month[aria-disabled='true'][data-rozie-s-6800c7a2],
+.rozie-datepicker-year[aria-disabled='true'][data-rozie-s-6800c7a2] {
   cursor: not-allowed;
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
   pointer-events: none;
@@ -491,7 +491,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
     ${repeat<any>(g.weeks, (week, wk) => wk, (week, wk) => html`<div class="rozie-datepicker-week" key=${rozieAttr(wk)} role="row" data-rozie-s-6800c7a2>
       ${repeat<any>(week, (day, _idx) => day.iso, (day, _idx) => html`<span class="rozie-datepicker-cell" key=${rozieAttr(day.iso)} role="gridcell" aria-selected=${!!(day.selected || day.rangeStart || day.rangeEnd)} data-rozie-s-6800c7a2>
-        <button class="${Object.entries({ "rozie-datepicker-day": true, 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" data-day=${rozieAttr(day.iso)} tabindex=${rozieAttr(this.dayTabIndex(day))} ?disabled=${!!day.disabled} aria-disabled=${!!day.disabled} aria-label=${rozieAttr(day.iso)} aria-current=${rozieAttr(day.today ? 'date' : null)} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDaySelect(day.iso); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayHover(day.iso); }} @focus=${($event: FocusEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayHover(day.iso); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayKeydown(day.iso, $event); }} data-rozie-s-6800c7a2>${rozieDisplay(day.day)}</button>
+        <button class="${Object.entries({ "rozie-datepicker-day": true, 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" data-day=${rozieAttr(day.iso)} tabindex=${rozieAttr(this.dayTabIndex(day))} ?disabled=${!!this.disabled} aria-disabled=${!!day.disabled} aria-label=${rozieAttr(day.iso)} aria-current=${rozieAttr(day.today ? 'date' : null)} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDaySelect(day.iso); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayHover(day.iso); }} @focus=${($event: FocusEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayHover(day.iso); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayKeydown(day.iso, $event); }} data-rozie-s-6800c7a2>${rozieDisplay(day.day)}</button>
       </span>`)}
     </div>`)}
   </div>`)}
@@ -502,14 +502,14 @@ export default class DatePicker extends SignalWatcher(LitElement) {
       <button class="rozie-datepicker-drill-label" type="button" ?disabled=${!!this.disabled} aria-disabled=${!!this.disabled} aria-label="Change year" @click=${this.enterYearsView} data-rozie-s-6800c7a2>${rozieDisplay(this.monthList().year)}</button>
     </div>
     <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose month" data-rozie-s-6800c7a2>
-      ${repeat<any>(this.monthList().months, (cell, _idx) => cell.iso, (cell, _idx) => html`<button class="${Object.entries({ "rozie-datepicker-month": true, 'is-selected': cell.selected, 'is-current': cell.current }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(cell.iso)} type="button" role="gridcell" data-month=${rozieAttr(cell.iso)} tabindex=${rozieAttr(this.monthTabIndex(cell))} ?disabled=${!!cell.disabled} aria-disabled=${!!cell.disabled} aria-selected=${!!cell.selected} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.selectMonth(cell.iso); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onMonthKeydown(cell.iso, $event); }} data-rozie-s-6800c7a2>${rozieDisplay(cell.label)}</button>`)}
+      ${repeat<any>(this.monthList().months, (cell, _idx) => cell.iso, (cell, _idx) => html`<button class="${Object.entries({ "rozie-datepicker-month": true, 'is-selected': cell.selected, 'is-current': cell.current }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(cell.iso)} type="button" role="gridcell" data-month=${rozieAttr(cell.iso)} tabindex=${rozieAttr(this.monthTabIndex(cell))} aria-disabled=${!!cell.disabled} aria-selected=${!!cell.selected} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.selectMonth(cell.iso); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onMonthKeydown(cell.iso, $event); }} data-rozie-s-6800c7a2>${rozieDisplay(cell.label)}</button>`)}
     </div>
   </div>` : nothing}${this.showsYearsView() ? html`<div class="rozie-datepicker-years" data-rozie-s-6800c7a2>
     <div class="rozie-datepicker-drill-header" data-rozie-s-6800c7a2>
       <span class="rozie-datepicker-drill-label" aria-live="polite" data-rozie-s-6800c7a2>${rozieDisplay(this.yearRangeLabel())}</span>
     </div>
     <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year" data-rozie-s-6800c7a2>
-      ${repeat<any>(this.yearGrid().years, (cell, _idx) => cell.iso, (cell, _idx) => html`<button class="${Object.entries({ "rozie-datepicker-year": true, 'is-selected': cell.selected, 'is-current': cell.current }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(cell.iso)} type="button" role="gridcell" data-year=${rozieAttr(cell.iso)} tabindex=${rozieAttr(this.yearTabIndex(cell))} ?disabled=${!!cell.disabled} aria-disabled=${!!cell.disabled} aria-selected=${!!cell.selected} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.selectYear(cell.iso); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onYearKeydown(cell.iso, $event); }} data-rozie-s-6800c7a2>${rozieDisplay(cell.year)}</button>`)}
+      ${repeat<any>(this.yearGrid().years, (cell, _idx) => cell.iso, (cell, _idx) => html`<button class="${Object.entries({ "rozie-datepicker-year": true, 'is-selected': cell.selected, 'is-current': cell.current }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(cell.iso)} type="button" role="gridcell" data-year=${rozieAttr(cell.iso)} tabindex=${rozieAttr(this.yearTabIndex(cell))} aria-disabled=${!!cell.disabled} aria-selected=${!!cell.selected} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.selectYear(cell.iso); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onYearKeydown(cell.iso, $event); }} data-rozie-s-6800c7a2>${rozieDisplay(cell.year)}</button>`)}
     </div>
   </div>` : nothing}${this.footer !== undefined ? this.footer({today: this.selectToday, clear: this.clear, todayIso: this.todayIso()}) : html`<slot name="footer" data-rozie-params=${(() => { try { return JSON.stringify({todayIso: this.todayIso()}); } catch { return '{}'; } })()} @rozie-footer-today=${($event: CustomEvent) => ((this.selectToday) as (...args: any[]) => any)($event.detail)} @rozie-footer-clear=${($event: CustomEvent) => ((this.clear) as (...args: any[]) => any)($event.detail)}>
     ${this.showsFooter() ? html`<div class="rozie-datepicker-footer" data-rozie-s-6800c7a2>
@@ -599,7 +599,22 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
   daysGrids = () => this.showsDaysView() ? this.grids() : [];
 
-  dayTabIndex = (day: any): number | undefined => day.selected || this.selected() === '' && day.today ? 0 : -1;
+  rovingDayIso = (): string => resolveRovingIso({
+  viewIso: this.viewMonthGrid(),
+  value: this.selected(),
+  today: this.todayIso(),
+  min: this.min,
+  max: this.max,
+  disabledDates: this.disabledDates,
+  disabledDaysOfWeek: this.disabledDaysOfWeek,
+  isDateDisabled: this.isDateDisabled,
+  weekStartsOn: this.weekStartsOn,
+  disabled: this.disabled,
+  numberOfMonths: this.numberOfMonths,
+  anchor: this.selected() !== '' ? this.selected() : this.selectionMode === 'range' ? this.readRange().start : ''
+});
+
+  dayTabIndex = (day: any): number | undefined => day.inMonth && day.iso === this.rovingDayIso() ? 0 : -1;
 
   monthHeading = () => monthLabel(this.viewMonthGrid(), this.locale);
 
@@ -710,26 +725,39 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
   enterMonthsView = () => {
   if (this.disabled) return;
+  const target = resolveRovingDrillIso(this.monthList().months);
   this._viewMode.value = 'months';
+  this.scheduleFocus('month', target);
 };
 
   enterYearsView = () => {
   if (this.disabled) return;
+  const target = resolveRovingDrillIso(this.yearGrid().years);
   this._viewMode.value = 'years';
+  this.scheduleFocus('year', target);
 };
 
   selectMonth = (iso: any) => {
   if (this.disabled) return;
   if (!isIsoDate(iso)) return;
+  if (!this.monthEnabled(iso)) return;
   this._viewIso.value = iso;
   this._viewMode.value = 'days';
+  this.scheduleFocus('day', this.rovingDayIso());
 };
 
   selectYear = (iso: any) => {
   if (this.disabled) return;
   if (!isIsoDate(iso)) return;
+  if (!this.yearEnabled(iso)) return;
   this._viewIso.value = iso;
   this._viewMode.value = 'months';
+  this.scheduleFocus('month', resolveRovingDrillIso(this.monthList().months));
+};
+
+  exitToDaysView = () => {
+  this._viewMode.value = 'days';
+  this.scheduleFocus('day', this.rovingDayIso());
 };
 
   dayCells = () => {
@@ -743,9 +771,10 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   for (let i = 0; i < cells.length; i++) {
     if (cells[i].getAttribute('data-day') === iso) {
       cells[i].focus();
-      return;
+      return true;
     }
   }
+  return false;
 };
 
   monthCells = () => {
@@ -759,9 +788,10 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   for (let i = 0; i < cells.length; i++) {
     if (cells[i].getAttribute('data-month') === iso) {
       cells[i].focus();
-      return;
+      return true;
     }
   }
+  return false;
 };
 
   yearCells = () => {
@@ -775,14 +805,53 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   for (let i = 0; i < cells.length; i++) {
     if (cells[i].getAttribute('data-year') === iso) {
       cells[i].focus();
-      return;
+      return true;
     }
   }
+  return false;
 };
 
-  monthTabIndex = (cell: any): number | undefined => cell.selected || this.selected() === '' && cell.current ? 0 : -1;
+  focusRequest = '';
 
-  yearTabIndex = (cell: any): number | undefined => cell.selected || this.selected() === '' && cell.current ? 0 : -1;
+  dispatchFocus = (kind: any, iso: any) => {
+  if (kind === 'day') return this.focusDayIso(iso);
+  if (kind === 'month') return this.focusMonthIso(iso);
+  return this.focusYearIso(iso);
+};
+
+  scheduleFocus = (kind: any, iso: any) => {
+  if (!iso) return;
+  const token = kind + ':' + iso;
+  this.focusRequest = token;
+  const pass = () => {
+    if (this.focusRequest !== token) return;
+    if (this.dispatchFocus(kind, iso)) this.focusRequest = '';
+  };
+  let scheduled = false;
+  if (typeof queueMicrotask !== 'undefined') {
+    scheduled = true;
+    queueMicrotask(pass);
+  }
+  if (typeof requestAnimationFrame === 'function') {
+    scheduled = true;
+    requestAnimationFrame(pass);
+  }
+  if (!scheduled) setTimeout(pass, 0);
+};
+
+  monthTabIndex = (cell: any): number | undefined => cell.iso === resolveRovingDrillIso(this.monthList().months) ? 0 : -1;
+
+  yearTabIndex = (cell: any): number | undefined => cell.iso === resolveRovingDrillIso(this.yearGrid().years) ? 0 : -1;
+
+  monthEnabled = (iso: any) => {
+  const cell = this.monthList().months.find((m: any) => m.iso === iso);
+  return !cell || !cell.disabled;
+};
+
+  yearEnabled = (iso: any) => {
+  const cell = this.yearGrid().years.find((y: any) => y.iso === iso);
+  return !cell || !cell.disabled;
+};
 
   moveFocus = (fromIso: any, days: any) => {
   if (this.disabled) return;
@@ -791,8 +860,15 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   // the displayed grids, arrow focus can cross month columns without swinging
   // the view. Only when it leaves every rendered month do we move the anchor.
   const present = this.grids().some((g: any) => g.weeks.some((row: any) => row.some((d: any) => d.iso === next)));
-  if (!present) this._viewIso.value = next;
-  this.focusDayIso(next);
+  if (present) {
+    // Already rendered — focus synchronously, exactly as before.
+    this.focusDayIso(next);
+  } else {
+    // The view must swing to show `next` — today's synchronous focusDayIso
+    // ran BEFORE the new month committed and silently dropped focus. Defer.
+    this._viewIso.value = next;
+    this.scheduleFocus('day', next);
+  }
 };
 
   onDayKeydown = (iso: any, e: any) => {
@@ -867,7 +943,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
     return;
   } else if (key === 'Escape') {
     e.preventDefault();
-    this._viewMode.value = 'days';
+    this.exitToDaysView();
     return;
   } else return;
   e.preventDefault();
@@ -888,7 +964,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
     return;
   } else if (key === 'Escape') {
     e.preventDefault();
-    this._viewMode.value = 'days';
+    this.exitToDaysView();
     return;
   } else return;
   e.preventDefault();
@@ -896,10 +972,11 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 };
 
   weekdayOffset = (iso: any) => {
-  const g = this.grid();
-  for (const row of g.weeks as any) {
-    for (let c = 0; c < row.length; c++) {
-      if (row[c].iso === iso) return c;
+  for (const g of this.grids() as any) {
+    for (const row of g.weeks as any) {
+      for (let c = 0; c < row.length; c++) {
+        if (row[c].iso === iso) return c;
+      }
     }
   }
   return 0;
@@ -952,18 +1029,8 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 };
 
   focus = () => {
-  const sel = this.selected();
-  const t = this.todayIso();
-  const g = this.grid();
-  const present = (iso: any) => g.weeks.some((row: any) => row.some((d: any) => d.iso === iso));
-  if (sel && present(sel)) {
-    this.focusDayIso(sel);
-  } else if (present(t)) {
-    this.focusDayIso(t);
-  } else {
-    const first = g.weeks[0] && g.weeks[0][0] ? g.weeks[0][0].iso : '';
-    if (first) this.focusDayIso(first);
-  }
+  const iso = this.rovingDayIso();
+  if (iso) this.focusDayIso(iso);
 };
 
   goToToday = () => {

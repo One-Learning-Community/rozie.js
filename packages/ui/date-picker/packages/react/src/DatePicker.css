@@ -83,7 +83,7 @@
   user-select: none;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
-.rozie-datepicker-day[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled) {
+.rozie-datepicker-day[data-rozie-s-6800c7a2]:hover:not([aria-disabled='true'][data-rozie-s-6800c7a2]) {
   background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
 }
 .rozie-datepicker-day.is-outside[data-rozie-s-6800c7a2] {
@@ -121,7 +121,7 @@
   border-top-right-radius: var(--rozie-datepicker-day-radius, 6px);
   border-bottom-right-radius: var(--rozie-datepicker-day-radius, 6px);
 }
-.rozie-datepicker-day[data-rozie-s-6800c7a2]:disabled {
+.rozie-datepicker-day[aria-disabled='true'][data-rozie-s-6800c7a2] {
   cursor: not-allowed;
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
   pointer-events: none;
@@ -229,8 +229,8 @@
   user-select: none;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
-.rozie-datepicker-month[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled),
-.rozie-datepicker-year[data-rozie-s-6800c7a2]:hover:not([data-rozie-s-6800c7a2]:disabled) {
+.rozie-datepicker-month[data-rozie-s-6800c7a2]:hover:not([aria-disabled='true'][data-rozie-s-6800c7a2]),
+.rozie-datepicker-year[data-rozie-s-6800c7a2]:hover:not([aria-disabled='true'][data-rozie-s-6800c7a2]) {
   background: var(--rozie-datepicker-hover-bg, rgba(0, 0, 0, 0.05));
 }
 .rozie-datepicker-month.is-current[data-rozie-s-6800c7a2]:not(.is-selected[data-rozie-s-6800c7a2]),
@@ -249,8 +249,8 @@
   outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
   outline-offset: var(--rozie-datepicker-ring-offset, 1px);
 }
-.rozie-datepicker-month[data-rozie-s-6800c7a2]:disabled,
-.rozie-datepicker-year[data-rozie-s-6800c7a2]:disabled {
+.rozie-datepicker-month[aria-disabled='true'][data-rozie-s-6800c7a2],
+.rozie-datepicker-year[aria-disabled='true'][data-rozie-s-6800c7a2] {
   cursor: not-allowed;
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
   pointer-events: none;

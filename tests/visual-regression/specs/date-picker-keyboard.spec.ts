@@ -101,16 +101,19 @@ for (const target of TARGETS) {
 
     await mount.locator('[data-day="2025-06-17"]').focus();
     await page.keyboard.press('ArrowRight');
+    // moveFocus's cross-month-swing branch defers via scheduleFocus (microtask
+    // + rAF) on some targets' async commit — poll rather than one-shot check.
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataDay, { timeout: 10_000 })
+      .toBe('2025-06-18');
     let active = await activeElementInfo(page);
-    expect(active?.dataDay, 'ArrowRight from 06-17 must land on the disabled 06-18 cell').toBe(
-      '2025-06-18',
-    );
     expect(active?.ariaDisabled).toBe('true');
 
     // Nav continues past the disabled cell on the next ArrowRight.
     await page.keyboard.press('ArrowRight');
-    active = await activeElementInfo(page);
-    expect(active?.dataDay).toBe('2025-06-19');
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataDay, { timeout: 10_000 })
+      .toBe('2025-06-19');
 
     // Focusable but inert: Enter on the disabled day does not select it.
     await mount.locator('[data-day="2025-06-18"]').focus();
@@ -180,21 +183,25 @@ for (const target of TARGETS) {
 
     // Drill days → months via the keyboard (Enter on the heading button —
     // the browser's native button-activation path, same handler as click).
+    // Entry focus is deferred via scheduleFocus (microtask + rAF, D-5) — poll
+    // rather than a one-shot activeElement check, the same reasoning
+    // data-table-grid-navedge.spec.ts uses expect.poll for cross-render focus
+    // reads: an async-commit target (e.g. a drill panel's FIRST render) can
+    // take more than one microtask/rAF tick to land, and the underlying
+    // mechanism is genuinely eventually-consistent, not a one-shot event.
     await mount.locator('.rozie-datepicker-heading-button').focus();
     await page.keyboard.press('Enter');
     await expect(mount.locator('.rozie-datepicker-months')).toBeVisible({ timeout: 10_000 });
-    let active = await activeElementInfo(page);
-    expect(active?.dataMonth, 'entering the months view must land focus on a month cell').toBe(
-      '2025-06-01',
-    );
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataMonth, { timeout: 10_000 })
+      .toBe('2025-06-01');
 
     // Escape returns to the days view WITH focus, not <body>.
     await page.keyboard.press('Escape');
     await expect(mount.locator('.rozie-datepicker-grid')).toBeVisible({ timeout: 10_000 });
-    active = await activeElementInfo(page);
-    expect(active?.dataDay, 'Escape from months must return focus to the day grid').toBe(
-      '2025-06-15',
-    );
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataDay, { timeout: 10_000 })
+      .toBe('2025-06-15');
 
     // Drill back in, then further into years via the months-panel year label.
     await mount.locator('.rozie-datepicker-heading-button').focus();
@@ -203,16 +210,16 @@ for (const target of TARGETS) {
     await mount.locator('.rozie-datepicker-months .rozie-datepicker-drill-label').focus();
     await page.keyboard.press('Enter');
     await expect(mount.locator('.rozie-datepicker-years')).toBeVisible({ timeout: 10_000 });
-    active = await activeElementInfo(page);
-    expect(active?.dataYear, 'entering the years view must land focus on the anchor year cell').toBe(
-      '2025-01-01',
-    );
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataYear, { timeout: 10_000 })
+      .toBe('2025-01-01');
 
     // Pick a year with Enter → focus lands back on a month cell.
     await page.keyboard.press('Enter');
     await expect(mount.locator('.rozie-datepicker-months')).toBeVisible({ timeout: 10_000 });
-    active = await activeElementInfo(page);
-    expect(active?.dataMonth, 'picking a year must land focus on a month cell').not.toBeNull();
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataMonth, { timeout: 10_000 })
+      .not.toBeNull();
 
     expect(pageErrors, `uncaught page errors: ${pageErrors.join('; ')}`).toEqual([]);
     expect(consoleErrors, `console errors: ${consoleErrors.join('; ')}`).toEqual([]);
@@ -245,14 +252,14 @@ for (const target of TARGETS) {
 
     await july.locator('[data-day="2025-07-16"]').focus();
     await page.keyboard.press('Home');
-    let active = await activeElementInfo(page);
-    expect(active?.dataDay, 'Home in month 2 must resolve within month 2\'s own week row').toBe(
-      '2025-07-13',
-    );
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataDay, { timeout: 10_000 })
+      .toBe('2025-07-13');
 
     await page.keyboard.press('End');
-    active = await activeElementInfo(page);
-    expect(active?.dataDay).toBe('2025-07-19');
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataDay, { timeout: 10_000 })
+      .toBe('2025-07-19');
 
     expect(pageErrors, `uncaught page errors: ${pageErrors.join('; ')}`).toEqual([]);
     expect(consoleErrors, `console errors: ${consoleErrors.join('; ')}`).toEqual([]);
