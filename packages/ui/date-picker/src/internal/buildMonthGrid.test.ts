@@ -21,6 +21,8 @@ import {
   monthLabel,
   normalizeRange,
   rangeFromPreset,
+  resolveRovingDrillIso,
+  resolveRovingIso,
   resolveViewIso,
   toIso,
   weekdayLabels,
@@ -475,5 +477,147 @@ describe('buildMonthGrid — range flags', () => {
     expect(flat.some((d) => d.inPreview)).toBe(false);
     expect(flat.some((d) => d.rangeStart)).toBe(false);
     expect(flat.some((d) => d.rangeEnd)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveRovingIso / resolveRovingDrillIso — the pure roving-tabindex resolvers
+// (D-4). Import failure IS the RED signal until Task 3 adds these exports.
+// Expected values below are hand-computed against the real 2025/2026 calendar,
+// not copied from any implementation.
+// ---------------------------------------------------------------------------
+describe('resolveRovingIso', () => {
+  it('returns the selection when it is IN VIEW (single mode)', () => {
+    // June 2025 view, value === June 15 → in view → the tab stop is the selection.
+    expect(
+      resolveRovingIso({
+        viewIso: '2025-06-01',
+        value: '',
+        today: '',
+        anchor: '2025-06-15',
+      }),
+    ).toBe('2025-06-15');
+  });
+
+  it('falls back to today-in-view, else the first enabled in-month day, when the selection is OFF-VIEW', () => {
+    // value 2025-06-15, viewIso July 2025 → selection is off-view. today is far off
+    // too → falls all the way to the first enabled day of July: 2025-07-01.
+    expect(
+      resolveRovingIso({
+        viewIso: '2025-07-01',
+        value: '2025-06-15',
+        today: '2020-01-01',
+        anchor: '2025-06-15',
+      }),
+    ).toBe('2025-07-01');
+  });
+
+  it('returns today when today is in view and nothing is selected', () => {
+    expect(
+      resolveRovingIso({
+        viewIso: '2025-06-01',
+        value: '',
+        today: '2025-06-24',
+        anchor: '',
+      }),
+    ).toBe('2025-06-24');
+  });
+
+  it('is multi-panel aware: an anchor living in month 2 of a numberOfMonths:2 view still resolves', () => {
+    // viewIso July 2025, numberOfMonths=2 → panels are July + August. The anchor
+    // lives in August (panel index 1) — proves the resolver scans every panel, not
+    // just panel 0.
+    expect(
+      resolveRovingIso({
+        viewIso: '2025-07-01',
+        value: '',
+        today: '2020-01-01',
+        anchor: '2025-08-10',
+        numberOfMonths: 2,
+      }),
+    ).toBe('2025-08-10');
+  });
+
+  it('the first-enabled fallback SKIPS leading disabled days', () => {
+    // No selection, no today-in-view. min=2025-07-04 disables July 1-3, so the
+    // fallback must land on July 4, NOT July 1.
+    expect(
+      resolveRovingIso({
+        viewIso: '2025-07-01',
+        value: '',
+        today: '2020-01-01',
+        anchor: '',
+        min: '2025-07-04',
+      }),
+    ).toBe('2025-07-04');
+  });
+
+  it('returns "" (no tab stop) when the whole control is disabled — preserves the untabbable disabled control', () => {
+    expect(
+      resolveRovingIso({
+        viewIso: '2025-06-01',
+        value: '2025-06-15',
+        today: '2025-06-15',
+        anchor: '2025-06-15',
+        disabled: true,
+      }),
+    ).toBe('');
+  });
+
+  it('the fallback never resolves to a SPILL day — the returned ISO always belongs to a rendered panel month', () => {
+    const iso = resolveRovingIso({
+      viewIso: '2025-07-01',
+      value: '',
+      today: '2020-01-01',
+      anchor: '',
+    });
+    expect(iso.slice(0, 7)).toBe('2025-07');
+  });
+});
+
+describe('resolveRovingDrillIso', () => {
+  it('the selected cell wins over current/first-enabled', () => {
+    const cells = [
+      { iso: 'a', selected: false, current: true, disabled: false },
+      { iso: 'b', selected: true, current: false, disabled: false },
+      { iso: 'c', selected: false, current: false, disabled: false },
+    ];
+    expect(resolveRovingDrillIso(cells)).toBe('b');
+  });
+
+  it('falls back to the current cell when nothing is selected', () => {
+    const cells = [
+      { iso: 'a', selected: false, current: false, disabled: false },
+      { iso: 'b', selected: false, current: true, disabled: false },
+      { iso: 'c', selected: false, current: false, disabled: false },
+    ];
+    expect(resolveRovingDrillIso(cells)).toBe('b');
+  });
+
+  it('falls back to the first !disabled cell when nothing is selected/current', () => {
+    const cells = [
+      { iso: 'a', selected: false, current: false, disabled: true },
+      { iso: 'b', selected: false, current: false, disabled: true },
+      { iso: 'c', selected: false, current: false, disabled: false },
+    ];
+    expect(resolveRovingDrillIso(cells)).toBe('c');
+  });
+
+  it('returns "" when every cell is disabled and none is selected/current', () => {
+    const cells = [
+      { iso: 'a', selected: false, current: false, disabled: true },
+      { iso: 'b', selected: false, current: false, disabled: true },
+    ];
+    expect(resolveRovingDrillIso(cells)).toBe('');
+  });
+
+  it('the defect case: a value selected in a DIFFERENT year (no selected cell) + today in a DIFFERENT year (no current cell) still returns the first enabled cell, not ""', () => {
+    // Mirrors buildMonthList/buildYearGrid output for a decade window that
+    // contains neither the selected year nor today's year.
+    const cells = [
+      { iso: '2020-01-01', selected: false, current: false, disabled: false },
+      { iso: '2021-01-01', selected: false, current: false, disabled: false },
+    ];
+    expect(resolveRovingDrillIso(cells)).toBe('2020-01-01');
   });
 });

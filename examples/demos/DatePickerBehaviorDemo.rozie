@@ -47,6 +47,7 @@ const applyDate = (v) => {
     r-model:value="$data.date"
     :weekStartsOn="0"
     locale="en-US"
+    :disabledDates="['2025-06-18']"
     @change="onChange($event)"
   />
 </div>
