@@ -34,6 +34,25 @@ name: Release (early subset)
 #     carry @rozie/runtime-<fw> and svelte carries @rozie/runtime-svelte (rewritten from
 #     `workspace:` at publish; live on npm at 0.1.3); angular carries no @rozie dep. All
 #     six take pdfjs-dist as a peer dep. 0.2.1 also ships a render-all-pages scroll-spy fix.
+#   - 5 non-vue @rozie-ui cropper leaves: cropper-{react,solid,lit,svelte,angular}.
+#     Now IN scope alongside cropper-vue (all six aligned at 0.1.2 — the FIRST all-targets
+#     cropper release line). These were excluded until now purely for lack of signal:
+#     cropper-vue was the only leaf dogfooded in production, and the other five had no
+#     verification. A whole-repo build/typecheck/codegen-idempotency/family-test/VR sweep
+#     (2026-08-02) came back clean on all five, so they graduate as-is. react/solid/lit
+#     carry @rozie/runtime-<fw> and svelte carries @rozie/runtime-svelte (rewritten from
+#     `workspace:` at publish; live on npm at 0.2.1); angular carries no @rozie dep (tslib
+#     only). All six take cropperjs v1 as a peer dep. Self-contained — no @rozie-ui
+#     workspace peer, so no ordering coupling to popover / combobox / data-table.
+#   - 5 non-vue @rozie-ui fullcalendar leaves: fullcalendar-{react,solid,lit,svelte,angular}.
+#     Now IN scope alongside fullcalendar-vue (all six aligned at 0.1.2 — the FIRST
+#     all-targets fullcalendar release line). Same story as cropper above: excluded purely
+#     for lack of signal (fullcalendar-vue only was dogfooded), and the same 2026-08-02
+#     verification sweep came back clean on all five. react/solid/lit carry
+#     @rozie/runtime-<fw> and svelte carries @rozie/runtime-svelte (rewritten from
+#     `workspace:` at publish; live on npm at 0.2.1); angular carries no @rozie dep (tslib
+#     only). All six take @fullcalendar/* v6 as peer deps. Self-contained — no @rozie-ui
+#     workspace peer, so no ordering coupling to popover / combobox / data-table.
 #   - 6 @rozie-ui popover leaves: popover-{react,vue,solid,lit,svelte,angular}
 #     (all six aligned at 0.1.0 — the FIRST all-targets popover release line). react/solid/
 #     lit/vue carry @rozie/runtime-<fw> and svelte carries @rozie/runtime-svelte (rewritten
@@ -76,9 +95,10 @@ name: Release (early subset)
 #     @rozie/runtime-* dist exists for type resolution) with no ordering coupling to combobox or
 #     any other leaf family.
 #
-# Everything else is DELIBERATELY out of scope: the react/solid/svelte/lit/angular
-# leaves of cropper + fullcalendar are not release-verified. Do NOT widen the --filter
-# lists below to other families without updating the release runbook.
+# Everything else is DELIBERATELY out of scope: any @rozie-ui family not enumerated
+# above (maplibre, codemirror, lexical, chartjs, embla, rete, uppy, dialog, slider,
+# tags, …) is not release-verified. Do NOT widen the --filter lists below to other
+# families without updating the release runbook.
 #
 # Prerequisites:
 #   - Repo is PUBLIC (npm provenance requires a public source repo) — verified.
@@ -281,6 +301,41 @@ jobs:
           --filter=@rozie-ui/tiptap-angular
           build
 
+      # Build the 5 non-vue cropper leaves into their compiled dist/ drop-in (cropper-vue is
+      # built in the "Build Vue leaves" step above). Mixed per-target toolchain (react/solid/lit
+      # tsdown, svelte @sveltejs/package, angular ng-packagr APF). Sits AFTER the toolchain build
+      # so the local @rozie/runtime-* dist exists for the react/solid/lit/svelte leaf type
+      # resolution (angular = tslib only, no @rozie dep). Self-contained — no @rozie-ui workspace
+      # peer, so it has NO ordering dependency on combobox, popover, or data-table. This is the
+      # FIRST all-targets cropper release line (all six aligned at 0.1.2).
+      - name: Build non-vue cropper leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/cropper-react
+          --filter=@rozie-ui/cropper-solid
+          --filter=@rozie-ui/cropper-lit
+          --filter=@rozie-ui/cropper-svelte
+          --filter=@rozie-ui/cropper-angular
+          build
+
+      # Build the 5 non-vue fullcalendar leaves into their compiled dist/ drop-in
+      # (fullcalendar-vue is built in the "Build Vue leaves" step above). Mixed per-target
+      # toolchain (react/solid/lit tsdown, svelte @sveltejs/package, angular ng-packagr APF).
+      # Sits AFTER the toolchain build so the local @rozie/runtime-* dist exists for the
+      # react/solid/lit/svelte leaf type resolution (angular = tslib only, no @rozie dep).
+      # Self-contained — no @rozie-ui workspace peer, so it has NO ordering dependency on
+      # combobox, popover, or data-table. This is the FIRST all-targets fullcalendar release
+      # line (all six aligned at 0.1.2).
+      - name: Build non-vue fullcalendar leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/fullcalendar-react
+          --filter=@rozie-ui/fullcalendar-solid
+          --filter=@rozie-ui/fullcalendar-lit
+          --filter=@rozie-ui/fullcalendar-svelte
+          --filter=@rozie-ui/fullcalendar-angular
+          build
+
       # Build all six toast leaves into their compiled dist/ drop-in. Same mixed per-target
       # toolchain as captcha/sortable-list/flatpickr/pdf (react/solid/lit tsdown, vue Vite lib +
       # vue-tsc, svelte @sveltejs/package, angular ng-packagr APF). Sits AFTER the toolchain
@@ -410,7 +465,17 @@ jobs:
           --filter @rozie-ui/flatpickr-vue
           --filter @rozie-ui/sortable-list-vue
           --filter @rozie-ui/cropper-vue
+          --filter @rozie-ui/cropper-react
+          --filter @rozie-ui/cropper-solid
+          --filter @rozie-ui/cropper-lit
+          --filter @rozie-ui/cropper-svelte
+          --filter @rozie-ui/cropper-angular
           --filter @rozie-ui/fullcalendar-vue
+          --filter @rozie-ui/fullcalendar-react
+          --filter @rozie-ui/fullcalendar-solid
+          --filter @rozie-ui/fullcalendar-lit
+          --filter @rozie-ui/fullcalendar-svelte
+          --filter @rozie-ui/fullcalendar-angular
           --filter @rozie-ui/pdf-vue
           --filter @rozie-ui/captcha-vue
           --filter @rozie-ui/tiptap-vue
@@ -689,6 +754,49 @@ jobs:
           --filter=@rozie-ui/tiptap-lit
           --filter=@rozie-ui/tiptap-svelte
           --filter=@rozie-ui/tiptap-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # The 5 non-vue cropper leaves (FIRST all-targets cropper release line, all six aligned at
+      # 0.1.2 — cropper-vue is published in the "Publish Vue leaves" step above, previously at
+      # 0.1.1). pnpm rewrites their `workspace:` deps to the concrete @rozie/runtime-* versions
+      # (live on npm at 0.2.1) in the tarball: react/solid/lit carry @rozie/runtime-<fw>
+      # (workspace:* -> 0.2.1 exact), svelte carries @rozie/runtime-svelte (workspace:^ -> ^0.2.1);
+      # angular carries no @rozie dep (tslib only). Self-contained — no @rozie-ui workspace peer,
+      # so this has NO ordering dependency on any other leaf family. Inherits dry_run (default
+      # TRUE) via steps.flags.outputs.extra and the skip-if-already-published behavior (no --force).
+      - name: Publish non-vue cropper leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/cropper-react
+          --filter=@rozie-ui/cropper-solid
+          --filter=@rozie-ui/cropper-lit
+          --filter=@rozie-ui/cropper-svelte
+          --filter=@rozie-ui/cropper-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # The 5 non-vue fullcalendar leaves (FIRST all-targets fullcalendar release line, all six
+      # aligned at 0.1.2 — fullcalendar-vue is published in the "Publish Vue leaves" step above,
+      # previously at 0.1.1). pnpm rewrites their `workspace:` deps to the concrete
+      # @rozie/runtime-* versions (live on npm at 0.2.1) in the tarball: react/solid/lit carry
+      # @rozie/runtime-<fw> (workspace:* -> 0.2.1 exact), svelte carries @rozie/runtime-svelte
+      # (workspace:^ -> ^0.2.1); angular carries no @rozie dep (tslib only). Self-contained — no
+      # @rozie-ui workspace peer, so this has NO ordering dependency on any other leaf family.
+      # Inherits dry_run (default TRUE) via steps.flags.outputs.extra and the
+      # skip-if-already-published behavior (no --force).
+      - name: Publish non-vue fullcalendar leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/fullcalendar-react
+          --filter=@rozie-ui/fullcalendar-solid
+          --filter=@rozie-ui/fullcalendar-lit
+          --filter=@rozie-ui/fullcalendar-svelte
+          --filter=@rozie-ui/fullcalendar-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
