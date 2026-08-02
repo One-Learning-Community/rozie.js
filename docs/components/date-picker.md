@@ -40,7 +40,7 @@ const date = ref('');
 
 ## The month-grid model
 
-From `value` + the bounds props, the component builds a fixed 6×7 grid for the displayed month. Leading days spill in from the previous month and trailing days from the next, so every row is full and the layout never reflows. `weekStartsOn` (default `0` = Sunday) rotates both the weekday header and the columns. Days outside `[min, max]` or listed in `disabledDates` are rendered disabled — focusable for keyboard exploration but not selectable.
+From `value` + the bounds props, the component builds a fixed 6×7 grid for the displayed month. Leading days spill in from the previous month and trailing days from the next, so every row is full and the layout never reflows. `weekStartsOn` (default `0` = Sunday) rotates both the weekday header and the columns. Days outside `[min, max]` or listed in `disabledDates` are rendered `aria-disabled` — focusable for keyboard exploration (arrow navigation lands on them, roving tabindex skips over them without stalling) but not selectable (a click or `Enter`/`Space` is refused). They carry `aria-disabled="true"` rather than the native `disabled` attribute, precisely so they stay in the keyboard tab order.
 
 All date arithmetic runs on UTC midnight, so a calendar date is treated as an abstract civil date and never drifts a day across DST boundaries. This branchy logic lives in `src/internal/buildMonthGrid.ts` and is unit-tested in isolation.
 
@@ -70,6 +70,40 @@ Override the month-nav header via the scoped `#header` slot — the component ke
     </div>
   </template>
 </DatePicker>
+```
+
+## More configuration
+
+Five props round out the day-to-day configuration surface beyond `min`/`max`/`disabledDates`/`weekStartsOn`:
+
+**`monthYearNav`** is capability-**on** by default: the month-year heading renders as a clickable button that drills days → months → years (and a year label that drills months → years). This is the documented exception to the boolean-default-`false` rule — the drill navigation is the ergonomic win, so it ships enabled. Set `:month-year-nav="false"` to restore the static, non-interactive heading `<span>`:
+
+```vue
+<DatePicker v-model:value="date" :month-year-nav="false" />
+```
+
+**`numberOfMonths`** renders N month grids side by side, stepping forward from the displayed month — no extra wrapper element is added; at `numberOfMonths="1"` (the default) the output is identical to the single-month case:
+
+```vue
+<DatePicker v-model:value="date" :number-of-months="2" />
+```
+
+**`disabledDaysOfWeek`** disables entire weekdays by UTC index (`0` = Sunday … `6` = Saturday). It is a plain array of numbers, so — unlike `isDateDisabled` below — it is **serializable** and can be passed as a plain string attribute on every target, including Lit (`disabled-days-of-week="[0,6]"` or a property binding, either works):
+
+```vue
+<DatePicker v-model:value="date" :disabled-days-of-week="[0, 6]" />
+```
+
+**`isDateDisabled`** is a consumer predicate `(iso: string) => boolean` for arbitrary per-date rules (holidays, blackout dates) beyond `min`/`max`/`disabledDates`. Because it is a **function**, it cannot survive attribute serialization — on Lit it must be a **property** binding (`.isDateDisabled=${fn}`), the same rule already in force for `disabledDates`/`presetRanges`:
+
+```vue
+<DatePicker v-model:value="date" :is-date-disabled="(iso) => iso.endsWith('-12-25')" />
+```
+
+**`showFooter`** renders a default Today / Clear row beneath the grid (`Today` commits the current date in single mode, or navigates the view to it in range mode; `Clear` deselects). The `#footer` slot fully overrides the default row — see the [API reference](/components/date-picker-api) for its scope params:
+
+```vue
+<DatePicker v-model:value="date" show-footer />
 ```
 
 ## Range selection

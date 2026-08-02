@@ -93,21 +93,23 @@ export function Demo() {
   );
 }
 
-// Custom header via the scoped #header slot (render-prop on React).
+// Custom header via the renderHeader render-prop (a self-closing element —
+// React's scoped slots are props, not children; see the API reference for
+// the equivalent slots={{ header: ... }} form).
 export function CustomHeaderDemo() {
   const [date, setDate] = useState('');
   return (
-    <DatePicker value={date} onValueChange={setDate}>
-      {{
-        header: ({ label, prev, next }) => (
-          <div className="my-header">
-            <button onClick={prev}>Prev</button>
-            <strong>{label}</strong>
-            <button onClick={next}>Next</button>
-          </div>
-        ),
-      }}
-    </DatePicker>
+    <DatePicker
+      value={date}
+      onValueChange={setDate}
+      renderHeader={({ label, prev, next }) => (
+        <div className="my-header">
+          <button onClick={prev}>Prev</button>
+          <strong>{label}</strong>
+          <button onClick={next}>Next</button>
+        </div>
+      )}
+    />
   );
 }
 
@@ -128,19 +130,24 @@ export function RangeDemo() {
       onValueChange={setRange}
       presetRanges={presetRanges}
       onRangeComplete={(e) => console.log('range:', e.value)}
-    >
-      {{
-        // Override the default preset rail via the #presets slot (render-prop).
-        presets: ({ presets, apply }) => (
-          <div className="my-presets">
-            {presets.map((p) => (
-              <button key={p.label} onClick={() => apply(p.range)}>{p.label}</button>
-            ))}
-          </div>
-        ),
-      }}
-    </DatePicker>
+      // Override the default preset rail via the renderPresets render-prop
+      // (equivalently: slots={{ presets: ({ presets, apply }) => ... }}).
+      renderPresets={({ presets, apply }) => (
+        <div className="my-presets">
+          {presets.map((p) => (
+            <button key={p.label} onClick={() => apply(p.range)}>{p.label}</button>
+          ))}
+        </div>
+      )}
+    />
   );
+}
+
+// showFooter renders a default Today / Clear row; the #footer render-prop
+// overrides it (receives { today, clear, todayIso }).
+export function FooterDemo() {
+  const [date, setDate] = useState('');
+  return <DatePicker value={date} onValueChange={setDate} showFooter />;
 }`,
   },
   vue: {
@@ -189,6 +196,9 @@ const presetRanges = [
       <button v-for="p in presets" :key="p.label" @click="apply(p.range)">{{ p.label }}</button>
     </template>
   </DatePicker>
+
+  <!-- showFooter renders a default Today / Clear row; #footer overrides it -->
+  <DatePicker v-model:value="date" show-footer />
 </template>`,
   },
   svelte: {
@@ -295,7 +305,8 @@ export function Demo() {
   );
 }
 
-// Range selection with presets + a #presets override.
+// Range selection with presets + a presetsSlot override (equivalently:
+// slots={{ presets: (ctx) => ... }}).
 export function RangeDemo() {
   const [range, setRange] = createSignal({ start: '', end: '' });
   const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -310,17 +321,14 @@ export function RangeDemo() {
       onValueChange={setRange}
       presetRanges={presetRanges}
       onRangeComplete={(e) => console.log('range:', e.value)}
-    >
-      {{
-        presets: ({ presets, apply }) => (
-          <div class="my-presets">
-            {presets.map((p) => (
-              <button onClick={() => apply(p.range)}>{p.label}</button>
-            ))}
-          </div>
-        ),
-      }}
-    </DatePicker>
+      presetsSlot={({ presets, apply }) => (
+        <div class="my-presets">
+          {presets.map((p) => (
+            <button onClick={() => apply(p.range)}>{p.label}</button>
+          ))}
+        </div>
+      )}
+    />
   );
 }`,
   },

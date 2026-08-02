@@ -57,6 +57,9 @@ const presetRanges = [
       <button v-for="p in presets" :key="p.label" @click="apply(p.range)">{{ p.label }}</button>
     </template>
   </DatePicker>
+
+  <!-- showFooter renders a default Today / Clear row; #footer overrides it -->
+  <DatePicker v-model:value="date" show-footer />
 </template>
 ```
 

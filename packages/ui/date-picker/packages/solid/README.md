@@ -28,7 +28,8 @@ export function Demo() {
   );
 }
 
-// Range selection with presets + a #presets override.
+// Range selection with presets + a presetsSlot override (equivalently:
+// slots={{ presets: (ctx) => ... }}).
 export function RangeDemo() {
   const [range, setRange] = createSignal({ start: '', end: '' });
   const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -43,17 +44,14 @@ export function RangeDemo() {
       onValueChange={setRange}
       presetRanges={presetRanges}
       onRangeComplete={(e) => console.log('range:', e.value)}
-    >
-      {{
-        presets: ({ presets, apply }) => (
-          <div class="my-presets">
-            {presets.map((p) => (
-              <button onClick={() => apply(p.range)}>{p.label}</button>
-            ))}
-          </div>
-        ),
-      }}
-    </DatePicker>
+      presetsSlot={({ presets, apply }) => (
+        <div class="my-presets">
+          {presets.map((p) => (
+            <button onClick={() => apply(p.range)}>{p.label}</button>
+          ))}
+        </div>
+      )}
+    />
   );
 }
 ```

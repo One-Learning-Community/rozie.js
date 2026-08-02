@@ -38,14 +38,15 @@ The two-way model also fires the framework-native update event (`onValueChange` 
 
 ## Slots
 
-The header slot is optional — omit it to get the default token-themed prev / month-year / next row.
+Every slot is optional — omit any of them to get the default token-themed markup for that region.
 
 | Slot | Scope params | Description |
 | --- | --- | --- |
 | `header` | `{ label, prev, next, disabled }` | Replace the default month-nav header. `label` is the localized "Month YYYY" heading, `prev`/`next` step the displayed month, `disabled` mirrors the `disabled` prop. |
+| `footer` | `{ today, clear, todayIso }` | Replace the default Today / Clear row. `today()` selects today (single mode) or navigates the view to today (range mode); `clear()` deselects; `todayIso` is today's ISO `YYYY-MM-DD` string. The default row is gated by `showFooter` — but an explicit `#footer` slot renders whenever provided, regardless of `showFooter`. |
 | `presets` | `{ presets, apply }` | **Range mode only.** Replace the default quick-pick preset rail. `presets` is the resolved `presetRanges` array (`{ label, range }[]`), and `apply(range)` commits a preset's range (firing `change` + `rangeComplete`). Omit the slot to get the default token-themed rail. |
 
-> On React the scoped slots are render-prop callbacks (the `header` and `presets` render-props) — the one documented cross-framework slot divergence.
+> On React the scoped slots are render-prop callbacks (`header`/`footer`/`presets` render-props) — the one documented cross-framework slot divergence.
 
 ## Caveats
 
@@ -57,9 +58,9 @@ Grab a handle via the framework-native ref mechanism (`useRef` → `DatePickerHa
 
 | Method | Description |
 | --- | --- |
-| `focus()` | Move keyboard focus into the grid — onto the selected day, else today, else the first visible day. |
+| `focus()` | Move keyboard focus into the grid — onto the selected day (if visible), else today (if visible), else the first enabled day of the displayed month(s). Multi-month aware. |
 | `goToToday()` | Swing the displayed month to today (no selection change). |
-| `clear()` | Deselect the date (`value` → `""`), emitting `change`. |
+| `clear()` | Deselect the current selection, emitting `change`. Writes `""` in single mode and `{ start: "", end: "" }` in range mode. A no-op (no `change` fired) when nothing is currently selected. |
 
 ## Theming
 
