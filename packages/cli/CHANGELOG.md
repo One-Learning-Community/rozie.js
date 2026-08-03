@@ -1,5 +1,18 @@
 # @rozie/cli
 
+## 0.3.0
+
+### Minor Changes
+
+- Compiles through `@rozie/core@0.3.0`: adds the `$memo(fn, keyFn)` primitive plus its `ROZ146` misuse diagnostic, the `ROZ147` Lit inherited-DOM-property validator, `ROZ144` retirement (array-form `:style` now uniformly supported), the `ROZ207`/`ROZ208` narrowing plus their per-target reactive/sigil lowering, Lit slot scope-param type synthesis, the Angular `?url` import rewrite for `new URL(lit, import.meta.url)`, boundary-comment/splice-seam dedups, and this series' 8 emitter seam fixes (react/solid emit-handler fallthrough, react `autocorrect` + solid `spellcheck` attribute mapping, lit nullish-attribute-drop + `r-for` key leak, react/lit derived-getter `$watch` dep correctness, react `.d.ts` unresolved slot-param typing, angular nullish-attribute-drop). The target emitters are bundled into `@rozie/core` and inlined here, so every `rozie build`/`rozie dev` invocation emits the corrected output for every target.
+- Updated dependencies
+  - @rozie/core@0.3.0
+  - @rozie/runtime-lit@0.2.2
+  - @rozie/runtime-react@0.2.2
+  - @rozie/runtime-vue@0.2.1
+  - @rozie/runtime-svelte@0.2.2
+  - @rozie/runtime-solid@0.2.2
+
 ## 0.2.1
 
 ### Patch Changes

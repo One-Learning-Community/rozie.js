@@ -147,6 +147,34 @@ name: Release (early subset)
 #     @rozie/runtime-vue@0.2.1 (unchanged — not part of this wave's runtime bump); angular = tslib
 #     only.
 #
+# 2026-08-03 toolchain 0.3.0 + otp/embla 0.1.3 + emitter-ripple patch wave (quick 260803-1dl):
+#   - @rozie/{core,cli,unplugin,babel-plugin} 0.2.1 -> 0.3.0 (minor — new `$memo` primitive +
+#     ROZ146/ROZ147 diagnostics, ROZ144 retirement, ROZ207/ROZ208 narrowing, plus this series'
+#     8 emitter seam fixes). @rozie/runtime-* deliberately NOT bumped (D1): the last runtime-
+#     touching commit predates this whole series, so every runtime is content-identical to its
+#     published tarball — confirmed via direct registry GET (all six 200). Bumping them would
+#     manufacture 49 leaf-side timing false-fails for zero content delivered; leaving them put
+#     means every one of the 49 bumped leaves' `@rozie/runtime-*` pin resolves to an
+#     already-live version, so `--gate` check (e) is 100% clean on all 49 leaves — the exact
+#     inverse of the toolchain-side same-run race (3 expected FAILs: cli/unplugin/babel-plugin
+#     each briefly see `@rozie/core@0.3.0 NOT on npm` until the single "Publish toolchain" step's
+#     topological order lands core first).
+#   - `otp` + `embla`: all six leaves each, 0.1.2 -> 0.1.3 (both genuinely changed on all six —
+#     not lockstep, just coincidentally uniform).
+#   - 37 further leaves across 14 already-published families (captcha, combobox,
+#     command-palette, cropper, data-table, date-picker, flatpickr, fullcalendar, pdf, popover,
+#     sortable-list, tags, tiptap, toast) patch-bump ONLY the leaves whose emitted content
+#     actually moved (D2 — per-leaf, not per-family lockstep). This corpus is already ragged
+#     (e.g. captcha sits at react 0.1.6 / solid 0.1.6 / vue 0.1.3 / svelte 0.1.4 / lit 0.1.5 /
+#     angular 0.1.3 after this wave) — "all six aligned" is a debut-release convention, not a
+#     patch-wave one. An unchanged leaf enumerated in this file's `--filter` lists is simply
+#     skipped by `pnpm publish` as already-published; no filter-list edit is needed for that case.
+#   - Scope stays exactly the 16 families + 4 toolchain packages already wired above (D3) — the
+#     13 additional unpublished families whose content also moved in this same seam batch
+#     (chartjs, codemirror, dialog, lexical, listbox, maplibre, number-field, pagination,
+#     resizable, rete, slider, switch, wavesurfer) are NOT added; their regenerated content ships
+#     whenever they eventually debut.
+#
 # Everything else is DELIBERATELY out of scope: any @rozie-ui family not enumerated
 # above (maplibre, codemirror, lexical, chartjs, rete, uppy, dialog, slider,
 # …) is not release-verified. Do NOT widen the --filter lists below to other

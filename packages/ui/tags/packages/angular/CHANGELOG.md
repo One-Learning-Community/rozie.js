@@ -1,5 +1,11 @@
 # @rozie-ui/tags-angular
 
+## 0.1.3
+
+### Patch Changes
+
+- Regenerated against `@rozie/core@0.3.0`. A nullable attribute binding no longer renders the literal string `null` through the property-binding path. No API surface change.
+
 ## 0.1.2
 
 ### Patch Changes

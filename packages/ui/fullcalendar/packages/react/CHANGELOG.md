@@ -1,5 +1,11 @@
 # @rozie-ui/fullcalendar-react
 
+## 0.1.3
+
+### Patch Changes
+
+- Regenerated against `@rozie/core@0.3.0`. The public `.d.ts` no longer types unresolved `r-for` slot-context params as callable (`() => void`) — they're now `unknown`, matching what the runtime actually hands the caller. No API surface change.
+
 ## 0.1.2
 
 ### Patch Changes

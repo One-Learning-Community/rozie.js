@@ -1,5 +1,11 @@
 # @rozie-ui/combobox-lit
 
+## 0.4.2
+
+### Patch Changes
+
+- Regenerated against `@rozie/core@0.3.0`. A nullable attribute bound to a null-valued primitive prop read is now dropped instead of rendered (previously the literal string `null` could render through the attribute binding). `r-for` loop keys are no longer leaked as literal DOM attributes on emitted elements. No API surface change.
+
 ## 0.4.1
 
 ### Patch Changes

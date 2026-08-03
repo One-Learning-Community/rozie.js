@@ -1,5 +1,17 @@
 # @rozie-ui/embla-lit
 
+## 0.1.3
+
+### Patch Changes
+
+- Regenerated against `@rozie/core@0.3.0`. The selected index now survives `reInit`: `startIndex` is stripped from every reInit payload after the raw `options` spread, so a runtime option flip (e.g. toggling `loop`) no longer teleports the carousel back to `startIndex`. **Deliberate behavior change to a published verb:** no-arg `reInitCarousel()` now preserves position instead of resetting to `startIndex` — documented in `embla.md`. Scheduled mount work (two `requestAnimationFrame` handles + a macrotask) is now cancelled on teardown, and both engines are nulled after `destroy()`, so all 14 `$expose` verbs fall through their guards after unmount. A runtime `thumbnails` toggle now actually builds the thumb engine (deferred/idempotent double-schedule).
+- The derived-getter `$watch` on `.length` now fires on value change instead of base-property identity — it previously gated on `changedProperties.has('slides')`, which could miss a length change that didn't also change array identity.
+- `r-for` loop keys are no longer leaked as literal DOM attributes on the emitted slide elements.
+- Docs truth pass: the runtime-updatable contract (17 of 20 props; `startIndex`/`plugins`/`options` marked construction-only, with reasons), the five previously-missing handle verbs (`scrollProgress`/`slidesInView`/`slidesNotInView`/`previousScrollSnap`/`getPlugins`), and a filled Events table. The docs' Slots section carries a still-open Lit-specific caveat: filling the `slide` scoped slot via native `slot="slide"` light-DOM children does not distribute per-iteration (the browser assigns all matching children to the first same-named `<slot>` in tree order) — use the documented property-function API (`el.slide = ({ slide, index }) => html\`…\`;`) instead. Tracked as an open architecture gap, not fixed in this release.
+- No API surface change.
+- Updated dependencies
+  - @rozie/runtime-lit@0.2.2
+
 ## 0.1.2
 
 ### Patch Changes

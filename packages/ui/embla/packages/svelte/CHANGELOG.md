@@ -1,5 +1,13 @@
 # @rozie-ui/embla-svelte
 
+## 0.1.3
+
+### Patch Changes
+
+- Regenerated from a fixed `Carousel.rozie` source (no emitter change reaches Svelte in this wave). The selected index now survives `reInit`: `startIndex` is stripped from every reInit payload after the raw `options` spread, so a runtime option flip (e.g. toggling `loop`) no longer teleports the carousel back to `startIndex`. **Deliberate behavior change to a published verb:** no-arg `reInitCarousel()` now preserves position instead of resetting to `startIndex` — documented in `embla.md`. Scheduled mount work (two `requestAnimationFrame` handles + a macrotask) is now cancelled on teardown, and both engines are nulled after `destroy()`, so all 14 `$expose` verbs fall through their guards after unmount. A runtime `thumbnails` toggle now actually builds the thumb engine (deferred/idempotent double-schedule).
+- Docs truth pass: the runtime-updatable contract (17 of 20 props; `startIndex`/`plugins`/`options` marked construction-only, with reasons), the five previously-missing handle verbs (`scrollProgress`/`slidesInView`/`slidesNotInView`/`previousScrollSnap`/`getPlugins`), a Slots section (`{#snippet slide({ slide, index })}` passed as the `slide` prop), and a filled Events table.
+- No API surface change.
+
 ## 0.1.2
 
 ### Patch Changes
