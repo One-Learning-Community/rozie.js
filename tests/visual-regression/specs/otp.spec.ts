@@ -382,13 +382,6 @@ for (const target of TARGETS) {
       const completeCount = page.getByTestId('readout-complete-count');
       const changeCount = page.getByTestId('readout-change-count');
 
-      // NOTE(260802-sc5): change-count is asserted on 4 targets only. react +
-      // solid double-fire `change` via the $attrs-spread root handler (native
-      // bubbling from the <input> re-triggers the consumer handler). That is a
-      // TOOLCHAIN bug owned by quick task C (emitter seams) — NOT an Otp defect.
-      // TODO(after task C): delete this gate and assert all 6.
-      const COUNT_ASSERTED = !['react', 'solid'].includes(target);
-
       // ---- 6. alt instance — autoFocus put focus on Digit 1 of 4 at mount.
       // Run FIRST: a one-shot $onMount effect race against any later
       // otp-primary focus-moving interaction below. ----
@@ -459,15 +452,15 @@ for (const target of TARGETS) {
 
       // ---- 4. change emit hygiene (D4) — the autofill above was exactly ONE
       // commit (`` -> `135790`), so `readout-change-count` must read exactly
-      // '1', not double-fire. ----
-      if (COUNT_ASSERTED) {
-        await expect
-          .poll(async () => (await changeCount.textContent())?.trim() ?? '', {
-            timeout: 10_000,
-            intervals: [100, 200, 400, 800],
-          })
-          .toBe('1');
-      }
+      // '1', not double-fire. Asserted on all 6 targets (260802-v1v seam 1
+      // closed the react/solid emit-handler root-DOM-spread double-fire —
+      // the change-count no longer needs a 4-target carve-out). ----
+      await expect
+        .poll(async () => (await changeCount.textContent())?.trim() ?? '', {
+          timeout: 10_000,
+          intervals: [100, 200, 400, 800],
+        })
+        .toBe('1');
 
       // ---- 2. fill-point clamp (D3) — clear, type '12' into cells 0-1, then
       // click cell 4 (past the fill point) and type '9': it must land at the
