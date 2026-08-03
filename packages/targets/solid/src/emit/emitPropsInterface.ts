@@ -111,7 +111,14 @@ function capitalize(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
-function toPascalCase(eventName: string): string {
+/**
+ * Exported (Quick 260802-v1v seam 1) so `emitSolid.ts`'s `propKeys` skip
+ * list can derive the SAME `on<Pascal>` handler names this file uses to
+ * declare the props-interface fields, instead of re-deriving independently
+ * — re-derivation is how the two sides would silently drift on a kebab
+ * emit name.
+ */
+export function toPascalCase(eventName: string): string {
   const parts = eventName.split(/[-_]/).filter(Boolean);
   return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
 }

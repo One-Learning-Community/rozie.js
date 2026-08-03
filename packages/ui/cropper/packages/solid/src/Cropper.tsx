@@ -153,7 +153,7 @@ export interface CropperHandle {
 
 export default function Cropper(_props: CropperProps): JSX.Element {
   const _merged = mergeProps({ src: '', aspectRatio: NaN, viewMode: 0, dragMode: 'crop', disabled: false, guides: true, center: true, background: true, movable: true, rotatable: true, scalable: true, zoomable: true, zoomOnWheel: true, cropBoxMovable: true, cropBoxResizable: true, autoCrop: true, autoCropArea: 0.8, responsive: true, preview: undefined, options: (() => ({}))() as Record<string, any> }, _props);
-  const [local, attrs] = splitProps(_merged, ['src', 'data', 'aspectRatio', 'viewMode', 'dragMode', 'disabled', 'guides', 'center', 'background', 'movable', 'rotatable', 'scalable', 'zoomable', 'zoomOnWheel', 'cropBoxMovable', 'cropBoxResizable', 'autoCrop', 'autoCropArea', 'responsive', 'preview', 'options', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['src', 'data', 'aspectRatio', 'viewMode', 'dragMode', 'disabled', 'guides', 'center', 'background', 'movable', 'rotatable', 'scalable', 'zoomable', 'zoomOnWheel', 'cropBoxMovable', 'cropBoxResizable', 'autoCrop', 'autoCropArea', 'responsive', 'preview', 'options', 'ref', 'onReady', 'onCropstart', 'onCropmove', 'onCropend', 'onCrop', 'onZoom']);
   onMount(() => { local.ref?.({ getCropper, getData, getCanvasData, getCropBoxData, getImageData, getContainerData, getCroppedCanvas, getCroppedDataURL, reset, clear, showCropBox, replace, rotateTo, rotateBy, zoomTo, zoomBy, scaleX, scaleY, scale, setCanvasData, setCropBoxData, moveTo, move, enable, disable, setAspectRatio, setDragMode }); });
 
   const [data, setData] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'data', undefined);

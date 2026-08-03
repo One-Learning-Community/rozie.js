@@ -52,8 +52,8 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
     ariaLabelledby: _props.ariaLabelledby ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, disableBackdropClose, disableEscapeClose, disableScrollLock, ariaLabel, ariaLabelledby, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as DialogProps & Record<string, unknown>;
-    void open; void disableBackdropClose; void disableEscapeClose; void disableScrollLock; void ariaLabel; void ariaLabelledby; void defaultValue; void onOpenChange; void defaultOpen;
+    const { open, disableBackdropClose, disableEscapeClose, disableScrollLock, ariaLabel, ariaLabelledby, defaultValue, onOpenChange, defaultOpen, onClose, ...rest } = _props as DialogProps & Record<string, unknown>;
+    void open; void disableBackdropClose; void disableEscapeClose; void disableScrollLock; void ariaLabel; void ariaLabelledby; void defaultValue; void onOpenChange; void defaultOpen; void onClose;
     return rest;
   })();
   const [open, setOpen] = useControllableState({

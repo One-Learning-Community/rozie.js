@@ -74,8 +74,8 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
     ariaLabel: _props.ariaLabel ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { modelValue, delimiters, allowDuplicates, max, disabled, readonly, validate, placeholder, ariaLabel, defaultValue, onModelValueChange, defaultModelValue, ...rest } = _props as TagsProps & Record<string, unknown>;
-    void modelValue; void delimiters; void allowDuplicates; void max; void disabled; void readonly; void validate; void placeholder; void ariaLabel; void defaultValue; void onModelValueChange; void defaultModelValue;
+    const { modelValue, delimiters, allowDuplicates, max, disabled, readonly, validate, placeholder, ariaLabel, defaultValue, onModelValueChange, defaultModelValue, onChange, onAdd, onRemove, ...rest } = _props as TagsProps & Record<string, unknown>;
+    void modelValue; void delimiters; void allowDuplicates; void max; void disabled; void readonly; void validate; void placeholder; void ariaLabel; void defaultValue; void onModelValueChange; void defaultModelValue; void onChange; void onAdd; void onRemove;
     return rest;
   })();
   const [modelValue, setModelValue] = useControllableState({

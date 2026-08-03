@@ -50,8 +50,8 @@ const RecaptchaV3 = forwardRef<RecaptchaV3Handle, RecaptchaV3Props>(function Rec
     executeOnMount: _props.executeOnMount ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { sitekey, action, token, executeOnMount, defaultValue, onTokenChange, defaultToken, ...rest } = _props as RecaptchaV3Props & Record<string, unknown>;
-    void sitekey; void action; void token; void executeOnMount; void defaultValue; void onTokenChange; void defaultToken;
+    const { sitekey, action, token, executeOnMount, defaultValue, onTokenChange, defaultToken, onError, onVerify, ...rest } = _props as RecaptchaV3Props & Record<string, unknown>;
+    void sitekey; void action; void token; void executeOnMount; void defaultValue; void onTokenChange; void defaultToken; void onError; void onVerify;
     return rest;
   })();
   const disposed = useRef(false);

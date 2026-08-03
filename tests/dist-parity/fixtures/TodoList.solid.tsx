@@ -29,7 +29,7 @@ interface TodoListProps {
 
 export default function TodoList(_props: TodoListProps): JSX.Element {
   const _merged = mergeProps({ title: 'Todo' }, _props);
-  const [local, attrs] = splitProps(_merged, ['items', 'title', 'children']);
+  const [local, attrs] = splitProps(_merged, ['items', 'title', 'children', 'onAdd', 'onToggle', 'onRemove']);
   const resolved = children(() => local.children);
 
   const [items, setItems] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'items', (() => [])());

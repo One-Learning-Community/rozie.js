@@ -74,8 +74,8 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
     ariaLabel: _props.ariaLabel ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { modelValue, min, max, step, largeStep, formatOptions, allowScrub, disabled, readonly, ariaLabel, defaultValue, onModelValueChange, defaultModelValue, ...rest } = _props as NumberFieldProps & Record<string, unknown>;
-    void modelValue; void min; void max; void step; void largeStep; void formatOptions; void allowScrub; void disabled; void readonly; void ariaLabel; void defaultValue; void onModelValueChange; void defaultModelValue;
+    const { modelValue, min, max, step, largeStep, formatOptions, allowScrub, disabled, readonly, ariaLabel, defaultValue, onModelValueChange, defaultModelValue, onChange, ...rest } = _props as NumberFieldProps & Record<string, unknown>;
+    void modelValue; void min; void max; void step; void largeStep; void formatOptions; void allowScrub; void disabled; void readonly; void ariaLabel; void defaultValue; void onModelValueChange; void defaultModelValue; void onChange;
     return rest;
   })();
   const scrubbing = useRef(false);

@@ -192,8 +192,8 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     virtualEstimateRowHeight: _props.virtualEstimateRowHeight ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, query, score, items, defaultItems, placeholder, emptyText, closeOnSelect, ariaLabel, idBase, searchDebounce, actionKey, closeOnAction, groupCap, appendTo, virtual, virtualMaxHeight, virtualEstimateRowHeight, defaultValue, onOpenChange, defaultOpen, onQueryChange, defaultQuery, ...rest } = _props as CommandPaletteProps & Record<string, unknown>;
-    void open; void query; void score; void items; void defaultItems; void placeholder; void emptyText; void closeOnSelect; void ariaLabel; void idBase; void searchDebounce; void actionKey; void closeOnAction; void groupCap; void appendTo; void virtual; void virtualMaxHeight; void virtualEstimateRowHeight; void defaultValue; void onOpenChange; void defaultOpen; void onQueryChange; void defaultQuery;
+    const { open, query, score, items, defaultItems, placeholder, emptyText, closeOnSelect, ariaLabel, idBase, searchDebounce, actionKey, closeOnAction, groupCap, appendTo, virtual, virtualMaxHeight, virtualEstimateRowHeight, defaultValue, onOpenChange, defaultOpen, onQueryChange, defaultQuery, onNavigate, onBack, onSelect, onActionSelect, ...rest } = _props as CommandPaletteProps & Record<string, unknown>;
+    void open; void query; void score; void items; void defaultItems; void placeholder; void emptyText; void closeOnSelect; void ariaLabel; void idBase; void searchDebounce; void actionKey; void closeOnAction; void groupCap; void appendTo; void virtual; void virtualMaxHeight; void virtualEstimateRowHeight; void defaultValue; void onOpenChange; void defaultOpen; void onQueryChange; void defaultQuery; void onNavigate; void onBack; void onSelect; void onActionSelect;
     return rest;
   })();
   const debounceTimerId = useRef<any>(null);

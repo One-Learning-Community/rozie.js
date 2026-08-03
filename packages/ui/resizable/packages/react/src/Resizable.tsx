@@ -55,8 +55,8 @@ const Resizable = forwardRef<ResizableHandle, ResizableProps>(function Resizable
     disabled: _props.disabled ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { size, direction, min, max, disabled, defaultValue, onSizeChange, defaultSize, ...rest } = _props as ResizableProps & Record<string, unknown>;
-    void size; void direction; void min; void max; void disabled; void defaultValue; void onSizeChange; void defaultSize;
+    const { size, direction, min, max, disabled, defaultValue, onSizeChange, defaultSize, onResize, ...rest } = _props as ResizableProps & Record<string, unknown>;
+    void size; void direction; void min; void max; void disabled; void defaultValue; void onSizeChange; void defaultSize; void onResize;
     return rest;
   })();
   const [size, setSize] = useControllableState({

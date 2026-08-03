@@ -201,7 +201,7 @@ export interface CarouselHandle {
 
 export default function Carousel(_props: CarouselProps): JSX.Element {
   const _merged = mergeProps({ slides: (() => [])() as any[], loop: false, align: 'center', axis: 'x', slidesToScroll: 1, dragFree: false, draggable: true, containScroll: 'trimSnaps', startIndex: 0, skipSnaps: false, duration: 25, direction: 'ltr', autoplay: false, autoplayDelay: 4000, dots: false, arrows: false, thumbnails: false, plugins: (() => [])() as any[], options: (() => ({}))() as Record<string, any> }, _props);
-  const [local, attrs] = splitProps(_merged, ['slides', 'loop', 'align', 'axis', 'slidesToScroll', 'dragFree', 'draggable', 'containScroll', 'startIndex', 'skipSnaps', 'duration', 'direction', 'autoplay', 'autoplayDelay', 'dots', 'arrows', 'thumbnails', 'plugins', 'options', 'selectedIndex', 'children', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['slides', 'loop', 'align', 'axis', 'slidesToScroll', 'dragFree', 'draggable', 'containScroll', 'startIndex', 'skipSnaps', 'duration', 'direction', 'autoplay', 'autoplayDelay', 'dots', 'arrows', 'thumbnails', 'plugins', 'options', 'selectedIndex', 'children', 'ref', 'onSelect', 'onSettle', 'onReInit', 'onPointerDown']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ scrollNext, scrollPrev, scrollToIndex, reInitCarousel, canScrollNext, canScrollPrev, getSelectedIndex, scrollSnapList, scrollProgress, slidesInView, slidesNotInView, previousScrollSnap, getPlugins, getInstance }); });
 

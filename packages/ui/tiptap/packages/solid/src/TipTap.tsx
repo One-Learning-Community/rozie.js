@@ -262,7 +262,7 @@ export interface TipTapHandle {
 
 export default function TipTap(_props: TipTapProps): JSX.Element {
   const _merged = mergeProps({ editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: (() => ({}))() as Record<string, any>, extensions: (() => [])() as any[], starterKit: (() => ({}))() as Record<string, any>, nodeSpecs: (() => [])() as any[], uploadImage: null, maxLength: null, enforceMaxLength: false, bubbleMenuShouldShow: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['html', 'editable', 'placeholder', 'autofocus', 'editorClass', 'ariaLabel', 'editorProps', 'extensions', 'starterKit', 'nodeSpecs', 'uploadImage', 'maxLength', 'enforceMaxLength', 'bubbleMenuShouldShow', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['html', 'editable', 'placeholder', 'autofocus', 'editorClass', 'ariaLabel', 'editorProps', 'extensions', 'starterKit', 'nodeSpecs', 'uploadImage', 'maxLength', 'enforceMaxLength', 'bubbleMenuShouldShow', 'ref', 'onUpdate', 'onSelectionUpdate', 'onFocus', 'onBlur']);
   onMount(() => { local.ref?.({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor }); });
 
   const [html, setHtml] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'html', '<p>Start writing…</p>');

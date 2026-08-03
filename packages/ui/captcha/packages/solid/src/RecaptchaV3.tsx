@@ -47,7 +47,7 @@ export interface RecaptchaV3Handle {
 
 export default function RecaptchaV3(_props: RecaptchaV3Props): JSX.Element {
   const _merged = mergeProps({ action: 'submit', executeOnMount: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['sitekey', 'action', 'token', 'executeOnMount', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['sitekey', 'action', 'token', 'executeOnMount', 'ref', 'onError', 'onVerify']);
   onMount(() => { local.ref?.({ execute }); });
 
   const [token, setToken] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'token', '');

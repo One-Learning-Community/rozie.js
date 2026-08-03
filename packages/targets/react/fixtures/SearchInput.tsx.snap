@@ -18,8 +18,8 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
     autofocus: _props.autofocus ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { placeholder, minLength, autofocus, ...rest } = _props as SearchInputProps & Record<string, unknown>;
-    void placeholder; void minLength; void autofocus;
+    const { placeholder, minLength, autofocus, onSearch, onClear, ...rest } = _props as SearchInputProps & Record<string, unknown>;
+    void placeholder; void minLength; void autofocus; void onSearch; void onClear;
     return rest;
   })();
   const [query, setQuery] = useState('');

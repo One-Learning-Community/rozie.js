@@ -34,8 +34,8 @@ export default function Modal(_props: ModalProps): JSX.Element {
     title: _props.title ?? '',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, closeOnEscape, closeOnBackdrop, lockBodyScroll, title, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as ModalProps & Record<string, unknown>;
-    void open; void closeOnEscape; void closeOnBackdrop; void lockBodyScroll; void title; void defaultValue; void onOpenChange; void defaultOpen;
+    const { open, closeOnEscape, closeOnBackdrop, lockBodyScroll, title, defaultValue, onOpenChange, defaultOpen, onClose, ...rest } = _props as ModalProps & Record<string, unknown>;
+    void open; void closeOnEscape; void closeOnBackdrop; void lockBodyScroll; void title; void defaultValue; void onOpenChange; void defaultOpen; void onClose;
     return rest;
   })();
   const savedBodyOverflow = useRef('');

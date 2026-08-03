@@ -132,7 +132,7 @@ export interface PaginationHandle {
 
 export default function Pagination(_props: PaginationProps): JSX.Element {
   const _merged = mergeProps({ totalPages: null, total: null, pageSize: null, siblingCount: 1, boundaryCount: 1, disabled: false, ariaLabel: 'Pagination' }, _props);
-  const [local, attrs] = splitProps(_merged, ['modelValue', 'totalPages', 'total', 'pageSize', 'siblingCount', 'boundaryCount', 'disabled', 'ariaLabel', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['modelValue', 'totalPages', 'total', 'pageSize', 'siblingCount', 'boundaryCount', 'disabled', 'ariaLabel', 'ref', 'onChange']);
   onMount(() => { local.ref?.({ goto, next, prev, first, last }); });
 
   const [modelValue, setModelValue] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'modelValue', 1);

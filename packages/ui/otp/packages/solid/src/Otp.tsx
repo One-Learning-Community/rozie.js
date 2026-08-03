@@ -93,7 +93,7 @@ export interface OtpHandle {
 
 export default function Otp(_props: OtpProps): JSX.Element {
   const _merged = mergeProps({ length: 6, type: 'numeric', mask: false, autoFocus: false, disabled: false, placeholder: '', ariaLabel: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['value', 'length', 'type', 'mask', 'autoFocus', 'disabled', 'placeholder', 'ariaLabel', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['value', 'length', 'type', 'mask', 'autoFocus', 'disabled', 'placeholder', 'ariaLabel', 'ref', 'onChange', 'onComplete']);
   onMount(() => { local.ref?.({ focus, clear }); });
 
   const [value, setValue] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'value', '');

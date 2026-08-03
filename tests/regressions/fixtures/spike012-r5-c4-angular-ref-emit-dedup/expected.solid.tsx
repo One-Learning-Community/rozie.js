@@ -6,7 +6,7 @@ interface RefEmitDedupProps {
 }
 
 export default function RefEmitDedup(_props: RefEmitDedupProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, ['onSave']);
 
   const [n, setN] = createSignal(0);
   onMount(() => {

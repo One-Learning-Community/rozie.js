@@ -153,8 +153,8 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     options: _props.options ?? __defaultOptions,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { slides, loop, align, axis, slidesToScroll, dragFree, draggable, containScroll, startIndex, skipSnaps, duration, direction, autoplay, autoplayDelay, dots, arrows, thumbnails, plugins, options, selectedIndex, defaultValue, onSelectedIndexChange, defaultSelectedIndex, ...rest } = _props as CarouselProps & Record<string, unknown>;
-    void slides; void loop; void align; void axis; void slidesToScroll; void dragFree; void draggable; void containScroll; void startIndex; void skipSnaps; void duration; void direction; void autoplay; void autoplayDelay; void dots; void arrows; void thumbnails; void plugins; void options; void selectedIndex; void defaultValue; void onSelectedIndexChange; void defaultSelectedIndex;
+    const { slides, loop, align, axis, slidesToScroll, dragFree, draggable, containScroll, startIndex, skipSnaps, duration, direction, autoplay, autoplayDelay, dots, arrows, thumbnails, plugins, options, selectedIndex, defaultValue, onSelectedIndexChange, defaultSelectedIndex, onSelect, onSettle, onReInit, onPointerDown, ...rest } = _props as CarouselProps & Record<string, unknown>;
+    void slides; void loop; void align; void axis; void slidesToScroll; void dragFree; void draggable; void containScroll; void startIndex; void skipSnaps; void duration; void direction; void autoplay; void autoplayDelay; void dots; void arrows; void thumbnails; void plugins; void options; void selectedIndex; void defaultValue; void onSelectedIndexChange; void defaultSelectedIndex; void onSelect; void onSettle; void onReInit; void onPointerDown;
     return rest;
   })();
   const embla = useRef<any>(null);

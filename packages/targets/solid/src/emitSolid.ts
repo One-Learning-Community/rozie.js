@@ -42,7 +42,7 @@ import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
 import { emitListeners } from './emit/emitListeners.js';
 import { emitSlotDecl } from './emit/emitSlotDecl.js';
-import { emitPropsInterface } from './emit/emitPropsInterface.js';
+import { emitPropsInterface, toPascalCase } from './emit/emitPropsInterface.js';
 import { emitStyle } from './emit/emitStyle.js';
 import { buildShell } from './emit/shell.js';
 import { composeSourceMap } from './sourcemap/compose.js';
@@ -256,6 +256,22 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   // element). Mirrors the conditional `'children'` push above.
   if (hasExpose && !propKeys.includes("'ref'")) {
     propKeys.push("'ref'");
+  }
+  // Emit-handler props (Quick 260802-v1v seam 1) — `emitPropsInterface.ts`
+  // declares `on<Pascal>?` on the props interface for every `ir.emits`
+  // entry, but this key list never learned about them, so an emit-handler
+  // prop fell into the `attrs` rest bucket and spread onto the root DOM
+  // element (a consumer's handler fired twice: once via the direct
+  // `_props.onX?.(...)` call, once more as a native DOM listener). Push
+  // each `on<Pascal>` key, same style as the conditional `'ref'` push above
+  // — `'ref'` was added for exactly this reason ("NEVER spread onto the
+  // DOM"). `toPascalCase` is imported from `emitPropsInterface.ts` so the
+  // two sides cannot drift on a kebab emit name.
+  for (const e of ir.emits ?? []) {
+    const eventPascal = toPascalCase(e);
+    if (eventPascal.length === 0) continue;
+    const key = `'on${eventPascal}'`;
+    if (!propKeys.includes(key)) propKeys.push(key);
   }
   const propNames = propKeys.join(', ');
   // When non-model defaults exist, emitScript emits `const _merged = mergeProps({...}, _props)`.

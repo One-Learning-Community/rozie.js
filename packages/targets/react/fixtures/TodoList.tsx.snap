@@ -27,8 +27,8 @@ export default function TodoList(_props: TodoListProps): JSX.Element {
     title: _props.title ?? 'Todo',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { items, title, defaultValue, onItemsChange, defaultItems, ...rest } = _props as TodoListProps & Record<string, unknown>;
-    void items; void title; void defaultValue; void onItemsChange; void defaultItems;
+    const { items, title, defaultValue, onItemsChange, defaultItems, onAdd, onToggle, onRemove, ...rest } = _props as TodoListProps & Record<string, unknown>;
+    void items; void title; void defaultValue; void onItemsChange; void defaultItems; void onAdd; void onToggle; void onRemove;
     return rest;
   })();
   const [items, setItems] = useControllableState({

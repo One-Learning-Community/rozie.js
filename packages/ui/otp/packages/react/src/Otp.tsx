@@ -64,8 +64,8 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
     ariaLabel: _props.ariaLabel ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { value, length, type, mask, autoFocus, disabled, placeholder, ariaLabel, defaultValue, onValueChange, ...rest } = _props as OtpProps & Record<string, unknown>;
-    void value; void length; void type; void mask; void autoFocus; void disabled; void placeholder; void ariaLabel; void defaultValue; void onValueChange;
+    const { value, length, type, mask, autoFocus, disabled, placeholder, ariaLabel, defaultValue, onValueChange, onChange, onComplete, ...rest } = _props as OtpProps & Record<string, unknown>;
+    void value; void length; void type; void mask; void autoFocus; void disabled; void placeholder; void ariaLabel; void defaultValue; void onValueChange; void onChange; void onComplete;
     return rest;
   })();
   const [value, setValue] = useControllableState({

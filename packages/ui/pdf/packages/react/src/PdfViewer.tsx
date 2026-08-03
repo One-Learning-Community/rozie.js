@@ -106,8 +106,8 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     options: _props.options ?? __defaultOptions,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { src, page, scale, rotation, workerSrc, standardFontDataUrl, renderAllPages, textLayer, password, query, autoFit, options, defaultValue, onPageChange, defaultPage, ...rest } = _props as PdfViewerProps & Record<string, unknown>;
-    void src; void page; void scale; void rotation; void workerSrc; void standardFontDataUrl; void renderAllPages; void textLayer; void password; void query; void autoFit; void options; void defaultValue; void onPageChange; void defaultPage;
+    const { src, page, scale, rotation, workerSrc, standardFontDataUrl, renderAllPages, textLayer, password, query, autoFit, options, defaultValue, onPageChange, defaultPage, onPagerendered, onError, onPagesrendered, onPasswordrequest, onProgress, onLoad, onPagechange, onFindresult, ...rest } = _props as PdfViewerProps & Record<string, unknown>;
+    void src; void page; void scale; void rotation; void workerSrc; void standardFontDataUrl; void renderAllPages; void textLayer; void password; void query; void autoFit; void options; void defaultValue; void onPageChange; void defaultPage; void onPagerendered; void onError; void onPagesrendered; void onPasswordrequest; void onProgress; void onLoad; void onPagechange; void onFindresult;
     return rest;
   })();
   const containerEl = useRef<any>(null);

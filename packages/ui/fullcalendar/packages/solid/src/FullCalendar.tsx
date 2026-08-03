@@ -139,7 +139,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
   center: 'title',
   right: 'dayGridMonth,timeGridWeek,timeGridDay'
 }))() as Record<string, any>, options: (() => ({}))() as Record<string, any> }, _props);
-  const [local, attrs] = splitProps(_merged, ['events', 'view', 'weekends', 'editable', 'selectable', 'height', 'defaultColor', 'locale', 'firstDay', 'slotDuration', 'nowIndicator', 'headerToolbar', 'options', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['events', 'view', 'weekends', 'editable', 'selectable', 'height', 'defaultColor', 'locale', 'firstDay', 'slotDuration', 'nowIndicator', 'headerToolbar', 'options', 'ref', 'onEventClick', 'onDateClick', 'onEventDrop', 'onSelect', 'onEventResize', 'onDatesSet', 'onEventMouseEnter', 'onEventMouseLeave', 'onUnselect', 'onLoading', 'onEventsSet']);
   onMount(() => { local.ref?.({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate, getDate, getEvents, scrollToTime, updateSize, prevYear, nextYear, selectRange, clearSelection }); });
 
   const [view, setView] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'view', 'dayGridMonth');

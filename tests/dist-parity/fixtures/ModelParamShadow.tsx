@@ -10,8 +10,8 @@ interface ModelParamShadowProps {
 
 export default function ModelParamShadow(props: ModelParamShadowProps): JSX.Element {
   const attrs: Record<string, unknown> = (() => {
-    const { token, defaultValue, onTokenChange, defaultToken, ...rest } = props as ModelParamShadowProps & Record<string, unknown>;
-    void token; void defaultValue; void onTokenChange; void defaultToken;
+    const { token, defaultValue, onTokenChange, defaultToken, onVerify, ...rest } = props as ModelParamShadowProps & Record<string, unknown>;
+    void token; void defaultValue; void onTokenChange; void defaultToken; void onVerify;
     return rest;
   })();
   const [token, setToken] = useControllableState({

@@ -17,7 +17,7 @@ interface SearchInputProps {
 
 export default function SearchInput(_props: SearchInputProps): JSX.Element {
   const _merged = mergeProps({ placeholder: 'Search…', minLength: 2, autofocus: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['placeholder', 'minLength', 'autofocus']);
+  const [local, attrs] = splitProps(_merged, ['placeholder', 'minLength', 'autofocus', 'onSearch', 'onClear']);
 
   const [query, setQuery] = createSignal('');
   const isValid = createMemo(() => query().length >= local.minLength);

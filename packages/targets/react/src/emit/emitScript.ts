@@ -61,6 +61,7 @@ import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { toPascalCase } from './emitPropsInterface.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -2206,9 +2207,16 @@ export function emitScript(
     templateUsesListenersSpread(ir.template)
   ) {
     const propsParam = defaultedNonModelProps.length > 0 ? '_props' : 'props';
-    // `declaredNames` reads ONLY from `ir.props` — `ir.emits` does not enter
-    // the destructure list. When `ir.props.length === 0` the destructure is
-    // empty regardless of `ir.emits.length`; previously the guard
+    // `declaredNames` covers every field `emitPropsInterface.ts` puts on the
+    // props interface — `ir.props` (+ the model triplet) AND `ir.emits`
+    // (Quick 260802-v1v seam 1). Before this, `ir.emits` never entered the
+    // list: `emitPropsInterface.ts` declares `onChange?` etc. on the
+    // interface, but the destructure/rest-bucket skip list didn't know about
+    // it, so an emit-handler prop fell into the `attrs` fallthrough spread on
+    // the root DOM element and a consumer's handler fired twice — once via
+    // the direct `props.onX(...)` call, once more as a native DOM listener.
+    // When `ir.props.length === 0` the destructure is empty regardless of
+    // `ir.emits.length`; previously the guard
     // `ir.props.length === 0 && ir.emits.length === 0` would emit
     // `const { , ...rest } = ...` + `void ;` (both JS syntax errors) for a
     // no-`<props>` + `$emit(...)` component. Compute the declared-names list
@@ -2230,6 +2238,14 @@ export function emitScript(
             ]
           : [],
       ),
+      // Emit-handler props — same `toPascalCase` + empty-guard emitPropsInterface.ts
+      // uses to declare `on<Pascal>?` on the interface (:151-155), imported
+      // rather than re-derived so the two sides cannot drift on a kebab
+      // emit name.
+      ...ir.emits.flatMap((e) => {
+        const eventPascal = toPascalCase(e);
+        return eventPascal.length === 0 ? [] : [`on${eventPascal}`];
+      }),
     ];
     const declaredNamesUnique = Array.from(new Set(declaredNames));
     if (declaredNamesUnique.length === 0) {

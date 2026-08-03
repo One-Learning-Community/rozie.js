@@ -200,7 +200,7 @@ export interface ToasterHandle {
 
 export default function Toaster(_props: ToasterProps): JSX.Element {
   const _merged = mergeProps({ position: 'bottom-right', duration: 4000, max: 0, disablePauseOnHover: false, ariaLabel: null, disableSwipe: false, stacked: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['position', 'duration', 'max', 'disablePauseOnHover', 'ariaLabel', 'disableSwipe', 'stacked', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['position', 'duration', 'max', 'disablePauseOnHover', 'ariaLabel', 'disableSwipe', 'stacked', 'ref', 'onDismissed']);
   onMount(() => { local.ref?.({ show, dismiss, clear, patch, promise }); });
 
   const [toasts, setToasts] = createSignal<any[]>([]);

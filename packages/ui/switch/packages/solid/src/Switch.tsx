@@ -86,7 +86,7 @@ export interface SwitchHandle {
 
 export default function Switch(_props: SwitchProps): JSX.Element {
   const _merged = mergeProps({ disabled: false, readonly: false, ariaLabel: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['modelValue', 'disabled', 'readonly', 'ariaLabel', 'children', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['modelValue', 'disabled', 'readonly', 'ariaLabel', 'children', 'ref', 'onChange']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ focus, toggle }); });
 

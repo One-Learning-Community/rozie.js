@@ -454,7 +454,7 @@ export interface FlowCanvasHandle {
 
 export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   const _merged = mergeProps({ validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, background: 'dots', canConnect: null, history: true, marquee: false, nodeToolbar: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'controls', 'minimap', 'background', 'canConnect', 'history', 'mode', 'marquee', 'nodeToolbar', 'children', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'controls', 'minimap', 'background', 'canConnect', 'history', 'mode', 'marquee', 'nodeToolbar', 'children', 'ref', 'onEdgeClick', 'onEdgeSelected', 'onSelectionChange', 'onConnectEnd', 'onNodeAction', 'onConnectionRejected', 'onConnectionCreated', 'onConnectionRemoved', 'onNodePicked', 'onNodeMoved', 'onTranslated', 'onContextMenu']);
   const resolved = () => local.children;
   onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo, getSelectedNodes, selectNode, clearSelection, selectAll, centerOnNode }); });
 

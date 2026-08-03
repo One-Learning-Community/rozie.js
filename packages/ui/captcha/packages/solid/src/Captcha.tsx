@@ -58,7 +58,7 @@ export interface CaptchaHandle {
 
 export default function Captcha(_props: CaptchaProps): JSX.Element {
   const _merged = mergeProps({ provider: 'recaptcha', theme: 'light', size: 'normal', tabindex: null, options: (() => ({}))() as Record<string, any> }, _props);
-  const [local, attrs] = splitProps(_merged, ['provider', 'sitekey', 'token', 'theme', 'size', 'tabindex', 'options', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['provider', 'sitekey', 'token', 'theme', 'size', 'tabindex', 'options', 'ref', 'onVerify', 'onExpire', 'onError']);
   onMount(() => { local.ref?.({ reset, execute, getResponse }); });
 
   const [token, setToken] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'token', '');

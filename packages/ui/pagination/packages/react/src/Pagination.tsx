@@ -82,8 +82,8 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
     ariaLabel: _props.ariaLabel ?? 'Pagination',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { modelValue, totalPages, total, pageSize, siblingCount, boundaryCount, disabled, ariaLabel, defaultValue, onModelValueChange, defaultModelValue, ...rest } = _props as PaginationProps & Record<string, unknown>;
-    void modelValue; void totalPages; void total; void pageSize; void siblingCount; void boundaryCount; void disabled; void ariaLabel; void defaultValue; void onModelValueChange; void defaultModelValue;
+    const { modelValue, totalPages, total, pageSize, siblingCount, boundaryCount, disabled, ariaLabel, defaultValue, onModelValueChange, defaultModelValue, onChange, ...rest } = _props as PaginationProps & Record<string, unknown>;
+    void modelValue; void totalPages; void total; void pageSize; void siblingCount; void boundaryCount; void disabled; void ariaLabel; void defaultValue; void onModelValueChange; void defaultModelValue; void onChange;
     return rest;
   })();
   const [modelValue, setModelValue] = useControllableState({

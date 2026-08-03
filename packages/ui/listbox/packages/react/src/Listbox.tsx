@@ -121,8 +121,8 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     maxHeight: _props.maxHeight ?? '',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { options, value, multiple, inline, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, id, ariaLabel, virtual, estimateRowHeight, maxHeight, defaultValue, onValueChange, ...rest } = _props as ListboxProps & Record<string, unknown>;
-    void options; void value; void multiple; void inline; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void id; void ariaLabel; void virtual; void estimateRowHeight; void maxHeight; void defaultValue; void onValueChange;
+    const { options, value, multiple, inline, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, id, ariaLabel, virtual, estimateRowHeight, maxHeight, defaultValue, onValueChange, onOpenChange, onChange, ...rest } = _props as ListboxProps & Record<string, unknown>;
+    void options; void value; void multiple; void inline; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void id; void ariaLabel; void virtual; void estimateRowHeight; void maxHeight; void defaultValue; void onValueChange; void onOpenChange; void onChange;
     return rest;
   })();
   const gridScrollEl = useRef<any>(null);

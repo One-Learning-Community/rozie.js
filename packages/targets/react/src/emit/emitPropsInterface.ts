@@ -94,8 +94,17 @@ function capitalize(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
-/** PascalCase from hyphenated/snake_case event name. */
-function toPascalCase(eventName: string): string {
+/**
+ * PascalCase from hyphenated/snake_case event name.
+ *
+ * Exported (Quick 260802-v1v seam 1) so `emitScript.ts`'s destructure skip
+ * list can derive the SAME `on<Pascal>` handler names this file uses to
+ * declare the props-interface fields, instead of re-deriving independently
+ * — re-derivation is how the two sides would silently drift on a kebab
+ * emit name (`my-event` → `onMyEvent` here vs a differently-cased
+ * destructure key there).
+ */
+export function toPascalCase(eventName: string): string {
   const parts = eventName.split(/[-_]/).filter(Boolean);
   return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
 }

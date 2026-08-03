@@ -168,8 +168,8 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
     options: _props.options ?? __defaultOptions,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { src, data, aspectRatio, viewMode, dragMode, disabled, guides, center, background, movable, rotatable, scalable, zoomable, zoomOnWheel, cropBoxMovable, cropBoxResizable, autoCrop, autoCropArea, responsive, preview, options, defaultValue, onDataChange, defaultData, ...rest } = _props as CropperProps & Record<string, unknown>;
-    void src; void data; void aspectRatio; void viewMode; void dragMode; void disabled; void guides; void center; void background; void movable; void rotatable; void scalable; void zoomable; void zoomOnWheel; void cropBoxMovable; void cropBoxResizable; void autoCrop; void autoCropArea; void responsive; void preview; void options; void defaultValue; void onDataChange; void defaultData;
+    const { src, data, aspectRatio, viewMode, dragMode, disabled, guides, center, background, movable, rotatable, scalable, zoomable, zoomOnWheel, cropBoxMovable, cropBoxResizable, autoCrop, autoCropArea, responsive, preview, options, defaultValue, onDataChange, defaultData, onReady, onCropstart, onCropmove, onCropend, onCrop, onZoom, ...rest } = _props as CropperProps & Record<string, unknown>;
+    void src; void data; void aspectRatio; void viewMode; void dragMode; void disabled; void guides; void center; void background; void movable; void rotatable; void scalable; void zoomable; void zoomOnWheel; void cropBoxMovable; void cropBoxResizable; void autoCrop; void autoCropArea; void responsive; void preview; void options; void defaultValue; void onDataChange; void defaultData; void onReady; void onCropstart; void onCropmove; void onCropend; void onCrop; void onZoom;
     return rest;
   })();
   const imgEl = useRef<any>(null);

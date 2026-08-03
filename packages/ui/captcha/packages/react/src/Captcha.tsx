@@ -65,8 +65,8 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(function Captcha(_props:
     options: _props.options ?? __defaultOptions,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { provider, sitekey, token, theme, size, tabindex, options, defaultValue, onTokenChange, defaultToken, ...rest } = _props as CaptchaProps & Record<string, unknown>;
-    void provider; void sitekey; void token; void theme; void size; void tabindex; void options; void defaultValue; void onTokenChange; void defaultToken;
+    const { provider, sitekey, token, theme, size, tabindex, options, defaultValue, onTokenChange, defaultToken, onVerify, onExpire, onError, ...rest } = _props as CaptchaProps & Record<string, unknown>;
+    void provider; void sitekey; void token; void theme; void size; void tabindex; void options; void defaultValue; void onTokenChange; void defaultToken; void onVerify; void onExpire; void onError;
     return rest;
   })();
   const api = useRef<any>(null);

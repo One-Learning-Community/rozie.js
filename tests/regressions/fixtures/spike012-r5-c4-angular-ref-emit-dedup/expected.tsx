@@ -6,7 +6,11 @@ interface RefEmitDedupProps {
 }
 
 export default function RefEmitDedup(props: RefEmitDedupProps): JSX.Element {
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { onSave, ...rest } = props as RefEmitDedupProps & Record<string, unknown>;
+    void onSave;
+    return rest;
+  })();
   const [n, setN] = useState(0);
   const save = useRef<HTMLDivElement | null>(null);
 

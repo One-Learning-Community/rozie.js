@@ -44,8 +44,8 @@ const Switch = forwardRef<SwitchHandle, SwitchProps>(function Switch(_props: Swi
     ariaLabel: _props.ariaLabel ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { modelValue, disabled, readonly, ariaLabel, defaultValue, onModelValueChange, defaultModelValue, ...rest } = _props as SwitchProps & Record<string, unknown>;
-    void modelValue; void disabled; void readonly; void ariaLabel; void defaultValue; void onModelValueChange; void defaultModelValue;
+    const { modelValue, disabled, readonly, ariaLabel, defaultValue, onModelValueChange, defaultModelValue, onChange, ...rest } = _props as SwitchProps & Record<string, unknown>;
+    void modelValue; void disabled; void readonly; void ariaLabel; void defaultValue; void onModelValueChange; void defaultModelValue; void onChange;
     return rest;
   })();
   const [modelValue, setModelValue] = useControllableState({

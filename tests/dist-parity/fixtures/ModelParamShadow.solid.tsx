@@ -10,7 +10,7 @@ interface ModelParamShadowProps {
 }
 
 export default function ModelParamShadow(_props: ModelParamShadowProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, ['token']);
+  const [local, attrs] = splitProps(_props, ['token', 'onVerify']);
 
   const [token, setToken] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'token', '');
   const [status, setStatus] = createSignal('');
