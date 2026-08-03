@@ -108,6 +108,9 @@ const HTML_TO_JSX_ATTR: Readonly<Record<string, string>> = {
   autofocus: 'autoFocus',
   autocomplete: 'autoComplete',
   autocapitalize: 'autoCapitalize',
+  // Quick 260802-v1v seam 5 — @types/react@18.3.28:2952 and @19.2.14:2833
+  // both declare `autoCorrect?: string` and NO lowercase `autocorrect`.
+  autocorrect: 'autoCorrect',
   inputmode: 'inputMode',
   enterkeyhint: 'enterKeyHint',
   formaction: 'formAction',

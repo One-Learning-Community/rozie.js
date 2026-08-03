@@ -129,6 +129,6 @@ Focus a cell (`Tab` or click), then drive the input from the keyboard. Typing a 
 
 - The container is a `role="group"` with the `ariaLabel` you supply as its `aria-label`; each cell is a native `<input maxlength="1">` carrying an ordinal `aria-label` (`"Digit 1 of 6"`).
 - The first cell sets `autocomplete="one-time-code"`, so mobile browsers offer to autofill a code received over SMS; the remaining cells set `autocomplete="off"`.
-- `type="numeric"` sets `inputmode="numeric"` for a numeric soft keyboard; `'alphanumeric'` / `'text'` use `inputmode="text"`. `autocapitalize` is disabled on every cell. (`autocorrect` / `spellcheck` are NOT currently set — a prior revision of this page claimed otherwise; that was inaccurate. Authoring them exposed two pre-existing per-target attribute-map bugs — React has no `autocorrect` mapping and Solid's `spellcheck` mapping targets the wrong casing — tracked as an emitter fix, not an Otp.rozie change.)
+- `type="numeric"` sets `inputmode="numeric"` for a numeric soft keyboard; `'alphanumeric'` / `'text'` use `inputmode="text"`. `autocapitalize`, `autocorrect`, and `spellcheck` are all disabled on every cell.
 - `mask` switches the cells to `type="password"` so a sensitive code renders as dots while keeping the same keyboard and ARIA behaviour.
 - Focus choreography reads a **single container ref** and walks `root.querySelectorAll('input')` — which reaches the cells inside Lit's shadow root too — and runs only in post-mount handlers, so it is identical on all six targets.

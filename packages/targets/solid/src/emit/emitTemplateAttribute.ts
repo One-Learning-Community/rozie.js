@@ -144,7 +144,12 @@ const HTML_TO_SOLID_ATTR: Readonly<Record<string, string>> = {
   minlength: 'minLength',
   for: 'for',           // Solid: <label for="..."> stays as `for`
   contenteditable: 'contentEditable',
-  spellcheck: 'spellCheck',
+  // Quick 260802-v1v seam 5 — solid-js@1.9.12/types/jsx.d.ts:1233 declares
+  // lowercase `spellcheck` and NO `spellCheck`. Native-lowercase passthrough,
+  // same pattern as the `autocapitalize` entry one line below. Do NOT
+  // "helpfully" re-camelCase this to match React's HTML_TO_JSX_ATTR — Solid's
+  // JSX intrinsics disagree with React's here.
+  spellcheck: 'spellcheck',
   autofocus: 'autofocus',
   autocomplete: 'autocomplete',
   autocapitalize: 'autocapitalize',
@@ -326,7 +331,9 @@ const RBIND_HTML_TO_SOLID_ATTR: Readonly<Record<string, string>> = {
   colspan: 'colSpan',
   rowspan: 'rowSpan',
   contenteditable: 'contentEditable',
-  spellcheck: 'spellCheck',
+  // Quick 260802-v1v seam 5 — same native-lowercase correction as
+  // HTML_TO_SOLID_ATTR above; solid-js's jsx.d.ts has no `spellCheck`.
+  spellcheck: 'spellcheck',
   crossorigin: 'crossOrigin',
   inputmode: 'inputMode',
   enterkeyhint: 'enterKeyHint',

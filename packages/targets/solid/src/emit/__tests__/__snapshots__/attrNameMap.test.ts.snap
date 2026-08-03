@@ -2,12 +2,12 @@
 
 exports[`emitTemplateAttribute (Solid) — HTML_TO_SOLID_ATTR name map (Quick 260802-v1v seam 5) > autocorrect / spellcheck / autocapitalize on a static <input> 1`] = `
 "<>
-      <input autocorrect="off" spellCheck="false" autocapitalize="off" {...attrs} data-rozie-s-8fd6d49e="" />
+      <input autocorrect="off" spellcheck="false" autocapitalize="off" {...attrs} data-rozie-s-8fd6d49e="" />
     </>"
 `;
 
 exports[`emitTemplateAttribute (Solid) — HTML_TO_SOLID_ATTR name map (Quick 260802-v1v seam 5) > r-bind literal covers the same map (RBIND_HTML_TO_SOLID_ATTR:329) 1`] = `
 "<>
-      <input {...{ spellCheck: false }} {...attrs} data-rozie-s-8fd6d49e="" />
+      <input {...{ spellcheck: false }} {...attrs} data-rozie-s-8fd6d49e="" />
     </>"
 `;

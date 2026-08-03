@@ -1,7 +1,7 @@
 <template>
 
 <div :class="['rozie-otp', { 'rozie-otp--disabled': props.disabled }]" ref="rootRef" role="group" :aria-label="props.ariaLabel" v-bind="$attrs">
-  <input v-for="cell in cells()" :key="cell.i" class="rozie-otp-cell" :type="cellType()" :inputmode="cellInputMode()" maxlength="1" autocapitalize="off" :autocomplete="cellAutocomplete(cell.i)" :value="cell.ch" :placeholder="props.placeholder" :disabled="!!props.disabled" :aria-label="cellAriaLabel(cell.i)" :data-filled="cell.ch ? 'true' : undefined" @input="onInput(cell.i, $event)" @keydown="onKeydown(cell.i, $event)" @paste="onPaste(cell.i, $event)" @focus="onFocus($event)" @pointerup="onPointerUp($event)" />
+  <input v-for="cell in cells()" :key="cell.i" class="rozie-otp-cell" :type="cellType()" :inputmode="cellInputMode()" maxlength="1" autocapitalize="off" autocorrect="off" spellcheck="false" :autocomplete="cellAutocomplete(cell.i)" :value="cell.ch" :placeholder="props.placeholder" :disabled="!!props.disabled" :aria-label="cellAriaLabel(cell.i)" :data-filled="cell.ch ? 'true' : undefined" @input="onInput(cell.i, $event)" @keydown="onKeydown(cell.i, $event)" @paste="onPaste(cell.i, $event)" @focus="onFocus($event)" @pointerup="onPointerUp($event)" />
 </div>
 
 </template>
