@@ -79,5 +79,4 @@ handle?.clear();
 
 ## Slots
 
-| Slot | Params |
-| --- | --- |
+This component declares no slots.

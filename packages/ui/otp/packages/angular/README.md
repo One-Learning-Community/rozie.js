@@ -109,5 +109,4 @@ export class DemoComponent {
 
 ## Slots
 
-| Slot | Params |
-| --- | --- |
+This component declares no slots.

@@ -418,12 +418,17 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   // Slots
   lines.push('## Slots');
   lines.push('');
-  lines.push('| Slot | Params |');
-  lines.push('| --- | --- |');
-  for (const s of ir.slots) {
-    lines.push(`| ${renderSlotName(s.name)} | ${slotParams(s)} |`);
+  if (ir.slots.length === 0) {
+    lines.push('This component declares no slots.');
+    lines.push('');
+  } else {
+    lines.push('| Slot | Params |');
+    lines.push('| --- | --- |');
+    for (const s of ir.slots) {
+      lines.push(`| ${renderSlotName(s.name)} | ${slotParams(s)} |`);
+    }
+    lines.push('');
   }
-  lines.push('');
 
   return lines.join('\n');
 }

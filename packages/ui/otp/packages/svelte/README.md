@@ -79,5 +79,4 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 
 ## Slots
 
-| Slot | Params |
-| --- | --- |
+This component declares no slots.

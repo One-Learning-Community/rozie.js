@@ -82,5 +82,4 @@ const otp = ref();          // template ref
 
 ## Slots
 
-| Slot | Params |
-| --- | --- |
+This component declares no slots.
