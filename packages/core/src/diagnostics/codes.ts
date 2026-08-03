@@ -579,6 +579,25 @@ export const RozieErrorCode = {
   // complement, which ROZ978 does not cover.
   // ROZ208 is the next free code after ROZ207 in the 200 reactive-state cluster.
   DATA_INIT_SIGIL_NOT_LOWERED: 'ROZ208', // error — a `$refs`/`$slots` member access inside a `<data>` initializer. Neither is meaningful at init time (nothing has mounted yet). Seed from `$refs` in `$onMount` instead: `$onMount(() => { $data.x = $refs.y })`.
+  // Quick 260803-ibt WR-03 — an `$emit` event name that cannot lower to a
+  // valid JS identifier. Emit names flow into a per-target destructure
+  // pattern (`const { on<Name>: handler, ...rest } = $props`) and a `void
+  // on<Name>;` statement (React's handler-fallthrough skip list). A
+  // colon-bearing name (`$emit('update:foo')` — the Vue two-way-binding
+  // convention, which Rozie does NOT special-case; two-way binding is
+  // `model: true` props, verified against
+  // `collectors/collectScriptDecls.ts:344` and `react/emitScript.ts` before
+  // this code was added) produces VALID JS that SILENTLY RENAMES
+  // (`{ onUpdate:foo }` destructures `onUpdate` into local `foo`); a
+  // dot-bearing name (`$emit('a.b')`) produces a SyntaxError. Constrained to
+  // `/^[a-zA-Z][a-zA-Z0-9_-]*$/` (kebab-case and snake_case both legal — the
+  // charset used by every existing `packages/ui/*` family emit name).
+  // ROZ209 confirmed free repo-wide before use (next free code after ROZ208
+  // in the 200 reactive-state cluster — a semantic-charset check, not a
+  // reactive-state check, but ROZ209..ROZ298 was the first open gap at plan
+  // time and this cluster's numbering is sequential-allocation, not
+  // topically partitioned beyond the 100/200/300 severity bands).
+  EMIT_NAME_INVALID_IDENTIFIER: 'ROZ209', // error — an `$emit` event name that is not `/^[a-zA-Z][a-zA-Z0-9_-]*$/` (e.g. `update:foo`, `a.b`). Cannot lower to a safe destructure/void-statement target on every emit-consuming code path. Use a `model: true` prop for two-way binding instead of Vue's `update:x` convention.
 
   // ---- Warnings (Phase 2 Plan 02) — ROZ300..ROZ399 ----
   RFOR_MISSING_KEY: 'ROZ300', // SEM-03: r-for without :key

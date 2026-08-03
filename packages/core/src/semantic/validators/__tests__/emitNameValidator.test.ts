@@ -191,3 +191,88 @@ describe('emitNameValidator — multi-positional-arg $emit (ROZ145)', () => {
     expect(compile(src, { target: 'lit' }).diagnostics.some((d) => d.code === 'ROZ145')).toBe(true);
   });
 });
+
+// Quick 260803-ibt WR-03 — ROZ209 EMIT_NAME_INVALID_IDENTIFIER.
+//
+// An `$emit` event name that cannot lower to a valid JS identifier
+// (`/^[a-zA-Z][a-zA-Z0-9_-]*$/`). A colon-bearing name (Vue's `update:x`
+// two-way-binding convention — NOT special-cased by Rozie, which lowers
+// two-way binding through `model: true` props instead) produces VALID JS
+// that SILENTLY RENAMES via destructuring; a dot-bearing name produces a
+// SyntaxError. Both are loud compile errors here instead. Shares
+// emitNameValidator's three-context $emit-call walk.
+describe('emitNameValidator — invalid-identifier $emit name (ROZ209)', () => {
+  const FLAGGED_SCRIPT: Array<[string, string]> = [
+    ['colon name (Vue update:x convention)', `function fire() { $emit('update:foo') }`],
+    ['dot name', `function fire() { $emit('a.b') }`],
+    ['leading digit', `function fire() { $emit('1change') }`],
+    ['space', `function fire() { $emit('change now') }`],
+  ];
+  for (const [label, script] of FLAGGED_SCRIPT) {
+    it(`flags ${label} in <script> with exactly one ROZ209 (error)`, () => {
+      const hits = byCode(diagnose(wrap(script)), 'ROZ209');
+      expect(hits.length, JSON.stringify(hits)).toBe(1);
+      expect(hits[0]!.severity).toBe('error');
+      expect(hits[0]!.hint).toMatch(/model:\s*true/);
+    });
+  }
+
+  const CLEAN_SCRIPT: Array<[string, string]> = [
+    ['plain lowercase', `function fire() { $emit('change') }`],
+    ['kebab-case', `function fire() { $emit('item-selected') }`],
+    ['snake_case', `function fire() { $emit('item_selected') }`],
+    ['camelCase', `function fire() { $emit('dateClick') }`],
+    ['empty string (out of ROZ209 scope — ROZ122 owns this shape)', `function fire() { $emit('') }`],
+    ['dynamic name (out of scope, no false positive)', `function fire(name) { $emit(name) }`],
+  ];
+  for (const [label, script] of CLEAN_SCRIPT) {
+    it(`does NOT flag ${label}`, () => {
+      expect(byCode(diagnose(wrap(script)), 'ROZ209').length).toBe(0);
+    });
+  }
+
+  // Regression guard — every emit name actually used across the shipped
+  // component library must stay clean. Sourced via
+  // `grep -rhoE "\$emit\('[^']*'" packages/ui/*/src/**/*.rozie` at plan time.
+  const EXISTING_FAMILY_EMIT_NAMES = [
+    'action-select', 'add', 'back', 'change', 'click', 'close', 'complete',
+    'connect-end', 'connection-created', 'connection-rejected', 'connection-removed',
+    'context-menu', 'contextmenu', 'crop', 'cropend', 'cropmove', 'cropstart',
+    'datasetClick', 'dateClick', 'datesSet', 'dayCreate', 'dblclick', 'dismissed',
+    'drag', 'dragend', 'dragstart', 'edge-click', 'edge-selected', 'end', 'error',
+    'eventClick', 'eventDrop', 'eventMouseEnter', 'eventMouseLeave', 'eventResize',
+    'eventsSet', 'expire', 'findresult', 'finished', 'hover', 'idle', 'interaction',
+    'load', 'loading', 'monthChange', 'mouseenter', 'mouseleave', 'mousemove',
+    'move', 'moveend', 'navigate', 'node-action', 'node-moved', 'node-picked',
+    'open', 'pagechange', 'pagerendered', 'pagesrendered', 'passwordrequest',
+    'paused', 'pitchend', 'playing', 'pointer-down', 'progress', 'rangeComplete',
+    'reInit', 'ready', 'regionClicked', 'regionCreated', 'regionIn', 'regionOut',
+    'regionRemoved', 'regionUpdated', 'remove', 'resize', 'rotate', 'rotateend',
+    'search', 'seeking', 'select', 'selection-change', 'settle', 'sourcedata',
+    'start', 'styledata', 'timeupdate', 'translated', 'unselect', 'valueUpdate',
+    'verify', 'yearChange', 'zoom', 'zoomend',
+  ];
+  it('does NOT flag any emit name currently used across packages/ui/*/src/*.rozie', () => {
+    for (const name of EXISTING_FAMILY_EMIT_NAMES) {
+      const src = wrap(`function fire() { $emit('${name}') }`);
+      const hits = byCode(diagnose(src), 'ROZ209');
+      expect(hits.length, `unexpected ROZ209 on existing emit name "${name}"`).toBe(0);
+    }
+  });
+
+  it('fires in a template @event handler', () => {
+    const src = wrap(`function noop() {}`, `<button @click="$emit('update:foo')">go</button>`);
+    expect(byCode(diagnose(src), 'ROZ209').length).toBe(1);
+  });
+
+  it('fires in a <listeners> handler', () => {
+    const src = wrapWithListeners(``, `<listener :target="window" @resize="$emit('update:foo')" />`);
+    expect(byCode(diagnose(src), 'ROZ209').length).toBe(1);
+  });
+
+  it('compile() to react surfaces ROZ209 and does not throw', () => {
+    const src = wrap(`function fire() { $emit('update:foo') }`);
+    expect(() => compile(src, { target: 'react' })).not.toThrow();
+    expect(compile(src, { target: 'react' }).diagnostics.some((d) => d.code === 'ROZ209')).toBe(true);
+  });
+});

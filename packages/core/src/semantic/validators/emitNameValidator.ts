@@ -1,5 +1,5 @@
 /**
- * SEM — `$emit`-call shape validator (ROZ122 + ROZ145).
+ * SEM — `$emit`-call shape validator (ROZ122 + ROZ145 + ROZ209).
  *
  * Walks the three contexts where a `$emit(...)` call can appear (script /
  * template handler / listeners) and emits, per call:
@@ -8,6 +8,11 @@
  *   - ROZ145 (Spike-012 R9) — 2+ POSITIONAL payload args (`$emit('name', a, b)`),
  *     which Lit (CustomEvent single `detail`) and Angular (output single value)
  *     silently drop past the first. Pack into one object/array payload.
+ *   - ROZ209 (Quick 260803-ibt WR-03) — a NON-EMPTY event name that still
+ *     cannot lower to a valid JS identifier (colon, dot, leading digit,
+ *     whitespace, etc.). The name flows into a per-target destructure
+ *     pattern and a `void` fallthrough-skip statement; a charset violation
+ *     is either a SyntaxError or — worse — valid JS that silently renames.
  *
  * ROZ122 detail — fires when the first argument is an empty/whitespace-only
  * string literal:
@@ -70,6 +75,10 @@ interface ValidatorContext {
   diagnostics: Diagnostic[];
 }
 
+// Quick 260803-ibt WR-03 (ROZ209) — the charset an $emit event name must
+// stay within to safely lower to a JS identifier on every consuming path.
+const EMIT_NAME_VALID_IDENTIFIER_RE = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
+
 /**
  * Shift Babel-relative offsets (computed against the parsed expression
  * fragment) into absolute offsets in the .rozie file by adding `baseOffset`.
@@ -111,15 +120,38 @@ function checkCallExpression(
   }
   const first = node.arguments[0];
   if (!first || !t.isStringLiteral(first)) return; // missing or dynamic — out of scope
-  if (first.value.trim() !== '') return; // non-empty name — valid
-  ctx.diagnostics.push({
-    code: RozieErrorCode.EMIT_EMPTY_EVENT_NAME,
-    severity: 'error',
-    message:
-      '$emit requires a non-empty event name — an empty name cannot be bound by consumers on any target.',
-    loc: locFromNodeOffset(node, baseOffset),
-    hint: "Give the event a descriptive name, e.g. $emit('change', payload).",
-  });
+  if (first.value.trim() === '') {
+    ctx.diagnostics.push({
+      code: RozieErrorCode.EMIT_EMPTY_EVENT_NAME,
+      severity: 'error',
+      message:
+        '$emit requires a non-empty event name — an empty name cannot be bound by consumers on any target.',
+      loc: locFromNodeOffset(node, baseOffset),
+      hint: "Give the event a descriptive name, e.g. $emit('change', payload).",
+    });
+    return; // ROZ122 already covers this shape — ROZ209's charset check is
+    // meaningless on an empty string (would report a confusing SECOND
+    // diagnostic for the same underlying "no usable name" problem).
+  }
+  // Quick 260803-ibt WR-03 (ROZ209) — the event name must lower to a valid
+  // JS identifier everywhere it is used: a per-target destructure pattern
+  // (`const { on<Name>: handler, ...rest } = $props`) and a `void
+  // on<Name>;` fallthrough-skip statement. A colon (`update:foo`, Vue's
+  // two-way-binding convention — NOT a lowering Rozie recognizes; two-way
+  // binding is `model: true` props) produces valid-but-SILENTLY-RENAMING JS
+  // (`{ onUpdate:foo }` destructures `onUpdate` into local `foo`); a dot
+  // (`a.b`) produces a SyntaxError. Charset: leading letter, then
+  // letters/digits/hyphen/underscore — kebab-case and snake_case both legal
+  // (the charset every existing `packages/ui/*` family emit name uses).
+  if (!EMIT_NAME_VALID_IDENTIFIER_RE.test(first.value)) {
+    ctx.diagnostics.push({
+      code: RozieErrorCode.EMIT_NAME_INVALID_IDENTIFIER,
+      severity: 'error',
+      message: `$emit event name "${first.value}" cannot lower to a valid JS identifier — it flows into a destructure pattern and a void statement on every emit-consuming code path.`,
+      loc: locFromNodeOffset(node, baseOffset),
+      hint: 'Use letters, digits, hyphens, or underscores, starting with a letter (e.g. "item-selected"). For two-way binding, use a `model: true` prop instead of a Vue-style `update:x` emit name.',
+    });
+  }
 }
 
 /**
