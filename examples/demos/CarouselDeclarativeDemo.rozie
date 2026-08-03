@@ -1,0 +1,135 @@
+<!--
+  CarouselDeclarativeDemo.rozie — BEHAVIORAL consumer for Embla Carousel's
+  declarative slide-source mode (mode b).
+
+  260802-tmo, Task 2: mode b — the consumer drops `.rozie-embla__slide` DOM
+  directly into the default slot, with NO `:slides` prop — is a documented
+  headline capability (`docs/components/embla.md` "two slide-source modes",
+  `docs/components/embla-comparison.md`'s "Config-array AND declarative
+  slides ✅" row), but had ZERO test coverage before this task. Both existing
+  demos (CarouselDemo, CarouselScreenshotDemo, CarouselNavScreenshotDemo) use
+  config-array mode exclusively.
+
+  The `.rozie-embla__slide` class on each child is REQUIRED, not decorative:
+  Carousel.rozie pins Embla's `slides` option to that exact selector
+  (`Carousel.rozie:280`) so both modes measure consistently and Lit's phantom
+  trailing-<slot> child doesn't get miscounted as a slide. A consumer who
+  drops unclassed children into the default slot gets zero measured slides.
+
+  Same `.slide-body` fixed-width styling as CarouselDemo.rozie, so Embla's
+  measured-width drag/scroll math stays deterministic. Same uniform two-way
+  driver (`next-model` writes `$data.idx` directly; the model write flows
+  through the echo-guarded `$watch` → `embla.scrollTo` → the `select` echo →
+  the bound readout climbs) — see embla-carousel.spec.ts,
+  `embla-carousel-declarative`.
+-->
+
+<rozie name="CarouselDeclarativeDemo">
+
+<components>
+{
+  Carousel: '../../packages/ui/embla/src/Carousel.rozie',
+}
+</components>
+
+<data>
+{
+  idx: 0,
+}
+</data>
+
+<script>
+// Four fixed-content slides — declarative mode: rendered directly as children,
+// NOT passed via :slides. Fixed-width .slide-body (below) keeps Embla's
+// measured-width math deterministic, same as CarouselDemo.rozie.
+const SLIDES = ['Alpha', 'Beta', 'Gamma', 'Delta']
+
+// The UNIFORM two-way driver — identical shape to CarouselDemo.rozie's
+// nextModel: direct $data.idx write → echo-guarded $watch → embla.scrollTo →
+// the `select` echo updates $data.idx, so the readout climbs.
+const nextModel = () => { $data.idx = Math.min($data.idx + 1, SLIDES.length - 1) }
+</script>
+
+<template>
+<div class="carousel-declarative-demo" data-testid="carousel-declarative-host">
+  <h3>Carousel — declarative (mode b)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="next-model" @click="nextModel">Next (model)</button>
+    <span class="readout" data-testid="readout-index">{{ $data.idx }}</span>
+  </div>
+
+  <!-- NO :slides prop — mode b only. Each child MUST carry
+       class="rozie-embla__slide": Carousel.rozie pins Embla's `slides` option
+       to that selector (:280), so unclassed children are not measured. -->
+  <Carousel r-model:selectedIndex="$data.idx" :loop="false" :draggable="true">
+    <div
+      r-for="slide, i in SLIDES"
+      :key="slide"
+      class="rozie-embla__slide"
+      :data-slide-index="i"
+    >
+      <div class="slide-body" :data-slide-index="i">{{ slide }}</div>
+    </div>
+  </Carousel>
+</div>
+</template>
+
+<style>
+.carousel-declarative-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+}
+.carousel-declarative-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 2ch;
+}
+/* Declarative-mode slides are PARENT-authored (default-slot projected), so
+   Carousel.rozie's own scoped `.rozie-embla__slide { flex: 0 0 100%; }` rule
+   (Carousel.rozie's <style>) does NOT reach them — scoped-CSS attributes tag
+   the element's OWNING template, and these slide wrappers are owned by this
+   demo, not by Carousel.rozie. Without this rule the wrapper has no forced
+   width, .slide-body's `flex:` below has no flex-container parent to act on,
+   and Embla measures near-zero slide widths (transform never moves). Mirror
+   Carousel.rozie's own rule verbatim so the declarative-mode fixture is
+   equally deterministic. */
+.rozie-embla__slide { flex: 0 0 100%; min-width: 0; }
+/* Fixed-width slides → deterministic Embla drag/scroll math. */
+.slide-body {
+  flex: 0 0 100%;
+  min-width: 0;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  background: #6d28d9;
+  border-radius: 8px;
+}
+.slide-body[data-slide-index="1"] { background: #0891b2; }
+.slide-body[data-slide-index="2"] { background: #ca8a04; }
+.slide-body[data-slide-index="3"] { background: #be185d; }
+</style>
+
+</rozie>

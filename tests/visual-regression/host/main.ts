@@ -491,6 +491,12 @@ export const EXAMPLES = [
   // Built-in carousel navigation (dots + arrows + synced thumbnail strip) — the
   // content-STABLE pixel cell (loader → examples/demos/CarouselNavScreenshotDemo.rozie).
   'CarouselNavScreenshot',
+  // 260802-tmo Task 2 — declarative (mode b) slide-source coverage. BEHAVIORAL
+  // cell (loader → examples/demos/CarouselDeclarativeDemo.rozie): NO :slides
+  // prop, four `.rozie-embla__slide` children dropped directly into the
+  // default slot. Not a screenshot cell — deliberately NOT in matrix.spec.ts
+  // EXAMPLES. See embla-carousel.spec.ts, `embla-carousel-declarative`.
+  'CarouselDeclarative',
   // @rozie-ui/listbox (pure-Rozie WAI-ARIA listbox/combobox, NO engine) — the
   // BEHAVIORAL cell (loader → examples/demos/ListboxBehaviorDemo.rozie, which
   // imports ../../packages/ui/listbox/src/Listbox.rozie). It drives single-select
@@ -1272,6 +1278,12 @@ export const LIT_TAGS: Record<Example, string> = {
   Carousel: 'rozie-carousel',
   CarouselScreenshot: 'rozie-carousel-screenshot',
   CarouselNavScreenshot: 'rozie-carousel-nav-screenshot',
+  // 260802-tmo Task 2 — entry.lit.ts appends '-demo' itself (isDemo branch,
+  // :43) → tag 'rozie-carousel-declarative-demo' = kebab of
+  // CarouselDeclarativeDemo. Verified against the emitted Lit output
+  // (customElements.define target in the built CarouselDeclarativeDemo.rozie
+  // chunk).
+  CarouselDeclarative: 'rozie-carousel-declarative',
   // @rozie-ui/listbox — '-demo' appended → tag 'rozie-listbox-behavior-demo' =
   // kebab of ListboxBehaviorDemo (the wrapper component is name="Listbox" →
   // 'rozie-listbox'). Behavioral-only, no screenshot cell.
@@ -1700,6 +1712,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   Carousel: {},
   CarouselScreenshot: {},
   CarouselNavScreenshot: {},
+  // CarouselDeclarativeDemo is self-contained: seeds idx:0 in <data>, SLIDES in
+  // <script>, binds r-model:selectedIndex internally. No parent props.
+  CarouselDeclarative: {},
   // @rozie-ui/listbox — ListboxBehaviorDemo is self-contained: it seeds OPTIONS in
   // <script> + value:null in <data> and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.

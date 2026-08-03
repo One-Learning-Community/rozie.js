@@ -289,3 +289,78 @@ for (const target of TARGETS) {
     expect(pageErrors.join('\n')).toBe('');
   });
 }
+
+/**
+ * Declarative (mode b) slide coverage (260802-tmo, Task 2) — mode b is a
+ * documented headline capability (embla.md "two slide-source modes",
+ * embla-comparison.md's "Config-array AND declarative slides ✅" row) with
+ * ZERO test coverage before this task. `CarouselDeclarativeDemo.rozie` passes
+ * NO `:slides` prop; four `.rozie-embla__slide` children are dropped directly
+ * into the default slot.
+ *
+ * D4 — VERIFIED (not just predicted): on Lit the four `.rozie-embla__slide`
+ * divs DO mount as light-DOM children of the nested `<rozie-carousel>`
+ * element (assertion 1 passes — Playwright's CSS locator pierces the shadow
+ * boundary and counts 4), and `next-model` does write the bound index
+ * (assertion 2 passes). But the container transform never moves (assertion 3
+ * is the load-bearing RED): `rozie-carousel`'s shadow root
+ * `.rozie-embla__container` renders only `<slot></slot>` — the assigned
+ * light-DOM nodes are not DESCENDANTS of that element in the DOM-tree sense,
+ * so Embla's internal `container.querySelectorAll('.rozie-embla__slide')`
+ * (Carousel.rozie:280) sees zero slides and the engine never lays out.
+ * Verified live via direct shadow-root inspection (not source-read).
+ *
+ * Resolving this needs `assignedElements()`-based slide discovery at the Lit
+ * slot lowering — an ARCHITECTURE change, not a Carousel.rozie edit. See
+ * .planning/quick/260802-tmo-embla-013-fixes/EMITTER-FINDINGS.md (D4). NOT a
+ * silent skip — delete this gate (and the title-scoped `test.fixme` route
+ * below) when that lands.
+ */
+const DECLARATIVE_KNOWN_FAILING = new Set<typeof TARGETS[number]>(['lit']);
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner =
+    !built || DECLARATIVE_KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`embla-carousel-declarative [${target}]: default-slot slide DOM mounts and drives the engine`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CarouselDeclarative&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    // ---- 1. the four declarative-mode slide children mounted ----
+    await expect
+      .poll(async () => page.locator('.rozie-embla__slide').count(), {
+        timeout: 15_000,
+      })
+      .toBe(4);
+
+    // ---- 2. next-model drives the engine (the light-DOM slides were
+    //      actually measured, not just rendered) ----
+    const readout = page.getByTestId('readout-index');
+    await page.getByTestId('next-model').click();
+    await expect
+      .poll(async () => Number((await readout.textContent())?.trim() ?? '0'), {
+        timeout: 10_000,
+        intervals: [100, 200, 400, 800],
+      })
+      .toBeGreaterThan(0);
+
+    // ---- 3. the container transform moved off origin ----
+    const container = page.locator('.rozie-embla__container').first();
+    const tx = async () => {
+      const m = await container.evaluate(
+        (el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41,
+      );
+      return m;
+    };
+    await expect
+      .poll(async () => Math.abs(await tx()), {
+        timeout: 10_000,
+        intervals: [100, 200, 400, 800],
+      })
+      .toBeGreaterThan(20);
+  });
+}
