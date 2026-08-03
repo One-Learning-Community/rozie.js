@@ -1,6 +1,6 @@
 # Components
 
-The `@rozie-ui` families are Rozie's flagship demonstration: pre-compiled, per-framework component packages where **one `.rozie` source compiles to idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers**. Most wrap a battle-tested vanilla-JS engine whose existing framework wrappers are uneven, partial, or — for Lit and friends — entirely missing. Two newer families (**Listbox** and **Slider**) carry no engine at all: they are headless, fully-accessible components authored from scratch in a single `.rozie` file, proving Rozie carries rich interaction on its own.
+The `@rozie-ui` families are Rozie's flagship demonstration: pre-compiled, per-framework component packages where **one `.rozie` source compiles to idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers**. Most wrap a battle-tested vanilla-JS engine whose existing framework wrappers are uneven, partial, or — for Lit and friends — entirely missing. Thirteen families (**Listbox**, **Slider**, **Combobox**, **CommandPalette**, and friends) carry no engine at all: they are headless, fully-accessible components authored from scratch in a single `.rozie` file, proving Rozie carries rich interaction on its own.
 
 Consumers install only the package for their framework. No Rozie toolchain, no build-time compile step, no `@rozie/*` runtime dependency — just the compiled output for the framework they already use.
 
@@ -76,7 +76,7 @@ Authored from scratch in a single `.rozie` file — no third-party engine, fully
 | **Tags** | *(no engine)* headless accessible token / tags input | [/components/tags](/components/tags) |
 | **NumberField** | *(no engine)* headless accessible number field / stepper | [/components/number-field](/components/number-field) |
 | **Pagination** | *(no engine)* headless accessible pagination | [/components/pagination](/components/pagination) |
-| **DatePicker** | *(no engine)* headless accessible single-date calendar | [/components/date-picker](/components/date-picker) |
+| **DatePicker** | *(no engine)* headless accessible calendar (single + range modes) | [/components/date-picker](/components/date-picker) |
 | **Switch** | *(no engine)* headless accessible toggle / switch | [/components/switch](/components/switch) |
 | **Resizable** | *(no engine)* headless accessible two-panel splitter / resizable pane | [/components/resizable](/components/resizable) |
 | **CommandPalette** | *(no engine)* headless accessible cmdk-style command menu | [/components/command-palette](/components/command-palette) |
