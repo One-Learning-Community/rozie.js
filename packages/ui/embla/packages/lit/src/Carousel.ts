@@ -130,7 +130,7 @@ export default class Carousel extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) containScroll: string = 'trimSnaps';
   /**
-   * Initial snap index the carousel starts at (the Embla `startIndex` option). Runtime-updatable.
+   * Initial snap index the carousel starts at (the Embla `startIndex` option). Init-only — to move after mount use the `scrollToIndex()` handle verb or the `selectedIndex` model.
    */
   @property({ type: Number, reflect: true }) startIndex: number = 0;
   /**
@@ -366,7 +366,7 @@ private __rozieFirstUpdateDone = false;
   updated(changedProperties: Map<string, unknown>): void {
     if (this.__rozieFirstUpdateDone && (changedProperties.has('loop') || changedProperties.has('align') || changedProperties.has('axis') || changedProperties.has('slidesToScroll') || changedProperties.has('dragFree') || changedProperties.has('draggable') || changedProperties.has('containScroll') || changedProperties.has('skipSnaps') || changedProperties.has('duration') || changedProperties.has('direction'))) { const __watchVal = (() => [this.loop, this.align, this.axis, this.slidesToScroll, this.dragFree, this.draggable, this.containScroll, this.skipSnaps, this.duration, this.direction].join('|'))(); (() => this.embla?.reInit(this.reinitOptions()))(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('autoplay') || changedProperties.has('autoplayDelay'))) { const __watchVal = (() => `${this.autoplay}|${this.autoplayDelay}`)(); (() => this.embla?.reInit(this.reinitOptions(), this.emblaPluginsFromProps()))(); }
-    if (changedProperties.has('slides')) { const __watchVal = (() => this.slides.length)(); if (!this.__rozieFirstUpdateDone) { this.__rozieWatchPrev_3 = __watchVal; } else if (__watchVal !== this.__rozieWatchPrev_3) { this.__rozieWatchPrev_3 = __watchVal; (() => {
+    if (changedProperties.has('slides')) { const __watchVal = (() => this.slides.length)(); if (!this.__rozieFirstUpdateDone) { this.__rozieWatchPrev_3 = __watchVal; } else if (!Object.is(__watchVal, this.__rozieWatchPrev_3)) { this.__rozieWatchPrev_3 = __watchVal; (() => {
       this.embla?.reInit(this.reinitOptions());
       this.emblaThumbs?.reInit(this.thumbsOptionsFromProps());
       this.syncNav();

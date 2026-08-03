@@ -1,5 +1,16 @@
 # @rozie/core
 
+## 0.3.1
+
+### Patch Changes
+
+- **Fixed:** slot params that resolve to a script function are typed callable again (`(...args: any[]) => any`), reversing the 0.3.0 regression that typed documented render-prop callbacks (`toggle`, `retry`, `setFilter`, …) as `unknown` in the published `.d.ts`. `r-for` loop vars correctly remain `unknown` — that half of the 0.3.0 change was right and is unchanged. (`inferParamType`/`renderPropsInterface` — consumed by all six targets' `emitTypes.ts`.)
+- **Fixed:** Lit no longer swallows a static `key="…"` attribute — the strip is now narrowed to the binding form (`:key="expr"`), matching the Svelte/Angular filter shape. A bound `r-for` loop key is still consumed by `repeat()`'s key function, never emitted as a DOM attribute.
+- **Fixed:** Lit derived-`$watch` NaN comparison now matches React (`Object.is`) — a NaN-valued derived getter no longer re-fires the watch callback on every cycle the base prop's setter ran.
+- **Fixed:** Lit `:class` bound to a null-defaulted prop drops the attribute instead of rendering `class="null"`, matching React/Vue.
+- **Added:** `ROZ209` — an `$emit` event name that cannot lower to a valid JS identifier (e.g. `update:foo`, `a.b`) is now a compile error, with a hint pointing two-way-binding authors at a `model: true` prop instead of Vue's `update:x` convention.
+- **Note (0.3.0 behavior change, documented late — no further behavior change in this release):** React `$watch` dep arrays for a derived member-chain getter now evaluate the getter's chain eagerly, including on first render — crash-parity with Vue/Solid/Svelte/Angular. See the [`$watch` guide](https://github.com/rozie-js/rozie/blob/main/docs/guide/features.md#watch-getter-cb--react-to-value-transitions) for the consumer-facing note.
+
 ## 0.3.0
 
 ### Minor Changes

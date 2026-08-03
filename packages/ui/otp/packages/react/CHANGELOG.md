@@ -1,5 +1,11 @@
 # @rozie-ui/otp-react
 
+## 0.1.4
+
+### Patch Changes
+
+- The vendored `internal/otpWrite.ts` write model (IN-04) now early-returns `null` from `planWrite` at the degenerate `length: 0` boundary instead of computing `landed: -1` (a boundary violation of the documented `OtpWrite.landed` contract; unreachable through this component with a sane `length`, but this is an exported pure function with its own test suite). No observable runtime behavior change for a correctly-configured `Otp`; no API surface change.
+
 ## 0.1.3
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/data-table-react
 
+## 0.2.4
+
+### Patch Changes
+
+- Regenerated against `@rozie/core@0.3.1`. The public `.d.ts` no longer types `applyGrouping`/`clearGrouping` (on `renderGroupBar`), `toggle` (on `renderSelectAll`), or `setFilter` (on `renderFilter`) as `unknown` — all four resolve to top-level script functions and now type callable (`(...args: any[]) => any`), reversing the 0.3.0 regression that broke a strict-TS consumer calling `setFilter` per the documented API. No runtime behavior change; type surface only.
+
 ## 0.2.3
 
 ### Patch Changes

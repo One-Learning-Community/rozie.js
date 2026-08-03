@@ -70,7 +70,7 @@ const props = withDefaults(
      */
     containScroll?: string;
     /**
-     * Initial snap index the carousel starts at (the Embla `startIndex` option). Runtime-updatable.
+     * Initial snap index the carousel starts at (the Embla `startIndex` option). Init-only — to move after mount use the `scrollToIndex()` handle verb or the `selectedIndex` model.
      */
     startIndex?: number;
     /**

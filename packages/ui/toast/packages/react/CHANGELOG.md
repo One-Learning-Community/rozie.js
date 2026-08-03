@@ -1,5 +1,11 @@
 # @rozie-ui/toast-react
 
+## 0.1.3
+
+### Patch Changes
+
+- Regenerated against `@rozie/core@0.3.1`. The public `.d.ts` no longer types the `dismiss` slot-context param (on `renderToast`) as `unknown` — it resolves to a top-level script function and now types callable (`(...args: any[]) => any`), reversing the 0.3.0 regression that broke a strict-TS consumer calling `dismiss` from a custom toast render prop. No runtime behavior change; type surface only.
+
 ## 0.1.2
 
 ### Patch Changes

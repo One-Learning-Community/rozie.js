@@ -24,7 +24,7 @@ export interface SwitchProps {
    */
   ariaLabel?: (string) | null;
   onChange?: (...args: unknown[]) => void;
-  children?: ReactNode | ((params: { checked: unknown; toggle: unknown }) => ReactNode);
+  children?: ReactNode | ((params: { checked: unknown; toggle: (...args: any[]) => any }) => ReactNode);
   slots?: Record<string, () => ReactNode>;
 }
 

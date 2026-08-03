@@ -32,7 +32,7 @@ export interface ToasterProps {
    */
   stacked?: boolean;
   onDismissed?: (...args: unknown[]) => void;
-  renderToast?: (params: { toast: unknown; dismiss: unknown }) => ReactNode;
+  renderToast?: (params: { toast: unknown; dismiss: (...args: any[]) => any }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

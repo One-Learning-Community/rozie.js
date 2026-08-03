@@ -1,5 +1,11 @@
 # @rozie-ui/embla-react
 
+## 0.1.4
+
+### Patch Changes
+
+- Regenerated against `@rozie/core@0.3.1`. The public `.d.ts`'s `renderSlide`/`renderThumb` params are unaffected (`slide`/`index` are `r-for` loop vars, correctly still `unknown`) — no CR-02-attributable change to this leaf's slot-callable types. The `startIndex` prop's JSDoc now correctly says "Init-only" instead of the stale "Runtime-updatable" (WR-01) — the D1 init-only contract shipped in 0.1.3, but the prop's own doc comment (copied verbatim into the `.d.ts` and IDE hover) was missed. No runtime behavior change.
+
 ## 0.1.3
 
 ### Patch Changes

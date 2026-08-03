@@ -101,13 +101,13 @@ export interface CommandPaletteProps {
   onBack?: (...args: unknown[]) => void;
   onSelect?: (...args: unknown[]) => void;
   onActionSelect?: (...args: unknown[]) => void;
-  renderBreadcrumb?: (params: { stack: unknown; back: unknown }) => ReactNode;
+  renderBreadcrumb?: (params: { stack: unknown; back: (...args: any[]) => any }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown; matches: unknown }) => ReactNode;
   renderGroupHeading?: (params: { group: unknown }) => ReactNode;
   renderEmpty?: (params: { query: string }) => ReactNode;
   renderArgsField?: (params: { item: unknown; arg: unknown; value: unknown; setValue: unknown }) => ReactNode;
   renderLoading?: (params: { query: string }) => ReactNode;
-  renderError?: (params: { query: string; error: unknown; retry: unknown }) => ReactNode;
+  renderError?: (params: { query: string; error: unknown; retry: (...args: any[]) => any }) => ReactNode;
   renderFooter?: () => ReactNode;
   renderActionItem?: (params: { action: unknown; item: unknown; active: unknown; disabled: unknown }) => ReactNode;
   renderIcon?: (params: { option: unknown }) => ReactNode;

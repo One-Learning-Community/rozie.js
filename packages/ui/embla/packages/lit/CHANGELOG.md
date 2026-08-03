@@ -1,5 +1,11 @@
 # @rozie-ui/embla-lit
 
+## 0.1.4
+
+### Patch Changes
+
+- Regenerated against `@rozie/core@0.3.1`. The `.length` derived `$watch` now compares with `Object.is` instead of strict `!==` (IN-02) — a NaN-valued derived getter (not reachable through this component's own `slides.length` shape today, but a real emitter parity fix) no longer re-fires the reInit/thumb-sync callback on every cycle the base `slides` property's setter ran; this matches React's existing `Object.is` dep-array comparison. The `startIndex` prop's JSDoc now correctly says "Init-only" instead of the stale "Runtime-updatable" (WR-01). No observable runtime behavior change for this component's actual usage (its watched value is never NaN); no API surface change.
+
 ## 0.1.3
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/command-palette-react
 
+## 0.4.3
+
+### Patch Changes
+
+- Regenerated against `@rozie/core@0.3.1`. The public `.d.ts` no longer types the `back` slot-context param (on `renderBreadcrumb`) or the `retry` slot-context param (on `renderError`) as `unknown` — both resolve to a top-level script function and now type callable (`(...args: any[]) => any`), reversing the 0.3.0 regression that broke a strict-TS consumer following the documented render-prop pattern. No runtime behavior change; type surface only.
+
 ## 0.4.2
 
 ### Patch Changes

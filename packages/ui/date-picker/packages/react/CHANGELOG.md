@@ -1,5 +1,11 @@
 # @rozie-ui/date-picker-react
 
+## 0.1.4
+
+### Patch Changes
+
+- Regenerated against `@rozie/core@0.3.1`. The public `.d.ts` no longer types `prev`/`next` (on `renderHeader`), `today`/`clear` (on `renderFooter`), or `apply` (on `renderPresets`) as `unknown` — all five resolve to top-level script functions and now type callable (`(...args: any[]) => any`), reversing the 0.3.0 regression that broke a strict-TS consumer using these render-prop callbacks. No runtime behavior change; type surface only.
+
 ## 0.1.3
 
 ### Patch Changes

@@ -65,6 +65,15 @@ export interface OtpWrite {
 export function planWrite(code: string, length: number, type: OtpType, index: number, text: string): OtpWrite | null {
   const chars = sanitize(type, text);
   if (chars.length === 0) return null;
+  // IN-04 (Quick 260803-ibt) — the degenerate `length: 0` boundary.
+  // `firstEmptyIndex('', 0)` is `-1`, so an unclamped `Math.min(index, -1)`
+  // would compute `landed = -1` and the fill loop below would write
+  // `arr[-1]` (a non-index property; harmless to `.join('')`, but `landed:
+  // -1` violates `OtpWrite.landed`'s documented contract — no char lands
+  // anywhere at `length: 0`). Early-return `null`; the caller already
+  // restores the originating cell's DOM value from the unchanged model on
+  // a `null` result.
+  if (length <= 0) return null;
   const landed = Math.min(index, firstEmptyIndex(code, length));
   const arr = code.split('');
   for (let k = 0; k < chars.length && landed + k < length; k++) {

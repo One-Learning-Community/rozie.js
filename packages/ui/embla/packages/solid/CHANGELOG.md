@@ -1,5 +1,11 @@
 # @rozie-ui/embla-solid
 
+## 0.1.4
+
+### Patch Changes
+
+- Regenerated against `@rozie/core@0.3.1` (no emitter-behavior change reaches this leaf's inline body — Solid's slot-ctx params are unconditionally `any`, unaffected by CR-02). The `startIndex` prop's JSDoc now correctly says "Init-only" instead of the stale "Runtime-updatable" (WR-01) — the D1 init-only contract shipped in 0.1.3, but the prop's own doc comment (copied verbatim into IDE hover) was missed. No runtime behavior change; no API surface change.
+
 ## 0.1.3
 
 ### Patch Changes
