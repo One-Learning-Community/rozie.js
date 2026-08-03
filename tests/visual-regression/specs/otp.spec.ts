@@ -395,19 +395,21 @@ for (const target of TARGETS) {
       for (let i = 0; i < 4; i++) {
         await expect(altCells.nth(i)).toHaveAttribute('placeholder', '•');
       }
-      // NOTE(260802-sc5): autoFocus is asserted on 5 targets only. Solid fails
-      // to focus the alt instance at mount — a genuine, PRE-EXISTING
-      // cross-target divergence discovered by this task's new alt-instance VR
-      // coverage (autoFocus was never exercised by any VR spec before this
-      // quick task; verified via a shadow-piercing deep-active-element probe:
-      // `null` on Solid vs `'Digit 1 of 4'` on vue/react/svelte/angular/lit).
-      // It is NOT one of the seven audited defects (D2/D3/D4/D5/D6/D7/D9) and
-      // is OUT OF SCOPE to fix here — it is a single-target mount-timing
-      // divergence, not an Otp.rozie authoring bug, and this quick task is
-      // forbidden from touching packages/core or packages/targets. Recorded
-      // as an additional finding in EMITTER-FINDINGS.md for quick task C (or a
-      // future dedicated audit) rather than hand-patched.
-      // TODO(after that fix lands): delete this gate and assert all 6.
+      // NOTE(260608-sc5, investigated 260802-v1v task 12): autoFocus is
+      // asserted on 5 targets only. Solid fails to focus the alt instance at
+      // mount — a genuine, PRE-EXISTING cross-target divergence (verified via
+      // a shadow-piercing deep-active-element probe: `null` on Solid vs
+      // `'Digit 1 of 4'` on vue/react/svelte/angular/lit). Quick 260802-v1v
+      // task 12 investigated this (timeboxed, lowest-confidence item):
+      // reviewed Otp.rozie's $onMount/focusIndex/$refs.root logic, the
+      // compiled Solid Otp.tsx onMount+ref wiring, and createControllableSignal
+      // for cross-instance shared state — found no surgical, provably-correct
+      // root cause. Filed to the emitter-hardening backlog (memory
+      // project_emitter_hardening_backlog, "Solid autoFocus / $onMount +
+      // $refs child-mount timing") with the repro and the child-vs-top-
+      // level-mount hypothesis, adjacent to the already-fragile
+      // $refs-only-safe-in-$onMount boundary (ROZ123). Delete this gate
+      // when that backlog entry resolves.
       const AUTOFOCUS_ASSERTED = target !== 'solid';
       if (AUTOFOCUS_ASSERTED) {
         await expect
