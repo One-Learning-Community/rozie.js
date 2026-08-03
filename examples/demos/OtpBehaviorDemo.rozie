@@ -1,9 +1,20 @@
 <!--
   OtpBehaviorDemo — VR behavioral cell for @rozie-ui/otp (pure-Rozie, no engine).
   Drives the native segmented one-time-code input: a two-way r-model:value (live
-  readout), a `set-code` direct-model-write button, and a @complete readout. The
-  spec types into the cells, checks the assembled value + complete event, and the
+  readout), a `set-code` direct-model-write button, a @change / @complete readout
+  pair, and the `focus()` / `clear()` imperative handle. The spec types into the
+  cells, checks the assembled value + change/complete emit hygiene, and the
   direct-write reflection — see otp.spec.ts. Behavioral-only (no pixel baseline).
+
+  260802-sc5: added @change wiring (readout-change-count / readout-last-change),
+  a readout-complete-count (proving `complete` fires exactly once through a
+  fill→edit→refill cycle and never from clear()), a focus()/clear() handle
+  (otp-focus / otp-clear via ref="otp" + $refs.otp, the DialogBehaviorDemo
+  precedent), and a SECOND Otp instance (otp-alt: 4-cell alphanumeric,
+  placeholder, autoFocus) to exercise a prop combination the original single
+  instance never covered. Both instances are wrapped in `data-testid`
+  containers (otp-primary / otp-alt) so `otp.spec.ts` locators stay scoped to
+  their own instance's cells now that a second `<input>` group exists.
 -->
 <rozie name="OtpBehaviorDemo">
 
@@ -19,18 +30,35 @@
   lastComplete: '',
   masked: false,
   isDisabled: false,
+  changeCount: 0,
+  lastChange: '',
+  completeCount: 0,
+  altCode: '',
 }
 </data>
 
 <script>
 const onComplete = (e) => {
   $data.lastComplete = e && e.value != null ? e.value : ''
+  $data.completeCount = $data.completeCount + 1
+}
+const onChange = (e) => {
+  $data.changeCount = $data.changeCount + 1
+  $data.lastChange = e && e.value != null ? e.value : ''
 }
 const setCode = (v) => {
   $data.code = v
 }
 const toggleMask = () => { $data.masked = !$data.masked }
 const toggleDisabled = () => { $data.isDisabled = !$data.isDisabled }
+// $refs reads are only safe post-mount — inside these click handlers, which is
+// fine (the DialogBehaviorDemo hideViaHandle precedent).
+const focusOtp = () => {
+  $refs.otp.focus()
+}
+const clearOtp = () => {
+  $refs.otp.clear()
+}
 </script>
 
 <template>
@@ -41,19 +69,43 @@ const toggleDisabled = () => { $data.isDisabled = !$data.isDisabled }
     <button type="button" data-testid="set-code" @click="setCode('123')">Set 123</button>
     <button type="button" data-testid="toggle-mask" @click="toggleMask()">Toggle mask</button>
     <button type="button" data-testid="toggle-disabled" @click="toggleDisabled()">Toggle disabled</button>
+    <button type="button" data-testid="otp-focus" @click="focusOtp()">Focus</button>
+    <button type="button" data-testid="otp-clear" @click="clearOtp()">Clear</button>
     <span class="readout" data-testid="readout-code">{{ $data.code }}</span>
     <span class="readout" data-testid="readout-complete">{{ $data.lastComplete }}</span>
+    <span class="readout" data-testid="readout-complete-count">{{ $data.completeCount }}</span>
+    <span class="readout" data-testid="readout-change-count">{{ $data.changeCount }}</span>
+    <span class="readout" data-testid="readout-last-change">{{ $data.lastChange }}</span>
   </div>
 
-  <Otp
-    r-model:value="$data.code"
-    :length="6"
-    type="numeric"
-    ariaLabel="Verification code"
-    :mask="$data.masked"
-    :disabled="$data.isDisabled"
-    @complete="onComplete($event)"
-  />
+  <div data-testid="otp-primary">
+    <Otp
+      ref="otp"
+      r-model:value="$data.code"
+      :length="6"
+      type="numeric"
+      ariaLabel="Verification code"
+      :mask="$data.masked"
+      :disabled="$data.isDisabled"
+      @complete="onComplete($event)"
+      @change="onChange($event)"
+    />
+  </div>
+
+  <div class="controls">
+    <span class="readout" data-testid="readout-alt-code">{{ $data.altCode }}</span>
+  </div>
+
+  <div data-testid="otp-alt">
+    <Otp
+      r-model:value="$data.altCode"
+      :length="4"
+      type="alphanumeric"
+      placeholder="•"
+      :autoFocus="true"
+      ariaLabel="Backup code"
+    />
+  </div>
 </div>
 </template>
 

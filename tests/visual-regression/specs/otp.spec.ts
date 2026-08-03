@@ -18,18 +18,34 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * `cells()` derived view, `commitValue` write funnel, `@complete`) produces
  * identical behaviour across all 6 targets.
  *
- * `examples/demos/OtpBehaviorDemo.rozie` drives a 6-cell numeric OTP, a two-way
- * `r-model:value` (live `readout-code`), a `set-code` direct-model-write button
- * (→ '123'), a `@complete` readout (`readout-complete`), and (260802-p7g
- * shore-up) `toggle-mask` / `toggle-disabled` buttons driving the previously-
- * VR-untestable `mask` / `disabled` static props.
+ * `examples/demos/OtpBehaviorDemo.rozie` drives a 6-cell numeric OTP (wrapped in
+ * `data-testid="otp-primary"`), a two-way `r-model:value` (live `readout-code`),
+ * a `set-code` direct-model-write button (→ '123'), a `@complete` readout
+ * (`readout-complete` / `readout-complete-count`), a `@change` readout
+ * (`readout-change-count` / `readout-last-change`), a `focus()`/`clear()`
+ * imperative handle (`otp-focus` / `otp-clear`), (260802-p7g shore-up)
+ * `toggle-mask` / `toggle-disabled` buttons driving the previously-
+ * VR-untestable `mask` / `disabled` static props, and (260802-sc5) a SECOND
+ * `Otp` instance (`data-testid="otp-alt"` — 4-cell alphanumeric, placeholder,
+ * autoFocus).
  *
- * Three test titles cover the family:
+ * **Locator scoping (260802-sc5):** the demo now renders TWO `<Otp>` instances
+ * (12 `<input>` elements total), so every cell locator below is scoped to its
+ * instance's `data-testid` container (`otp-primary` / `otp-alt`) rather than
+ * the bare `page.locator('input')` the original single-instance fixture used.
+ *
+ * Four test titles cover the family:
  *   - `otp [t]` — the original smoke (render, type, set-code, @complete) plus
- *     (260802-p7g) an overwrite-a-filled-cell strengthening step.
+ *     (260802-p7g) an overwrite-a-filled-cell strengthening step — (260802-sc5)
+ *     rewritten to drive the REAL mouse-click + keypress path (D5) instead of
+ *     `.fill()`, which bypasses `maxlength="1"` and can never fail the way a
+ *     real user's mouse-click + keypress does.
  *   - `otp-keyboard [t]` (260802-p7g, NEW) — paste distribution, backspace
  *     navigation, arrow/Home/End focus movement.
  *   - `otp-modes [t]` (260802-p7g, NEW) — mask rendering, disabled state.
+ *   - `otp-input-model [t]` (260802-sc5, NEW) — autofill (D2), fill-point clamp
+ *     (D3), complete-fires-exactly-once (D4), change-emit hygiene (D4),
+ *     focus()/clear() handles, and the alt-instance prop combination.
  *
  * Per `feedback_vr_linux_baselines`: structural/behavioral assertions only — no
  * `toHaveScreenshot`. Like slider.spec.ts / listbox.spec.ts, this runs locally on
@@ -54,7 +70,8 @@ for (const target of TARGETS) {
     await expect(page.getByTestId('rozie-mount')).toBeVisible();
 
     // ---- 1. six native input cells render (the CSS locator pierces Lit shadow) ----
-    const cells = page.locator('input');
+    // Scoped to otp-primary: the demo now renders a second (otp-alt) instance.
+    const cells = page.getByTestId('otp-primary').locator('input');
     await expect(cells.first()).toBeVisible({ timeout: 15_000 });
     await expect
       .poll(async () => cells.count(), { timeout: 15_000 })
@@ -103,12 +120,15 @@ for (const target of TARGETS) {
       })
       .toBe('123456');
 
-    // ---- 5. overwriting a filled cell takes the LAST char typed ----
-    // Locks onInput's documented "take the LAST char typed (handles
-    // overwriting a filled cell)" branch (Otp.rozie L205-206), currently
-    // untested. `.fill('7')` on an already-filled cell 0 ('1') replaces its
-    // DOM value with '7'; onInput reads `e.target.value.slice(-1)` === '7'.
-    await cells.nth(0).fill('7');
+    // ---- 5. mouse click + keypress overwrites a filled cell (D5) ----
+    // `.fill('7')` sets `.value` directly and BYPASSES `maxlength="1"` — it
+    // can never fail the way a real user's mouse-click + keypress does (the
+    // false-positive the 260802-sc5 audit found: onFocus's `select()` is
+    // collapsed by the subsequent mouseup caret placement, so a filled cell
+    // then REJECTS the next keystroke under `maxlength="1"` unless the
+    // component re-selects on pointerup). Drive the REAL path instead.
+    await cells.nth(0).click();
+    await page.keyboard.press('7');
     await expect
       .poll(async () => (await code.textContent())?.trim() ?? '', {
         timeout: 10_000,
@@ -135,7 +155,7 @@ for (const target of TARGETS) {
       await page.goto(`/?example=OtpBehavior&target=${target}`);
       await expect(page.getByTestId('rozie-mount')).toBeVisible();
 
-      const cells = page.locator('input');
+      const cells = page.getByTestId('otp-primary').locator('input');
       await expect(cells.first()).toBeVisible({ timeout: 15_000 });
       await expect
         .poll(async () => cells.count(), { timeout: 15_000 })
@@ -277,7 +297,7 @@ for (const target of TARGETS) {
       await page.goto(`/?example=OtpBehavior&target=${target}`);
       await expect(page.getByTestId('rozie-mount')).toBeVisible();
 
-      const cells = page.locator('input');
+      const cells = page.getByTestId('otp-primary').locator('input');
       await expect(cells.first()).toBeVisible({ timeout: 15_000 });
       await expect
         .poll(async () => cells.count(), { timeout: 15_000 })
@@ -308,8 +328,240 @@ for (const target of TARGETS) {
       for (let i = 0; i < 6; i++) {
         await expect(cells.nth(i)).toBeDisabled();
       }
-      const group = page.locator('.rozie-otp');
+      const group = page.getByTestId('otp-primary').locator('.rozie-otp');
       await expect(group).toHaveClass(/rozie-otp--disabled/);
+    },
+  );
+}
+
+/**
+ * otp-input-model [t] (260802-sc5, NEW) — autofill (D2), fill-point clamp
+ * (D3), complete-fires-exactly-once (D4), change-emit hygiene (D4), the
+ * focus()/clear() imperative handle, and the otp-alt prop combination
+ * (4-cell alphanumeric, placeholder, autoFocus).
+ *
+ * Step ordering deviates from a literal top-to-bottom reading of the six
+ * defect classes for two deterministic reasons, both noted inline:
+ *   - the otp-alt autoFocus assertion runs FIRST, immediately after page
+ *     load — autoFocus is a one-shot $onMount effect, so it must be observed
+ *     before any other focus-moving interaction with otp-primary races it.
+ *   - the change-count assertion (D4) is folded into the autofill step (a
+ *     single write is the only way to assert an EXACT count deterministically
+ *     without re-deriving the running total across every prior interaction).
+ *   - "complete fires exactly once" is proven via an in-place OVERWRITE of an
+ *     already-full code (D5's click+keypress path, length staying at 6
+ *     throughout) rather than a backspace-then-refill — a backspace-then-
+ *     refill is a genuine NEW not-full→full transition and legitimately fires
+ *     `complete` again under the fixed `planEmits` semantics (Otp.md's
+ *     "not-full → full transition" contract); it is the ALREADY-FULL→
+ *     STILL-FULL edit that must not re-fire, which is exactly what D4 broke.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(
+    `otp-input-model [${target}]: autofill, fill-point clamp, complete fires exactly once`,
+    async ({ page }) => {
+      await page.goto(`/?example=OtpBehavior&target=${target}`);
+      await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+      const cells = page.getByTestId('otp-primary').locator('input');
+      await expect(cells.first()).toBeVisible({ timeout: 15_000 });
+      await expect
+        .poll(async () => cells.count(), { timeout: 15_000 })
+        .toBe(6);
+
+      const altCells = page.getByTestId('otp-alt').locator('input');
+      await expect
+        .poll(async () => altCells.count(), { timeout: 15_000 })
+        .toBe(4);
+
+      const code = page.getByTestId('readout-code');
+      const completeCount = page.getByTestId('readout-complete-count');
+      const changeCount = page.getByTestId('readout-change-count');
+
+      // NOTE(260802-sc5): change-count is asserted on 4 targets only. react +
+      // solid double-fire `change` via the $attrs-spread root handler (native
+      // bubbling from the <input> re-triggers the consumer handler). That is a
+      // TOOLCHAIN bug owned by quick task C (emitter seams) — NOT an Otp defect.
+      // TODO(after task C): delete this gate and assert all 6.
+      const COUNT_ASSERTED = !['react', 'solid'].includes(target);
+
+      // ---- 6. alt instance — autoFocus put focus on Digit 1 of 4 at mount.
+      // Run FIRST: a one-shot $onMount effect race against any later
+      // otp-primary focus-moving interaction below. ----
+      for (let i = 0; i < 4; i++) {
+        await expect(altCells.nth(i)).toHaveAttribute('placeholder', '•');
+      }
+      // NOTE(260802-sc5): autoFocus is asserted on 5 targets only. Solid fails
+      // to focus the alt instance at mount — a genuine, PRE-EXISTING
+      // cross-target divergence discovered by this task's new alt-instance VR
+      // coverage (autoFocus was never exercised by any VR spec before this
+      // quick task; verified via a shadow-piercing deep-active-element probe:
+      // `null` on Solid vs `'Digit 1 of 4'` on vue/react/svelte/angular/lit).
+      // It is NOT one of the seven audited defects (D2/D3/D4/D5/D6/D7/D9) and
+      // is OUT OF SCOPE to fix here — it is a single-target mount-timing
+      // divergence, not an Otp.rozie authoring bug, and this quick task is
+      // forbidden from touching packages/core or packages/targets. Recorded
+      // as an additional finding in EMITTER-FINDINGS.md for quick task C (or a
+      // future dedicated audit) rather than hand-patched.
+      // TODO(after that fix lands): delete this gate and assert all 6.
+      const AUTOFOCUS_ASSERTED = target !== 'solid';
+      if (AUTOFOCUS_ASSERTED) {
+        await expect
+          .poll(() => page.evaluate(deepActiveElementProbeInPage, 'aria-label'), {
+            timeout: 10_000,
+          })
+          .toBe('Digit 1 of 4');
+      } else {
+        // Focus manually so the typing assertions below (isAllowedChar
+        // filtering) still exercise all 6 targets despite the mount-time gap.
+        await altCells.nth(0).click();
+      }
+      // typing 'a' is accepted (type="alphanumeric").
+      await page.keyboard.press('a');
+      await expect(altCells.nth(0)).toHaveValue('a');
+      // '!' is rejected — planWrite returns null, the cell's DOM value is
+      // restored directly (it never advanced past cell 1's empty value).
+      await page.keyboard.press('!');
+      await expect(altCells.nth(1)).toHaveValue('');
+
+      // ---- 1. autofill (D2) — the native-setter form is required: assigning
+      // el.value directly does not notify React's value tracker, and this must
+      // exercise the same path SMS autofill uses. ----
+      await cells.nth(0).evaluate((el: HTMLInputElement) => {
+        const setter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          'value',
+        )!.set!;
+        setter.call(el, '135790');
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await expect
+        .poll(async () => (await code.textContent())?.trim() ?? '', {
+          timeout: 10_000,
+          intervals: [100, 200, 400, 800],
+        })
+        .toBe('135790');
+      // Per-cell assertion — catches the "DOM keeps the full string" failure
+      // mode: without restoring the originating cell's DOM value from the
+      // derived model, cell 0 keeps rendering the WHOLE autofilled string.
+      await expect(cells.nth(0)).toHaveValue('1');
+      await expect(cells.nth(1)).toHaveValue('3');
+      await expect(cells.nth(2)).toHaveValue('5');
+      await expect(cells.nth(3)).toHaveValue('7');
+      await expect(cells.nth(4)).toHaveValue('9');
+      await expect(cells.nth(5)).toHaveValue('0');
+
+      // ---- 4. change emit hygiene (D4) — the autofill above was exactly ONE
+      // commit (`` -> `135790`), so `readout-change-count` must read exactly
+      // '1', not double-fire. ----
+      if (COUNT_ASSERTED) {
+        await expect
+          .poll(async () => (await changeCount.textContent())?.trim() ?? '', {
+            timeout: 10_000,
+            intervals: [100, 200, 400, 800],
+          })
+          .toBe('1');
+      }
+
+      // ---- 2. fill-point clamp (D3) — clear, type '12' into cells 0-1, then
+      // click cell 4 (past the fill point) and type '9': it must land at the
+      // fill point (cell 2), not leave a hole. ----
+      await page.getByTestId('otp-clear').click();
+      await expect
+        .poll(async () => (await code.textContent())?.trim() ?? '', {
+          timeout: 10_000,
+          intervals: [100, 200, 400, 800],
+        })
+        .toBe('');
+      await cells.nth(0).click();
+      await page.keyboard.press('1');
+      await cells.nth(1).click();
+      await page.keyboard.press('2');
+      await cells.nth(4).click();
+      await page.keyboard.press('9');
+      await expect
+        .poll(async () => (await code.textContent())?.trim() ?? '', {
+          timeout: 10_000,
+          intervals: [100, 200, 400, 800],
+        })
+        .toBe('129');
+      await expect(cells.nth(2)).toHaveValue('9');
+      await expect(cells.nth(4)).toHaveValue('');
+      await expect
+        .poll(() => page.evaluate(deepActiveElementProbeInPage, 'aria-label'), {
+          timeout: 10_000,
+        })
+        .toBe('Digit 4 of 6');
+
+      // ---- 3. complete fires exactly once (D4) — fill to 6, then OVERWRITE
+      // an already-filled cell (click + keypress, length staying at 6
+      // throughout — the D5 path) and assert complete does NOT re-fire. ----
+      await page.getByTestId('otp-clear').click();
+      await expect
+        .poll(async () => (await code.textContent())?.trim() ?? '', {
+          timeout: 10_000,
+          intervals: [100, 200, 400, 800],
+        })
+        .toBe('');
+      for (let i = 0; i < 6; i++) {
+        await cells.nth(i).click();
+        await page.keyboard.press(String(i + 1));
+      }
+      await expect
+        .poll(async () => (await code.textContent())?.trim() ?? '', {
+          timeout: 10_000,
+          intervals: [100, 200, 400, 800],
+        })
+        .toBe('123456');
+      await expect
+        .poll(async () => (await completeCount.textContent())?.trim() ?? '', {
+          timeout: 10_000,
+          intervals: [100, 200, 400, 800],
+        })
+        .toBe('1');
+      // In-place overwrite of the (still full) already-complete code.
+      await cells.nth(0).click();
+      await page.keyboard.press('9');
+      await expect
+        .poll(async () => (await code.textContent())?.trim() ?? '', {
+          timeout: 10_000,
+          intervals: [100, 200, 400, 800],
+        })
+        .toBe('923456');
+      await expect
+        .poll(async () => (await completeCount.textContent())?.trim() ?? '', {
+          timeout: 10_000,
+          intervals: [100, 200, 400, 800],
+        })
+        .toBe('1');
+
+      // ---- 5. focus() / clear() handles — clear() must reset the code AND
+      // must NOT increment readout-complete-count (the clear()-emits-complete
+      // half of D4; completeCount is meaningfully nonzero ('1') here). ----
+      await page.getByTestId('otp-clear').click();
+      await expect
+        .poll(async () => (await code.textContent())?.trim() ?? '', {
+          timeout: 10_000,
+          intervals: [100, 200, 400, 800],
+        })
+        .toBe('');
+      await expect
+        .poll(async () => (await completeCount.textContent())?.trim() ?? '', {
+          timeout: 10_000,
+          intervals: [100, 200, 400, 800],
+        })
+        .toBe('1');
+      // focus() moves focus to the first empty cell (index 0 after clear()).
+      await page.getByTestId('otp-focus').click();
+      await expect
+        .poll(() => page.evaluate(deepActiveElementProbeInPage, 'aria-label'), {
+          timeout: 10_000,
+        })
+        .toBe('Digit 1 of 6');
     },
   );
 }
