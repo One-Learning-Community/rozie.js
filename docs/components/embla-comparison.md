@@ -57,7 +57,7 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 
 - **React/Vue/Svelte/Solid depth on their home framework.** The four official wrappers are mature, maintained, and idiomatic for their framework's own conventions (a React dev expects a hook; a Svelte dev expects an action). On its home framework each is a perfectly good pick. Rozie's value is **not** "more than `embla-carousel-react` on React" — it's the **same idiomatic component on all six frameworks from one source**, with Lit and Angular getting an Embla component they otherwise lack. For anything outside the curated surface, `getInstance()` hands you the raw engine on every target.
 - **Per-option setters.** Embla itself ships **no** per-option setters — `reInit(options)` is the only update path. So `@rozie-ui/embla` `$watch`es each runtime option and calls `reInit`, exactly as you would by hand with the official wrappers. A consumer rapidly mutating options can thrash `reInit`; debounce on the consumer side if needed (Embla's native `watchSlides` is incremental for slide changes).
-- **`@rozie-ui/embla` is `0.1.0`.** The surface (20 props / 4 events / 14-verb handle / two-way `selectedIndex` model) is stable and gate-verified, but it is younger than the official wrappers.
+- **`@rozie-ui/embla` is `0.1.2`.** The surface (20 props / 4 events / 14-verb handle / two-way `selectedIndex` model) is stable and gate-verified, but it is younger than the official wrappers.
 - **Embla v8, not v9.** These packages wrap the mature v8. Embla v9 (RC at time of writing) renames the API surface; teams that want v9 are better served by it directly once it ships stable.
 
 ## Try it

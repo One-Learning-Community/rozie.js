@@ -67,7 +67,7 @@ This page concedes where the incumbents are genuinely ahead — that's what keep
 - **Middle-gap / non-contiguous states.** Rozie models the standard OTP UX — a contiguous left-to-right code — which is what keeps it fully controlled with no draft state. A deliberately sparse code (cell 1 and cell 4 filled, 2–3 empty), which no real verification flow produces, is intentionally not modeled.
 - **Per-cell custom rendering.** Libraries that own their cell DOM can inject arbitrary per-cell content (icons, separators, grouped layouts) via render props or slots. `@rozie-ui/otp` renders native `<input>` cells and styles them via tokens; it does not expose a per-cell render slot today.
 - **It's a single component, not a form/primitive kit.** Base UI, PrimeVue/PrimeNG, and the shadcn ports ship OTP alongside whole families of inputs, dialogs, and form controls. Rozie ships OTP (alongside its other `@rozie-ui` components), not a unified primitive suite.
-- **`@rozie-ui/otp` is `0.1.0`.** The surface (8 props / 2 events / 2-verb handle / masking / paste-distribute) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established per-framework libraries.
+- **`@rozie-ui/otp` is `0.1.2`.** The surface (8 props / 2 events / 2-verb handle / masking / paste-distribute) is stable and gate-verified across all six targets, but it is younger and less battle-tested than the established per-framework libraries.
 
 ## Try it
 

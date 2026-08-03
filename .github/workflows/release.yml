@@ -2,7 +2,11 @@ name: Release (early subset)
 
 # Manual, provenance-backed npm publish for the FIRST release wave ONLY:
 #   - 9 @rozie/* toolchain packages (core, cli, unplugin, babel-plugin,
-#     runtime-{react,vue,svelte,solid,lit})
+#     runtime-{react,vue,svelte,solid,lit}). 2026-08-02: runtime-{react,solid,
+#     lit,svelte} ship 0.2.2 in this wave (array-form `:style` merge, `cbe01eaa`
+#     — closes the published-vs-source drift where 0.2.1 predated that commit);
+#     runtime-vue + runtime-keynav-core stay 0.2.1 (content-unchanged vs the
+#     published tarball, so `pnpm publish` skips them as already-published).
 #   - 7 @rozie-ui Vue leaves: flatpickr / sortable-list / cropper /
 #     fullcalendar / pdf / captcha / tiptap (the `-vue` packages). captcha-vue was
 #     added to dogfood it; like the others it is self-contained (zero @rozie/* deps,
@@ -118,9 +122,33 @@ name: Release (early subset)
 #     data-table / toast. Self-contained — no @rozie-ui workspace peer, so no ordering coupling to
 #     popover / combobox / data-table / command-palette. tags is a pure-Rozie family (no external
 #     engine peer) — framework peer only.
+#   - 6 @rozie-ui embla leaves: embla-{react,vue,solid,lit,svelte,angular}
+#     (all six DEBUTING at 0.1.2 — verified 0/6 via a direct registry GET, since `npm view` lags on
+#     first-ever names). The 0.1.0/0.1.1/0.1.2 on-disk spread is a changesets ripple artifact from
+#     @rozie/runtime-* bumps, not release history — lockstep-aligned to 0.1.2 for the debut.
+#     Self-contained — no @rozie-ui workspace peer, so no ordering coupling to popover / combobox /
+#     data-table / command-palette. `embla-vue` is self-contained (zero @rozie/* deps), so it rides
+#     the shared "Build/Publish Vue leaves" steps (the cropper/fullcalendar/pdf/tiptap shape) while
+#     the other five get their own non-vue Build/Publish blocks. All six take
+#     `embla-carousel ^8.6` + `embla-carousel-autoplay ^8.6` as PEERS; no engine CSS import is
+#     required. react/solid/lit/svelte carry @rozie/runtime-<fw> — now 0.2.2 (bumped in this same
+#     wave for the array-form `:style` merge), published by the "Publish toolchain" step earlier in
+#     the same run; angular = tslib only.
+#   - 6 @rozie-ui otp leaves: otp-{react,vue,solid,lit,svelte,angular}
+#     (all six DEBUTING at 0.1.2 — verified 0/6 via a direct registry GET). The 0.1.0/0.1.1/0.1.2
+#     on-disk spread is a changesets ripple artifact from @rozie/runtime-* bumps, not release
+#     history — lockstep-aligned to 0.1.2 for the debut. Self-contained — no @rozie-ui workspace
+#     peer, so no ordering coupling to popover / combobox / data-table / command-palette. `otp` is
+#     pure-Rozie (no third-party engine): framework peer only, no external engine peer. NOTE
+#     (load-bearing): unlike the self-contained -vue leaves in "Build Vue leaves" below, `otp-vue`
+#     DOES carry @rozie/runtime-vue, so all six build together in their own step placed AFTER the
+#     toolchain build — same rationale as data-table / toast / date-picker / tags. react/solid/lit/
+#     svelte carry @rozie/runtime-<fw> — now 0.2.2 (bumped in this same wave); `otp-vue` carries
+#     @rozie/runtime-vue@0.2.1 (unchanged — not part of this wave's runtime bump); angular = tslib
+#     only.
 #
 # Everything else is DELIBERATELY out of scope: any @rozie-ui family not enumerated
-# above (maplibre, codemirror, lexical, chartjs, embla, rete, uppy, dialog, slider,
+# above (maplibre, codemirror, lexical, chartjs, rete, uppy, dialog, slider,
 # …) is not release-verified. Do NOT widen the --filter lists below to other
 # families without updating the release runbook.
 #
@@ -228,12 +256,14 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
 
-      # Build the 6 Vue leaves into their compiled dist/ drop-in (Vite lib mode +
+      # Build the 8 Vue leaves into their compiled dist/ drop-in (Vite lib mode +
       # vue-tsc declaration emit). Each leaf's `build` script needs only its own
       # devDeps (already installed by the frozen install above); it does NOT run
       # codegen and does NOT depend on @rozie/core, so running it after the
-      # toolchain build is fine. (captcha-vue likewise carries zero @rozie/* deps —
-      # its dist bundles the vendored internal/ loader, externalizing only vue.)
+      # toolchain build is fine. (captcha-vue and embla-vue likewise carry zero
+      # @rozie/* deps — embla-vue's dist externalizes only vue + the
+      # embla-carousel* peers, captcha-vue's bundles the vendored internal/
+      # loader externalizing only vue.)
       - name: Build Vue leaves
         run: >
           pnpm
@@ -244,6 +274,7 @@ jobs:
           --filter=@rozie-ui/pdf-vue
           --filter=@rozie-ui/captcha-vue
           --filter=@rozie-ui/tiptap-vue
+          --filter=@rozie-ui/embla-vue
           build
 
       # Build the 5 non-vue captcha leaves into their compiled dist/ drop-in. Each
@@ -360,6 +391,27 @@ jobs:
           --filter=@rozie-ui/fullcalendar-angular
           build
 
+      # Build the 5 non-vue embla leaves into their compiled dist/ drop-in
+      # (embla-vue is built in the "Build Vue leaves" step above — it is
+      # self-contained, zero @rozie/* deps). Mixed per-target toolchain
+      # (react/solid/lit tsdown, svelte @sveltejs/package, angular ng-packagr APF).
+      # Sits AFTER the toolchain build so the local @rozie/runtime-* dist exists for
+      # the react/solid/lit/svelte leaf type resolution (angular = tslib only, no
+      # @rozie dep). The COMMITTED leaf src/ is the build input — codegen is NOT run
+      # in CI. Self-contained — no @rozie-ui workspace peer, so NO ordering dependency
+      # on popover / data-table / combobox / command-palette. All six take
+      # embla-carousel + embla-carousel-autoplay (^8.6) as PEERS. DEBUT all-targets
+      # embla release line, all six aligned at 0.1.2.
+      - name: Build non-vue embla leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/embla-react
+          --filter=@rozie-ui/embla-solid
+          --filter=@rozie-ui/embla-lit
+          --filter=@rozie-ui/embla-svelte
+          --filter=@rozie-ui/embla-angular
+          build
+
       # Build all six toast leaves into their compiled dist/ drop-in. Same mixed per-target
       # toolchain as captcha/sortable-list/flatpickr/pdf (react/solid/lit tsdown, vue Vite lib +
       # vue-tsc, svelte @sveltejs/package, angular ng-packagr APF). Sits AFTER the toolchain
@@ -417,6 +469,29 @@ jobs:
           --filter=@rozie-ui/tags-lit
           --filter=@rozie-ui/tags-svelte
           --filter=@rozie-ui/tags-angular
+          build
+
+      # Build all six otp leaves into their compiled dist/ drop-in. Mixed
+      # per-target toolchain (react/solid/lit tsdown, vue Vite lib + vue-tsc, svelte
+      # @sveltejs/package, angular ng-packagr APF). NOTE (load-bearing): unlike the
+      # self-contained -vue leaves in "Build Vue leaves" above, otp-vue DOES carry
+      # @rozie/runtime-vue, so all six build together here — AFTER the toolchain
+      # build, so the local @rozie/runtime-* dist exists for the
+      # react/solid/lit/svelte/vue leaf type resolution (angular = tslib only).
+      # The COMMITTED leaf src/ is the build input — codegen is NOT run in CI.
+      # Self-contained — no @rozie-ui workspace peer, so NO ordering dependency on
+      # popover, data-table, combobox, or command-palette. otp is pure-Rozie (no
+      # third-party engine) — framework peer only, no external engine peer. DEBUT
+      # all-targets otp release line, all six aligned at 0.1.2.
+      - name: Build otp leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/otp-react
+          --filter=@rozie-ui/otp-vue
+          --filter=@rozie-ui/otp-solid
+          --filter=@rozie-ui/otp-lit
+          --filter=@rozie-ui/otp-svelte
+          --filter=@rozie-ui/otp-angular
           build
 
       # Build all six popover leaves into their compiled dist/ drop-in. Mixed per-target
@@ -528,6 +603,7 @@ jobs:
           --filter @rozie/runtime-svelte
           --filter @rozie/runtime-solid
           --filter @rozie/runtime-lit
+          --filter @rozie/runtime-keynav-core
           --filter @rozie-ui/flatpickr-vue
           --filter @rozie-ui/sortable-list-vue
           --filter @rozie-ui/cropper-vue
@@ -612,8 +688,20 @@ jobs:
           --filter @rozie-ui/tags-lit
           --filter @rozie-ui/tags-svelte
           --filter @rozie-ui/tags-angular
+          --filter @rozie-ui/embla-react
+          --filter @rozie-ui/embla-vue
+          --filter @rozie-ui/embla-solid
+          --filter @rozie-ui/embla-lit
+          --filter @rozie-ui/embla-svelte
+          --filter @rozie-ui/embla-angular
+          --filter @rozie-ui/otp-react
+          --filter @rozie-ui/otp-vue
+          --filter @rozie-ui/otp-solid
+          --filter @rozie-ui/otp-lit
+          --filter @rozie-ui/otp-svelte
+          --filter @rozie-ui/otp-angular
 
-      # Then the 6 Vue leaves. They carry zero @rozie/* deps so they don't
+      # Then the 8 Vue leaves. They carry zero @rozie/* deps so they don't
       # actually depend on the step above — ordering just keeps the log readable.
       - name: Publish Vue leaves (@rozie-ui/*-vue)
         run: >
@@ -625,6 +713,7 @@ jobs:
           --filter=@rozie-ui/pdf-vue
           --filter=@rozie-ui/captcha-vue
           --filter=@rozie-ui/tiptap-vue
+          --filter=@rozie-ui/embla-vue
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -921,6 +1010,55 @@ jobs:
           --filter=@rozie-ui/tags-lit
           --filter=@rozie-ui/tags-svelte
           --filter=@rozie-ui/tags-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # The 5 non-vue embla leaves (DEBUT all-targets embla release line, all six aligned
+      # at 0.1.2 — embla-vue is published in the "Publish Vue leaves" step above). pnpm
+      # rewrites their `workspace:` deps to the concrete @rozie/runtime-* versions in the
+      # tarball: react/solid/lit `workspace:*` -> 0.2.2 exact, svelte `workspace:^` ->
+      # ^0.2.2; angular carries no @rozie dep (tslib only). All six take
+      # embla-carousel + embla-carousel-autoplay (^8.6) as PEERS; no engine CSS import is
+      # required. Self-contained — no @rozie-ui workspace peer, so this has NO ordering
+      # dependency on any other leaf family. Inherits dry_run (default TRUE) via
+      # steps.flags.outputs.extra and the skip-if-already-published behavior (no --force).
+      - name: Publish non-vue embla leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/embla-react
+          --filter=@rozie-ui/embla-solid
+          --filter=@rozie-ui/embla-lit
+          --filter=@rozie-ui/embla-svelte
+          --filter=@rozie-ui/embla-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # All six otp leaves (DEBUT all-targets otp release line, aligned at 0.1.2 — the
+      # family has never been published; the earlier 0.1.0/0.1.1 numbers were changesets
+      # ripples from @rozie/runtime-* bumps, never a publish). NOTE (load-bearing):
+      # otp-vue carries @rozie/runtime-vue (unlike the self-contained -vue leaves
+      # published in "Publish Vue leaves" above), so all six publish together here. pnpm
+      # rewrites their `workspace:` deps to the concrete @rozie/runtime-* versions in the
+      # tarball: react/solid/lit `workspace:*` -> 0.2.2 exact, svelte `workspace:^` ->
+      # ^0.2.2, otp-vue `workspace:^` -> ^0.2.1 (runtime-vue was NOT bumped in this wave);
+      # angular carries no @rozie dep (tslib only). otp is pure-Rozie (no third-party
+      # engine) — framework peer only, no external engine peer. Self-contained — no
+      # @rozie-ui workspace peer, so NO ordering dependency on any other leaf family.
+      # Inherits dry_run (default TRUE) via steps.flags.outputs.extra and the
+      # skip-if-already-published behavior (no --force).
+      - name: Publish otp leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/otp-react
+          --filter=@rozie-ui/otp-vue
+          --filter=@rozie-ui/otp-solid
+          --filter=@rozie-ui/otp-lit
+          --filter=@rozie-ui/otp-svelte
+          --filter=@rozie-ui/otp-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
