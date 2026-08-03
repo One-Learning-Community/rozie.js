@@ -3,6 +3,10 @@ import { customElement, property, query } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
 import { createLitControllableProperty, rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
+import { firstEmptyIndex as firstEmpty, isAllowedChar, planEmits, planWrite } from './internal/otpWrite';
+
+// ---- derived view (plain functions, uniform ×6) ------------------------
+// The current code, normalized to a string.
 
 @customElement('rozie-otp')
 export default class Otp extends SignalWatcher(LitElement) {
@@ -110,7 +114,7 @@ export default class Otp extends SignalWatcher(LitElement) {
   render() {
     return html`
 <div class="${Object.entries({ "rozie-otp": true, 'rozie-otp--disabled': this.disabled }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="group" aria-label=${this.ariaLabel} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="root" data-rozie-s-8267d52a>
-  ${repeat<any>(this.cells(), (cell, _idx) => cell.i, (cell, _idx) => html`<input class="rozie-otp-cell" key=${rozieAttr(cell.i)} type=${rozieAttr(this.cellType())} inputmode=${rozieAttr(this.cellInputMode())} maxlength="1" autocapitalize="off" autocomplete=${rozieAttr(this.cellAutocomplete(cell.i))} .value=${cell.ch} placeholder=${this.placeholder} ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.cellAriaLabel(cell.i))} data-filled=${rozieAttr(cell.ch ? 'true' : null)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput(cell.i, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown(cell.i, $event); }} @paste=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onPaste(cell.i, $event); }} @focus=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onFocus($event); }} data-rozie-s-8267d52a />`)}
+  ${repeat<any>(this.cells(), (cell, _idx) => cell.i, (cell, _idx) => html`<input class="rozie-otp-cell" key=${rozieAttr(cell.i)} type=${rozieAttr(this.cellType())} inputmode=${rozieAttr(this.cellInputMode())} maxlength="1" autocapitalize="off" autocomplete=${rozieAttr(this.cellAutocomplete(cell.i))} .value=${cell.ch} placeholder=${this.placeholder} ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.cellAriaLabel(cell.i))} data-filled=${rozieAttr(cell.ch ? 'true' : null)} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput(cell.i, $event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown(cell.i, $event); }} @paste=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onPaste(cell.i, $event); }} @focus=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onFocus($event); }} @pointerup=${($event: PointerEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onPointerUp($event); }} data-rozie-s-8267d52a />`)}
 </div>
 `;
   }
@@ -127,17 +131,9 @@ export default class Otp extends SignalWatcher(LitElement) {
   return out;
 };
 
-  allowChar = (ch: any) => {
-  if (!ch) return false;
-  if (this.type === 'numeric') return /[0-9]/.test(ch);
-  if (this.type === 'alphanumeric') return /[a-zA-Z0-9]/.test(ch);
-  return /\S/.test(ch);
-};
+  allowChar = (ch: any) => isAllowedChar(this.type, ch);
 
-  firstEmptyIndex = () => {
-  const len = this.code().length;
-  return len >= this.length ? this.length - 1 : len;
-};
+  firstEmptyIndex = () => firstEmpty(this.code(), this.length);
 
   focusIndex = (idx: any) => {
   let i = idx;
@@ -154,16 +150,18 @@ export default class Otp extends SignalWatcher(LitElement) {
 };
 
   commitValue = (raw: any) => {
+  const prev = this.code();
   const next = String(raw).slice(0, this.length);
+  const emits = planEmits(prev, next, this.length);
   this._valueControllable.write(next);
-  this.dispatchEvent(new CustomEvent("change", {
+  if (emits.change) this.dispatchEvent(new CustomEvent("change", {
     detail: {
       value: next
     },
     bubbles: true,
     composed: true
   }));
-  if (next.length === this.length) this.dispatchEvent(new CustomEvent("complete", {
+  if (emits.complete) this.dispatchEvent(new CustomEvent("complete", {
     detail: {
       value: next
     },
@@ -179,14 +177,20 @@ export default class Otp extends SignalWatcher(LitElement) {
     this.commitValue(cur.slice(0, i) + cur.slice(i + 1));
     return;
   }
-  const ch = raw.slice(-1);
-  if (!this.allowChar(ch)) {
+  const plan = planWrite(this.code(), this.length, this.type, i, raw);
+  if (!plan) {
     if (e && e.target) e.target.value = this.code()[i] || '';
     return;
   }
-  const cur = this.code();
-  this.commitValue(cur.slice(0, i) + ch + cur.slice(i + 1));
-  this.focusIndex(i + 1);
+  this.commitValue(plan.next);
+  // Restore the originating cell's DOM value from the derived model. Required
+  // for the multi-char/autofill case: the element currently holds the WHOLE
+  // pasted/autofilled string, and when the committed value happens to equal the
+  // previous value the framework re-render is a no-op (the same reason the
+  // invalid-char branch above resets the element directly). Without this the
+  // first cell keeps rendering the whole autofilled string.
+  if (e && e.target) e.target.value = plan.next[i] || '';
+  this.focusIndex(plan.focus);
 };
 
   onKeydown = (i: any, e: any) => {
@@ -218,16 +222,17 @@ export default class Otp extends SignalWatcher(LitElement) {
   onPaste = (i: any, e: any) => {
   if (e) e.preventDefault();
   const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
-  const chars = text.split('').filter(this.allowChar);
-  if (!chars.length) return;
-  const arr = this.code().split('');
-  for (let k = 0; k < chars.length && i + k < this.length; k++) arr[i + k] = chars[k];
-  this.commitValue(arr.join(''));
-  const landed = i + chars.length;
-  this.focusIndex(landed >= this.length ? this.length - 1 : landed);
+  const plan = planWrite(this.code(), this.length, this.type, i, text);
+  if (!plan) return;
+  this.commitValue(plan.next);
+  this.focusIndex(plan.focus);
 };
 
   onFocus = (e: any) => {
+  if (e && e.target && e.target.select) e.target.select();
+};
+
+  onPointerUp = (e: any) => {
   if (e && e.target && e.target.select) e.target.select();
 };
 

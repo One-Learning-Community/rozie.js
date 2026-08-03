@@ -59,6 +59,7 @@ let {
 
 let root = $state<HTMLElement | undefined>(undefined);
 
+import { firstEmptyIndex as firstEmpty, isAllowedChar, planEmits, planWrite } from './internal/otpWrite';
 // ---- derived view (plain functions, uniform ×6) ------------------------
 // The current code, normalized to a string.
 const code = () => typeof value === 'string' ? value : '';
@@ -73,19 +74,12 @@ const cells = () => {
   });
   return out;
 };
-// Allowed-character test for the configured `type`.
-const allowChar = (ch: any) => {
-  if (!ch) return false;
-  if (type === 'numeric') return /[0-9]/.test(ch);
-  if (type === 'alphanumeric') return /[a-zA-Z0-9]/.test(ch);
-  return /\S/.test(ch);
-};
+// Allowed-character test for the configured `type`. Thin wrapper over the
+// pure write model in ./internal/otpWrite (vendored into every leaf).
+const allowChar = (ch: any) => isAllowedChar(type, ch);
 // The cell that should receive focus for new input: the first empty position
 // (clamped to the last cell when full).
-const firstEmptyIndex = () => {
-  const len = code().length;
-  return len >= length ? length - 1 : len;
-};
+const firstEmptyIndex = () => firstEmpty(code(), length);
 // ---- focus choreography (container ref, post-mount only) ----------------
 // Read $refs.root only here / in $onMount / in $expose verbs (all post-mount →
 // ROZ123-safe). querySelectorAll reaches the cells inside Lit's shadow root too.
@@ -103,23 +97,33 @@ const focusIndex = (idx: any) => {
   }
 };
 // ---- write funnel (single $emit site) ----------------------------------
-// Clamp to length, write the model, emit change, and emit complete when every
-// cell is filled (a contiguous full string has length === $props.length).
+// Capture `prev` BEFORE the model write (code() reads $props.value, which has
+// not yet round-tripped) — this is what makes the transition detection
+// stateless and keeps the documented "CONTROLLED, NO LOCAL STATE" invariant
+// (do NOT add a `wasFull` flag to <data>). The model write stays
+// unconditional (idempotent, keeps the controlled contract); only the emits
+// are gated: `change` on an actual value transition, `complete` only on the
+// not-full -> full transition (never on an in-place edit of an already-full
+// code, never at length: 0 — see ./internal/otpWrite.planEmits).
 const commitValue = (raw: any) => {
+  const prev = code();
   const next = String(raw).slice(0, length);
+  const emits = planEmits(prev, next, length);
   value = next;
-  onchange?.({
+  if (emits.change) onchange?.({
     value: next
   });
-  if (next.length === length) oncomplete?.({
+  if (emits.complete) oncomplete?.({
     value: next
   });
 };
 // ---- input handler -----------------------------------------------------
-// Take the LAST char typed (handles overwriting a filled cell), sanitize, splice
-// it into the contiguous string at this position, advance focus. An invalid char
-// is rejected by restoring the cell's DOM value directly (a no-op model write may
-// not re-render on React, so reset the element instead).
+// One path for every input shape (single char, autofill, swipe, IME commit —
+// see ./internal/otpWrite.planWrite): sanitize + distribute from the write
+// position, clamped to the current fill point so a click past the fill point
+// never leaves a hole. An invalid / empty-after-sanitize write is rejected by
+// restoring the cell's DOM value directly (a no-op model write may not
+// re-render on React, so reset the element instead).
 const onInput = (i: any, e: any) => {
   const raw = e && e.target ? e.target.value : '';
   if (raw === '') {
@@ -127,14 +131,20 @@ const onInput = (i: any, e: any) => {
     commitValue(cur.slice(0, i) + cur.slice(i + 1));
     return;
   }
-  const ch = raw.slice(-1);
-  if (!allowChar(ch)) {
+  const plan = planWrite(code(), length, type, i, raw);
+  if (!plan) {
     if (e && e.target) e.target.value = code()[i] || '';
     return;
   }
-  const cur = code();
-  commitValue(cur.slice(0, i) + ch + cur.slice(i + 1));
-  focusIndex(i + 1);
+  commitValue(plan.next);
+  // Restore the originating cell's DOM value from the derived model. Required
+  // for the multi-char/autofill case: the element currently holds the WHOLE
+  // pasted/autofilled string, and when the committed value happens to equal the
+  // previous value the framework re-render is a no-op (the same reason the
+  // invalid-char branch above resets the element directly). Without this the
+  // first cell keeps rendering the whole autofilled string.
+  if (e && e.target) e.target.value = plan.next[i] || '';
+  focusIndex(plan.focus);
 };
 // ---- keyboard ----------------------------------------------------------
 // Backspace deletes the current char (or the previous one when the cell is
@@ -164,20 +174,25 @@ const onKeydown = (i: any, e: any) => {
     focusIndex(length - 1);
   }
 };
-// ---- paste (distribute across cells from this position) ----------------
+// ---- paste (collapses onto the same distribution routine as onInput) ---
 const onPaste = (i: any, e: any) => {
   if (e) e.preventDefault();
   const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
-  const chars = text.split('').filter(allowChar);
-  if (!chars.length) return;
-  const arr = code().split('');
-  for (let k = 0; k < chars.length && i + k < length; k++) arr[i + k] = chars[k];
-  commitValue(arr.join(''));
-  const landed = i + chars.length;
-  focusIndex(landed >= length ? length - 1 : landed);
+  const plan = planWrite(code(), length, type, i, text);
+  if (!plan) return;
+  commitValue(plan.next);
+  focusIndex(plan.focus);
 };
-// Select the cell's content on focus so a keystroke overwrites it.
+// Select the cell's content on focus so a keystroke overwrites it. Correct
+// for Tab and programmatic focus.
 const onFocus = (e: any) => {
+  if (e && e.target && e.target.select) e.target.select();
+};
+// A mouse/touch focus places the caret on mouseup, collapsing onFocus's
+// select(); with maxlength="1" a filled cell then REJECTS the next keystroke.
+// Re-select on pointerup (after caret placement) so click-then-type overwrites,
+// matching the Tab-focus behavior.
+const onPointerUp = (e: any) => {
   if (e && e.target && e.target.select) e.target.select();
 };
 // ---- per-cell attribute helpers ----------------------------------------
@@ -205,7 +220,7 @@ onMount(() => {
 });
 </script>
 
-<div bind:this={root} role="group" aria-label={ariaLabel} {...__rozieAttrs} class={["rozie-otp", { 'rozie-otp--disabled': disabled }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-8267d52a>{#each cells() as cell (cell.i)}<input class="rozie-otp-cell" type={rozieAttr(cellType())} inputmode={rozieAttr(cellInputMode())} maxlength="1" autocapitalize="off" autocomplete={rozieAttr(cellAutocomplete(cell.i))} value={rozieAttr(cell.ch)} placeholder={placeholder} disabled={!!disabled} aria-label={rozieAttr(cellAriaLabel(cell.i))} data-filled={rozieAttr(cell.ch ? 'true' : null)} oninput={($event) => { onInput(cell.i, $event); }} onkeydown={($event) => { onKeydown(cell.i, $event); }} onpaste={($event) => { onPaste(cell.i, $event); }} onfocus={($event) => { onFocus($event); }} data-rozie-s-8267d52a />{/each}</div>
+<div bind:this={root} role="group" aria-label={ariaLabel} {...__rozieAttrs} class={["rozie-otp", { 'rozie-otp--disabled': disabled }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-8267d52a>{#each cells() as cell (cell.i)}<input class="rozie-otp-cell" type={rozieAttr(cellType())} inputmode={rozieAttr(cellInputMode())} maxlength="1" autocapitalize="off" autocomplete={rozieAttr(cellAutocomplete(cell.i))} value={rozieAttr(cell.ch)} placeholder={placeholder} disabled={!!disabled} aria-label={rozieAttr(cellAriaLabel(cell.i))} data-filled={rozieAttr(cell.ch ? 'true' : null)} oninput={($event) => { onInput(cell.i, $event); }} onkeydown={($event) => { onKeydown(cell.i, $event); }} onpaste={($event) => { onPaste(cell.i, $event); }} onfocus={($event) => { onFocus($event); }} onpointerup={($event) => { onPointerUp($event); }} data-rozie-s-8267d52a />{/each}</div>
 
 <style>
 :global {

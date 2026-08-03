@@ -1,6 +1,6 @@
 /**
- * codegen.mjs — the single parse-once → emit-6 → copy-themes → render-READMEs
- * engine for @rozie-ui/otp.
+ * codegen.mjs — the single parse-once → emit-6 → copy-internal+themes →
+ * render-READMEs engine for @rozie-ui/otp.
  *
  * Pure GLUE over the `@rozie/core` public API (compile / parse / lowerToIR /
  * createDefaultRegistry) — the exact primitive docs/.vitepress/rozie-codegen.ts
@@ -15,17 +15,21 @@
  * only `error`-severity diagnostics, so the deliberate `focus` override does
  * NOT throw codegen (the slider precedent).
  *
- * This is a pure-Rozie family with NO third-party vanilla engine, so there is no
- * `src/internal/` helper to vendor. Instead it vendors the `src/themes/` design-
- * token presets (base / shadcn / material / bootstrap) into each leaf so
- * consumers can `import '@rozie-ui/otp-<fw>/themes/X.css'`.
+ * This is a pure-Rozie family with NO third-party vanilla engine. The branchy
+ * sanitize/distribute + emit-transition write model lives in
+ * `src/internal/otpWrite.ts` (260802-sc5, the date-picker `buildMonthGrid`
+ * precedent), imported by the `.rozie` `<script>` and vendored (via
+ * copyInternal, excluding `*.test.ts`) into every leaf so the relative
+ * `./internal/otpWrite` specifier resolves verbatim. It ALSO vendors the
+ * `src/themes/` design-token presets (base / shadcn / material / bootstrap)
+ * into each leaf so consumers can `import '@rozie-ui/otp-<fw>/themes/X.css'`.
  *
  * Steps:
  *   1. read src/Otp.rozie
  *   2. parse() + lowerToIR() ONCE → ir (props/slots/emits/expose) for docs tables
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
  *        (React only: also write Otp.css + Otp.d.ts)
- *   4. copy src/themes/ → each leaf src/themes/
+ *   4. copy src/internal/ + src/themes/ → each leaf src/
  *   5. render each leaf README from the IR + the hand-kept event/handle manifests
  *   6. ENFORCE validateDocsPropsTable against docs/components/otp.md
  *      (THROWS on drift of the IR-derivable structural columns — prop name,
@@ -33,8 +37,8 @@
  *
  * The Vue leaf is dual-packaged (compiled dist/index.mjs + raw ./source) via a
  * committed vite.config.ts / tsconfig.json / src/index.ts; codegen only writes
- * its src/Otp.vue + themes + README (it never cleans the leaf src, so the
- * committed barrel survives).
+ * its src/Otp.vue + internal + themes + README (it never cleans the leaf src,
+ * so the committed barrel survives).
  */
 import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -69,6 +73,16 @@ function copyThemes(leafSrc) {
   const src = resolve(ROOT, 'src/themes');
   if (!existsSync(src)) throw new Error('codegen: src/themes/ not found (token presets must exist)');
   cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
+}
+
+/** Copy src/internal/ → leaf src/internal/, excluding any *.test.ts. */
+function copyInternal(leafSrc) {
+  const src = resolve(ROOT, 'src/internal');
+  if (!existsSync(src)) throw new Error('codegen: src/internal/ not found (the write model must exist)');
+  cpSync(src, resolve(leafSrc, 'internal'), {
+    recursive: true,
+    filter: (from) => !from.endsWith('.test.ts'),
+  });
 }
 
 function main() {
@@ -129,7 +143,8 @@ function main() {
       if (r.types) writeFileSync(resolve(leafSrc, 'Otp.d.ts'), r.types);
     }
 
-    // (4) vendor the design-token presets.
+    // (4) vendor the write model + the design-token presets.
+    copyInternal(leafSrc);
     copyThemes(leafSrc);
 
     // (5) README from the single IR parse.
@@ -141,7 +156,7 @@ function main() {
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ themes/)`);
+    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ internal/ + themes/)`);
   }
 
   // (6) ENFORCE docs props-table validation.
@@ -165,7 +180,7 @@ function main() {
     `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING; throws on drift)`,
   );
 
-  console.log('codegen: done — 6 targets emitted, themes vendored, 6 READMEs rendered.');
+  console.log('codegen: done — 6 targets emitted, internal + themes vendored, 6 READMEs rendered.');
 }
 
 main();

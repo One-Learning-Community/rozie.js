@@ -1,6 +1,10 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { clsx, rozieAttr, useControllableState } from '@rozie/runtime-react';
 import './Otp.css';
+import { firstEmptyIndex as firstEmpty, isAllowedChar, planEmits, planWrite } from './internal/otpWrite';
+
+// ---- derived view (plain functions, uniform ×6) ------------------------
+// The current code, normalized to a string.
 
 interface OtpProps {
   /**
@@ -84,15 +88,9 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
     return out;
   }
   function allowChar(ch: any) {
-    if (!ch) return false;
-    if (props.type === 'numeric') return /[0-9]/.test(ch);
-    if (props.type === 'alphanumeric') return /[a-zA-Z0-9]/.test(ch);
-    return /\S/.test(ch);
+    return isAllowedChar(props.type, ch);
   }
-  const firstEmptyIndex = useCallback(() => {
-    const len = code().length;
-    return len >= props.length ? props.length - 1 : len;
-  }, [code, props.length]);
+  const firstEmptyIndex = useCallback(() => firstEmpty(code(), props.length), [code, props.length]);
   const focusIndex = useCallback((idx: any) => {
     let i = idx;
     if (i < 0) i = 0;
@@ -107,12 +105,14 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
     }
   }, [props.length]);
   function commitValue(raw: any) {
+    const prev = code();
     const next = String(raw).slice(0, props.length);
+    const emits = planEmits(prev, next, props.length);
     setValue(next);
-    props.onChange && props.onChange({
+    if (emits.change) props.onChange && props.onChange({
       value: next
     });
-    if (next.length === props.length) props.onComplete && props.onComplete({
+    if (emits.complete) props.onComplete && props.onComplete({
       value: next
     });
   }
@@ -123,15 +123,21 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
       commitValue(cur.slice(0, i) + cur.slice(i + 1));
       return;
     }
-    const ch = raw.slice(-1);
-    if (!allowChar(ch)) {
+    const plan = planWrite(code(), props.length, props.type, i, raw);
+    if (!plan) {
       if (e && e.target) e.target.value = code()[i] || '';
       return;
     }
-    const cur = code();
-    commitValue(cur.slice(0, i) + ch + cur.slice(i + 1));
-    focusIndex(i + 1);
-  }, [allowChar, code, commitValue, focusIndex]);
+    commitValue(plan.next);
+    // Restore the originating cell's DOM value from the derived model. Required
+    // for the multi-char/autofill case: the element currently holds the WHOLE
+    // pasted/autofilled string, and when the committed value happens to equal the
+    // previous value the framework re-render is a no-op (the same reason the
+    // invalid-char branch above resets the element directly). Without this the
+    // first cell keeps rendering the whole autofilled string.
+    if (e && e.target) e.target.value = plan.next[i] || '';
+    focusIndex(plan.focus);
+  }, [code, commitValue, focusIndex, props.length, props.type]);
   const onKeydown = useCallback((i: any, e: any) => {
     const key = e ? e.key : '';
     const cur = code();
@@ -160,15 +166,15 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
   const onPaste = useCallback((i: any, e: any) => {
     if (e) e.preventDefault();
     const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
-    const chars = text.split('').filter(allowChar);
-    if (!chars.length) return;
-    const arr = code().split('');
-    for (let k = 0; k < chars.length && i + k < props.length; k++) arr[i + k] = chars[k];
-    commitValue(arr.join(''));
-    const landed = i + chars.length;
-    focusIndex(landed >= props.length ? props.length - 1 : landed);
-  }, [allowChar, code, commitValue, focusIndex, props.length]);
+    const plan = planWrite(code(), props.length, props.type, i, text);
+    if (!plan) return;
+    commitValue(plan.next);
+    focusIndex(plan.focus);
+  }, [code, commitValue, focusIndex, props.length, props.type]);
   const onFocus = useCallback((e: any) => {
+    if (e && e.target && e.target.select) e.target.select();
+  }, []);
+  const onPointerUp = useCallback((e: any) => {
     if (e && e.target && e.target.select) e.target.select();
   }, []);
   function cellType() {
@@ -202,7 +208,7 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
   return (
     <>
     <div ref={root} role="group" aria-label={rozieAttr(props.ariaLabel)} {...attrs} className={clsx(clsx("rozie-otp", { "rozie-otp--disabled": props.disabled }), (attrs.className as string | undefined))} data-rozie-s-8267d52a="">
-      {cells().map((cell) => <input key={cell.i} className={"rozie-otp-cell"} type={rozieAttr(cellType())} inputMode={rozieAttr(cellInputMode())} maxLength={1} autoCapitalize="off" autoComplete={rozieAttr(cellAutocomplete(cell.i))} value={cell.ch} placeholder={props.placeholder} disabled={!!props.disabled} aria-label={rozieAttr(cellAriaLabel(cell.i))} data-filled={rozieAttr(cell.ch ? 'true' : undefined)} onInput={($event) => { onInput(cell.i, $event); }} onKeyDown={($event) => { onKeydown(cell.i, $event); }} onPaste={($event) => { onPaste(cell.i, $event); }} onFocus={($event) => { onFocus($event); }} data-rozie-s-8267d52a="" />)}
+      {cells().map((cell) => <input key={cell.i} className={"rozie-otp-cell"} type={rozieAttr(cellType())} inputMode={rozieAttr(cellInputMode())} maxLength={1} autoCapitalize="off" autoComplete={rozieAttr(cellAutocomplete(cell.i))} value={cell.ch} placeholder={props.placeholder} disabled={!!props.disabled} aria-label={rozieAttr(cellAriaLabel(cell.i))} data-filled={rozieAttr(cell.ch ? 'true' : undefined)} onInput={($event) => { onInput(cell.i, $event); }} onKeyDown={($event) => { onKeydown(cell.i, $event); }} onPaste={($event) => { onPaste(cell.i, $event); }} onFocus={($event) => { onFocus($event); }} onPointerUp={($event) => { onPointerUp($event); }} data-rozie-s-8267d52a="" />)}
     </div>
     </>
   );

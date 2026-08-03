@@ -2,6 +2,10 @@ import type { JSX } from 'solid-js';
 import { mergeProps, onMount, splitProps } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, createControllableSignal, rozieAttr, rozieClass } from '@rozie/runtime-solid';
+import { firstEmptyIndex as firstEmpty, isAllowedChar, planEmits, planWrite } from './internal/otpWrite';
+
+// ---- derived view (plain functions, uniform ×6) ------------------------
+// The current code, normalized to a string.
 
 __rozieInjectStyle('Otp-8267d52a', `.rozie-otp[data-rozie-s-8267d52a] {
   display: inline-flex;
@@ -116,19 +120,16 @@ export default function Otp(_props: OtpProps): JSX.Element {
     return out;
   }
 
-  // Allowed-character test for the configured `type`.
+  // Allowed-character test for the configured `type`. Thin wrapper over the
+  // pure write model in ./internal/otpWrite (vendored into every leaf).
   function allowChar(ch: any) {
-    if (!ch) return false;
-    if (local.type === 'numeric') return /[0-9]/.test(ch);
-    if (local.type === 'alphanumeric') return /[a-zA-Z0-9]/.test(ch);
-    return /\S/.test(ch);
+    return isAllowedChar(local.type, ch);
   }
 
   // The cell that should receive focus for new input: the first empty position
   // (clamped to the last cell when full).
   function firstEmptyIndex() {
-    const len = code().length;
-    return len >= local.length ? local.length - 1 : len;
+    return firstEmpty(code(), local.length);
   }
 
   // ---- focus choreography (container ref, post-mount only) ----------------
@@ -149,24 +150,34 @@ export default function Otp(_props: OtpProps): JSX.Element {
   }
 
   // ---- write funnel (single $emit site) ----------------------------------
-  // Clamp to length, write the model, emit change, and emit complete when every
-  // cell is filled (a contiguous full string has length === $props.length).
+  // Capture `prev` BEFORE the model write (code() reads $props.value, which has
+  // not yet round-tripped) — this is what makes the transition detection
+  // stateless and keeps the documented "CONTROLLED, NO LOCAL STATE" invariant
+  // (do NOT add a `wasFull` flag to <data>). The model write stays
+  // unconditional (idempotent, keeps the controlled contract); only the emits
+  // are gated: `change` on an actual value transition, `complete` only on the
+  // not-full -> full transition (never on an in-place edit of an already-full
+  // code, never at length: 0 — see ./internal/otpWrite.planEmits).
   function commitValue(raw: any) {
+    const prev = code();
     const next = String(raw).slice(0, local.length);
+    const emits = planEmits(prev, next, local.length);
     setValue(next);
-    _props.onChange?.({
+    if (emits.change) _props.onChange?.({
       value: next
     });
-    if (next.length === local.length) _props.onComplete?.({
+    if (emits.complete) _props.onComplete?.({
       value: next
     });
   }
 
   // ---- input handler -----------------------------------------------------
-  // Take the LAST char typed (handles overwriting a filled cell), sanitize, splice
-  // it into the contiguous string at this position, advance focus. An invalid char
-  // is rejected by restoring the cell's DOM value directly (a no-op model write may
-  // not re-render on React, so reset the element instead).
+  // One path for every input shape (single char, autofill, swipe, IME commit —
+  // see ./internal/otpWrite.planWrite): sanitize + distribute from the write
+  // position, clamped to the current fill point so a click past the fill point
+  // never leaves a hole. An invalid / empty-after-sanitize write is rejected by
+  // restoring the cell's DOM value directly (a no-op model write may not
+  // re-render on React, so reset the element instead).
   function onInput(i: any, e: any) {
     const raw = e && e.target ? e.target.value : '';
     if (raw === '') {
@@ -174,14 +185,20 @@ export default function Otp(_props: OtpProps): JSX.Element {
       commitValue(cur.slice(0, i) + cur.slice(i + 1));
       return;
     }
-    const ch = raw.slice(-1);
-    if (!allowChar(ch)) {
+    const plan = planWrite(code(), local.length, local.type, i, raw);
+    if (!plan) {
       if (e && e.target) e.target.value = code()[i] || '';
       return;
     }
-    const cur = code();
-    commitValue(cur.slice(0, i) + ch + cur.slice(i + 1));
-    focusIndex(i + 1);
+    commitValue(plan.next);
+    // Restore the originating cell's DOM value from the derived model. Required
+    // for the multi-char/autofill case: the element currently holds the WHOLE
+    // pasted/autofilled string, and when the committed value happens to equal the
+    // previous value the framework re-render is a no-op (the same reason the
+    // invalid-char branch above resets the element directly). Without this the
+    // first cell keeps rendering the whole autofilled string.
+    if (e && e.target) e.target.value = plan.next[i] || '';
+    focusIndex(plan.focus);
   }
 
   // ---- keyboard ----------------------------------------------------------
@@ -213,21 +230,27 @@ export default function Otp(_props: OtpProps): JSX.Element {
     }
   }
 
-  // ---- paste (distribute across cells from this position) ----------------
+  // ---- paste (collapses onto the same distribution routine as onInput) ---
   function onPaste(i: any, e: any) {
     if (e) e.preventDefault();
     const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
-    const chars = text.split('').filter(allowChar);
-    if (!chars.length) return;
-    const arr = code().split('');
-    for (let k = 0; k < chars.length && i + k < local.length; k++) arr[i + k] = chars[k];
-    commitValue(arr.join(''));
-    const landed = i + chars.length;
-    focusIndex(landed >= local.length ? local.length - 1 : landed);
+    const plan = planWrite(code(), local.length, local.type, i, text);
+    if (!plan) return;
+    commitValue(plan.next);
+    focusIndex(plan.focus);
   }
 
-  // Select the cell's content on focus so a keystroke overwrites it.
+  // Select the cell's content on focus so a keystroke overwrites it. Correct
+  // for Tab and programmatic focus.
   function onFocus(e: any) {
+    if (e && e.target && e.target.select) e.target.select();
+  }
+
+  // A mouse/touch focus places the caret on mouseup, collapsing onFocus's
+  // select(); with maxlength="1" a filled cell then REJECTS the next keystroke.
+  // Re-select on pointerup (after caret placement) so click-then-type overwrites,
+  // matching the Tab-focus behavior.
+  function onPointerUp(e: any) {
     if (e && e.target && e.target.select) e.target.select();
   }
 
@@ -265,7 +288,7 @@ export default function Otp(_props: OtpProps): JSX.Element {
   return (
     <>
     <div ref={(el) => { rootRef = el as HTMLElement; }} role="group" aria-label={rozieAttr(local.ariaLabel)} {...attrs} class={"rozie-otp" + " " + rozieClass({ 'rozie-otp--disabled': local.disabled }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-8267d52a="">
-      <Key each={cells() as readonly any[]} by={(cell) => cell.i}>{(cell) => <input autocapitalize="off" aria-label={rozieAttr(cellAriaLabel(cell().i))} data-filled={rozieAttr(cell().ch ? 'true' : null)} class={"rozie-otp-cell"} type={rozieAttr(cellType())} inputMode={rozieAttr(cellInputMode())} maxLength={1} autocomplete={rozieAttr(cellAutocomplete(cell().i))} value={cell().ch} placeholder={local.placeholder} disabled={!!local.disabled} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput(cell().i, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown(cell().i, $event); }} onPaste={($event: ClipboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onPaste(cell().i, $event); }} onFocus={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onFocus($event); }} data-rozie-s-8267d52a="" />}</Key>
+      <Key each={cells() as readonly any[]} by={(cell) => cell.i}>{(cell) => <input autocapitalize="off" aria-label={rozieAttr(cellAriaLabel(cell().i))} data-filled={rozieAttr(cell().ch ? 'true' : null)} class={"rozie-otp-cell"} type={rozieAttr(cellType())} inputMode={rozieAttr(cellInputMode())} maxLength={1} autocomplete={rozieAttr(cellAutocomplete(cell().i))} value={cell().ch} placeholder={local.placeholder} disabled={!!local.disabled} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput(cell().i, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown(cell().i, $event); }} onPaste={($event: ClipboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onPaste(cell().i, $event); }} onFocus={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onFocus($event); }} onPointerUp={($event: PointerEvent & { currentTarget: HTMLInputElement; target: Element }) => { onPointerUp($event); }} data-rozie-s-8267d52a="" />}</Key>
     </div>
     </>
   );
