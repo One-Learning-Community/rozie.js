@@ -542,6 +542,38 @@ function isPureLiteral(node: bt.Node): boolean {
   return false;
 }
 
+/**
+ * Quick 260802-v1v seam 3 — is `expr` a RAW read of a `null`-defaulted prop
+ * (`$props.ariaLabel` where `<props>` declares `ariaLabel: { default: null }`)?
+ *
+ * Port of React's `isNullablePropRead` (`emitTemplateAttribute.ts:292-305`,
+ * "Phase 65 Class 1/SC-1") and Solid's identical carve-out
+ * (`emitTemplateAttribute.ts:263-276`). A bare `$props.<nullable String>`
+ * read is provably primitive (`wrapForDisplay=false`), so the generic
+ * attribute-binding branch above returns the RAW value before this gate is
+ * ever consulted — without it, a null-defaulted prop renders `attr=""`
+ * instead of dropping the attribute (the same nullish-drop contract every
+ * `wrapForDisplay=true` binding already gets via `rozieAttr`).
+ *
+ * Gated STRICTLY on a resolved null-default prop read so a non-nullable
+ * prop read, a literal, or any other expression stays byte-identical (a
+ * false-positive widening here would break the dist-parity byte oracle).
+ */
+function isNullablePropRead(expr: bt.Expression, ir: IRComponent): boolean {
+  if (
+    !bt.isMemberExpression(expr) ||
+    expr.computed ||
+    !bt.isIdentifier(expr.object, { name: '$props' }) ||
+    !bt.isIdentifier(expr.property)
+  ) {
+    return false;
+  }
+  const name = expr.property.name;
+  return ir.props.some(
+    (p) => p.name === name && p.defaultValue != null && bt.isNullLiteral(p.defaultValue),
+  );
+}
+
 function emitAttribute(
   attr: AttributeBinding,
   ir: IRComponent,
@@ -720,6 +752,20 @@ function emitAttribute(
       // already excluded; the interpolated-segment branch below stays on
       // `rozieDisplay`. `nothing` is supplied by the runtime-lit helper itself,
       // not this emit site, so no `opts.lit.add('nothing')` is needed here.
+      opts?.runtime.add('rozieAttr');
+      return `${attr.name}=\${rozieAttr(${expr})}`;
+    }
+    // Quick 260802-v1v seam 3 — a RAW read of a `null`-defaulted prop
+    // (`aria-label=${this.ariaLabel}`) is provably primitive
+    // (`wrapForDisplay=false`), so it fell through the branch above and hit
+    // the raw return below without ever nullish-dropping. Port of React's
+    // second `isNullablePropRead` gate (`emitTemplateAttribute.ts:1208-1220`,
+    // "Phase 65 Class 1/SC-1") and Solid's identical carve-out
+    // (`emitTemplateAttribute.ts:263,824`). Lit needs no numeric/boolean-ARIA
+    // carve-out sibling — those exist in React/Solid solely to dodge TS2322
+    // on a typed JSX attribute slot, and lit-html's `html` tagged template has
+    // no such typed slots to dodge.
+    if (isNullablePropRead(attr.expression, ir)) {
       opts?.runtime.add('rozieAttr');
       return `${attr.name}=\${rozieAttr(${expr})}`;
     }

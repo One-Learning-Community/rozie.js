@@ -1,7 +1,8 @@
 import { LitElement, css, html } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-attr-nullish-drop')
 export default class AttrNullishDrop extends SignalWatcher(LitElement) {
@@ -9,8 +10,10 @@ export default class AttrNullishDrop extends SignalWatcher(LitElement) {
 :host{display:contents}
 `;
 
+  @property({ type: String, reflect: true }) maybeNullProp: string | null = null;
   private _cond = signal(false);
   private _maybeNull = signal<any>(null);
+  private _loopItems = signal(['a', 'b']);
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -31,6 +34,8 @@ export default class AttrNullishDrop extends SignalWatcher(LitElement) {
     return html`
 <div class="attr-nullish-drop" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-f2d28246>
   <span data-x=${rozieAttr(this._cond.value ? 'v' : null)} aria-expanded=${rozieAttr(this._cond.value ? 'true' : 'false')} title=${rozieAttr(this._maybeNull.value)} data-rozie-s-f2d28246>probe</span>
+  <span class="attr-nullish-drop-prop" title=${rozieAttr(this.maybeNullProp)} data-rozie-s-f2d28246>probe-prop</span>
+  ${repeat<any>(this._loopItems.value, (c, _idx) => c, (c, _idx) => html`<i class="attr-nullish-drop-loop" key=${rozieAttr(c)} title=${rozieAttr(this.maybeNullProp)} data-rozie-s-f2d28246>${rozieDisplay(c)}</i>`)}
 </div>
 `;
   }
@@ -54,7 +59,7 @@ export default class AttrNullishDrop extends SignalWatcher(LitElement) {
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref']);
+    const __skip = new Set<string>(['data-rozie-ref', 'maybe-null-prop', 'maybenullprop']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

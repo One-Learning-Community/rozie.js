@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, signal, viewChild } from '@angular/core';
 
 function __rozieDisplay(v: unknown): string {
   if (v == null) return '';
@@ -27,6 +27,10 @@ function __rozieAttr(v: unknown): string | null {
 
     <div class="attr-nullish-drop" #rozieSpread_0 #rozieListenersTarget_1>
       <span [attr.data-x]="rozieAttr(cond() ? 'v' : null)" [attr.aria-expanded]="rozieAttr(cond() ? 'true' : 'false')" [attr.title]="rozieAttr(maybeNull())">probe</span>
+      <span class="attr-nullish-drop-prop" [title]="maybeNullProp()">probe-prop</span>
+      @for (c of loopItems(); track c) {
+    <i class="attr-nullish-drop-loop" [title]="maybeNullProp()">{{ rozieDisplay(c) }}</i>
+    }
     </div>
 
   `,
@@ -35,8 +39,10 @@ function __rozieAttr(v: unknown): string | null {
   `],
 })
 export class AttrNullishDrop {
+  maybeNullProp = input<(string) | null>(null);
   cond = signal(false);
   maybeNull = signal<any>(null);
+  loopItems = signal(['a', 'b']);
 
   private __rozieDestroyRef = inject(DestroyRef);
 

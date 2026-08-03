@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, untracked } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { createLitControllableProperty, rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 
 @customElement('rozie-dialog')
 export default class Dialog extends SignalWatcher(LitElement) {
@@ -144,7 +144,7 @@ private __rozieWatchInitial_0 = true;
 
   render() {
     return html`
-<dialog class="rozie-dialog" aria-label=${this.ariaLabel} aria-labelledby=${this.ariaLabelledby} ${rozieSpread(this.$attrs)} @cancel=${($event: Event & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onCancel($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onClick($event); }} ${rozieListeners(this.$listeners)} data-rozie-s-2a679072>
+<dialog class="rozie-dialog" aria-label=${rozieAttr(this.ariaLabel)} aria-labelledby=${rozieAttr(this.ariaLabelledby)} ${rozieSpread(this.$attrs)} @cancel=${($event: Event & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onCancel($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onClick($event); }} ${rozieListeners(this.$listeners)} data-rozie-s-2a679072>
   
   <div class="rozie-dialog-panel" data-rozie-ref="panelEl" data-rozie-s-2a679072>
     <slot></slot>

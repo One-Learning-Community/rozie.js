@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { injectGlobalStyles, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { injectGlobalStyles, rozieAttr, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { ContextProvider, createContext } from '@lit/context';
 // D-05 / REQ-37: the namespace-import form is the ONLY cross-target-safe way to
 // use Lexical's `$`-prefixed API. Every `$`-call below is `lexical.$…` (a property
@@ -196,7 +196,7 @@ private __rozieCtxProvider_rozie_lexical_editor = new ContextProvider(this, { co
     return html`
 <div class="rozie-lexical" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-f679124a>
   
-  <div class="rozie-lexical-content" contenteditable=${true} aria-label=${this.ariaLabel} data-rozie-ref="rootEl" data-rozie-s-f679124a></div>
+  <div class="rozie-lexical-content" contenteditable=${true} aria-label=${rozieAttr(this.ariaLabel)} data-rozie-ref="rootEl" data-rozie-s-f679124a></div>
   
   <slot></slot>
 </div>

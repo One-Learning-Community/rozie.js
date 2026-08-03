@@ -200,7 +200,7 @@ export default class Tags extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="${Object.entries({ "rozie-tags": true, 'rozie-tags--disabled': this.disabled, 'rozie-tags--readonly': this.readonly }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="group" aria-label=${this.ariaLabel} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="root" data-rozie-s-64848f8e>
+<div class="${Object.entries({ "rozie-tags": true, 'rozie-tags--disabled': this.disabled, 'rozie-tags--readonly': this.readonly }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="group" aria-label=${rozieAttr(this.ariaLabel)} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="root" data-rozie-s-64848f8e>
   <ul class="rozie-tags-list" data-rozie-s-64848f8e>
     ${repeat<any>(this.tokens(), (t, _idx) => t + ':' + this.tokens().indexOf(t), (t, _idx) => html`<li class="rozie-tags-chip" key=${rozieAttr(t + ':' + this.tokens().indexOf(t))} data-rozie-s-64848f8e>
       ${this.tag !== undefined ? this.tag({tag: t, index: this.tokens().indexOf(t), remove: () => this.removeAt(this.tokens().indexOf(t))}) : html`<slot name="tag" data-rozie-params=${(() => { try { return JSON.stringify({tag: t, index: this.tokens().indexOf(t)}); } catch { return '{}'; } })()} @rozie-tag-remove=${($event: CustomEvent) => ((() => this.removeAt(this.tokens().indexOf(t))) as (...args: any[]) => any)($event.detail)}>
@@ -209,7 +209,7 @@ export default class Tags extends SignalWatcher(LitElement) {
     </li>`)}
   </ul>
 
-  ${!this.readonly ? html`<input class="rozie-tags-input" type="text" autocomplete="off" autocapitalize="off" .value=${this._draft.value} placeholder=${this.placeholder} ?disabled=${!!this.disabled || !!this.atMax()} aria-label=${this.ariaLabel} aria-disabled=${!!this.disabled} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @paste=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onPaste($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur($event); }} data-rozie-s-64848f8e />` : nothing}<span class="rozie-tags-count" aria-live="polite" data-rozie-s-64848f8e>${rozieDisplay(this.countLabel())}</span>
+  ${!this.readonly ? html`<input class="rozie-tags-input" type="text" autocomplete="off" autocapitalize="off" .value=${this._draft.value} placeholder=${this.placeholder} ?disabled=${!!this.disabled || !!this.atMax()} aria-label=${rozieAttr(this.ariaLabel)} aria-disabled=${!!this.disabled} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onInput($event); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onKeydown($event); }} @paste=${($event: Event & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onPaste($event); }} @blur=${($event: FocusEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this.onBlur($event); }} data-rozie-s-64848f8e />` : nothing}<span class="rozie-tags-count" aria-live="polite" data-rozie-s-64848f8e>${rozieDisplay(this.countLabel())}</span>
 </div>
 `;
   }
