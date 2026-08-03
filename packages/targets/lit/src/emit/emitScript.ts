@@ -827,6 +827,44 @@ function partitionScript(program: t.File): PartitionedScript {
 }
 
 /**
+ * Quick 260802-v1v seam 2 (Lit half) — is `body` a "stable-comparable
+ * derived expression": a bare (non-optional, non-computed) MemberExpression
+ * chain rooted in a plain Identifier OR `this`, with NO CallExpression
+ * anywhere in the chain?
+ *
+ * Mirror of React's `isStableMemberChainGetter` (`react/src/emit/emitScript.ts`).
+ * `partitionScript` operates on `rewritten.file` — the WHOLE script has
+ * already been rewritten by the time `w.getter` reaches this function, so
+ * `$props.xs.length` has already become `this.xs.length` (rewriteScript
+ * lowers a bare `$props.<name>` prop read to `this.<name>`). The root of the
+ * chain is therefore a `ThisExpression`, not an `Identifier` — accept both;
+ * the structural shape (member chain, no calls, no computed access) is what
+ * matters, not which AST node kind terminates it.
+ */
+function isStableMemberChainGetterBody(body: t.BlockStatement | t.Expression): boolean {
+  if (t.isBlockStatement(body)) return false;
+  let cur: t.Node = body;
+  let hops = 0;
+  while (t.isMemberExpression(cur)) {
+    if (cur.computed) return false;
+    cur = cur.object;
+    hops++;
+  }
+  if (!(t.isIdentifier(cur) || t.isThisExpression(cur))) return false;
+  // Quick 260802-v1v seam 2 gate refinement — REQUIRE at least two hops
+  // (`this.xs.length`, not a bare `this.open`). Unlike React (where a
+  // single-level `props.xs` renders the SAME dep-array string via either
+  // the derived-getter path or the narrowed path, so gating on depth is
+  // unnecessary there), Lit's value-diff branch is a STRUCTURALLY DIFFERENT
+  // emit shape regardless of chain depth. A single-level prop read's
+  // existing `changedProperties.has('X')` gate is ALREADY the derived
+  // value's identity (there is nothing further to derive) — applying the
+  // value-diff wrapper there would be a pure-cosmetic, unrequested emit-
+  // shape change on every single-prop $watch in the corpus (S2 territory).
+  return hops >= 2;
+}
+
+/**
  * Classify a WatchHook by its IR-computed `getterDeps`:
  *   - 'props' — every dep is a $props.X read; safe to route through Lit's
  *     `updated(changedProperties)` because Lit fires `updated()` whenever
@@ -1428,12 +1466,57 @@ export function emitScript(
           .map((n) => `changedProperties.has('${n}')`)
           .join(' || ');
         if (!irWatcher.immediate) needsFirstUpdateDoneFlag = true;
-        const guard = irWatcher.immediate
-          ? propChecks
-          : `this.__rozieFirstUpdateDone && (${propChecks})`;
-        watcherUpdatedBranches.push(
-          `if (${guard}) { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); }`,
-        );
+
+        // Quick 260802-v1v seam 2 — `changedProperties.has(...)` is an
+        // IDENTITY gate (did Lit's @property setter for this name run at
+        // all?), not a VALUE gate. `$watch(() => $props.xs.length, …)` — the
+        // Carousel.rozie:464 shape (`$props.slides.length`) — must fire on
+        // the derived LENGTH changing, not merely on the base prop's setter
+        // running (e.g. a fresh same-length array reference). When the
+        // getter is a proven-safe stable member chain
+        // (`isStableMemberChainGetterBody`, gated on the PRE-rewrite getter
+        // body so a call anywhere in the chain is excluded — same tight gate
+        // as the React half), diff `__watchVal` against a stored previous
+        // value and only invoke the callback when it actually changed.
+        // `changedProperties.has(...)` stays as the CHEAP outer gate — it
+        // correctly bounds when the getter is worth evaluating at all; a
+        // derived getter never needs re-evaluating on a cycle where none of
+        // its root props changed.
+        const isDerived = isStableMemberChainGetterBody(w.getter.body);
+        if (isDerived) {
+          const prevField = `__rozieWatchPrev_${i}`;
+          fieldLines.push(`private ${prevField}: unknown;`);
+          if (irWatcher.immediate) {
+            // Eager shape: fire on the FIRST evaluation regardless of value
+            // (that is what "immediate" means), then value-diff thereafter.
+            // Seed with a dedicated "seen" flag rather than relying on
+            // `undefined` as a sentinel — a legitimately `undefined`-valued
+            // getter must still fire once.
+            const seenField = `__rozieWatchSeen_${i}`;
+            fieldLines.push(`private ${seenField} = false;`);
+            watcherUpdatedBranches.push(
+              `if (${propChecks}) { const __watchVal = (${getterCode})(); if (!this.${seenField} || __watchVal !== this.${prevField}) { this.${seenField} = true; this.${prevField} = __watchVal; (${cbCode})(${callArg}); } }`,
+            );
+          } else {
+            // Lazy (default) shape: the existing `__rozieFirstUpdateDone`
+            // gate skips firing on the initial mount cycle, but the getter
+            // is STILL evaluated (and the previous-value field SEEDED) on
+            // that cycle — otherwise the first real post-mount change would
+            // compare against an unseeded `undefined` and fire spuriously
+            // even when the derived value hasn't actually changed since
+            // mount (e.g. a fresh same-length array reference).
+            watcherUpdatedBranches.push(
+              `if (${propChecks}) { const __watchVal = (${getterCode})(); if (!this.__rozieFirstUpdateDone) { this.${prevField} = __watchVal; } else if (__watchVal !== this.${prevField}) { this.${prevField} = __watchVal; (${cbCode})(${callArg}); } }`,
+            );
+          }
+        } else {
+          const guard = irWatcher.immediate
+            ? propChecks
+            : `this.__rozieFirstUpdateDone && (${propChecks})`;
+          watcherUpdatedBranches.push(
+            `if (${guard}) { const __watchVal = (${getterCode})(); (${cbCode})(${callArg}); }`,
+          );
+        }
       } else {
         // effect()-based route (data/computed/slots/closure-touching, OR
         // empty getterDeps as a defensive fallback).

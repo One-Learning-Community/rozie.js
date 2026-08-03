@@ -187,6 +187,7 @@ export default class Carousel extends SignalWatcher(LitElement) {
   @query('[data-rozie-ref="viewportEl"]') private _refViewportEl!: HTMLElement;
   @query('[data-rozie-ref="thumbsViewportEl"]') private _refThumbsViewportEl!: HTMLElement;
 private __rozieWatchInitial_0 = true;
+private __rozieWatchPrev_3: unknown;
 private __rozieFirstUpdateDone = false;
 
   @state() private _hasSlotSlide = false;
@@ -365,11 +366,11 @@ private __rozieFirstUpdateDone = false;
   updated(changedProperties: Map<string, unknown>): void {
     if (this.__rozieFirstUpdateDone && (changedProperties.has('loop') || changedProperties.has('align') || changedProperties.has('axis') || changedProperties.has('slidesToScroll') || changedProperties.has('dragFree') || changedProperties.has('draggable') || changedProperties.has('containScroll') || changedProperties.has('skipSnaps') || changedProperties.has('duration') || changedProperties.has('direction'))) { const __watchVal = (() => [this.loop, this.align, this.axis, this.slidesToScroll, this.dragFree, this.draggable, this.containScroll, this.skipSnaps, this.duration, this.direction].join('|'))(); (() => this.embla?.reInit(this.reinitOptions()))(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('autoplay') || changedProperties.has('autoplayDelay'))) { const __watchVal = (() => `${this.autoplay}|${this.autoplayDelay}`)(); (() => this.embla?.reInit(this.reinitOptions(), this.emblaPluginsFromProps()))(); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('slides'))) { const __watchVal = (() => this.slides.length)(); (() => {
+    if (changedProperties.has('slides')) { const __watchVal = (() => this.slides.length)(); if (!this.__rozieFirstUpdateDone) { this.__rozieWatchPrev_3 = __watchVal; } else if (__watchVal !== this.__rozieWatchPrev_3) { this.__rozieWatchPrev_3 = __watchVal; (() => {
       this.embla?.reInit(this.reinitOptions());
       this.emblaThumbs?.reInit(this.thumbsOptionsFromProps());
       this.syncNav();
-    })(); }
+    })(); } }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('thumbnails'))) { const __watchVal = (() => this.thumbnails)(); ((on: any) => {
       if (!on) {
         if (this.emblaThumbs) {
