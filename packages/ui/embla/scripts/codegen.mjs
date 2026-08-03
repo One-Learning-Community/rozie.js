@@ -16,7 +16,7 @@
  * same as @rozie-ui/listbox, so consumers can
  * `import '@rozie-ui/embla-<fw>/themes/X.css'`.
  *
- * Carousel.rozie's 4 emits + 9 expose verbs compile strict-tsc-clean as-authored,
+ * Carousel.rozie's 4 emits + 14 expose verbs compile strict-tsc-clean as-authored,
  * so there is NO per-leaf type-aid `code.replace(...)` patch. (The Cropper
  * `imageEl` ref aid does NOT apply: Carousel's only ref is `viewportEl` on a
  * `<div>` → HTMLDivElement, which the React emitter's tag→type map covers.) If a
@@ -42,6 +42,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
@@ -85,6 +86,17 @@ function main() {
     if (!handleManifest[m.name]) {
       throw new Error(
         `codegen: method "${m.name}" is exposed by the source but has no entry in handle-manifest.mjs`,
+      );
+    }
+  }
+
+  // Keep the hand-kept event manifest in lockstep with ir.emits — same contract
+  // as the handle-manifest assertion above, so a future emit cannot ship a
+  // blank Events row again (readme.mjs's Events table renders from this).
+  for (const ev of ir.emits) {
+    if (!eventManifest[ev]) {
+      throw new Error(
+        `codegen: event "${ev}" is emitted by the source but has no entry in event-manifest.mjs`,
       );
     }
   }
@@ -152,7 +164,7 @@ function main() {
 
     // (4) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);
-    const readme = renderReadme(target, ir, pkgName, handleManifest);
+    const readme = renderReadme(target, ir, pkgName, handleManifest, eventManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
     // Vendor the repo LICENSE into each published leaf so the tarball carries its

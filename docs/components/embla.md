@@ -45,6 +45,12 @@ There are **two slide-source modes** from one component:
 - **Config array** — pass `:slides="[...]"` and Rozie renders one slide per item (optionally via the scoped `slide` slot for custom markup).
 - **Declarative** — drop `<div class="rozie-embla__slide">…</div>` children into the default slot; Embla's native `watchSlides` reacts to adds/removes.
 
+The `rozie-embla__slide` class is **required**, not decorative, in both modes: the component pins Embla's `slides` option to that exact selector, so unclassed children are never measured as slides.
+
+::: warning Lit: declarative (mode b) slides don't resolve today
+On the Lit target specifically, dropping children into the default slot does **not** work: Embla measures the slide set by running `container.querySelectorAll('.rozie-embla__slide')` against the shadow-root container, and light-DOM children arriving through a native `<slot>` are invisible to that query — the engine sees zero slides (verified live, tracked as an architecture gap; see the [Lit scoped-slot caveat](#slots) below for a related shadow-DOM constraint). Use the config-array `:slides` prop on Lit instead.
+:::
+
 The current snap is **two-way bound** through the single `selectedIndex` model prop. Dragging or scrolling writes the new index back through the model path (echo-guarded so a programmatic `scrollTo` doesn't ping-pong); a consumer write scrolls the carousel. Snap/settle/reInit/pointer lifecycle fires as native framework events. Note the model is `selectedIndex` while the snap-change event is `select` — distinct identifiers (a model prop must not share a name with an emit).
 
 ### Vue
@@ -101,7 +107,7 @@ export function Demo() {
 | `dragFree` | `Boolean` | `false` | ✓ | Momentum/free-scroll drag (no hard snapping). |
 | `draggable` | `Boolean` | `true` | ✓ | Enable pointer drag (Embla `watchDrag`). |
 | `containScroll` | `String` | `"trimSnaps"` | ✓ | Edge-snap containment — `'' \| 'trimSnaps' \| 'keepSnaps'`. |
-| `startIndex` | `Number` | `0` | ✓ | Initial snap index. |
+| `startIndex` | `Number` | `0` | | Initial snap index. **Init-only, by design** — Embla's `reActivate` preserves the live position by merging `{ startIndex: selectedScrollSnap() }` with the reInit payload, and the payload wins. A `startIndex` left in every reInit would teleport the carousel back to this prop's value on every option flip. To move programmatically after mount, use the `scrollToIndex()` handle verb, or write the two-way `selectedIndex` model. |
 | `skipSnaps` | `Boolean` | `false` | ✓ | Allow a fast flick to skip intermediate snaps. |
 | `duration` | `Number` | `25` | ✓ | Scroll transition duration (Embla's relative unit). |
 | `direction` | `String` | `"ltr"` | ✓ | Text/scroll direction — `'ltr' \| 'rtl'`. |
@@ -109,12 +115,12 @@ export function Demo() {
 | `autoplayDelay` | `Number` | `4000` | ✓ | Autoplay delay between snaps (ms). |
 | `dots` | `Boolean` | `false` | ✓ | Show built-in dot pagination (one dot per scroll snap). |
 | `arrows` | `Boolean` | `false` | ✓ | Show built-in prev/next arrow buttons overlaid on the viewport. |
-| `thumbnails` | `Boolean` | `false` | ✓ | Show a synced thumbnail strip (its own Embla instance); fill the `thumb` slot for custom thumbs. |
-| `plugins` | `Array` | `[]` | ✓ | Escape hatch — extra Embla plugins appended verbatim. |
-| `options` | `Object` | `{}` | ✓ | Escape hatch — raw `EmblaOptionsType` spread last. |
+| `thumbnails` | `Boolean` | `false` | ✓ | Show a synced thumbnail strip (its own Embla instance); fill the `thumb` slot for custom thumbs. Runtime-updatable — toggling it live builds/tears down the strip's own Embla instance. |
+| `plugins` | `Array` | `[]` | | Escape hatch — extra Embla plugins appended verbatim. **Init-only** — the plugin set is rebuilt only when `autoplay` or `autoplayDelay` changes, not when this array's contents change. |
+| `options` | `Object` | `{}` | | Escape hatch — raw `EmblaOptionsType` spread last. **Init-only** — read when a reInit is triggered by one of the watched props above, not when this object itself changes. |
 | `selectedIndex` | `Number` | `0` | ✓ | **Two-way** — the current scroll-snap index. Distinct from the `select` emit. |
 
-Every option prop is runtime-updatable: changing it `$watch`-triggers `embla.reInit()` (Embla has no per-option setter; reInit is the only update path).
+**17 of the 20 props above are runtime-updatable** — changing one `$watch`-triggers `embla.reInit()` (Embla has no per-option setter; reInit is the only update path). The three exceptions are **init-only**: `startIndex` (structural — see its row; watching it would defeat the position-preservation fix), `plugins`, and `options`. Neither `plugins` nor `options` is watched **by design**: both are reference-typed escape hatches, so an identity watch would fire on every fresh literal a consumer passes (a full `reInit` per render), and Solid's/Angular's declarative-reactivity limits would make the failure target-asymmetric on top of that. If you need either to change after mount, remount the component (a `:key` change) or drive the equivalent curated prop instead.
 
 ### Events
 
@@ -125,6 +131,23 @@ Every option prop is runtime-updatable: changing it `$watch`-triggers `embla.reI
 | `reInit` | — | Fires when the engine re-initialises (option/slide change). |
 | `pointer-down` | — | Fires when a pointer drag begins. |
 
+### Slots
+
+Three slots: a scoped `slide` slot (config-array mode custom markup), a scoped `thumb` slot (custom thumbnail content), and the default slot (declarative mode — see [Quick start](#quick-start)). Both scoped slots receive `{ slide, index }`. Per-framework consumer syntax, read off the emitted leaves rather than assumed:
+
+| Framework | `slide` (scoped) | default |
+| --- | --- | --- |
+| React | `renderSlide={({ slide, index }) => …}` (also `renderThumb` for the `thumb` slot) | `children` |
+| Vue | `<template #slide="{ slide, index }">…</template>` | default slot |
+| Svelte | `{#snippet slide({ slide, index })}…{/snippet}` passed as the `slide` prop | children snippet |
+| Angular | `<ng-template #slide let-slide="slide" let-index="index">…</ng-template>` | content projection |
+| Solid | `slideSlot={({ slide, index }) => …}` (also `thumbSlot` for the `thumb` slot) | `children` |
+| Lit | set the `.slide` property to a render function: `el.slide = ({ slide, index }) => html\`…\`;` | default slot (native `<slot>`) |
+
+::: warning Lit: don't fill `slide` with raw `slot="slide"` children
+Every other target's scoped-slot fill is a genuine per-iteration render callback. On Lit, filling `slide` via the **property function** (`el.slide = (ctx) => html\`…\``) works correctly and renders distinct content per slide — this is what the live demo does. But `Carousel.rozie` renders `<slot name="slide">` **inside an `r-for`**, so Lit's shadow root ends up with N same-named `<slot name="slide">` elements (one per config-array slide). If you instead try to fill it the native web-components way — light-DOM children carrying `slot="slide"` — the browser's slot-assignment algorithm assigns **all** of them to the **first** `<slot name="slide">` in tree order; the remaining slots receive no assigned nodes and fall back to their own default content (verified live: 3 `slot="slide"` children all landed in `assignedNodes()` of slide 0's slot, while slides 1 and 2 stayed empty). Use the property-function API above instead. This is a Lit-specific architecture gap tracked for a future fix (`assignedElements()`-based per-iteration slot discovery) — it does not affect the other five targets, whose scoped slots lower to independent render-prop/snippet invocations per iteration. See also the [declarative-mode caveat](#quick-start): Lit cannot resolve default-slot (mode b) children at all today, for a related shadow-DOM reason.
+:::
+
 ### Imperative handle
 
 Build prev/next/dots controls off the `$expose` handle (there is no `#controls` slot — the imperative surface exposes everything). Grab the handle with your framework's native ref mechanism:
@@ -134,11 +157,16 @@ Build prev/next/dots controls off the `$expose` handle (there is no `#controls` 
 | `scrollNext(jump?)` | Scroll to the next snap. |
 | `scrollPrev(jump?)` | Scroll to the previous snap. |
 | `scrollToIndex(index, jump?)` | Scroll to a specific snap index. Named to avoid the inherited DOM `HTMLElement.scrollTo`. |
-| `reInitCarousel(opts?)` | Re-initialise the engine (recompute snaps). Named to avoid the `reInit` emit. |
+| `reInitCarousel(opts?)` | Re-initialise the engine, **preserving the current snap** — call with no args to recompute snaps (e.g. after a layout change) without losing position. Pass raw `EmblaOptionsType` to override the prop-derived options instead. Named to avoid the `reInit` emit. |
 | `canScrollNext()` | Whether a next snap is reachable. |
 | `canScrollPrev()` | Whether a previous snap is reachable. |
 | `getSelectedIndex()` | The current snap index. Named to avoid the `selectedIndex` model prop. |
 | `scrollSnapList()` | The snap-point progress array. |
+| `scrollProgress()` | The overall scroll progress in `[0, 1]`, for a custom progress bar or scrollbar thumb. |
+| `slidesInView()` | Indices of slides currently in view — for lazy-loading or highlighting in-view dots. |
+| `slidesNotInView()` | Indices of slides currently out of view — to unload heavy off-screen content. |
+| `previousScrollSnap()` | The previously selected snap index, to compute transition direction. |
+| `getPlugins()` | The live plugin API map (e.g. `getPlugins().autoplay?.play()/.stop()`) for imperative autoplay control. Named to avoid the `plugins` prop. |
 | `getInstance()` | The underlying `EmblaCarouselType` instance (engine escape hatch). |
 
 ```vue

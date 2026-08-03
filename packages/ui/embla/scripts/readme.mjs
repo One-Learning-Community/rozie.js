@@ -266,7 +266,7 @@ const i = el.getSelectedIndex();`,
 // README rendering.
 // ---------------------------------------------------------------------------
 
-export function renderReadme(target, ir, pkgName, handleManifest = {}) {
+export function renderReadme(target, ir, pkgName, handleManifest = {}, eventManifest = {}) {
   const usage = USAGE[target];
   if (!usage) throw new Error(`renderReadme: no usage snippet for target "${target}"`);
 
@@ -279,6 +279,18 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
       `source wrapping [Embla Carousel](https://www.embla-carousel.com) (v8). The current ` +
       `snap is two-way bound via \`selectedIndex\`; slides come as a \`slides\` config array or ` +
       `as default-slot DOM. This package is generated; do not edit \`src/\` by hand.`,
+  );
+  lines.push('');
+  lines.push(
+    `> **Declarative-mode slides must carry \`class="rozie-embla__slide"\`.** The component ` +
+      `pins Embla's \`slides\` option to that exact selector, so unclassed default-slot children ` +
+      `are not measured as slides.${
+        target === 'lit'
+          ? ' On Lit specifically, declarative (default-slot) slides do not resolve at all today — ' +
+            'the selector is queried from inside the shadow root, which cannot see light-DOM children ' +
+            'assigned through `<slot>`; use the `slides` config-array prop on Lit instead.'
+          : ''
+      }`,
   );
   lines.push('');
 
@@ -323,14 +335,20 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   lines.push('');
 
   // Events — gated on ir.emits.length > 0 (Embla IS event-ful, so this section
-  // SHIPS).
+  // SHIPS). Payload + description come from the hand-kept event-manifest.mjs
+  // (the same lockstep-with-IR contract as handle-manifest.mjs — codegen.mjs
+  // throws if an emit has no manifest entry, so this table cannot ship blank).
   if (ir.emits && ir.emits.length > 0) {
     lines.push('## Events');
     lines.push('');
-    lines.push('| Event | Description |');
-    lines.push('| --- | --- |');
+    lines.push('| Event | Payload | Description |');
+    lines.push('| --- | --- | --- |');
     for (const ev of ir.emits) {
-      lines.push(`| \`${ev}\` | |`);
+      const entry = eventManifest[ev];
+      if (!entry) {
+        throw new Error(`renderReadme: emitted event "${ev}" missing from event-manifest`);
+      }
+      lines.push(`| \`${ev}\` | ${entry.payload} | ${entry.description} |`);
     }
     lines.push('');
   }

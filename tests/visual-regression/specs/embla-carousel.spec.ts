@@ -12,7 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * `Carousel` is the engine-wrapper archetype simplified: Rozie owns the host,
  * renders the consumer's slides inside a flex container, attaches a vanilla
  * Embla v8 instance to the viewport in `$onMount`, drives `transform:
- * translate3d(...)`, two-way binds the snap index, and `$expose`s a 9-verb
+ * translate3d(...)`, two-way binds the snap index, and `$expose`s a 14-verb
  * imperative handle. `examples/demos/CarouselDemo.rozie` drives a 5-slide
  * config-array carousel, a two-way `r-model:selectedIndex`, a `next-model`
  * button (direct `$data.idx` write), a `next` button (the `$expose`

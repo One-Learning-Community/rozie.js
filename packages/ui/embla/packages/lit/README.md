@@ -2,6 +2,8 @@
 
 Idiomatic **lit** `Carousel` — a cross-framework carousel compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source wrapping [Embla Carousel](https://www.embla-carousel.com) (v8). The current snap is two-way bound via `selectedIndex`; slides come as a `slides` config array or as default-slot DOM. This package is generated; do not edit `src/` by hand.
 
+> **Declarative-mode slides must carry `class="rozie-embla__slide"`.** The component pins Embla's `slides` option to that exact selector, so unclassed default-slot children are not measured as slides. On Lit specifically, declarative (default-slot) slides do not resolve at all today — the selector is queried from inside the shadow root, which cannot see light-DOM children assigned through `<slot>`; use the `slides` config-array prop on Lit instead.
+
 ## Install
 
 ```bash
@@ -54,12 +56,12 @@ el.addEventListener('select', (e) => console.log('snap', e.detail));
 
 ## Events
 
-| Event | Description |
-| --- | --- |
-| `select` | |
-| `settle` | |
-| `reInit` | |
-| `pointer-down` | |
+| Event | Payload | Description |
+| --- | --- | --- |
+| `select` | index: number | Fires on every snap change (drag, scroll, or programmatic). Distinct from the `selectedIndex` model prop — a model prop must not share a name with an emit. |
+| `settle` | — | Fires when carousel motion stops (after a drag, scroll, or reInit settles). |
+| `reInit` | — | Fires when the engine re-initialises (an option flip, a slide add/remove, or a manual `reInitCarousel()` call). The current snap is preserved across it. |
+| `pointer-down` | — | Fires when a pointer drag begins on the viewport. |
 
 ## Imperative handle
 
