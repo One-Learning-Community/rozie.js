@@ -97,11 +97,17 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
     const out = emitReactTypes(ir);
     // <slot name="trigger" :open="$props.open" :toggle="toggle">
     // open resolves via $props.open → Boolean (D-86 member-expression branch).
-    // toggle is an unresolved identifier → '() => void' fallback.
+    // Quick 260802-v1v seam 7 — toggle is an unresolved bare identifier;
+    // the old '() => void' "residual-script function reference" heuristic
+    // was REMOVED (it could not distinguish an actual callback from an
+    // r-for loop variable at this call site — both are unresolved bare
+    // identifiers — and was silently lying about r-for loop-var slot params
+    // like embla's `slide`/`index`). toggle now falls through to the
+    // genuine 'unknown' fallback, same as any other unresolved identifier.
     expect(out).toMatch(
-      /renderTrigger\?: \(params: \{ open: boolean; toggle: \(\) => void \}\) => ReactNode;/,
+      /renderTrigger\?: \(params: \{ open: boolean; toggle: unknown \}\) => ReactNode;/,
     );
-    // NOT 'unknown' for the open param.
+    // open still resolves to its real type — NOT 'unknown'.
     expect(out).not.toMatch(/open: unknown/);
   });
 

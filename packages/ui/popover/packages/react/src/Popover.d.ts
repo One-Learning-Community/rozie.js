@@ -46,7 +46,7 @@ export interface PopoverProps {
    */
   strategy?: string;
   onChange?: (...args: unknown[]) => void;
-  renderAnchor?: (params: { open: boolean; toggle: () => void; show: () => void; hide: () => void }) => ReactNode;
+  renderAnchor?: (params: { open: boolean; toggle: unknown; show: unknown; hide: unknown }) => ReactNode;
   children?: ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

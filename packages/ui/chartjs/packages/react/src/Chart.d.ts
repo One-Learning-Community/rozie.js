@@ -53,7 +53,7 @@ export interface ChartProps {
   onDatasetClick?: (...args: unknown[]) => void;
   onHover?: (...args: unknown[]) => void;
   renderFallback?: () => ReactNode;
-  renderTooltip?: (params: { model: () => void }) => ReactNode;
+  renderTooltip?: (params: { model: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

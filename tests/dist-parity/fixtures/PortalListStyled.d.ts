@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 export interface PortalListStyledProps {
   items?: unknown[];
-  renderItem?: (params: { item: () => void }) => ReactNode;
+  renderItem?: (params: { item: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

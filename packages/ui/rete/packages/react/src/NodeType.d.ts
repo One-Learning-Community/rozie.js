@@ -27,7 +27,7 @@ export interface NodeTypeProps {
    * Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth.
    */
   maxHeight?: (number) | null;
-  renderBody?: (params: { node: () => void; selected: () => void; emit: () => void }) => ReactNode;
+  renderBody?: (params: { node: unknown; selected: unknown; emit: unknown }) => ReactNode;
   children?: ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

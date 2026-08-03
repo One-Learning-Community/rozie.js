@@ -8,8 +8,8 @@ export interface DropdownProps {
   onOpenChange?: (next: boolean) => void;
   closeOnOutsideClick?: boolean;
   closeOnEscape?: boolean;
-  renderTrigger?: (params: { open: boolean; toggle: () => void }) => ReactNode;
-  children?: ReactNode | ((params: { close: () => void }) => ReactNode);
+  renderTrigger?: (params: { open: boolean; toggle: unknown }) => ReactNode;
+  children?: ReactNode | ((params: { close: unknown }) => ReactNode);
   slots?: Record<string, () => ReactNode>;
 }
 

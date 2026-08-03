@@ -134,9 +134,9 @@ export interface MapLibreProps {
   onMouseenter?: (...args: unknown[]) => void;
   onMouseleave?: (...args: unknown[]) => void;
   children?: ReactNode;
-  renderMarker?: (params: { marker: () => void; index: () => void }) => ReactNode;
-  renderPopup?: (params: { popup: () => void; index: () => void }) => ReactNode;
-  renderControl?: (params: { map: () => void }) => ReactNode;
+  renderMarker?: (params: { marker: unknown; index: unknown }) => ReactNode;
+  renderPopup?: (params: { popup: unknown; index: unknown }) => ReactNode;
+  renderControl?: (params: { map: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

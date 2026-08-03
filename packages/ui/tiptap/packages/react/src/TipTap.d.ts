@@ -76,11 +76,11 @@ export interface TipTapProps {
   onFocus?: (...args: unknown[]) => void;
   onBlur?: (...args: unknown[]) => void;
   renderCount?: (params: { characters: unknown; words: unknown; maxLength: number; over: unknown }) => ReactNode;
-  renderToolbar?: (params: { editor: () => void }) => ReactNode;
-  renderBubbleMenu?: (params: { editor: () => void }) => ReactNode;
-  renderFloatingMenu?: (params: { editor: () => void }) => ReactNode;
-  renderLinkEditor?: (params: { editor: () => void; href: () => void; attrs: () => void; setLink: () => void; unsetLink: () => void; close: () => void }) => ReactNode;
-  renderNodeView?: (params: { node: () => void; selected: () => void; updateAttributes: () => void; getPos: () => void; editor: () => void; contentDOM: () => void }) => ReactNode;
+  renderToolbar?: (params: { editor: unknown }) => ReactNode;
+  renderBubbleMenu?: (params: { editor: unknown }) => ReactNode;
+  renderFloatingMenu?: (params: { editor: unknown }) => ReactNode;
+  renderLinkEditor?: (params: { editor: unknown; href: unknown; attrs: unknown; setLink: unknown; unsetLink: unknown; close: unknown }) => ReactNode;
+  renderNodeView?: (params: { node: unknown; selected: unknown; updateAttributes: unknown; getPos: unknown; editor: unknown; contentDOM: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

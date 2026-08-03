@@ -70,16 +70,16 @@ export interface FullCalendarProps {
   onUnselect?: (...args: unknown[]) => void;
   onLoading?: (...args: unknown[]) => void;
   onEventsSet?: (...args: unknown[]) => void;
-  renderEvent?: (params: { arg: () => void }) => ReactNode;
-  renderDayCell?: (params: { arg: () => void }) => ReactNode;
-  renderDayHeader?: (params: { arg: () => void }) => ReactNode;
-  renderSlotLabel?: (params: { arg: () => void }) => ReactNode;
-  renderWeekNumber?: (params: { arg: () => void }) => ReactNode;
-  renderNowIndicatorContent?: (params: { arg: () => void }) => ReactNode;
-  renderMoreLink?: (params: { arg: () => void }) => ReactNode;
-  renderAllDayContent?: (params: { arg: () => void }) => ReactNode;
-  renderSlotLaneContent?: (params: { arg: () => void }) => ReactNode;
-  renderNoEventsContent?: (params: { arg: () => void }) => ReactNode;
+  renderEvent?: (params: { arg: unknown }) => ReactNode;
+  renderDayCell?: (params: { arg: unknown }) => ReactNode;
+  renderDayHeader?: (params: { arg: unknown }) => ReactNode;
+  renderSlotLabel?: (params: { arg: unknown }) => ReactNode;
+  renderWeekNumber?: (params: { arg: unknown }) => ReactNode;
+  renderNowIndicatorContent?: (params: { arg: unknown }) => ReactNode;
+  renderMoreLink?: (params: { arg: unknown }) => ReactNode;
+  renderAllDayContent?: (params: { arg: unknown }) => ReactNode;
+  renderSlotLaneContent?: (params: { arg: unknown }) => ReactNode;
+  renderNoEventsContent?: (params: { arg: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

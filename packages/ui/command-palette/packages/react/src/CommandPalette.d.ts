@@ -101,18 +101,18 @@ export interface CommandPaletteProps {
   onBack?: (...args: unknown[]) => void;
   onSelect?: (...args: unknown[]) => void;
   onActionSelect?: (...args: unknown[]) => void;
-  renderBreadcrumb?: (params: { stack: unknown; back: () => void }) => ReactNode;
-  renderOption?: (params: { option: () => void; index: () => void; active: () => void; selected: () => void; disabled: () => void; matches: unknown }) => ReactNode;
-  renderGroupHeading?: (params: { group: () => void }) => ReactNode;
+  renderBreadcrumb?: (params: { stack: unknown; back: unknown }) => ReactNode;
+  renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown; matches: unknown }) => ReactNode;
+  renderGroupHeading?: (params: { group: unknown }) => ReactNode;
   renderEmpty?: (params: { query: string }) => ReactNode;
-  renderArgsField?: (params: { item: unknown; arg: () => void; value: unknown; setValue: unknown }) => ReactNode;
+  renderArgsField?: (params: { item: unknown; arg: unknown; value: unknown; setValue: unknown }) => ReactNode;
   renderLoading?: (params: { query: string }) => ReactNode;
-  renderError?: (params: { query: string; error: unknown; retry: () => void }) => ReactNode;
+  renderError?: (params: { query: string; error: unknown; retry: unknown }) => ReactNode;
   renderFooter?: () => ReactNode;
-  renderActionItem?: (params: { action: () => void; item: unknown; active: unknown; disabled: unknown }) => ReactNode;
-  renderIcon?: (params: { option: () => void }) => ReactNode;
-  renderActions?: (params: { option: () => void; actions: unknown }) => ReactNode;
-  renderTrailing?: (params: { option: () => void }) => ReactNode;
+  renderActionItem?: (params: { action: unknown; item: unknown; active: unknown; disabled: unknown }) => ReactNode;
+  renderIcon?: (params: { option: unknown }) => ReactNode;
+  renderActions?: (params: { option: unknown; actions: unknown }) => ReactNode;
+  renderTrailing?: (params: { option: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

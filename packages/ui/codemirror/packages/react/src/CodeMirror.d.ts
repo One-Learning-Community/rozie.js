@@ -47,11 +47,11 @@ export interface CodeMirrorProps {
    * An array of `{ from, to? }` **0-based document offsets** that each get an inline widget rendered by the `decoration` reactive multi-instance portal slot (one portal handle per visible widget). A point widget is placed at `from`; `to` is passed through in scope for the consumer's awareness. Compute an offset from a line via `view.state.doc.line(n).from`. Runtime-updatable via a `decorationCompartment` reconfigure. Only meaningful when the `decoration` slot is filled.
    */
   decorations?: unknown[];
-  renderPanel?: (params: { view: () => void }) => ReactNode;
-  renderTopPanel?: (params: { view: () => void }) => ReactNode;
-  renderTooltip?: (params: { view: () => void; pos: () => void }) => ReactNode;
-  renderGutter?: (params: { line: () => void; view: () => void }) => ReactNode;
-  renderDecoration?: (params: { from: () => void; to: () => void; view: () => void }) => ReactNode;
+  renderPanel?: (params: { view: unknown }) => ReactNode;
+  renderTopPanel?: (params: { view: unknown }) => ReactNode;
+  renderTooltip?: (params: { view: unknown; pos: unknown }) => ReactNode;
+  renderGutter?: (params: { line: unknown; view: unknown }) => ReactNode;
+  renderDecoration?: (params: { from: unknown; to: unknown; view: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

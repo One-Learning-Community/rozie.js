@@ -65,9 +65,9 @@ export interface DatePickerProps {
   isDateDisabled?: ((...args: any[]) => any) | null;
   onChange?: (...args: unknown[]) => void;
   onRangeComplete?: (...args: unknown[]) => void;
-  renderHeader?: (params: { label: unknown; prev: () => void; next: () => void; disabled: unknown }) => ReactNode;
-  renderFooter?: (params: { today: () => void; clear: () => void; todayIso: unknown }) => ReactNode;
-  renderPresets?: (params: { presets: unknown; apply: () => void }) => ReactNode;
+  renderHeader?: (params: { label: unknown; prev: unknown; next: unknown; disabled: unknown }) => ReactNode;
+  renderFooter?: (params: { today: unknown; clear: unknown; todayIso: unknown }) => ReactNode;
+  renderPresets?: (params: { presets: unknown; apply: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

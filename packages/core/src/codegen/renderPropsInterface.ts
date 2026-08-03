@@ -273,16 +273,33 @@ export function renderPropType(ann: PropTypeAnnotation): string {
  *
  *   1. Bare Identifier (`<slot :open="open">`) — look up in ir.props by name.
  *      (Note: Phase 2 IR's StateDecl does NOT carry a typeAnnotation field,
- *      so $data identifiers fall through to the function-fallback below;
+ *      so $data identifiers fall through to the genuine fallback below;
  *      v2 may extend StateDecl with inferred types.)
  *   2. MemberExpression (`<slot :open="$props.open">` / `$data.open`) — resolve
  *      the property name and look up in `ir.props` (and reach state-decl
  *      existence-check for callable-vs-value disambiguation).
- *   3. Bare Identifier that doesn't resolve to a prop and isn't in ir.state →
- *      treat as a residual-script function reference, emit `() => void` as
- *      the canonical-Dropdown `toggle: () => void` shape (documented v1
- *      heuristic per plan §<action> Note on D-86 inference scope).
- *   4. Genuine fallback: `'unknown'` per CONTEXT.md D-86.
+ *   3. Genuine fallback: `'unknown'` per CONTEXT.md D-86.
+ *
+ * Quick 260802-v1v seam 7 — a bare Identifier that doesn't resolve to a prop
+ * PREVIOUSLY special-cased as "residual-script function reference" and
+ * emitted `() => void` (the canonical-Dropdown `toggle` heuristic). That
+ * heuristic has no way to distinguish an actual script-defined callback
+ * (`toggle`) from an `r-for` LOOP VARIABLE (`<slot :slide="slide" :index="i">`
+ * inside `r-for="slide, i in $props.slides"` — the `Carousel.rozie:573`
+ * shape) — loop vars are unresolved by construction (never props), so they
+ * hit the same branch and the PUBLIC `.d.ts` lied about the consumer-facing
+ * shape (`slide: () => void` for a plain array element). `inferParamType`
+ * has no visibility into the enclosing template scope (it receives only the
+ * `ParamDecl` + `IRComponent`, not the loop-variable binding context), so
+ * there is no principled way to keep the callable heuristic for ONE bare-
+ * identifier shape while excluding the other from this call site — removed
+ * entirely; both now fall through to the genuine `unknown` fallback. This
+ * DELIBERATELY changes the Dropdown `toggle` shape from `() => void` to
+ * `unknown` — a reviewed, intentional trade: `unknown` is honest (forces the
+ * consumer to narrow/assert before calling), where `() => void` was already
+ * a v1 best-effort GUESS, not a resolved type. The INLINE `.tsx`/`.vue`/
+ * `.svelte` body path (`refineSlotTypes.ts`, per-target) is unaffected — it
+ * already used the safe `any` universally and does not call this function.
  *
  * @public — shared so slot-param inference cannot drift between targets.
  */
@@ -295,12 +312,8 @@ export function inferParamType(param: ParamDecl, ir: IRComponent): string {
     const name = expr.name;
     const propDecl = ir.props.find((p) => p.name === name);
     if (propDecl) return renderPropType(propDecl.typeAnnotation);
-
-    // Case 3 — identifier present in ir.state is a known reactive value but
-    // we have no v1 type info — fall through to the callable fallback below.
-    // Identifier NOT in state OR props is treated as a residual-script
-    // function reference per the canonical Dropdown `toggle` shape.
-    return '() => void';
+    // Unresolved bare identifier (r-for loop var OR a residual script
+    // reference) — fall through to the genuine `unknown` fallback below.
   }
 
   // Case 2 — MemberExpression (`$props.foo`, `$data.bar`, etc.).
@@ -318,7 +331,7 @@ export function inferParamType(param: ParamDecl, ir: IRComponent): string {
     }
   }
 
-  // Case 4 — genuine fallback per D-86.
+  // Case 3 — genuine fallback per D-86.
   return 'unknown';
 }
 

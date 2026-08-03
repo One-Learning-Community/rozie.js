@@ -48,7 +48,7 @@ export interface TagsProps {
   onChange?: (...args: unknown[]) => void;
   onAdd?: (...args: unknown[]) => void;
   onRemove?: (...args: unknown[]) => void;
-  renderTag?: (params: { tag: () => void; index: unknown; remove: unknown }) => ReactNode;
+  renderTag?: (params: { tag: unknown; index: unknown; remove: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

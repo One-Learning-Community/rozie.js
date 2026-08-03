@@ -9,9 +9,9 @@ export interface ModalProps {
   lockBodyScroll?: boolean;
   title?: string;
   onClose?: (...args: unknown[]) => void;
-  renderHeader?: (params: { close: () => void }) => ReactNode;
-  children?: ReactNode | ((params: { close: () => void }) => ReactNode);
-  renderFooter?: (params: { close: () => void }) => ReactNode;
+  renderHeader?: (params: { close: unknown }) => ReactNode;
+  children?: ReactNode | ((params: { close: unknown }) => ReactNode);
+  renderFooter?: (params: { close: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

@@ -8,8 +8,8 @@ export interface TodoListProps {
   onAdd?: (...args: unknown[]) => void;
   onToggle?: (...args: unknown[]) => void;
   onRemove?: (...args: unknown[]) => void;
-  renderHeader?: (params: { remaining: () => void; total: unknown }) => ReactNode;
-  children?: ReactNode | ((params: { item: () => void; toggle: unknown; remove: unknown }) => ReactNode);
+  renderHeader?: (params: { remaining: unknown; total: unknown }) => ReactNode;
+  children?: ReactNode | ((params: { item: unknown; toggle: unknown; remove: unknown }) => ReactNode);
   renderEmpty?: () => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

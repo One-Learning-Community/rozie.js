@@ -38,10 +38,10 @@ export interface PaginationProps {
    */
   ariaLabel?: string;
   onChange?: (...args: unknown[]) => void;
-  renderPrevControl?: (params: { disabled: unknown; goto: () => void; page: unknown }) => ReactNode;
-  renderEllipsis?: (params: { index: () => void }) => ReactNode;
-  renderItem?: (params: { page: () => void; selected: unknown; goto: unknown }) => ReactNode;
-  renderNextControl?: (params: { disabled: unknown; goto: () => void; page: unknown }) => ReactNode;
+  renderPrevControl?: (params: { disabled: unknown; goto: unknown; page: unknown }) => ReactNode;
+  renderEllipsis?: (params: { index: unknown }) => ReactNode;
+  renderItem?: (params: { page: unknown; selected: unknown; goto: unknown }) => ReactNode;
+  renderNextControl?: (params: { disabled: unknown; goto: unknown; page: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

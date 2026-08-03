@@ -93,9 +93,9 @@ export interface CarouselProps {
   onSettle?: (...args: unknown[]) => void;
   onReInit?: (...args: unknown[]) => void;
   onPointerDown?: (...args: unknown[]) => void;
-  renderSlide?: (params: { slide: () => void; index: () => void }) => ReactNode;
+  renderSlide?: (params: { slide: unknown; index: unknown }) => ReactNode;
   children?: ReactNode;
-  renderThumb?: (params: { slide: () => void; index: () => void }) => ReactNode;
+  renderThumb?: (params: { slide: unknown; index: unknown }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 

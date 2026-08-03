@@ -93,7 +93,7 @@ export interface SortableListProps {
   onStart?: (...args: unknown[]) => void;
   onEnd?: (...args: unknown[]) => void;
   renderHeader?: () => ReactNode;
-  children?: ReactNode | ((params: { item: () => void; index: () => void }) => ReactNode);
+  children?: ReactNode | ((params: { item: unknown; index: unknown }) => ReactNode);
   renderFooter?: () => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

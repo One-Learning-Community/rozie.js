@@ -69,8 +69,8 @@ export interface ListboxProps {
   maxHeight?: string;
   onOpenChange?: (...args: unknown[]) => void;
   onChange?: (...args: unknown[]) => void;
-  renderSelected?: (params: { selected: () => void; value: unknown }) => ReactNode;
-  renderOption?: (params: { option: () => void; index: () => void; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
+  renderSelected?: (params: { selected: unknown; value: unknown }) => ReactNode;
+  renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;

@@ -107,8 +107,8 @@ export interface FlowCanvasProps {
   onNodeMoved?: (...args: unknown[]) => void;
   onTranslated?: (...args: unknown[]) => void;
   onContextMenu?: (...args: unknown[]) => void;
-  renderNode?: (params: { node: () => void; selected: () => void; emit: () => void }) => ReactNode;
-  renderToolbar?: (params: { node: () => void; emit: () => void }) => ReactNode;
+  renderNode?: (params: { node: unknown; selected: unknown; emit: unknown }) => ReactNode;
+  renderToolbar?: (params: { node: unknown; emit: unknown }) => ReactNode;
   children?: ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

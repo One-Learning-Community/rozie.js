@@ -25,9 +25,13 @@
  *     the interface AND the function signature both carry the type-parameter list.
  *   - D-86 best-effort param-type inference — slot-param `valueExpression` is
  *     resolved against `ir.props` (member-expressions like `$props.open` and
- *     bare identifiers) with `'unknown'` as the genuine fallback. Callable-
- *     looking unresolved identifiers (e.g., Dropdown's `toggle`) emit `() => void`
- *     as a best-effort hint per the canonical Dropdown shape.
+ *     bare identifiers) with `'unknown'` as the genuine fallback for anything
+ *     unresolved. (Quick 260802-v1v seam 7 — an unresolved bare identifier
+ *     PREVIOUSLY emitted a best-effort `() => void` callable guess; removed
+ *     because it could not distinguish a real script-defined callback
+ *     (Dropdown's `toggle`) from an `r-for` loop variable — both are
+ *     unresolved bare identifiers at this call site, and the guess silently
+ *     lied about the loop-var shape. Both now fall to `unknown`.)
  *
  * Per Pitfall 2 (Oxc isolated-decl): every exported function carries an
  * explicit return-type annotation so tsdown's isolated-decl typegen succeeds
