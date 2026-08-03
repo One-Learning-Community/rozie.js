@@ -62,8 +62,8 @@ import '@rozie-ui/otp-react/themes/shadcn.css';    // or material.css, bootstrap
 
 | Event | Description |
 | --- | --- |
-| `change` | Fired on every edit (type, paste, backspace, or a programmatic `clear`). Payload `{ value }` — the new contiguous code string (0..`length` chars). |
-| `complete` | Fired when the last cell is filled, i.e. the code reaches `length` characters. Payload `{ value }` — the complete code string. Use it to auto-submit a verification flow. |
+| `change` | Fired on every edit (type, paste, backspace, or a programmatic `clear`) that actually changes the code — a write that produces the same value does not re-emit. Payload `{ value }` — the new contiguous code string (0..`length` chars). Funneled through one `commitValue` wrapper so the React prop-destructure hoists exactly once. |
+| `complete` | Fired on the not-full → full transition, i.e. the code reaches `length` characters. Editing a cell of an already-complete code does not re-fire it, and `clear()` never fires it. Payload `{ value }` — the complete code string. Use it to auto-submit a verification flow. |
 
 ## Imperative handle
 

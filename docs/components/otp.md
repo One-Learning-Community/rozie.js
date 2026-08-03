@@ -68,8 +68,8 @@ Two-way bind `value` and set `length` / `type` to get a segmented code input. Th
 
 | Event | Description |
 | --- | --- |
-| `change` | Fired on every edit (type, paste, backspace, or a programmatic `clear`). Payload `{ value }` — the new contiguous code string (`0..length` chars). Funneled through one `writeValue` wrapper so the React prop-destructure hoists exactly once. |
-| `complete` | Fired when the last cell is filled (the code reaches `length` characters). Payload `{ value }` — the complete code. Use it to auto-submit a verification flow. |
+| `change` | Fired on every edit (type, paste, backspace, or a programmatic `clear`) **that actually changes the code** — a write that produces the same value does not re-emit. Payload `{ value }` — the new contiguous code string (`0..length` chars). Funneled through one `commitValue` wrapper so the React prop-destructure hoists exactly once. |
+| `complete` | Fired on the **not-full → full transition** (the code reaches `length` characters). Editing a cell of an already-complete code does not re-fire it, and `clear()` never fires it. Payload `{ value }` — the complete code. Use it to auto-submit a verification flow. |
 
 ### Imperative handle
 
@@ -118,16 +118,17 @@ Focus a cell (`Tab` or click), then drive the input from the keyboard. Typing a 
 
 | Key | Action |
 | --- | --- |
-| a digit / character | Filtered by `type`; written into the cell and focus advances to the next cell. Overwrites a filled cell (the last char typed wins). |
+| a digit / character | Filtered by `type`, then written at the **first empty cell** — clicking a cell past the fill point and typing lands the character there rather than leaving a hole. A **full** code stays editable in place at any cell (the clamp is a no-op when there is no empty cell left), so overwriting a filled cell works. |
+| multi-character input (SMS autofill, swipe, IME commit) | The whole string is filtered by `type` and distributed across cells from the same clamped position paste uses — one routine serves single-char typing, autofill, swipe, and IME commit alike. |
 | `Backspace` | Delete the current cell's character; if it is already empty, delete the previous cell's character and move focus back. |
 | `←` / `→` | Move focus to the previous / next cell (no edit). |
 | `Home` / `End` | Move focus to the first / last cell. |
-| paste | The pasted text is filtered by `type` and distributed across the cells from the current position; focus lands after the last filled cell. |
+| paste | The pasted text is filtered by `type` and distributed across the cells from the **clamped** position (the first empty cell, or the paste target when the code is already full); focus lands after the last written cell. |
 
 ## Accessibility
 
 - The container is a `role="group"` with the `ariaLabel` you supply as its `aria-label`; each cell is a native `<input maxlength="1">` carrying an ordinal `aria-label` (`"Digit 1 of 6"`).
 - The first cell sets `autocomplete="one-time-code"`, so mobile browsers offer to autofill a code received over SMS; the remaining cells set `autocomplete="off"`.
-- `type="numeric"` sets `inputmode="numeric"` for a numeric soft keyboard; `'alphanumeric'` / `'text'` use `inputmode="text"`. `autocapitalize`, `autocorrect`, and `spellcheck` are disabled on every cell.
+- `type="numeric"` sets `inputmode="numeric"` for a numeric soft keyboard; `'alphanumeric'` / `'text'` use `inputmode="text"`. `autocapitalize` is disabled on every cell. (`autocorrect` / `spellcheck` are NOT currently set — a prior revision of this page claimed otherwise; that was inaccurate. Authoring them exposed two pre-existing per-target attribute-map bugs — React has no `autocorrect` mapping and Solid's `spellcheck` mapping targets the wrong casing — tracked as an emitter fix, not an Otp.rozie change.)
 - `mask` switches the cells to `type="password"` so a sensitive code renders as dots while keeping the same keyboard and ARIA behaviour.
 - Focus choreography reads a **single container ref** and walks `root.querySelectorAll('input')` — which reaches the cells inside Lit's shadow root too — and runs only in post-mount handlers, so it is identical on all six targets.
