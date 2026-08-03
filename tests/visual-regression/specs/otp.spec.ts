@@ -499,7 +499,16 @@ for (const target of TARGETS) {
 
       // ---- 3. complete fires exactly once (D4) — fill to 6, then OVERWRITE
       // an already-filled cell (click + keypress, length staying at 6
-      // throughout — the D5 path) and assert complete does NOT re-fire. ----
+      // throughout — the D5 path) and assert complete does NOT re-fire.
+      //
+      // Baseline via DELTA, not a hardcoded count: step 1's autofill above
+      // already drove one legitimate not-full -> full transition ('' ->
+      // '135790'), so completeCount is already nonzero here. Capture it
+      // before this fill and assert it advances by exactly ONE (this fill's
+      // own not-full -> full transition), then stays flat through the
+      // in-place overwrite (the actual D4 regression this step proves). ----
+      const completeCountBeforeFill = (await completeCount.textContent())?.trim() ?? '0';
+      const expectedAfterFill = String(Number(completeCountBeforeFill) + 1);
       await page.getByTestId('otp-clear').click();
       await expect
         .poll(async () => (await code.textContent())?.trim() ?? '', {
@@ -522,7 +531,7 @@ for (const target of TARGETS) {
           timeout: 10_000,
           intervals: [100, 200, 400, 800],
         })
-        .toBe('1');
+        .toBe(expectedAfterFill);
       // In-place overwrite of the (still full) already-complete code.
       await cells.nth(0).click();
       await page.keyboard.press('9');
@@ -537,11 +546,11 @@ for (const target of TARGETS) {
           timeout: 10_000,
           intervals: [100, 200, 400, 800],
         })
-        .toBe('1');
+        .toBe(expectedAfterFill);
 
       // ---- 5. focus() / clear() handles — clear() must reset the code AND
       // must NOT increment readout-complete-count (the clear()-emits-complete
-      // half of D4; completeCount is meaningfully nonzero ('1') here). ----
+      // half of D4; completeCount is meaningfully nonzero here). ----
       await page.getByTestId('otp-clear').click();
       await expect
         .poll(async () => (await code.textContent())?.trim() ?? '', {
@@ -554,7 +563,7 @@ for (const target of TARGETS) {
           timeout: 10_000,
           intervals: [100, 200, 400, 800],
         })
-        .toBe('1');
+        .toBe(expectedAfterFill);
       // focus() moves focus to the first empty cell (index 0 after clear()).
       await page.getByTestId('otp-focus').click();
       await expect
