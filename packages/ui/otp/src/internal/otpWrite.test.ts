@@ -64,6 +64,23 @@ describe('firstEmptyIndex / planWrite — D3 clamp to the fill point', () => {
   it('focus never exceeds length - 1', () => {
     expect(planWrite('12345', 6, 'numeric', 5, '6')?.focus).toBe(5);
   });
+
+  // IN-04 (Quick 260803-ibt) — the degenerate `length: 0` boundary.
+  // `firstEmptyIndex('', 0)` is `-1` (`len(0) >= length(0)` -> `length - 1`
+  // = `-1`), so pre-fix `planWrite` computed `landed = Math.min(index, -1)`
+  // = `-1`, the fill loop wrote `arr[-1]` (a non-index property, harmlessly
+  // ignored by `.join('')`), and the function returned `{ next: '', landed:
+  // -1, focus: 0 }` — violating `OtpWrite.landed`'s documented contract
+  // ("the index the FIRST char actually wrote to"): no char landed anywhere
+  // at `length: 0`, so `-1` is not a real answer. Early-return `null` — the
+  // caller already handles `null` by restoring the originating cell's DOM
+  // value from the (unchanged) model.
+  it('length: 0 boundary — planWrite returns null, never { landed: -1 }', () => {
+    // '5' passes the numeric sanitize filter (chars.length > 0), so this
+    // exercises the length:0 landed-clamp path specifically, not the
+    // pre-existing "every character disallowed" early return above.
+    expect(planWrite('', 0, 'numeric', 0, '5')).toBeNull();
+  });
 });
 
 describe('planEmits — D4 emit hygiene', () => {
