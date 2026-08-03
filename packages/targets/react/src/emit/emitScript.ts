@@ -1500,6 +1500,34 @@ function renderGetterExpression(
   return genCode(body);
 }
 
+/**
+ * Quick 260802-v1v seam 2 — is `node` a "stable-comparable derived
+ * expression": a bare (non-optional, non-computed) MemberExpression chain
+ * rooted in a plain Identifier, with NO CallExpression anywhere in the
+ * chain?
+ *
+ * Gated tightly on purpose. A member chain like `props.xs.length` is safe to
+ * use AS THE DEP ITSELF — React's `Object.is` comparison on the derived
+ * primitive (a number) does exactly what the watcher contract wants (fire
+ * when the WATCHED VALUE changes), matching Vue/Svelte/Solid/Angular's
+ * getter-tracks-whatever-it-reads semantics. A CALL anywhere in the chain
+ * (`buildConfig()`, `getX().length`) is explicitly EXCLUDED — that is the
+ * shape the 260519 linechart-watch-recreate fix (Bug B) exists to protect:
+ * an unstable call-derived identity in the dep array re-fires the effect on
+ * every render. Optional chaining (`xs?.length`) and computed member access
+ * (`xs[i]`) are ALSO excluded — neither is a proven-safe shape, and this
+ * gate does not guess.
+ */
+function isStableMemberChainGetter(node: t.Expression | t.BlockStatement): boolean {
+  if (t.isBlockStatement(node)) return false;
+  let cur: t.Node = node;
+  while (t.isMemberExpression(cur)) {
+    if (cur.computed) return false;
+    cur = cur.object;
+  }
+  return t.isIdentifier(cur);
+}
+
 export interface EmitScriptResult {
   /**
    * Portal-slot primitive (Spike 003) — true when the IR has any slot with
@@ -2918,7 +2946,23 @@ export function emitScript(
     // recreate the Chart.js instance) on every data change. The exhaustive-
     // deps rule is advisory tooling; the watcher-fires-on-getter contract is
     // the correctness invariant — and it matches the five sibling targets.
-    const depsArr = renderDepArray(wh.getterDeps, modelProps);
+    //
+    // Quick 260802-v1v seam 2 — `renderDepArray`'s `props` case path-narrows
+    // a member-chain getter (`props.xs.length`) to the root identifier
+    // (`props.xs`) — an IDENTITY dep, not the actual watched VALUE. The
+    // rendered getter text (`renderedGetter`, computed above for the param
+    // rebind) is the derived value itself; when it is a proven-safe stable
+    // member chain (`isStableMemberChainGetter`, gated on the RAW un-rewritten
+    // getter body so a call ANYWHERE in the chain is excluded), dep the
+    // effect on THAT instead of the narrowed root. Do NOT widen
+    // `renderDepArray` / `renderSignalRef` here — they are shared with
+    // `$computed` (:2548-ish) and `$onMount` (:2720-ish); a global change
+    // would move dep arrays across the entire repo for reasons unrelated to
+    // this seam (S3).
+    const rawGetterNode = paired?.getterCloned ?? wh.getter;
+    const depsArr = isStableMemberChainGetter(rawGetterNode)
+      ? `[${renderedGetter}]`
+      : renderDepArray(wh.getterDeps, modelProps);
 
     // 260519 linechart-watch-recreate Round 4 — emit a TARGETED
     // `react-hooks/exhaustive-deps` disable on the watcher useEffect's

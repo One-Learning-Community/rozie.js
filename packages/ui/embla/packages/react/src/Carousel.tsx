@@ -403,7 +403,7 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     embla.current?.reInit(reinitOptions());
     emblaThumbs.current?.reInit(thumbsOptionsFromProps());
     syncNav();
-  }, [props.slides]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [props.slides.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch4First.current) { _watch4First.current = false; return; }
     const on = props.thumbnails;
