@@ -1,11 +1,12 @@
 <!--
-  AttrNullishDrop.rozie — quick-task 260608-sya
+  AttrNullishDrop.rozie — quick-task 260608-sya; extended by quick 260802-v1v
+  (seams 3+4).
 
   Nullish attribute-binding DROP parity fixture. Pins the cross-framework
   behavior that a WHOLE-VALUE one-way attribute binding whose value is
   null/undefined DROPS the attribute (no `attr=""`) on the five non-Vue
   targets, matching Vue's native `:attr` semantics (`patchAttr`: value == null
-  → removeAttribute). Three positions:
+  → removeAttribute). Five positions:
 
     (1) :data-x="$data.cond ? 'v' : null"
         → a ConditionalExpression with a `null` branch (wrapForDisplay=true).
@@ -22,21 +23,43 @@
         → a plain untyped $data member (wrapForDisplay=true). DROPS — proves the
           fix is not ternary-specific: any nullish wrapped attr value drops.
 
+    (4) :title="$props.maybeNullProp" (maybeNullProp: { type: String, default: null })
+        → a RAW read of a `null`-defaulted PROP (`wrapForDisplay=false` — it's
+          provably a primitive String read, not a display-wrapped expression).
+          Seam 3 (quick 260802-v1v): Lit had no second gate for this shape —
+          React (`emitTemplateAttribute.ts:1195-1217`, "Phase 65 Class 1/SC-1")
+          and Solid (`:263,824`) already route a nullable prop READ through
+          `rozieAttr` even when `wrapForDisplay=false`; Lit rendered the raw
+          value (`aria-label=""` on null) until this fixture's fix landed.
+
+    (5) r-for element with :key carrying position (4)'s same binding
+        → seam 4 (quick 260802-v1v): the `r-for` LOOP key must be consumed by
+          `repeat()`'s key function, never emitted as a literal DOM attribute.
+          Lit leaked `key=${rozieAttr(c)}` on every loop element until this
+          fixture's fix landed; the other five targets already strip it.
+
   Drop sentinels are verified at runtime by the behavioral absence spec
-  (tests/vr/specs/attr-nullish-drop.spec.ts): hasAttribute('data-x') === false
-  and getAttribute('aria-expanded') === 'false' across the matrix. The dist-
-  parity byte gate (this fixture, registered in bootstrap-fixtures.mjs +
-  parity.test.ts) pins the rozieAttr(...) emit shape across all six targets:
-  the five non-Vue targets emit rozieAttr; Vue stays native. Single-file; no
-  sibling .rozie producers — stays OUT of RESOLVER_ROOT.
+  (tests/visual-regression/specs/attr-nullish-drop.spec.ts): hasAttribute
+  checks across the matrix. The dist-parity byte gate (this fixture,
+  registered in bootstrap-fixtures.mjs + parity.test.ts) pins the
+  rozieAttr(...) emit shape across all six targets: the five non-Vue targets
+  emit rozieAttr; Vue stays native. Single-file; no sibling .rozie producers
+  — stays OUT of RESOLVER_ROOT.
 -->
 
 <rozie name="AttrNullishDrop">
+
+<props>
+{
+  maybeNullProp: { type: String, default: null },
+}
+</props>
 
 <data>
 {
   cond: false,
   maybeNull: null,
+  loopItems: ['a', 'b'],
 }
 </data>
 
@@ -47,6 +70,13 @@
     :aria-expanded="$data.cond ? 'true' : 'false'"
     :title="$data.maybeNull"
   >probe</span>
+  <span class="attr-nullish-drop-prop" :title="$props.maybeNullProp">probe-prop</span>
+  <i
+    r-for="c in $data.loopItems"
+    :key="c"
+    class="attr-nullish-drop-loop"
+    :title="$props.maybeNullProp"
+  >{{ c }}</i>
 </div>
 </template>
 
