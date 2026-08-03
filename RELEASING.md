@@ -132,6 +132,7 @@ When a family becomes release-verified, widen the workflow — and mirror the sa
 - **Private `@rozie/*` deps are dangling-dep traps** — a `workspace:` runtime dependency on a private package (e.g. an `@rozie/target-*`) publishes as a concrete version that 404s on npm; it must be a devDependency (bundled at build time). The precheck flags this.
 - **`tsdown` dual packages emit `.d.mts`/`.d.cts`, not `.d.ts`** — a `types: "./dist/index.d.ts"` after a copy-paste will reference a nonexistent file. The precheck `(d)` check catches it.
 - **The CI precheck is ADVISORY by design** — a green CI run does **not** mean the version/dep timing checks passed. Those only run in your LOCAL `--gate`.
+- **"Pre-existing failure" baselines must be captured against the last GREEN PUSHED commit, not the current tree.** The 2026-08-03 wave captured its Task-0 baseline *after* the commit that broke the docs build, so a series-introduced regression was recorded as pre-existing and shipped. Identify the last green pushed commit (CI run history, not local state) and diff against that.
 
 ---
 

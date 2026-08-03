@@ -2964,6 +2964,23 @@ export function emitScript(
       ? `[${renderedGetter}]`
       : renderDepArray(wh.getterDeps, modelProps);
 
+    // IN-01 (Quick 260803-ibt, no behavior change — documentation only) —
+    // `[${renderedGetter}]` (e.g. `[props.a.b]`) EXECUTES the getter's member
+    // chain at render time, INCLUDING the first render — where the prior
+    // identity dep (`[props.a]`) never dereferenced `.b`. A `$watch(() =>
+    // $props.a.b, …)` whose intermediate (`a`) is `undefined` at mount
+    // previously mounted fine on React (the lazy first run returned before
+    // the param rebind); it now throws during the first render. This is
+    // DELIBERATE crash-parity with Vue/Solid/Svelte, which all evaluate the
+    // getter eagerly — kept as-is, not reverted — but it is a real,
+    // documented-late behavior change for existing React consumers whose
+    // getter chain can be undefined at mount. See `docs/features/` (the
+    // watcher page) for the consumer-facing note and the
+    // `$watch(() => $props.a?.b, …)` optional-chaining workaround. No
+    // nullability gate (reusing the seam-3 `isNullablePropRead` machinery)
+    // was added here — that is a minor-release design question, not a
+    // patch-wave fix.
+    //
     // 260519 linechart-watch-recreate Round 4 — emit a TARGETED
     // `react-hooks/exhaustive-deps` disable on the watcher useEffect's
     // dependency-array line WHEN (and only when) the callback body reads a

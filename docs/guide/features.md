@@ -794,6 +794,28 @@ $watch(() => $data.liveFeed, (on) => {
 The `immediate` initial fire happens at watcher-setup time, which lands **before** `$onMount` on vue/angular and **after** it on react/svelte/solid/lit. Do **not** use `{ immediate: true }` for engine-instance reconciliation that depends on the engine already existing — that's exactly what the lazy default plus an `$onMount` build is for. Reserve `immediate` for self-contained side effects (timers, derived-state sync) that don't touch an engine handle.
 :::
 
+### React member-chain getters evaluate eagerly, including on first render
+
+When the getter is a **derived member chain** (e.g. `() => $props.a.b`, more than one property hop off `$props`/`$data`), React's dep array holds the **rendered getter expression itself** (`[props.a.b]`), not just the root prop identity (`[props.a]`). That means the chain is **dereferenced at every render, including the first** — matching Vue/Solid/Svelte/Angular, all of which evaluate a `$watch` getter eagerly regardless of the lazy-fire-vs-eager-fire distinction above (lazy only gates the *callback*, not the *getter read*).
+
+```rozie
+<script>
+// If $props.a can be undefined at mount, this throws during React's FIRST
+// render (a.b dereferences undefined) — it does not "wait" for a to exist.
+$watch(() => $props.a.b, (v) => { /* cb */ })
+</script>
+```
+
+Prior to this eager-dependency fix, React's dep array narrowed a member chain to its root identity (`[props.a]`) and never dereferenced `.b` in the dependency computation — so the same getter mounted fine even when `a` was `undefined` at mount, and only threw later once the watcher's lazy callback actually ran (if it ever did). That was a silent cross-target divergence: Vue/Solid/Svelte/Angular already crashed in this situation, and React quietly didn't. The current behavior is **crash-parity with the other five targets** and is the correct trade — but it is a real, late-documented behavior change for existing React consumers whose watched chain can be `undefined` at mount.
+
+If your chain's intermediate can genuinely be absent at mount, guard it explicitly:
+
+```rozie
+<script>
+$watch(() => $props.a?.b, (v) => { /* cb */ })
+</script>
+```
+
 ### Change detection is reference equality (`!==`)
 
 The watcher fires when the getter's return value is `!==` its previous value. A getter that returns a **fresh object or array reference every run** therefore fires on **every** reactive tick:
