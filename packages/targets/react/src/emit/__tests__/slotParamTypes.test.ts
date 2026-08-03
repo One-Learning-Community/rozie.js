@@ -1,23 +1,48 @@
 /**
- * Quick 260802-v1v Task 11 — SEAM 7 INVESTIGATE (timeboxed): React `.d.ts`
- * slot params typed `() => void` for `r-for` loop vars.
+ * Quick 260802-v1v Task 11 — SEAM 7, revised by Quick 260803-ibt (CR-02).
  *
- * D-86 (`renderPropsInterface.ts:289-323`, `inferParamType`) resolves a
- * slot-param `valueExpression` against `ir.props` ONLY. `r-for` loop vars
- * are unresolved BY CONSTRUCTION — they are never props — so Case 1's bare-
- * Identifier fallback ("treat as a residual-script function reference")
- * fires and emits `() => void`, even when the identifier is a plain data
- * value (an array element, an index). `<slot name="slide" :slide="slide"
- * :index="i">` inside an `r-for="slide, i in $props.slides"` — the
- * `Carousel.rozie:573` shape — emits a public `.d.ts` that LIES about the
- * consumer-facing slot-param callback shape: `renderSlide?: (params: {
- * slide: () => void; index: () => void }) => ReactNode`, when both are
- * plain data values (an array element and a loop index), never callables.
+ * WHAT SEAM 7 GOT RIGHT: D-86 (`renderPropsInterface.ts:289-323`,
+ * `inferParamType`) previously resolved a slot-param `valueExpression`
+ * against `ir.props` ONLY, and a bare-Identifier that failed to resolve
+ * ("treat as a residual-script function reference") emitted `() => void`
+ * unconditionally. `r-for` loop vars are unresolved BY CONSTRUCTION — they
+ * are never props — so `<slot name="slide" :slide="slide" :index="i">`
+ * inside an `r-for="slide, i in $props.slides"` (the `Carousel.rozie:573`
+ * shape) emitted a public `.d.ts` that LIED about the consumer-facing
+ * slot-param shape (`slide: () => void` for a plain array element). Seam 7
+ * correctly killed that lie for loop vars.
+ *
+ * WHAT SEAM 7 OVERSHOT (CR-02): the same removal ALSO downgraded every
+ * genuinely-callable slot param that resolves to a top-level `<script>`
+ * function — documented consumer API (popover `toggle`, data-table
+ * `setFilter`, command-palette `retry`, and this file's own `Dropdown`
+ * `toggle` shape). Those are resolvable: `IRComponent.setupBody` is the
+ * PRESERVED Babel Program (IR-04 referential preservation — the SAME `File`
+ * node as `ast.script.program`, no clone), so a bare identifier CAN be
+ * checked against top-level script function names without any signature
+ * change to `inferParamType`/`renderPropsInterface` — script scope is
+ * resolvable from `ir` alone; TEMPLATE scope (where `r-for` loop vars live)
+ * is not, which is exactly why loop vars still correctly fall through to
+ * `unknown`.
+ *
+ * WHY `(...args: any[]) => any` AND NOT `() => void`: `() => void` was the
+ * original v1 lie — wrong ARITY (`setFilter(columnId, value)` consumers
+ * were already casting around it even before seam 7). `(...args: any[]) =>
+ * any` is the house callable-lowering standard (see `renderPropType`'s
+ * `Function`/`'function'` cases in this same file) and fixes the arity lie
+ * in the same change, while remaining a genuinely permissive callable type.
+ *
+ * This test previously asserted the `toggle` shape moving `() => void` ->
+ * `unknown` as "deliberate, reviewed" — that assertion CEMENTED the CR-02
+ * regression (memory: `feedback_snapshot_tests_cement_bugs`) and is
+ * inverted below to assert `toggle` resolves callable again. The loop-var
+ * assertions (`slide`/`index` must NOT be callable) are unchanged — that
+ * half of seam 7 was correct and stays.
  *
  * The INLINE `.tsx` path (`refineSlotTypes.ts`) already emits the SAFE
  * `any` for exactly this case; only the separately-synthesised PUBLIC
- * `.d.ts` lies — this is the consumer-facing product surface, in scope
- * per the house rule ([[feedback_no_cosmetic_tsc_on_emitted_bodies]] draws
+ * `.d.ts` is in scope — this is the consumer-facing product surface, per
+ * the house rule ([[feedback_no_cosmetic_tsc_on_emitted_bodies]] draws
  * the line at emitted BODIES, not public types).
  */
 import { describe, it, expect } from 'vitest';
@@ -57,14 +82,11 @@ describe('emitReactTypes — r-for slot-param .d.ts type (Quick 260802-v1v seam 
     expect(dts).not.toContain('index: () => void');
   });
 
-  it('deliberate, reviewed change — the Dropdown toggle shape moves from () => void to unknown', () => {
-    // The D-86 "residual-script function reference" heuristic (removed by
-    // this seam) had no way to distinguish an actual script-defined
-    // callback (toggle) from an r-for loop variable at this call site --
-    // both are unresolved bare identifiers. Rather than leave the loop-var
-    // lie in place, `() => void` is dropped for BOTH shapes; `unknown` is
-    // honest (forces the consumer to narrow/assert) where `() => void` was
-    // already a v1 best-effort GUESS, not a resolved type.
+  it('CR-02 fix — the Dropdown toggle shape resolves callable, not unknown', () => {
+    // Inverted per Quick 260803-ibt CR-02: `toggle` names a top-level
+    // script FunctionDeclaration, which is resolvable via `ir.setupBody`
+    // (IR-04 referential preservation) without any signature change. It
+    // must type as the house callable-lowering standard, not `unknown`.
     const src = `<rozie name="Dropdown">
 <props>
 {
@@ -82,7 +104,10 @@ function toggle() { }
 </script>
 </rozie>`;
     const dts = emitReactTypes(irFor(src));
-    expect(dts).toMatch(/renderTrigger\?: \(params: \{ open: boolean; toggle: unknown \}\) => ReactNode;/);
+    expect(dts).toMatch(
+      /renderTrigger\?: \(params: \{ open: boolean; toggle: \(\.\.\.args: any\[\]\) => any \}\) => ReactNode;/,
+    );
+    expect(dts).not.toContain('toggle: unknown');
     expect(dts).not.toContain('toggle: () => void');
   });
 

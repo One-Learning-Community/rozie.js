@@ -271,7 +271,9 @@ export function renderPropType(ann: PropTypeAnnotation): string {
 /**
  * D-86 best-effort param-type inference.
  *
- *   1. Bare Identifier (`<slot :open="open">`) — look up in ir.props by name.
+ *   1. Bare Identifier (`<slot :open="open">`) — look up in ir.props by name;
+ *      failing that, resolve against top-level `<script>` function names
+ *      (Quick 260803-ibt CR-02, see below); failing that, genuine fallback.
  *      (Note: Phase 2 IR's StateDecl does NOT carry a typeAnnotation field,
  *      so $data identifiers fall through to the genuine fallback below;
  *      v2 may extend StateDecl with inferred types.)
@@ -283,23 +285,41 @@ export function renderPropType(ann: PropTypeAnnotation): string {
  * Quick 260802-v1v seam 7 — a bare Identifier that doesn't resolve to a prop
  * PREVIOUSLY special-cased as "residual-script function reference" and
  * emitted `() => void` (the canonical-Dropdown `toggle` heuristic). That
- * heuristic has no way to distinguish an actual script-defined callback
+ * heuristic could not distinguish an actual script-defined callback
  * (`toggle`) from an `r-for` LOOP VARIABLE (`<slot :slide="slide" :index="i">`
  * inside `r-for="slide, i in $props.slides"` — the `Carousel.rozie:573`
- * shape) — loop vars are unresolved by construction (never props), so they
- * hit the same branch and the PUBLIC `.d.ts` lied about the consumer-facing
- * shape (`slide: () => void` for a plain array element). `inferParamType`
- * has no visibility into the enclosing template scope (it receives only the
- * `ParamDecl` + `IRComponent`, not the loop-variable binding context), so
- * there is no principled way to keep the callable heuristic for ONE bare-
- * identifier shape while excluding the other from this call site — removed
- * entirely; both now fall through to the genuine `unknown` fallback. This
- * DELIBERATELY changes the Dropdown `toggle` shape from `() => void` to
- * `unknown` — a reviewed, intentional trade: `unknown` is honest (forces the
- * consumer to narrow/assert before calling), where `() => void` was already
- * a v1 best-effort GUESS, not a resolved type. The INLINE `.tsx`/`.vue`/
- * `.svelte` body path (`refineSlotTypes.ts`, per-target) is unaffected — it
- * already used the safe `any` universally and does not call this function.
+ * shape) — loop vars are unresolved by construction (never props) and hit
+ * the same branch, so the PUBLIC `.d.ts` lied about the consumer-facing
+ * shape (`slide: () => void` for a plain array element). Seam 7 removed the
+ * heuristic entirely, correctly fixing the loop-var lie — but it ALSO
+ * downgraded every genuinely-callable slot param that resolves to a
+ * top-level script function (documented consumer API: popover `toggle`,
+ * data-table `setFilter`, command-palette `retry`) — see CR-02 below.
+ *
+ * Quick 260803-ibt CR-02 fix — the seam-7 comment (formerly here) claimed
+ * "there is no principled way to keep the callable heuristic for ONE
+ * bare-identifier shape while excluding the other from this call site".
+ * That claim is FALSE: the two shapes live in different SCOPES, and one of
+ * those scopes IS visible to this function. `toggle` is a top-level
+ * `<script>` declaration; `IRComponent.setupBody.scriptProgram` is the
+ * PRESERVED Babel Program (IR-04 referential preservation — the SAME `File`
+ * node as `ast.script.program`, no clone), so top-level script function
+ * names are resolvable from `ir` alone, with NO signature change to this
+ * function or to `renderPropsInterface` (which would ripple into six
+ * `emitTypes.ts` call sites — the D2 entanglement this fix deliberately
+ * avoids). `slide`/`index`, by contrast, are `r-for` TEMPLATE-scope
+ * bindings — `inferParamType` has no visibility into template scope (it
+ * receives only the `ParamDecl` + `IRComponent`, never the loop-variable
+ * binding context) and correctly cannot resolve them, so they still
+ * (correctly) fall through to `unknown`.
+ *
+ * Resolved script functions emit `(...args: any[]) => any` — the house
+ * callable-lowering standard (see `renderPropType`'s `Function`/`'function'`
+ * cases below) — not the original `() => void`, which was already a v1
+ * arity lie (`setFilter(columnId, value)` consumers were already casting
+ * around it). The INLINE `.tsx`/`.vue`/`.svelte` body path
+ * (`refineSlotTypes.ts`, per-target) is unaffected — it already used the
+ * safe `any` universally and does not call this function.
  *
  * @public — shared so slot-param inference cannot drift between targets.
  */
@@ -312,8 +332,15 @@ export function inferParamType(param: ParamDecl, ir: IRComponent): string {
     const name = expr.name;
     const propDecl = ir.props.find((p) => p.name === name);
     if (propDecl) return renderPropType(propDecl.typeAnnotation);
-    // Unresolved bare identifier (r-for loop var OR a residual script
-    // reference) — fall through to the genuine `unknown` fallback below.
+    // CR-02 — resolve against top-level script function names before
+    // falling through. Matched -> callable (D3); unmatched (r-for loop
+    // vars, template-only names) -> the genuine `unknown` fallback below
+    // (D-86 preserved).
+    if (collectTopLevelScriptFunctionNames(ir).has(name)) {
+      return '(...args: any[]) => any';
+    }
+    // Unresolved bare identifier (r-for loop var OR an undeclared/template-
+    // only name) — fall through to the genuine `unknown` fallback below.
   }
 
   // Case 2 — MemberExpression (`$props.foo`, `$data.bar`, etc.).
@@ -333,6 +360,58 @@ export function inferParamType(param: ParamDecl, ir: IRComponent): string {
 
   // Case 3 — genuine fallback per D-86.
   return 'unknown';
+}
+
+/**
+ * Quick 260803-ibt CR-02 — the set of top-level `<script>` function names
+ * for an `IRComponent`, memoized per-`ir` (a `WeakMap` avoids re-scanning
+ * `setupBody.scriptProgram` on every `inferParamType` call within the same
+ * render pass).
+ *
+ * Only TOP-LEVEL declarations are collected — nested function scopes are
+ * never slot-param candidates (a slot param's `valueExpression` is always a
+ * reference resolved at component setup scope) and must not widen the set.
+ * Covers both top-level function shapes:
+ *   - `function toggle() {}`     — FunctionDeclaration
+ *   - `const toggle = () => {}` — VariableDeclarator whose init is an
+ *     ArrowFunctionExpression or FunctionExpression (`let` included for
+ *     symmetry; `var` is out of scope for `.rozie` script authoring).
+ *
+ * `setupBody.annotations`' `helper-fn` role (checked first per D2/T3) only
+ * tags top-level `FunctionDeclaration` statements (see
+ * `ir/lowerers/lowerScript.ts:buildAnnotations`) and does not carry names —
+ * it cannot alone cover the arrow-const shape, so this function performs the
+ * direct top-level scan described in the task brief's fallback path for both
+ * shapes in one pass rather than partially relying on the annotation.
+ */
+const topLevelScriptFunctionNamesCache = new WeakMap<IRComponent, Set<string>>();
+
+function collectTopLevelScriptFunctionNames(ir: IRComponent): Set<string> {
+  const cached = topLevelScriptFunctionNamesCache.get(ir);
+  if (cached) return cached;
+
+  const names = new Set<string>();
+  const body = ir.setupBody?.scriptProgram?.program?.body ?? [];
+  for (const stmt of body) {
+    if (t.isFunctionDeclaration(stmt) && stmt.id) {
+      names.add(stmt.id.name);
+      continue;
+    }
+    if (t.isVariableDeclaration(stmt)) {
+      for (const decl of stmt.declarations) {
+        if (
+          t.isIdentifier(decl.id) &&
+          decl.init &&
+          (t.isArrowFunctionExpression(decl.init) || t.isFunctionExpression(decl.init))
+        ) {
+          names.add(decl.id.name);
+        }
+      }
+    }
+  }
+
+  topLevelScriptFunctionNamesCache.set(ir, names);
+  return names;
 }
 
 function capitalize(s: string): string {

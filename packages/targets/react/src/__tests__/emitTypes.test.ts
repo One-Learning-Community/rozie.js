@@ -92,20 +92,19 @@ describe('emitReactTypes — D-84 canonical shape (Plan 06-02 Task 1)', () => {
     expect(out).toContain(`step?: number;`);
   });
 
-  it('Test 4: Dropdown scoped slot — D-86 inference produces boolean for $props.open', () => {
+  it('Test 4: Dropdown scoped slot — D-86 inference produces boolean for $props.open, callable for toggle', () => {
     const { ir } = load('Dropdown');
     const out = emitReactTypes(ir);
     // <slot name="trigger" :open="$props.open" :toggle="toggle">
     // open resolves via $props.open → Boolean (D-86 member-expression branch).
-    // Quick 260802-v1v seam 7 — toggle is an unresolved bare identifier;
-    // the old '() => void' "residual-script function reference" heuristic
-    // was REMOVED (it could not distinguish an actual callback from an
-    // r-for loop variable at this call site — both are unresolved bare
-    // identifiers — and was silently lying about r-for loop-var slot params
-    // like embla's `slide`/`index`). toggle now falls through to the
-    // genuine 'unknown' fallback, same as any other unresolved identifier.
+    // Quick 260803-ibt CR-02 — toggle names a top-level script `const toggle
+    // = () => {...}` declaration, resolvable via ir.setupBody (IR-04
+    // referential preservation) without any signature change. It types
+    // callable ((...args: any[]) => any), the house callable-lowering
+    // standard — NOT the seam-7-era 'unknown' (which cemented the CR-02
+    // regression) and NOT the original v1 '() => void' arity lie.
     expect(out).toMatch(
-      /renderTrigger\?: \(params: \{ open: boolean; toggle: unknown \}\) => ReactNode;/,
+      /renderTrigger\?: \(params: \{ open: boolean; toggle: \(\.\.\.args: any\[\]\) => any \}\) => ReactNode;/,
     );
     // open still resolves to its real type — NOT 'unknown'.
     expect(out).not.toMatch(/open: unknown/);

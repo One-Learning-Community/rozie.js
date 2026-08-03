@@ -25,13 +25,18 @@
  *     the interface AND the function signature both carry the type-parameter list.
  *   - D-86 best-effort param-type inference — slot-param `valueExpression` is
  *     resolved against `ir.props` (member-expressions like `$props.open` and
- *     bare identifiers) with `'unknown'` as the genuine fallback for anything
- *     unresolved. (Quick 260802-v1v seam 7 — an unresolved bare identifier
- *     PREVIOUSLY emitted a best-effort `() => void` callable guess; removed
- *     because it could not distinguish a real script-defined callback
- *     (Dropdown's `toggle`) from an `r-for` loop variable — both are
- *     unresolved bare identifiers at this call site, and the guess silently
- *     lied about the loop-var shape. Both now fall to `unknown`.)
+ *     bare identifiers), then against top-level `<script>` function names
+ *     (Quick 260803-ibt CR-02), with `'unknown'` as the genuine fallback for
+ *     anything still unresolved. (Quick 260802-v1v seam 7 removed a blanket
+ *     `() => void` callable guess for ANY unresolved bare identifier because
+ *     it could not distinguish a real script-defined callback (Dropdown's
+ *     `toggle`) from an `r-for` loop variable at that call site — but the
+ *     removal ALSO downgraded genuinely-callable script functions to
+ *     `unknown`, a working-to-broken regression across published patch
+ *     releases. CR-02 restores callable typing for the script-function
+ *     population specifically — via `ir.setupBody`, resolvable without a
+ *     signature change — while loop vars (template scope, not visible here)
+ *     correctly keep falling through to `unknown`.)
  *
  * Per Pitfall 2 (Oxc isolated-decl): every exported function carries an
  * explicit return-type annotation so tsdown's isolated-decl typegen succeeds
