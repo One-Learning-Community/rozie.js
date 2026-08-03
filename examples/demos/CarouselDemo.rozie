@@ -42,6 +42,12 @@
 <data>
 {
   idx: 0,
+  // Bound (not a literal `:loop="false"`) so the reInit-index-survival spec
+  // step (embla-carousel.spec.ts, `embla-carousel-reinit`) can flip a WATCHED
+  // option at runtime and observe what a reInit does to the current position.
+  // Defaults to `false`, so the three pre-existing titles' behavior is
+  // unaffected.
+  loopOn: false,
 }
 </data>
 
@@ -58,6 +64,11 @@ const SLIDES = ['One', 'Two', 'Three', 'Four', 'Five']
 // (Angular's child-ref is the host element, so the $expose path below no-ops
 // there — this direct model write is the cross-target path the spec asserts).
 const nextModel = () => { $data.idx = Math.min($data.idx + 1, SLIDES.length - 1) }
+
+// Flips $data.loopOn, which is bound to :loop — a WATCHED Carousel option. This
+// drives Carousel.rozie's `:404-408` option-signature watch → embla.reInit(...),
+// so a spec step can assert the selected index survives that reInit.
+const toggleLoop = () => { $data.loopOn = !$data.loopOn }
 </script>
 
 <template>
@@ -69,6 +80,8 @@ const nextModel = () => { $data.idx = Math.min($data.idx + 1, SLIDES.length - 1)
     <button type="button" data-testid="next" @click="$refs.car && $refs.car.scrollNext()">Next (handle)</button>
     <!-- The uniform two-way driver (direct model write) -->
     <button type="button" data-testid="next-model" @click="nextModel">Next (model)</button>
+    <!-- Flips a WATCHED Carousel option at runtime (embla-carousel-reinit spec step) -->
+    <button type="button" data-testid="toggle-loop" @click="toggleLoop">Toggle loop</button>
     <span class="readout" data-testid="readout-index">{{ $data.idx }}</span>
   </div>
 
@@ -76,7 +89,7 @@ const nextModel = () => { $data.idx = Math.min($data.idx + 1, SLIDES.length - 1)
     ref="car"
     :slides="SLIDES"
     r-model:selectedIndex="$data.idx"
-    :loop="false"
+    :loop="$data.loopOn"
     :draggable="true"
   >
     <template #slide="{ slide, index }">

@@ -157,6 +157,74 @@ for (const target of TARGETS) {
 }
 
 /**
+ * Index-survives-reInit smoke (260802-tmo, D1) — pins the fix for the audit's
+ * HIGH defect: the carousel used to teleport back to `startIndex` on every
+ * reInit, so any runtime option flip silently threw the user back to slide 0.
+ * `CarouselDemo.rozie`'s `:loop` is now bound to `$data.loopOn` (a WATCHED
+ * option, `Carousel.rozie:404-408`), with a `toggle-loop` button driving it.
+ *
+ * Drives the index to 2 via the UNIFORM two-way path (`next-model`, not the
+ * `next` handle — the handle no-ops on Angular per ANGULAR-REF-NOOP above),
+ * flips `loopOn`, and asserts the position survived on BOTH halves: the bound
+ * readout AND the container transform. Asserting both makes the failure
+ * unambiguous — today the engine snaps the position back to `startIndex: 0`
+ * (a full reInit reset), so the transform assertion is the load-bearing RED;
+ * depending on echo ordering the readout may or may not follow.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built ? test.fixme : test;
+  runner(`embla-carousel-reinit [${target}]: the selected index survives a runtime option change`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=Carousel&target=${target}`);
+    await expect(page.locator('.rozie-embla__viewport').first()).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // ---- drive the index to 2 via the uniform two-way path ----
+    const readout = page.getByTestId('readout-index');
+    await page.getByTestId('next-model').click();
+    await page.getByTestId('next-model').click();
+    await expect
+      .poll(async () => Number((await readout.textContent())?.trim() ?? '0'), {
+        timeout: 10_000,
+        intervals: [100, 200, 400, 800],
+      })
+      .toBe(2);
+
+    // ---- flip a WATCHED option (loop) → triggers Carousel.rozie's
+    //      option-signature $watch → embla.reInit(...) ----
+    await page.getByTestId('toggle-loop').click();
+
+    // ---- assert BOTH halves: the model and the engine can disagree ----
+    const container = page.locator('.rozie-embla__container').first();
+    const tx = async () => {
+      const m = await container.evaluate(
+        (el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41,
+      );
+      return m;
+    };
+    await expect
+      .poll(async () => Number((await readout.textContent())?.trim() ?? '0'), {
+        timeout: 10_000,
+        intervals: [100, 200, 400, 800],
+      })
+      .toBe(2);
+    // The transform is the load-bearing assertion: a reset-to-startIndex reInit
+    // snaps the container back to ~0 translation (startIndex defaults to 0).
+    await expect
+      .poll(async () => Math.abs(await tx()), {
+        timeout: 10_000,
+        intervals: [100, 200, 400, 800],
+      })
+      .toBeGreaterThan(20);
+  });
+}
+
+/**
  * Built-in navigation behavioral smoke (dots + arrows + thumbnails) — guards two
  * bugs that the deterministic `CarouselNavScreenshot` pixel cell alone can't:
  *
