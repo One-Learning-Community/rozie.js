@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitTemplateAttribute (React) — HTML_TO_JSX_ATTR name map (Quick 260802-v1v seam 5) > autocorrect / spellcheck / autocapitalize on a static <input> 1`] = `
+"<>
+      <input autocorrect="off" spellCheck="false" autoCapitalize="off" {...attrs} data-rozie-s-8fd6d49e="" />
+    </>"
+`;
