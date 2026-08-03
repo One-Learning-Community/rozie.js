@@ -1494,8 +1494,13 @@ export function emitScript(
             // getter must still fire once.
             const seenField = `__rozieWatchSeen_${i}`;
             fieldLines.push(`private ${seenField} = false;`);
+            // Quick 260803-ibt IN-02 — `!Object.is(...)`, not strict `!==`.
+            // `NaN !== NaN` is always true, so a NaN-valued derived getter
+            // would re-fire on every cycle the base prop's setter ran;
+            // `Object.is` treats NaN as equal to itself (React dep-array
+            // parity — React's comparison already uses `Object.is`).
             watcherUpdatedBranches.push(
-              `if (${propChecks}) { const __watchVal = (${getterCode})(); if (!this.${seenField} || __watchVal !== this.${prevField}) { this.${seenField} = true; this.${prevField} = __watchVal; (${cbCode})(${callArg}); } }`,
+              `if (${propChecks}) { const __watchVal = (${getterCode})(); if (!this.${seenField} || !Object.is(__watchVal, this.${prevField})) { this.${seenField} = true; this.${prevField} = __watchVal; (${cbCode})(${callArg}); } }`,
             );
           } else {
             // Lazy (default) shape: the existing `__rozieFirstUpdateDone`
@@ -1505,8 +1510,27 @@ export function emitScript(
             // compare against an unseeded `undefined` and fire spuriously
             // even when the derived value hasn't actually changed since
             // mount (e.g. a fresh same-length array reference).
+            //
+            // IN-05 tripwire (Quick 260803-ibt, no behavior change) — the
+            // seed above (`this.${prevField} = __watchVal` on the
+            // `!this.__rozieFirstUpdateDone` branch) is safe ONLY because
+            // the current `@property` class-field emit shape routes
+            // defaults through the accessor on the FIRST update cycle, so
+            // `changedProperties.has(...)` (the `propChecks` gate above) is
+            // reliably true on mount and this seed always runs before any
+            // real post-mount comparison. If the Lit property-declaration
+            // emit shape ever changes (e.g. `useDefineForClassFields: true`
+            // / native `accessor` fields), an unseeded `prev` would make the
+            // first post-mount set fire the callback spuriously even when
+            // the derived value hasn't changed — exactly the case this
+            // branch exists to suppress. If that emit shape changes, seed
+            // `${prevField}` unconditionally on the first cycle instead of
+            // gating the seed on `propChecks`.
+            //
+            // Quick 260803-ibt IN-02 — `!Object.is(...)`, not strict `!==`,
+            // for the same NaN-parity reason as the eager branch above.
             watcherUpdatedBranches.push(
-              `if (${propChecks}) { const __watchVal = (${getterCode})(); if (!this.__rozieFirstUpdateDone) { this.${prevField} = __watchVal; } else if (__watchVal !== this.${prevField}) { this.${prevField} = __watchVal; (${cbCode})(${callArg}); } }`,
+              `if (${propChecks}) { const __watchVal = (${getterCode})(); if (!this.__rozieFirstUpdateDone) { this.${prevField} = __watchVal; } else if (!Object.is(__watchVal, this.${prevField})) { this.${prevField} = __watchVal; (${cbCode})(${callArg}); } }`,
             );
           }
         } else {

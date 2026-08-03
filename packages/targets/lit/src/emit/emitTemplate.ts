@@ -1432,6 +1432,17 @@ function emitElementOpenTag(
           opts.runtime.add('rozieClass');
           classExpr = `rozieClass(${expr})`;
         }
+      } else if (isNullablePropRead(bindingClass.expression, ir)) {
+        // Quick 260803-ibt IN-03 — a RAW (`wrapForDisplay=false`) read of a
+        // `null`-defaulted prop bound to `:class` bypasses `emitAttribute`
+        // entirely (this whole class-binding branch is hand-rolled, unlike
+        // every other binding), so the seam-3 `isNullablePropRead` gate
+        // never saw it: lit-html stringifies the raw `null` into a literal
+        // `class="null"` instead of dropping the attribute, diverging from
+        // React (`className={null}`) and Vue. Port the same gate + `rozieAttr`
+        // wrap the generic attribute path uses (:768-771 above).
+        opts.runtime.add('rozieAttr');
+        classExpr = `rozieAttr(${expr})`;
       }
       // Use quoted attribute — lit-html requires quotes for mixed static+dynamic values (CR-01 fix).
       parts.push(`class="${staticPart}\${(${classExpr})}"`);
@@ -1467,16 +1478,32 @@ function emitElementOpenTag(
       // `keyed()` wrap.
       //
       // Quick 260802-v1v seam 4 — an `r-for` LOOP key (which never sets
-      // `remountKeyExpression`) must ALSO be stripped, unconditionally: it
-      // is consumed by `repeat()`'s own key-function argument (emitted by
-      // `emitLoop`, below the element open-tag emit), never a DOM attribute.
-      // React's `isConsumedAttribute` (`emitTemplateAttribute.ts:88`) and
-      // Solid's (`:128`) both treat `key`/`:key` as consumed unconditionally
-      // — Lit previously left the loop-key case "untouched" (per the prior
-      // revision of this comment) and leaked `key=${rozieAttr(c)}` onto
-      // every `r-for` cell's DOM. Both cases (component-level remount key AND
-      // loop key) are consumed elsewhere; neither is ever emitted here.
-      if (attr.name === 'key') continue;
+      // `remountKeyExpression`) must ALSO be stripped: it is consumed by
+      // `repeat()`'s own key-function argument (emitted by `emitLoop`, below
+      // the element open-tag emit), never a DOM attribute.
+      //
+      // Quick 260803-ibt WR-02 — the strip above was originally
+      // `attr.name === 'key'` UNCONDITIONALLY, dropping every `key` attr
+      // regardless of `attr.kind` (static, interpolated, OR binding). That
+      // is BROADER than React's/Solid's own `isConsumedAttribute`
+      // precedent this comment used to cite: React (`emitTemplateAttribute
+      // .ts:88`) and Solid (`:128`) consume ALL forms of `key` (a
+      // deliberate divergence for those two targets), but Svelte and
+      // Angular filter ONLY the binding form (`svelte/src/emit/
+      // emitTemplateNode.ts:334`, `angular/src/emit/emitTemplateNode.ts
+      // :360` — `attr.kind === 'binding' && attr.name === 'key'`), leaving
+      // a static `key="literal"` attribute to render as an ordinary DOM
+      // attribute on those two targets. Narrowed to match the
+      // Svelte/Angular filter shape: only a BINDING-form `key` is a
+      // remount/loop-key candidate and gets stripped here; a static or
+      // interpolated `key` is data the author wrote and now renders like
+      // any other attribute. This reduces (does not eliminate) the
+      // six-target divergence — full `key`-attribute parity (reserve `key`
+      // everywhere, or strip everywhere) is filed as a durable backlog item
+      // for a minor release (`.planning/todos/pending/`), since either
+      // resolution is a breaking authoring-surface change unsuitable for a
+      // patch wave.
+      if (attr.kind === 'binding' && attr.name === 'key') continue;
     }
     const emitted = emitAttribute(attr, ir, node.tagName, node.tagKind, opts);
     if (emitted) parts.push(emitted);

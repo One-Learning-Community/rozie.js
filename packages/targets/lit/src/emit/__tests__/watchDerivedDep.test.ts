@@ -71,7 +71,13 @@ $watch(() => $props.xs.length, () => {
     // with NO value-diff of __watchVal against a stored previous value.
     // Assert a stored-previous-value comparison exists in the updated()
     // branch for this watcher.
-    expect(code).toMatch(/__watchVal\s*!==\s*this\.__\w*[Pp]rev\w*/);
+    //
+    // Quick 260803-ibt IN-02 — the comparator is `Object.is`, not strict
+    // `!==` (NaN-parity with React's dep-array comparison; see the
+    // sibling `watchDerivedNaN.test.ts` for the dedicated fixture). This
+    // assertion was reblessed to match that fix — it still pins "a
+    // stored-previous-value comparison exists", just via the new operator.
+    expect(code).toMatch(/!Object\.is\(__watchVal, this\.__\w*[Pp]rev\w*\)/);
   });
 
   it('guard — vue/svelte/solid/angular emit a getter-valued watch (cross-target parity control)', () => {
