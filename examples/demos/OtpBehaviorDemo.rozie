@@ -17,6 +17,8 @@
 {
   code: '',
   lastComplete: '',
+  masked: false,
+  isDisabled: false,
 }
 </data>
 
@@ -27,6 +29,8 @@ const onComplete = (e) => {
 const setCode = (v) => {
   $data.code = v
 }
+const toggleMask = () => { $data.masked = !$data.masked }
+const toggleDisabled = () => { $data.isDisabled = !$data.isDisabled }
 </script>
 
 <template>
@@ -35,6 +39,8 @@ const setCode = (v) => {
 
   <div class="controls">
     <button type="button" data-testid="set-code" @click="setCode('123')">Set 123</button>
+    <button type="button" data-testid="toggle-mask" @click="toggleMask()">Toggle mask</button>
+    <button type="button" data-testid="toggle-disabled" @click="toggleDisabled()">Toggle disabled</button>
     <span class="readout" data-testid="readout-code">{{ $data.code }}</span>
     <span class="readout" data-testid="readout-complete">{{ $data.lastComplete }}</span>
   </div>
@@ -44,6 +50,8 @@ const setCode = (v) => {
     :length="6"
     type="numeric"
     ariaLabel="Verification code"
+    :mask="$data.masked"
+    :disabled="$data.isDisabled"
     @complete="onComplete($event)"
   />
 </div>
