@@ -545,6 +545,41 @@ const BOOLEAN_HTML_ATTRS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Quick 260802-v1v seam 3 (Angular half, discovered mid-verification by the
+ * shared `AttrNullishDrop.rozie` fixture's positions 4/5) — is `expr` a RAW
+ * read of a `null`-defaulted prop (`$props.ariaLabel` where `<props>`
+ * declares `ariaLabel: { default: null }`)?
+ *
+ * Port of React's `isNullablePropRead` (`emitTemplateAttribute.ts:292-305`),
+ * Solid's identical carve-out (`:263-276`), and Lit's port
+ * (`lit/src/emit/emitTemplate.ts`, quick 260802-v1v seam 3). A bare
+ * `$props.<nullable String>` read is provably primitive
+ * (`wrapForDisplay=false`), so the `wrapForDisplay` branch below (which
+ * already force-drops via `[attr.NAME]="rozieAttr(...)"` — see the
+ * `attrDropName` comment there) never runs for it, and the fall-through
+ * `[${bindingName}]="${expr}"` emits a PLAIN PROPERTY binding. Angular's
+ * renderer does `el.title = null` for a property binding, which the DOM
+ * coerces to the string `"null"` (renders `title="null"`, worse than
+ * `title=""`) instead of dropping the attribute — the exact class of bug
+ * the `wrapForDisplay` branch's comment already documents for THIS reason,
+ * just not gated for the non-wrapForDisplay case.
+ */
+function isNullablePropRead(expr: t.Expression, ir: IRComponent): boolean {
+  if (
+    !t.isMemberExpression(expr) ||
+    expr.computed ||
+    !t.isIdentifier(expr.object, { name: '$props' }) ||
+    !t.isIdentifier(expr.property)
+  ) {
+    return false;
+  }
+  const name = expr.property.name;
+  return ir.props.some(
+    (p) => p.name === name && p.defaultValue != null && t.isNullLiteral(p.defaultValue),
+  );
+}
+
+/**
  * Phase 26 (SPEC-4, D-06/D-07) — position-aware refinement of the IR's
  * `wrapForDisplay` gate for ATTRIBUTE positions. `wrapForDisplay` only says the
  * value MIGHT be non-primitive; the binding POSITION decides whether
@@ -1666,6 +1701,27 @@ export function emitSingleAttr(
       // Vue's setAttribute-based `patchAttr` for these positions. `expr` is left
       // computed with the original `bindingName` (its only effect is the
       // hoisted double-read accessor name), so the expression stays identical.
+      if (ctx.hasDisplayWrap) ctx.hasDisplayWrap.value = true;
+      const attrDropName = bindingName.startsWith('attr.')
+        ? bindingName
+        : `attr.${attr.name}`;
+      return `[${attrDropName}]="rozieAttr(${expr})"`;
+    }
+    // Quick 260802-v1v seam 3 (Angular half) — a RAW read of a
+    // `null`-defaulted prop (`title={{ $props.maybeNullProp }}` /
+    // `:title="$props.maybeNullProp"`) is provably primitive
+    // (`wrapForDisplay=false`), so the branch above never runs for it and it
+    // fell through to the plain property-binding return below — the exact
+    // "PROPERTY binding `[title]="null"` does NOT drop" hazard that branch's
+    // own comment documents, just not gated for this shape. Route it through
+    // the SAME force-`[attr.NAME]` + `rozieAttr` drop, gated on
+    // `shouldWrapAttrBinding` so component/self-tag props, form-control
+    // value/checked, and boolean attrs stay untouched (byte-identical) —
+    // same position-gating the `wrapForDisplay` branch above uses.
+    if (
+      isNullablePropRead(attr.expression, ctx.ir) &&
+      shouldWrapAttrBinding(attr.name, attr.expression, ctx, elementTagName)
+    ) {
       if (ctx.hasDisplayWrap) ctx.hasDisplayWrap.value = true;
       const attrDropName = bindingName.startsWith('attr.')
         ? bindingName

@@ -34,7 +34,7 @@ function __rozieAttr(v: unknown): string | null {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <button #control type="button" class="rozie-switch" [ngClass]="{ 'rozie-switch--checked': isChecked(), 'rozie-switch--disabled': (disabled() || this.__rozieCvaDisabled()) }" role="switch" [attr.tabindex]="rozieAttr(controlTabindex())" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-checked]="!!modelValue()" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-readonly]="!!readonly()" [attr.aria-label]="ariaLabel()" #rozieSpread_0 (click)="onClick()" (keydown)="onKeydown($event)" #rozieListenersTarget_1>
+    <button #control type="button" class="rozie-switch" [ngClass]="{ 'rozie-switch--checked': isChecked(), 'rozie-switch--disabled': (disabled() || this.__rozieCvaDisabled()) }" role="switch" [attr.tabindex]="rozieAttr(controlTabindex())" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-checked]="!!modelValue()" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-readonly]="!!readonly()" [attr.aria-label]="rozieAttr(ariaLabel())" #rozieSpread_0 (click)="onClick()" (keydown)="onKeydown($event)" #rozieListenersTarget_1>
       @if ((defaultTpl ?? templates()?.['defaultSlot'])) {
     <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { checked: isChecked(), toggle: toggle }, checked: isChecked(), toggle: toggle }" />
     } @else {

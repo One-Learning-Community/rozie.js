@@ -27,9 +27,9 @@ function __rozieAttr(v: unknown): string | null {
 
     <div class="attr-nullish-drop" #rozieSpread_0 #rozieListenersTarget_1>
       <span [attr.data-x]="rozieAttr(cond() ? 'v' : null)" [attr.aria-expanded]="rozieAttr(cond() ? 'true' : 'false')" [attr.title]="rozieAttr(maybeNull())">probe</span>
-      <span class="attr-nullish-drop-prop" [title]="maybeNullProp()">probe-prop</span>
+      <span class="attr-nullish-drop-prop" [attr.title]="rozieAttr(maybeNullProp())">probe-prop</span>
       @for (c of loopItems(); track c) {
-    <i class="attr-nullish-drop-loop" [title]="maybeNullProp()">{{ rozieDisplay(c) }}</i>
+    <i class="attr-nullish-drop-loop" [attr.title]="rozieAttr(maybeNullProp())">{{ rozieDisplay(c) }}</i>
     }
     </div>
 

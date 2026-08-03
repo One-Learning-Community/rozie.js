@@ -29,6 +29,26 @@ import { mountDecorators } from './mountDecorators';
 
 interface DefaultCtx {}
 
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') {
+    try {
+      return JSON.stringify(v, null, 2);
+    } catch {
+      // Circular structure or a non-serialisable value (BigInt nested in an
+      // object). Degrade to a non-throwing form so the wrap never crashes the
+      // render — that is the entire point of "safe" interpolation (SPEC-1).
+      return String(v);
+    }
+  }
+  return String(v);
+}
+
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}
+
 const __rozieTokenRegistry: Map<string, InjectionToken<unknown>> =
   ((globalThis as Record<string, unknown>).__rozieCtx ??= new Map()) as Map<
     string,
@@ -51,7 +71,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
     <div class="rozie-lexical" #rozieSpread_0 #rozieListenersTarget_1>
       
-      <div #rootEl class="rozie-lexical-content" [contentEditable]="true" [attr.aria-label]="ariaLabel()"></div>
+      <div #rootEl class="rozie-lexical-content" [contentEditable]="true" [attr.aria-label]="rozieAttr(ariaLabel())"></div>
       
       <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
     </div>
@@ -315,6 +335,10 @@ export class LexicalEditor {
       });
     }
   });
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default LexicalEditor;

@@ -35,7 +35,7 @@ function __rozieAttr(v: unknown): string | null {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <div class="rozie-tags" [ngClass]="{ 'rozie-tags--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-tags--readonly': readonly() }" #root role="group" [attr.aria-label]="ariaLabel()" #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="rozie-tags" [ngClass]="{ 'rozie-tags--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-tags--readonly': readonly() }" #root role="group" [attr.aria-label]="rozieAttr(ariaLabel())" #rozieSpread_0 #rozieListenersTarget_1>
       <ul class="rozie-tags-list">
         @for (t of tokens(); track t + ':' + tokens().indexOf(t)) {
     <li class="rozie-tags-chip">
@@ -53,7 +53,7 @@ function __rozieAttr(v: unknown): string | null {
       </ul>
 
       @if (!readonly()) {
-    <input class="rozie-tags-input" type="text" autocomplete="off" autocapitalize="off" [value]="draft()" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled()) || !!atMax()" [attr.aria-label]="ariaLabel()" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (input)="onInput($event)" (keydown)="onKeydown($event)" (paste)="onPaste($event)" (blur)="onBlur($event)" />
+    <input class="rozie-tags-input" type="text" autocomplete="off" autocapitalize="off" [value]="draft()" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled()) || !!atMax()" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (input)="onInput($event)" (keydown)="onKeydown($event)" (paste)="onPaste($event)" (blur)="onBlur($event)" />
     }<span class="rozie-tags-count" aria-live="polite">{{ rozieDisplay(countLabel()) }}</span>
     </div>
 

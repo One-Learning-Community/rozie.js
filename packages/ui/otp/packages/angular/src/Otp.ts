@@ -33,7 +33,7 @@ function __rozieAttr(v: unknown): string | null {
   imports: [NgClass],
   template: `
 
-    <div class="rozie-otp" [ngClass]="{ 'rozie-otp--disabled': (disabled() || this.__rozieCvaDisabled()) }" #root role="group" [attr.aria-label]="ariaLabel()" #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="rozie-otp" [ngClass]="{ 'rozie-otp--disabled': (disabled() || this.__rozieCvaDisabled()) }" #root role="group" [attr.aria-label]="rozieAttr(ariaLabel())" #rozieSpread_0 #rozieListenersTarget_1>
       @for (cell of cells(); track cell.i) {
     <input class="rozie-otp-cell" [attr.type]="rozieAttr(cellType())" [attr.inputmode]="rozieAttr(cellInputMode())" maxlength="1" autocapitalize="off" autocorrect="off" spellcheck="false" [attr.autocomplete]="rozieAttr(cellAutocomplete(cell.i))" [value]="cell.ch" [placeholder]="placeholder()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(cellAriaLabel(cell.i))" [attr.data-filled]="rozieAttr(cell.ch ? 'true' : null)" (input)="onInput(cell.i, $event)" (keydown)="onKeydown(cell.i, $event)" (paste)="onPaste(cell.i, $event)" (focus)="onFocus($event)" (pointerup)="onPointerUp($event)" />
     }

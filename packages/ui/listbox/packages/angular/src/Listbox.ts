@@ -64,7 +64,7 @@ function __rozieAttr(v: unknown): string | null {
 
       
       <div class="rozie-listbox-control" #controlEl>
-        <button #triggerEl type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" [attr.aria-expanded]="open$local()" [attr.aria-controls]="rozieAttr(id() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="ariaLabel()" [disabled]="(disabled() || this.__rozieCvaDisabled())" (click)="toggle()" (keydown)="onControlKeyDown($event)">
+        <button #triggerEl type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" [attr.aria-expanded]="open$local()" [attr.aria-controls]="rozieAttr(id() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="rozieAttr(ariaLabel())" [disabled]="(disabled() || this.__rozieCvaDisabled())" (click)="toggle()" (keydown)="onControlKeyDown($event)">
           @if ((selectedTpl ?? templates()?.['selected'])) {
     <ng-container *ngTemplateOutlet="(selectedTpl ?? templates()?.['selected']); context: { $implicit: { selected: selectedLabel(), value: value() }, selected: selectedLabel(), value: value() }" />
     } @else {
@@ -81,7 +81,7 @@ function __rozieAttr(v: unknown): string | null {
 
       
       @if (open$local() && !virtual()) {
-    <div #listEl class="rozie-listbox-list" role="listbox" [attr.id]="rozieAttr(id() + '-list')" [attr.aria-label]="ariaLabel()" [attr.aria-multiselectable]="multiple()">
+    <div #listEl class="rozie-listbox-list" role="listbox" [attr.id]="rozieAttr(id() + '-list')" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-multiselectable]="multiple()">
         @for (opt of visibleOptions(); track optionId(index); let index = $index) {
     <div [attr.id]="rozieAttr(optionId(index))" class="rozie-listbox-option" [ngClass]="{ 'is-active': activeIndex() === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }" role="option" [attr.aria-selected]="!!isSelected(opt)" [attr.aria-disabled]="!!disabledOf(opt)" (click)="select(opt)" (mousemove)="onOptionPointerMove(index)">
           @if ((optionTpl ?? templates()?.['option'])) {
@@ -104,7 +104,7 @@ function __rozieAttr(v: unknown): string | null {
         </div>
     }</div>
     }@if (virtual()) {
-    <div #listEl class="rozie-listbox-list rozie-listbox-list--virtual" role="listbox" [attr.id]="rozieAttr(id() + '-list')" [attr.aria-label]="ariaLabel()" [attr.aria-multiselectable]="multiple()" [attr.style]="__style">
+    <div #listEl class="rozie-listbox-list rozie-listbox-list--virtual" role="listbox" [attr.id]="rozieAttr(id() + '-list')" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-multiselectable]="multiple()" [attr.style]="__style">
         <div class="rozie-listbox-spacer" aria-hidden="true" [attr.style]="'height:' + padTop() + 'px'"></div>
 
         @for (wr of windowedRows(); track wr.row.id) {
