@@ -159,6 +159,9 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
   })();
   const embla = useRef<any>(null);
   const emblaThumbs = useRef<any>(null);
+  const remeasureRafOuter = useRef<any>(null);
+  const remeasureRafInner = useRef<any>(null);
+  const remeasureTimer = useRef<any>(null);
   const [selectedIndex, setSelectedIndex] = useControllableState({
     value: props.selectedIndex,
     defaultValue: props.defaultSelectedIndex ?? 0,
@@ -182,7 +185,7 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     if (slide !== null && typeof slide === 'object') return slide.id ?? slide.key ?? i;
     return slide ?? i;
   }
-  const emblaOptionsFromProps = useCallback(() => {
+  const initialOptions = useCallback(() => {
     let opts: any = null;
     opts = {
       // Pin the slide set explicitly rather than letting Embla infer it from the
@@ -211,6 +214,12 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     };
     return opts;
   }, [props.align, props.axis, props.containScroll, props.direction, props.dragFree, props.draggable, props.duration, props.loop, props.options, props.skipSnaps, props.slidesToScroll, props.startIndex]);
+  const reinitOptions = useCallback(() => {
+    let opts: any = null;
+    opts = initialOptions();
+    delete opts.startIndex;
+    return opts;
+  }, [initialOptions]);
   const emblaPluginsFromProps = useCallback(() => {
     const builtins = props.autoplay ? [Autoplay({
       delay: props.autoplayDelay
@@ -241,6 +250,10 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
   // ─── imperative handle (Phase 21 $expose) — collision-suffix discipline ──────
   // 14 verbs, each guarding the pre-mount/destroyed `embla = null`.
   //  - reInitCarousel ≠ the `reInit` emit (ROZ121 expose-verb==emit collision).
+  //    260802-tmo D1: a DELIBERATE behavior change to this published verb —
+  //    no-arg reInitCarousel() now PRESERVES the current snap (via
+  //    reinitOptions()) instead of resetting to `startIndex` on every call. Pass
+  //    raw options to override. See docs/components/embla.md's handle table.
   //  - getSelectedIndex ≠ the `selectedIndex` model prop (ROZ524-class — avoids any
   //    setter collision on Lit/Angular; it's a method, the prop is the two-way value).
   //  - scrollToIndex ≠ the inherited DOM/LitElement `HTMLElement.scrollTo(x, y)`. A
@@ -266,7 +279,7 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     if (embla.current) embla.current.scrollTo(index, jump);
   }
   function reInitCarousel(opts: any) {
-    if (embla.current) embla.current.reInit(opts ?? emblaOptionsFromProps(), emblaPluginsFromProps());
+    if (embla.current) embla.current.reInit(opts ?? reinitOptions(), emblaPluginsFromProps());
   }
   function canScrollNext() {
     return embla.current ? embla.current.canScrollNext() : false;
@@ -300,7 +313,7 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
   }
 
   useEffect(() => {
-    embla.current = EmblaCarousel(viewportEl.current!, emblaOptionsFromProps(), emblaPluginsFromProps());
+    embla.current = EmblaCarousel(viewportEl.current!, initialOptions(), emblaPluginsFromProps());
 
     // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
     // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
@@ -341,14 +354,35 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
     if (typeof requestAnimationFrame === 'function') {
       const remeasure = () => {
-        if (embla.current) embla.current.reInit(emblaOptionsFromProps(), emblaPluginsFromProps());
+        if (embla.current) embla.current.reInit(reinitOptions(), emblaPluginsFromProps());
       };
-      requestAnimationFrame(() => requestAnimationFrame(remeasure));
-      setTimeout(remeasure, 0);
+      remeasureRafOuter.current = requestAnimationFrame(() => {
+        remeasureRafInner.current = requestAnimationFrame(remeasure);
+      });
+      remeasureTimer.current = setTimeout(remeasure, 0);
     }
+
+    // D7: cancel every scheduled handle AND null both engines on unmount. Nulling
+    // both (not just calling destroy()) makes all 14 exposed verbs + getInstance()
+    // fall through their existing `if (embla)` / ternary guards after unmount, so
+    // the handle-manifest's "Null / 0 / Empty before mount" contract becomes
+    // symmetric — null before mount AND after unmount — instead of calling into a
+    // destroyed engine.
     return () => {
-      embla.current?.destroy();
-      emblaThumbs.current?.destroy();
+      if (remeasureRafOuter.current) cancelAnimationFrame(remeasureRafOuter.current);
+      if (remeasureRafInner.current) cancelAnimationFrame(remeasureRafInner.current);
+      if (remeasureTimer.current) clearTimeout(remeasureTimer.current);
+      remeasureRafOuter.current = null;
+      remeasureRafInner.current = null;
+      remeasureTimer.current = null;
+      if (embla.current) {
+        embla.current.destroy();
+        embla.current = null;
+      }
+      if (emblaThumbs.current) {
+        emblaThumbs.current.destroy();
+        emblaThumbs.current = null;
+      }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -358,28 +392,49 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
   }, [selectedIndex]);
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
-    embla.current?.reInit(emblaOptionsFromProps());
+    embla.current?.reInit(reinitOptions());
   }, [props.align, props.axis, props.containScroll, props.direction, props.dragFree, props.draggable, props.duration, props.loop, props.skipSnaps, props.slidesToScroll]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
-    embla.current?.reInit(emblaOptionsFromProps(), emblaPluginsFromProps());
+    embla.current?.reInit(reinitOptions(), emblaPluginsFromProps());
   }, [props.autoplay, props.autoplayDelay]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch3First.current) { _watch3First.current = false; return; }
-    embla.current?.reInit(emblaOptionsFromProps());
+    embla.current?.reInit(reinitOptions());
     emblaThumbs.current?.reInit(thumbsOptionsFromProps());
     syncNav();
   }, [props.slides]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch4First.current) { _watch4First.current = false; return; }
     const on = props.thumbnails;
-    if (on && !emblaThumbs.current && thumbsViewportEl.current) {
+    if (!on) {
+      if (emblaThumbs.current) {
+        emblaThumbs.current.destroy();
+        emblaThumbs.current = null;
+      }
+      return;
+    }
+    if (emblaThumbs.current) return;
+    // The r-if'd thumbs viewport mounts in the SAME tick this watch fires, and a
+    // pre-flush watcher (Vue's default) runs BEFORE that render — $refs.thumbs-
+    // ViewportEl is still null when the callback runs, so a synchronous build
+    // silently no-ops and a runtime thumbnails toggle never gets an engine.
+    // Double-schedule an idempotent pass through queueMicrotask AND rAF (the
+    // DatePicker scheduleFocus idiom, DatePicker.rozie:656-673) so whichever
+    // lands first after the flush wins; targets that already flushed
+    // synchronously take the immediate fast path in `build()` below and never
+    // wait on the deferred passes.
+    const build = () => {
+      if (!embla.current) return; // unmounted — the $onMount cleanup nulled it
+      if (!props.thumbnails) return; // toggled back off before this pass ran
+      if (emblaThumbs.current) return; // idempotent across the double-schedule
+      if (!thumbsViewportEl.current) return;
       emblaThumbs.current = EmblaCarousel(thumbsViewportEl.current!, thumbsOptionsFromProps());
       syncNav();
-    } else if (!on && emblaThumbs.current) {
-      emblaThumbs.current.destroy();
-      emblaThumbs.current = null;
-    }
+    };
+    build();
+    if (typeof queueMicrotask !== 'undefined') queueMicrotask(build);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(build);
   }, [props.thumbnails]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieExposeRef = useRef({ scrollNext, scrollPrev, scrollToIndex, reInitCarousel, canScrollNext, canScrollPrev, getSelectedIndex, scrollSnapList, scrollProgress, slidesInView, slidesNotInView, previousScrollSnap, getPlugins, getInstance });

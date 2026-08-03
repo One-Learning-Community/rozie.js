@@ -251,15 +251,27 @@ private __rozieFirstUpdateDone = false;
     this._armListeners();
 
     this._disconnectCleanups.push((() => {
-      this.embla?.destroy();
-      this.emblaThumbs?.destroy();
+      if (this.remeasureRafOuter) cancelAnimationFrame(this.remeasureRafOuter);
+      if (this.remeasureRafInner) cancelAnimationFrame(this.remeasureRafInner);
+      if (this.remeasureTimer) clearTimeout(this.remeasureTimer);
+      this.remeasureRafOuter = null;
+      this.remeasureRafInner = null;
+      this.remeasureTimer = null;
+      if (this.embla) {
+        this.embla.destroy();
+        this.embla = null;
+      }
+      if (this.emblaThumbs) {
+        this.emblaThumbs.destroy();
+        this.emblaThumbs = null;
+      }
     }));
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.selectedIndex)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((i: any) => {
       if (this.embla && typeof i === 'number' && i !== this.embla.selectedScrollSnap()) this.embla.scrollTo(i);
     })(__watchVal); }); }));
 
-    this.embla = EmblaCarousel(this._refViewportEl, this.emblaOptionsFromProps(), this.emblaPluginsFromProps());
+    this.embla = EmblaCarousel(this._refViewportEl, this.initialOptions(), this.emblaPluginsFromProps());
 
     // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
     // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
@@ -334,29 +346,59 @@ private __rozieFirstUpdateDone = false;
     // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
     if (typeof requestAnimationFrame === 'function') {
       const remeasure = () => {
-        if (this.embla) this.embla.reInit(this.emblaOptionsFromProps(), this.emblaPluginsFromProps());
+        if (this.embla) this.embla.reInit(this.reinitOptions(), this.emblaPluginsFromProps());
       };
-      requestAnimationFrame(() => requestAnimationFrame(remeasure));
-      setTimeout(remeasure, 0);
+      this.remeasureRafOuter = requestAnimationFrame(() => {
+        this.remeasureRafInner = requestAnimationFrame(remeasure);
+      });
+      this.remeasureTimer = setTimeout(remeasure, 0);
     }
+
+    // D7: cancel every scheduled handle AND null both engines on unmount. Nulling
+    // both (not just calling destroy()) makes all 14 exposed verbs + getInstance()
+    // fall through their existing `if (embla)` / ternary guards after unmount, so
+    // the handle-manifest's "Null / 0 / Empty before mount" contract becomes
+    // symmetric — null before mount AND after unmount — instead of calling into a
+    // destroyed engine.
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('loop') || changedProperties.has('align') || changedProperties.has('axis') || changedProperties.has('slidesToScroll') || changedProperties.has('dragFree') || changedProperties.has('draggable') || changedProperties.has('containScroll') || changedProperties.has('skipSnaps') || changedProperties.has('duration') || changedProperties.has('direction'))) { const __watchVal = (() => [this.loop, this.align, this.axis, this.slidesToScroll, this.dragFree, this.draggable, this.containScroll, this.skipSnaps, this.duration, this.direction].join('|'))(); (() => this.embla?.reInit(this.emblaOptionsFromProps()))(); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('autoplay') || changedProperties.has('autoplayDelay'))) { const __watchVal = (() => `${this.autoplay}|${this.autoplayDelay}`)(); (() => this.embla?.reInit(this.emblaOptionsFromProps(), this.emblaPluginsFromProps()))(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('loop') || changedProperties.has('align') || changedProperties.has('axis') || changedProperties.has('slidesToScroll') || changedProperties.has('dragFree') || changedProperties.has('draggable') || changedProperties.has('containScroll') || changedProperties.has('skipSnaps') || changedProperties.has('duration') || changedProperties.has('direction'))) { const __watchVal = (() => [this.loop, this.align, this.axis, this.slidesToScroll, this.dragFree, this.draggable, this.containScroll, this.skipSnaps, this.duration, this.direction].join('|'))(); (() => this.embla?.reInit(this.reinitOptions()))(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('autoplay') || changedProperties.has('autoplayDelay'))) { const __watchVal = (() => `${this.autoplay}|${this.autoplayDelay}`)(); (() => this.embla?.reInit(this.reinitOptions(), this.emblaPluginsFromProps()))(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('slides'))) { const __watchVal = (() => this.slides.length)(); (() => {
-      this.embla?.reInit(this.emblaOptionsFromProps());
+      this.embla?.reInit(this.reinitOptions());
       this.emblaThumbs?.reInit(this.thumbsOptionsFromProps());
       this.syncNav();
     })(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('thumbnails'))) { const __watchVal = (() => this.thumbnails)(); ((on: any) => {
-      if (on && !this.emblaThumbs && this._refThumbsViewportEl) {
+      if (!on) {
+        if (this.emblaThumbs) {
+          this.emblaThumbs.destroy();
+          this.emblaThumbs = null;
+        }
+        return;
+      }
+      if (this.emblaThumbs) return;
+      // The r-if'd thumbs viewport mounts in the SAME tick this watch fires, and a
+      // pre-flush watcher (Vue's default) runs BEFORE that render — $refs.thumbs-
+      // ViewportEl is still null when the callback runs, so a synchronous build
+      // silently no-ops and a runtime thumbnails toggle never gets an engine.
+      // Double-schedule an idempotent pass through queueMicrotask AND rAF (the
+      // DatePicker scheduleFocus idiom, DatePicker.rozie:656-673) so whichever
+      // lands first after the flush wins; targets that already flushed
+      // synchronously take the immediate fast path in `build()` below and never
+      // wait on the deferred passes.
+      const build = () => {
+        if (!this.embla) return; // unmounted — the $onMount cleanup nulled it
+        if (!this.thumbnails) return; // toggled back off before this pass ran
+        if (this.emblaThumbs) return; // idempotent across the double-schedule
+        if (!this._refThumbsViewportEl) return;
         this.emblaThumbs = EmblaCarousel(this._refThumbsViewportEl, this.thumbsOptionsFromProps());
         this.syncNav();
-      } else if (!on && this.emblaThumbs) {
-        this.emblaThumbs.destroy();
-        this.emblaThumbs = null;
-      }
+      };
+      build();
+      if (typeof queueMicrotask !== 'undefined') queueMicrotask(build);
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(build);
     })(__watchVal); }
     this.__rozieFirstUpdateDone = true;
   }
@@ -412,12 +454,18 @@ private __rozieFirstUpdateDone = false;
 
   emblaThumbs: any = null;
 
+  remeasureRafOuter: any = null;
+
+  remeasureRafInner: any = null;
+
+  remeasureTimer: any = null;
+
   keyFor = (slide: any, i: any) => {
   if (slide !== null && typeof slide === 'object') return slide.id ?? slide.key ?? i;
   return slide ?? i;
 };
 
-  emblaOptionsFromProps = () => {
+  initialOptions = () => {
   let opts: any = null;
   opts = {
     // Pin the slide set explicitly rather than letting Embla infer it from the
@@ -444,6 +492,13 @@ private __rozieFirstUpdateDone = false;
     direction: this.direction,
     ...this.options
   };
+  return opts;
+};
+
+  reinitOptions = () => {
+  let opts: any = null;
+  opts = this.initialOptions();
+  delete opts.startIndex;
   return opts;
 };
 
@@ -491,7 +546,7 @@ private __rozieFirstUpdateDone = false;
   }
 
   reInitCarousel(opts: any) {
-    if (this.embla) this.embla.reInit(opts ?? this.emblaOptionsFromProps(), this.emblaPluginsFromProps());
+    if (this.embla) this.embla.reInit(opts ?? this.reinitOptions(), this.emblaPluginsFromProps());
   }
 
   canScrollNext() {

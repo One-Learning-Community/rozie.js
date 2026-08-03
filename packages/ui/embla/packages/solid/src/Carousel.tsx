@@ -212,7 +212,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   const [canNext, setCanNext] = createSignal(false);
   onMount(() => {
     const _cleanup = (() => {
-    embla = EmblaCarousel(viewportElRef!, emblaOptionsFromProps(), emblaPluginsFromProps());
+    embla = EmblaCarousel(viewportElRef!, initialOptions(), emblaPluginsFromProps());
 
     // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
     // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
@@ -253,36 +253,78 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
     // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
     if (typeof requestAnimationFrame === 'function') {
       const remeasure = () => {
-        if (embla) embla.reInit(emblaOptionsFromProps(), emblaPluginsFromProps());
+        if (embla) embla.reInit(reinitOptions(), emblaPluginsFromProps());
       };
-      requestAnimationFrame(() => requestAnimationFrame(remeasure));
-      setTimeout(remeasure, 0);
+      remeasureRafOuter = requestAnimationFrame(() => {
+        remeasureRafInner = requestAnimationFrame(remeasure);
+      });
+      remeasureTimer = setTimeout(remeasure, 0);
     }
+
+    // D7: cancel every scheduled handle AND null both engines on unmount. Nulling
+    // both (not just calling destroy()) makes all 14 exposed verbs + getInstance()
+    // fall through their existing `if (embla)` / ternary guards after unmount, so
+    // the handle-manifest's "Null / 0 / Empty before mount" contract becomes
+    // symmetric — null before mount AND after unmount — instead of calling into a
+    // destroyed engine.
   })() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => {
-    embla?.destroy();
-    emblaThumbs?.destroy();
+    if (remeasureRafOuter) cancelAnimationFrame(remeasureRafOuter);
+    if (remeasureRafInner) cancelAnimationFrame(remeasureRafInner);
+    if (remeasureTimer) clearTimeout(remeasureTimer);
+    remeasureRafOuter = null;
+    remeasureRafInner = null;
+    remeasureTimer = null;
+    if (embla) {
+      embla.destroy();
+      embla = null;
+    }
+    if (emblaThumbs) {
+      emblaThumbs.destroy();
+      emblaThumbs = null;
+    }
   });
   });
   createEffect(on(() => (() => selectedIndex())(), (v) => untrack(() => ((i: any) => {
     if (embla && typeof i === 'number' && i !== embla.selectedScrollSnap()) embla.scrollTo(i);
   })(v)), { defer: true }));
-  createEffect(on(() => (() => [local.loop, local.align, local.axis, local.slidesToScroll, local.dragFree, local.draggable, local.containScroll, local.skipSnaps, local.duration, local.direction].join('|'))(), (v) => untrack(() => (() => embla?.reInit(emblaOptionsFromProps()))()), { defer: true }));
-  createEffect(on(() => (() => `${local.autoplay}|${local.autoplayDelay}`)(), (v) => untrack(() => (() => embla?.reInit(emblaOptionsFromProps(), emblaPluginsFromProps()))()), { defer: true }));
+  createEffect(on(() => (() => [local.loop, local.align, local.axis, local.slidesToScroll, local.dragFree, local.draggable, local.containScroll, local.skipSnaps, local.duration, local.direction].join('|'))(), (v) => untrack(() => (() => embla?.reInit(reinitOptions()))()), { defer: true }));
+  createEffect(on(() => (() => `${local.autoplay}|${local.autoplayDelay}`)(), (v) => untrack(() => (() => embla?.reInit(reinitOptions(), emblaPluginsFromProps()))()), { defer: true }));
   createEffect(on(() => (() => local.slides.length)(), (v) => untrack(() => (() => {
-    embla?.reInit(emblaOptionsFromProps());
+    embla?.reInit(reinitOptions());
     emblaThumbs?.reInit(thumbsOptionsFromProps());
     syncNav();
   })()), { defer: true }));
   createEffect(on(() => (() => local.thumbnails)(), (v) => untrack(() => ((on: any) => {
-    if (on && !emblaThumbs && thumbsViewportElRef) {
+    if (!on) {
+      if (emblaThumbs) {
+        emblaThumbs.destroy();
+        emblaThumbs = null;
+      }
+      return;
+    }
+    if (emblaThumbs) return;
+    // The r-if'd thumbs viewport mounts in the SAME tick this watch fires, and a
+    // pre-flush watcher (Vue's default) runs BEFORE that render — $refs.thumbs-
+    // ViewportEl is still null when the callback runs, so a synchronous build
+    // silently no-ops and a runtime thumbnails toggle never gets an engine.
+    // Double-schedule an idempotent pass through queueMicrotask AND rAF (the
+    // DatePicker scheduleFocus idiom, DatePicker.rozie:656-673) so whichever
+    // lands first after the flush wins; targets that already flushed
+    // synchronously take the immediate fast path in `build()` below and never
+    // wait on the deferred passes.
+    const build = () => {
+      if (!embla) return; // unmounted — the $onMount cleanup nulled it
+      if (!local.thumbnails) return; // toggled back off before this pass ran
+      if (emblaThumbs) return; // idempotent across the double-schedule
+      if (!thumbsViewportElRef) return;
       emblaThumbs = EmblaCarousel(thumbsViewportElRef, thumbsOptionsFromProps());
       syncNav();
-    } else if (!on && emblaThumbs) {
-      emblaThumbs.destroy();
-      emblaThumbs = null;
-    }
+    };
+    build();
+    if (typeof queueMicrotask !== 'undefined') queueMicrotask(build);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(build);
   })(v)), { defer: true }));
   let viewportElRef: HTMLElement | null = null;
   let thumbsViewportElRef: HTMLElement | null = null;
@@ -293,6 +335,13 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   // The SECOND Embla instance powering the optional synced thumbnail strip (null
   // when `thumbnails` is off). Top-level let for the same hoist reason as `embla`.
   let emblaThumbs: any = null;
+  // D7: the two mount-time remeasure rAF handles + the macrotask handle, captured
+  // so the mount cleanup can cancel them on unmount. Null-lets (not `= 0`) so they
+  // type-neutralize to `any` — setTimeout's return type differs between the DOM
+  // and Node lib shapes across the six leaves' tsconfigs.
+  let remeasureRafOuter: any = null;
+  let remeasureRafInner: any = null;
+  let remeasureTimer: any = null;
 
   // Stable key for config-array slides — prefer an object id, fall back to value/index.
   function keyFor(slide: any, i: any) {
@@ -310,7 +359,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   // pre-nulled `let` (auto type-neutralized to `any`) launders the literal so the
   // engine accepts it — the .rozie-native fix (no codegen type-aid, no lang="ts"),
   // the same laundering discipline MapLibre uses for its untyped option object.
-  function emblaOptionsFromProps() {
+  function initialOptions() {
     let opts: any = null;
     opts = {
       // Pin the slide set explicitly rather than letting Embla infer it from the
@@ -340,6 +389,20 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
     return opts;
   }
 
+  // startIndex is INIT-ONLY. Embla's reActivate preserves the live position by
+  // merging mergeOptions({ startIndex: selectedScrollSnap() }, withOptions) — and
+  // withOptions WINS (embla-carousel@8 esm :1450, :1558). So any startIndex left
+  // in a reInit payload teleports the carousel back to the prop's value on every
+  // option flip, slide add/remove, and no-arg reInitCarousel(). Delete it AFTER
+  // the ...$props.options spread so the raw escape hatch cannot reintroduce it
+  // either. To move programmatically, use the scrollToIndex() handle verb.
+  function reinitOptions() {
+    let opts: any = null;
+    opts = initialOptions();
+    delete opts.startIndex;
+    return opts;
+  }
+
   // Build the plugin array: gate Autoplay behind the `autoplay` prop, then append
   // any consumer-supplied plugins verbatim.
   function emblaPluginsFromProps() {
@@ -352,7 +415,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   // Thumbnail-strip Embla options (the canonical Embla "thumbs" config): keep every
   // snap reachable + free dragging so the strip scrolls independently of the main
   // carousel, sharing the main axis. Built into a pre-nulled let for the same
-  // literal-union laundering reason as emblaOptionsFromProps (axis is a `string`).
+  // literal-union laundering reason as initialOptions (axis is a `string`).
   function thumbsOptionsFromProps() {
     let opts: any = null;
     opts = {
@@ -396,6 +459,10 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   // ─── imperative handle (Phase 21 $expose) — collision-suffix discipline ──────
   // 14 verbs, each guarding the pre-mount/destroyed `embla = null`.
   //  - reInitCarousel ≠ the `reInit` emit (ROZ121 expose-verb==emit collision).
+  //    260802-tmo D1: a DELIBERATE behavior change to this published verb —
+  //    no-arg reInitCarousel() now PRESERVES the current snap (via
+  //    reinitOptions()) instead of resetting to `startIndex` on every call. Pass
+  //    raw options to override. See docs/components/embla.md's handle table.
   //  - getSelectedIndex ≠ the `selectedIndex` model prop (ROZ524-class — avoids any
   //    setter collision on Lit/Angular; it's a method, the prop is the two-way value).
   //  - scrollToIndex ≠ the inherited DOM/LitElement `HTMLElement.scrollTo(x, y)`. A
@@ -421,7 +488,7 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
     if (embla) embla.scrollTo(index, jump);
   }
   function reInitCarousel(opts: any) {
-    if (embla) embla.reInit(opts ?? emblaOptionsFromProps(), emblaPluginsFromProps());
+    if (embla) embla.reInit(opts ?? reinitOptions(), emblaPluginsFromProps());
   }
   function canScrollNext() {
     return embla ? embla.canScrollNext() : false;

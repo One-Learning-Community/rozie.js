@@ -291,26 +291,47 @@ export class Carousel {
     effect(() => { const __watchVal = (() => this.selectedIndex())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((i: any) => {
       if (this.embla && typeof i === 'number' && i !== this.embla.selectedScrollSnap()) this.embla.scrollTo(i);
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => [this.loop(), this.align(), this.axis(), this.slidesToScroll(), this.dragFree(), this.draggable(), this.containScroll(), this.skipSnaps(), this.duration(), this.direction()].join('|'))(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => this.embla?.reInit(this.emblaOptionsFromProps()))(); }); });
-    effect(() => { const __watchVal = (() => `${this.autoplay()}|${this.autoplayDelay()}`)(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => this.embla?.reInit(this.emblaOptionsFromProps(), this.emblaPluginsFromProps()))(); }); });
+    effect(() => { const __watchVal = (() => [this.loop(), this.align(), this.axis(), this.slidesToScroll(), this.dragFree(), this.draggable(), this.containScroll(), this.skipSnaps(), this.duration(), this.direction()].join('|'))(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => this.embla?.reInit(this.reinitOptions()))(); }); });
+    effect(() => { const __watchVal = (() => `${this.autoplay()}|${this.autoplayDelay()}`)(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => this.embla?.reInit(this.reinitOptions(), this.emblaPluginsFromProps()))(); }); });
     effect(() => { const __watchVal = (() => this.slides().length)(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
-      this.embla?.reInit(this.emblaOptionsFromProps());
+      this.embla?.reInit(this.reinitOptions());
       this.emblaThumbs?.reInit(this.thumbsOptionsFromProps());
       this.syncNav();
     })(); }); });
     effect(() => { const __watchVal = (() => this.thumbnails())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((on: any) => {
-      if (on && !this.emblaThumbs && this.thumbsViewportEl()?.nativeElement) {
+      if (!on) {
+        if (this.emblaThumbs) {
+          this.emblaThumbs.destroy();
+          this.emblaThumbs = null;
+        }
+        return;
+      }
+      if (this.emblaThumbs) return;
+      // The r-if'd thumbs viewport mounts in the SAME tick this watch fires, and a
+      // pre-flush watcher (Vue's default) runs BEFORE that render — $refs.thumbs-
+      // ViewportEl is still null when the callback runs, so a synchronous build
+      // silently no-ops and a runtime thumbnails toggle never gets an engine.
+      // Double-schedule an idempotent pass through queueMicrotask AND rAF (the
+      // DatePicker scheduleFocus idiom, DatePicker.rozie:656-673) so whichever
+      // lands first after the flush wins; targets that already flushed
+      // synchronously take the immediate fast path in `build()` below and never
+      // wait on the deferred passes.
+      const build = () => {
+        if (!this.embla) return; // unmounted — the $onMount cleanup nulled it
+        if (!this.thumbnails()) return; // toggled back off before this pass ran
+        if (this.emblaThumbs) return; // idempotent across the double-schedule
+        if (!this.thumbsViewportEl()?.nativeElement) return;
         this.emblaThumbs = EmblaCarousel(this.thumbsViewportEl()!.nativeElement, this.thumbsOptionsFromProps());
         this.syncNav();
-      } else if (!on && this.emblaThumbs) {
-        this.emblaThumbs.destroy();
-        this.emblaThumbs = null;
-      }
+      };
+      build();
+      if (typeof queueMicrotask !== 'undefined') queueMicrotask(build);
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(build);
     })(__watchVal); }); });
   }
 
   ngAfterViewInit() {
-    this.embla = EmblaCarousel(this.viewportEl()!.nativeElement, this.emblaOptionsFromProps(), this.emblaPluginsFromProps());
+    this.embla = EmblaCarousel(this.viewportEl()!.nativeElement, this.initialOptions(), this.emblaPluginsFromProps());
 
     // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
     // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
@@ -369,24 +390,48 @@ export class Carousel {
     // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
     if (typeof requestAnimationFrame === 'function') {
       const remeasure = () => {
-        if (this.embla) this.embla.reInit(this.emblaOptionsFromProps(), this.emblaPluginsFromProps());
+        if (this.embla) this.embla.reInit(this.reinitOptions(), this.emblaPluginsFromProps());
       };
-      requestAnimationFrame(() => requestAnimationFrame(remeasure));
-      setTimeout(remeasure, 0);
+      this.remeasureRafOuter = requestAnimationFrame(() => {
+        this.remeasureRafInner = requestAnimationFrame(remeasure);
+      });
+      this.remeasureTimer = setTimeout(remeasure, 0);
     }
+
+    // D7: cancel every scheduled handle AND null both engines on unmount. Nulling
+    // both (not just calling destroy()) makes all 14 exposed verbs + getInstance()
+    // fall through their existing `if (embla)` / ternary guards after unmount, so
+    // the handle-manifest's "Null / 0 / Empty before mount" contract becomes
+    // symmetric — null before mount AND after unmount — instead of calling into a
+    // destroyed engine.
     this.__rozieDestroyRef.onDestroy(() => {
-      this.embla?.destroy();
-      this.emblaThumbs?.destroy();
+      if (this.remeasureRafOuter) cancelAnimationFrame(this.remeasureRafOuter);
+      if (this.remeasureRafInner) cancelAnimationFrame(this.remeasureRafInner);
+      if (this.remeasureTimer) clearTimeout(this.remeasureTimer);
+      this.remeasureRafOuter = null;
+      this.remeasureRafInner = null;
+      this.remeasureTimer = null;
+      if (this.embla) {
+        this.embla.destroy();
+        this.embla = null;
+      }
+      if (this.emblaThumbs) {
+        this.emblaThumbs.destroy();
+        this.emblaThumbs = null;
+      }
     });
   }
 
   embla: any = null;
   emblaThumbs: any = null;
+  remeasureRafOuter: any = null;
+  remeasureRafInner: any = null;
+  remeasureTimer: any = null;
   keyFor = (slide: any, i: any) => {
     if (slide !== null && typeof slide === 'object') return slide.id ?? slide.key ?? i;
     return slide ?? i;
   };
-  emblaOptionsFromProps = () => {
+  initialOptions = () => {
     let opts: any = null;
     opts = {
       // Pin the slide set explicitly rather than letting Embla infer it from the
@@ -413,6 +458,12 @@ export class Carousel {
       direction: this.direction(),
       ...this.options()
     };
+    return opts;
+  };
+  reinitOptions = () => {
+    let opts: any = null;
+    opts = this.initialOptions();
+    delete opts.startIndex;
     return opts;
   };
   emblaPluginsFromProps = () => {
@@ -452,7 +503,7 @@ export class Carousel {
     if (this.embla) this.embla.scrollTo(index, jump);
   };
   reInitCarousel = (opts: any) => {
-    if (this.embla) this.embla.reInit(opts ?? this.emblaOptionsFromProps(), this.emblaPluginsFromProps());
+    if (this.embla) this.embla.reInit(opts ?? this.reinitOptions(), this.emblaPluginsFromProps());
   };
   canScrollNext = () => {
     return this.embla ? this.embla.canScrollNext() : false;
