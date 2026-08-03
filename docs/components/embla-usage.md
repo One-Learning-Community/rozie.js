@@ -188,6 +188,6 @@ const i = el.getSelectedIndex();
 
 ## See also
 
-- [Carousel — showcase & API](/components/embla) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Carousel — showcase & API](/components/embla) — the full prop / event / slot / handle reference, and theming.
 - [Carousel comparison](/components/embla-comparison) — how it stacks up against the per-framework libraries.
 - [Carousel — live demo](/components/embla-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

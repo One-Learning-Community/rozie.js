@@ -192,6 +192,6 @@ const total = el.getPageCount();
 
 ## See also
 
-- [PdfViewer — showcase & API](/components/pdf) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [PdfViewer — showcase & API](/components/pdf) — the full prop / event / slot / handle reference, and theming.
 - [PdfViewer comparison](/components/pdf-comparison) — how it stacks up against the per-framework libraries.
 - [PdfViewer — live demo](/components/pdf-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

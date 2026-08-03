@@ -181,6 +181,6 @@ const api = el.getApi();
 
 ## See also
 
-- [FullCalendar — showcase & API](/components/fullcalendar) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [FullCalendar — showcase & API](/components/fullcalendar) — the full prop / event / slot / handle reference, and theming.
 - [FullCalendar comparison](/components/fullcalendar-comparison) — how it stacks up against the per-framework libraries.
 - [FullCalendar — live demo](/components/fullcalendar-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

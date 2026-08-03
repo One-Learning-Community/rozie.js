@@ -174,6 +174,6 @@ document.querySelector('rozie-flatpickr').openPicker();
 
 ## See also
 
-- [Flatpickr — showcase & API](/components/flatpickr) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Flatpickr — showcase & API](/components/flatpickr) — the full prop / event / slot / handle reference, and theming.
 - [Flatpickr comparison](/components/flatpickr-comparison) — how it stacks up against the per-framework libraries.
 - [Flatpickr — live demo](/components/flatpickr-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

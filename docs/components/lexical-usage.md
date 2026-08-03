@@ -64,6 +64,6 @@ export function Editor() {
 
 ## See also
 
-- [LexicalEditor — showcase & API](/components/lexical) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [LexicalEditor — showcase & API](/components/lexical) — the full prop / event / slot / handle reference, and theming.
 - [LexicalEditor comparison](/components/lexical-comparison) — how it stacks up against the per-framework libraries.
 - [LexicalEditor — live demo](/components/lexical-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

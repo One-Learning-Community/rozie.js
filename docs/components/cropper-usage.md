@@ -198,6 +198,6 @@ const url = el.getCroppedDataURL();
 
 ## See also
 
-- [Cropper — showcase & API](/components/cropper) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Cropper — showcase & API](/components/cropper) — the full prop / event / slot / handle reference, and theming.
 - [Cropper comparison](/components/cropper-comparison) — how it stacks up against the per-framework libraries.
 - [Cropper — live demo](/components/cropper-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

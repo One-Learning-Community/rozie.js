@@ -168,6 +168,6 @@ document.querySelector('rozie-captcha');
 
 ## See also
 
-- [Captcha — showcase & API](/components/captcha) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Captcha — showcase & API](/components/captcha) — the full prop / event / slot / handle reference, and theming.
 - [Captcha comparison](/components/captcha-comparison) — how it stacks up against the per-framework libraries.
 - [Captcha — live demo](/components/captcha-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

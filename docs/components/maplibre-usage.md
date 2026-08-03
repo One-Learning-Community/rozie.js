@@ -211,6 +211,6 @@ const raw = el.getMap();
 
 ## See also
 
-- [MapLibre — showcase & API](/components/maplibre) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [MapLibre — showcase & API](/components/maplibre) — the full prop / event / slot / handle reference, and theming.
 - [MapLibre comparison](/components/maplibre-comparison) — how it stacks up against the per-framework libraries.
 - [MapLibre — live demo](/components/maplibre-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

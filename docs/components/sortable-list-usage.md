@@ -193,5 +193,5 @@ el.option('disabled', true);
 
 ## See also
 
-- [SortableList — showcase & API](/components/sortable-list) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [SortableList — showcase & API](/components/sortable-list) — the full prop / event / slot / handle reference, and theming.
 - [SortableList — live demo](/components/sortable-list-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

@@ -2360,6 +2360,6 @@ const cats = el.getFacetedUniqueValues('category'); // getFacetedMinMaxValues to
 
 ## See also
 
-- [DataTable — showcase & API](/components/data-table) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [DataTable — showcase & API](/components/data-table) — the full prop / event / slot / handle reference, and theming.
 - [DataTable comparison](/components/data-table-comparison) — how it stacks up against the per-framework libraries.
 - [DataTable — live demo](/components/data-table-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

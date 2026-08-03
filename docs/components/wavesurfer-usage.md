@@ -192,6 +192,6 @@ const dur = el.getDuration();
 
 ## See also
 
-- [Waveform — showcase & API](/components/wavesurfer) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Waveform — showcase & API](/components/wavesurfer) — the full prop / event / slot / handle reference, and theming.
 - [Waveform comparison](/components/wavesurfer-comparison) — how it stacks up against the per-framework libraries.
 - [Waveform — live demo](/components/wavesurfer-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

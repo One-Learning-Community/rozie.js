@@ -369,6 +369,6 @@ el.clear();
 
 ## See also
 
-- [DatePicker — showcase & API](/components/date-picker) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [DatePicker — showcase & API](/components/date-picker) — the full prop / event / slot / handle reference, and theming.
 - [DatePicker comparison](/components/date-picker-comparison) — how it stacks up against the per-framework libraries.
 - [DatePicker — live demo](/components/date-picker-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

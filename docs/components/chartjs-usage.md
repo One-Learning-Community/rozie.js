@@ -168,6 +168,6 @@ const png = el.toBase64Image();
 
 ## See also
 
-- [Chart — showcase & API](/components/chartjs) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Chart — showcase & API](/components/chartjs) — the full prop / event / slot / handle reference, and theming.
 - [Chart comparison](/components/chartjs-comparison) — how it stacks up against the per-framework libraries.
 - [Chart — live demo](/components/chartjs-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

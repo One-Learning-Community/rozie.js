@@ -152,6 +152,6 @@ const html = el.getHTML();
 
 ## See also
 
-- [TipTap — showcase & API](/components/tiptap) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [TipTap — showcase & API](/components/tiptap) — the full prop / event / slot / handle reference, and theming.
 - [TipTap comparison](/components/tiptap-comparison) — how it stacks up against the per-framework libraries.
 - [TipTap — live demo](/components/tiptap-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

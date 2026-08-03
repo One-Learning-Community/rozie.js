@@ -84,9 +84,21 @@ function codeGroup(snippets, i = 0) {
   return `::: code-group\n\n${tabs.join('\n\n')}\n\n:::`;
 }
 
+/** Whether `<slug>.md` documents an `## Accessibility` section — checked so
+ * the "showcase & API" link's promise below is never false. Verified (Task 6,
+ * 260802-tmo): only 13 of the ~40 component docs pages actually carry this
+ * heading (combobox, command-palette, data-table-grid-mode, dialog, listbox,
+ * number-field, otp, popover, resizable, slider, switch, tags, toast). */
+function hasAccessibilitySection(slug) {
+  const page = resolve(COMPONENTS_DIR, `${slug}.md`);
+  if (!existsSync(page)) return false;
+  return /^##\s+Accessibility\b/m.test(readFileSync(page, 'utf8'));
+}
+
 function relatedLinks(slug, name) {
+  const tail = hasAccessibilitySection(slug) ? 'theming, and accessibility.' : 'and theming.';
   const links = [
-    `- [${name} — showcase & API](/components/${slug}) — the full prop / event / slot / handle reference, theming, and accessibility.`,
+    `- [${name} — showcase & API](/components/${slug}) — the full prop / event / slot / handle reference, ${tail}`,
   ];
   if (existsSync(resolve(COMPONENTS_DIR, `${slug}-comparison.md`))) {
     links.push(`- [${name} comparison](/components/${slug}-comparison) — how it stacks up against the per-framework libraries.`);

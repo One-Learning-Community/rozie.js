@@ -171,6 +171,6 @@ const text = el.getValue();
 
 ## See also
 
-- [CodeMirror — showcase & API](/components/codemirror) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [CodeMirror — showcase & API](/components/codemirror) — the full prop / event / slot / handle reference, and theming.
 - [CodeMirror comparison](/components/codemirror-comparison) — how it stacks up against the per-framework libraries.
 - [CodeMirror — live demo](/components/codemirror-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.
