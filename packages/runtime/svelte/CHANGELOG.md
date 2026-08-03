@@ -1,5 +1,23 @@
 # @rozie/runtime-svelte
 
+## 0.2.2
+
+### Patch Changes
+
+- Array-form `:style` merge. `rozieStyle` now accepts an **array** of style
+  sources (`:style="[a, b]"`) and merges them left-to-right (later wins,
+  mirroring Vue's `normalizeStyle`); each element still goes through the
+  same single-value logic. Every element is normalized to a CSS-declaration
+  string, stripping a trailing `;` per element before the `'; '` join so
+  concatenation never produces a `;;` empty declaration (the
+  `project_angular_style_map_double_semicolon_drop` class of bug); the
+  browser's cascade resolves "later wins". This closed the `ROZ144`
+  restriction — emitters are unchanged, the array literal already reached
+  this helper at the existing binding site.
+- **Republish note:** `0.2.1` was cut before this landed
+  (`cbe01eaa`), so the published `0.2.1` tarball does not contain it.
+  `0.2.2` is the first published build with the array branch.
+
 ## 0.2.1
 
 ### Patch Changes
