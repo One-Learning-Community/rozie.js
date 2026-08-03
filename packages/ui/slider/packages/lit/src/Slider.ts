@@ -299,7 +299,7 @@ export default class Slider extends SignalWatcher(LitElement) {
   
   ${this.normalizedMarks().length > 0 ? html`<div class="rozie-slider-marks" aria-hidden="true" data-rozie-s-4e6f0be6>
     
-    ${repeat<any>(this.normalizedMarks(), (mark, _idx) => mark.value, (mark, _idx) => html`<div class="rozie-slider-mark" key=${rozieAttr(mark.value)} style=${styleMap({ left: this.pct(mark.value) + '%' })} data-rozie-s-4e6f0be6>
+    ${repeat<any>(this.normalizedMarks(), (mark, _idx) => mark.value, (mark, _idx) => html`<div class="rozie-slider-mark" style=${styleMap({ left: this.pct(mark.value) + '%' })} data-rozie-s-4e6f0be6>
       ${this.mark !== undefined ? this.mark({value: mark.value, label: mark.label, position: this.pct(mark.value)}) : html`<slot name="mark" data-rozie-params=${(() => { try { return JSON.stringify({value: mark.value, label: mark.label, position: this.pct(mark.value)}); } catch { return '{}'; } })()}>
         <span class="rozie-slider-mark-label" data-rozie-s-4e6f0be6>${rozieDisplay(mark.label)}</span>
       </slot>`}

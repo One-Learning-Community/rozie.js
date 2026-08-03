@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { rozieAttr, rozieDisplay } from '@rozie/runtime-lit';
+import { rozieDisplay } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-detail-panel')
@@ -34,7 +34,7 @@ export default class DetailPanel extends SignalWatcher(LitElement) {
     return html`
 <dl class="rdt-detail-panel" data-rozie-s-8f65bdaa>
   
-  ${repeat<any>(this.entries(), (pair, _idx) => pair.key, (pair, _idx) => html`<div class="rdt-detail-entry" key=${rozieAttr(pair.key)} data-rozie-s-8f65bdaa>
+  ${repeat<any>(this.entries(), (pair, _idx) => pair.key, (pair, _idx) => html`<div class="rdt-detail-entry" data-rozie-s-8f65bdaa>
     <dt class="rdt-detail-key" data-rozie-s-8f65bdaa>${rozieDisplay(pair.key)}</dt>
     <dd class="rdt-detail-value" data-rozie-s-8f65bdaa>${rozieDisplay(pair.value)}</dd>
   </div>`)}

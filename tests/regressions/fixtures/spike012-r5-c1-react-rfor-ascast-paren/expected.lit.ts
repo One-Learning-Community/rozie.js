@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-rfor-as-cast-paren')
@@ -29,7 +29,7 @@ export default class RforAsCastParen extends SignalWatcher(LitElement) {
 
   render() {
     return html`
-<div class="r" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-1453ae2b><ul data-rozie-s-1453ae2b>${repeat<any>(this._items.value as number[], (it, _idx) => it, (it, _idx) => html`<li key=${rozieAttr(it)} data-rozie-s-1453ae2b>${rozieDisplay(it)}</li>`)}</ul></div>
+<div class="r" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-1453ae2b><ul data-rozie-s-1453ae2b>${repeat<any>(this._items.value as number[], (it, _idx) => it, (it, _idx) => html`<li data-rozie-s-1453ae2b>${rozieDisplay(it)}</li>`)}</ul></div>
 `;
   }
 

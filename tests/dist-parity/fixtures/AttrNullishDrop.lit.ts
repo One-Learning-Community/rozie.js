@@ -35,7 +35,7 @@ export default class AttrNullishDrop extends SignalWatcher(LitElement) {
 <div class="attr-nullish-drop" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-f2d28246>
   <span data-x=${rozieAttr(this._cond.value ? 'v' : null)} aria-expanded=${rozieAttr(this._cond.value ? 'true' : 'false')} title=${rozieAttr(this._maybeNull.value)} data-rozie-s-f2d28246>probe</span>
   <span class="attr-nullish-drop-prop" title=${rozieAttr(this.maybeNullProp)} data-rozie-s-f2d28246>probe-prop</span>
-  ${repeat<any>(this._loopItems.value, (c, _idx) => c, (c, _idx) => html`<i class="attr-nullish-drop-loop" key=${rozieAttr(c)} title=${rozieAttr(this.maybeNullProp)} data-rozie-s-f2d28246>${rozieDisplay(c)}</i>`)}
+  ${repeat<any>(this._loopItems.value, (c, _idx) => c, (c, _idx) => html`<i class="attr-nullish-drop-loop" title=${rozieAttr(this.maybeNullProp)} data-rozie-s-f2d28246>${rozieDisplay(c)}</i>`)}
 </div>
 `;
   }

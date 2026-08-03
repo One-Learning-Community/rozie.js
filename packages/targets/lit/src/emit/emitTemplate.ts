@@ -1464,10 +1464,19 @@ function emitElementOpenTag(
       // relies on it as its own working vnode-key remount — see Task 1's
       // Global Constraints), so Lit must strip it at its own seam to avoid
       // ALSO emitting a dead `.key=${…}` property binding alongside the
-      // `keyed()` wrap. Guarded on `remountKeyExpression` being set so an
-      // r-for LOOP key (which never sets `remountKeyExpression`) is
-      // untouched here.
-      if (attr.name === 'key' && node.remountKeyExpression) continue;
+      // `keyed()` wrap.
+      //
+      // Quick 260802-v1v seam 4 — an `r-for` LOOP key (which never sets
+      // `remountKeyExpression`) must ALSO be stripped, unconditionally: it
+      // is consumed by `repeat()`'s own key-function argument (emitted by
+      // `emitLoop`, below the element open-tag emit), never a DOM attribute.
+      // React's `isConsumedAttribute` (`emitTemplateAttribute.ts:88`) and
+      // Solid's (`:128`) both treat `key`/`:key` as consumed unconditionally
+      // — Lit previously left the loop-key case "untouched" (per the prior
+      // revision of this comment) and leaked `key=${rozieAttr(c)}` onto
+      // every `r-for` cell's DOM. Both cases (component-level remount key AND
+      // loop key) are consumed elsewhere; neither is ever emitted here.
+      if (attr.name === 'key') continue;
     }
     const emitted = emitAttribute(attr, ir, node.tagName, node.tagKind, opts);
     if (emitted) parts.push(emitted);

@@ -426,7 +426,7 @@ private __rozieFirstUpdateDone = false;
     ${this.arrows ? html`<button class="rozie-embla__arrow rozie-embla__arrow--prev" type="button" ?disabled=${!this._canPrev.value} aria-label="Previous slide" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.scrollPrev(); }} data-rozie-s-4143c216>‹</button>` : nothing}<div class="rozie-embla__viewport" data-rozie-ref="viewportEl" data-rozie-s-4143c216>
       <div class="rozie-embla__container" data-rozie-s-4143c216>
         
-        ${repeat<any>(this.slides, (slide, i) => this.keyFor(slide, i), (slide, i) => html`<div class="rozie-embla__slide" key=${rozieAttr(this.keyFor(slide, i))} data-rozie-s-4143c216>
+        ${repeat<any>(this.slides, (slide, i) => this.keyFor(slide, i), (slide, i) => html`<div class="rozie-embla__slide" data-rozie-s-4143c216>
           ${this.slide !== undefined ? this.slide({slide: slide, index: i}) : html`<slot name="slide" data-rozie-params=${(() => { try { return JSON.stringify({slide: slide, index: i}); } catch { return '{}'; } })()}>${rozieDisplay(slide)}</slot>`}
         </div>`)}
         
@@ -437,11 +437,11 @@ private __rozieFirstUpdateDone = false;
 
   
   ${this.dots ? html`<div class="rozie-embla__dots" data-rozie-s-4143c216>
-    ${repeat<any>(this._snaps.value, (di, _idx) => di, (di, _idx) => html`<button class="${Object.entries({ "rozie-embla__dot": true, 'is-selected': di === this._selected.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(di)} type="button" aria-label=${rozieAttr('Go to slide ' + (di + 1))} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.scrollToIndex(di); }} data-rozie-s-4143c216></button>`)}
+    ${repeat<any>(this._snaps.value, (di, _idx) => di, (di, _idx) => html`<button class="${Object.entries({ "rozie-embla__dot": true, 'is-selected': di === this._selected.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" aria-label=${rozieAttr('Go to slide ' + (di + 1))} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.scrollToIndex(di); }} data-rozie-s-4143c216></button>`)}
   </div>` : nothing}${this.thumbnails ? html`<div class="rozie-embla__thumbs" data-rozie-s-4143c216>
     <div class="rozie-embla__thumbs-viewport" data-rozie-ref="thumbsViewportEl" data-rozie-s-4143c216>
       <div class="rozie-embla__thumbs-container" data-rozie-s-4143c216>
-        ${repeat<any>(this.slides, (item, i) => this.keyFor(item, i), (item, i) => html`<div class="${Object.entries({ "rozie-embla__thumb": true, 'is-selected': i === this._selected.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" key=${rozieAttr(this.keyFor(item, i))} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.selectThumb(i); }} data-rozie-s-4143c216>
+        ${repeat<any>(this.slides, (item, i) => this.keyFor(item, i), (item, i) => html`<div class="${Object.entries({ "rozie-embla__thumb": true, 'is-selected': i === this._selected.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.selectThumb(i); }} data-rozie-s-4143c216>
           ${this.thumb !== undefined ? this.thumb({slide: item, index: i}) : html`<slot name="thumb" data-rozie-params=${(() => { try { return JSON.stringify({slide: item, index: i}); } catch { return '{}'; } })()}>${rozieDisplay(item)}</slot>`}
         </div>`)}
       </div>

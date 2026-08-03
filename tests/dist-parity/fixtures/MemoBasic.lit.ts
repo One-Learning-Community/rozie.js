@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 @customElement('rozie-memo-basic')
@@ -37,7 +37,7 @@ export default class MemoBasic extends SignalWatcher(LitElement) {
 <div class="probe" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-fcb74b54>
   <input .value=${this._query.value} @input=${($event: InputEvent & { currentTarget: HTMLInputElement; target: HTMLInputElement }) => { this._query.value = $event.target.value; }} data-rozie-s-fcb74b54 />
   <ul data-rozie-s-fcb74b54>
-    ${repeat<any>(this.filtered(), (item, _idx) => item, (item, _idx) => html`<li key=${rozieAttr(item)} data-rozie-s-fcb74b54>${rozieDisplay(item)}</li>`)}
+    ${repeat<any>(this.filtered(), (item, _idx) => item, (item, _idx) => html`<li data-rozie-s-fcb74b54>${rozieDisplay(item)}</li>`)}
   </ul>
 </div>
 `;

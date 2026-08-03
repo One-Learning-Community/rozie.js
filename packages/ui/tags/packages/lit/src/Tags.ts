@@ -202,7 +202,7 @@ export default class Tags extends SignalWatcher(LitElement) {
     return html`
 <div class="${Object.entries({ "rozie-tags": true, 'rozie-tags--disabled': this.disabled, 'rozie-tags--readonly': this.readonly }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="group" aria-label=${rozieAttr(this.ariaLabel)} ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="root" data-rozie-s-64848f8e>
   <ul class="rozie-tags-list" data-rozie-s-64848f8e>
-    ${repeat<any>(this.tokens(), (t, _idx) => t + ':' + this.tokens().indexOf(t), (t, _idx) => html`<li class="rozie-tags-chip" key=${rozieAttr(t + ':' + this.tokens().indexOf(t))} data-rozie-s-64848f8e>
+    ${repeat<any>(this.tokens(), (t, _idx) => t + ':' + this.tokens().indexOf(t), (t, _idx) => html`<li class="rozie-tags-chip" data-rozie-s-64848f8e>
       ${this.tag !== undefined ? this.tag({tag: t, index: this.tokens().indexOf(t), remove: () => this.removeAt(this.tokens().indexOf(t))}) : html`<slot name="tag" data-rozie-params=${(() => { try { return JSON.stringify({tag: t, index: this.tokens().indexOf(t)}); } catch { return '{}'; } })()} @rozie-tag-remove=${($event: CustomEvent) => ((() => this.removeAt(this.tokens().indexOf(t))) as (...args: any[]) => any)($event.detail)}>
         <span class="rozie-tags-chip__label" data-rozie-s-64848f8e>${rozieDisplay(t)}</span>
         ${!this.readonly ? html`<button class="rozie-tags-chip__remove" type="button" ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.removeLabel(t))} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.removeAt(this.tokens().indexOf(t)); }} data-rozie-s-64848f8e>×</button>` : nothing}</slot>`}
