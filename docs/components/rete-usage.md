@@ -15,25 +15,34 @@ outline: [2, 3]
 
 ```tsx [React]
 import { useState } from 'react';
-import { FlowCanvas } from '@rozie-ui/rete-react';
+import { FlowCanvas, NodeType, Port } from '@rozie-ui/rete-react';
 
 export function Demo() {
+  const [graph, setGraph] = useState({
+    nodes: [
+      { id: 'a', type: 'source', x: 0,   y: 0,  data: { label: 'Source' } },
+      { id: 'b', type: 'merge',  x: 280, y: 60, data: { label: 'Merge' } },
+    ],
+    connections: [{ source: 'a', sourceOutput: 'num', target: 'b', targetInput: 'num' }],
+  });
   const [zoom, setZoom] = useState(1);
-  const nodes = [
-    { id: 'a', label: 'Source', x: 0,   y: 0,   outputs: [{ key: 'out' }] },
-    { id: 'b', label: 'Sink',   x: 280, y: 60,  inputs:  [{ key: 'in' }] },
-  ];
-  const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' }];
   return (
     <div style={{ height: 400 }}>
       <FlowCanvas
-        nodes={nodes}
-        connections={connections}
+        graph={graph}
+        onGraphChange={setGraph}
         zoom={zoom}
         onZoomChange={setZoom}
         onConnectionCreated={(c) => console.log('connected', c)}
         onNodeMoved={(e) => console.log('moved', e)}
-      />
+      >
+        <NodeType type="source" renderBody={({ node }) => <div>{node.data.label}</div>}>
+          <Port output="num" type="number" />
+        </NodeType>
+        <NodeType type="merge" renderBody={({ node }) => <div>{node.data.label}</div>}>
+          <Port input="num" type="number" multiple />
+        </NodeType>
+      </FlowCanvas>
     </div>
   );
 }
@@ -42,79 +51,109 @@ export function Demo() {
 ```vue [Vue]
 <script setup lang="ts">
 import { ref } from 'vue';
-import FlowCanvas from '@rozie-ui/rete-vue';
+import FlowCanvas, { NodeType, Port } from '@rozie-ui/rete-vue';
 
+const graph = ref({
+  nodes: [
+    { id: 'a', type: 'source', x: 0,   y: 0,  data: { label: 'Source' } },
+    { id: 'b', type: 'merge',  x: 280, y: 60, data: { label: 'Merge' } },
+  ],
+  connections: [{ source: 'a', sourceOutput: 'num', target: 'b', targetInput: 'num' }],
+});
 const zoom = ref(1);
-const nodes = [
-    { id: 'a', label: 'Source', x: 0,   y: 0,   outputs: [{ key: 'out' }] },
-    { id: 'b', label: 'Sink',   x: 280, y: 60,  inputs:  [{ key: 'in' }] },
-  ];
-const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' }];
 </script>
 
 <template>
   <div style="height: 400px">
     <FlowCanvas
-      :nodes="nodes"
-      :connections="connections"
+      v-model:graph="graph"
       v-model:zoom="zoom"
       @connection-created="(c) => console.log('connected', c)"
       @node-moved="(e) => console.log('moved', e)"
-    />
+    >
+      <NodeType type="source">
+        <template #body="{ node }">{{ node.data.label }}</template>
+        <Port output="num" type="number" />
+      </NodeType>
+      <NodeType type="merge">
+        <template #body="{ node }">{{ node.data.label }}</template>
+        <Port input="num" type="number" multiple />
+      </NodeType>
+    </FlowCanvas>
   </div>
 </template>
 ```
 
 ```svelte [Svelte]
 <script lang="ts">
-  import FlowCanvas from '@rozie-ui/rete-svelte';
+  import FlowCanvas, { NodeType, Port } from '@rozie-ui/rete-svelte';
 
+  let graph = $state({
+    nodes: [
+      { id: 'a', type: 'source', x: 0,   y: 0,  data: { label: 'Source' } },
+      { id: 'b', type: 'merge',  x: 280, y: 60, data: { label: 'Merge' } },
+    ],
+    connections: [{ source: 'a', sourceOutput: 'num', target: 'b', targetInput: 'num' }],
+  });
   let zoom = $state(1);
-  const nodes = [
-    { id: 'a', label: 'Source', x: 0,   y: 0,   outputs: [{ key: 'out' }] },
-    { id: 'b', label: 'Sink',   x: 280, y: 60,  inputs:  [{ key: 'in' }] },
-  ];
-  const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' }];
 </script>
 
 <div style="height: 400px">
   <FlowCanvas
-    {nodes}
-    {connections}
+    bind:graph
     bind:zoom
     onconnectioncreated={(c) => console.log('connected', c)}
     onnodemoved={(e) => console.log('moved', e)}
-  />
+  >
+    <NodeType type="source">
+      {#snippet body({ node })}<div>{node.data.label}</div>{/snippet}
+      <Port output="num" type="number" />
+    </NodeType>
+    <NodeType type="merge">
+      {#snippet body({ node })}<div>{node.data.label}</div>{/snippet}
+      <Port input="num" type="number" multiple />
+    </NodeType>
+  </FlowCanvas>
 </div>
 ```
 
 ```ts [Angular]
 import { Component } from '@angular/core';
-import { FlowCanvas } from '@rozie-ui/rete-angular';
+import { FlowCanvas, NodeType, Port } from '@rozie-ui/rete-angular';
 
 @Component({
   selector: 'app-demo',
   standalone: true,
-  imports: [FlowCanvas],
+  imports: [FlowCanvas, NodeType, Port],
   template: `
     <div style="height: 400px">
-      <FlowCanvas
-        [nodes]="nodes"
-        [connections]="connections"
+      <rozie-flow-canvas
+        [(graph)]="graph"
         [(zoom)]="zoom"
         (connection-created)="onConnect($event)"
         (node-moved)="onMoved($event)"
-      />
+      >
+        <rozie-node-type type="source">
+          <ng-template #body let-node="node">{{ node.data.label }}</ng-template>
+          <rozie-port output="num" type="number" />
+        </rozie-node-type>
+        <rozie-node-type type="merge">
+          <ng-template #body let-node="node">{{ node.data.label }}</ng-template>
+          <rozie-port input="num" type="number" multiple />
+        </rozie-node-type>
+      </rozie-flow-canvas>
     </div>
   `,
 })
 export class DemoComponent {
+  graph = {
+    nodes: [
+      { id: 'a', type: 'source', x: 0,   y: 0,  data: { label: 'Source' } },
+      { id: 'b', type: 'merge',  x: 280, y: 60, data: { label: 'Merge' } },
+    ],
+    connections: [{ source: 'a', sourceOutput: 'num', target: 'b', targetInput: 'num' }],
+  };
   zoom = 1;
-  nodes = [
-    { id: 'a', label: 'Source', x: 0,   y: 0,   outputs: [{ key: 'out' }] },
-    { id: 'b', label: 'Sink',   x: 280, y: 60,  inputs:  [{ key: 'in' }] },
-  ];
-  connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' }];
   onConnect(c: any) { console.log('connected', c); }
   onMoved(e: any) { console.log('moved', e); }
 }
@@ -122,44 +161,71 @@ export class DemoComponent {
 
 ```tsx [Solid]
 import { createSignal } from 'solid-js';
-import { FlowCanvas } from '@rozie-ui/rete-solid';
+import { FlowCanvas, NodeType, Port } from '@rozie-ui/rete-solid';
 
 export function Demo() {
+  const [graph, setGraph] = createSignal({
+    nodes: [
+      { id: 'a', type: 'source', x: 0,   y: 0,  data: { label: 'Source' } },
+      { id: 'b', type: 'merge',  x: 280, y: 60, data: { label: 'Merge' } },
+    ],
+    connections: [{ source: 'a', sourceOutput: 'num', target: 'b', targetInput: 'num' }],
+  });
   const [zoom, setZoom] = createSignal(1);
-  const nodes = [
-    { id: 'a', label: 'Source', x: 0,   y: 0,   outputs: [{ key: 'out' }] },
-    { id: 'b', label: 'Sink',   x: 280, y: 60,  inputs:  [{ key: 'in' }] },
-  ];
-  const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' }];
   return (
     <div style={{ height: '400px' }}>
       <FlowCanvas
-        nodes={nodes}
-        connections={connections}
+        graph={graph()}
+        onGraphChange={setGraph}
         zoom={zoom()}
         onZoomChange={setZoom}
         onConnectionCreated={(c) => console.log('connected', c)}
         onNodeMoved={(e) => console.log('moved', e)}
-      />
+      >
+        {/* the #body scope arrives as an ACCESSOR on Solid — call it, don't destructure */}
+        <NodeType type="source" bodySlot={(ctx) => <div>{ctx().node.data.label}</div>}>
+          <Port output="num" type="number" />
+        </NodeType>
+        <NodeType type="merge" bodySlot={(ctx) => <div>{ctx().node.data.label}</div>}>
+          <Port input="num" type="number" multiple />
+        </NodeType>
+      </FlowCanvas>
     </div>
   );
 }
 ```
 
-```ts [Lit]
-import '@rozie-ui/rete-lit';
+```html [Lit]
+<!-- Node TYPE templates are light-DOM children; each body is a `slot="body"` element. -->
+<rozie-flow-canvas id="flow" style="height: 400px">
+  <rozie-node-type type="source">
+    <div slot="body">Source</div>
+    <rozie-port output="num" type="number"></rozie-port>
+  </rozie-node-type>
+  <rozie-node-type type="merge">
+    <div slot="body">Merge</div>
+    <rozie-port input="num" type="number" multiple></rozie-port>
+  </rozie-node-type>
+</rozie-flow-canvas>
 
-// <rozie-flow-canvas> is a custom element. Set `nodes`/`connections` as
-// properties, bind `zoom`, and listen for graph events.
-const el = document.querySelector('rozie-flow-canvas');
-el.nodes = [
-    { id: 'a', label: 'Source', x: 0,   y: 0,   outputs: [{ key: 'out' }] },
-    { id: 'b', label: 'Sink',   x: 280, y: 60,  inputs:  [{ key: 'in' }] },
-  ];
-el.connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' }];
-el.zoom = 1;
-el.addEventListener('zoom-change', (e) => { el.zoom = e.detail; });
-el.addEventListener('connection-created', (e) => console.log('connected', e.detail));
+<script type="module">
+  import '@rozie-ui/rete-lit';
+
+  // The custom elements own their own state — set `graph` as a PROPERTY and
+  // write it back from `graph-change` to keep the model two-way.
+  const el = document.querySelector('#flow');
+  el.graph = {
+    nodes: [
+      { id: 'a', type: 'source', x: 0,   y: 0,  data: { label: 'Source' } },
+      { id: 'b', type: 'merge',  x: 280, y: 60, data: { label: 'Merge' } },
+    ],
+    connections: [{ source: 'a', sourceOutput: 'num', target: 'b', targetInput: 'num' }],
+  };
+  el.zoom = 1;
+  el.addEventListener('graph-change', (e) => { el.graph = e.detail; });
+  el.addEventListener('zoom-change', (e) => { el.zoom = e.detail; });
+  el.addEventListener('connection-created', (e) => console.log('connected', e.detail));
+</script>
 ```
 
 :::
@@ -176,7 +242,9 @@ import { FlowCanvas, type FlowCanvasHandle } from '@rozie-ui/rete-react';
 
 const flow = useRef<FlowCanvasHandle>(null);
 // <FlowCanvas ref={flow} ... />
-flow.current?.addNode({ id: 'c', label: 'New', x: 100, y: 200, inputs: [{ key: 'in' }] });
+// A node spec is { id, type, x, y, data? } — ports come from the TYPE's <Port>
+// schema, and the label from data.label.
+flow.current?.addNode({ id: 'c', type: 'merge', x: 100, y: 200, data: { label: 'New' } });
 flow.current?.zoomToFit();
 const editor = flow.current?.getEditor();
 ```

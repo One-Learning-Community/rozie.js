@@ -1,6 +1,6 @@
 # @rozie-ui/rete-svelte
 
-Idiomatic **svelte** `FlowCanvas` — a cross-framework node-based flow / graph editor compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source wrapping [Rete.js v2](https://retejs.org/). The graph is driven by the `nodes` / `connections` config-array props; the engine owns pan / zoom / drag / drag-to-connect. This package is generated; do not edit `src/` by hand.
+Idiomatic **svelte** `FlowCanvas` — a cross-framework node-based flow / graph editor compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source wrapping [Rete.js v2](https://retejs.org/). It follows the **controlled-graph** model: you bind ONE two-way `graph` object as the single source of truth and declare node **TYPE templates** with `<NodeType>` / `<Port>` children (render-by-type). The engine owns pan / zoom / drag / drag-to-connect, and the canvas writes layout (x/y on drag) and connections (on connect / disconnect) back through the model, so you never hand-reconcile. This package is generated; do not edit `src/` by hand.
 
 ## Install
 
@@ -16,26 +16,46 @@ Rete ships no stylesheet — all node / socket / connection chrome is styled by 
 
 ```svelte
 <script lang="ts">
-  import FlowCanvas from '@rozie-ui/rete-svelte';
+  import FlowCanvas, { NodeType, Port } from '@rozie-ui/rete-svelte';
 
+  let graph = $state({
+    nodes: [
+      { id: 'a', type: 'source', x: 0,   y: 0,  data: { label: 'Source' } },
+      { id: 'b', type: 'merge',  x: 280, y: 60, data: { label: 'Merge' } },
+    ],
+    connections: [{ source: 'a', sourceOutput: 'num', target: 'b', targetInput: 'num' }],
+  });
   let zoom = $state(1);
-  const nodes = [
-    { id: 'a', label: 'Source', x: 0,   y: 0,   outputs: [{ key: 'out' }] },
-    { id: 'b', label: 'Sink',   x: 280, y: 60,  inputs:  [{ key: 'in' }] },
-  ];
-  const connections = [{ source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' }];
 </script>
 
 <div style="height: 400px">
   <FlowCanvas
-    {nodes}
-    {connections}
+    bind:graph
     bind:zoom
     onconnectioncreated={(c) => console.log('connected', c)}
     onnodemoved={(e) => console.log('moved', e)}
-  />
+  >
+    <NodeType type="source">
+      {#snippet body({ node })}<div>{node.data.label}</div>{/snippet}
+      <Port output="num" type="number" />
+    </NodeType>
+    <NodeType type="merge">
+      {#snippet body({ node })}<div>{node.data.label}</div>{/snippet}
+      <Port input="num" type="number" multiple />
+    </NodeType>
+  </FlowCanvas>
 </div>
 ```
+
+## Theming
+
+Every visual value the canvas renders is a `--rozie-flow-*` CSS custom property with a built-in inline `var(token, fallback)` default — it looks right zero-config and re-skins by overriding a token at any ancestor scope. Overriding just `--rozie-flow-accent` recolors every selected/active affordance at once: the selected-node border + ring, socket hover, the selected-edge stroke, the active control button, the marquee box, and the minimap selection. **Dark mode is a zero-import, OS-driven default** — the component ships an `@media (prefers-color-scheme: dark)` block. Ready-made design-system bridges ship in the package:
+
+```svelte
+import '@rozie-ui/rete-svelte/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
+```
+
+The full token vocabulary — plus the `.dark` / `[data-theme="dark"]` class strategy for apps that toggle theme by a root class — lives in `@rozie-ui/rete-svelte/themes/base.css`.
 
 ## Props
 
@@ -97,10 +117,10 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | --- | --- |
 | `getEditor` | Return the underlying Rete `NodeEditor` instance for direct graph-model access (the engine escape hatch). |
 | `getArea` | Return the underlying Rete `AreaPlugin` instance (viewport transform, node views, pan/zoom). |
-| `addNode` | Imperatively add a node — `addNode(spec)` where spec is `{ id, label?, x, y, inputs?, outputs?, data? }`. Returns the id. NOT reaped by the `nodes` prop reconcile. |
+| `addNode` | Imperatively add a node — `addNode(spec)` where spec is `{ id, type, x, y, data? }`. The node's sockets come from its TYPE's `<Port>` schema (never a per-node port array) and its label from `data.label`. Returns the id. NOT reaped by the `graph` reconcile. |
 | `removeNode` | Imperatively remove a node and its connections by id — `removeNode(id)`. Returns whether it existed. The engine-only escape hatch — NOT written back to the bound `graph` model (use `deleteNode` for the controlled-graph delete). |
 | `deleteNode` | Remove a node and its incident connections from the CONTROLLED graph — `deleteNode(id)` writes a fresh `graph` object back through the two-way model (the blessed cascading delete; the `$watch(graph)` reconcile reaps the live engine node/edges). Returns whether a node was removed. Contrast `removeNode`, the engine-only imperative escape hatch. |
-| `addConnection` | Imperatively add a connection — `addConnection({ id?, source, sourceOutput?, target, targetInput? })`. Returns the id. NOT reaped by the `connections` prop reconcile. |
+| `addConnection` | Imperatively add a connection — `addConnection({ id?, source, sourceOutput?, target, targetInput? })`. Returns the id. NOT reaped by the `graph` reconcile. |
 | `removeConnection` | Imperatively remove a connection by id — `removeConnection(id)`. |
 | `clear` | Remove every node and connection from the graph. |
 | `zoomToFit` | Pan and zoom the viewport to fit all nodes (Rete `AreaExtensions.zoomAt`). |
