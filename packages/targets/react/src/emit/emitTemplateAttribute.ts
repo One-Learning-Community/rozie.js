@@ -497,14 +497,82 @@ function staticPropKey(prop: t.ObjectProperty): string | null {
 }
 
 /**
+ * Quick 260804-4cy — the `r-bind` LITERAL key remap, gated on tag kind.
+ *
+ * On a NATIVE tag this is exactly what `:522` did before: delegate to
+ * `htmlAttrToJsxName`, applying all 45 `HTML_TO_JSX_ATTR` aliases.
+ *
+ * On a COMPONENT/self tag the keys reach the child's props interface, which
+ * declares the RAW authored names — so `readonly`/`tabindex`/`for` must pass
+ * through VERBATIM or the prop is silently lost.
+ *
+ * D-02 — `class` is the ONE EXEMPTION, and it is deliberate:
+ *   - `className` is ALREADY what a `:class` on a React component tag emits.
+ *     The `class` bucket bypasses `colonPropToJsxName` entirely, so quick
+ *     260711-i5m's `:attr` gate never touched it. `class` is React's universal
+ *     class-prop name, NOT an HTML-attribute alias — categorically different
+ *     from the `readonly`/`tabindex` shape this gate targets.
+ *   - The shipped R6 literal class-merge on component tags
+ *     (`<Child :class="'x'" r-bind="{ class: 'c' }" />` →
+ *     `className={clsx('x','c')}`) DEPENDS on the rename happening BEFORE
+ *     `splitClassStyleFromLiteral` looks for `className` (`:552`). Gating
+ *     `class` would silently kill a working merge.
+ *   - A Rozie-compiled React child drops a raw `class` key on the floor — its
+ *     fallthrough bucket reads `attrs.className`
+ *     (`packages/ui/switch/packages/react/src/Switch.tsx:47,97`) while its props
+ *     interface declares the raw names (`Switch.d.ts:21`) — and spreading
+ *     `class` onto a DOM node makes React warn `Invalid DOM property 'class'`.
+ *
+ * So gating `class` would be three regressions traded for zero gain.
+ * The Solid twin needs no such exemption: `class` is deliberately absent from
+ * its `RBIND_HTML_TO_SOLID_ATTR` table, and its `splitClassStyleFromLiteral`
+ * keys off `class` rather than `className`.
+ */
+function rbindKeyToJsxName(
+  keyName: string,
+  elementTagKind?: 'html' | 'component' | 'self',
+): string {
+  if (elementTagKind === 'component' || elementTagKind === 'self') {
+    // D-02 — preserve the case-insensitive lookup semantics of the map path.
+    return keyName.toLowerCase() === 'class' ? 'className' : keyName;
+  }
+  return htmlAttrToJsxName(keyName);
+}
+
+/**
  * Phase 14 D-03 — compile-time key remap of an `r-bind` LITERAL object for the
  * React target. Returns a NEW ObjectExpression (the IR node is never mutated)
  * with HTML-shape keys renamed to React-DOM naming (`class`→`className`, …) and
  * `__proto__`/`constructor`/`prototype` keys SKIPPED (T-14-06). Spread / method
  * / computed-key properties pass through verbatim — only statically-named
  * data properties are remappable.
+ *
+ * Quick 260804-4cy: the alias table applies ONLY to real DOM elements
+ * (`elementTagKind === 'html'`, the default when unset) — see
+ * `rbindKeyToJsxName` above for the gate and for D-02's `class` exemption.
+ * This is the THIRD and final member of the component-tag rename class
+ * (260711-i5m react `:attr` → 260803-swj solid `:attr` → 260804-4cy react +
+ * solid `r-bind` literal). PARITY, not invention: Vue, Svelte, Angular and Lit
+ * already emit these keys verbatim on a component tag (`vue:420-421`,
+ * `svelte:427-428` document "no key remap is applied here").
+ *
+ * SCOPE FENCES:
+ *   - The `FORBIDDEN_SPREAD_KEYS` strip (T-14-06) stays ABOVE the gate and is
+ *     therefore unconditional on every tag kind — a security guard, not a
+ *     naming concern.
+ *   - `splitClassStyleFromLiteral` is NOT touched; given D-02 the object it
+ *     receives still carries `className`/`style`, so the class/style split is
+ *     byte-identical on every tag kind.
+ *   - The DYNAMIC `r-bind` path is deliberately out of scope: it lowers to
+ *     `{...normalizeAttrs(expr)}` and the runtime helper remaps unconditionally
+ *     AND performs its own `FORBIDDEN_KEYS` strip, so gating it would trade a
+ *     naming bug for a security regression. Needs a new runtime signature;
+ *     tracked as emitter backlog.
  */
-function remapObjectKeysReact(obj: t.ObjectExpression): t.ObjectExpression {
+function remapObjectKeysReact(
+  obj: t.ObjectExpression,
+  elementTagKind?: 'html' | 'component' | 'self',
+): t.ObjectExpression {
   const cloned = t.cloneNode(obj, true, false) as t.ObjectExpression;
   const kept: t.ObjectExpression['properties'] = [];
   for (const prop of cloned.properties) {
@@ -519,7 +587,7 @@ function remapObjectKeysReact(obj: t.ObjectExpression): t.ObjectExpression {
       continue;
     }
     if (keyName !== null) {
-      const mapped = htmlAttrToJsxName(keyName);
+      const mapped = rbindKeyToJsxName(keyName, elementTagKind);
       if (mapped !== keyName) {
         prop.key = t.identifier(mapped);
         prop.computed = false;
@@ -1309,7 +1377,9 @@ function emitSpread(
   }
   if (t.isObjectExpression(attr.expression)) {
     // D-03 LITERAL — compile-time key remap, zero runtime cost.
-    const remapped = remapObjectKeysReact(attr.expression);
+    // Quick 260804-4cy — gated on tag kind; component keys pass through
+    // (except `class`→`className`, D-02).
+    const remapped = remapObjectKeysReact(attr.expression, ctx.elementTagKind);
     if (hasExplicitClass) {
       // R6 — `className`/`style` already extracted into the merge paths; only
       // spread the remaining keys.
@@ -1407,11 +1477,16 @@ export function emitListenerSpreadAsMergePartial(
  */
 function extractLiteralClassStyle(
   attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+  ctx: EmitAttrCtx,
 ): { classValue: t.Expression | null; styleValue: t.Expression | null } {
   if (isAttrsIdentifier(attr.expression) || !t.isObjectExpression(attr.expression)) {
     return { classValue: null, styleValue: null };
   }
-  const remapped = remapObjectKeysReact(attr.expression);
+  // Quick 260804-4cy — same tag-kind gate as `emitSpread`, so the object this
+  // split sees is byte-identical to the one that gets spread. `class` stays
+  // exempt (D-02), so the `className` key the split keys off is still present
+  // on a component tag and the R6 merge is unaffected.
+  const remapped = remapObjectKeysReact(attr.expression, ctx.elementTagKind);
   const { classValue, styleValue } = splitClassStyleFromLiteral(remapped);
   return { classValue, styleValue };
 }
@@ -1503,7 +1578,7 @@ export function emitAttributes(
   if (hasExplicitClass) {
     for (const a of attrs) {
       if (a.kind !== 'spreadBinding') continue;
-      const { classValue } = extractLiteralClassStyle(a);
+      const { classValue } = extractLiteralClassStyle(a, ctx);
       if (classValue !== null) {
         literalClassBindings.set(a, {
           kind: 'binding',

@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitTemplateAttribute (React) — r-bind LITERAL keys must bypass the DOM attr map on component tags (Quick 260804-4cy) > GREEN GUARD-4 (D-02) — the shipped R6 component-tag class merge is byte-identical 1`] = `
+"<>
+      <div {...attrs} data-rozie-s-8fd6d49e="">
+        <Child3 className={clsx('x', 'c')} {...{ id: 'k' }} data-rozie-s-8fd6d49e="" />
+      </div>
+    </>"
+`;
+
+exports[`emitTemplateAttribute (React) — r-bind LITERAL keys must bypass the DOM attr map on component tags (Quick 260804-4cy) > RED-1 — r-bind literal keys pass through VERBATIM on a COMPONENT tag 1`] = `
+"<>
+      <div {...attrs} data-rozie-s-8fd6d49e="">
+        <Child {...{ readonly: true, tabindex: 0, for: 'x', id: 'k' }} data-rozie-s-8fd6d49e="" />
+        <input {...{ readOnly: true, tabIndex: 0, htmlFor: 'x', id: 'k' }} data-rozie-s-8fd6d49e="" />
+      </div>
+    </>"
+`;
+
+exports[`emitTemplateAttribute (React) — r-bind LITERAL keys must bypass the DOM attr map on component tags (Quick 260804-4cy) > RED-2 — a non-class key on a COMPONENT tag passes through verbatim alongside the exempt class key 1`] = `
+"<>
+      <div {...attrs} data-rozie-s-8fd6d49e="">
+        <Child2 {...{ className: 'c', readonly: true }} data-rozie-s-8fd6d49e="" />
+      </div>
+    </>"
+`;
