@@ -474,19 +474,19 @@ export class FlowCanvas {
    */
   zoom = model<number>(1);
   /**
-   * Whether the canvas can be panned by dragging the background (applied at construction). Set `false` to detach the area's drag handler.
+   * Whether the canvas can be panned by dragging the background. **Applied live** — flipping it after mount takes effect on the next gesture.
    */
   pannable = input<boolean>(true);
   /**
-   * Whether the canvas can be zoomed by scroll/pinch (applied at construction). Set `false` to detach the area's zoom handler.
+   * Whether the canvas can be zoomed by scroll/pinch. **Applied live** — flipping it after mount takes effect on the next gesture.
    */
   zoomable = input<boolean>(true);
   /**
-   * Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope and surfaced to the consumer via the `@selection-change` event.
+   * Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope and surfaced to the consumer via the `@selection-change` event. Applied live — turning it off after mount clears the current selection and blocks further picks (including marquee, edge selection and the keyboard shortcuts).
    */
   selectable = input<boolean>(true);
   /**
-   * Read-only viewer mode — no node drag, no connection editing, and no selection. View-only zoom/fit (Controls, the `zoomTo`/`zoomToFit` verbs) stay enabled.
+   * Read-only viewer mode — no node drag, no connection editing, and no selection. Applied live. View-only zoom/fit (Controls, the `zoomTo`/`zoomToFit` verbs) stay enabled, as do the imperative `undo()`/`redo()` verbs; the Ctrl/Cmd+Z / +Y **keyboard shortcuts** are suppressed along with every other canvas shortcut.
    */
   readonly = input<boolean>(false);
   /**
@@ -498,7 +498,7 @@ export class FlowCanvas {
    */
   maxZoom = input<number>(4);
   /**
-   * Snap-to-grid size in pixels for node dragging. `0` turns snapping off.
+   * Snap-to-grid size in pixels for node dragging. `0` turns snapping off. Applied live — changing it after mount affects the next drag. Snapping applies to user drags only; positions applied from the bound `graph` are never snapped.
    */
   snapGrid = input<number>(0);
   /**
@@ -518,7 +518,7 @@ export class FlowCanvas {
    */
   controls = input<boolean>(true);
   /**
-   * Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction, like `pannable`/`zoomable`/`controls` — set it at mount time.
+   * Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction — set it at mount time.
    */
   minimap = input<boolean>(false);
   /**
@@ -580,6 +580,8 @@ export class FlowCanvas {
   private __rozieWatchInitial_1 = true;
   private __rozieWatchInitial_2 = true;
   private __rozieWatchInitial_3 = true;
+  private __rozieWatchInitial_4 = true;
+  private __rozieWatchInitial_5 = true;
 
   constructor() {
     effect(() => { const __watchVal = (() => this.graph())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
@@ -626,6 +628,12 @@ export class FlowCanvas {
       Promise.resolve(this.area.area.zoom(v)).finally(() => {
         this.programmatic--;
       });
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.selectable())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => {
+      if (v === false) this.clearSelection();
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.readonly())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
+      if (v === true) this.clearSelection();
     })(__watchVal); }); });
   }
 
@@ -678,11 +686,6 @@ export class FlowCanvas {
         };
       },
     };
-    const __selectable = this.selectable();
-    const __readonly = this.readonly();
-    const __minZoom = this.minZoom();
-    const __maxZoom = this.maxZoom();
-    const __snapGrid = this.snapGrid();
     const container = this.canvasEl()?.nativeElement;
 
     // Resolve a `--rozie-flow-*` token off the live canvas element for the imperative
@@ -799,6 +802,15 @@ export class FlowCanvas {
     this.connectionPlugin.addPipe((context: any) => {
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       if (context.type === 'connectionpick') {
+        // ── quick-260803-s3m — READONLY veto, BEFORE any reconnect bookkeeping ──
+        // The classic flow AWAITS `emit({ type: 'connectionpick' })` and only `switchTo
+        // (Picked)` if the result is truthy — otherwise it `drop()`s. Returning undefined
+        // here therefore stops the connection drag from ever STARTING, so no ghost path is
+        // drawn (strictly better than cancelling later at `connectioncreate`, which draws
+        // the rubber band first). Placed before the window bookkeeping so a vetoed pick
+        // never opens a coalesce window that nothing would close. `!programmatic` keeps
+        // imperative/restore-driven engine ops unaffected.
+        if (!this.programmatic && this.readonly() === true) return undefined;
         // Open the coalesce window + capture the pre-gesture snapshot once. Gated on
         // !programmatic + history (a restore-driven engine op must not record history). A
         // re-pick while a close is pending cancels the pending close (the gesture continues).
@@ -908,54 +920,68 @@ export class FlowCanvas {
     this.arrange.addPreset(ArrangePresets.classic.setup());
     this.area.use(this.arrange);
 
-    // ── selection (selectableNodes) ──
-    // Capture the returned handle ({ select(id, accumulate), unselect(id) }) so the T2.4
-    // marquee can PROGRAMMATICALLY select each intersecting node (select(id, true) =
-    // accumulate). The handle is null when selection is off (readonly / !selectable), in
-    // which case the marquee branch no-ops.
-    // ── selection (selectableNodes) ──
-    // Capture the returned handle ({ select(id, accumulate), unselect(id) }) so the T2.4
-    // marquee can PROGRAMMATICALLY select each intersecting node (select(id, true) =
-    // accumulate). The handle is null when selection is off (readonly / !selectable), in
-    // which case the marquee branch no-ops.
-    if (__selectable && !__readonly) {
-      this.selector = AreaExtensions.selector();
-      this.nodeSelectApi = AreaExtensions.selectableNodes(this.area, this.selector, {
-        accumulating: this.accumulateOnCtrl() ? AreaExtensions.accumulateOnCtrl() : {
-          active: () => false
-        }
-      });
-    }
+    // ── selection (selectableNodes) — INSTALLED FURTHER DOWN, after the gate pipe ──
+    // quick-260803-s3m: the install used to sit HERE behind a construction-time
+    // `if ($props.selectable && !$props.readonly)`, which is exactly what made both props
+    // dead after mount. It now installs UNCONDITIONALLY, immediately after the
+    // "runtime-reactive interaction gate" pipe (search that string) — pipe order IS
+    // registration order, and the gate must register BEFORE `selectableNodes` for its
+    // `nodepicked` veto to land. Nothing between here and there reads `selector` /
+    // `nodeSelectApi` (the marquee, `selectedNodeIds()` and the $expose selection verbs all
+    // run later, post-mount), so the move is free.
+
     // raise the picked node above its siblings.
+    // ── selection (selectableNodes) — INSTALLED FURTHER DOWN, after the gate pipe ──
+    // quick-260803-s3m: the install used to sit HERE behind a construction-time
+    // `if ($props.selectable && !$props.readonly)`, which is exactly what made both props
+    // dead after mount. It now installs UNCONDITIONALLY, immediately after the
+    // "runtime-reactive interaction gate" pipe (search that string) — pipe order IS
+    // registration order, and the gate must register BEFORE `selectableNodes` for its
+    // `nodepicked` veto to land. Nothing between here and there reads `selector` /
+    // `nodeSelectApi` (the marquee, `selectedNodeIds()` and the $expose selection verbs all
+    // run later, post-mount), so the move is free.
+
     // raise the picked node above its siblings.
     AreaExtensions.simpleNodesOrder(this.area);
 
-    // ── zoom clamp (restrictor) ──
-    // ── zoom clamp (restrictor) ──
-    const min = typeof __minZoom === 'number' && __minZoom > 0 ? __minZoom : 0;
-    const max = typeof __maxZoom === 'number' && __maxZoom > 0 ? __maxZoom : 0;
-    if (min || max) {
-      AreaExtensions.restrictor(this.area, {
-        scaling: {
-          min: min || 0.01,
-          max: max || 100
-        }
-      });
-    }
+    // ── zoom clamp (restrictor) — unconditional, with a LIVE `scaling` FUNCTION ──
+    // quick-260803-s3m: `scaling` may be a FUNCTION. rete-area-plugin's restrictZoom does
+    // `typeof scaling === 'function' ? scaling() : scaling` and evaluates it on EVERY `zoom`
+    // event, so minZoom/maxZoom become live reads for free and a consumer can retune the
+    // clamp after mount. Do NOT "simplify" this back to an object literal — that
+    // re-snapshots both bounds at construction. The documented "0 disables the bound"
+    // escape hatch is preserved by the 0.01 / 100 fallbacks; the only changed case is
+    // minZoom === 0 && maxZoom === 0, which now installs an effectively-unbounded
+    // restrictor instead of none (same behaviour, one fewer branch).
+    // ── zoom clamp (restrictor) — unconditional, with a LIVE `scaling` FUNCTION ──
+    // quick-260803-s3m: `scaling` may be a FUNCTION. rete-area-plugin's restrictZoom does
+    // `typeof scaling === 'function' ? scaling() : scaling` and evaluates it on EVERY `zoom`
+    // event, so minZoom/maxZoom become live reads for free and a consumer can retune the
+    // clamp after mount. Do NOT "simplify" this back to an object literal — that
+    // re-snapshots both bounds at construction. The documented "0 disables the bound"
+    // escape hatch is preserved by the 0.01 / 100 fallbacks; the only changed case is
+    // minZoom === 0 && maxZoom === 0, which now installs an effectively-unbounded
+    // restrictor instead of none (same behaviour, one fewer branch).
+    AreaExtensions.restrictor(this.area, {
+      scaling: () => ({
+        min: typeof this.minZoom() === 'number' && this.minZoom() > 0 ? this.minZoom() : 0.01,
+        max: typeof this.maxZoom() === 'number' && this.maxZoom() > 0 ? this.maxZoom() : 100
+      })
+    });
 
-    // ── snap-to-grid ──
-    // ── snap-to-grid ──
-    if (typeof __snapGrid === 'number' && __snapGrid > 0) {
-      AreaExtensions.snapGrid(this.area, {
-        size: __snapGrid,
-        dynamic: true
-      });
-    }
+    // ── snap-to-grid: deliberately NOT AreaExtensions.snapGrid ──
+    // quick-260803-s3m: the extension captures its `size` ONCE at install and has no
+    // function form, so it is structurally unusable for reactivity. Its entire behaviour is
+    // `Math.round(v / size) * size` on the `nodetranslate` signal — reimplemented inline in
+    // the gate pipe below off a LIVE `$props.snapGrid` read.
 
-    // ── interaction toggles ──
-    // ── interaction toggles ──
-    if (!this.pannable()) this.area.area.setDragHandler(null);
-    if (!this.zoomable()) this.area.area.setZoomHandler(null);
+    // ── interaction toggles: deliberately NOT setDragHandler(null)/setZoomHandler(null) ──
+    // quick-260803-s3m: those were IRREVERSIBLE (rete's `Drag`/`Zoom` classes are not
+    // exported, so a detached handler could never be re-instantiated — flipping
+    // pannable/zoomable back on was impossible). `pannable` / `zoomable` are now per-event
+    // VETOES in the gate pipe below: Area.translate / Area.zoom each AWAIT their guard emit
+    // and abort on a falsy result without touching the transform, so the handlers stay
+    // attached and simply have their effect refused — reversibly.
 
     // ── Delete / Backspace key → cascading delete of the selected node(s) (Win 1) ──
     // Attached to the engine container ($refs.canvasEl, which carries tabindex="0" in
@@ -963,19 +989,51 @@ export class FlowCanvas {
     // lives INSIDE the Lit shadow root alongside the canvas, so a canvas-focused key
     // reaches it on Lit too (a `:target="document"` listener does not reliably see
     // shadow-scoped focus across all 6 — the canvas-element listener is the robust
-    // cross-target path). Gated on selectable && !readonly. We guard against deleting
-    // while focus is in a node-body text field (INPUT/TEXTAREA/contenteditable) so
-    // typing in a node never nukes it. The listener is removed in the teardown.
+    // cross-target path). We guard against deleting while focus is in a node-body text
+    // field (INPUT/TEXTAREA/contenteditable) so typing in a node never nukes it. The
+    // listener is removed in the teardown.
+    //
+    // quick-260803-s3m: the listener installs UNCONDITIONALLY and the `selectable &&
+    // !readonly` rule became a LIVE guard inside the handler (below) — it used to gate the
+    // install, which is what made both props dead after mount. The rule itself is unchanged:
+    // every canvas shortcut (Delete/Backspace, edge-delete, Ctrl/Cmd+Z / +Shift+Z / +Y,
+    // Ctrl/Cmd+A, Ctrl/Cmd+D) is suppressed while selection is off or the canvas is
+    // readonly — as it already was. The imperative `undo()` / `redo()` $expose verbs were
+    // never gated and stay ungated: a readonly canvas can still be driven by its consumer,
+    // it just has no keyboard editing affordances of its own.
+    // ── snap-to-grid: deliberately NOT AreaExtensions.snapGrid ──
+    // quick-260803-s3m: the extension captures its `size` ONCE at install and has no
+    // function form, so it is structurally unusable for reactivity. Its entire behaviour is
+    // `Math.round(v / size) * size` on the `nodetranslate` signal — reimplemented inline in
+    // the gate pipe below off a LIVE `$props.snapGrid` read.
+
+    // ── interaction toggles: deliberately NOT setDragHandler(null)/setZoomHandler(null) ──
+    // quick-260803-s3m: those were IRREVERSIBLE (rete's `Drag`/`Zoom` classes are not
+    // exported, so a detached handler could never be re-instantiated — flipping
+    // pannable/zoomable back on was impossible). `pannable` / `zoomable` are now per-event
+    // VETOES in the gate pipe below: Area.translate / Area.zoom each AWAIT their guard emit
+    // and abort on a falsy result without touching the transform, so the handlers stay
+    // attached and simply have their effect refused — reversibly.
+
     // ── Delete / Backspace key → cascading delete of the selected node(s) (Win 1) ──
     // Attached to the engine container ($refs.canvasEl, which carries tabindex="0" in
     // the template so it can receive key focus) rather than `document`: the listener
     // lives INSIDE the Lit shadow root alongside the canvas, so a canvas-focused key
     // reaches it on Lit too (a `:target="document"` listener does not reliably see
     // shadow-scoped focus across all 6 — the canvas-element listener is the robust
-    // cross-target path). Gated on selectable && !readonly. We guard against deleting
-    // while focus is in a node-body text field (INPUT/TEXTAREA/contenteditable) so
-    // typing in a node never nukes it. The listener is removed in the teardown.
-    if (__selectable && !__readonly && container && typeof container.addEventListener === 'function') {
+    // cross-target path). We guard against deleting while focus is in a node-body text
+    // field (INPUT/TEXTAREA/contenteditable) so typing in a node never nukes it. The
+    // listener is removed in the teardown.
+    //
+    // quick-260803-s3m: the listener installs UNCONDITIONALLY and the `selectable &&
+    // !readonly` rule became a LIVE guard inside the handler (below) — it used to gate the
+    // install, which is what made both props dead after mount. The rule itself is unchanged:
+    // every canvas shortcut (Delete/Backspace, edge-delete, Ctrl/Cmd+Z / +Shift+Z / +Y,
+    // Ctrl/Cmd+A, Ctrl/Cmd+D) is suppressed while selection is off or the canvas is
+    // readonly — as it already was. The imperative `undo()` / `redo()` $expose verbs were
+    // never gated and stay ungated: a readonly canvas can still be driven by its consumer,
+    // it just has no keyboard editing affordances of its own.
+    if (container && typeof container.addEventListener === 'function') {
       this.onCanvasKeydown = (e: any) => {
         if (!e) return;
         const t = e.target;
@@ -983,6 +1041,8 @@ export class FlowCanvas {
         // node-body text field (INPUT/TEXTAREA/contenteditable) — Ctrl+Z must reach the
         // browser's native text undo there, and Delete must not nuke the node.
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        // quick-260803-s3m — THE LIVE GATE. One read, covering every branch below.
+        if (this.selectable() === false || this.readonly() === true) return;
         // ── T1.3 — Undo / Redo keybinds (D-02). Ctrl/Cmd+Z → undo; Ctrl/Cmd+Shift+Z and
         // Ctrl/Cmd+Y → redo. Gated on the SAME focus-guard as Delete. preventDefault so the
         // browser's page-level undo doesn't also fire. `metaKey` covers macOS Cmd. ──
@@ -999,11 +1059,12 @@ export class FlowCanvas {
             return;
           }
           // ── quick-260803-qwh — Ctrl/Cmd+A → select all; Ctrl/Cmd+D → duplicate the
-          // selection. Same guards as Delete/undo, inherited for free: the whole listener is
-          // only attached when `selectable && !readonly`, and the editable-focus guard above
-          // already returned for INPUT/TEXTAREA/contenteditable — so Ctrl+A inside a node's
-          // text field still reaches the browser's native select-all. preventDefault stops the
-          // page-level select-all / bookmark dialog. Ctrl+D is ONE undo step for N nodes. ──
+          // selection. Same guards as Delete/undo, inherited for free: the live
+          // `selectable && !readonly` gate at the top of this handler (quick-260803-s3m)
+          // already returned, and the editable-focus guard above already returned for
+          // INPUT/TEXTAREA/contenteditable — so Ctrl+A inside a node's text field still
+          // reaches the browser's native select-all. preventDefault stops the page-level
+          // select-all / bookmark dialog. Ctrl+D is ONE undo step for N nodes. ──
           if (k === 'a' && !e.shiftKey) {
             e.preventDefault();
             this.selectAll();
@@ -1463,15 +1524,24 @@ export class FlowCanvas {
       // Attach an IMPERATIVE pointerup listener on the engine-DOM <path> (NOT a template
       // `@` — the path is engine-created; NOT click — Rete swallows it; NOT pointerdown —
       // Rete stopPropagations it: the Phase-41 connector landmine, playbook §6a item 7).
-      // Gated on `selectable && !readonly` (mirrors node delete) and ONLY for COMMITTED
-      // edges — a drag-to-connect pseudo (either side dangling) carries no stable id and
-      // must not be selectable. `selectEdge` reads the id back off the closure (the
-      // committed connection.id == the graph connection id — conn.id = spec.id at build),
-      // so it always matches what `writeBackConnectionRemoved` filters. `.stop` keeps the
-      // pointerup from reaching the area's pan/background handling beneath the path.
-      if (__selectable && !__readonly && !srcDangling && !tgtDangling) {
+      // Attached ONLY for COMMITTED edges — a drag-to-connect pseudo (either side dangling)
+      // carries no stable id and must not be selectable. `selectEdge` reads the id back off
+      // the closure (the committed connection.id == the graph connection id — conn.id =
+      // spec.id at build), so it always matches what `writeBackConnectionRemoved` filters.
+      // `.stop` keeps the pointerup from reaching the area's pan/background handling
+      // beneath the path.
+      //
+      // quick-260803-s3m: the `selectable && !readonly` rule (which mirrors node delete)
+      // moved from the ATTACH condition into the handler as a LIVE read — attaching per
+      // render meant an edge drawn while selectable was false stayed permanently unclickable
+      // even after the flag flipped back. Note the deliberate ordering: the gate returns
+      // BEFORE `stopPropagation`, so a non-selectable canvas lets the pointerup reach the
+      // area's background handling exactly as it did before. The `cursor: pointer` is now
+      // unconditional (cosmetic only — cursors do not render in screenshots).
+      if (!srcDangling && !tgtDangling) {
         path.style.cursor = 'pointer';
         path.addEventListener('pointerup', (e: any) => {
+          if (this.selectable() === false || this.readonly() === true) return;
           if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
           this.selectEdge(connection.id, path);
         });
@@ -1879,6 +1949,124 @@ export class FlowCanvas {
         });
       }
       return context;
+    });
+
+    // ─── quick-260803-s3m — THE RUNTIME-REACTIVE INTERACTION GATE ────────────────────
+    // ONE persistent pipe that makes `selectable` / `readonly` / `pannable` / `zoomable` /
+    // `snapGrid` LIVE. Every one of them used to be applied once in $onMount (a
+    // construction-time `if`, an irreversible setDragHandler(null), a one-shot snapGrid
+    // install), so flipping any of them after mount did nothing. Here they are read fresh
+    // on EVERY event and enforced by VETO — returning `undefined` from a pipe halts the
+    // signal (rete's Signal.emit walks pipes in registration order and `return`s the moment
+    // one yields undefined), and rete's own engine is built for exactly this: Area.translate,
+    // Area.zoom and NodeView.translate each AWAIT their guard emit and abort on a falsy
+    // result WITHOUT touching the transform and WITHOUT emitting the past-tense signal.
+    //
+    // REGISTRATION POSITION IS LOAD-BEARING (pipe order == registration order):
+    //   - AFTER `simpleNodesOrder` — or a pick under `selectable=false` would stop z-raising
+    //     the node, a regression for the legal `selectable=false, readonly=false` drag case.
+    //   - AFTER the wrapper's own `nodepicked` branch (just above) — or a vetoed pick would
+    //     silently lose `@node-picked` AND `pendingDragSnapshot`, killing the per-gesture
+    //     undo entry for drags under `selectable=false`.
+    //   - BEFORE `selectableNodes` (installed immediately below, moved down from its old
+    //     construction-time home) — or the pick has already happened and the veto lands too
+    //     late.
+    // All three hold simultaneously only here. Do not move it.
+    // ─── quick-260803-s3m — THE RUNTIME-REACTIVE INTERACTION GATE ────────────────────
+    // ONE persistent pipe that makes `selectable` / `readonly` / `pannable` / `zoomable` /
+    // `snapGrid` LIVE. Every one of them used to be applied once in $onMount (a
+    // construction-time `if`, an irreversible setDragHandler(null), a one-shot snapGrid
+    // install), so flipping any of them after mount did nothing. Here they are read fresh
+    // on EVERY event and enforced by VETO — returning `undefined` from a pipe halts the
+    // signal (rete's Signal.emit walks pipes in registration order and `return`s the moment
+    // one yields undefined), and rete's own engine is built for exactly this: Area.translate,
+    // Area.zoom and NodeView.translate each AWAIT their guard emit and abort on a falsy
+    // result WITHOUT touching the transform and WITHOUT emitting the past-tense signal.
+    //
+    // REGISTRATION POSITION IS LOAD-BEARING (pipe order == registration order):
+    //   - AFTER `simpleNodesOrder` — or a pick under `selectable=false` would stop z-raising
+    //     the node, a regression for the legal `selectable=false, readonly=false` drag case.
+    //   - AFTER the wrapper's own `nodepicked` branch (just above) — or a vetoed pick would
+    //     silently lose `@node-picked` AND `pendingDragSnapshot`, killing the per-gesture
+    //     undo entry for drags under `selectable=false`.
+    //   - BEFORE `selectableNodes` (installed immediately below, moved down from its old
+    //     construction-time home) — or the pick has already happened and the veto lands too
+    //     late.
+    // All three hold simultaneously only here. Do not move it.
+    this.area.addPipe((context: any) => {
+      const __readonly = this.readonly();
+      if (!context || typeof context !== 'object' || !('type' in context)) return context;
+      // THE ECHO GUARD, FIRST. Every programmatic viewport/node write in this wrapper is
+      // wrapped in `programmatic++ … finally programmatic--`, and NO user gesture is — so
+      // this single line keeps zoomTo / zoomToFit / setCenter / setViewport / autoArrange /
+      // the graph reconcile / fitOnMount / undo-redo restore / the MiniMap pointer-pan
+      // working unchanged under every "off" flag. Without it, `:pannable=false` would also
+      // break `setCenter`, which is NOT what the prop means.
+      if (this.programmatic) return context;
+      if (context.type === 'nodepicked') {
+        // selection off (either flag — readonly KEEPS its shipped coupling to selection):
+        // halt before AreaExtensions.selectableNodes' own `nodepicked` branch runs its
+        // core.pick + select.
+        if (this.selectable() === false || __readonly === true) return undefined;
+      } else if (context.type === 'nodetranslate') {
+        // readonly: no node drag at all (NodeView.translate returns false — the element
+        // transform is never written and `nodetranslated` never fires, so there is also no
+        // write-back into the bound graph).
+        if (__readonly === true) return undefined;
+        // snap-to-grid, inlined from AreaExtensions.snapGrid (which cannot be made
+        // reactive — see the note at its old install site). A FRESH context object,
+        // mirroring the extension's own spread shape; never an in-place mutation.
+        const size = this.snapGrid();
+        if (typeof size === 'number' && size > 0) {
+          const p = context.data.position;
+          return {
+            ...context,
+            data: {
+              ...context.data,
+              position: {
+                x: Math.round(p.x / size) * size,
+                y: Math.round(p.y / size) * size
+              }
+            }
+          };
+        }
+      } else if (context.type === 'translate') {
+        // pannable: refuse the viewport pan (Area.translate returns false without touching
+        // `transform` and without emitting `translated`).
+        if (this.pannable() === false) return undefined;
+      } else if (context.type === 'zoom') {
+        // zoomable: refuse the wheel/pinch zoom (Area.zoom returns without touching
+        // `transform` and without emitting `zoomed`). Note Area.zoom adjusts transform.x/y
+        // for the zoom origin directly, without emitting `translate` — so a `pannable` veto
+        // does not block zoom-origin panning, exactly as setDragHandler(null) did not.
+        if (this.zoomable() === false) return undefined;
+      }
+      return context;
+    });
+
+    // ── selection (selectableNodes), relocated here from its old construction-time home ──
+    // Capture the returned handle ({ select(id, accumulate), unselect(id) }) so the T2.4
+    // marquee can PROGRAMMATICALLY select each intersecting node (select(id, true) =
+    // accumulate). quick-260803-s3m: the handle is now ALWAYS non-null — selection is gated
+    // per-pick by the live gate pipe above, not by whether this ever installed. So the
+    // $expose verbs (`selectNode` / `selectAll` / `clearSelection`) no longer no-op merely
+    // because the canvas happened to MOUNT with `selectable=false`, and the marquee branch
+    // no longer has to defend against a null handle for that reason.
+    // `accumulateOnCtrl` stays construction-time — it is not one of the five live props.
+    // ── selection (selectableNodes), relocated here from its old construction-time home ──
+    // Capture the returned handle ({ select(id, accumulate), unselect(id) }) so the T2.4
+    // marquee can PROGRAMMATICALLY select each intersecting node (select(id, true) =
+    // accumulate). quick-260803-s3m: the handle is now ALWAYS non-null — selection is gated
+    // per-pick by the live gate pipe above, not by whether this ever installed. So the
+    // $expose verbs (`selectNode` / `selectAll` / `clearSelection`) no longer no-op merely
+    // because the canvas happened to MOUNT with `selectable=false`, and the marquee branch
+    // no longer has to defend against a null handle for that reason.
+    // `accumulateOnCtrl` stays construction-time — it is not one of the five live props.
+    this.selector = AreaExtensions.selector();
+    this.nodeSelectApi = AreaExtensions.selectableNodes(this.area, this.selector, {
+      accumulating: this.accumulateOnCtrl() ? AreaExtensions.accumulateOnCtrl() : {
+        active: () => false
+      }
     });
 
     // ─── reconciler off the bound graph, bridged to the top-level $watch ──────────
@@ -2599,7 +2787,18 @@ export class FlowCanvas {
       this.resizerTrackedId = id;
       this.scheduleResizerTrack();
     };
-    if (__selectable && !__readonly && container && typeof container.addEventListener === 'function') {
+
+    // quick-260803-s3m: the 4 corner listeners install UNCONDITIONALLY; the
+    // `selectable && !readonly` rule became a LIVE read at the top of `beginResize` (below).
+    // The handles are only ever REACHABLE while a resizable node is selected, so under
+    // either flag the D-10 selection-clearing $watch has already hidden them — this gate is
+    // the belt to that braces.
+    // quick-260803-s3m: the 4 corner listeners install UNCONDITIONALLY; the
+    // `selectable && !readonly` rule became a LIVE read at the top of `beginResize` (below).
+    // The handles are only ever REACHABLE while a resizable node is selected, so under
+    // either flag the D-10 selection-clearing $watch has already hidden them — this gate is
+    // the belt to that braces.
+    if (container && typeof container.addEventListener === 'function') {
       this.resizeHandleNw = this.resizeHandleNwEl()?.nativeElement || null;
       this.resizeHandleNe = this.resizeHandleNeEl()?.nativeElement || null;
       this.resizeHandleSw = this.resizeHandleSwEl()?.nativeElement || null;
@@ -2612,6 +2811,8 @@ export class FlowCanvas {
       const beginResize = (corner: any, handleEl: any) => (e: any) => {
         const id = this.resizerTrackedId;
         if (id == null) return;
+        // quick-260803-s3m — the live interaction gate (see the install comment above).
+        if (this.selectable() === false || this.readonly() === true) return;
         // Re-entrancy guard (WR-01): a gesture is already in flight (a second pointerdown
         // landed on another corner handle before the first gesture's pointerup) — ignore it
         // rather than clobbering the shared onResizeHandleMove/onResizeHandleUp/
@@ -2839,12 +3040,21 @@ export class FlowCanvas {
       // surface @selection-change once the engine's awaited select() chain has flushed.
       this.scheduleSelectionEmit();
     };
-    if (__selectable && !__readonly && container && typeof container.addEventListener === 'function') {
+
+    // quick-260803-s3m: the marquee listeners install UNCONDITIONALLY; the
+    // `selectable && !readonly` rule became a LIVE read inside the capture-phase guard,
+    // alongside the `mode` read that was already live.
+    // quick-260803-s3m: the marquee listeners install UNCONDITIONALLY; the
+    // `selectable && !readonly` rule became a LIVE read inside the capture-phase guard,
+    // alongside the `mode` read that was already live.
+    if (container && typeof container.addEventListener === 'function') {
       this.marqueeBox = this.marqueeEl()?.nativeElement || null;
       this.onCanvasPointerDownCapture = (e: any) => {
-        // only in select mode, only the EMPTY canvas (not on a node — those still drag), only
-        // the primary button. A live `$props.mode` read = the persistent mode-guard (restoring
-        // pan is just this check returning early; no engine mutation).
+        // only when selection is live, only in select mode, only the EMPTY canvas (not on a
+        // node — those still drag), only the primary button. THREE live `$props` reads =
+        // the persistent guard pattern (restoring pan, or re-enabling selection, is just
+        // these checks returning early; no engine mutation, nothing to re-install).
+        if (this.selectable() === false || this.readonly() === true) return;
         if (this.mode() !== 'select') return;
         if (e && e.button != null && e.button !== 0) return;
         if (nodeAt(e.target)) return;

@@ -22,19 +22,19 @@ export interface FlowCanvasProps {
   defaultZoom?: number;
   onZoomChange?: (next: number) => void;
   /**
-   * Whether the canvas can be panned by dragging the background (applied at construction). Set `false` to detach the area's drag handler.
+   * Whether the canvas can be panned by dragging the background. **Applied live** — flipping it after mount takes effect on the next gesture.
    */
   pannable?: boolean;
   /**
-   * Whether the canvas can be zoomed by scroll/pinch (applied at construction). Set `false` to detach the area's zoom handler.
+   * Whether the canvas can be zoomed by scroll/pinch. **Applied live** — flipping it after mount takes effect on the next gesture.
    */
   zoomable?: boolean;
   /**
-   * Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope and surfaced to the consumer via the `@selection-change` event.
+   * Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope and surfaced to the consumer via the `@selection-change` event. Applied live — turning it off after mount clears the current selection and blocks further picks (including marquee, edge selection and the keyboard shortcuts).
    */
   selectable?: boolean;
   /**
-   * Read-only viewer mode — no node drag, no connection editing, and no selection. View-only zoom/fit (Controls, the `zoomTo`/`zoomToFit` verbs) stay enabled.
+   * Read-only viewer mode — no node drag, no connection editing, and no selection. Applied live. View-only zoom/fit (Controls, the `zoomTo`/`zoomToFit` verbs) stay enabled, as do the imperative `undo()`/`redo()` verbs; the Ctrl/Cmd+Z / +Y **keyboard shortcuts** are suppressed along with every other canvas shortcut.
    */
   readonly?: boolean;
   /**
@@ -46,7 +46,7 @@ export interface FlowCanvasProps {
    */
   maxZoom?: number;
   /**
-   * Snap-to-grid size in pixels for node dragging. `0` turns snapping off.
+   * Snap-to-grid size in pixels for node dragging. `0` turns snapping off. Applied live — changing it after mount affects the next drag. Snapping applies to user drags only; positions applied from the bound `graph` are never snapped.
    */
   snapGrid?: number;
   /**
@@ -66,7 +66,7 @@ export interface FlowCanvasProps {
    */
   controls?: boolean;
   /**
-   * Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction, like `pannable`/`zoomable`/`controls` — set it at mount time.
+   * Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction — set it at mount time.
    */
   minimap?: boolean;
   /**

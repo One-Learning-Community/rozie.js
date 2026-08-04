@@ -1,0 +1,201 @@
+<!--
+  FlowCanvasReactiveDemo.rozie — BEHAVIORAL consumer for quick-260803-s3m: the five
+  FlowCanvas INTERACTION props (`readonly`, `pannable`, `zoomable`, `selectable`,
+  `snapGrid`) are RUNTIME-REACTIVE, not construction-time.
+
+  Every one of them used to be read exactly once in `$onMount` (selection installed
+  behind `selectable && !readonly`, pan/zoom killed by the irreversible
+  setDragHandler(null)/setZoomHandler(null), snapGrid's size captured by a one-shot
+  AreaExtensions install), so flipping any of them after mount did nothing. This demo is
+  the proof surface for the fix: it drives all five off its OWN local <data> (the
+  FlowCanvasBackgroundDemo precedent — internal state + toggle buttons, no parent props)
+  and one-way-binds them onto <FlowCanvas>, so a spec can flip a prop mid-session and
+  assert the canvas obeys it on the very next gesture.
+
+  A DEDICATED cell (NOT folded into FlowCanvasDemo / FlowCanvasScreenshot) so the
+  existing rete-flow cells + the pixel baseline stay byte-untouched.
+
+  The graph is 3 `task` nodes with a→b connected and a→c deliberately UNCONNECTED, so a
+  connect drag (Alpha's `out` → Charlie's `in`) is always available to prove that
+  `readonly` stops the connection gesture from ever starting. `:fit-on-mount="false"`
+  keeps the seeded positions so the spec's geometry (and the snap-multiple arithmetic)
+  is deterministic.
+
+  Readouts are all read off the BOUND MODEL (`$data.graph`), never a derived script
+  variable — the discipline every other rete-flow demo follows. Boolean readouts render
+  `String(...)` (the DialogBehaviorDemo `readout-open` precedent) so the value stringifies
+  identically on all 6 targets. `zoom-readout` is a 2dp STRING so `toHaveText` is stable
+  cross-target (a raw float renders with different precision per target).
+
+  The spec (rete-flow.spec.ts `rete-flow-reactive-*`) asserts on all 6:
+    - readonly  → drag write-back stops, selection stops, Delete is inert, a connect drag
+      never commits; toggling it back restores all of it,
+    - pannable  → the same empty-canvas drag stops moving `viewport-x` and resumes,
+    - zoomable  → the same wheel stops moving `zoom-readout` and resumes,
+    - selectable→ turning it off CLEARS the live selection and blocks further picks,
+    - snapGrid  → flipping 0 → 25 snaps the NEXT drag to a 25px multiple, and back to 0
+      un-snaps it.
+
+  Container needs explicit height/width (the VR host mounts at max-content).
+-->
+
+<rozie name="FlowCanvasReactiveDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  // the five interaction props, driven LOCALLY (one-way onto the canvas) so the spec can
+  // flip each one mid-session with a button click and assert the canvas obeys it live.
+  readonly: false,
+  pannable: true,
+  zoomable: true,
+  selectable: true,
+  // snap-to-grid size in px; the snap-btn toggles 0 ↔ 25.
+  snap: 0,
+  // two-way viewport zoom (the wheel/pinch write-back) — the `zoomable` proof.
+  zoom: 1,
+  // settled selected-node count (from @selection-change) — the `selectable`/`readonly` proof.
+  selectedCount: 0,
+  // last viewport translate x (from @translated) — the `pannable` proof.
+  vx: 0,
+  // THE SINGLE SOURCE OF TRUTH. a/b stack in the left column (a is the drag target);
+  // c sits far right. a→b is connected; a→c is deliberately NOT, so a connect drag from
+  // Alpha's `out` to Charlie's `in` is always available (the readonly connect-veto proof).
+  graph: {
+    nodes: [
+      { id: 'a', type: 'task', x: 40,  y: 40,  data: { label: 'Alpha' } },
+      { id: 'b', type: 'task', x: 40,  y: 190, data: { label: 'Bravo' } },
+      { id: 'c', type: 'task', x: 420, y: 40,  data: { label: 'Charlie' } },
+    ],
+    connections: [
+      { id: 'ab', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+    ],
+  },
+}
+</data>
+
+<script>
+// @selection-change surfaces the selected node id set ({ ids }) — record the SETTLED count.
+const onSelectionChange = (e) => {
+  $data.selectedCount = e && Array.isArray(e.ids) ? e.ids.length : 0
+}
+// @translated surfaces a viewport pan (x, y) — record x so the spec can prove a background
+// drag PANS (vx changes) while `pannable`, and does NOT while it is false.
+const onTranslated = (e) => { $data.vx = e && typeof e.x === 'number' ? Math.round(e.x) : $data.vx }
+
+// the five toggles. Each writes ONLY local state — the canvas must pick the new value up
+// on its next event, with no remount (the whole point of the task).
+const toggleReadonly = () => { $data.readonly = !$data.readonly }
+const togglePannable = () => { $data.pannable = !$data.pannable }
+const toggleZoomable = () => { $data.zoomable = !$data.zoomable }
+const toggleSelectable = () => { $data.selectable = !$data.selectable }
+// 0 ↔ 25: 25 is a coarse-enough grid that a deliberately non-multiple drag delta (+83px)
+// lands on an unambiguous multiple when snapping is live.
+const toggleSnap = () => { $data.snap = $data.snap > 0 ? 0 : 25 }
+
+// the bound zoom as a fixed 2dp STRING — a raw float renders with target-dependent
+// precision, so the spec asserts this stable readout instead (the SwitchBehaviorDemo
+// `valueText()` function-call-in-template precedent).
+const zoomText = () => Number($data.zoom).toFixed(2)
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — runtime-reactive interaction props (behavioral)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="readonly-btn" @click="toggleReadonly">readonly</button>
+    <button type="button" data-testid="pannable-btn" @click="togglePannable">pannable</button>
+    <button type="button" data-testid="zoomable-btn" @click="toggleZoomable">zoomable</button>
+    <button type="button" data-testid="selectable-btn" @click="toggleSelectable">selectable</button>
+    <button type="button" data-testid="snap-btn" @click="toggleSnap">snap</button>
+  </div>
+
+  <div class="controls">
+    <span class="readout">readonly: <b data-testid="readonly-state">{{ String($data.readonly) }}</b></span>
+    <span class="readout">pannable: <b data-testid="pannable-state">{{ String($data.pannable) }}</b></span>
+    <span class="readout">zoomable: <b data-testid="zoomable-state">{{ String($data.zoomable) }}</b></span>
+    <span class="readout">selectable: <b data-testid="selectable-state">{{ String($data.selectable) }}</b></span>
+    <span class="readout">snap: <b data-testid="snap-state">{{ $data.snap }}</b></span>
+  </div>
+
+  <div class="controls">
+    <!-- all read off the BOUND graph model — a dead write-back fails here. -->
+    <span class="readout" data-testid="node0-x">{{ Math.round($data.graph.nodes[0].x) }}</span>
+    <span class="readout" data-testid="node0-y">{{ Math.round($data.graph.nodes[0].y) }}</span>
+    <span class="readout" data-testid="node-count">{{ $data.graph.nodes.length }}</span>
+    <span class="readout" data-testid="conn-count">{{ $data.graph.connections.length }}</span>
+    <span class="readout" data-testid="selected-count">{{ $data.selectedCount }}</span>
+    <span class="readout" data-testid="viewport-x">{{ $data.vx }}</span>
+    <span class="readout" data-testid="zoom-readout">{{ zoomText() }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 400px; width: 760px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      r-model:zoom="$data.zoom"
+      :readonly="$data.readonly"
+      :pannable="$data.pannable"
+      :zoomable="$data.zoomable"
+      :selectable="$data.selectable"
+      :snap-grid="$data.snap"
+      :fit-on-mount="false"
+      @selection-change="onSelectionChange"
+      @translated="onTranslated"
+    >
+      <NodeType type="task">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+          </div>
+        </template>
+        <Port input="in" label="in" multiple />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 800px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+
+:root {
+  /* the #body chrome teleports into the engine node element inside the canvas shadow
+     root (render-by-type bodyRenderer → $portals.body), so on Lit a plain scoped rule
+     cannot reach it — :root emits document-level CSS adopted into the shadow root. */
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -2324,5 +2324,464 @@ for (const target of TARGETS) {
     await page.waitForTimeout(300);
     expect(await readWidth(), 'double-click reset must hold at auto').toBe('auto');
     expect(await readHeight(), 'double-click reset must hold at auto').toBe('auto');
+  });
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// rete-flow-reactive-* helpers (quick-260803-s3m).
+//
+// All three re-read the LIVE bounding box on every call, so repeated gestures on the
+// same node compose (a node that already moved is grabbed at its new position) and a
+// panned viewport never desyncs the grab point.
+// ───────────────────────────────────────────────────────────────────────────────
+
+/** The node box whose `#body` carries `label`. */
+function nodeByLabel(page: Page, label: string) {
+  return page.locator('.rozie-flow-node', { hasText: label }).first();
+}
+
+/**
+ * Drag the labelled node by (dx, dy) using the house grab/step technique: grab near the
+ * node's top-left label area (`+14, +10`) — away from the right-edge output socket — so
+ * this is a node-MOVE gesture and never a connect gesture, then two stepped moves so the
+ * area-plugin's Drag fires pointermove → `nodetranslate` → write-back.
+ */
+async function dragNodeBy(page: Page, label: string, dx: number, dy = 0): Promise<void> {
+  const node = nodeByLabel(page, label);
+  await expect(node).toBeVisible({ timeout: 10_000 });
+  const nb = await node.boundingBox();
+  if (!nb) throw new Error(`${label} node bounding box unavailable`);
+  const grabX = nb.x + 14;
+  const grabY = nb.y + 10;
+  await page.mouse.move(grabX, grabY);
+  await page.mouse.down();
+  await page.mouse.move(grabX + dx / 2, grabY + dy / 2, { steps: 6 });
+  await page.mouse.move(grabX + dx, grabY + dy, { steps: 6 });
+  await page.mouse.up();
+}
+
+/** Click the labelled node's body (the `nodepicked` gesture), away from its sockets. */
+async function clickNodeBody(page: Page, label: string): Promise<void> {
+  const node = nodeByLabel(page, label);
+  await expect(node).toBeVisible({ timeout: 10_000 });
+  const nb = await node.boundingBox();
+  if (!nb) throw new Error(`${label} node bounding box unavailable`);
+  await page.mouse.click(nb.x + 14, nb.y + 10);
+}
+
+/**
+ * Drag from one node's OUTPUT socket to another's INPUT socket (the rete-flow-drag
+ * socket-locator technique) — the connect gesture.
+ */
+async function dragConnect(page: Page, fromLabel: string, toLabel: string): Promise<void> {
+  const out = nodeByLabel(page, fromLabel).locator('.rozie-flow-socket--output').first();
+  const inn = nodeByLabel(page, toLabel).locator('.rozie-flow-socket--input').first();
+  await expect(out).toBeVisible({ timeout: 10_000 });
+  await expect(inn).toBeVisible({ timeout: 10_000 });
+  const ob = await out.boundingBox();
+  const ib = await inn.boundingBox();
+  if (!ob || !ib) throw new Error('socket bounding boxes unavailable');
+  const ox = ob.x + ob.width / 2;
+  const oy = ob.y + ob.height / 2;
+  const ix = ib.x + ib.width / 2;
+  const iy = ib.y + ib.height / 2;
+  await page.mouse.move(ox, oy);
+  await page.mouse.down();
+  await page.mouse.move((ox + ix) / 2, (oy + iy) / 2, { steps: 8 });
+  await page.mouse.move(ix, iy, { steps: 8 });
+  await page.mouse.up();
+}
+
+/**
+ * 22. RUNTIME-REACTIVE `readonly` (quick-260803-s3m).
+ *
+ * `readonly` used to be read ONCE in `$onMount` (it only ever decided whether the
+ * selection extension + the canvas keydown listener were installed at construction), so
+ * flipping it after mount did nothing at all. It is now a LIVE read on every gesture,
+ * vetoed per-event in the area gate pipe (`nodetranslate` → no drag) and in the
+ * connection plugin's `connectionpick` branch (→ the connect drag never starts, so no
+ * ghost path is even drawn).
+ *
+ * Loader → examples/demos/FlowCanvasReactiveDemo.rozie (3 `task` nodes, a→b connected,
+ * a→c deliberately NOT, `:fit-on-mount="false"`, all five interaction props driven off
+ * local state by their own toggle buttons).
+ *
+ * Proves on all 6, with `readonly` flipped MID-SESSION:
+ *
+ *   0. BASELINE — while editable, dragging 'Alpha' writes back (bound `node0-x` climbs
+ *      off its seeded 40 and settles).
+ *   1. DRAG WRITE-BACK STOPS — the SAME drag under `readonly` leaves `node0-x` byte-
+ *      identical (the `nodetranslate` veto; the engine never moves the box either).
+ *   2. SELECTION STOPS — clicking 'Bravo' leaves `selected-count` at '0'. `readonly`
+ *      KEEPS its shipped coupling to selection (D-05); decoupling is a separate task.
+ *   3. DELETE IS INERT — canvas-focused Delete changes neither `node-count` nor
+ *      `conn-count` (the live guard at the top of the now-unconditional keydown handler).
+ *   4. CONNECT NEVER STARTS — an Alpha`out` → Charlie`in` drag leaves `conn-count` at '1'
+ *      (the `connectionpick` veto).
+ *   5. REVERSIBLE — toggling `readonly` back off restores BOTH the drag write-back and
+ *      selection, with no remount.
+ *
+ * Asserts the SETTLED bound-model readouts only. Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-reactive-readonly [${target}]: flipping :readonly live stops drag write-back, selection, Delete and connect — and restores them`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasReactive&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    const node0x = page.getByTestId('node0-x');
+    const readX = async (): Promise<number> =>
+      Number((await node0x.textContent())?.trim() ?? 'NaN');
+    const readonlyState = page.getByTestId('readonly-state');
+    const readonlyBtn = page.getByTestId('readonly-btn');
+    const selectedCount = page.getByTestId('selected-count');
+    const nodeCount = page.getByTestId('node-count');
+    const connCount = page.getByTestId('conn-count');
+
+    // seeded state: editable, node 'a' at x=40, 3 nodes, 1 edge.
+    await expect(readonlyState).toHaveText('false');
+    await expect(node0x).toHaveText('40');
+    await expect(nodeCount).toHaveText('3');
+    await expect(connCount).toHaveText('1');
+
+    // ---- 0. BASELINE: editable → the drag writes back into the bound graph ----
+    await dragNodeBy(page, 'Alpha', 80);
+    await expect
+      .poll(readX, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBeGreaterThan(40);
+    await page.waitForTimeout(400);
+    const baselineX = await readX();
+    await page.waitForTimeout(200);
+    expect(await readX(), 'baseline drag readout must settle (no echo loop)').toBe(baselineX);
+
+    // ---- flip readonly ON, live (no remount) ----
+    await readonlyBtn.click();
+    await expect(readonlyState).toHaveText('true', { timeout: 5_000 });
+
+    // ---- 1. DRAG WRITE-BACK MUST STOP ----
+    await dragNodeBy(page, 'Alpha', 80);
+    await page.waitForTimeout(600);
+    expect(
+      await readX(),
+      'readonly must veto the node drag — node0-x moved anyway',
+    ).toBe(baselineX);
+
+    // ---- 2. SELECTION MUST STOP (D-05: readonly stays coupled to selection) ----
+    await clickNodeBody(page, 'Bravo');
+    await page.waitForTimeout(500);
+    await expect(selectedCount).toHaveText('0');
+
+    // ---- 3. DELETE MUST BE INERT ----
+    await canvas.focus();
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(500);
+    await expect(nodeCount).toHaveText('3');
+    await expect(connCount).toHaveText('1');
+
+    // ---- 4. THE CONNECT DRAG MUST NOT EVEN START (connectionpick veto) ----
+    await dragConnect(page, 'Alpha', 'Charlie');
+    await page.waitForTimeout(600);
+    await expect(connCount).toHaveText('1');
+
+    // ---- 5. REVERSIBLE: toggling readonly back off restores drag + selection ----
+    await readonlyBtn.click();
+    await expect(readonlyState).toHaveText('false', { timeout: 5_000 });
+
+    await dragNodeBy(page, 'Alpha', 80);
+    await expect
+      .poll(readX, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBeGreaterThan(baselineX);
+
+    await clickNodeBody(page, 'Bravo');
+    await expect(selectedCount).toHaveText('1', { timeout: 10_000 });
+  });
+}
+
+/**
+ * 23. RUNTIME-REACTIVE `pannable` / `zoomable` (quick-260803-s3m).
+ *
+ * Both used to be applied by an IRREVERSIBLE construction-time engine mutation
+ * (`area.area.setDragHandler(null)` / `setZoomHandler(null)` — rete's `Drag`/`Zoom` are
+ * not re-instantiable from our import surface, so there was no way back). They are now
+ * per-event VETOES in the area gate pipe: `Area.translate` and `Area.zoom` each AWAIT
+ * their guard emit and abort on a falsy result without touching the transform, so the
+ * handlers stay attached and simply have their effect refused — reversibly.
+ *
+ * Proves on all 6, flipping each flag MID-SESSION:
+ *
+ *   1. PAN — an empty-canvas drag moves the bound `viewport-x` (fed by `@translated`);
+ *      under `:pannable="false"` the SAME drag leaves it byte-identical; toggling back
+ *      moves it again.
+ *   2. ZOOM — a wheel over the canvas moves `zoom-readout` (the 2dp bound `zoom` model);
+ *      under `:zoomable="false"` the SAME wheel leaves it byte-identical; toggling back
+ *      moves it again.
+ *
+ * The drag starts in the top-left gutter (clear of every node, which sit at graph x≥40
+ * and only ever move further right/down as the viewport pans) so it is always a
+ * pan gesture, never a node drag. Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-reactive-viewport [${target}]: flipping :pannable / :zoomable live blocks and restores the background pan and the wheel zoom`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasReactive&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    const viewportX = page.getByTestId('viewport-x');
+    const zoomReadout = page.getByTestId('zoom-readout');
+    const readVx = async (): Promise<string> => (await viewportX.textContent())?.trim() ?? '';
+    const readZoom = async (): Promise<string> => (await zoomReadout.textContent())?.trim() ?? '';
+
+    await expect(page.getByTestId('pannable-state')).toHaveText('true');
+    await expect(page.getByTestId('zoomable-state')).toHaveText('true');
+    await expect(zoomReadout).toHaveText('1.00');
+
+    const cb = await canvas.boundingBox();
+    if (!cb) throw new Error('canvas bounding box unavailable');
+    // an EMPTY-canvas drag from the top-left gutter (nodes sit at graph x≥40 and only
+    // move further right/down as the viewport pans).
+    const panDrag = async (): Promise<void> => {
+      const x0 = cb.x + 8;
+      const y0 = cb.y + 8;
+      await page.mouse.move(x0, y0);
+      await page.mouse.down();
+      await page.mouse.move(x0 + 60, y0 + 30, { steps: 8 });
+      await page.mouse.move(x0 + 120, y0 + 60, { steps: 8 });
+      await page.mouse.up();
+    };
+    const wheelZoom = async (): Promise<void> => {
+      await page.mouse.move(cb.x + cb.width / 2, cb.y + cb.height / 2);
+      await page.mouse.wheel(0, -120);
+    };
+
+    // ---- 1a. PAN works while :pannable ----
+    const vx0 = await readVx();
+    await panDrag();
+    await expect
+      .poll(readVx, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .not.toBe(vx0);
+    await page.waitForTimeout(400);
+    const vxPanned = await readVx();
+
+    // ---- 1b. :pannable=false → the SAME drag does NOT pan ----
+    await page.getByTestId('pannable-btn').click();
+    await expect(page.getByTestId('pannable-state')).toHaveText('false', { timeout: 5_000 });
+    await panDrag();
+    await page.waitForTimeout(600);
+    expect(
+      await readVx(),
+      'pannable=false must veto the viewport translate — viewport-x moved anyway',
+    ).toBe(vxPanned);
+
+    // ---- 1c. toggling back restores the pan (the veto is reversible) ----
+    await page.getByTestId('pannable-btn').click();
+    await expect(page.getByTestId('pannable-state')).toHaveText('true', { timeout: 5_000 });
+    await panDrag();
+    await expect
+      .poll(readVx, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .not.toBe(vxPanned);
+
+    // ---- 2a. ZOOM works while :zoomable ----
+    await wheelZoom();
+    await expect
+      .poll(readZoom, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .not.toBe('1.00');
+    await page.waitForTimeout(400);
+    const zoomed = await readZoom();
+
+    // ---- 2b. :zoomable=false → the SAME wheel does NOT zoom ----
+    await page.getByTestId('zoomable-btn').click();
+    await expect(page.getByTestId('zoomable-state')).toHaveText('false', { timeout: 5_000 });
+    await wheelZoom();
+    await page.waitForTimeout(600);
+    expect(
+      await readZoom(),
+      'zoomable=false must veto the wheel zoom — zoom-readout moved anyway',
+    ).toBe(zoomed);
+
+    // ---- 2c. toggling back restores the zoom ----
+    await page.getByTestId('zoomable-btn').click();
+    await expect(page.getByTestId('zoomable-state')).toHaveText('true', { timeout: 5_000 });
+    await wheelZoom();
+    await expect
+      .poll(readZoom, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .not.toBe(zoomed);
+  });
+}
+
+/**
+ * 24. RUNTIME-REACTIVE `selectable` (quick-260803-s3m).
+ *
+ * `selectable` used to decide, at construction, whether `AreaExtensions.selectableNodes`
+ * was installed at all (`selector`/`nodeSelectApi` stayed null otherwise). The extension
+ * is now installed unconditionally and the pick is vetoed per-event on the `nodepicked`
+ * signal off a LIVE `$props.selectable` read — plus a `$watch` that CLEARS the live
+ * selection the moment the flag goes false (which also hides the NodeToolbar and the
+ * resize handles through the existing selection-change chain).
+ *
+ * Proves on all 6:
+ *
+ *   1. A pick selects ('Alpha' → `selected-count` '1').
+ *   2. `:selectable="false"` CLEARS the standing selection → '0' (the `$watch`).
+ *   3. A further pick under `selectable=false` does nothing → still '0' (the veto).
+ *   4. Toggling back restores picking → '1', no remount.
+ *
+ * Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-reactive-select [${target}]: flipping :selectable live clears the selection, blocks further picks, and restores them`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasReactive&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    const selectedCount = page.getByTestId('selected-count');
+    const selectableState = page.getByTestId('selectable-state');
+    const selectableBtn = page.getByTestId('selectable-btn');
+
+    await expect(selectableState).toHaveText('true');
+    await expect(selectedCount).toHaveText('0');
+
+    // ---- 1. a pick selects ----
+    await clickNodeBody(page, 'Alpha');
+    await expect(selectedCount).toHaveText('1', { timeout: 10_000 });
+
+    // ---- 2. :selectable=false CLEARS the standing selection ($watch) ----
+    await selectableBtn.click();
+    await expect(selectableState).toHaveText('false', { timeout: 5_000 });
+    await expect(selectedCount).toHaveText('0', { timeout: 10_000 });
+
+    // ---- 3. a further pick under selectable=false does nothing (nodepicked veto) ----
+    await clickNodeBody(page, 'Bravo');
+    await page.waitForTimeout(500);
+    await expect(selectedCount).toHaveText('0');
+
+    // ---- 4. toggling back restores picking ----
+    await selectableBtn.click();
+    await expect(selectableState).toHaveText('true', { timeout: 5_000 });
+    await clickNodeBody(page, 'Bravo');
+    await expect(selectedCount).toHaveText('1', { timeout: 10_000 });
+  });
+}
+
+/**
+ * 25. RUNTIME-REACTIVE `snapGrid` (quick-260803-s3m).
+ *
+ * `AreaExtensions.snapGrid` captures its `size` ONCE at install and has no function form,
+ * so it is structurally unusable for reactivity. Its entire behaviour is
+ * `Math.round(v / size) * size` on the `nodetranslate` signal — reimplemented inline in
+ * the gate pipe off a LIVE `$props.snapGrid` read (returning a FRESH context, mirroring
+ * the extension's own spread shape).
+ *
+ * Proves on all 6, flipping the grid MID-SESSION:
+ *
+ *   1. `snapGrid` 0 → 25 makes the NEXT drag snap: a deliberately non-multiple +83px
+ *      delta from the seeded (40, 40) lands the bound `node0-x` AND `node0-y` on exact
+ *      multiples of 25.
+ *   2. Back to 0 un-snaps: a second +83px drag from that 25-aligned origin lands
+ *      `node0-x` OFF the grid (83 is not a multiple of 25, so a snapped result is
+ *      arithmetically impossible if snapping were still live).
+ *
+ * Asserts the SETTLED bound-model readouts. Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-reactive-snap [${target}]: flipping :snap-grid live snaps the next drag to the grid, and un-snaps when turned off`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasReactive&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    const node0x = page.getByTestId('node0-x');
+    const node0y = page.getByTestId('node0-y');
+    const snapState = page.getByTestId('snap-state');
+    const snapBtn = page.getByTestId('snap-btn');
+    const readX = async (): Promise<string> => (await node0x.textContent())?.trim() ?? '';
+    const readY = async (): Promise<string> => (await node0y.textContent())?.trim() ?? '';
+
+    await expect(snapState).toHaveText('0');
+    await expect(node0x).toHaveText('40');
+    await expect(node0y).toHaveText('40');
+
+    // ---- 1. snapGrid 0 → 25: the NEXT drag snaps ----
+    await snapBtn.click();
+    await expect(snapState).toHaveText('25', { timeout: 5_000 });
+
+    await dragNodeBy(page, 'Alpha', 83);
+    await expect
+      .poll(readX, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .not.toBe('40');
+    await page.waitForTimeout(400);
+
+    const snappedX = Number(await readX());
+    const snappedY = Number(await readY());
+    expect(
+      snappedX % 25,
+      `snapGrid=25 must snap the drag — node0-x settled at ${snappedX}`,
+    ).toBe(0);
+    expect(
+      snappedY % 25,
+      `snapGrid=25 must snap the drag — node0-y settled at ${snappedY}`,
+    ).toBe(0);
+
+    // ---- 2. back to 0: the next drag is NOT snapped ----
+    await snapBtn.click();
+    await expect(snapState).toHaveText('0', { timeout: 5_000 });
+
+    await dragNodeBy(page, 'Alpha', 83);
+    await expect
+      .poll(readX, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .not.toBe(String(snappedX));
+    await page.waitForTimeout(400);
+
+    const freeX = Number(await readX());
+    expect(
+      freeX % 25,
+      `snapGrid=0 must stop snapping — node0-x settled at ${freeX} (a multiple of 25)`,
+    ).not.toBe(0);
   });
 }

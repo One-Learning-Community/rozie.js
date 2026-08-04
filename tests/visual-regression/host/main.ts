@@ -473,6 +473,17 @@ export const EXAMPLES = [
   // them to `'auto'`, and a handle double-click on a freshly re-resized node ALSO resets to
   // `'auto'`. Behavioral-only; NOT a screenshot cell.
   'FlowCanvasResize',
+  // quick-260803-s3m (runtime-reactive interaction props) — FlowCanvasReactive is the
+  // BEHAVIORAL cell (loader → examples/demos/FlowCanvasReactiveDemo.rozie): a 3-node /
+  // 1-edge controlled graph plus 5 toggle buttons (`readonly-btn`/`pannable-btn`/
+  // `zoomable-btn`/`selectable-btn`/`snap-btn`) driving the canvas's OWN local copies of
+  // `readonly`/`pannable`/`zoomable`/`selectable`/`snapGrid`, with bound-model readouts
+  // (`node0-x`/`node0-y`/`node-count`/`conn-count`/`selected-count`/`viewport-x`/
+  // `zoom-readout` + a `*-state` readout per flag). The 4 specs (rete-flow-reactive-
+  // readonly / -viewport / -select / -snap) flip each prop MID-SESSION and assert the
+  // canvas obeys it on the very next gesture — the proof that none of the five is
+  // construction-time any more. Behavioral-only; NOT a screenshot cell.
+  'FlowCanvasReactive',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -1272,6 +1283,8 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasBackground: 'rozie-flow-canvas-background',
   // Phase 74 NodeResizer cell — '-demo' appended → 'rozie-flow-canvas-resize-demo'.
   FlowCanvasResize: 'rozie-flow-canvas-resize',
+  // quick-260803-s3m reactive-props cell — '-demo' appended → 'rozie-flow-canvas-reactive-demo'.
+  FlowCanvasReactive: 'rozie-flow-canvas-reactive',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -1704,6 +1717,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 74 — FlowCanvasResizeDemo is self-contained (seeds its own single resizable
   // node; graph/zoom bound internally — the FlowCanvas precedent). No parent props.
   FlowCanvasResize: {},
+  // quick-260803-s3m — FlowCanvasReactiveDemo is self-contained (seeds its own 3-node /
+  // 1-edge graph AND its own local copies of the five interaction props, toggled by its
+  // own buttons). No parent props; no MODEL_PROPS entry (graph/zoom are bound internally
+  // — the FlowCanvas precedent; the five interaction props are one-way, not models).
+  FlowCanvasReactive: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not
