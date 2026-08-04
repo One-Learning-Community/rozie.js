@@ -1,5 +1,18 @@
 # @rozie-ui/pdf-react
 
+## 0.2.5
+
+### Patch Changes
+
+- Mount-time staleness fix. Values read inside `$onMount` are now mirrored through synced refs, so a callback registered once at mount no longer reads the first render's values for the lifetime of the component. A consumer that changes a prop — or passes a new handler identity — after mount is now observed by the mount-registered callback instead of being silently ignored.
+
+  Two read kinds landed here:
+  - **Prop read** — `autoFit`. Changing the fit mode after mount is now seen by the mount-registered fit pass.
+  - **Helper call** — `applyFit()`, so the fit is applied against the current viewport/zoom state.
+- The mount effect's dependency array is now honest, so the `react-hooks/exhaustive-deps` suppression is no longer emitted.
+- No `$emit` handler prop was affected. No API surface change.
+- @rozie/runtime-react@0.2.3
+
 ## 0.2.4
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @rozie-ui/command-palette-react
 
+## 0.4.4
+
+### Patch Changes
+
+- Mount-time staleness fix. Values read inside `$onMount` are now mirrored through synced refs, so a callback registered once at mount no longer reads the first render's values for the lifetime of the component. A consumer that changes a prop — or passes a new handler identity — after mount is now observed by the mount-registered callback instead of being silently ignored.
+
+  Only the **helper-call** read kind landed here — the `onOpen()` script helper is now invoked through a synced ref, so the open transition runs against current state rather than mount-time state. No prop read or `$emit` handler in this component was affected.
+- The mount effect's dependency array is now honest, so the `react-hooks/exhaustive-deps` suppression is no longer emitted.
+- No API surface change.
+- @rozie/runtime-react@0.2.3
+
 ## 0.4.3
 
 ### Patch Changes

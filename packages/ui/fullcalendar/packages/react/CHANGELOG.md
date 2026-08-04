@@ -1,5 +1,17 @@
 # @rozie-ui/fullcalendar-react
 
+## 0.1.4
+
+### Patch Changes
+
+- Mount-time staleness fix. Values read inside `$onMount` are now mirrored through synced refs, so a callback registered once at mount no longer reads the first render's values for the lifetime of the component. A consumer that changes a prop — or passes a new handler identity — after mount is now observed by the mount-registered callback instead of being silently ignored.
+
+  Only the **`$emit` handler prop** read kind landed here, but it landed on the entire event surface — all 11: `onDateClick`, `onDatesSet`, `onEventClick`, `onEventDrop`, `onEventMouseEnter`, `onEventMouseLeave`, `onEventResize`, `onEventsSet`, `onLoading`, `onSelect`, `onUnselect`.
+
+  FullCalendar's callbacks are handed to the engine once at mount, so before this fix every one of these events was permanently bound to the handler identity present on the first render. A consumer using inline arrow handlers, or swapping handlers on state change, was silently calling stale closures for the life of the calendar. This is the single most consequential leaf in the wave for that pattern.
+- No prop read or helper call in this component was affected. No API surface change.
+- @rozie/runtime-react@0.2.3
+
 ## 0.1.3
 
 ### Patch Changes

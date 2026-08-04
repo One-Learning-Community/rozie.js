@@ -1,5 +1,12 @@
 # @rozie/cli
 
+## 0.3.2
+
+### Patch Changes
+
+- Republish for `@rozie/core@0.3.2` — the React `$onMount` staleness seams and the React/Solid component-tag prop-delivery seams. `@rozie/cli` bundles `@rozie/core` and the private `@rozie/target-*` emitters, so a stale CLI ships stale emitters; there is no independent change of its own in this release.
+- @rozie/core@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes

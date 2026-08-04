@@ -1,5 +1,18 @@
 # @rozie-ui/tiptap-react
 
+## 0.2.2
+
+### Patch Changes
+
+- Mount-time staleness fix. Values read inside `$onMount` are now mirrored through synced refs, so a callback registered once at mount no longer reads the first render's values for the lifetime of the component. A consumer that changes a prop — or passes a new handler identity — after mount is now observed by the mount-registered callback instead of being silently ignored.
+
+  All three read kinds landed here, across 20 synced refs:
+  - **Prop reads** (12) — `ariaLabel`, `autofocus`, `bubbleMenuShouldShow`, `editorClass`, `editorProps`, `enforceMaxLength`, `extensions`, `maxLength`, `nodeSpecs`, `placeholder`, `starterKit`, `uploadImage`. The TipTap editor is constructed inside `$onMount`; these now read their current values at construction time rather than the first render's. `enforceMaxLength`/`maxLength` and `uploadImage` are the consumer-visible ones — a length cap or upload handler changed after mount is now honored.
+  - **Helper calls** (4) — `buildDefaultLinkEditor`, `buildLinkScope`, `makeNodeViewExtensions`, `refreshLink`, so the bubble-menu link editor and node views operate on current state.
+  - **`$emit` handler props** (4) — `onBlur`, `onFocus`, `onSelectionUpdate`, `onUpdate`. TipTap's event handlers are bound to the editor instance once at construction, so a consumer that swapped `onUpdate` after mount previously kept the original closure being called on every keystroke.
+- No API surface change.
+- @rozie/runtime-react@0.2.3
+
 ## 0.2.1
 
 ### Patch Changes

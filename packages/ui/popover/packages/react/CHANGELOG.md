@@ -1,5 +1,17 @@
 # @rozie-ui/popover-react
 
+## 0.1.5
+
+### Patch Changes
+
+- Mount-time staleness fix. Values read inside `$onMount` are now mirrored through synced refs, so a callback registered once at mount no longer reads the first render's values for the lifetime of the component. A consumer that changes a prop — or passes a new handler identity — after mount is now observed by the mount-registered callback instead of being silently ignored.
+
+  Two read kinds landed here:
+  - **Prop read** — `disabled`. Disabling the popover after mount is now observed by the mount-registered tracking setup instead of being pinned to the first render's value.
+  - **Helper call** — `startTracking()`, so Floating UI tracking starts against current anchor/placement state.
+- No `$emit` handler prop was affected. No API surface change.
+- @rozie/runtime-react@0.2.3
+
 ## 0.1.4
 
 ### Patch Changes

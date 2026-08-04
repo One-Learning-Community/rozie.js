@@ -1,5 +1,18 @@
 # @rozie-ui/sortable-list-react
 
+## 0.1.10
+
+### Patch Changes
+
+- Mount-time staleness fix. Values read inside `$onMount` are now mirrored through synced refs, so a callback registered once at mount no longer reads the first render's values for the lifetime of the component. A consumer that changes a prop — or passes a new handler identity — after mount is now observed by the mount-registered callback instead of being silently ignored.
+
+  All three read kinds landed here:
+  - **`$emit` handler props** (5) — `onAdd`, `onChange`, `onEnd`, `onRemove`, `onStart`. SortableJS callbacks are registered once at mount, so a consumer swapping a drag handler after mount previously kept getting the original called.
+  - **Prop reads** (3) — `animation`, `forceFallback`, `options`. The SortableJS instance is constructed inside `$onMount`; these now read current values at construction time.
+  - **Helper call** — `resolveGroup()`, so cross-list group resolution runs against current group configuration.
+- No API surface change.
+- @rozie/runtime-react@0.2.3
+
 ## 0.1.9
 
 ### Patch Changes

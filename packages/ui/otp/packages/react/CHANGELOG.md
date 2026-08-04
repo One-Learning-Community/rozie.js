@@ -1,5 +1,18 @@
 # @rozie-ui/otp-react
 
+## 0.1.5
+
+### Patch Changes
+
+- Mount-time staleness fix. Values read inside `$onMount` are now mirrored through synced refs, so a callback registered once at mount no longer reads the first render's values for the lifetime of the component. A consumer that changes a prop — or passes a new handler identity — after mount is now observed by the mount-registered callback instead of being silently ignored.
+
+  Two read kinds landed here:
+  - **Prop read** — `autoFocus`.
+  - **Helper calls** (2) — `firstEmptyIndex()` and `focusIndex()`, so the mount-time focus placement targets the current first-empty cell rather than the one computed at mount.
+- The mount effect's dependency array is now honest, so the `react-hooks/exhaustive-deps` suppression is no longer emitted.
+- No `$emit` handler prop was affected. No API surface change.
+- @rozie/runtime-react@0.2.3
+
 ## 0.1.4
 
 ### Patch Changes

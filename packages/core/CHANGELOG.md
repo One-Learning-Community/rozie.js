@@ -1,5 +1,25 @@
 # @rozie/core
 
+## 0.3.2
+
+### Patch Changes
+
+- **Fixed (React, 3 seams) — `$onMount` staleness.** A callback registered inside `$onMount` runs once, but it used to close over the values present on the FIRST render and keep reading them forever. Three read kinds are now mirrored through synced refs so the mount-registered callback stays live:
+  - **Prop reads** — `$props.x` read inside `$onMount` now resolves through a synced ref.
+  - **Helper calls** — a `<script>` helper invoked inside `$onMount` now resolves through a synced ref, so the helper's own captured state is current at call time rather than at mount time.
+  - **`$emit` handler props** — the emitted `on<Event>` prop read inside `$onMount` is mirrored too, so a consumer that swaps handler identity after mount actually gets called. This is what makes engine-callback components (rete, fullcalendar, embla, flatpickr, sortable-list) deliver events to the CURRENT handler.
+
+  Because the emitted `useEffect` dep array is now honest about what it reads, the accompanying `// eslint-disable-line react-hooks/exhaustive-deps` suppression is no longer emitted on the mount effect.
+
+- **Fixed (React + Solid, 4 seams) — component-tag prop delivery.** Props addressed to a CHILD COMPONENT are no longer renamed through the DOM attribute map. The map exists to translate authored attribute names to their DOM/JSX spellings on native elements; applying it to a component tag silently renamed — and therefore dropped — props the child had actually declared (`readonly`, `tabindex`, `for`, and friends).
+  - `r-bind` with **literal** keys on a component tag (React + Solid).
+  - `r-bind` with **dynamic** keys on a component tag (React + Solid). The dynamic path routes through the new `normalizeComponentAttrs` runtime helper, which strips the same prototype-pollution key set as `normalizeAttrs` but does **not** apply the DOM alias table — so the security strip survives on every tag kind. No security regression.
+  - Solid `:attr` bindings on a component tag are likewise no longer remapped.
+
+- **Fixed:** `reservedNames` — `normalizeComponentAttrs` is now reserved on Solid, so an author `<data>` key cannot shadow the auto-injected bare-name runtime import.
+
+The target emitters are bundled into `@rozie/core` and inlined into `@rozie/cli`, `@rozie/unplugin` and `@rozie/babel-plugin` — every fix above changes emitted output for every consumer compiling through any of those entry points.
+
 ## 0.3.1
 
 ### Patch Changes

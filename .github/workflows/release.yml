@@ -196,6 +196,38 @@ name: Release (early subset)
 #     (SUPERSEDED for rete only, 2026-08-04: rete is now release-verified and wired above; the
 #     other 12 families remain out of scope.)
 #
+# 2026-08-04 react-staleness + component-prop-delivery patch wave (quick 260804-hzx):
+#   - NO new family, NO --filter-list edit needed. All 21 bumped packages were already
+#     enumerated in the Build, Publish and advisory-precheck lists (verified
+#     programmatically: ALL WIRED 21/21). Unbumped siblings enumerated in those same
+#     lists are simply skipped by `pnpm publish` as already-published (D-05, per-leaf
+#     bumps rather than per-family lockstep).
+#   - @rozie/{core,cli,unplugin,babel-plugin} 0.3.1 -> 0.3.2. `@rozie/core` DOES bump,
+#     contra a toolchain-only assumption: commit `15a97bf3` — subject line says
+#     "feat(runtime)" — also edited packages/core/src/rewrite/reservedNames.ts, and core
+#     additionally inlines the private @rozie/target-* emitters, so all nine
+#     target-react/target-solid seam commits are inside core's published dist. Derive the
+#     toolchain set from `git log <cut>..HEAD -- packages/core -- packages/targets`,
+#     never from a commit SUBJECT.
+#   - @rozie/runtime-{react,solid} 0.2.2 -> 0.2.3 (additive `normalizeComponentAttrs`,
+#     shipped as a PATCH per repo precedent). runtime-{lit,svelte} stay 0.2.2 and
+#     runtime-{vue,keynav-core} stay 0.2.1 — all four verified byte-identical to their
+#     published tarballs, so bumping them would publish unchanged content.
+#   - 15 @rozie-ui `-react` leaves patch-bump (captcha, combobox, command-palette,
+#     cropper, data-table, date-picker, embla, flatpickr, fullcalendar, otp, pdf,
+#     popover, rete, sortable-list, tiptap). ZERO `-solid` leaves: the solid emitter
+#     commits moved no leaf bytes (the corpus has no non-$attrs `r-bind` on a component
+#     tag, and no leaf reads normalizeAttrs).
+#   - Bump set derived MECHANICALLY by a per-leaf published-tarball comparison, not a
+#     single commit-range cut — 35 of 102 wired leaves drifted, 67 clean. See
+#     RELEASING.md §6 item 10 for the method and its two mandatory pack-time
+#     normalizations.
+#   - KNOWN DEBT surfaced by that method and deliberately NOT folded into this wave:
+#     20 non-react leaves are currently STALE on npm (published tarball != committed
+#     source at the same version). Documented in RELEASING.md §7 and backlogged as
+#     `@rozie-ui stale-publish reconciliation`. Not caused by this series — every one of
+#     its ten commits touches zero non-react leaf files.
+#
 # Everything else is DELIBERATELY out of scope: any @rozie-ui family not enumerated
 # above (maplibre, codemirror, lexical, chartjs, uppy, dialog, slider,
 # …) is not release-verified. Do NOT widen the --filter lists below to other

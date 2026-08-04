@@ -1,5 +1,21 @@
 # @rozie-ui/data-table-react
 
+## 0.2.5
+
+### Patch Changes
+
+- Mount-time staleness fix. Values read inside `$onMount` are now mirrored through synced refs, so a callback registered once at mount no longer reads the first render's values for the lifetime of the component. A consumer that changes a prop — or passes a new handler identity — after mount is now observed by the mount-registered callback instead of being silently ignored.
+
+  This is the largest ripple in the wave — 19 synced refs across both shipped components:
+  - **Prop reads** (`DataTable`) — `getSubRows`, `manual` and `virtual`. Switching to manual pagination/sorting, toggling virtualization, or supplying a new `getSubRows` after mount is now observed by the mount-registered table wiring.
+  - **Helper calls** (`DataTable`, 14) — `clampActiveCell`, `currentData`, `currentState`, `effectiveColumnFilters`, `effectiveGlobalFilter`, `effectiveSorting`, `focusCellWhenReady`, `indexOfRowIn`, `isGrid`, `syncIndeterminate`, `tableColumns`, `virtualizerOptions`, `windowSource`, `writePagination`. The mount-time table/virtualizer wiring now reads live filter, sort, pagination and windowing state instead of the snapshot taken at mount.
+  - **Helper calls** (`Column`, 2) — `buildSpec` and `colId`.
+
+  In practice this is what makes a grid whose columns, filters or data source change after first paint keep its active-cell tracking, windowing and pagination writes consistent.
+- `Column`'s mount effect no longer emits the `react-hooks/exhaustive-deps` suppression.
+- No `$emit` handler prop was affected. No API surface change.
+- @rozie/runtime-react@0.2.3
+
 ## 0.2.4
 
 ### Patch Changes
