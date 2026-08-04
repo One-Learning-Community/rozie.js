@@ -349,17 +349,19 @@ const Cropper = forwardRef<CropperHandle, CropperProps>(function Cropper(_props:
     if (instance.current) instance.current.setDragMode(mode);
   }
 
+  const _buildCropperRef = useRef(buildCropper);
+  _buildCropperRef.current = buildCropper;
   useEffect(() => {
     // Ref the <img> directly — the engine's attach target (the flatpickr/codemirror
     // pattern). $refs is read ONLY here (ROZ123). The React emitter types an `img`
     // ref as HTMLElement (not HTMLImageElement) — a strict-tsc mismatch fixed by a
     // codegen type-aid (scripts/codegen.mjs), NOT an emitter edit (scope fence).
     imgEl.current = imageEl.current;
-    buildCropper(null);
+    _buildCropperRef.current(null);
     return () => {
       if (instance.current) instance.current.destroy();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     const v = props.src;

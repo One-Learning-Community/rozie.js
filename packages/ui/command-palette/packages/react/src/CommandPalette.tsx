@@ -974,12 +974,14 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
     return focusInput();
   }
 
+  const _onOpenRef = useRef(onOpen);
+  _onOpenRef.current = onOpen;
   useEffect(() => {
     setPlatformIsApple(sniffApplePlatform());
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_openRef.current) onOpen();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (_openRef.current) _onOpenRef.current();
+  }, []);
   useEffect(() => {
     return () => {
       if (debounceTimerId.current != null) clearTimeout(debounceTimerId.current);

@@ -108,9 +108,11 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
     closeWith('programmatic');
   }
 
+  const _syncRef = useRef(sync);
+  _syncRef.current = sync;
   useEffect(() => {
-    sync(_openRef.current);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    _syncRef.current(_openRef.current);
+  }, []);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     const isOpen = open;

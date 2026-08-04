@@ -130,6 +130,8 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(function Captcha(_props:
     return widgetId.current != null && api.current && typeof api.current.getResponse === 'function' ? api.current.getResponse(widgetId.current) : '';
   }
 
+  const _buildConfigRef = useRef(buildConfig);
+  _buildConfigRef.current = buildConfig;
   useEffect(() => {
     // Mount-local (not top-level) — read only by this closure's own async
     // .then()/.catch() and the returned teardown below. Emitter-hardening
@@ -141,7 +143,7 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(function Captcha(_props:
     loadCaptchaApi(_providerRef.current).then((a: any) => {
       if (disposed) return;
       api.current = a;
-      widgetId.current = api.current.render(widgetEl.current!, buildConfig());
+      widgetId.current = api.current.render(widgetEl.current!, _buildConfigRef.current());
     }).catch((err: any) => {
       props.onError && props.onError({
         provider: _providerRef.current,

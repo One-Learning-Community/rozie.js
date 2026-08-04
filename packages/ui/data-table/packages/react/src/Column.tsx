@@ -114,18 +114,22 @@ export default function Column(_props: ColumnProps): JSX.Element {
     validate: props.validate
   }), [colId, props.aggregationFn, props.editable, props.editor, props.editorOptions, props.expandable, props.field, props.filterable, props.groupable, props.header, props.pinned, props.sortable, props.validate, props.width]);
 
+  const _buildSpecRef = useRef(buildSpec);
+  _buildSpecRef.current = buildSpec;
+  const _colIdRef = useRef(colId);
+  _colIdRef.current = colId;
   useEffect(() => {
     // register this column's spec. On Lit the injected registry may still be undefined
     // here (REQ-30 async context); the $onUpdate below performs the registration once
     // the value arrives.
     if (reg.current && !registered.current) {
       registered.current = true;
-      reg.current.registerColumn(colId(), buildSpec());
+      reg.current.registerColumn(_colIdRef.current(), _buildSpecRef.current());
     }
     return () => {
-      if (reg.current) reg.current.unregisterColumn(colId());
+      if (reg.current) reg.current.unregisterColumn(_colIdRef.current());
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (registered.current) return;
     const live = registry;

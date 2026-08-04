@@ -498,13 +498,15 @@ const Waveform = forwardRef<WaveformHandle, WaveformProps>(function Waveform(_pr
     return regionsPlugin.current ? regionsPlugin.current.getRegions() : [];
   }
 
+  const _buildWaveSurferRef = useRef(buildWaveSurfer);
+  _buildWaveSurferRef.current = buildWaveSurfer;
   useEffect(() => {
     // $refs read ONLY here (ROZ123). The container is the engine's attach target.
-    buildWaveSurfer();
+    _buildWaveSurferRef.current();
     return () => {
       if (ws.current) ws.current.destroy();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     const v = props.src;

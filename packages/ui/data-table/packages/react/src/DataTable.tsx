@@ -4325,6 +4325,34 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return col.getFacetedMinMaxValues() || null; // [number, number] | null
   }
 
+  const _clampActiveCellRef = useRef(clampActiveCell);
+  _clampActiveCellRef.current = clampActiveCell;
+  const _currentDataRef = useRef(currentData);
+  _currentDataRef.current = currentData;
+  const _currentStateRef = useRef(currentState);
+  _currentStateRef.current = currentState;
+  const _effectiveColumnFiltersRef = useRef(effectiveColumnFilters);
+  _effectiveColumnFiltersRef.current = effectiveColumnFilters;
+  const _effectiveGlobalFilterRef = useRef(effectiveGlobalFilter);
+  _effectiveGlobalFilterRef.current = effectiveGlobalFilter;
+  const _effectiveSortingRef = useRef(effectiveSorting);
+  _effectiveSortingRef.current = effectiveSorting;
+  const _focusCellWhenReadyRef = useRef(focusCellWhenReady);
+  _focusCellWhenReadyRef.current = focusCellWhenReady;
+  const _indexOfRowInRef = useRef(indexOfRowIn);
+  _indexOfRowInRef.current = indexOfRowIn;
+  const _isGridRef = useRef(isGrid);
+  _isGridRef.current = isGrid;
+  const _syncIndeterminateRef = useRef(syncIndeterminate);
+  _syncIndeterminateRef.current = syncIndeterminate;
+  const _tableColumnsRef = useRef(tableColumns);
+  _tableColumnsRef.current = tableColumns;
+  const _virtualizerOptionsRef = useRef(virtualizerOptions);
+  _virtualizerOptionsRef.current = virtualizerOptions;
+  const _windowSourceRef = useRef(windowSource);
+  _windowSourceRef.current = windowSource;
+  const _writePaginationRef = useRef(writePagination);
+  _writePaginationRef.current = writePagination;
   useEffect(() => {
     // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
     // edit committed BEFORE the consumer ever pushes new rows (or when the consumer passes
@@ -4341,9 +4369,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // the getter bought nothing. Snapshot the initial data here; setOptions owns updates.
       // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
       // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
-      data: currentData(),
-      columns: tableColumns(),
-      state: currentState(),
+      data: _currentDataRef.current(),
+      columns: _tableColumnsRef.current(),
+      state: _currentStateRef.current(),
       getCoreRowModel: getCoreRowModel(),
       getSortedRowModel: getSortedRowModel(),
       getFilteredRowModel: getFilteredRowModel(),
@@ -4435,7 +4463,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // PRE-write value).
       // windowSource(): the FULL pre-pagination model when virtual (windowing replaces client
       // pagination, req-9), else the normal paginated row model (non-virtual path byte-unchanged).
-      const nextRows = windowSource().slice();
+      const nextRows = _windowSourceRef.current().slice();
       const nextGroups = table.current.getHeaderGroups().slice();
       setRows(nextRows);
       setHeaderGroups(nextGroups);
@@ -4445,7 +4473,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // NEVER in a render helper (Pitfall 1). Pass the COMPLETE options set (virtual-core's
       // setOptions replaces, not merges). Guarded so the off path executes no virtual-core code.
       if (_virtualRef.current && virtualizer.current) {
-        virtualizer.current.setOptions(virtualizerOptions());
+        virtualizer.current.setOptions(_virtualizerOptionsRef.current());
         virtualizer.current._willUpdate();
       }
       // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
@@ -4456,7 +4484,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // the range corners on React too — never re-reading the pre-change model.
       const nextRowCount = nextRows.length;
       const nextColCount = nextRows.length ? nextRows[0].getVisibleCells().length : nextGroups.length ? (nextGroups[nextGroups.length - 1].headers || []).length : 0;
-      clampActiveCell(nextRowCount, nextColCount);
+      _clampActiveCellRef.current(nextRowCount, nextColCount);
       // #4: clamp a pageIndex that now points PAST the last page. When the consumer holds
       // pagination.pageIndex (controlled) and shrinks the data (filter / replace) so there are
       // fewer pages, the body renders blank ("Page 6 of 3" with Next disabled). Read table-core's
@@ -4478,7 +4506,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       const pgState = table.current.getState().pagination;
       const pc = table.current.getPageCount();
       if (pc > 0 && pgState.pageIndex > pc - 1) {
-        writePagination({
+        _writePaginationRef.current({
           pageIndex: pc - 1,
           pageSize: pgState.pageSize
         });
@@ -4489,16 +4517,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // stale state) and re-seat focus on that cell via the DOM-only poll (focusCellWhenReady reads
       // gridRoot only → React-safe). Consumed ONCE (cleared) so a multi-render re-feed focuses once;
       // a no-relocation commit resolves the same index → byte-behaviorally identical to before.
-      if (pendingEditFollow.current && isGrid()) {
+      if (pendingEditFollow.current && _isGridRef.current()) {
         const follow = pendingEditFollow.current;
         pendingEditFollow.current = null;
-        const followIdx = indexOfRowIn(nextRows, follow.rowOriginal, follow.rowId);
-        if (followIdx >= 0) focusCellWhenReady(followIdx, follow.col);
+        const followIdx = _indexOfRowInRef.current(nextRows, follow.rowOriginal, follow.rowId);
+        if (followIdx >= 0) _focusCellWhenReadyRef.current(followIdx, follow.col);
       }
       // keep the select-all checkbox's `indeterminate` DOM property in lockstep with the
       // selection state (bound :indeterminate is inert on 5/6 targets). The box persists
       // across selection changes; a microtask defer covers React's post-render DOM patch.
-      syncIndeterminate();
+      _syncIndeterminateRef.current();
       if (typeof queueMicrotask !== 'undefined') queueMicrotask(syncIndeterminate);else Promise.resolve().then(syncIndeterminate);
     };
 
@@ -4523,7 +4551,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // the scroll-element ResizeObserver and returns the teardown stored for $onUnmount.
     if (_virtualRef.current) {
       gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rdt-scroll') : null;
-      virtualizer.current = new Virtualizer(virtualizerOptions());
+      virtualizer.current = new Virtualizer(_virtualizerOptionsRef.current());
       virtualizerCleanup.current = virtualizer.current._didMount();
       // FINE-GRAINED FIRST-WINDOW KICK (Solid/Svelte): the windowed <For>/{#each} accessor was first
       // evaluated at initial render — while `virtualizer` was still null — and (because windowedRows()
@@ -4567,9 +4595,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // #14: seed the sort/filter announce baseline from the initial (post-mount) state so the LAZY
     // watch's first fire — a real user sort/filter — compares against the true starting values and
     // is classified correctly (a null sentinel would misread the first filter change as a sort change).
-    announceState.sorting = effectiveSorting();
-    announceState.columnFilters = effectiveColumnFilters();
-    announceState.globalFilter = effectiveGlobalFilter();
+    announceState.sorting = _effectiveSortingRef.current();
+    announceState.columnFilters = _effectiveColumnFiltersRef.current();
+    announceState.globalFilter = _effectiveGlobalFilterRef.current();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     return () => {

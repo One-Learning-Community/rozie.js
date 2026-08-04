@@ -113,6 +113,8 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
     maxHeight: props.maxHeight
   }), [props.maxHeight, props.maxWidth, props.minHeight, props.minWidth, props.resizable, props.type]);
 
+  const _buildSpecRef = useRef(buildSpec);
+  _buildSpecRef.current = buildSpec;
   useEffect(() => {
     interface ReactivePortalHandle {
     update(scope: unknown): void;
@@ -183,7 +185,7 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
     // registration once the value arrives.
     if (cv.current && !registered.current) {
       registered.current = true;
-      cv.current.registerType(_typeRef.current, buildSpec());
+      cv.current.registerType(_typeRef.current, _buildSpecRef.current());
     }
     return () => {
       for (const root of portalRoots.current) root.unmount();

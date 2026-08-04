@@ -274,9 +274,11 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
     setText('');
   }
 
+  const _readValueRef = useRef(readValue);
+  _readValueRef.current = readValue;
   useEffect(() => {
     // Seed the edit buffer so a programmatic focus shows the right text.
-    const n = readValue();
+    const n = _readValueRef.current();
     setText(n === null ? '' : String(n));
     // Tear down any running repeat / scrub on unmount.
     return () => {

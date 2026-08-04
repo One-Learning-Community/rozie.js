@@ -957,6 +957,121 @@ function rewriteWatchedPropReads(
   return bodyClone;
 }
 
+/**
+ * Quick 260803-w7b seam 3 — rewrite `<H>(...)` to `_<H>Ref.current(...)` for
+ * every eligible top-level helper `H` called lexically inside a MOUNT-phase
+ * lifecycle body.
+ *
+ * A mount hook lowers to a `[]`-dep `useEffect` by contract (see the `depsArr`
+ * ternary in the lifecycle loop), so a closure created inside it captures the
+ * FIRST render's `H` and calls it forever — and `H`, being
+ * `useCallback(fn, [<reactive deps>])`, closes over the first render's props /
+ * state. Routing the CALL through a synced ref (`_<H>Ref.current = <H>` is
+ * re-assigned on every render) makes the mount closure invoke the CURRENT
+ * instance while leaving every other consumer of `H`'s identity — `$watch`
+ * getter deps, listener deps, sibling helpers' `useCallback` deps, render-scope
+ * JSX — completely untouched. That is the whole point of D-01: this changes
+ * exactly one thing, which instance the mount closure invokes.
+ *
+ * Deliberately narrow, mirroring `rewriteWatchedPropReads` above:
+ *   - CALL positions only (D-03). A VALUE-position reference
+ *     (`addEventListener('x', H)`) has the same defect, but the only fix is a
+ *     wrapper `(...a) => _HRef.current(...a)`, which mints a NEW function
+ *     identity and breaks the paired `removeEventListener(H)`. Rewriting the
+ *     bare identifier to `_HRef.current` would be WORSE than doing nothing (it
+ *     snapshots the current instance at registration time while adding bytes).
+ *     Filed to the emitter-hardening backlog.
+ *   - Plain non-computed `Identifier` callees only. `OptionalCallExpression`
+ *     (`H?.()`) is a different node shape and does not occur in the corpus.
+ *   - Locally-shadowed names are skipped (D-11). Because we traverse a
+ *     synthetic Program built from the BODY, a locally-declared name HAS a
+ *     binding in that scope while a real top-level helper does NOT — so
+ *     `path.scope.getBinding(name)` is a correct, machinery-free shadow test.
+ *
+ * `residual` collects every reference to an eligible helper that SURVIVES in a
+ * non-property, non-binding position (i.e. the D-03 value positions). It is the
+ * input to the D-07 dep filter: a closure dep may only be dropped when the
+ * helper has zero residual references, otherwise the emitted
+ * `eslint-disable-line` would flip from unused-directive to missing-dep.
+ */
+function rewriteMountHelperCalls(
+  bodyClone: t.Expression | t.BlockStatement,
+  eligibleHelpers: ReadonlySet<string>,
+): {
+  node: t.Expression | t.BlockStatement;
+  rewritten: Set<string>;
+  residual: Set<string>;
+} {
+  const rewritten = new Set<string>();
+  const residual = new Set<string>();
+  if (eligibleHelpers.size === 0) return { node: bodyClone, rewritten, residual };
+
+  // Wrap into a Program-rooted file so we can traverse WITH SCOPE — the shadow
+  // test depends on it.
+  const programStmts: t.Statement[] = t.isBlockStatement(bodyClone)
+    ? bodyClone.body
+    : [t.expressionStatement(bodyClone as t.Expression)];
+  const file = t.file(t.program(programStmts));
+
+  // Identifiers we MANUFACTURED as the `object` of a freshly-built
+  // `_<H>Ref.current` MemberExpression — visiting them would mis-classify them
+  // as residual references. Tracked via WeakSet keyed on node identity (same
+  // pattern as `rewriteWatchedPropReads` / `hoistModuleLet`).
+  const synthesizedIdentifiers = new WeakSet<t.Node>();
+
+  traverse(file, {
+    CallExpression(path: NodePath<t.CallExpression>) {
+      const callee = path.node.callee;
+      if (!t.isIdentifier(callee)) return;
+      const name = callee.name;
+      if (!eligibleHelpers.has(name)) return;
+      // D-11 shadow guard — a binding resolvable from this scope means the name
+      // refers to a LOCAL declaration, not the top-level helper.
+      if (path.scope.getBinding(name)) return;
+      const refIdent = t.identifier(`_${name}Ref`);
+      synthesizedIdentifiers.add(refIdent);
+      path.node.callee = t.memberExpression(refIdent, t.identifier('current'));
+      rewritten.add(name);
+    },
+    Identifier(path: NodePath<t.Identifier>) {
+      if (synthesizedIdentifiers.has(path.node)) return;
+      const name = path.node.name;
+      if (!eligibleHelpers.has(name)) return;
+      if (path.scope.getBinding(name)) return;
+      const parent = path.parent;
+      // The callee slot of a call we just rewrote is gone; any callee slot we
+      // did NOT rewrite is a shadowed name, already excluded above.
+      if (t.isCallExpression(parent) && parent.callee === path.node) return;
+      // Same skip ladder as `rewriteWatchedPropReads`'s Identifier visitor.
+      if (
+        (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+        parent.property === path.node &&
+        !parent.computed
+      ) {
+        return;
+      }
+      if (t.isObjectProperty(parent) && parent.key === path.node && !parent.shorthand) return;
+      if (t.isVariableDeclarator(parent) && parent.id === path.node) return;
+      if (t.isFunctionDeclaration(parent) && parent.id === path.node) return;
+      if (t.isFunction(parent) && parent.params.includes(path.node)) return;
+      if (t.isImportSpecifier(parent) || t.isImportDefaultSpecifier(parent)) return;
+      if (t.isExportSpecifier(parent)) return;
+      if (t.isLabeledStatement(parent) && parent.label === path.node) return;
+      residual.add(name);
+    },
+  });
+
+  // Reassemble — file.program.body now contains the rewritten Program body.
+  let node: t.Expression | t.BlockStatement = bodyClone;
+  if (t.isBlockStatement(bodyClone)) {
+    node = t.blockStatement(file.program.body);
+  } else {
+    const stmt = file.program.body[0];
+    if (stmt && t.isExpressionStatement(stmt)) node = stmt.expression;
+  }
+  return { node, rewritten, residual };
+}
+
 function tryHoistArrowToFunction(stmt: t.Statement): t.Statement | null {
   if (!t.isVariableDeclaration(stmt)) return null;
   if (stmt.declarations.length !== 1) return null;
@@ -1798,6 +1913,176 @@ export function emitScript(
   // component has no $provide/$inject — existing fixtures stay byte-identical.
   const contextEmit = emitContext(ir, collectors, cloned);
 
+  // Pre-scan ALL top-level helpers (arrow + function decl) so the
+  // `computeHelperBodyDeps` walk knows which identifiers are sibling helpers
+  // (and should be classified as `closure` deps, not unknown identifiers).
+  //
+  // 260519 linechart-watch-recreate Round 4 — this pre-scan was previously
+  // built in section 6b (AFTER the lifecycle + watcher loops). It was hoisted
+  // above them so the watcher loop's callback-body walk could consult it when
+  // deciding whether to emit the targeted `react-hooks/exhaustive-deps`
+  // disable directive.
+  //
+  // Quick 260803-w7b — hoisted AGAIN, now above pass 4b, so that pass's
+  // lifecycle loop can consult it while rewriting mount-phase bodies (it needs
+  // to know which CallExpression callees are top-level helpers). The move is
+  // semantically inert: its three inputs — `cloned`, `lifecyclePairing` and
+  // `watcherPairing` — are all declared above this point, and
+  // `cloned.program.body` is mutated exactly once, by the module-let hoist,
+  // which also runs above this point. `helperLocByName`'s only consumer is the
+  // ROZ524 assertion in section 6b, which runs later either way. Proved
+  // byte-neutral by its own forced whole-repo build before the seam fix was
+  // layered on top.
+  const allHelperNames = new Set<string>();
+  // Build helper-name -> declaration-location map for the ROZ524 diagnostic.
+  const helperLocByName = new Map<string, { start: number; end: number }>();
+  // Quick 260803-w7b — helper-name -> body, so the eligibility gate below can
+  // run the SAME dep computation the `useCallback` wrap makes.
+  const helperBodyByName = new Map<string, t.Expression | t.BlockStatement>();
+  // Which helpers are `function` DECLARATIONS (vs arrow / function-expression
+  // consts). Only the latter are ever wrapped in `useCallback`, and only a
+  // `useCallback` helper is flagged by `react-hooks/exhaustive-deps`.
+  const helperIsFunctionDecl = new Set<string>();
+  for (let i = 0; i < cloned.program.body.length; i++) {
+    if (lifecyclePairing.consumedIndices.has(i)) continue;
+    // Quick plan 260515-u2b - $watch lines were emitted as useEffects.
+    if (watcherPairing.consumedIndices.has(i)) continue;
+    const stmt = cloned.program.body[i]!;
+    if (t.isFunctionDeclaration(stmt) && stmt.id) {
+      allHelperNames.add(stmt.id.name);
+      helperBodyByName.set(stmt.id.name, stmt.body);
+      helperIsFunctionDecl.add(stmt.id.name);
+      if (stmt.id.loc) {
+        helperLocByName.set(stmt.id.name, {
+          start: stmt.id.loc.start.index ?? 0,
+          end: stmt.id.loc.end.index ?? 0,
+        });
+      }
+      continue;
+    }
+    if (t.isVariableDeclaration(stmt)) {
+      for (const d of stmt.declarations) {
+        if (
+          t.isIdentifier(d.id) &&
+          d.init &&
+          (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init))
+        ) {
+          allHelperNames.add(d.id.name);
+          helperBodyByName.set(d.id.name, d.init.body);
+          if (d.id.loc) {
+            helperLocByName.set(d.id.name, {
+              start: d.id.loc.start.index ?? 0,
+              end: d.id.loc.end.index ?? 0,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // Quick 260803-w7b seam 3 — which top-level helpers are STALENESS-CAPABLE
+  // when called from a `[]`-dep mount effect.
+  //
+  // D-02 eligibility gate: the helper's RENDERED dep array is non-empty. This
+  // is the IDENTICAL computation `tryWrapEscapingHelperUseCallback` makes when
+  // it emits `useCallback(fn, <deps>)`, so the gate is exactly "React may mint a
+  // new instance of this helper between renders". `'[]'` ⇒ the helper reads
+  // nothing reactive ⇒ its identity is stable by construction ⇒ the instance
+  // the mount closure captured IS the current one ⇒ leave the call site
+  // byte-identical. Using the RENDERED array rather than the raw `SignalRef[]`
+  // matters: `renderDepArray` drops the `$event` sigil, so a helper whose only
+  // "dep" is `$event` correctly renders `[]`.
+  //
+  // Transitive staleness needs no new machinery: a helper whose body calls
+  // another helper records a `closure` dep, so `A = useCallback(fn, [B])` is
+  // non-empty and gets a ref. Over-inclusion is possible in principle (`B` may
+  // itself be `[]`-stable) and is ACCEPTED — a fixed-point over the helper dep
+  // graph is new machinery, and the over-included shape is byte churn with
+  // identical behaviour.
+  //
+  // Shapes deliberately NOT here, each a distinct seam:
+  //   D-03 value-position references (see `rewriteMountHelperCalls`);
+  //   D-04 the `$onMount(H)` / `$onUnmount(H)` Identifier lifecycle form, which
+  //        never reaches an AST rewrite (the lifecycle loop synthesizes `H();`
+  //        as a STRING from `setupCloned.name`). `$onMount(H)` is provably
+  //        identity-safe — it executes DURING mount, when the first-render
+  //        instance IS current — while `$onUnmount(H)` is a real stale-at-
+  //        teardown defect living in three separate string builders. Backlog;
+  //   D-05 non-mount phases, which keep their real dep array and therefore
+  //        re-create their closures when a dep changes;
+  //   D-06 no nesting predicate — a call at the TOP level of the mount body is
+  //        behaviourally identical before and after (the ref holds the
+  //        first-render instance at mount time). Only calls inside deferred
+  //        closures actually change. Rewriting only the nested ones would need
+  //        a NEW lexical predicate, which seam 2's D-04 rejected for the same
+  //        trade. The cost is byte churn with identical behaviour.
+  const eligibleMountHelpers = new Set<string>();
+  // The helpers `exhaustive-deps` actually flags when they are referenced from
+  // an effect: exactly the ones emitted as `useCallback(...)`. A helper emitted
+  // as a plain `function` DECLARATION (pdf's `cdnBase`) is treated as static by
+  // the rule and is NOT flagged — while a `useCallback(fn, [])` helper
+  // (number-field's `stopHold`, popover's `stopTracking`) IS, despite having a
+  // stable identity, because the rule wants every component-scope binding in
+  // the array. This mirrors the wrap condition in section 6a
+  // (`escapingHelperNames`) intersected with the arrow / function-EXPRESSION
+  // declaration form that `tryWrapEscapingHelperUseCallback` accepts; it is
+  // recomputed locally rather than hoisted so section 6a is left untouched.
+  const useCallbackHelperNames = new Set<string>();
+  {
+    const escaping = new Set<string>();
+    for (const listener of ir.listeners) {
+      for (const dep of listener.deps) {
+        if (dep.scope === 'closure') escaping.add(dep.identifier);
+      }
+    }
+    for (const lh of ir.lifecycle) {
+      for (const dep of lh.setupDeps) {
+        if (dep.scope === 'closure') escaping.add(dep.identifier);
+      }
+    }
+    for (const name of escaping) {
+      if (!allHelperNames.has(name)) continue;
+      if (helperIsFunctionDecl.has(name)) continue;
+      useCallbackHelperNames.add(name);
+    }
+  }
+  {
+    // D-10 collision guard — this path, seam 2, 5b-bis and `emitPortals` all
+    // mint `_<name>Ref`. Skip any helper whose ref ident could collide with a
+    // prop / state / template-ref name or a portal renderer ident (mirroring
+    // `emitPortals`' `'_render' + pascalCase(key) + 'Ref'` construction). The
+    // T0-d probe found ZERO collisions across the corpus (58 files / 1151
+    // helpers / 743 existing `useRef` bindings); the guard is insurance against
+    // a duplicate `const _<X>Ref` (TS2451) and ships regardless.
+    const pascalCase = (name: string): string =>
+      name
+        .split(/[-_]/)
+        .filter(Boolean)
+        .map((p) => capitalize(p))
+        .join('');
+    const reservedRefIdents = new Set<string>();
+    for (const key of portalsEmit.portalSlotNames) {
+      reservedRefIdents.add(`_render${pascalCase(key)}Ref`);
+    }
+    const reservedNames = new Set<string>();
+    for (const p of ir.props) reservedNames.add(p.name);
+    for (const s of ir.state) reservedNames.add(s.name);
+    for (const r of ir.refs) reservedNames.add(r.name);
+
+    for (const name of allHelperNames) {
+      const body = helperBodyByName.get(name);
+      if (!body) continue;
+      const deps = renderDepArrayWithIR(
+        computeHelperBodyDeps(body, ir, allHelperNames, name),
+        ir,
+      );
+      if (deps === '[]') continue;
+      if (reservedNames.has(name)) continue;
+      if (reservedRefIdents.has(`_${name}Ref`)) continue;
+      eligibleMountHelpers.add(name);
+    }
+  }
+
   // 4b. Plan 07.7 follow-up — pre-compute the watched-prop ref-rewrite plan.
   // For each prop X that has a sibling `$watch(() => $props.X, ...)`, we
   // want the mount-phase useEffect body to read `_<X>Ref.current` instead
@@ -1948,12 +2233,25 @@ export function emitScript(
   //   - this set participates in (i) ref-decl emission at 5b-bis (union,
   //     sorted) and (ii) the dep filter ONLY under `lh.phase === 'mount'`.
   const mountOnlyRewrittenNonModelProps = new Set<string>();
+  // Quick 260803-w7b seam 3 — the union of helper names actually rewritten in
+  // ANY mount body; section 5b-bis emits one `_<H>Ref` pair per entry.
+  const actuallyRewrittenMountHelpers = new Set<string>();
+  // ...and, keyed by hook index, the subset that is FULLY indirected in THAT
+  // hook (rewritten in at least one of its bodies AND with zero residual
+  // references across both). Only those may be dropped from the hook's dep
+  // array — see the D-07 filter in the lifecycle loop.
+  const fullyIndirectedHelpersByIdx = new Map<number, Set<string>>();
 
   if (
     (watchedModelPropNames.size > 0 ||
       watchedNonModelPropNames.size > 0 ||
       mountReactiveStateNames.size > 0 ||
-      mountReadablePropNames.size > 0) &&
+      mountReadablePropNames.size > 0 ||
+      // Quick 260803-w7b seam 3 — a component with NO declared props and no
+      // reactive state can still have a staleness-capable helper (e.g. one that
+      // reads a `$computed` or calls a sibling helper), so this pass must run
+      // for it too.
+      eligibleMountHelpers.size > 0) &&
     ir.lifecycle.length > 0
   ) {
     // `bareNames` is the set of bare-identifier reactive names this walk
@@ -2076,7 +2374,19 @@ export function emitScript(
 
       const localModel = new Set<string>([...setupModel, ...cleanupModel]);
       const localNonModel = new Set<string>([...setupNonModel, ...cleanupNonModel]);
-      if (localModel.size === 0 && localNonModel.size === 0) return;
+
+      // Quick 260803-w7b seam 3 — mount-phase helper CALLS. Gated on
+      // `lh.phase === 'mount'` (D-05): an `$onUpdate` hook keeps its real dep
+      // array, so React re-creates its closures when a dep changes and there is
+      // no staleness to defend against. Verified live at `FlowCanvas.tsx:3653`,
+      // where the same `currentGraph()` call sits in the `[graph]`-dep effect
+      // and must stay byte-identical.
+      const helperRewriteActive = lh.phase === 'mount' && eligibleMountHelpers.size > 0;
+
+      // The old early return lived here. It is now conditional on the HELPER
+      // pass also having nothing to do — otherwise a hook whose body reads no
+      // prop / state but DOES call a stale-capable helper would be skipped.
+      if (localModel.size === 0 && localNonModel.size === 0 && !helperRewriteActive) return;
 
       // 260521 sortable-stale-state — `localModel` now holds two flavours of
       // bare-identifier name: watched model props AND mount-phase reactive
@@ -2105,12 +2415,29 @@ export function emitScript(
       // has no discovered read (the names came from the cleanup body only).
       // Leaving the map entry unset makes the lifecycle loop fall back to
       // `paired?.setupCloned ?? lh.setup`, i.e. the original node, byte-identical.
-      if (setupModel.size > 0 || setupNonModel.size > 0) {
-      const rewrittenInner = rewriteWatchedPropReads(
-        setupBodyForRewrite,
-        localModel,
-        localNonModel,
-      );
+      //
+      // Quick 260803-w7b seam 3 — the helper-CALL rewrite composes INTO that
+      // same gate rather than adding a second rebuild: one discovery, one
+      // rewrite, one rebuild. A second `t.arrowFunctionExpression(...)`
+      // reconstruction is exactly the comment-destroying shape swj's S2 caught.
+      const helperSetup = helperRewriteActive
+        ? rewriteMountHelperCalls(setupBodyForRewrite, eligibleMountHelpers)
+        : null;
+      if (helperSetup) {
+        for (const n of helperSetup.rewritten) actuallyRewrittenMountHelpers.add(n);
+      }
+      if (setupModel.size > 0 || setupNonModel.size > 0 || (helperSetup?.rewritten.size ?? 0) > 0) {
+      // The helper pass mutated the SAME body node in place (its callee slots),
+      // so the prop rewrite below runs over the already-indirected body and
+      // both changes land in ONE rebuilt arrow.
+      const rewrittenInner =
+        setupModel.size > 0 || setupNonModel.size > 0
+          ? rewriteWatchedPropReads(
+              helperSetup ? helperSetup.node : setupBodyForRewrite,
+              localModel,
+              localNonModel,
+            )
+          : helperSetup!.node;
       // Phase 09 rebuild-site audit (Pattern 4 / Pitfall 3): both the arrow
       // and function-expression rebuilds below reuse `setupCloned.params` /
       // `cleanupCloned.params` by reference — every param `typeAnnotation`
@@ -2141,13 +2468,48 @@ export function emitScript(
       }
 
       // Quick 260803-swj seam 2 (follow-up) — same per-body gate for cleanup.
+      const helperCleanup =
+        helperRewriteActive && cleanupBodyForRewrite
+          ? rewriteMountHelperCalls(cleanupBodyForRewrite, eligibleMountHelpers)
+          : null;
+      if (helperCleanup) {
+        for (const n of helperCleanup.rewritten) actuallyRewrittenMountHelpers.add(n);
+      }
+
+      // Quick 260803-w7b seam 3 (D-07) — a helper may be dropped from THIS
+      // hook's dep array only when it was rewritten in at least one body AND
+      // has zero residual references across BOTH. A helper that is both called
+      // and passed (D-03) keeps its dep, so the emitted directive survives.
+      if (helperRewriteActive) {
+        const residual = new Set<string>([
+          ...(helperSetup?.residual ?? []),
+          ...(helperCleanup?.residual ?? []),
+        ]);
+        const fully = new Set<string>();
+        for (const n of [
+          ...(helperSetup?.rewritten ?? []),
+          ...(helperCleanup?.rewritten ?? []),
+        ]) {
+          if (!residual.has(n)) fully.add(n);
+        }
+        if (fully.size > 0) fullyIndirectedHelpersByIdx.set(idx, fully);
+      }
+
       if (cleanupCloned) {
-        if (cleanupBodyForRewrite && (cleanupModel.size > 0 || cleanupNonModel.size > 0)) {
-          const rewrittenCleanupInner = rewriteWatchedPropReads(
-            cleanupBodyForRewrite,
-            localModel,
-            localNonModel,
-          );
+        if (
+          cleanupBodyForRewrite &&
+          (cleanupModel.size > 0 ||
+            cleanupNonModel.size > 0 ||
+            (helperCleanup?.rewritten.size ?? 0) > 0)
+        ) {
+          const rewrittenCleanupInner =
+            cleanupModel.size > 0 || cleanupNonModel.size > 0
+              ? rewriteWatchedPropReads(
+                  helperCleanup ? helperCleanup.node : cleanupBodyForRewrite,
+                  localModel,
+                  localNonModel,
+                )
+              : helperCleanup!.node;
           let newCleanupCloned: t.Expression;
           if (t.isArrowFunctionExpression(cleanupCloned)) {
             newCleanupCloned = t.arrowFunctionExpression(
@@ -2723,53 +3085,35 @@ export function emitScript(
   // Same `renderDepArray` helper applies; callback body is inlined into the
   // useEffect callback exactly like a lifecycle setup body.
 
-  // Pre-scan ALL top-level helpers (arrow + function decl) so the
-  // `computeHelperBodyDeps` walk knows which identifiers are sibling helpers
-  // (and should be classified as `closure` deps, not unknown identifiers).
-  //
-  // 260519 linechart-watch-recreate Round 4 — this pre-scan was previously
-  // built in section 6b (AFTER the lifecycle + watcher loops). It is hoisted
-  // here so the watcher loop's callback-body walk can consult it when deciding
-  // whether to emit the targeted `react-hooks/exhaustive-deps` disable
-  // directive (see the per-watcher block below).
-  const allHelperNames = new Set<string>();
-  // Build helper-name -> declaration-location map for the ROZ524 diagnostic.
-  const helperLocByName = new Map<string, { start: number; end: number }>();
-  for (let i = 0; i < cloned.program.body.length; i++) {
-    if (lifecyclePairing.consumedIndices.has(i)) continue;
-    // Quick plan 260515-u2b - $watch lines were emitted as useEffects.
-    if (watcherPairing.consumedIndices.has(i)) continue;
-    const stmt = cloned.program.body[i]!;
-    if (t.isFunctionDeclaration(stmt) && stmt.id) {
-      allHelperNames.add(stmt.id.name);
-      if (stmt.id.loc) {
-        helperLocByName.set(stmt.id.name, {
-          start: stmt.id.loc.start.index ?? 0,
-          end: stmt.id.loc.end.index ?? 0,
-        });
-      }
-      continue;
-    }
-    if (t.isVariableDeclaration(stmt)) {
-      for (const d of stmt.declarations) {
-        if (
-          t.isIdentifier(d.id) &&
-          d.init &&
-          (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init))
-        ) {
-          allHelperNames.add(d.id.name);
-          if (d.id.loc) {
-            helperLocByName.set(d.id.name, {
-              start: d.id.loc.start.index ?? 0,
-              end: d.id.loc.end.index ?? 0,
-            });
-          }
-        }
-      }
-    }
-  }
+  // Helper-name pre-scan (`allHelperNames` / `helperLocByName`) is built
+  // earlier — hoisted above pass 4b in quick
+  // 260803-w7b so that pass's lifecycle loop can consult it when deciding
+  // which mount-scoped helper CALLS to route through a synced ref. (It was
+  // already hoisted once before, out of section 6b and above the lifecycle +
+  // watcher loops, in Round 4 of 260519 linechart-watch-recreate.) See the
+  // pre-scan block above the pass-4b comment.
 
   const lifecycleEffectLines: string[] = [];
+  // Quick 260803-w7b seam 3 (D-08) — the `_<H>Ref` decls SEED
+  // `lifecycleEffectLines`; they must NOT go in `hookSection`.
+  // `emitReact.ts` joins `[hookSection, userArrowsSection,
+  // lifecycleEffectsSection]` IN THAT ORDER, so a `useRef(<helper>)` emitted
+  // into `hookSection` — where seam 2's `_XRef` decls live — would reference a
+  // `const … = useCallback(…)` still in its temporal dead zone: a render-time
+  // ReferenceError for every consumer. Seeding here puts the decls after every
+  // user arrow and immediately before the lifecycle effects, which is the
+  // narrowest position that is provably in scope. (A dedicated
+  // `helperRefsSection` on `EmitScriptResult` was considered and rejected: it
+  // would change the emitScript↔emitReact interface and the sourcemap offset
+  // contract for a purely cosmetic gain.) Sorted for snapshot determinism,
+  // matching 5b-bis.
+  if (actuallyRewrittenMountHelpers.size > 0) {
+    collectors.react.add('useRef');
+    for (const name of [...actuallyRewrittenMountHelpers].sort()) {
+      lifecycleEffectLines.push(`const _${name}Ref = useRef(${name});`);
+      lifecycleEffectLines.push(`_${name}Ref.current = ${name};`);
+    }
+  }
   // Portal-slot primitive (Spike 003) — inject the portals closure into the
   // FIRST mount-phase lifecycle hook. The closure depends on `portalRoots`
   // (hoisted in hookLines) and `props`, both in scope at useEffect-body
@@ -2867,6 +3211,27 @@ export function emitScript(
           // dep on an $onUpdate hook). The gate is self-checking.
           (lh.phase === 'mount' && mountOnlyRewrittenNonModelProps.has(d.path[0]!))
         )
+      ) {
+        return false;
+      }
+      // Quick 260803-w7b seam 3 (D-07) — the helper flavour of the same
+      // argument, and PER-HOOK rather than component-wide (seam 2's D-05
+      // lesson). A mount hook's `depsArr` is `[]` regardless of this filter, so
+      // the ONLY observable effect is the `mountHasFlaggableDep` predicate
+      // below: once every call has become `_<H>Ref.current(...)` — and refs are
+      // exempt from `react-hooks/exhaustive-deps` — an emitted
+      // `// eslint-disable-line` would become an UNUSED directive, and
+      // `lint:fixtures` runs `--max-warnings 0` with ESLint v9's default
+      // `reportUnusedDisableDirectives: 'warn'`, i.e. a hard gate failure.
+      // Omitting this disjunct fails the gate one way (unused directive);
+      // over-broadening it fails the other (missing dep). The membership test
+      // is deliberately the FULLY-indirected set: a helper that is also PASSED
+      // in a value position (D-03) still has a live bare reference and keeps its
+      // dep. The gate is self-checking.
+      if (
+        d.scope === 'closure' &&
+        lh.phase === 'mount' &&
+        fullyIndirectedHelpersByIdx.get(idx)?.has(d.identifier)
       ) {
         return false;
       }
@@ -2990,9 +3355,64 @@ export function emitScript(
     //     (`allHelperNames`); those get a `useCallback` wrap (section 6a) and
     //     thus an unstable identity the rule flags. A `closure` ref whose
     //     identifier is NOT a known helper is a mis-tagged global — skip it.
-    const mountHasFlaggableDep = filteredSetupDeps.some((d) =>
+    let mountHasFlaggableDep = filteredSetupDeps.some((d) =>
       d.scope === 'closure' ? allHelperNames.has(d.identifier) : true,
     );
+
+    // Quick 260803-w7b seam 3 — `filteredSetupDeps` is an IR-DERIVED MODEL of
+    // what `exhaustive-deps` will flag, and it is imprecise in BOTH directions.
+    // That imprecision is invisible while the model's dominant entries (the
+    // closure helpers) are present; indirecting them exposes it:
+    //
+    //   UNDER-approximation — an `$emit`-lowered `props.on<Event>` read, a
+    //     `props.slots` / `props.render<Slot>` read, or a generated setter
+    //     never enters `setupDeps`, so once the helper deps are dropped the
+    //     model says "nothing flaggable" while ESLint still reports a missing
+    //     `props` dependency. Measured on captcha/Captcha, captcha/RecaptchaV3,
+    //     codemirror/CodeMirror, rete/NodeType and sortable-list/SortableList:
+    //     dropping the directive there turns 5 clean files into 5 ESLint ERRORS.
+    //
+    //   OVER-approximation — the model can carry an entry ESLint considers
+    //     stable, so the directive is kept on an effect that no longer trips the
+    //     rule at all, which `reportUnusedDisableDirectives` reports as a
+    //     warning. Measured on listbox/Listbox and pdf/PdfViewer.
+    //
+    // Neither edge is new — both are pre-existing approximations of a heuristic
+    // that happened to be exactly calibrated for the pre-seam emit. Rather than
+    // redesign `mountHasFlaggableDep` corpus-wide (a separate seam, and a far
+    // wider blast radius than this one), re-derive the predicate from the
+    // ACTUAL EMITTED BODY — but ONLY for the hooks this seam indirected. That
+    // bound is what keeps the change surgical: a hook whose helper deps were
+    // not touched here takes the identical pre-fix path, byte for byte.
+    if (lh.phase === 'mount' && (fullyIndirectedHelpersByIdx.get(idx)?.size ?? 0) > 0) {
+      const emittedBody = `${setupInvocation}\n${cleanupInvocation}`
+        // Comments are not code — a helper name mentioned in a `//` note (e.g.
+        // combobox's "Routes through the SAME buildVirtualizer() …") must not
+        // register as a reference.
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/^[ \t]*\/\/.*$/gm, ' ')
+        // ...and neither is a quoted string literal: pdf's mount body contains
+        // `? 'width' : 'page'`, and `page` is one of its `useState` names.
+        // Template literals are deliberately NOT stripped — they can embed real
+        // `${...}` references, and keeping them only ever KEEPS a directive,
+        // which is the safe direction.
+        .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+        .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+        // Ref reads are exempt from the rule, so strip them before testing —
+        // otherwise `_<H>Ref.current` would match on the helper name it embeds.
+        .replace(/_[A-Za-z0-9_$]+Ref\.current/g, '');
+      const referencesBare = (name: string): boolean =>
+        new RegExp(String.raw`(?<![\w$.])${name}(?![\w$])`).test(emittedBody);
+      mountHasFlaggableDep =
+        // any `props.<x>` read the model may have missed
+        /(?<![\w$.])props\./.test(emittedBody) ||
+        // any surviving helper reference the rule actually flags
+        [...useCallbackHelperNames].some(referencesBare) ||
+        // any reactive state / computed / model binding read bare
+        [...mountReactiveStateNames].some(referencesBare) ||
+        ir.computed.some((c) => referencesBare(c.name));
+    }
+
     const mountNeedsDisable = lh.phase === 'mount' && mountHasFlaggableDep;
     if (mountNeedsDisable) {
       lifecycleEffectLines.push(

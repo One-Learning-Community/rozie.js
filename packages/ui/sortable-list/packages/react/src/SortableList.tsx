@@ -321,6 +321,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     return value;
   }
 
+  const _resolveGroupRef = useRef(resolveGroup);
+  _resolveGroupRef.current = resolveGroup;
   useEffect(() => {
     // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
     // when the options object below references it.
@@ -332,7 +334,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       options: {
         animation: _animationRef.current,
         disabled: _disabledRef.current,
-        group: resolveGroup(),
+        group: _resolveGroupRef.current(),
         handle: _handleRef.current,
         ghostClass: _ghostClassRef.current,
         chosenClass: _chosenClassRef.current,

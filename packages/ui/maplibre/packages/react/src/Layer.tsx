@@ -75,16 +75,20 @@ export default function Layer(_props: LayerProps): JSX.Element {
     beforeId: props.beforeId
   }), [props.beforeId, props.id, props.layout, props.paint, props.type, resolveSource]);
 
+  const _buildSpecRef = useRef(buildSpec);
+  _buildSpecRef.current = buildSpec;
+  const _resolveSourceRef = useRef(resolveSource);
+  _resolveSourceRef.current = resolveSource;
   useEffect(() => {
     if (reg.current) {
       didRegister.current = true;
-      appliedSource.current = resolveSource();
-      reg.current.register(_idRef.current, buildSpec());
+      appliedSource.current = _resolveSourceRef.current();
+      reg.current.register(_idRef.current, _buildSpecRef.current());
     }
     return () => {
       if (reg.current) reg.current.unregister(_idRef.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     const src = resolveSource();

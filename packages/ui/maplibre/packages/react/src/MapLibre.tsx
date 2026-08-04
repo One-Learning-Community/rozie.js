@@ -556,6 +556,12 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     if (instance.current) instance.current.panBy(offset, opts);
   }
 
+  const _applyControlsRef = useRef(applyControls);
+  _applyControlsRef.current = applyControls;
+  const _applyInteractionTogglesRef = useRef(applyInteractionToggles);
+  _applyInteractionTogglesRef.current = applyInteractionToggles;
+  const _applyLayersRef = useRef(applyLayers);
+  _applyLayersRef.current = applyLayers;
   useEffect(() => {
     interface ReactivePortalHandle {
     update(scope: unknown): void;
@@ -843,8 +849,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     }
 
     // standard controls + interaction toggles don't need style load.
-    applyControls();
-    applyInteractionToggles();
+    _applyControlsRef.current();
+    _applyInteractionTogglesRef.current();
 
     // markers/popups/interactive are DOM/event overlays — no style-load gate.
     reconcileMarkers.current(_markersRef.current);
@@ -852,7 +858,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     reconcileInteractive.current(_interactiveLayerIdsRef.current);
 
     // sources/layers need the style loaded.
-    if (instance.current.isStyleLoaded()) applyLayers();else instance.current.on('load', applyLayers);
+    if (instance.current.isStyleLoaded()) _applyLayersRef.current();else instance.current.on('load', applyLayers);
     return () => {
       for (const root of portalRoots.current) root.unmount();
   portalRoots.current.clear();

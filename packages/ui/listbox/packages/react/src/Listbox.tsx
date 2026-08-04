@@ -600,20 +600,26 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     }
   }, [remeasureWindow, syncRows, virtualizerOptions, windowSource, windowedRows]);
 
+  const _kickWindowRef = useRef(kickWindow);
+  _kickWindowRef.current = kickWindow;
+  const _syncRowsRef = useRef(syncRows);
+  _syncRowsRef.current = syncRows;
+  const _virtualizerOptionsRef = useRef(virtualizerOptions);
+  _virtualizerOptionsRef.current = virtualizerOptions;
   useEffect(() => {
-    syncRows();
+    _syncRowsRef.current();
     if (_virtualRef.current) {
       // The list renders at mount when virtual, so the .rozie-listbox-list scroll container
       // exists here. Capture it via $el.querySelector (the data-table gridScrollEl precedent,
       // proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered node is null on
       // Solid/Lit, which leaves the virtualizer with no scroll element.
       gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-listbox-list') : null;
-      virtualizer.current = new Virtualizer(virtualizerOptions());
+      virtualizer.current = new Virtualizer(_virtualizerOptionsRef.current());
       virtualizerCleanup.current = virtualizer.current._didMount();
       setWindowVer(prev => prev + 1);
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => _kickWindowRef.current(8));else setTimeout(() => _kickWindowRef.current(8), 0);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     return () => {
       if (typeTimer.current !== null) clearTimeout(typeTimer.current);

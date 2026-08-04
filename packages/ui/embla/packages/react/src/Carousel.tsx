@@ -312,14 +312,22 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     return embla.current;
   }
 
+  const _emblaPluginsFromPropsRef = useRef(emblaPluginsFromProps);
+  _emblaPluginsFromPropsRef.current = emblaPluginsFromProps;
+  const _initialOptionsRef = useRef(initialOptions);
+  _initialOptionsRef.current = initialOptions;
+  const _reinitOptionsRef = useRef(reinitOptions);
+  _reinitOptionsRef.current = reinitOptions;
+  const _thumbsOptionsFromPropsRef = useRef(thumbsOptionsFromProps);
+  _thumbsOptionsFromPropsRef.current = thumbsOptionsFromProps;
   useEffect(() => {
-    embla.current = EmblaCarousel(viewportEl.current!, initialOptions(), emblaPluginsFromProps());
+    embla.current = EmblaCarousel(viewportEl.current!, _initialOptionsRef.current(), _emblaPluginsFromPropsRef.current());
 
     // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
     // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
     // only $refs-safe site). Stays null otherwise (zero overhead).
     if (_thumbnailsRef.current && thumbsViewportEl.current) {
-      emblaThumbs.current = EmblaCarousel(thumbsViewportEl.current!, thumbsOptionsFromProps());
+      emblaThumbs.current = EmblaCarousel(thumbsViewportEl.current!, _thumbsOptionsFromPropsRef.current());
     }
 
     // engine → consumer: on every snap change write the two-way model AND fire the
@@ -354,7 +362,7 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
     if (typeof requestAnimationFrame === 'function') {
       const remeasure = () => {
-        if (embla.current) embla.current.reInit(reinitOptions(), emblaPluginsFromProps());
+        if (embla.current) embla.current.reInit(_reinitOptionsRef.current(), _emblaPluginsFromPropsRef.current());
       };
       remeasureRafOuter.current = requestAnimationFrame(() => {
         remeasureRafInner.current = requestAnimationFrame(remeasure);

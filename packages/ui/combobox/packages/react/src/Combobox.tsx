@@ -740,15 +740,21 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     pinned.current = !!v;
   }
 
+  const _buildVirtualizerRef = useRef(buildVirtualizer);
+  _buildVirtualizerRef.current = buildVirtualizer;
+  const _syncQueryToValueRef = useRef(syncQueryToValue);
+  _syncQueryToValueRef.current = syncQueryToValue;
+  const _syncRowsRef = useRef(syncRows);
+  _syncRowsRef.current = syncRows;
   useEffect(() => {
-    syncQueryToValue();
-    syncRows();
+    _syncQueryToValueRef.current();
+    _syncRowsRef.current();
     didMount.current = true;
     // Routes through the SAME buildVirtualizer() the virtual $watch calls below
     // (VIRT-BUILD) — one construction site, so the mount path cannot drift from the flip
     // path.
-    if (_virtualRef.current) buildVirtualizer();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (_virtualRef.current) _buildVirtualizerRef.current();
+  }, []);
   useEffect(() => {
     return () => {
       if (virtualizerCleanup.current) virtualizerCleanup.current();

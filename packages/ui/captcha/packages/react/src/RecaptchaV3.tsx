@@ -98,12 +98,14 @@ const RecaptchaV3 = forwardRef<RecaptchaV3Handle, RecaptchaV3Props>(function Rec
     });
   }
 
+  const _executeRef = useRef(execute);
+  _executeRef.current = execute;
   useEffect(() => {
     disposed.current = false;
     // Warm the script once for this sitekey. If opted in, run an initial execute.
     loadRecaptchaV3(_sitekeyRef.current).then(() => {
       if (disposed.current || !_executeOnMountRef.current) return;
-      execute();
+      _executeRef.current();
     }).catch((err: any) => {
       if (disposed.current) return;
       props.onError && props.onError({

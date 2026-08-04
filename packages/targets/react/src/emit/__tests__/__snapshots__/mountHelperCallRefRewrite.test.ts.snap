@@ -1,0 +1,200 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitScript (React) — $onMount-scoped helper CALLS must go through synced refs (Quick 260803-w7b seam 3) > snapshot — SRC_CLEANUP_COMMENT 1`] = `
+"import { useCallback, useEffect, useRef } from 'react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  const readGain = useCallback(() => props.gain * 2, [props.gain]);
+
+  const _readGainRef = useRef(readGain);
+  _readGainRef.current = readGain;
+  useEffect(() => {
+    const h = () => {
+      use(_readGainRef.current());
+    };
+    document.addEventListener('pointerdown', h);
+    return () => {
+      // teardown note: this comment must survive the mount-helper rewrite
+    };
+  }, []);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — $onMount-scoped helper CALLS must go through synced refs (Quick 260803-w7b seam 3) > snapshot — SRC_COLLIDE 1`] = `
+"import { useCallback, useEffect, useRef } from 'react';
+
+interface TestProps {
+  foo?: number;
+  bar?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'foo' | 'bar'> & { foo: number; bar: number } = {
+    ..._props,
+    foo: _props.foo ?? 1,
+    bar: _props.bar ?? 2,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { foo, bar, ...rest } = _props as TestProps & Record<string, unknown>;
+    void foo; void bar;
+    return rest;
+  })();
+  const _fooRef = useRef(props.foo);
+  _fooRef.current = props.foo;
+
+  const foo = useCallback(() => props.bar * 2, [props.bar]);
+
+  useEffect(() => {
+    const h = () => {
+      use(foo());
+      use(_fooRef.current);
+    };
+    document.addEventListener('pointerdown', h);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — $onMount-scoped helper CALLS must go through synced refs (Quick 260803-w7b seam 3) > snapshot — SRC_MAIN 1`] = `
+"import { useCallback, useEffect, useRef } from 'react';
+import { rozieDisplay } from '@rozie/runtime-react';
+
+interface TestProps {
+  gain?: number;
+  live?: boolean;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain' | 'live'> & { gain: number; live: boolean } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+    live: _props.live ?? false,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, live, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain; void live;
+    return rest;
+  })();
+  const _watch0First = useRef(true);
+
+  const readGain = useCallback(() => props.gain * 2, [props.gain]);
+  const constant = useCallback(() => 42, []);
+
+  const _readGainRef = useRef(readGain);
+  _readGainRef.current = readGain;
+  useEffect(() => {
+    const h = () => {
+      use(_readGainRef.current());
+    };
+    document.addEventListener('pointerdown', h);
+    seed(constant());
+    return () => document.removeEventListener('pointerdown', h);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    touch(props.live);
+    use(readGain());
+  }, [props.live, readGain, touch, use]);
+  useEffect(() => {
+    if (_watch0First.current) { _watch0First.current = false; return; }
+    const v = readGain();
+    note(v);
+  }, [readGain]);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">{rozieDisplay(readGain())}</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — $onMount-scoped helper CALLS must go through synced refs (Quick 260803-w7b seam 3) > snapshot — SRC_SHADOW 1`] = `
+"import { useEffect } from 'react';
+import { rozieDisplay } from '@rozie/runtime-react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  function readGain() {
+    return props.gain * 2;
+  }
+
+  useEffect(() => {
+    const readGain = () => 7;
+    seed(readGain());
+  }, []);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">{rozieDisplay(readGain())}</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — $onMount-scoped helper CALLS must go through synced refs (Quick 260803-w7b seam 3) > snapshot — SRC_VALUE_POS 1`] = `
+"import { useCallback, useEffect } from 'react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  const onTick = useCallback(() => {
+    use(props.gain);
+  }, [props.gain]);
+
+  useEffect(() => {
+    document.addEventListener('pointerdown', onTick);
+    return () => document.removeEventListener('pointerdown', onTick);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;

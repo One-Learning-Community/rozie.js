@@ -1301,6 +1301,46 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // `clearSelection`'s definition, so nothing relies on cross-target hoisting of a
   // top-level `function` declaration.
 
+  const _buildNodeRef = useRef(buildNode);
+  _buildNodeRef.current = buildNode;
+  const _currentGraphRef = useRef(currentGraph);
+  _currentGraphRef.current = currentGraph;
+  const _deleteNodeRef = useRef(deleteNode);
+  _deleteNodeRef.current = deleteNode;
+  const _duplicateNodeRef = useRef(duplicateNode);
+  _duplicateNodeRef.current = duplicateNode;
+  const _duplicateNodesRef = useRef(duplicateNodes);
+  _duplicateNodesRef.current = duplicateNodes;
+  const _portSchemaForTypeRef = useRef(portSchemaForType);
+  _portSchemaForTypeRef.current = portSchemaForType;
+  const _pushHistorySnapshotRef = useRef(pushHistorySnapshot);
+  _pushHistorySnapshotRef.current = pushHistorySnapshot;
+  const _redoRef = useRef(redo);
+  _redoRef.current = redo;
+  const _resetNodeSizeRef = useRef(resetNodeSize);
+  _resetNodeSizeRef.current = resetNodeSize;
+  const _scheduleDragFlushRef = useRef(scheduleDragFlush);
+  _scheduleDragFlushRef.current = scheduleDragFlush;
+  const _scheduleReconnectCloseRef = useRef(scheduleReconnectClose);
+  _scheduleReconnectCloseRef.current = scheduleReconnectClose;
+  const _scheduleResizeFlushRef = useRef(scheduleResizeFlush);
+  _scheduleResizeFlushRef.current = scheduleResizeFlush;
+  const _scheduleSelectionEmitRef = useRef(scheduleSelectionEmit);
+  _scheduleSelectionEmitRef.current = scheduleSelectionEmit;
+  const _selectAllRef = useRef(selectAll);
+  _selectAllRef.current = selectAll;
+  const _selectEdgeRef = useRef(selectEdge);
+  _selectEdgeRef.current = selectEdge;
+  const _setCenterRef = useRef(setCenter);
+  _setCenterRef.current = setCenter;
+  const _snapshotCurrentRef = useRef(snapshotCurrent);
+  _snapshotCurrentRef.current = snapshotCurrent;
+  const _undoRef = useRef(undo);
+  _undoRef.current = undo;
+  const _writeBackConnectionCreatedRef = useRef(writeBackConnectionCreated);
+  _writeBackConnectionCreatedRef.current = writeBackConnectionCreated;
+  const _writeBackConnectionRemovedRef = useRef(writeBackConnectionRemoved);
+  _writeBackConnectionRemovedRef.current = writeBackConnectionRemoved;
   useEffect(() => {
     interface ReactivePortalHandle {
     update(scope: unknown): void;
@@ -1449,7 +1489,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // re-pick while a close is pending cancels the pending close (the gesture continues).
         if (!programmatic.current && _historyRef.current !== false) {
           reconnectInFlight.current++;
-          reconnectPreSnapshot.current = snapshotCurrent();
+          reconnectPreSnapshot.current = _snapshotCurrentRef.current();
           reconnectDidWriteBack.current = false;
           reconnectCloseScheduled.current = false;
         }
@@ -1466,7 +1506,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // reconnectDidWriteBack), then closeReconnectGesture pushes the SINGLE pre-gesture
         // snapshot iff the graph actually changed. Re-entrant picks can't desync because the
         // close is gated on a one-shot scheduled flag.
-        scheduleReconnectClose();
+        _scheduleReconnectCloseRef.current();
 
         // ── T2.7 CONNECT-END-ON-PANE (D-07, pure emit) ──
         // A drag that STARTED on an output socket and ENDED on empty canvas (no target
@@ -1616,12 +1656,12 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           const k = typeof e.key === 'string' ? e.key.toLowerCase() : '';
           if (k === 'z' && !e.shiftKey) {
             e.preventDefault();
-            undo();
+            _undoRef.current();
             return;
           }
           if (k === 'z' && e.shiftKey || k === 'y') {
             e.preventDefault();
-            redo();
+            _redoRef.current();
             return;
           }
           // ── quick-260803-qwh — Ctrl/Cmd+A → select all; Ctrl/Cmd+D → duplicate the
@@ -1633,12 +1673,12 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           // select-all / bookmark dialog. Ctrl+D is ONE undo step for N nodes. ──
           if (k === 'a' && !e.shiftKey) {
             e.preventDefault();
-            selectAll();
+            _selectAllRef.current();
             return;
           }
           if (k === 'd' && !e.shiftKey) {
             e.preventDefault();
-            duplicateNodes(selectedNodeIds());
+            _duplicateNodesRef.current(selectedNodeIds());
             return;
           }
         }
@@ -1646,7 +1686,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         const ids = selectedNodeIds();
         if (ids.length > 0) {
           e.preventDefault();
-          for (const id of ids as any) deleteNode(id);
+          for (const id of ids as any) _deleteNodeRef.current(id);
           return;
         }
         // T1.1 — EDGE DELETE (D-08). No node is picked but an edge is selected → remove
@@ -1660,7 +1700,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           e.preventDefault();
           const id = selectedConnId.current;
           clearEdgeSelection();
-          writeBackConnectionRemoved(id);
+          _writeBackConnectionRemovedRef.current(id);
         }
       };
       keydownContainer.current = container;
@@ -2062,7 +2102,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         path.addEventListener('pointerup', (e: any) => {
           if (_selectableRef.current === false || _readonlyRef.current === true) return;
           if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
-          selectEdge(connection.id, path);
+          _selectEdgeRef.current(connection.id, path);
         });
       }
 
@@ -2317,7 +2357,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         connInstances.set(context.data.id, context.data);
         if (!programmatic.current) {
           // WRITE-BACK: append the new connection into a fresh graph object (D4).
-          writeBackConnectionCreated(context.data);
+          _writeBackConnectionCreatedRef.current(context.data);
           // keep the discrete event too (back-compat).
           props.onConnectionCreated && props.onConnectionCreated(serializeConn(context.data));
         }
@@ -2326,7 +2366,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         connMeta.delete(context.data.id);
         if (!programmatic.current) {
           // WRITE-BACK: filter the removed connection out of a fresh graph object (D4).
-          writeBackConnectionRemoved(context.data.id);
+          _writeBackConnectionRemovedRef.current(context.data.id);
           props.onConnectionRemoved && props.onConnectionRemoved({
             id: context.data.id
           });
@@ -2344,11 +2384,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // is committed to history on the first `nodetranslated` (only if a drag follows;
         // gated on !programmatic + history). A re-pick mid-drag won't overwrite a live one.
         if (!programmatic.current && _historyRef.current !== false && !dragGestureActive.current) {
-          pendingDragSnapshot.current = snapshotCurrent();
+          pendingDragSnapshot.current = _snapshotCurrentRef.current();
         }
         // Win 2: a pick changed the selection — surface @selection-change after the
         // engine's awaited select() for THIS pick has flushed the selector entities.
-        scheduleSelectionEmit();
+        _scheduleSelectionEmitRef.current();
       } else if (context.type === 'pointerup') {
         // Win 2: AreaExtensions.selectableNodes UNSELECTS all on a click-like background
         // pointerUP (its `twitch < 4` deselect — NOT on pointerdown, verified against
@@ -2356,7 +2396,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // runs before ours, so recompute AFTER its awaited unselectAll() flushes (the
         // microtask + rAF schedule). The dedup makes a no-op when nothing changed (e.g. a
         // pointerup that ended a node pick — already surfaced by the nodepicked branch).
-        scheduleSelectionEmit();
+        _scheduleSelectionEmitRef.current();
         // T1.3 — a pointerup ends any in-progress drag gesture, so the NEXT drag pushes a
         // fresh history snapshot (one gesture = one undo step, D-03). Drop any stashed
         // pre-drag snapshot that was never committed (a pick with no drag).
@@ -2383,7 +2423,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           if (!dragGestureActive.current) {
             dragGestureActive.current = true;
             if (pendingDragSnapshot.current) {
-              pushHistorySnapshot(pendingDragSnapshot.current);
+              _pushHistorySnapshotRef.current(pendingDragSnapshot.current);
               pendingDragSnapshot.current = null;
             }
           }
@@ -2394,7 +2434,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             x: pos.x,
             y: pos.y
           });
-          scheduleDragFlush();
+          _scheduleDragFlushRef.current();
           props.onNodeMoved && props.onNodeMoved({
             id,
             x: pos.x,
@@ -2554,7 +2594,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           nodeMeta.set(spec.id, spec);
           let node = nodeInstances.get(spec.id);
           if (!node) {
-            node = buildNode(spec, _portRegRef.current);
+            node = _buildNodeRef.current(spec, _portRegRef.current);
             nodeInstances.set(spec.id, node);
             await editor.current.addNode(node);
             await area.current.translate(spec.id, {
@@ -2572,7 +2612,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             const {
               inputs: wantIn,
               outputs: wantOut
-            } = portSchemaForType(spec.type, _portRegRef.current);
+            } = _portSchemaForTypeRef.current(spec.type, _portRegRef.current);
             for (const inp of wantIn as any) {
               if (!inp || inp.key == null || node.inputs[inp.key]) continue;
               node.addInput(inp.key, new ClassicPreset.Input(SOCKET, inp.label, inp.multiple === true));
@@ -2794,7 +2834,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         vy = -t.y / k,
         vw = cw / k,
         vh = ch / k;
-      const graphNodes = currentGraph().nodes || [];
+      const graphNodes = _currentGraphRef.current().nodes || [];
       const selIds = new Set(selectedNodeIds().map((s: any) => String(s)));
       const rects = [];
       for (const n of graphNodes as any) {
@@ -2905,14 +2945,14 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         } catch (err: any) {}
         e.preventDefault();
         e.stopPropagation();
-        setCenter(g.gx, g.gy, null);
+        _setCenterRef.current(g.gx, g.gy, null);
       };
       onMinimapPointerMove.current = (e: any) => {
         if (!minimapPanning.current || !_pannableRef.current) return;
         const g = minimapPointerToGraph(e);
         if (!g) return;
         e.preventDefault();
-        setCenter(g.gx, g.gy, null);
+        _setCenterRef.current(g.gx, g.gy, null);
       };
       onMinimapPointerUp.current = (e: any) => {
         if (!minimapPanning.current) return;
@@ -3063,7 +3103,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             id
           });
           toolbarSelectedId.current = null;
-          deleteNode(id);
+          _deleteNodeRef.current(id);
           scheduleToolbarTrack.current();
         };
         onToolbarDup.current = (e: any) => {
@@ -3073,7 +3113,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           }
           const id = toolbarSelectedId.current;
           if (id == null) return;
-          const newId = duplicateNode(id);
+          const newId = _duplicateNodeRef.current(id);
           toolbarEmit('duplicate', {
             id,
             newId
@@ -3209,7 +3249,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // FIRST clamp-changed pointermove commits it (a pointerdown+pointerup with no move
         // never creates a history entry).
         if (!programmatic.current && _historyRef.current !== false) {
-          pendingResizeSnapshot.current = snapshotCurrent();
+          pendingResizeSnapshot.current = _snapshotCurrentRef.current();
         }
         resizeGestureActive.current = false;
         resizeActiveHandleEl.current = handleEl;
@@ -3239,7 +3279,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           if (changed && !resizeGestureActive.current) {
             resizeGestureActive.current = true;
             if (pendingResizeSnapshot.current) {
-              pushHistorySnapshot(pendingResizeSnapshot.current);
+              _pushHistorySnapshotRef.current(pendingResizeSnapshot.current);
               pendingResizeSnapshot.current = null;
             }
           }
@@ -3255,7 +3295,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           if (corner === 'nw' || corner === 'sw') next.x = startX + (startW - clamped.width);
           if (corner === 'nw' || corner === 'ne') next.y = startY + (startH - clamped.height);
           pendingResizeSizes.set(id, next);
-          scheduleResizeFlush();
+          _scheduleResizeFlushRef.current();
         };
         onResizeHandleUp.current = (ue: any) => {
           try {
@@ -3288,7 +3328,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           if (!hadMovement) {
             const now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
             if (now - lastHandlePointerUpAt.current < 400) {
-              resetNodeSize(id);
+              _resetNodeSizeRef.current(id);
               lastHandlePointerUpAt.current = -Infinity;
             } else {
               lastHandlePointerUpAt.current = now;
@@ -3372,7 +3412,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         by1 = Math.max(a.y, b.y);
       marqueeStart.current = null;
       marqueeCur.current = null;
-      const graphNodes = currentGraph().nodes || [];
+      const graphNodes = _currentGraphRef.current().nodes || [];
       let first = true;
       for (const n of graphNodes as any) {
         if (!n || n.id == null) continue;
@@ -3390,7 +3430,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         }
       }
       // surface @selection-change once the engine's awaited select() chain has flushed.
-      scheduleSelectionEmit();
+      _scheduleSelectionEmitRef.current();
     };
 
     // quick-260803-s3m: the marquee listeners install UNCONDITIONALLY; the
@@ -3454,7 +3494,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     (async () => {
       // T1.3 — seed the canvas's own last-written graph from the initial bound value so the
       // first gesture's snapshot/base reflects the mounted graph (immune to prop re-bind lag).
-      lastWrittenGraph.current = structuredClone(currentGraph());
+      lastWrittenGraph.current = structuredClone(_currentGraphRef.current());
       await reconcileNodes.current();
       await reconcileConnections.current();
       if (typeof _zoomRef.current === 'number' && _zoomRef.current !== 1) {

@@ -262,6 +262,8 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     position();
   }
 
+  const _startTrackingRef = useRef(startTracking);
+  _startTrackingRef.current = startTracking;
   useEffect(() => {
     // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
     // and may be null until open; startTracking re-reads via the watch path.
@@ -271,7 +273,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       // the watch/handlers too. Position on next tick when it exists.
       floatingNode.current = floatingEl.current;
       arrowNode.current = arrowEl.current;
-      startTracking();
+      _startTrackingRef.current();
     }
     return () => {
       stopTracking();

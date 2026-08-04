@@ -579,6 +579,8 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     });
   }
 
+  const _applyFitRef = useRef(applyFit);
+  _applyFitRef.current = applyFit;
   useEffect(() => {
     // mount-local (not a top-level script `let`) — set here so a late-resolving
     // dynamic import() below bails, and read by the returned teardown. Emitter-
@@ -595,7 +597,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     // no observer teardown/recreation. No-ops via applyFit's own instance/
     // containerEl guard before a document has loaded.
     resizeObserver.current = new ResizeObserver(() => {
-      if (_autoFitRef.current) applyFit(_autoFitRef.current === 'width' ? 'width' : 'page');
+      if (_autoFitRef.current) _applyFitRef.current(_autoFitRef.current === 'width' ? 'width' : 'page');
     });
     resizeObserver.current.observe(containerEl.current);
     // lazy-load the engine (SSR-safe + code-split), then configure the worker and
@@ -625,7 +627,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
       }
       instance.current = null;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     load();

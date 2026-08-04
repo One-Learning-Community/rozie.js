@@ -293,6 +293,14 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
     });
   }
 
+  const _baselineExtRef = useRef(baselineExt);
+  _baselineExtRef.current = baselineExt;
+  const _langExtRef = useRef(langExt);
+  _langExtRef.current = langExt;
+  const _phExtRef = useRef(phExt);
+  _phExtRef.current = phExt;
+  const _themeExtRef = useRef(themeExt);
+  _themeExtRef.current = themeExt;
   useEffect(() => {
     interface ReactivePortalHandle {
     update(scope: unknown): void;
@@ -694,7 +702,7 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
     rebuildDecorationExt.current = () => makeDecorationExt(portals.decoration);
     const buildState = (doc: any) => EditorState.create({
       doc,
-      extensions: [baselineCompartment.of(baselineExt()), langCompartment.of(langExt()), themeCompartment.of(themeExt()), readOnlyCompartment.of(EditorState.readOnly.of(_readOnlyRef.current)), placeholderCompartment.of(phExt()), panelCompartment.of(panelExt()), topPanelCompartment.of(topPanelExt()),
+      extensions: [baselineCompartment.of(_baselineExtRef.current()), langCompartment.of(_langExtRef.current()), themeCompartment.of(_themeExtRef.current()), readOnlyCompartment.of(EditorState.readOnly.of(_readOnlyRef.current)), placeholderCompartment.of(_phExtRef.current()), panelCompartment.of(panelExt()), topPanelCompartment.of(topPanelExt()),
       // gutter / decoration — the REACTIVE MULTI-INSTANCE portal slots (G5 wave
       // 2). Each lives in a compartment so its driving prop (gutterLines /
       // decorations) reconfigures live; the factory captures the per-target

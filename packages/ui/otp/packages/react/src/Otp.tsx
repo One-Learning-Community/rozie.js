@@ -199,9 +199,13 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
     focusIndex(0);
   }
 
+  const _firstEmptyIndexRef = useRef(firstEmptyIndex);
+  _firstEmptyIndexRef.current = firstEmptyIndex;
+  const _focusIndexRef = useRef(focusIndex);
+  _focusIndexRef.current = focusIndex;
   useEffect(() => {
-    if (_autoFocusRef.current) focusIndex(firstEmptyIndex());
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (_autoFocusRef.current) _focusIndexRef.current(_firstEmptyIndexRef.current());
+  }, []);
 
   const _rozieExposeRef = useRef({ focus, clear });
   _rozieExposeRef.current = { focus, clear };

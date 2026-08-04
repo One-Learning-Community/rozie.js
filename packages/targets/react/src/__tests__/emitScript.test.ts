@@ -140,14 +140,33 @@ $onMount(() => { $data.instance = buildConfig() })
     // `props.data` into the dep array (Bug B over-tracking regression).
     expect(lifecycleEffectsSection).not.toMatch(/,\s*\[[^\]]*\bbuildConfig\b[^\]]*\]\s*\)/);
     expect(lifecycleEffectsSection).not.toMatch(/,\s*\[[^\]]*\bprops\.data\b[^\]]*\]\s*\)/);
-    // 260519 linechart-watch-recreate Round 4 — the mount `[]` is intentional,
-    // so the dependency-array line MUST carry the targeted, justified
-    // `eslint-disable` (this mount body reads the `buildConfig` closure helper,
-    // so `exhaustive-deps` WOULD flag the `[]` without it). Placement: trailing
-    // the `}, []);` line — `exhaustive-deps` reports on that node.
-    expect(lifecycleEffectsSection).toMatch(
-      /,\s*\[\]\s*\)\s*;\s*\/\/ eslint-disable-line react-hooks\/exhaustive-deps/,
+    // 260519 linechart-watch-recreate Round 4 emitted a targeted, justified
+    // `eslint-disable` on the dependency-array line here, because the mount body
+    // read the `buildConfig` closure helper and `exhaustive-deps` WOULD flag the
+    // intentional `[]` without it.
+    //
+    // Quick 260803-w7b seam 3 INVERTED that for this exact source. The mount
+    // body no longer reads `buildConfig`'s (unstable, per-render) identity — it
+    // calls `_buildConfigRef.current()`, and refs are exempt from
+    // `exhaustive-deps`. So the rule now reports NOTHING here, which makes the
+    // directive an UNUSED one; ESLint v9 defaults `reportUnusedDisableDirectives`
+    // to `warn`, and `lint:fixtures` runs `--max-warnings 0`, so emitting it
+    // would be a hard gate failure. Measured with the package's own
+    // `eslint.config.js` on the post-fix emit:
+    //   without the directive → 0 messages;
+    //   with it → `Unused eslint-disable directive (no problems were reported
+    //   from 'react-hooks/exhaustive-deps')`.
+    // The invariant is unchanged — emit the directive IFF the body actually
+    // trips the rule (see R4a for the negative case, and the SRC_MAIN snapshot
+    // in `emit/__tests__/mountHelperCallRefRewrite.test.ts` for a mount body that
+    // still DOES trip it, via a `[]`-dep helper that D-02 leaves un-indirected).
+    expect(lifecycleEffectsSection).not.toMatch(
+      /\/\/ eslint-disable-line react-hooks\/exhaustive-deps/,
     );
+    // ...and the reason it no longer trips is the seam-3 ref indirection. Assert
+    // it here so a regression that merely DROPS the directive (rather than
+    // removing the violation) fails loudly.
+    expect(lifecycleEffectsSection).toContain('_buildConfigRef.current()');
   });
 
   // ---------------------------------------------------------------------------

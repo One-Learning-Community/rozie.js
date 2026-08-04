@@ -828,6 +828,14 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     return editor.current.storage.characterCount ? editor.current.storage.characterCount.words() : editor.current.getText().split(/\s+/).filter(Boolean).length;
   }
 
+  const _buildDefaultLinkEditorRef = useRef(buildDefaultLinkEditor);
+  _buildDefaultLinkEditorRef.current = buildDefaultLinkEditor;
+  const _buildLinkScopeRef = useRef(buildLinkScope);
+  _buildLinkScopeRef.current = buildLinkScope;
+  const _makeNodeViewExtensionsRef = useRef(makeNodeViewExtensions);
+  _makeNodeViewExtensionsRef.current = makeNodeViewExtensions;
+  const _refreshLinkRef = useRef(refreshLink);
+  _refreshLinkRef.current = refreshLink;
   useEffect(() => {
     interface ReactivePortalHandle {
     update(scope: unknown): void;
@@ -932,7 +940,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // read ONCE here (setup-once — NOT a $watch); $portals.nodeView is captured
     // here inside the mount body and passed into the node factory, keeping the
     // reference scoped to the mount lifecycle (the toolbar-slot discipline).
-    const nodeViewExtensions = (props.renderNodeView ?? props.slots?.["nodeView"]) && _nodeSpecsRef.current.length ? makeNodeViewExtensions(portals.nodeView, _nodeSpecsRef.current) : [];
+    const nodeViewExtensions = (props.renderNodeView ?? props.slots?.["nodeView"]) && _nodeSpecsRef.current.length ? _makeNodeViewExtensionsRef.current(portals.nodeView, _nodeSpecsRef.current) : [];
 
     // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
     // (setup-once, like content/editable/autofocus — no reactivity required). The
@@ -1070,12 +1078,12 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         // Round-trip guard — see CodeMirror/Flatpickr for the same shape.
         if (next !== _htmlRef.current) setHtml(next);
         refreshCount();
-        refreshLink();
+        _refreshLinkRef.current();
         props.onUpdate && props.onUpdate(next);
       },
       onSelectionUpdate: () => {
         refreshActive();
-        refreshLink();
+        _refreshLinkRef.current();
         props.onSelectionUpdate && props.onSelectionUpdate();
       },
       onFocus: () => props.onFocus && props.onFocus(),
@@ -1095,7 +1103,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     });
     refreshActive();
     refreshCount();
-    refreshLink();
+    _refreshLinkRef.current();
 
     // `toolbar` portal slot — when the consumer fills it, mount their toolbar
     // fragment into the engine-adjacent host node, handing them the live editor
@@ -1136,9 +1144,9 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
     if (linkEditorEl.current) {
       if ((props.renderLinkEditor ?? props.slots?.["linkEditor"])) {
-        linkEditorHandle.current = portals.linkEditor(linkEditorEl.current, buildLinkScope());
+        linkEditorHandle.current = portals.linkEditor(linkEditorEl.current, _buildLinkScopeRef.current());
       } else {
-        buildDefaultLinkEditor(linkEditorEl.current);
+        _buildDefaultLinkEditorRef.current(linkEditorEl.current);
       }
     }
     return () => {

@@ -632,9 +632,11 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     }
   }, [_rozieProp_onChange, props.disabled, props.selectionMode, readRange, selected, setValue]);
 
+  const _viewMonthGridRef = useRef(viewMonthGrid);
+  _viewMonthGridRef.current = viewMonthGrid;
   useEffect(() => {
-    setViewIso(viewMonthGrid());
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    setViewIso(_viewMonthGridRef.current());
+  }, []);
 
   const _rozieExposeRef = useRef({ focus, goToToday, clear });
   _rozieExposeRef.current = { focus, goToToday, clear };

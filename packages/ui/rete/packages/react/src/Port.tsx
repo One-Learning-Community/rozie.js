@@ -61,6 +61,10 @@ export default function Port(_props: PortProps): JSX.Element {
   const portSide = useCallback(() => props.output != null ? 'output' : 'input', [props.output]);
   const portKey = useCallback(() => props.output != null ? props.output : props.input, [props.input, props.output]);
 
+  const _portKeyRef = useRef(portKey);
+  _portKeyRef.current = portKey;
+  const _portSideRef = useRef(portSide);
+  _portSideRef.current = portSide;
   useEffect(() => {
     // register this typed port against the enclosing node TYPE's schema; the canvas's
     // reconcileNodes builds buildNode with the updated input/output spec for every node
@@ -68,9 +72,9 @@ export default function Port(_props: PortProps): JSX.Element {
     // context, REQ-30) — the $onUpdate below adds the port once it resolves.
     if (nt.current && !added.current) {
       added.current = true;
-      nt.current.addPort(portSide(), portKey(), _typeRef.current, _labelRef.current, _multipleRef.current, _positionRef.current);
+      nt.current.addPort(_portSideRef.current(), _portKeyRef.current(), _typeRef.current, _labelRef.current, _multipleRef.current, _positionRef.current);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (added.current) return;
     const live = injectedType;
