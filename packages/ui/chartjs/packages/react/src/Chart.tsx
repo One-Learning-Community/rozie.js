@@ -122,6 +122,8 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
   const canvasEl$local = useRef<any>(null);
   const _dataRef = useRef(props.data);
   _dataRef.current = props.data;
+  const _destroyDelayRef = useRef(props.destroyDelay);
+  _destroyDelayRef.current = props.destroyDelay;
   const _optionsRef = useRef(props.options);
   _optionsRef.current = props.options;
   const _pluginsRef = useRef(props.plugins);
@@ -365,13 +367,13 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
       // can finish. The captured `dying` instance is destroyed after the grace;
       // 0 (default) destroys synchronously.
       const dying = instance.current;
-      if (props.destroyDelay > 0) {
-        setTimeout(() => dying?.destroy(), props.destroyDelay);
+      if (_destroyDelayRef.current > 0) {
+        setTimeout(() => dying?.destroy(), _destroyDelayRef.current);
       } else {
         dying?.destroy();
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     const v = props.data;
     if (!instance.current) return;

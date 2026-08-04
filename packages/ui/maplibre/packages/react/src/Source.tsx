@@ -31,6 +31,8 @@ export default function Source(_props: SourceProps): JSX.Element {
   })();
   const reg = useRef<any>(null);
   const didRegister = useRef(false);
+  const _idRef = useRef(props.id);
+  _idRef.current = props.id;
   const _specRef = useRef(props.spec);
   _specRef.current = props.spec;
   const _watch0First = useRef(true);
@@ -48,16 +50,16 @@ export default function Source(_props: SourceProps): JSX.Element {
     // context, REQ-30) — the $onUpdate below registers once it resolves.
     if (reg.current && !didRegister.current) {
       didRegister.current = true;
-      reg.current.register(props.id, {
-        id: props.id,
+      reg.current.register(_idRef.current, {
+        id: _idRef.current,
         spec: _specRef.current
       });
     }
     // unregister on unmount so the parent reaps this source (its layers first).
     return () => {
-      if (reg.current) reg.current.unregister(props.id);
+      if (reg.current) reg.current.unregister(_idRef.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     const live = sources;

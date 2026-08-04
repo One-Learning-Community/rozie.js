@@ -203,8 +203,32 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     defaultValue: props.defaultHtml ?? '<p>Start writing…</p>',
     onValueChange: props.onHtmlChange,
   });
+  const _ariaLabelRef = useRef(props.ariaLabel);
+  _ariaLabelRef.current = props.ariaLabel;
+  const _autofocusRef = useRef(props.autofocus);
+  _autofocusRef.current = props.autofocus;
+  const _bubbleMenuShouldShowRef = useRef(props.bubbleMenuShouldShow);
+  _bubbleMenuShouldShowRef.current = props.bubbleMenuShouldShow;
   const _editableRef = useRef(props.editable);
   _editableRef.current = props.editable;
+  const _editorClassRef = useRef(props.editorClass);
+  _editorClassRef.current = props.editorClass;
+  const _editorPropsRef = useRef(props.editorProps);
+  _editorPropsRef.current = props.editorProps;
+  const _enforceMaxLengthRef = useRef(props.enforceMaxLength);
+  _enforceMaxLengthRef.current = props.enforceMaxLength;
+  const _extensionsRef = useRef(props.extensions);
+  _extensionsRef.current = props.extensions;
+  const _maxLengthRef = useRef(props.maxLength);
+  _maxLengthRef.current = props.maxLength;
+  const _nodeSpecsRef = useRef(props.nodeSpecs);
+  _nodeSpecsRef.current = props.nodeSpecs;
+  const _placeholderRef = useRef(props.placeholder);
+  _placeholderRef.current = props.placeholder;
+  const _starterKitRef = useRef(props.starterKit);
+  _starterKitRef.current = props.starterKit;
+  const _uploadImageRef = useRef(props.uploadImage);
+  _uploadImageRef.current = props.uploadImage;
   const _htmlRef = useRef(html);
   _htmlRef.current = html;
   const [active, setActive] = useState({
@@ -908,7 +932,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // read ONCE here (setup-once — NOT a $watch); $portals.nodeView is captured
     // here inside the mount body and passed into the node factory, keeping the
     // reference scoped to the mount lifecycle (the toolbar-slot discipline).
-    const nodeViewExtensions = (props.renderNodeView ?? props.slots?.["nodeView"]) && props.nodeSpecs.length ? makeNodeViewExtensions(portals.nodeView, props.nodeSpecs) : [];
+    const nodeViewExtensions = (props.renderNodeView ?? props.slots?.["nodeView"]) && _nodeSpecsRef.current.length ? makeNodeViewExtensions(portals.nodeView, _nodeSpecsRef.current) : [];
 
     // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
     // (setup-once, like content/editable/autofocus — no reactivity required). The
@@ -916,8 +940,8 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // adds class `is-editor-empty` + a `data-placeholder` attribute to the first
     // empty node; the `::before` rule in the `:root { }` engine-DOM escape hatch
     // (in the style block) paints the ghost text. Empty placeholder = no extension.
-    const placeholderExtensions = props.placeholder ? [Placeholder.configure({
-      placeholder: props.placeholder
+    const placeholderExtensions = _placeholderRef.current ? [Placeholder.configure({
+      placeholder: _placeholderRef.current
     })] : [];
 
     // Selection-anchored menu extensions (G2). Built BEFORE `new Editor` because the
@@ -961,8 +985,8 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     const menuExtensions = [...(bubbleMenuEl.current ? [BubbleMenu.configure({
       pluginKey: 'rozieBubbleMenu',
       element: bubbleMenuEl.current,
-      ...(props.bubbleMenuShouldShow ? {
-        shouldShow: props.bubbleMenuShouldShow
+      ...(_bubbleMenuShouldShowRef.current ? {
+        shouldShow: _bubbleMenuShouldShowRef.current
       } : {})
     })] : []), ...(floatingMenuEl.current ? [FloatingMenu.configure({
       element: floatingMenuEl.current
@@ -982,7 +1006,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // absent: no Image extension, no paste/drop handlers (zero overhead, the
     // unfilled-slot discipline). Conditional SPREAD (not `const x = []; x.push`)
     // for the same never[]-inference reason as placeholderExtensions/nodeViewExtensions.
-    const imageExtensions = props.uploadImage ? [Image] : [];
+    const imageExtensions = _uploadImageRef.current ? [Image] : [];
 
     // Character/word count (D-01..D-03). Gated on maxLength being set OR the
     // `count` slot being filled — a stock <TipTap> with neither registers NO
@@ -992,9 +1016,9 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
     // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
     // never[]-inference reason as placeholderExtensions/imageExtensions.
-    const needsCount = props.maxLength != null || (props.renderCount ?? props.slots?.["count"]);
-    const characterCountExtensions = needsCount ? [CharacterCount.configure(props.enforceMaxLength && props.maxLength != null ? {
-      limit: props.maxLength
+    const needsCount = _maxLengthRef.current != null || (props.renderCount ?? props.slots?.["count"]);
+    const characterCountExtensions = needsCount ? [CharacterCount.configure(_enforceMaxLengthRef.current && _maxLengthRef.current != null ? {
+      limit: _maxLengthRef.current
     } : {})] : [];
 
     // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
@@ -1002,7 +1026,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
     // functions declared above (see their doc comment for why they live at the
     // top level rather than as closures nested in this ternary).
-    const uploadHandlers = props.uploadImage ? {
+    const uploadHandlers = _uploadImageRef.current ? {
       handlePaste,
       handleDrop
     } : {};
@@ -1010,7 +1034,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       element: editorEl.current!,
       content: _htmlRef.current,
       editable: _editableRef.current,
-      autofocus: props.autofocus,
+      autofocus: _autofocusRef.current,
       // StarterKit first (config-disabled per the collision scan below); the
       // Placeholder ext next; the reactive node-view nodes next; consumer
       // extensions LAST so they win (TipTap applies later-registered extensions
@@ -1018,16 +1042,16 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
       // of the config-level auto-disable (D-02), which is what actually silences
       // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-      extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(props.starterKit, props.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...props.extensions]),
+      extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(_starterKitRef.current, _extensionsRef.current)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ..._extensionsRef.current]),
       editorProps: {
         attributes: {
-          'aria-label': props.ariaLabel,
-          ...(props.editorClass ? {
-            class: props.editorClass
+          'aria-label': _ariaLabelRef.current,
+          ...(_editorClassRef.current ? {
+            class: _editorClassRef.current
           } : {}),
-          ...(props.placeholder ? {
-            'data-placeholder': props.placeholder,
-            'aria-placeholder': props.placeholder
+          ...(_placeholderRef.current ? {
+            'data-placeholder': _placeholderRef.current,
+            'aria-placeholder': _placeholderRef.current
           } : {})
         },
         // uploadImage paste/drop fallbacks (D-04) — spread BEFORE the consumer's
@@ -1036,7 +1060,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         ...uploadHandlers,
         // Consumer editorProps spread LAST — full ProseMirror editorProps control
         // (handleKeyDown, handlePaste, a custom `attributes`, …) wins.
-        ...props.editorProps
+        ..._editorPropsRef.current
       },
       onUpdate: ({
         editor

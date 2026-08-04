@@ -1,0 +1,92 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitScript (React) — $onMount-scoped prop reads must go through synced refs (Quick 260803-swj seam 2) > emitted module snapshot 1`] = `
+"import { useEffect, useRef, useState } from 'react';
+
+interface TestProps {
+  pannable?: boolean;
+  gain?: number;
+  live?: boolean;
+  onPing?: (...args: any[]) => void;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'pannable' | 'gain' | 'live'> & { pannable: boolean; gain: number; live: boolean } = {
+    ..._props,
+    pannable: _props.pannable ?? true,
+    gain: _props.gain ?? 1,
+    live: _props.live ?? false,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { pannable, gain, live, onPing, ...rest } = _props as TestProps & Record<string, unknown>;
+    void pannable; void gain; void live; void onPing;
+    return rest;
+  })();
+  const _gainRef = useRef(props.gain);
+  _gainRef.current = props.gain;
+  const _pannableRef = useRef(props.pannable);
+  _pannableRef.current = props.pannable;
+  const [handler, setHandler] = useState<any>(null);
+  const _watch0First = useRef(true);
+
+  useEffect(() => {
+    const h = () => {
+      if (!_pannableRef.current) return;
+      use(_gainRef.current);
+      props.onPing && props.onPing();
+    };
+    document.addEventListener('pointerdown', h);
+    return () => document.removeEventListener('pointerdown', h);
+  }, []);
+  useEffect(() => {
+    touch(props.live);
+  }, [props.live, touch]);
+  useEffect(() => {
+    if (_watch0First.current) { _watch0First.current = false; return; }
+    const v = props.gain;
+    note(v);
+  }, [props.gain]);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — $onMount-scoped prop reads must go through synced refs (Quick 260803-swj seam 2) > emitted module snapshot — zero-rewrite cleanup body 1`] = `
+"import { useEffect, useRef } from 'react';
+
+interface TestProps {
+  pannable?: boolean;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'pannable'> & { pannable: boolean } = {
+    ..._props,
+    pannable: _props.pannable ?? true,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { pannable, ...rest } = _props as TestProps & Record<string, unknown>;
+    void pannable;
+    return rest;
+  })();
+  const _pannableRef = useRef(props.pannable);
+  _pannableRef.current = props.pannable;
+
+  useEffect(() => {
+    const h = () => {
+      if (!_pannableRef.current) return;
+    };
+    document.addEventListener('pointerdown', h);
+    return () => {
+      // teardown note: this comment must survive the mount-ref rewrite
+    };
+  }, []);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;

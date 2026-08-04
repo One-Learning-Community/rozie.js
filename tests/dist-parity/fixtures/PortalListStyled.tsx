@@ -28,6 +28,8 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
   const _renderItemRef = useRef(props.renderItem);
   _renderItemRef.current = props.renderItem;
   const instance = useRef<any>(null);
+  const _itemsRef = useRef(props.items);
+  _itemsRef.current = props.items;
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
 
   // Tiny inline "engine" — same shape as examples/PortalList.rozie but
@@ -81,7 +83,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
     },
   };
     instance.current = new MiniListEngine(__rozieRoot.current!, {
-      items: props.items,
+      items: _itemsRef.current,
       cellRenderer: (item: any) => {
         const node = document.createElement('div');
         const dispose = portals.item(node, {
@@ -98,7 +100,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
   portalRoots.current.clear();
       instance.current?.destroy();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

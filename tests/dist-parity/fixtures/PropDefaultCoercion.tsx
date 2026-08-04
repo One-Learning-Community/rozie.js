@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { clsx, rozieDisplay } from '@rozie/runtime-react';
 import './PropDefaultCoercion.css';
 
@@ -30,18 +30,30 @@ export default function PropDefaultCoercion(_props: PropDefaultCoercionProps): J
     void a; void b; void c; void d; void e; void f;
     return rest;
   })();
+  const _aRef = useRef(props.a);
+  _aRef.current = props.a;
+  const _bRef = useRef(props.b);
+  _bRef.current = props.b;
+  const _cRef = useRef(props.c);
+  _cRef.current = props.c;
+  const _dRef = useRef(props.d);
+  _dRef.current = props.d;
+  const _eRef = useRef(props.e);
+  _eRef.current = props.e;
+  const _fRef = useRef(props.f);
+  _fRef.current = props.f;
   const [observed, setObserved] = useState<any>(null);
 
   useEffect(() => {
     setObserved({
-      a: props.a,
-      b: props.b,
-      c: props.c,
-      d: props.d,
-      e: props.e,
-      f: props.f
+      a: _aRef.current,
+      b: _bRef.current,
+      c: _cRef.current,
+      d: _dRef.current,
+      e: _eRef.current,
+      f: _fRef.current
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

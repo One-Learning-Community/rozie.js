@@ -292,6 +292,36 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     defaultValue: props.defaultMode ?? 'pan',
     onValueChange: props.onModeChange,
   });
+  const _accumulateOnCtrlRef = useRef(props.accumulateOnCtrl);
+  _accumulateOnCtrlRef.current = props.accumulateOnCtrl;
+  const _canConnectRef = useRef(props.canConnect);
+  _canConnectRef.current = props.canConnect;
+  const _curvatureRef = useRef(props.curvature);
+  _curvatureRef.current = props.curvature;
+  const _fitOnMountRef = useRef(props.fitOnMount);
+  _fitOnMountRef.current = props.fitOnMount;
+  const _historyRef = useRef(props.history);
+  _historyRef.current = props.history;
+  const _maxZoomRef = useRef(props.maxZoom);
+  _maxZoomRef.current = props.maxZoom;
+  const _minZoomRef = useRef(props.minZoom);
+  _minZoomRef.current = props.minZoom;
+  const _minimapRef = useRef(props.minimap);
+  _minimapRef.current = props.minimap;
+  const _nodeToolbarRef = useRef(props.nodeToolbar);
+  _nodeToolbarRef.current = props.nodeToolbar;
+  const _pannableRef = useRef(props.pannable);
+  _pannableRef.current = props.pannable;
+  const _readonlyRef = useRef(props.readonly);
+  _readonlyRef.current = props.readonly;
+  const _selectableRef = useRef(props.selectable);
+  _selectableRef.current = props.selectable;
+  const _snapGridRef = useRef(props.snapGrid);
+  _snapGridRef.current = props.snapGrid;
+  const _validateTypesRef = useRef(props.validateTypes);
+  _validateTypesRef.current = props.validateTypes;
+  const _zoomableRef = useRef(props.zoomable);
+  _zoomableRef.current = props.zoomable;
   const _graphRef = useRef(graph);
   _graphRef.current = graph;
   const _modeRef = useRef(mode);
@@ -1391,7 +1421,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // Open the coalesce window + capture the pre-gesture snapshot once. Gated on
         // !programmatic + history (a restore-driven engine op must not record history). A
         // re-pick while a close is pending cancels the pending close (the gesture continues).
-        if (!programmatic.current && props.history !== false) {
+        if (!programmatic.current && _historyRef.current !== false) {
           reconnectInFlight.current++;
           reconnectPreSnapshot.current = snapshotCurrent();
           reconnectDidWriteBack.current = false;
@@ -1487,10 +1517,10 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // marquee can PROGRAMMATICALLY select each intersecting node (select(id, true) =
     // accumulate). The handle is null when selection is off (readonly / !selectable), in
     // which case the marquee branch no-ops.
-    if (props.selectable && !props.readonly) {
+    if (_selectableRef.current && !_readonlyRef.current) {
       selector.current = AreaExtensions.selector();
       nodeSelectApi.current = AreaExtensions.selectableNodes(area.current, selector.current, {
-        accumulating: props.accumulateOnCtrl ? AreaExtensions.accumulateOnCtrl() : {
+        accumulating: _accumulateOnCtrlRef.current ? AreaExtensions.accumulateOnCtrl() : {
           active: () => false
         }
       });
@@ -1499,8 +1529,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     AreaExtensions.simpleNodesOrder(area.current);
 
     // ── zoom clamp (restrictor) ──
-    const min = typeof props.minZoom === 'number' && props.minZoom > 0 ? props.minZoom : 0;
-    const max = typeof props.maxZoom === 'number' && props.maxZoom > 0 ? props.maxZoom : 0;
+    const min = typeof _minZoomRef.current === 'number' && _minZoomRef.current > 0 ? _minZoomRef.current : 0;
+    const max = typeof _maxZoomRef.current === 'number' && _maxZoomRef.current > 0 ? _maxZoomRef.current : 0;
     if (min || max) {
       AreaExtensions.restrictor(area.current, {
         scaling: {
@@ -1511,16 +1541,16 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     }
 
     // ── snap-to-grid ──
-    if (typeof props.snapGrid === 'number' && props.snapGrid > 0) {
+    if (typeof _snapGridRef.current === 'number' && _snapGridRef.current > 0) {
       AreaExtensions.snapGrid(area.current, {
-        size: props.snapGrid,
+        size: _snapGridRef.current,
         dynamic: true
       });
     }
 
     // ── interaction toggles ──
-    if (!props.pannable) area.current.area.setDragHandler(null);
-    if (!props.zoomable) area.current.area.setZoomHandler(null);
+    if (!_pannableRef.current) area.current.area.setDragHandler(null);
+    if (!_zoomableRef.current) area.current.area.setZoomHandler(null);
 
     // ── Delete / Backspace key → cascading delete of the selected node(s) (Win 1) ──
     // Attached to the engine container ($refs.canvasEl, which carries tabindex="0" in
@@ -1531,7 +1561,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // cross-target path). Gated on selectable && !readonly. We guard against deleting
     // while focus is in a node-body text field (INPUT/TEXTAREA/contenteditable) so
     // typing in a node never nukes it. The listener is removed in the teardown.
-    if (props.selectable && !props.readonly && container && typeof container.addEventListener === 'function') {
+    if (_selectableRef.current && !_readonlyRef.current && container && typeof container.addEventListener === 'function') {
       onCanvasKeydown.current = (e: any) => {
         if (!e) return;
         const t = e.target;
@@ -1978,7 +2008,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       // committed connection.id == the graph connection id — conn.id = spec.id at build),
       // so it always matches what `writeBackConnectionRemoved` filters. `.stop` keeps the
       // pointerup from reaching the area's pan/background handling beneath the path.
-      if (props.selectable && !props.readonly && !srcDangling && !tgtDangling) {
+      if (_selectableRef.current && !_readonlyRef.current && !srcDangling && !tgtDangling) {
         path.style.cursor = 'pointer';
         path.addEventListener('pointerup', (e: any) => {
           if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
@@ -2031,7 +2061,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       element.appendChild(svg);
       let start: any = null;
       let end: any = null;
-      const curvature = typeof props.curvature === 'number' ? props.curvature : 0.3;
+      const curvature = typeof _curvatureRef.current === 'number' ? _curvatureRef.current : 0.3;
       const redraw = () => {
         if (!start || !end) return;
         // branch on the resolved edge type; default (bezier/unknown) stays
@@ -2205,7 +2235,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           targetInput: c.targetInput
         };
         // 1. AUTOMATIC typed validation (default ON; opt out via :validate-types="false").
-        if (props.validateTypes !== false) {
+        if (_validateTypesRef.current !== false) {
           const srcType = portTypeOf(c.source, 'output', c.sourceOutput);
           const tgtType = portTypeOf(c.target, 'input', c.targetInput);
           if (srcType != null && tgtType != null && srcType !== tgtType) {
@@ -2217,7 +2247,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           }
         }
         // 2. canConnect OVERRIDE (Phase-40 contract — custom rule, in addition).
-        if (typeof props.canConnect === 'function' && props.canConnect(conn) === false) {
+        if (typeof _canConnectRef.current === 'function' && _canConnectRef.current(conn) === false) {
           if (!programmatic.current) props.onConnectionRejected && props.onConnectionRejected({
             ...conn,
             reason: 'can-connect'
@@ -2263,7 +2293,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // T1.3 — pointer-DOWN: stash the PRE-drag graph snapshot (before any movement). It
         // is committed to history on the first `nodetranslated` (only if a drag follows;
         // gated on !programmatic + history). A re-pick mid-drag won't overwrite a live one.
-        if (!programmatic.current && props.history !== false && !dragGestureActive.current) {
+        if (!programmatic.current && _historyRef.current !== false && !dragGestureActive.current) {
           pendingDragSnapshot.current = snapshotCurrent();
         }
         // Win 2: a pick changed the selection — surface @selection-change after the
@@ -2610,7 +2640,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // pan handlers read). Cheap (a handful of rects) → a full rebuild per frame is fine.
     const redrawMinimap = () => {
       minimapRedrawRaf.current = 0;
-      if (!props.minimap || !minimapSvg.current || !area.current || !container) return;
+      if (!_minimapRef.current || !minimapSvg.current || !area.current || !container) return;
       const t = area.current.area.transform;
       const k = t.k || 1;
       const cw = container.clientWidth || MINIMAP_W;
@@ -2690,7 +2720,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // rAF-coalesced scheduler (bridged to the top-level $watch + the engine pipes). No-op
     // when :minimap is off (the bridge stays callable everywhere, cheap).
     scheduleMinimapRedraw.current = () => {
-      if (!props.minimap || minimapRedrawRaf.current) return;
+      if (!_minimapRef.current || minimapRedrawRaf.current) return;
       if (typeof requestAnimationFrame === 'function') {
         minimapRedrawRaf.current = requestAnimationFrame(redrawMinimap);
       } else {
@@ -2714,7 +2744,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         gy: minimapMap.current.minY + (my - minimapMap.current.offY) / minimapMap.current.scale
       };
     };
-    if (props.minimap && minimapEl.current) {
+    if (_minimapRef.current && minimapEl.current) {
       minimapHost.current = minimapEl.current;
       minimapSvg.current = document.createElementNS(SVGNS, 'svg');
       minimapSvg.current.setAttribute('class', 'rozie-flow-minimap__svg');
@@ -2722,7 +2752,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       minimapSvg.current.setAttribute('preserveAspectRatio', 'none');
       minimapHost.current.appendChild(minimapSvg.current);
       onMinimapPointerDown.current = (e: any) => {
-        if (!props.pannable) return;
+        if (!_pannableRef.current) return;
         const g = minimapPointerToGraph(e);
         if (!g) return;
         minimapPanning.current = true;
@@ -2734,7 +2764,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         setCenter(g.gx, g.gy, null);
       };
       onMinimapPointerMove.current = (e: any) => {
-        if (!minimapPanning.current || !props.pannable) return;
+        if (!minimapPanning.current || !_pannableRef.current) return;
         const g = minimapPointerToGraph(e);
         if (!g) return;
         e.preventDefault();
@@ -2780,7 +2810,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // node's top edge); clamped so it never goes off the top of the container.
     const trackToolbar = () => {
       toolbarTrackRaf.current = 0;
-      if (!props.nodeToolbar || !toolbarHost.current || !area.current || !container) return;
+      if (!_nodeToolbarRef.current || !toolbarHost.current || !area.current || !container) return;
       const id = toolbarSelectedId.current;
       if (id == null) {
         toolbarHost.current.style.display = 'none';
@@ -2805,7 +2835,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       toolbarHost.current.style.display = 'flex';
     };
     scheduleToolbarTrack.current = () => {
-      if (!props.nodeToolbar || toolbarTrackRaf.current) return;
+      if (!_nodeToolbarRef.current || toolbarTrackRaf.current) return;
       if (typeof requestAnimationFrame === 'function') {
         toolbarTrackRaf.current = requestAnimationFrame(trackToolbar);
       } else {
@@ -2820,7 +2850,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // with the new node scope; else the default buttons stay put (they read the live tracked
     // id at click time, so no re-mount needed). Then reposition.
     const syncToolbar = () => {
-      if (!props.nodeToolbar || !toolbarHost.current) return;
+      if (!_nodeToolbarRef.current || !toolbarHost.current) return;
       const id = singleSelectedNodeId();
       if (id === toolbarSelectedId.current && id == null === (toolbarSelectedId.current == null)) {
         // same target — just reposition (e.g. after a drag).
@@ -2859,7 +2889,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         detail
       });
     };
-    if (props.nodeToolbar && toolbarEl.current) {
+    if (_nodeToolbarRef.current && toolbarEl.current) {
       toolbarHost.current = toolbarEl.current;
       toolbarHost.current.style.display = 'none';
       if (!(props.renderToolbar ?? props.slots?.["toolbar"])) {
@@ -2992,7 +3022,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       resizerTrackedId.current = id;
       scheduleResizerTrack.current();
     };
-    if (props.selectable && !props.readonly && container && typeof container.addEventListener === 'function') {
+    if (_selectableRef.current && !_readonlyRef.current && container && typeof container.addEventListener === 'function') {
       resizeHandleNw.current = resizeHandleNwEl.current || null;
       resizeHandleNe.current = resizeHandleNeEl.current || null;
       resizeHandleSw.current = resizeHandleSwEl.current || null;
@@ -3026,7 +3056,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // T1.3-style pre-gesture stash — NOT pushed yet (mirrors pendingDragSnapshot). The
         // FIRST clamp-changed pointermove commits it (a pointerdown+pointerup with no move
         // never creates a history entry).
-        if (!programmatic.current && props.history !== false) {
+        if (!programmatic.current && _historyRef.current !== false) {
           pendingResizeSnapshot.current = snapshotCurrent();
         }
         resizeGestureActive.current = false;
@@ -3210,7 +3240,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       // surface @selection-change once the engine's awaited select() chain has flushed.
       scheduleSelectionEmit();
     };
-    if (props.selectable && !props.readonly && container && typeof container.addEventListener === 'function') {
+    if (_selectableRef.current && !_readonlyRef.current && container && typeof container.addEventListener === 'function') {
       marqueeBox.current = marqueeEl.current || null;
       onCanvasPointerDownCapture.current = (e: any) => {
         // only in select mode, only the EMPTY canvas (not on a node — those still drag), only
@@ -3277,7 +3307,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           programmatic.current--;
         }
       }
-      if (props.fitOnMount && editor.current.getNodes().length) {
+      if (_fitOnMountRef.current && editor.current.getNodes().length) {
         programmatic.current++;
         try {
           await AreaExtensions.zoomAt(area.current, editor.current.getNodes());

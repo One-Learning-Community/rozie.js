@@ -125,6 +125,8 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     defaultValue: props.defaultPage ?? 1,
     onValueChange: props.onPageChange,
   });
+  const _autoFitRef = useRef(props.autoFit);
+  _autoFitRef.current = props.autoFit;
   const _rotationRef = useRef(props.rotation);
   _rotationRef.current = props.rotation;
   const _scaleRef = useRef(props.scale);
@@ -593,7 +595,7 @@ const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(function PdfViewer
     // no observer teardown/recreation. No-ops via applyFit's own instance/
     // containerEl guard before a document has loaded.
     resizeObserver.current = new ResizeObserver(() => {
-      if (props.autoFit) applyFit(props.autoFit === 'width' ? 'width' : 'page');
+      if (_autoFitRef.current) applyFit(_autoFitRef.current === 'width' ? 'width' : 'page');
     });
     resizeObserver.current.observe(containerEl.current);
     // lazy-load the engine (SSR-safe + code-split), then configure the worker and

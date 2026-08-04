@@ -113,9 +113,24 @@ $onMount(() => {
 </rozie>`;
     const code = compile(src);
     // $onMount has no getter/dep-array concept the same way $watch does in
-    // this codebase (it runs once on mount) -- this guard just proves the fix
-    // did not accidentally touch lifecycle-hook emission at all.
+    // this codebase (it runs once on mount) -- this guard just proves the
+    // DERIVED-GETTER DEP-ARRAY fix did not accidentally touch lifecycle-hook
+    // emission at all: the mount hook still emits a `[]`-dep useEffect, and no
+    // `props.xs.length` dep array appears anywhere.
     expect(code).toContain('useEffect(() => {');
-    expect(code).toContain('console.log(props.xs.length)');
+    expect(code).toContain('}, []);');
+    expect(code).not.toContain('}, [props.xs.length]);');
+
+    // Quick 260803-swj seam 2 — the READ SHAPE inside the mount body moved,
+    // deliberately and by a LATER seam: a declared, non-model prop read inside
+    // a mount-phase body is now mirrored through a synced ref, because a mount
+    // hook's `[]` dep array otherwise freezes every closure created in it at
+    // the first-render value. This particular read is SYNCHRONOUS and top
+    // level, so it is behaviourally identical before and after
+    // (`_xsRef.current` at mount time IS the first-render value) — only the
+    // emitted bytes move. The original assertion here
+    // (`console.log(props.xs.length)`) predated that seam.
+    expect(code).toContain('const _xsRef = useRef(props.xs);');
+    expect(code).toContain('console.log(_xsRef.current.length)');
   });
 });

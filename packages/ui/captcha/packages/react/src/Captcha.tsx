@@ -76,6 +76,8 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(function Captcha(_props:
     defaultValue: props.defaultToken ?? '',
     onValueChange: props.onTokenChange,
   });
+  const _providerRef = useRef(props.provider);
+  _providerRef.current = props.provider;
   const widgetEl = useRef<HTMLDivElement | null>(null);
 
   const { onError: _rozieProp_onError, onExpire: _rozieProp_onExpire, onVerify: _rozieProp_onVerify } = props;
@@ -136,13 +138,13 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(function Captcha(_props:
     // no longer needs the prior TOP-LEVEL-`let` workaround (unlike `api`/
     // `widgetId` above, which stay top-level for the unrelated $expose reason).
     let disposed = false;
-    loadCaptchaApi(props.provider).then((a: any) => {
+    loadCaptchaApi(_providerRef.current).then((a: any) => {
       if (disposed) return;
       api.current = a;
       widgetId.current = api.current.render(widgetEl.current!, buildConfig());
     }).catch((err: any) => {
       props.onError && props.onError({
-        provider: props.provider,
+        provider: _providerRef.current,
         error: err
       });
     });

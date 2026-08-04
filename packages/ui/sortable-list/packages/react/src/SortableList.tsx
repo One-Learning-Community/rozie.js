@@ -145,6 +145,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     defaultValue: props.defaultItems ?? (() => [])(),
     onValueChange: props.onItemsChange,
   });
+  const _animationRef = useRef(props.animation);
+  _animationRef.current = props.animation;
   const _chosenClassRef = useRef(props.chosenClass);
   _chosenClassRef.current = props.chosenClass;
   const _disabledRef = useRef(props.disabled);
@@ -155,10 +157,14 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   _easingRef.current = props.easing;
   const _filterRef = useRef(props.filter);
   _filterRef.current = props.filter;
+  const _forceFallbackRef = useRef(props.forceFallback);
+  _forceFallbackRef.current = props.forceFallback;
   const _ghostClassRef = useRef(props.ghostClass);
   _ghostClassRef.current = props.ghostClass;
   const _handleRef = useRef(props.handle);
   _handleRef.current = props.handle;
+  const _optionsRef = useRef(props.options);
+  _optionsRef.current = props.options;
   const _swapThresholdRef = useRef(props.swapThreshold);
   _swapThresholdRef.current = props.swapThreshold;
   const _itemsRef = useRef(items);
@@ -324,7 +330,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
         setItems(next);
       },
       options: {
-        animation: props.animation,
+        animation: _animationRef.current,
         disabled: _disabledRef.current,
         group: resolveGroup(),
         handle: _handleRef.current,
@@ -332,10 +338,10 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
         chosenClass: _chosenClassRef.current,
         dragClass: _dragClassRef.current,
         filter: _filterRef.current,
-        forceFallback: props.forceFallback,
+        forceFallback: _forceFallbackRef.current,
         swapThreshold: _swapThresholdRef.current,
         easing: _easingRef.current,
-        ...props.options
+        ..._optionsRef.current
       },
       // Lit lit-html `repeat` directive caches its part array by sentinel-
       // comment node identity; SortableJS's physical DOM mutation desyncs

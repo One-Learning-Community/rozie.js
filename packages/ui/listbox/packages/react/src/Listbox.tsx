@@ -136,6 +136,8 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     defaultValue: props.defaultValue ?? null,
     onValueChange: props.onValueChange,
   });
+  const _virtualRef = useRef(props.virtual);
+  _virtualRef.current = props.virtual;
   const [open$local, setOpen$local] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [query, setQuery] = useState('');
@@ -600,7 +602,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
 
   useEffect(() => {
     syncRows();
-    if (props.virtual) {
+    if (_virtualRef.current) {
       // The list renders at mount when virtual, so the .rozie-listbox-list scroll container
       // exists here. Capture it via $el.querySelector (the data-table gridScrollEl precedent,
       // proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered node is null on

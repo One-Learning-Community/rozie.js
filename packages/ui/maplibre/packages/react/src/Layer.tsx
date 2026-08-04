@@ -50,6 +50,8 @@ export default function Layer(_props: LayerProps): JSX.Element {
   const didRegister = useRef(false);
   const appliedSource = useRef<any>(null);
   const ctx = useRef<any>(null);
+  const _idRef = useRef(props.id);
+  _idRef.current = props.id;
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
   const _watch2First = useRef(true);
@@ -77,10 +79,10 @@ export default function Layer(_props: LayerProps): JSX.Element {
     if (reg.current) {
       didRegister.current = true;
       appliedSource.current = resolveSource();
-      reg.current.register(props.id, buildSpec());
+      reg.current.register(_idRef.current, buildSpec());
     }
     return () => {
-      if (reg.current) reg.current.unregister(props.id);
+      if (reg.current) reg.current.unregister(_idRef.current);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

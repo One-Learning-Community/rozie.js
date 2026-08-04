@@ -67,19 +67,25 @@ export default function LexicalEditor(_props: LexicalEditorProps): JSX.Element {
     return rest;
   })();
   const editor = useRef<any>(null);
+  const _namespaceRef = useRef(props.namespace);
+  _namespaceRef.current = props.namespace;
+  const _nodesRef = useRef(props.nodes);
+  _nodesRef.current = props.nodes;
+  const _themeRef = useRef(props.theme);
+  _themeRef.current = props.theme;
   const rootEl = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     editor.current = lexical.createEditor({
-      namespace: props.namespace || 'rozie-lexical',
+      namespace: _namespaceRef.current || 'rozie-lexical',
       // The full v1.0 node CLASS set is declared here (Lexical requires all node
       // classes up front); consumer `nodes` are composed LAST so they win.
-      nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, AutoLinkNode, MentionNode, ...props.nodes],
+      nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, AutoLinkNode, MentionNode, ..._nodesRef.current],
       // Fail-loud: rethrow rather than swallow editor-state corruption (T-76-01).
       onError: (e: any) => {
         throw e;
       },
-      theme: props.theme
+      theme: _themeRef.current
     });
 
     // Bind the editor to the authored contenteditable host.
@@ -108,7 +114,7 @@ export default function LexicalEditor(_props: LexicalEditorProps): JSX.Element {
       cleanup();
       editor.current = null;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <__ctx_rozie_lexical_editor.Provider value={{

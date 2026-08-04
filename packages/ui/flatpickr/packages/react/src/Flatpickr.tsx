@@ -213,6 +213,16 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
     defaultValue: props.defaultDate ?? '',
     onValueChange: props.onDateChange,
   });
+  const _allowInputRef = useRef(props.allowInput);
+  _allowInputRef.current = props.allowInput;
+  const _altFormatRef = useRef(props.altFormat);
+  _altFormatRef.current = props.altFormat;
+  const _altInputRef = useRef(props.altInput);
+  _altInputRef.current = props.altInput;
+  const _appendToRef = useRef(props.appendTo);
+  _appendToRef.current = props.appendTo;
+  const _commitOnRef = useRef(props.commitOn);
+  _commitOnRef.current = props.commitOn;
   const _dateFormatRef = useRef(props.dateFormat);
   _dateFormatRef.current = props.dateFormat;
   const _disableRef = useRef(props.disable);
@@ -221,8 +231,16 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
   _disabledRef.current = props.disabled;
   const _enableRef = useRef(props.enable);
   _enableRef.current = props.enable;
+  const _enableSecondsRef = useRef(props.enableSeconds);
+  _enableSecondsRef.current = props.enableSeconds;
+  const _enableTimeRef = useRef(props.enableTime);
+  _enableTimeRef.current = props.enableTime;
   const _firstDayOfWeekRef = useRef(props.firstDayOfWeek);
   _firstDayOfWeekRef.current = props.firstDayOfWeek;
+  const _formatDateRef = useRef(props.formatDate);
+  _formatDateRef.current = props.formatDate;
+  const _inlineRef = useRef(props.inline);
+  _inlineRef.current = props.inline;
   const _localeRef = useRef(props.locale);
   _localeRef.current = props.locale;
   const _maxDateRef = useRef(props.maxDate);
@@ -231,6 +249,30 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
   _minDateRef.current = props.minDate;
   const _modeRef = useRef(props.mode);
   _modeRef.current = props.mode;
+  const _monthSelectorTypeRef = useRef(props.monthSelectorType);
+  _monthSelectorTypeRef.current = props.monthSelectorType;
+  const _nextArrowRef = useRef(props.nextArrow);
+  _nextArrowRef.current = props.nextArrow;
+  const _noCalendarRef = useRef(props.noCalendar);
+  _noCalendarRef.current = props.noCalendar;
+  const _optionsRef = useRef(props.options);
+  _optionsRef.current = props.options;
+  const _parseDateRef = useRef(props.parseDate);
+  _parseDateRef.current = props.parseDate;
+  const _pluginsRef = useRef(props.plugins);
+  _pluginsRef.current = props.plugins;
+  const _positionRef = useRef(props.position);
+  _positionRef.current = props.position;
+  const _prevArrowRef = useRef(props.prevArrow);
+  _prevArrowRef.current = props.prevArrow;
+  const _showMonthsRef = useRef(props.showMonths);
+  _showMonthsRef.current = props.showMonths;
+  const _staticPositionRef = useRef(props.staticPosition);
+  _staticPositionRef.current = props.staticPosition;
+  const _time24hrRef = useRef(props.time24hr);
+  _time24hrRef.current = props.time24hr;
+  const _weekNumbersRef = useRef(props.weekNumbers);
+  _weekNumbersRef.current = props.weekNumbers;
   const _dateRef = useRef(date);
   _dateRef.current = date;
   const inputEl = useRef<HTMLInputElement | null>(null);
@@ -324,36 +366,36 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
     instance.current = flatpickr(inputEl.current!, {
       mode: _modeRef.current,
       dateFormat: _dateFormatRef.current,
-      altInput: props.altInput,
-      altFormat: props.altFormat,
-      enableTime: props.enableTime,
-      enableSeconds: props.enableSeconds,
-      time_24hr: props.time24hr,
-      noCalendar: props.noCalendar,
+      altInput: _altInputRef.current,
+      altFormat: _altFormatRef.current,
+      enableTime: _enableTimeRef.current,
+      enableSeconds: _enableSecondsRef.current,
+      time_24hr: _time24hrRef.current,
+      noCalendar: _noCalendarRef.current,
       minDate: _minDateRef.current,
       maxDate: _maxDateRef.current,
       defaultDate: _dateRef.current || null,
       // GAP-5 UI passthrough (construction-time only) + GAP-6a allowInput.
       // These match flatpickr's own defaults so passing them is render-neutral.
-      inline: props.inline,
-      static: props.staticPosition,
-      position: props.position,
-      showMonths: props.showMonths,
-      weekNumbers: props.weekNumbers,
-      monthSelectorType: props.monthSelectorType,
-      allowInput: props.allowInput,
+      inline: _inlineRef.current,
+      static: _staticPositionRef.current,
+      position: _positionRef.current,
+      showMonths: _showMonthsRef.current,
+      weekNumbers: _weekNumbersRef.current,
+      monthSelectorType: _monthSelectorTypeRef.current,
+      allowInput: _allowInputRef.current,
       // `appendTo` / `prevArrow` / `nextArrow` default to null here but flatpickr
       // expects them ABSENT (its own defaults are `undefined` for appendTo and
       // built-in SVG strings for the arrows). Passing an explicit null breaks
       // construction, so include each ONLY when the consumer set a real value.
-      ...(props.appendTo != null ? {
-        appendTo: props.appendTo
+      ...(_appendToRef.current != null ? {
+        appendTo: _appendToRef.current
       } : {}),
-      ...(props.prevArrow != null ? {
-        prevArrow: props.prevArrow
+      ...(_prevArrowRef.current != null ? {
+        prevArrow: _prevArrowRef.current
       } : {}),
-      ...(props.nextArrow != null ? {
-        nextArrow: props.nextArrow
+      ...(_nextArrowRef.current != null ? {
+        nextArrow: _nextArrowRef.current
       } : {}),
       // GAP-2/3/4/6b conditional-spread passthrough. NEVER pass an empty array /
       // null / default-0, because flatpickr treats `enable: []` as "nothing
@@ -365,14 +407,14 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
       ...(_enableRef.current.length ? {
         enable: _enableRef.current
       } : {}),
-      ...(props.parseDate != null ? {
-        parseDate: props.parseDate
+      ...(_parseDateRef.current != null ? {
+        parseDate: _parseDateRef.current
       } : {}),
-      ...(props.formatDate != null ? {
-        formatDate: props.formatDate
+      ...(_formatDateRef.current != null ? {
+        formatDate: _formatDateRef.current
       } : {}),
-      ...(props.plugins.length ? {
-        plugins: props.plugins
+      ...(_pluginsRef.current.length ? {
+        plugins: _pluginsRef.current
       } : {}),
       // locale + firstDayOfWeek merge: emit a single `locale` entry present when
       // EITHER a locale object is set OR firstDayOfWeek is non-default (0). The
@@ -387,7 +429,7 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
           } : {})
         }
       } : {}),
-      ...props.options,
+      ..._optionsRef.current,
       onChange: (selectedDates: any, dateStr: any) => {
         // Value contract + range-commit semantics. In range mode flatpickr fires
         // onChange on the FIRST click (partial range) — committing then is the
@@ -395,7 +437,7 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
         // complete (2 dates) unless the consumer opted into commitOn:'change'.
         const isRange = _modeRef.current === 'range';
         const complete = !isRange || selectedDates.length === 2;
-        if ((props.commitOn === 'change' || complete) && dateStr !== _dateRef.current) {
+        if ((_commitOnRef.current === 'change' || complete) && dateStr !== _dateRef.current) {
           setDate(dateStr);
         }
         // Always surface BOTH the formatted string and the Date[] so consumers
@@ -421,7 +463,7 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
     });
     if (_disabledRef.current) instance.current.input.disabled = true;
     return () => instance.current?.destroy();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     const v = date;

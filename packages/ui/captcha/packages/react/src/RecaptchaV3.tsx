@@ -60,6 +60,10 @@ const RecaptchaV3 = forwardRef<RecaptchaV3Handle, RecaptchaV3Props>(function Rec
     defaultValue: props.defaultToken ?? '',
     onValueChange: props.onTokenChange,
   });
+  const _executeOnMountRef = useRef(props.executeOnMount);
+  _executeOnMountRef.current = props.executeOnMount;
+  const _sitekeyRef = useRef(props.sitekey);
+  _sitekeyRef.current = props.sitekey;
 
   // Run a v3 challenge and return a fresh token. The optional `action` arg
   // overrides the prop default for this one call. On success writes the two-way
@@ -97,8 +101,8 @@ const RecaptchaV3 = forwardRef<RecaptchaV3Handle, RecaptchaV3Props>(function Rec
   useEffect(() => {
     disposed.current = false;
     // Warm the script once for this sitekey. If opted in, run an initial execute.
-    loadRecaptchaV3(props.sitekey).then(() => {
-      if (disposed.current || !props.executeOnMount) return;
+    loadRecaptchaV3(_sitekeyRef.current).then(() => {
+      if (disposed.current || !_executeOnMountRef.current) return;
       execute();
     }).catch((err: any) => {
       if (disposed.current) return;

@@ -371,12 +371,18 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   });
   const _expandableRef = useRef(props.expandable);
   _expandableRef.current = props.expandable;
+  const _getSubRowsRef = useRef(props.getSubRows);
+  _getSubRowsRef.current = props.getSubRows;
+  const _manualRef = useRef(props.manual);
+  _manualRef.current = props.manual;
   const _pageCountRef = useRef(props.pageCount);
   _pageCountRef.current = props.pageCount;
   const _rowCountRef = useRef(props.rowCount);
   _rowCountRef.current = props.rowCount;
   const _selectionModeRef = useRef(props.selectionMode);
   _selectionModeRef.current = props.selectionMode;
+  const _virtualRef = useRef(props.virtual);
+  _virtualRef.current = props.virtual;
   const _dataRef = useRef(data);
   _dataRef.current = data;
   const _paginationRef = useRef(pagination);
@@ -4349,8 +4355,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // (no subRows to gate on); when getSubRows IS supplied, leave it undefined so the
       // default `!!subRows.length` rule applies (only parents with children expand).
       getExpandedRowModel: getExpandedRowModel(),
-      getSubRows: (props.getSubRows || undefined) as any,
-      getRowCanExpand: _expandableRef.current === true && props.getSubRows == null ? () => true : undefined,
+      getSubRows: (_getSubRowsRef.current || undefined) as any,
+      getRowCanExpand: _expandableRef.current === true && _getSubRowsRef.current == null ? () => true : undefined,
       onExpandedChange: onExpandedChangeCb,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
       // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
@@ -4381,9 +4387,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // Server-side hook (req-6): when `manual` is set, table-core trusts the consumer's
       // rows verbatim (no client-side filter/sort/paginate) and only emits the change
       // events so the consumer can fetch the next page/filtered slice.
-      manualPagination: props.manual === true,
-      manualFiltering: props.manual === true,
-      manualSorting: props.manual === true,
+      manualPagination: _manualRef.current === true,
+      manualFiltering: _manualRef.current === true,
+      manualSorting: _manualRef.current === true,
       // Server-side page-count sources (#2): pass the consumer-supplied total row count and/or
       // explicit page count so table-core can compute getPageCount() under `manual` (where it
       // does not hold the full dataset). undefined when unset → table-core auto-derives from the
@@ -4438,7 +4444,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // into the virtualizer + reconcile IMPERATIVELY here (the table.setOptions re-feed path),
       // NEVER in a render helper (Pitfall 1). Pass the COMPLETE options set (virtual-core's
       // setOptions replaces, not merges). Guarded so the off path executes no virtual-core code.
-      if (props.virtual && virtualizer.current) {
+      if (_virtualRef.current && virtualizer.current) {
         virtualizer.current.setOptions(virtualizerOptions());
         virtualizer.current._willUpdate();
       }
@@ -4515,7 +4521,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // getPrePaginationRowModel reads the live table. ENTIRELY inside the $props.virtual guard:
     // when off, NO virtual-core runtime code executes (byte-identical-off). _didMount() registers
     // the scroll-element ResizeObserver and returns the teardown stored for $onUnmount.
-    if (props.virtual) {
+    if (_virtualRef.current) {
       gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rdt-scroll') : null;
       virtualizer.current = new Virtualizer(virtualizerOptions());
       virtualizerCleanup.current = virtualizer.current._didMount();
@@ -4551,7 +4557,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         // virtual=false path are untouched (this lives entirely inside the $props.virtual guard).
         const pg = _paginationRef.current;
         const pgConfigured = pg != null && !(pg.pageIndex === 0 && pg.pageSize === 10);
-        if (props.manual !== true && pgConfigured) {
+        if (_manualRef.current !== true && pgConfigured) {
           console.warn('[rozie-data-table] virtual+pagination: client pagination is configured but virtual windowing replaces it — the pagination chrome is auto-suppressed. Remove the pagination prop or set manual to silence this.');
         }
       };

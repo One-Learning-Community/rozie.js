@@ -240,6 +240,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     defaultValue: props.defaultPitch ?? 0,
     onValueChange: props.onPitchChange,
   });
+  const _boundsRef = useRef(props.bounds);
+  _boundsRef.current = props.bounds;
   const _boxZoomRef = useRef(props.boxZoom);
   _boxZoomRef.current = props.boxZoom;
   const _doubleClickZoomRef = useRef(props.doubleClickZoom);
@@ -248,6 +250,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   _dragPanRef.current = props.dragPan;
   const _dragRotateRef = useRef(props.dragRotate);
   _dragRotateRef.current = props.dragRotate;
+  const _fitBoundsOptionsRef = useRef(props.fitBoundsOptions);
+  _fitBoundsOptionsRef.current = props.fitBoundsOptions;
   const _interactiveLayerIdsRef = useRef(props.interactiveLayerIds);
   _interactiveLayerIdsRef.current = props.interactiveLayerIds;
   const _keyboardRef = useRef(props.keyboard);
@@ -262,6 +266,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   _maxZoomRef.current = props.maxZoom;
   const _minZoomRef = useRef(props.minZoom);
   _minZoomRef.current = props.minZoom;
+  const _optionsRef = useRef(props.options);
+  _optionsRef.current = props.options;
   const _popupsRef = useRef(props.popups);
   _popupsRef.current = props.popups;
   const _scrollZoomRef = useRef(props.scrollZoom);
@@ -632,7 +638,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     let mapOptions: any = null;
     mapOptions = {
       container: el,
-      ...props.options,
+      ..._optionsRef.current,
       style: _mapStyleRef.current ?? DEFAULT_STYLE,
       center: _centerRef.current,
       zoom: _zoomRef.current,
@@ -641,8 +647,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
       minZoom: _minZoomRef.current,
       maxZoom: _maxZoomRef.current,
       maxBounds: _maxBoundsRef.current,
-      bounds: props.bounds,
-      fitBoundsOptions: props.fitBoundsOptions,
+      bounds: _boundsRef.current,
+      fitBoundsOptions: _fitBoundsOptionsRef.current,
       dragPan: _dragPanRef.current,
       dragRotate: _dragRotateRef.current,
       scrollZoom: _scrollZoomRef.current,

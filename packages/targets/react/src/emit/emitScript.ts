@@ -1866,6 +1866,64 @@ export function emitScript(
   for (const s of ir.state) mountReactiveStateNames.add(s.name);
   for (const name of modelProps) mountReactiveStateNames.add(name);
 
+  // Quick 260803-swj seam 2 — the two sets above still leave a hole: a plain
+  // DECLARED prop read inside a `$onMount`-created closure. Ref synthesis was
+  // gated on `watchedNonModelPropNames`, i.e. a prop got a live ref only if it
+  // HAPPENED to also be a `$watch` getter dep. Two props read identically in
+  // the same mount closure therefore behaved differently — one live
+  // (`_gainRef.current`), its neighbour permanently frozen at the first-render
+  // value, because a mount hook always emits `depsArr = '[]'` (see the "Bug B
+  // fix 260519 linechart-watch-recreate" comment in the lifecycle loop). Live
+  // on the other five targets, dead on React alone.
+  //
+  // Surfaced by rete's FlowCanvas: `onMinimapPointerDown`/`onMinimapPointerMove`
+  // (long-lived handlers stashed in refs at mount) each guard on
+  // `props.pannable`, so minimap panning never saw a post-mount change.
+  // `_readonlyRef` exists in that same file only because `readonly` happens to
+  // be a `$watch` source.
+  //
+  // Breadth is every DECLARED, NON-MODEL prop, read as a `props.<X>`
+  // MemberExpression, anywhere lexically inside a MOUNT-phase lifecycle body
+  // (setup or cleanup, nested closures included) — exactly matching how the
+  // 260521 mount-state path above already treats reactive state, so props and
+  // state do not diverge without an explanation. A synchronous top-level read
+  // is behaviourally IDENTICAL before and after (`_XRef.current` at mount time
+  // IS the first-render value); only the emitted bytes move. Only reads inside
+  // deferred closures change, and every one of those was a stale-snapshot bug.
+  //
+  // Gating on `ir.props` mechanically excludes three shapes that are NOT this
+  // seam: (a) `props.on<Event>` from `$emit` lowering — that rewrite runs
+  // BEFORE `pairClonedLifecycle`, so those reads ARE visible to the walk and
+  // must be excluded deliberately, not accidentally; (b) `props.render<Slot>`
+  // portal renderers, which already have their own `_render<Pascal>Ref`
+  // machinery in emitPortals; (c) `props.slots` / `props.default<X>` /
+  // `props.on<X>Change`. The emit-handler variant is a real, distinct seam of
+  // the same class and is filed to the emitter-hardening backlog.
+  const mountReadablePropNames = new Set<string>();
+  {
+    // Collision guard — both this path and the portal-renderer path mint
+    // `_<name>Ref`. A DECLARED prop literally named `render<Pascal>` for a slot
+    // that is ALSO a portal slot would emit a duplicate `const _render<Pascal>Ref`
+    // (TS2451). Mirror emitPortals' `'_render' + pascalCase(key) + 'Ref'`
+    // construction and skip any prop whose ref ident would collide. No family
+    // trips this today; the guard is cheap and ships regardless.
+    const pascalCase = (name: string): string =>
+      name
+        .split(/[-_]/)
+        .filter(Boolean)
+        .map((p) => capitalize(p))
+        .join('');
+    const portalRefIdents = new Set<string>();
+    for (const key of portalsEmit.portalSlotNames) {
+      portalRefIdents.add(`_render${pascalCase(key)}Ref`);
+    }
+    for (const p of ir.props) {
+      if (p.isModel) continue;
+      if (portalRefIdents.has(`_${p.name}Ref`)) continue;
+      mountReadablePropNames.add(p.name);
+    }
+  }
+
   // Discover-then-rewrite per lifecycle hook. We collect the rewritten
   // bodies into Maps keyed by hook index so the lifecycle forEach below
   // uses them instead of `paired?.setupCloned` / `paired?.cleanupCloned`.
@@ -1878,11 +1936,24 @@ export function emitScript(
   // share this one set; section 5b-bis emits one ref decl per entry.
   const actuallyRewrittenModelProps = new Set<string>();
   const actuallyRewrittenNonModelProps = new Set<string>();
+  // Quick 260803-swj seam 2 — the newly-discovered mount-scoped prop names live
+  // in their OWN set, deliberately NOT merged into
+  // `actuallyRewrittenNonModelProps`. That set's dep filter (see the lifecycle
+  // loop) is COMPONENT-WIDE: any name in it is dropped from EVERY hook's dep
+  // array. Widening it would silently strip a legitimately-depended prop from
+  // an `$onUpdate` hook's dep array — a behaviour regression. So:
+  //   - `actuallyRewrittenNonModelProps` keeps its EXACT current membership
+  //     (watch-sourced names only) and its component-wide filter role → zero
+  //     byte drift for non-mount hooks;
+  //   - this set participates in (i) ref-decl emission at 5b-bis (union,
+  //     sorted) and (ii) the dep filter ONLY under `lh.phase === 'mount'`.
+  const mountOnlyRewrittenNonModelProps = new Set<string>();
 
   if (
     (watchedModelPropNames.size > 0 ||
       watchedNonModelPropNames.size > 0 ||
-      mountReactiveStateNames.size > 0) &&
+      mountReactiveStateNames.size > 0 ||
+      mountReadablePropNames.size > 0) &&
     ir.lifecycle.length > 0
   ) {
     // `bareNames` is the set of bare-identifier reactive names this walk
@@ -1895,6 +1966,12 @@ export function emitScript(
       outModel: Set<string>,
       outNonModel: Set<string>,
       bareNames: ReadonlySet<string>,
+      // Quick 260803-swj seam 2 — the `props.<X>` MemberExpression flavour of
+      // `bareNames`. Previously the MemberExpression visitor closed over
+      // `watchedNonModelPropNames` directly, which is what made the discovery
+      // set un-widenable per hook phase. Now parameterised, exactly mirroring
+      // `bareNames`.
+      memberNames: ReadonlySet<string>,
     ): void => {
       const programStmts: t.Statement[] = t.isBlockStatement(bodyNode)
         ? bodyNode.body
@@ -1907,7 +1984,7 @@ export function emitScript(
           const prop = p.node.property;
           if (!t.isIdentifier(obj) || obj.name !== 'props') return;
           if (!t.isIdentifier(prop)) return;
-          if (watchedNonModelPropNames.has(prop.name)) outNonModel.add(prop.name);
+          if (memberNames.has(prop.name)) outNonModel.add(prop.name);
         },
         Identifier(p) {
           const name = p.node.name;
@@ -1945,6 +2022,14 @@ export function emitScript(
         lh.phase === 'mount'
           ? new Set<string>([...watchedModelPropNames, ...mountReactiveStateNames])
           : watchedModelPropNames;
+      // Quick 260803-swj seam 2 — same phase gate for the `props.<X>`
+      // MemberExpression flavour: watched props are rewritten regardless of
+      // phase (their existing contract), declared props join only for
+      // `phase === 'mount'` where the `[]` dep array freezes the closure.
+      const memberNamesForHook =
+        lh.phase === 'mount'
+          ? new Set<string>([...watchedNonModelPropNames, ...mountReadablePropNames])
+          : watchedNonModelPropNames;
 
       // Determine the actual body to walk + rewrite. For arrow/fn-expr
       // setups, we operate on the body (block or expression). For Identifier
@@ -1959,23 +2044,38 @@ export function emitScript(
       }
       if (!setupBodyForRewrite) return;
 
-      const localModel = new Set<string>();
-      const localNonModel = new Set<string>();
-      findRefsInBody(setupBodyForRewrite, localModel, localNonModel, bareNamesForHook);
+      // Quick 260803-swj seam 2 (follow-up) — discovery is per-HOOK (a name read
+      // in EITHER body needs its ref declared once) but the REWRITE must be
+      // per-BODY. Rebuilding a function node that contains zero rewritten reads
+      // is a pure no-op that only destroys bytes: `t.arrowFunctionExpression(...)`
+      // reconstruction drops comments attached to the block. Caught by the
+      // SearchInput fixture, whose mount cleanup contains ONLY a comment —
+      // widening the discovery set pulled that hook into the rewrite path for
+      // the first time and silently replaced the comment with whitespace.
+      // So: collect per body, union for the ref decls, gate each rebuild on its
+      // OWN body's discovery.
+      const setupModel = new Set<string>();
+      const setupNonModel = new Set<string>();
+      findRefsInBody(setupBodyForRewrite, setupModel, setupNonModel, bareNamesForHook, memberNamesForHook);
+
       // Walk cleanup too (engine wrappers sometimes read props from cleanup
       // for teardown sequencing).
+      const cleanupModel = new Set<string>();
+      const cleanupNonModel = new Set<string>();
+      let cleanupBodyForRewrite: t.Expression | t.BlockStatement | null = null;
       if (cleanupCloned) {
-        let cleanupBodyForRewrite: t.Expression | t.BlockStatement | null = null;
         if (t.isArrowFunctionExpression(cleanupCloned) || t.isFunctionExpression(cleanupCloned)) {
           cleanupBodyForRewrite = cleanupCloned.body;
         } else if (t.isExpression(cleanupCloned)) {
           cleanupBodyForRewrite = cleanupCloned;
         }
         if (cleanupBodyForRewrite) {
-          findRefsInBody(cleanupBodyForRewrite, localModel, localNonModel, bareNamesForHook);
+          findRefsInBody(cleanupBodyForRewrite, cleanupModel, cleanupNonModel, bareNamesForHook, memberNamesForHook);
         }
       }
 
+      const localModel = new Set<string>([...setupModel, ...cleanupModel]);
+      const localNonModel = new Set<string>([...setupNonModel, ...cleanupNonModel]);
       if (localModel.size === 0 && localNonModel.size === 0) return;
 
       // 260521 sortable-stale-state — `localModel` now holds two flavours of
@@ -1987,12 +2087,25 @@ export function emitScript(
       // a name that is BOTH a watched prop and a mount-state read emits
       // exactly once.
       for (const n of localModel) actuallyRewrittenModelProps.add(n);
-      for (const n of localNonModel) actuallyRewrittenNonModelProps.add(n);
+      // Quick 260803-swj seam 2 — route by ORIGIN, not by hook. A watch-sourced
+      // name keeps its existing component-wide semantics; a name discovered
+      // only via the mount-phase widening goes to the mount-scoped set so the
+      // dep filter below stays narrow (see that set's declaration).
+      for (const n of localNonModel) {
+        if (watchedNonModelPropNames.has(n)) actuallyRewrittenNonModelProps.add(n);
+        else mountOnlyRewrittenNonModelProps.add(n);
+      }
 
       // Now rewrite setupCloned. We replace setupBodyForRewrite (the inner
       // body) with the rewritten version. For arrow/fn-expr setups, we
       // rebuild the arrow with the rewritten body. For block/expression
       // setups, we rewrite directly.
+      //
+      // Quick 260803-swj seam 2 (follow-up) — skipped entirely when THIS body
+      // has no discovered read (the names came from the cleanup body only).
+      // Leaving the map entry unset makes the lifecycle loop fall back to
+      // `paired?.setupCloned ?? lh.setup`, i.e. the original node, byte-identical.
+      if (setupModel.size > 0 || setupNonModel.size > 0) {
       const rewrittenInner = rewriteWatchedPropReads(
         setupBodyForRewrite,
         localModel,
@@ -2025,15 +2138,11 @@ export function emitScript(
         newSetupCloned = rewrittenInner;
       }
       rewrittenSetupByIdx.set(idx, newSetupCloned);
+      }
 
+      // Quick 260803-swj seam 2 (follow-up) — same per-body gate for cleanup.
       if (cleanupCloned) {
-        let cleanupBodyForRewrite: t.Expression | t.BlockStatement | null = null;
-        if (t.isArrowFunctionExpression(cleanupCloned) || t.isFunctionExpression(cleanupCloned)) {
-          cleanupBodyForRewrite = cleanupCloned.body;
-        } else if (t.isExpression(cleanupCloned)) {
-          cleanupBodyForRewrite = cleanupCloned;
-        }
-        if (cleanupBodyForRewrite) {
+        if (cleanupBodyForRewrite && (cleanupModel.size > 0 || cleanupNonModel.size > 0)) {
           const rewrittenCleanupInner = rewriteWatchedPropReads(
             cleanupBodyForRewrite,
             localModel,
@@ -2429,7 +2538,13 @@ export function emitScript(
   const deferredStateRefNames: string[] = [];
   {
     const sortedModelRefs = [...actuallyRewrittenModelProps].sort();
-    const sortedNonModelRefs = [...actuallyRewrittenNonModelProps].sort();
+    // Quick 260803-swj seam 2 — SORTED UNION of both non-model sets, so each
+    // name emits exactly one `const _<X>Ref = useRef(props.<X>)` pair (a Set
+    // dedupes a name that is both watch-sourced and mount-read). Alphabetical
+    // ordering keeps the emit deterministic for snapshot stability.
+    const sortedNonModelRefs = [
+      ...new Set([...actuallyRewrittenNonModelProps, ...mountOnlyRewrittenNonModelProps]),
+    ].sort();
     for (const name of sortedNonModelRefs) {
       collectors.react.add('useRef');
       hookLines.push(
@@ -2738,7 +2853,19 @@ export function emitScript(
         d.path.length > 0 &&
         (
           actuallyRewrittenModelProps.has(d.path[0]!) ||
-          actuallyRewrittenNonModelProps.has(d.path[0]!)
+          actuallyRewrittenNonModelProps.has(d.path[0]!) ||
+          // Quick 260803-swj seam 2 — mount-SCOPED, unlike its two siblings.
+          // A mount hook's `depsArr` is `[]` regardless of this filter, so the
+          // only observable effect is the `mountHasFlaggableDep` predicate
+          // below: once the body's reads are rewritten to `_<X>Ref.current`
+          // (refs are exempt from react-hooks/exhaustive-deps), an emitted
+          // `// eslint-disable-line` would become an UNUSED directive — and
+          // `lint:fixtures` runs `--max-warnings 0` with ESLint v9's default
+          // `reportUnusedDisableDirectives: 'warn'`, so that is a hard gate
+          // failure. Omitting this disjunct fails the gate one way (unused
+          // directive); applying it component-wide fails it the other (missing
+          // dep on an $onUpdate hook). The gate is self-checking.
+          (lh.phase === 'mount' && mountOnlyRewrittenNonModelProps.has(d.path[0]!))
         )
       ) {
         return false;

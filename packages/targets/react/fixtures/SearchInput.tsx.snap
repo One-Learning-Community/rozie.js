@@ -22,6 +22,8 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
     void placeholder; void minLength; void autofocus; void onSearch; void onClear;
     return rest;
   })();
+  const _autofocusRef = useRef(props.autofocus);
+  _autofocusRef.current = props.autofocus;
   const [query, setQuery] = useState('');
   const inputEl = useRef<HTMLInputElement | null>(null);
   const isValid = useMemo(() => query.length >= props.minLength, [props.minLength, query]);
@@ -37,14 +39,14 @@ export default function SearchInput(_props: SearchInputProps): JSX.Element {
   }, [_rozieProp_onClear]);
 
   useEffect(() => {
-    if (props.autofocus) inputEl.current?.focus();
+    if (_autofocusRef.current) inputEl.current?.focus();
 
     // Returning a function from $onMount registers a teardown — equivalent to
     // a separate $onUnmount, useful when setup and teardown logic belong together.
     return () => {
       // e.g., abort an in-flight request initialized in this hook
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const _rozieDebouncedOnSearch = useDebouncedCallback(onSearch, [onSearch], 300);
 

@@ -43,6 +43,14 @@ export default function Port(_props: PortProps): JSX.Element {
   };
   const nt = useRef<any>(null);
   const added = useRef(false);
+  const _labelRef = useRef(props.label);
+  _labelRef.current = props.label;
+  const _multipleRef = useRef(props.multiple);
+  _multipleRef.current = props.multiple;
+  const _positionRef = useRef(props.position);
+  _positionRef.current = props.position;
+  const _typeRef = useRef(props.type);
+  _typeRef.current = props.type;
 
   nt.current = injectedType;
 
@@ -60,7 +68,7 @@ export default function Port(_props: PortProps): JSX.Element {
     // context, REQ-30) — the $onUpdate below adds the port once it resolves.
     if (nt.current && !added.current) {
       added.current = true;
-      nt.current.addPort(portSide(), portKey(), props.type, props.label, props.multiple, props.position);
+      nt.current.addPort(portSide(), portKey(), _typeRef.current, _labelRef.current, _multipleRef.current, _positionRef.current);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

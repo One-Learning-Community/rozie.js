@@ -117,6 +117,8 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     defaultValue: props.defaultOpen ?? false,
     onValueChange: props.onOpenChange,
   });
+  const _disabledRef = useRef(props.disabled);
+  _disabledRef.current = props.disabled;
   const _openRef = useRef(open);
   _openRef.current = open;
   const anchorEl = useRef<HTMLDivElement | null>(null);
@@ -264,7 +266,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
     // and may be null until open; startTracking re-reads via the watch path.
     anchorNode.current = anchorEl.current;
-    if (_openRef.current && !props.disabled) {
+    if (_openRef.current && !_disabledRef.current) {
       // floatingNode is populated by its r-if having rendered; read it lazily inside
       // the watch/handlers too. Position on next tick when it exists.
       floatingNode.current = floatingEl.current;

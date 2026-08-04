@@ -73,6 +73,8 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
     defaultValue: props.defaultValue ?? '',
     onValueChange: props.onValueChange,
   });
+  const _autoFocusRef = useRef(props.autoFocus);
+  _autoFocusRef.current = props.autoFocus;
   const root = useRef<HTMLDivElement | null>(null);
 
   function code() {
@@ -198,7 +200,7 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
   }
 
   useEffect(() => {
-    if (props.autoFocus) focusIndex(firstEmptyIndex());
+    if (_autoFocusRef.current) focusIndex(firstEmptyIndex());
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieExposeRef = useRef({ focus, clear });
