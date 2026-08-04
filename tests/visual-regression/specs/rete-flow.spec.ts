@@ -3627,41 +3627,27 @@ for (const target of TARGETS) {
  */
 
 /**
- * REACT is fixme'd for this ONE cell — an EMITTER seam, recorded as a finding by
- * quick-260803-uwb and deliberately NOT worked around at the component source.
+ * This cell was `fixme`'d on react (quick-260803-uwb) for an EMITTER defect, never a
+ * component-source one: `.rozie-flow-minimap__node` stayed at 0 forever while the other
+ * five targets reported 48.
  *
- * SYMPTOM (steps 1-9 all pass on react EXCEPT step 2): with a graph seeded in `$onMount`,
- * react renders all 48 node boxes and all 86 drawn paths, and the minimap host, mask and
- * viewport rect all draw — but `.rozie-flow-minimap__node` stays at 0 forever (measured at
- * t+3s, t+8s and after a pan that forces a redraw; every other target reports 48 at t+3s).
+ * FIXED in 9acd7737 (quick-260803-w7b, the third react staleness seam). A top-level helper
+ * that reads reactive scope lowers to `useCallback(fn, [deps])`, whose identity React
+ * refreshes every render — but `redrawMinimap` is declared inside the `[]`-dep mount effect,
+ * so it captured render #1's `currentGraph` and observed the MOUNT-TIME graph forever. The
+ * emitter now routes mount-scoped helper calls through a synced ref
+ * (`_currentGraphRef.current()`), so the closure invokes the current instance.
  *
- * SEAM — `packages/target-react`: the emitter ref-lowers `$props.X` reads that appear
- * TEXTUALLY inside `$onMount` (the generated leaf carries `_graphRef`/`_snapGridRef`/… and
- * the reconcile reads `_graphRef.current`), but a TOP-LEVEL helper that reads `$props.X`
- * lowers to `useCallback(() => graph || …, [graph])`, closing over the RENDER-SCOPE value.
- * `redrawMinimap` is defined inside the mount effect and therefore captures the FIRST
- * render's `currentGraph` identity — permanently observing the MOUNT-TIME graph. That is
- * empty here because this demo seeds in `$onMount` (the shipped `FlowCanvasMinimap` demo
+ * Why THIS demo exposed it and `rete-flow-minimap` did not: FlowCanvasLarge seeds its graph
+ * in `$onMount`, so the mount-time capture is EMPTY; the shipped `FlowCanvasMinimap` demo
  * seeds in `<data>`, so its mount-time capture already holds the right nodes and the seam
- * is invisible — which is why `rete-flow-minimap [react]` is green).
- *
- * Out of scope for a VR-coverage task (`packages/core` / `packages/target-*` are fenced
- * off), and per feedback_emitter_owns_parity a component-side workaround — e.g. routing
- * `redrawMinimap` through `lastWrittenGraph` — would be debt, not a fix. Fixme'd here so
- * the finding stays visible rather than being silently absorbed by a softened assertion.
+ * was invisible there.
  */
-const LARGE_KNOWN_FAILING: ReadonlySet<typeof TARGETS[number]> = new Set<
-  typeof TARGETS[number]
->(['react']);
-
 for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
-  const runner =
-    !built || KNOWN_FAILING.has(target) || LARGE_KNOWN_FAILING.has(target)
-      ? test.fixme
-      : test;
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
   runner(`rete-flow-large [${target}]: a 48-node / 86-edge pipeline renders, auto-arranges without overlaps, fits on screen, and survives drag/undo + select-all/duplicate at scale`, async ({
     page,
   }) => {
