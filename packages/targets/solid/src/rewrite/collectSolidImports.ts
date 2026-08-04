@@ -84,6 +84,11 @@ export type RuntimeSolidImport =
   | 'rozieContext'
   | 'parseInlineStyle'
   | 'normalizeAttrs'
+  // Quick 260804-f15 — the COMPONENT-tag twin of `normalizeAttrs`. Added by the
+  // spread emitter ONLY when a DYNAMIC (non-literal, non-`$attrs`) `r-bind`
+  // lands on a component/self tag, so an unaffected component's
+  // `@rozie/runtime-solid` import line stays byte-identical.
+  | 'normalizeComponentAttrs'
   | 'normalizeListeners'
   | 'mergeListeners'
   /**

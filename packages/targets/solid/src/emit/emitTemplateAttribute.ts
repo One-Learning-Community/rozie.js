@@ -404,10 +404,19 @@ const RBIND_HTML_TO_SOLID_ATTR: Readonly<Record<string, string>> = {
  *   - `class` and `style` are absent from `RBIND_HTML_TO_SOLID_ATTR` (see its
  *     comment above), so `splitClassStyleFromLiteral` is provably unaffected by
  *     this gate and is NOT touched.
- *   - The DYNAMIC `r-bind` path is deliberately out of scope: it lowers to
- *     `{...normalizeAttrs(expr)}` (`emitSpread` below) and the runtime helper
- *     remaps unconditionally AND performs its own `FORBIDDEN_KEYS` strip, so
- *     gating it needs a new runtime signature. Tracked as emitter backlog.
+ *   - The DYNAMIC `r-bind` path is now gated too (quick 260804-f15): it selects
+ *     `normalizeComponentAttrs` over `normalizeAttrs` on a component/self tag.
+ *     That needed a new runtime export — the helper performs its own
+ *     `FORBIDDEN_KEYS` strip, so un-wrapping the call would have traded the
+ *     naming bug for a pollution regression. See `emitSpread` below. The
+ *     literal/dynamic asymmetry this comment used to record is CLOSED.
+ *   - `opaqueSpreadClassReadExpr` (the R6 opaque-spread class merge, below) is
+ *     deliberately NOT touched by the f15 gate. It is a SECOND dynamic call
+ *     site, reached only when an element has BOTH an explicit `:class` AND a
+ *     dynamic non-`$attrs` `r-bind`, and it is already tag-kind-agnostic: it
+ *     reads `.class` off the RAW expression precisely because
+ *     `SOLID_ATTR_KEY_MAP` omits `class`. The new helper also leaves `class`
+ *     alone, so the read stays correct by construction — zero diff.
  */
 function remapObjectKeysSolid(
   obj: t.ObjectExpression,
@@ -991,8 +1000,14 @@ export interface EmitAttributesResult {
  *     KEPT for Solid; `for`→`htmlFor`, …); `__proto__`/`constructor`/`prototype`
  *     skipped. R6: when the element ALSO has an explicit `class` binding, the
  *     literal's `class` is extracted upstream and only `rest` is spread here.
- *   - DYNAMIC (any other expr)  → `{...normalizeAttrs(<expr>)}` + the runtime
- *     import is collected.
+ *   - DYNAMIC (any other expr)  → gated on tag kind (quick 260804-f15):
+ *       html          → `{...normalizeAttrs(<expr>)}`
+ *       component/self→ `{...normalizeComponentAttrs(<expr>)}`
+ *     The chosen runtime import is collected. Both helpers perform the SAME
+ *     `FORBIDDEN_KEYS` strip from the same shared const; they differ only in
+ *     whether `SOLID_ATTR_KEY_MAP` is applied. Un-wrapping to a bare
+ *     `{...expr}` on a component tag was NOT an option — it would trade the
+ *     naming bug for a prototype-pollution regression (T-14-05).
  *
  * KNOWN LIMITATION (RESEARCH Open Question 1 / Assumption A4) — for a DYNAMIC
  * `r-bind` object the keys are NOT known at compile time, so a `class`/`style`
@@ -1024,8 +1039,16 @@ function emitSpread(
     return `{...${renderExpr(remapped, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })}}`;
   }
   // D-03 DYNAMIC — runtime key remap.
-  ctx.collectors.runtime.add('normalizeAttrs');
-  return `{...normalizeAttrs(${renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })})}`;
+  // Quick 260804-f15 — gated on tag kind, exactly like the LITERAL branch
+  // above. A component tag receives the CHILD's declared prop names, so the DOM
+  // alias table must not run; but a bare `{...expr}` would drop the runtime
+  // `FORBIDDEN_KEYS` strip, so the gate selects a sibling helper that strips
+  // identically (shared const) and aliases nothing, rather than un-wrapping.
+  const isComponentTag =
+    ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self';
+  const helper = isComponentTag ? 'normalizeComponentAttrs' : 'normalizeAttrs';
+  ctx.collectors.runtime.add(helper);
+  return `{...${helper}(${renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })})}`;
 }
 
 /**
