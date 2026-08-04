@@ -37,6 +37,7 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     },
+    "./source": "./src/index.ts",
     "./themes/*": "./src/themes/*"
   },
   "files": [
