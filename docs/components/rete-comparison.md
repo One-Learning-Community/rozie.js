@@ -114,7 +114,7 @@ This page concedes where the standalone libraries are genuinely ahead — that's
 
 - **NodeResizer aspect-ratio lock, plus assorted second-tier chrome.** NodeResizer is free-form width/height only — a `keepAspectRatio` lock is deferred out of v1. Also still deferred (unchanged from Phase 44's list): subflows/grouping, copy/paste across canvases, export-to-PNG/SVG, controlled selection (bound selected-ids), and per-node locked/draggable/deletable flags.
 - **Big-framework depth on the home framework.** React Flow (Zustand store, deep node/edge-type catalogs, helper hooks, layouting integrations) is a mature, multi-year library; on React it exposes more surface than Rozie's curated set. Rozie's value is **not** "more than React Flow on React" — it's the **same idiomatic editor on all six frameworks from one source**, with the unserved **Solid and Lit** finally covered.
-- **`@rozie-ui/rete` is `0.1.0`.** The surface (21 props / 12 events / 26-verb handle / `<NodeType>` render-by-type body portal + typed `<Port>` schema with top/bottom positioning + built-in Controls & MiniMap + labeled/styled edges + palette drag-drop) is stable and gate-verified (behavioral parity across all six targets), but it is younger than the incumbents.
+- **`@rozie-ui/rete` is `0.1.2`.** The surface (21 props / 12 events / 26-verb handle / `<NodeType>` render-by-type body portal + typed `<Port>` schema with top/bottom positioning + built-in Controls & MiniMap + labeled/styled edges + palette drag-drop) is stable and gate-verified (behavioral parity across all six targets), but it is younger than the incumbents.
 
 ## Try it
 

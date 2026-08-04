@@ -85,12 +85,10 @@ export function Demo() {
   return (
     <div style={{ height: 400 }}>
       <FlowCanvas graph={graph} onGraphChange={setGraph} validateTypes>
-        <NodeType type="source">
-          {({ node }) => <div>{node.data.label}</div>}
+        <NodeType type="source" renderBody={({ node }) => <div>{node.data.label}</div>}>
           <Port output="num" type="number" />
         </NodeType>
-        <NodeType type="merge">
-          {({ node }) => <div>{node.data.label}</div>}
+        <NodeType type="merge" renderBody={({ node }) => <div>{node.data.label}</div>}>
           <Port input="num" type="number" multiple />
         </NodeType>
       </FlowCanvas>
@@ -154,7 +152,7 @@ The sockets (connection anchors) come from each type's `<Port>` schema and are r
 
 | Name | Type | Default | Two-way (model) | Description |
 | --- | --- | --- | :---: | --- |
-| `graph` | `Object` | `{…}` | ✓ | The single source of truth — `{ nodes: [{ id, type, x, y, data? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, label?, stroke?, dashed? }] }`. `type` selects the node's `<NodeType>` template (render-by-type + its `<Port>` schema); `data` is the opaque payload handed to the type's `#body` scope. A connection may carry an optional **`label`** (rendered at the edge midpoint), **`stroke`** (CSS color), and **`dashed`** (Boolean) — per-edge label / styling for conditional & labeled edges (editing them on the bound graph re-renders the edge). **Two-way**: the canvas writes back a fresh top-level object on every drag (x/y) and connect / disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `'out'`/`'in'`; a missing connection `id` is derived from the endpoints. |
+| `graph` | `Object` | `{…}` | ✓ | The single source of truth — `{ nodes: [{ id, type, x, y, data?, width?, height? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, type?, label?, stroke?, dashed? }] }`. A node's `type` selects the node's `<NodeType>` template (render-by-type + its `<Port>` schema); `data` is the opaque payload handed to the type's `#body` scope. A connection may carry an optional **`label`** (rendered at the edge midpoint), **`stroke`** (CSS color), and **`dashed`** (Boolean) — per-edge label / styling for conditional & labeled edges (editing them on the bound graph re-renders the edge), plus an optional **`type`** — `'bezier'` (default) \| `'step'` \| `'smoothstep'` \| `'straight'` — selecting the path shape (see [Edge types](#edge-types)). A node may carry an explicit **`width`** / **`height`**: the fixed box a `<NodeType resizable>` corner-drag persists, overriding auto-sizing for that instance (see [Node resizer](#node-resizer)). **Two-way**: the canvas writes back a fresh top-level object on every drag (x/y) and connect / disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `'out'`/`'in'`; a missing connection `id` is derived from the endpoints. |
 | `validateTypes` | `Boolean` | `true` | | Automatic typed-socket validation (default ON). When `true`, the canvas resolves each endpoint's port TYPE from the per-`<NodeType>` `<Port type>` schema and auto-rejects a type-mismatched connection (firing `connection-rejected`). `canConnect` survives as the optional custom-rule override (runs in addition). Set `false` for pure-`canConnect` (type as metadata only). |
 | `zoom` | `Number` | `1` | ✓ | The viewport zoom level. Two-way: scroll / pinch writes the new zoom back through the model (echo-guarded against the wrapper's own programmatic zooms); a consumer write zooms the live area. |
 | `pannable` | `Boolean` | `true` | | Whether the canvas can be panned (drag the background). Disabling detaches the area's drag handler. |
@@ -171,7 +169,7 @@ The sockets (connection anchors) come from each type's `<Port>` schema and are r
 | `minimap` | `Boolean` | `false` | | Render the built-in **MiniMap overlay** — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the **measured** engine node-view dims) plus the current viewport window (the area outside dimmed). **Pannable**: drag the minimap to recenter the main viewport (via `setCenter`). Opt-in (default OFF) — the React Flow `<MiniMap/>` parity. Evaluated at construction (like `pannable` / `zoomable` / `controls`); set it at mount time. |
 | `canConnect` | `Function` | `null` | | Connection-validation predicate `(conn: { source, sourceOutput, target, targetInput }) => boolean`. Return `false` to REJECT a connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in **addition** to the automatic `:validate-types` check (the custom-rule override). Gates ALL connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent / `null` imposes no custom rule. |
 | `history` | `Boolean` | `true` | | **Undo / redo**, on by default. Every gesture — drag, connect, disconnect, delete — pushes ONE capped (~100) snapshot of the bound graph (nodes incl. x/y + connections; **not** the viewport), and `undo()` / `redo()` + **Ctrl/Cmd+Z** · **Ctrl/Cmd+Shift+Z** · **Ctrl/Cmd+Y** restore it through the two-way `graph` model (echo-guarded). One gesture = one undo step; a fresh edit after an undo discards the redo branch. Opt out with `:history="false"` (the snapshot stack stays empty; the verbs no-op). |
-| `mode` | `String` | `"pan"` | ✅ | **Two-way interaction mode** — the Figma-style pan ↔ select toggle. `'pan'` (default) PANS the viewport on an empty-canvas drag (UNCHANGED). `'select'` draws a rubber-band **marquee** box on an empty-canvas drag that multi-selects the intersecting nodes (surfacing `selection-change`). A node drag still drags the node in BOTH modes. Bind with `r-model:mode`; the canvas writes it back when the built-in mode button (see `marquee`) toggles. |
+| `mode` | `String` | `"pan"` | ✓ | **Two-way interaction mode** — the Figma-style pan ↔ select toggle. `'pan'` (default) PANS the viewport on an empty-canvas drag (UNCHANGED). `'select'` draws a rubber-band **marquee** box on an empty-canvas drag that multi-selects the intersecting nodes (surfacing `selection-change`). A node drag still drags the node in BOTH modes. Bind with `r-model:mode`; the canvas writes it back when the built-in mode button (see `marquee`) toggles. |
 | `marquee` | `Boolean` | `false` | | Render the **4th Controls button** — the pan ↔ select mode toggle (two-way-writes `mode`). Default OFF so the default Controls overlay keeps its 3 buttons (the `FlowCanvasScreenshot` pixel baseline is byte-identical). The marquee BEHAVIOR works whenever `mode === 'select'` regardless of this flag (a consumer can drive `mode` directly); this only governs the built-in button. |
 | `nodeToolbar` | `Boolean` | `false` | | Render the opt-in **NodeToolbar** — a floating toolbar over the **single selected** node (positioned from the engine node-view rect + the area transform, re-tracked on pan / zoom / drag). Default content = **Delete** (cascading controlled-graph `deleteNode`) + **Duplicate** (clone the node spec at an offset with a new id into a fresh `graph` object); both fire `node-action` (`name: 'delete' | 'duplicate'`). Override the content by filling the `#toolbar` reactive slot (scope `{ node, emit }`). Default OFF — existing canvases are pixel-identical (selecting a node pops nothing). |
 | `background` | `String` | `"dots"` | | Canvas **background pattern** — `'dots'` (default, today's grid) \| `'lines'` \| `'cross'` \| `'none'` (the React Flow `<Background variant>` parity). One-way (not a model). Gap / size / color stay CSS custom properties (`--rozie-flow-grid-size`, `--rozie-flow-grid-dot-color`, `--rozie-flow-bg`) — not separate props. |
@@ -220,8 +218,21 @@ Beyond props, `FlowCanvas` exposes imperative methods via `$expose`. Grab a hand
 | `canUndo()` | Whether there is an edit to undo → `boolean`. |
 | `canRedo()` | Whether there is an edit to redo → `boolean`. |
 | `autoArrange(opts?)` | Relayout the graph into a non-overlapping layered arrangement (elkjs-backed), then read the arranged node positions back through the two-way `graph` model (echo-guarded, one undoable gesture). **Verb-only — never auto-triggered.** `await`-able; `opts.options` forwards elk layout options (direction / spacing). No-op before mount. |
+| `getSelectedNodes()` | The currently-selected nodes as `[{ id, label, x, y }]` — the `getNodes()` shape filtered to the live selection (empty when nothing is selected). The on-demand read that complements the push-only `selection-change` event. |
+| `selectNode(id, accumulate?)` | Programmatically select a node by id (`accumulate: true` adds to the selection; falsy replaces it) — drive selection from a sidebar or search. No-op when selection is disabled (`readonly` / `!selectable`). Named `selectNode`, not bare `select`, which is an inherited `HTMLElement` method. |
+| `clearSelection()` | Clear the current node selection (and any selected edge). |
+| `selectAll()` | Select every node. No-op when selection is disabled. |
+| `centerOnNode(id, opts?)` | Pan — and optionally zoom via `opts.zoom` — to center the viewport on a node by id. `await`-able; measures the node to find its center in graph coordinates. No-op before mount or for an unknown id. |
 
 > The method is `zoomTo`, not `setZoom` — `zoom` is a model prop, so React auto-generates a `setZoom` state setter that a `setZoom` verb would collide with (the same collision discipline as the rest of `@rozie-ui`).
+
+### Slots
+
+| Slot | Params | Notes |
+| --- | --- | --- |
+| (default) | — | Hosts the declarative `<NodeType>` / `<Port>` TYPE-template children. The normal authoring path. |
+| `node` | `{ node, selected, emit }` | Reactive portal slot — the **low-level per-node escape hatch**: invoked per graph node whose `type` has no `<NodeType>` template, so the consumer switches on `node.type` inside one `#node` fill. Prefer `<NodeType>`. |
+| `toolbar` | `{ node, emit }` | Reactive portal slot — replaces the default NodeToolbar buttons when `:node-toolbar="true"`. |
 
 ## Editing the graph
 
