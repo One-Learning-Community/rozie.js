@@ -367,4 +367,36 @@ $onMount(() => {
   it('snapshot — SRC_COLLIDE', () => {
     expect(compile(SRC_COLLIDE)).toMatchSnapshot();
   });
+
+  // Review follow-up (260804) — the eligibility gate deliberately does NOT
+  // exclude `function` declarations (unlike `useCallbackHelperNames`): a
+  // function declaration in component scope is re-created per render exactly
+  // like an arrow helper, so the same staleness argument applies. This case
+  // pins that generalization, which the arrow-only fixtures above left
+  // unexercised.
+  const SRC_FUNCDECL = `<rozie name="Test" inherit-attrs="false">
+<props>{ gain: { type: Number, default: 1 } }</props>
+<script>
+function readScale() { return $props.gain * 3; }
+$onMount(() => {
+  const h = () => { use(readScale()); };
+  document.addEventListener('pointerdown', h);
+  return () => document.removeEventListener('pointerdown', h);
+});
+</script>
+<template><div>{{ readScale() }}</div></template>
+</rozie>`;
+
+  it('a function-declaration helper is ref-routed like an arrow helper', () => {
+    const code = compile(SRC_FUNCDECL);
+    const mount = mountEffect(code);
+    expect(code).toContain('const _readScaleRef = useRef(readScale);');
+    expect(code).toContain('_readScaleRef.current = readScale;');
+    expect(mount.body).toContain('_readScaleRef.current(');
+    expect(bareCallCount(mount.body, 'readScale')).toBe(0);
+  });
+
+  it('snapshot — SRC_FUNCDECL', () => {
+    expect(compile(SRC_FUNCDECL)).toMatchSnapshot();
+  });
 });

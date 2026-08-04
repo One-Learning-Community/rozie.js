@@ -1927,9 +1927,10 @@ export function emitScript(
   // lifecycle loop can consult it while rewriting mount-phase bodies (it needs
   // to know which CallExpression callees are top-level helpers). The move is
   // semantically inert: its three inputs — `cloned`, `lifecyclePairing` and
-  // `watcherPairing` — are all declared above this point, and
-  // `cloned.program.body` is mutated exactly once, by the module-let hoist,
-  // which also runs above this point. `helperLocByName`'s only consumer is the
+  // `watcherPairing` — are all declared above this point, and both mutations of
+  // `cloned.program.body` (the import/type partitioning reassignment and the
+  // module-let hoist's filter) also run above this point — nothing reassigns it
+  // between here and the old pre-scan position. `helperLocByName`'s only consumer is the
   // ROZ524 assertion in section 6b, which runs later either way. Proved
   // byte-neutral by its own forced whole-repo build before the seam fix was
   // layered on top.
