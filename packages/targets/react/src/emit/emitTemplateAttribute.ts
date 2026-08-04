@@ -563,11 +563,13 @@ function rbindKeyToJsxName(
  *   - `splitClassStyleFromLiteral` is NOT touched; given D-02 the object it
  *     receives still carries `className`/`style`, so the class/style split is
  *     byte-identical on every tag kind.
- *   - The DYNAMIC `r-bind` path is deliberately out of scope: it lowers to
- *     `{...normalizeAttrs(expr)}` and the runtime helper remaps unconditionally
- *     AND performs its own `FORBIDDEN_KEYS` strip, so gating it would trade a
- *     naming bug for a security regression. Needs a new runtime signature;
- *     tracked as emitter backlog.
+ *   - The DYNAMIC `r-bind` path is now gated too (quick 260804-f15): it selects
+ *     `normalizeComponentAttrs` over `normalizeAttrs` on a component/self tag.
+ *     That needed a new runtime export — the helper performs its own
+ *     `FORBIDDEN_KEYS` strip, so un-wrapping the call would have traded the
+ *     naming bug for a security regression. The component helper preserves
+ *     D-02's `class`→`className` clause. See `emitSpread` below. The
+ *     literal/dynamic asymmetry this comment used to record is CLOSED.
  */
 function remapObjectKeysReact(
   obj: t.ObjectExpression,
@@ -1353,8 +1355,15 @@ export interface EmitAttributesResult {
  *     R6: when the element ALSO has an explicit `class` binding, the literal's
  *     `className` key is extracted (see `extractLiteralClassExpr`) and only the
  *     `rest` keys are spread here.
- *   - DYNAMIC (any other expr)  → `{...normalizeAttrs(<expr>)}` + the runtime
- *     import is collected.
+ *   - DYNAMIC (any other expr)  → gated on tag kind (quick 260804-f15):
+ *       html          → `{...normalizeAttrs(<expr>)}`
+ *       component/self→ `{...normalizeComponentAttrs(<expr>)}`
+ *     The chosen runtime import is collected. Both helpers perform the SAME
+ *     `FORBIDDEN_KEYS` strip from the same shared const AND both map
+ *     `class`→`className` (D-02); they differ only in whether the rest of
+ *     `REACT_ATTR_KEY_MAP` is applied. Un-wrapping to a bare `{...expr}` on a
+ *     component tag was NOT an option — it would trade the naming bug for a
+ *     prototype-pollution regression (T-14-05).
  *
  * KNOWN LIMITATION (RESEARCH Open Question 1 / Assumption A4) — for a DYNAMIC
  * `r-bind` object the keys are NOT known at compile time, so a `class`/`style`
@@ -1389,8 +1398,17 @@ function emitSpread(
     return `{...${renderExpr(remapped, ctx.ir)}}`;
   }
   // D-03 DYNAMIC — runtime key remap.
-  ctx.collectors.runtime.add('normalizeAttrs');
-  return `{...normalizeAttrs(${renderExpr(attr.expression, ctx.ir)})}`;
+  // Quick 260804-f15 — gated on tag kind, exactly like the LITERAL branch
+  // above. A component tag receives the CHILD's declared prop names, so the DOM
+  // alias table must not run; but a bare `{...expr}` would drop the runtime
+  // `FORBIDDEN_KEYS` strip, so the gate selects a sibling helper that strips
+  // identically (shared const) rather than un-wrapping. D-02: the component
+  // helper STILL maps `class`→`className` — see `rbindKeyToJsxName` above.
+  const isComponentTag =
+    ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self';
+  const helper = isComponentTag ? 'normalizeComponentAttrs' : 'normalizeAttrs';
+  ctx.collectors.runtime.add(helper);
+  return `{...${helper}(${renderExpr(attr.expression, ctx.ir)})}`;
 }
 
 /**
@@ -1534,6 +1552,19 @@ function opaqueSpreadClassReadExpr(
   // Dynamic — read `.className` off the normalized expression. normalizeAttrs
   // remaps `class` → `className` (HTML_TO_JSX_ATTR), matching the key that
   // the JSX `{...normalizeAttrs(expr)}` spread reaches the DOM with.
+  //
+  // D-09 SCOPE FENCE (quick 260804-f15) — this call site deliberately stays on
+  // `normalizeAttrs` and is NOT gated on `ctx.elementTagKind`, even though the
+  // sibling spread in `emitSpread` now is. The zero-diff argument: on React
+  // BOTH helpers map `class`→`className` (D-02), so on a component tag the
+  // spread emits `normalizeComponentAttrs(expr)` while this merge reads
+  // `normalizeAttrs(expr).className` — the SAME object key carrying the SAME
+  // value. The merge is value-correct unchanged.
+  //
+  // The only artifact is that an element with BOTH an explicit `:class` AND a
+  // dynamic non-`$attrs` `r-bind` on a component tag imports both helpers.
+  // That is honest — they do two different jobs — and it costs nothing.
+  // Asserted by fixture: `rbindDynamicComponentTag.test.ts` GREEN GUARD-4.
   ctx.collectors.runtime.add('normalizeAttrs');
   const exprCode = renderExpr(attr.expression, ctx.ir);
   return `(normalizeAttrs(${exprCode}).className as string | undefined)`;

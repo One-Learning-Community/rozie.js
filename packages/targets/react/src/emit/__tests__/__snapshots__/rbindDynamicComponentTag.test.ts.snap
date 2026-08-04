@@ -1,0 +1,10 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitTemplateAttribute (React) — r-bind DYNAMIC spreads must bypass the runtime attr remap on component tags (Quick 260804-f15) > RED-1 — a DYNAMIC r-bind on a COMPONENT tag routes through the component helper 1`] = `
+"<>
+      <div {...attrs} data-rozie-s-8fd6d49e="">
+        <Child {...normalizeComponentAttrs(someObj)} data-rozie-s-8fd6d49e="" />
+        <input {...normalizeAttrs(someObj)} data-rozie-s-8fd6d49e="" />
+      </div>
+    </>"
+`;
