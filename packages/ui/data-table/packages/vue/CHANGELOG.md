@@ -1,5 +1,12 @@
 # @rozie-ui/data-table-vue
 
+## 0.2.3
+
+### Patch Changes
+
+- Stale-publish reconciliation. The published `0.2.2` tarball's `src/DataTable.vue` predates a regeneration that landed on `main` without a version bump, so the registry kept serving the pre-regeneration bytes. This release republishes the current generated output — verified purely internal source-comment cleanup (documentation of the grouping/pinning/windowing internals); every non-comment line is byte-identical to the previously published version. No behavior change, no API surface change.
+- @rozie/runtime-vue@0.2.1 (unchanged — no runtime bump in this wave)
+
 ## 0.2.2
 
 ### Patch Changes

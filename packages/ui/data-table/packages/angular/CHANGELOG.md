@@ -1,5 +1,11 @@
 # @rozie-ui/data-table-angular
 
+## 0.2.1
+
+### Patch Changes
+
+- Stale-publish reconciliation. The published `0.2.0` tarball predates a regeneration that landed on `main` without a version bump, so the registry kept serving stale bytes across 11 files (`Column.ts`, `DataTable.ts`, the five `Editor*.ts` cell editors, the three `Filter*.ts` filter controls, and `GroupBar.ts`). This release republishes the current generated output. The drift is one mechanical, repo-wide theme, not 11 separate changes: every `Function`-typed input (`aggregationFn`, `validate`, `getSubRows`, each editor's `commit`/`cancel`, each filter's `setFilter`, `applyGrouping`/`clearGrouping`) is now widened from `(...args: unknown[]) => unknown` to `(...args: any[]) => any` — the Angular half of the emitter's function-prop type-lowering fix. The published `unknown`-typed signature rejected a consumer's own typed callback at the call site (`TS2345`, since `unknown` params/return are not assignable from/to a concrete function type); `any` accepts it. No runtime behavior change — these are compile-time-only input type annotations.
+
 ## 0.2.0
 
 ### Minor Changes

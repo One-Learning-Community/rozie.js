@@ -1,5 +1,15 @@
 # @rozie-ui/command-palette-angular
 
+## 0.4.1
+
+### Patch Changes
+
+- Stale-publish reconciliation. The published `0.4.0` tarball predates several regenerations that landed on `main` without a version bump, so the registry kept serving stale bytes. This release republishes the current generated output:
+  - **Fix: multi-modifier `actionKey` hotkeys were silently dead.** `matchesActionKey` (the per-row action-menu keyboard matcher) previously only recognized a bare `$mod+<letter>` token or a single unmodified letter — any other modifier combination (`$shift`, `$alt`, `$ctrl`, or a token combining several, e.g. `$mod+$shift+p`) never matched, even though the badge rendered by `formatKeyToken` correctly displayed it. Both now parse through a new shared `src/internal/parseKeyToken.ts` module (vendored into all six leaves), so a hotkey that renders a badge is now always one the matcher can fire on. This module was entirely absent from the published tarball despite being imported by the compiled component.
+  - `argsState`'s breadcrumb/args-chip label now reads through a nullish-safe `labelText(item)` helper instead of a direct `.label` field access that did not exist on the `argsState` shape (the label lives at `.item.label`) — the args surface's chip/aria-label previously rendered blank/incorrect text.
+  - Apple-platform detection for hotkey badge rendering (⌘ vs Ctrl) is now sniffed once at mount into a signal instead of being recomputed on every render — an internal perf change with no observable difference.
+  - No prop/event/slot surface change. The `hotKey` teaching-badge and inline-args features shipped in `0.4.0` are unaffected in shape, only in the badge-matcher correctness described above.
+
 ## 0.4.0
 
 ### Minor Changes

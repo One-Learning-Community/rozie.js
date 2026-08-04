@@ -1,5 +1,15 @@
 # @rozie-ui/toast-angular
 
+## 0.1.1
+
+### Patch Changes
+
+- Stale-publish reconciliation. The published `0.1.0` tarball predates the `0.4.0`-cluster's stacked-offset regeneration and never carried it — `pnpm publish` silently skipped republishing at the time, so the registry has been serving a `Toaster` missing the `stacked` mode's per-toast depth offset since the feature's introduction. This release republishes the current generated output:
+  - **Fix: `stacked` mode's collapsed depth offset now actually applies.** The template's per-toast style call was `toastStyle(t)` (single-arg) in the published tarball; the depth-driven `--rozie-toast-depth` custom property that the `stacked` CSS relies on to fan/collapse the grid overlay was never computed per-row, so a `stacked` toaster rendered every toast at depth 0 (all stacked flush, no depth cascade). It is now `toastStyle(t, ti)`, threading the row index through to `depth(ti)`.
+  - `depth()` itself changed from an O(n) `findIndex` scan per toast (invoked once per rendered row, so O(n²) per render) to O(1) arithmetic off the `@for`-provided index (`let ti = $index`) — same observable depth values, no behavior change beyond the fix above.
+  - The `swipeGesture` pointer-drag bookkeeping moves from a component signal (`swipeGesture = signal<any>(null)`) to a plain instance field, matching the hoisted-non-reactive-bookkeeping convention used elsewhere in the corpus (the value is never read from the template, only from the four `onToastPointer*` handlers) — an internal implementation detail with no observable behavior change.
+  - No prop/event/emit surface change. The `stacked` prop and its opt-in behavior shipped as designed in the `0.1.0` minor; only the depth-offset computation was missing from what actually reached npm.
+
 ## 0.1.0
 
 ### Minor Changes

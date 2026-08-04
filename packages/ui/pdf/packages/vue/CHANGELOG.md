@@ -1,5 +1,11 @@
 # @rozie-ui/pdf-vue
 
+## 0.2.2
+
+### Patch Changes
+
+- Stale-publish reconciliation. The published `0.2.1` tarball's `src/PdfViewer.vue` predates a regeneration that landed on `main` without a version bump, so the registry kept serving the pre-regeneration bytes. This release republishes the current generated output — verified purely internal source-comment cleanup (documentation of the load/render/find-search internals) plus the mechanical `cancelled` field-to-mount-local move already shipped in the Angular leaf (emitter-hardening backlog item #2); every functional line is byte-identical to the previously published version. No behavior change, no API surface change.
+
 ## 0.2.1
 
 ### Patch Changes

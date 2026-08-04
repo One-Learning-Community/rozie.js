@@ -1,5 +1,12 @@
 # @rozie-ui/combobox-svelte
 
+## 0.4.1
+
+### Patch Changes
+
+- Stale-publish reconciliation. The published `0.4.0` tarball predates a `src/Combobox.svelte` regeneration that landed on `main` without a version bump, so the registry kept serving the pre-regeneration bytes. This release republishes the current generated output. The regeneration is purely an internal-implementation refactor of the filtered-options memoization: the hand-rolled reference-keyed cache (`foCache`) is now expressed on the shared `$memo(fn, keyFn)` core primitive (dogfooded across the corpus), which subscribes to the same four reactive inputs (options/query/disableFilter/groups) and produces byte-identical filtering, grouping, and windowing behavior. No prop/model/emit/slot/expose surface change; the `virtual` live-flip behavior from 0.4.0 is unaffected.
+- @rozie/runtime-svelte@0.2.2 (unchanged — no runtime bump in this wave)
+
 ## 0.4.0
 
 ### Minor Changes

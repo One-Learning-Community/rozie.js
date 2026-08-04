@@ -1,5 +1,11 @@
 # @rozie-ui/sortable-list-vue
 
+## 0.1.7
+
+### Patch Changes
+
+- Stale-publish reconciliation. The published `0.1.6` tarball shipped without a `web-types.json` IDE sidecar at all — it was missing from the tarball entirely, and the `package.json` `web-types` field / `files` entry that reference it were also absent from the published manifest, so PhpStorm/WebStorm consumers got zero `<SortableList>` prop/slot completion. This release republishes with the sidecar present and wired (`web-types` field + `files` entry), matching every other release-verified vue leaf's convention. No `src/` change, no API surface change.
+
 ## 0.1.6
 
 ### Patch Changes

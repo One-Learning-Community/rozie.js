@@ -1,5 +1,11 @@
 # @rozie-ui/tiptap-vue
 
+## 0.2.1
+
+### Patch Changes
+
+- Stale-publish reconciliation. The published `0.2.0` tarball's `web-types.json` IDE sidecar was pinned at `0.1.1` — commit `4a095fdd` (2026-08-03) regenerated it to match the leaf version but landed on `main` without a version bump, so `pnpm publish` silently skipped republishing and the registry kept serving the stale sidecar for seven days after the `0.2.0` content itself went live. This release republishes with the sidecar's `version` field matching the leaf `package.json` version. No `src/` change, no API surface change — PhpStorm/WebStorm consumers now get correct `<TipTap>` prop/slot IDE completion instead of stale 0.1.1-era metadata.
+
 ## 0.2.0
 
 ### Minor Changes

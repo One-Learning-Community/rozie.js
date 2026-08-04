@@ -228,6 +228,29 @@ name: Release (early subset)
 #     `@rozie-ui stale-publish reconciliation`. Not caused by this series — every one of
 #     its ten commits touches zero non-react leaf files.
 #
+# 2026-08-04 @rozie-ui stale-publish reconciliation wave (quick 260804-lxk):
+#   - NO new family, NO --filter-list edit needed. All 19 bumped leaves were already
+#     enumerated 3x in the Build, Publish, and advisory-precheck lists (verified
+#     programmatically). Unbumped siblings enumerated in those same lists are simply
+#     skipped by `pnpm publish` as already-published (D-02, per-leaf bumps).
+#   - NO toolchain and NO runtime bump (D-03) — the drifted leaf content is already
+#     produced by the published toolchain 0.3.2 / runtimes 0.2.3 that landed in the
+#     260804-hzx wave; `git log 2568956e..HEAD -- packages/core packages/targets
+#     packages/runtime` is empty.
+#   - 19 of the 20 pre-existing stale-published non-react leaves (flagged by the
+#     260804-hzx wave's derivation) are reconciled here: captcha-{angular,vue},
+#     combobox-{svelte,vue}, command-palette-{angular,svelte,vue},
+#     data-table-{angular,svelte,vue}, flatpickr-{angular,vue}, pdf-{angular,vue},
+#     sortable-list-vue, tiptap-vue, toast-{angular,svelte,vue}. Each republishes the
+#     ALREADY-committed generated output at a patch bump — no `.rozie` source, emitter,
+#     runtime, or emitted leaf `src/` byte is touched by this wave.
+#   - `@rozie-ui/popover-lit` is DELIBERATELY EXCLUDED (D-01) and stays stale on npm at
+#     0.1.2 — its drift is a consumer-visible public-type change (unknown -> any on the
+#     `anchor` render-prop slot scope), an API decision pending, not a mechanical patch
+#     ripple. It is allowlisted (name@version-keyed, self-disarming on bump) in the new
+#     release-precheck check (f) — published-tarball drift (RELEASING.md §6 item 11) —
+#     so the class this wave exists to close cannot silently re-accumulate.
+#
 # Everything else is DELIBERATELY out of scope: any @rozie-ui family not enumerated
 # above (maplibre, codemirror, lexical, chartjs, uppy, dialog, slider,
 # …) is not release-verified. Do NOT widen the --filter lists below to other

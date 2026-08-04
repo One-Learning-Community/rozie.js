@@ -1,5 +1,14 @@
 # @rozie-ui/pdf-angular
 
+## 0.2.2
+
+### Patch Changes
+
+- Stale-publish reconciliation. The published `0.2.1` tarball's `src/PdfViewer.ts` predates a regeneration that landed on `main` without a version bump, so the registry kept serving the pre-regeneration bytes. This release republishes the current generated output:
+  - Adds the `:host(rozie-pdf-viewer) { display: contents; }` component style, so the host element no longer imposes its own box in the layout.
+  - The `cancelled` async-load guard moves from a component field (`this.cancelled`) to a mount-scoped local, per the emitter-hardening backlog item #2 convention (every target now keeps a `$onMount` setup-local in scope for its own returned teardown) — an internal implementation detail with no observable behavior change.
+  - No prop/event/emit surface change.
+
 ## 0.2.1
 
 ### Patch Changes
