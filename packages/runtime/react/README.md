@@ -40,7 +40,7 @@ const [value, setValue] = useControllableState({ prop, defaultValue, onChange })
 - **Hooks:** `useControllableState`, `useOutsideClick`, `useDebouncedCallback`, `useThrottledCallback`
 - **Interpolation:** `rozieDisplay` (Phase 26 safe non-primitive interpolation — `toDisplayString` semantics, crash-safe)
 - **Class names:** `clsx`
-- **Style/attr/listener normalization:** `parseInlineStyle`, `toStyleObjectKey`, `normalizeAttrs`, `REACT_ATTR_KEY_MAP`, `normalizeListeners`, `REACT_LISTENER_KEY_MAP`, `mergeListeners`
+- **Style/attr/listener normalization:** `parseInlineStyle`, `toStyleObjectKey`, `normalizeAttrs`, `normalizeComponentAttrs`, `REACT_ATTR_KEY_MAP`, `normalizeListeners`, `REACT_LISTENER_KEY_MAP`, `mergeListeners`
 - **Key filters:** `isEnter`, `isEscape`, `isTab`, `isSpace`, `isUp`, `isDown`, `isLeft`, `isRight`, `isCtrl`, `isAlt`, `isShift`, `isMeta`
 - **Types:** `UseControllableStateOpts`
 

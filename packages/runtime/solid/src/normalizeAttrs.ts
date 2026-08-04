@@ -98,3 +98,45 @@ export function normalizeAttrs(
   }
   return out;
 }
+
+/**
+ * Quick 260804-f15 — the COMPONENT-tag counterpart of `normalizeAttrs`.
+ *
+ * WHY IT EXISTS: a `<Component>` tag does not receive DOM attribute names — it
+ * receives the child's DECLARED prop names. A Rozie Solid child's `splitProps`
+ * key list is built from its `ir.props`, so it declares `readonly`, `tabindex`,
+ * `for` exactly as authored. Running the DOM alias table over a dynamic
+ * `r-bind` object bound for such a child renames those keys to `readOnly` /
+ * `tabIndex` / `htmlFor` and the props SILENTLY NEVER ARRIVE. This is the
+ * runtime twin of the compile-time component branch in `remapObjectKeysSolid`
+ * (`targets/solid/src/emit/emitTemplateAttribute.ts:427-434`, quick 260804-4cy)
+ * — so the LITERAL and DYNAMIC `r-bind` paths are now semantically identical on
+ * a component tag.
+ *
+ * SECURITY: the `FORBIDDEN_KEYS` strip is deliberately IDENTICAL to
+ * `normalizeAttrs` and shares the same module-level const, so the prototype-
+ * pollution semantics of the two functions CANNOT drift (T-14-05). This is the
+ * entire reason an emitter-only gate was impossible: emitting a bare
+ * `{...obj}` on a component tag would have traded a naming bug for a
+ * pollution regression.
+ *
+ * EVERY key passes through verbatim — Solid needs no rename exception at all.
+ * `class` is deliberately absent from `SOLID_ATTR_KEY_MAP` and Solid JSX takes
+ * `class` natively on component and DOM tags alike. (The React twin DOES keep
+ * `class`→`className` here; see D-02 / quick 260804-4cy `ccc2225a`.)
+ *
+ * @public — runtime API consumed by emitted .tsx files.
+ */
+export function normalizeComponentAttrs(
+  obj: Record<string, unknown>,
+): Record<string, unknown> {
+  // Build on a null-prototype object so a copied key can never collide with an
+  // inherited Object.prototype member — same invariant as `normalizeAttrs`.
+  const out: Record<string, unknown> = Object.create(null);
+  for (const key of Object.keys(obj)) {
+    // SECURITY (T-14-05) — never copy a pollution-vector key. Shared const.
+    if (FORBIDDEN_KEYS.has(key)) continue;
+    out[key] = obj[key];
+  }
+  return out;
+}

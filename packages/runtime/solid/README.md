@@ -39,7 +39,7 @@ const [value, setValue] = createControllableSignal({ prop, defaultValue, onChang
 
 - **Reactive primitives:** `createControllableSignal`, `createOutsideClick`, `createDebouncedHandler`, `createThrottledHandler`
 - **Interpolation:** `rozieDisplay` (Phase 26 safe non-primitive interpolation — `toDisplayString` semantics, crash-safe)
-- **Style/attr/listener normalization:** `parseInlineStyle`, `toStyleObjectKey`, `normalizeAttrs`, `SOLID_ATTR_KEY_MAP`, `normalizeListeners`, `SOLID_LISTENER_KEY_MAP`, `mergeListeners`, `__rozieInjectStyle`
+- **Style/attr/listener normalization:** `parseInlineStyle`, `toStyleObjectKey`, `normalizeAttrs`, `normalizeComponentAttrs`, `SOLID_ATTR_KEY_MAP`, `normalizeListeners`, `SOLID_LISTENER_KEY_MAP`, `mergeListeners`, `__rozieInjectStyle`
 - **Key filters:** `isEnter`, `isEscape`, `isTab`, `isSpace`, `isUp`, `isDown`, `isLeft`, `isRight`, `isCtrl`, `isAlt`, `isShift`, `isMeta`
 
 ## Links

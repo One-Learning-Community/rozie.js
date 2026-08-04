@@ -319,7 +319,8 @@ export const SOLID_IMPORT_NAMES: ReadonlySet<string> = new Set([
   // @rozie/runtime-solid
   'createControllableSignal', 'createOutsideClick', 'createDebouncedHandler',
   'createThrottledHandler', 'rozieDisplay', 'rozieAttr', 'rozieClass',
-  'rozieContext', 'parseInlineStyle', 'normalizeAttrs', 'normalizeListeners',
+  'rozieContext', 'parseInlineStyle', 'normalizeAttrs', 'normalizeComponentAttrs',
+  'normalizeListeners',
   'mergeListeners', '__rozieInjectStyle',
 ]);
 
