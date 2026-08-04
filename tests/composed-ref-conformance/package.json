@@ -8,6 +8,7 @@
   },
   "devDependencies": {
     "@rozie/core": "workspace:*",
+    "@rozie/runtime-lit": "workspace:*",
     "typescript": "~5.6.0",
     "vitest": "^4"
   }
