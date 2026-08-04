@@ -2147,15 +2147,22 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         if (this.scheduleResizerTrack) this.scheduleResizerTrack();
       } else if (context.type === 'contextmenu') {
         // suppress the native browser menu over the canvas; surface a hook instead.
-        context.data.event.preventDefault();
-        const ctx = context.data.context;
-        this.dispatchEvent(new CustomEvent("context-menu", {
-          detail: {
-            id: ctx && ctx.id ? ctx.id : null
-          },
-          bubbles: true,
-          composed: true
-        }));
+        const ev = context.data.event;
+        ev.preventDefault();
+        // DEDUPE per native event (see `lastContextMenuEvent`): a node/connection right-click
+        // bubbles into the container listener too, so rete emits the specific signal AND a
+        // generic `context: 'root'` one for the SAME event. Keep the first (most specific).
+        if (ev !== this.lastContextMenuEvent) {
+          this.lastContextMenuEvent = ev;
+          const ctx = context.data.context;
+          this.dispatchEvent(new CustomEvent("context-menu", {
+            detail: {
+              id: ctx && ctx.id ? ctx.id : null
+            },
+            bubbles: true,
+            composed: true
+          }));
+        }
       }
       return context;
     });
@@ -3564,6 +3571,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   dragGestureActive = false;
 
   pendingDragSnapshot: any = null;
+
+  lastContextMenuEvent: any = null;
 
   reconnectInFlight = 0;
 

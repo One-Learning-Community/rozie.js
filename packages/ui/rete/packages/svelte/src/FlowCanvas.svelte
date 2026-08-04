@@ -424,6 +424,20 @@ let redoStack = [];
 // `pointerup` resets it. D-03: a drag = ONE undo step.
 let dragGestureActive = false;
 let pendingDragSnapshot: any = null;
+// One-shot per-NATIVE-EVENT guard for `contextmenu` (quick-260803-uwb, found by VR).
+// rete-area-plugin@2.1.5 attaches TWO `contextmenu` DOM listeners that both bubble from
+// the same native event and neither of which stops propagation:
+//   - NodeView / ConnectionView attach one on their OWN element and emit the SPECIFIC
+//     signal `{ event, context: <node|connection> }` (rete-area-plugin.esm.js:637, :782),
+//   - AreaPlugin attaches one on the CONTAINER and emits `{ event, context: 'root' }`
+//     (rete-area-plugin.esm.js:1519-1530).
+// So ONE right-click on a node fires the specific signal FIRST and the generic 'root' one
+// immediately after — which used to surface as TWO `@context-menu` emits whose second
+// carried `id: null` and CLOBBERED the node id. We remember the native event object of the
+// signal we already surfaced and ignore any later signal carrying the SAME event, keeping
+// the FIRST (most specific) one: one right-click = one emit. `preventDefault()` still runs
+// on every pass (idempotent, and the native menu must be suppressed either way).
+let lastContextMenuEvent: any = null;
 // T2.5 — RECONNECT coalescing (D-08 reconnectable edges, D-03 one-gesture-one-entry).
 // Dragging an existing edge endpoint to a new socket is a SINGLE user gesture, but the
 // shipped `Presets.classic.setup()` implements it as `editor.removeConnection(old)` then
@@ -2675,11 +2689,18 @@ onMount(() => {
       if (scheduleResizerTrack) scheduleResizerTrack();
     } else if (context.type === 'contextmenu') {
       // suppress the native browser menu over the canvas; surface a hook instead.
-      context.data.event.preventDefault();
-      const ctx = context.data.context;
-      oncontextmenu?.({
-        id: ctx && ctx.id ? ctx.id : null
-      });
+      const ev = context.data.event;
+      ev.preventDefault();
+      // DEDUPE per native event (see `lastContextMenuEvent`): a node/connection right-click
+      // bubbles into the container listener too, so rete emits the specific signal AND a
+      // generic `context: 'root'` one for the SAME event. Keep the first (most specific).
+      if (ev !== lastContextMenuEvent) {
+        lastContextMenuEvent = ev;
+        const ctx = context.data.context;
+        oncontextmenu?.({
+          id: ctx && ctx.id ? ctx.id : null
+        });
+      }
     }
     return context;
   });
