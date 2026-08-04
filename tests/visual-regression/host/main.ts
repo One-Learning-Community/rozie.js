@@ -516,6 +516,32 @@ export const EXAMPLES = [
   // `connectioncreate` pipe (FlowCanvas.rozie:2060-2080), not captured at construction.
   // Behavioral-only; NOT a screenshot cell.
   'FlowCanvasValidateOff',
+  // quick-260803-uwb (the 260702-wws dark deferral) — FlowCanvasDarkScreenshot is a PIXEL
+  // cell (loader → examples/demos/FlowCanvasDarkScreenshotDemo.rozie): the same fixed
+  // 3-node / 2-edge content-stable graph as FlowCanvasScreenshotDemo (identity transform,
+  // no interaction, no minimap, no controls) plus its own
+  // `@media (prefers-color-scheme: dark)` demo chrome, captured under
+  // `emulateMedia({ colorScheme: 'dark' })`. It is owned by the NEW
+  // specs/rete-flow-dark.spec.ts — deliberately NOT matrix.spec.ts, which runs every cell
+  // under the default light scheme and has no per-example media hook. It writes its OWN
+  // baseline (__screenshots__/FlowCanvasDarkScreenshot.png); the shared light
+  // FlowCanvasScreenshot.png D-10 invariant is untouched. Auto-fixme until the
+  // Linux-Docker PNG lands. The ungated BEHAVIORAL dark cell is rete-flow-dark-tokens.
+  'FlowCanvasDarkScreenshot',
+  // quick-260803-uwb (Dan's scale ask) — FlowCanvasLarge is the BEHAVIORAL scale cell
+  // (loader → examples/demos/FlowCanvasLargeDemo.rozie): a 48-node / 86-edge ETL pipeline
+  // (8 layers, 1-3 fan-in per node, mixed edge types + labels + strokes + dashed) built by
+  // a PURE index-arithmetic builder in $onMount — no Math.random / Date.now, so all six
+  // targets seed a byte-identical graph and the spec can pin '48' / '86' as literals. Seeds
+  // deliberately OVERLAP so autoArrange() has a genuinely tangled graph to untangle. Binds
+  // r-model:graph + r-model:zoom, :minimap, @selection-change, with `arrange-btn`/`fit-btn`/
+  // `undo-btn` and node-count / conn-count / selected-count / zoom-readout / bbox-w /
+  // bbox-h / drag-node-x readouts. The spec (rete-flow-large) proves scale render, minimap
+  // at scale, autoArrange non-overlap + stability, zoomToFit putting every node on screen,
+  // drag write-back + undo in a dense graph, and Ctrl/Cmd+A → +D → ONE undo at 48 nodes.
+  // Behavioral-only; NOT a screenshot cell (elk consumes MEASURED node dims, so an
+  // arranged-layout pixel baseline is not provably deterministic).
+  'FlowCanvasLarge',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -1324,6 +1350,12 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasVerbs: 'rozie-flow-canvas-verbs',
   FlowCanvasAccumOff: 'rozie-flow-canvas-accum-off',
   FlowCanvasValidateOff: 'rozie-flow-canvas-validate-off',
+  // quick-260803-uwb dark pixel cell — '-demo' appended by the entry →
+  // 'rozie-flow-canvas-dark-screenshot-demo' = kebab of FlowCanvasDarkScreenshotDemo.
+  FlowCanvasDarkScreenshot: 'rozie-flow-canvas-dark-screenshot',
+  // quick-260803-uwb scale cell — '-demo' appended by the entry →
+  // 'rozie-flow-canvas-large-demo' = kebab of FlowCanvasLargeDemo.
+  FlowCanvasLarge: 'rozie-flow-canvas-large',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -1769,6 +1801,14 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   FlowCanvasVerbs: {},
   FlowCanvasAccumOff: {},
   FlowCanvasValidateOff: {},
+  // quick-260803-uwb — FlowCanvasDarkScreenshotDemo is self-contained (hardcodes its own
+  // fixed 3-node / 2-edge graph and pins zoom/interaction off). No parent props; no
+  // MODEL_PROPS entry (graph is bound internally — the FlowCanvas precedent).
+  FlowCanvasDarkScreenshot: {},
+  // quick-260803-uwb — FlowCanvasLargeDemo is self-contained (builds its own 48-node /
+  // 86-edge graph in $onMount). No parent props; no MODEL_PROPS entry (graph/zoom are
+  // bound internally — the FlowCanvas precedent).
+  FlowCanvasLarge: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not

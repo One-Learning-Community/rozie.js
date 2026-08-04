@@ -1,0 +1,134 @@
+<!--
+  FlowCanvasDarkScreenshotDemo.rozie — the DARK pixel cell for the FlowCanvas (Rete.js)
+  wrapper. Closes the 260702-wws deferral.
+
+  WHY IT EXISTS: FlowCanvas ships dark mode as a ZERO-IMPORT, OS-driven default — a
+  top-level scoped `@media (prefers-color-scheme: dark)` block that redefines the
+  `--rozie-flow-*` tokens on `.rozie-flow-canvas` (FlowCanvas.rozie:3873). It had NO pixel
+  guard at all: every VR cell (matrix included) runs under the default LIGHT colour scheme,
+  so a broken dark block would have rendered green across the whole suite. The behavioral
+  half of the coverage is `rete-flow-dark-tokens` in rete-flow.spec.ts (ungated, ×6); this
+  demo is the belt-and-braces pixel half.
+
+  A SEPARATE BASELINE: this cell writes `__screenshots__/FlowCanvasDarkScreenshot.png`.
+  `FlowCanvasScreenshot.png` — the shared D-10 byte-identity baseline for the LIGHT render —
+  is UNTOUCHED and must never be regenerated or bootstrap-listed on account of this demo.
+  The cell lives in its own `rete-flow-dark.spec.ts` rather than matrix.spec.ts, because the
+  matrix runs every cell under the default colour scheme and has no per-example media hook.
+
+  DETERMINISTIC, ANIMATION-FREE, and structurally a mirror of FlowCanvasScreenshotDemo: the
+  same fixed 3-node / 2-connection controlled graph at the same fixed positions, the same
+  single `task` <NodeType> with a minimal `#body`, the same fixed 720×280 wrap, and
+  pannable / zoomable / selectable / fitOnMount / controls all OFF with zoom pinned to 1, so
+  the viewport transform is identity and node positions map 1:1 to pixels on every target.
+
+  NO MINIMAP AND NO CONTROLS — minimum first-baseline risk. Their dark tokens are covered
+  by the BEHAVIORAL cell (which asserts the imperative flowToken() minimap path directly),
+  not by pixels. Recorded trade-off.
+
+  THE ONE DELIBERATE DIFFERENCE from FlowCanvasScreenshotDemo: that demo hardcodes LIGHT
+  demo chrome (`.flow-shot { color: #1a1a1a }`, `.rozie-shot-node { color: #111827 }`),
+  which under dark would paint near-black text on a `#1e293b` node. This demo carries its
+  OWN `@media (prefers-color-scheme: dark)` blocks for its heading, its `#body` text and its
+  wrapper background, so the captured frame reads as a genuine dark render rather than a
+  dark canvas with light-mode chrome bolted on. Scoped conditional at-rules (including
+  inside the `:root { }` engine-DOM hatch) are preserved by the compiler since quick
+  260703-12j.
+
+  EXPLICIT WIDTH: the VR host mounts at `width: max-content`, so a width-auto flow-wrap
+  collapses the `overflow:hidden` canvas and nodes b/c render off-canvas.
+-->
+
+<rozie name="FlowCanvasDarkScreenshotDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  // The single source of truth — the SAME fixed controlled graph as
+  // FlowCanvasScreenshotDemo, all `task` type, so the dark frame is the light frame's
+  // exact structural twin and any diff is purely a colour diff.
+  graph: {
+    nodes: [
+      { id: 'a', type: 'task', x: 20,  y: 30,  data: { label: 'Input' } },
+      { id: 'b', type: 'task', x: 240, y: 30,  data: { label: 'Process' } },
+      { id: 'c', type: 'task', x: 460, y: 110, data: { label: 'Output' } },
+    ],
+    connections: [
+      { id: 'e1', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+      { id: 'e2', source: 'b', sourceOutput: 'out', target: 'c', targetInput: 'in' },
+    ],
+  },
+}
+</data>
+
+<template>
+<div class="flow-shot-dark">
+  <h3>FlowCanvas — screenshot (dark)</h3>
+  <div class="flow-wrap" style="width: 720px; height: 280px">
+    <FlowCanvas
+      r-model:graph="$data.graph"
+      :zoom="1"
+      :pannable="false"
+      :zoomable="false"
+      :selectable="false"
+      :fit-on-mount="false"
+      :controls="false"
+    >
+      <!-- ONE `task` type; minimal #body (just the label) for content-stable,
+           cross-target-identical node chrome. -->
+      <NodeType type="task">
+        <template #body="{ node }">
+          <div class="rozie-shot-dark-node">{{ node.data.label }}</div>
+        </template>
+        <Port input="in" label="in" />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-shot-dark {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 760px;
+}
+.flow-shot-dark h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+
+/* The demo's OWN chrome follows the OS colour scheme, so the captured frame is a real
+   dark render rather than a dark canvas wrapped in light-mode chrome. */
+@media (prefers-color-scheme: dark) {
+  .flow-shot-dark {
+    color: #e2e8f0;
+    background: #0b1120;
+  }
+}
+
+:root {
+  /* Engine-DOM escape hatch — the #body teleports into the engine node element inside
+     <rozie-flow-canvas>'s shadow root (render-by-type bodyRenderer → $portals.body), so
+     on Lit a plain scoped rule cannot reach it. :root emits document-level CSS adopted
+     into the shadow root. NOT :global() (ROZ128). */
+  .rozie-flow-canvas .rozie-shot-dark-node {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+  /* under dark the node box is #1e293b — light body text would be near-invisible. */
+  @media (prefers-color-scheme: dark) {
+    .rozie-flow-canvas .rozie-shot-dark-node { color: #e2e8f0; }
+  }
+}
+</style>
+
+</rozie>

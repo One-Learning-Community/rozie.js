@@ -3399,3 +3399,501 @@ for (const target of TARGETS) {
     await expect(accepted).toHaveText('1');
   });
 }
+
+/**
+ * 31. DARK MODE — the zero-import `prefers-color-scheme` default, declarative AND
+ * imperative (quick-260803-uwb; closes the 260702-wws dark-mode deferral).
+ *
+ * FlowCanvas ships dark as a top-level SCOPED `@media (prefers-color-scheme: dark)` block
+ * that redefines the `--rozie-flow-*` tokens on `.rozie-flow-canvas` (FlowCanvas.rozie:
+ * 3873-3910). It is zero-import and OS-driven: `themes/*.css` also define those tokens, but
+ * they are opt-in imports the VR demos never make — so in a LIGHT context the tokens are
+ * genuinely UNDEFINED and every rule falls back through `var(token, <literal>)`. That makes
+ * `getPropertyValue('--rozie-flow-bg')` a perfect discriminator: `''` under light,
+ * `'#0f172a'` under dark.
+ *
+ * NEW MACHINERY: `page.emulateMedia({ colorScheme })`. NOTHING in the VR suite used colour-
+ * scheme emulation before this cell — every other spec runs under the default (light)
+ * scheme. Reuses the EXISTING `?example=FlowCanvasMinimap` (canvas + 4 nodes + edges +
+ * minimap = exactly the token surface worth asserting); no demo is modified.
+ *
+ *   1. LIGHT baseline — `--rozie-flow-bg` is `''` (undefined; the fallback does the work),
+ *      and the RENDERED colours are the light literals.
+ *   2. FLIP to dark.
+ *   3. DARK, DECLARATIVE — the three discriminating tokens take their dark values AND the
+ *      rendered `backgroundColor` of the canvas and of a node element actually change.
+ *      Asserting the rendered colour as well as the custom property is the load-bearing
+ *      part: a declared-but-unapplied token would pass a property-only check.
+ *   4. DARK, IMPERATIVE — the minimap SVG reads tokens at DRAW time via `flowToken()` →
+ *      `getComputedStyle(container).getPropertyValue(name)` (FlowCanvas.rozie:1261-1263,
+ *      2546-2557), and the redraw is rAF-coalesced off translate/zoom/node-move — so a
+ *      colour-scheme flip alone does NOT repaint it. The cell forces a redraw with the
+ *      shipped minimap pointer-drag, then asserts the mask `fill` and the viewport
+ *      `stroke` attributes carry the dark token values.
+ *   5. BACK TO LIGHT — every one of those reverts (with another forced redraw). This is
+ *      what proves the MEDIA QUERY flipped them rather than a hardcode.
+ *
+ * DO NOT add the connection stroke / arrowhead as a dark signal: the dark value
+ * `--rozie-flow-connection-stroke: #64748b` is IDENTICAL to the light fallback `#64748b`
+ * (FlowCanvas.rozie:1843, 3887), so it discriminates nothing and would silently pass on a
+ * completely broken dark block.
+ *
+ * Ungated and behavioral-only — it needs no PNG and runs green from day one. The pixel
+ * guard is the separate baseline-gated `FlowCanvasDarkScreenshot` cell in
+ * `rete-flow-dark.spec.ts`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-dark-tokens [${target}]: prefers-color-scheme dark repaints the canvas, nodes and the imperative minimap SVG — and reverts`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasMinimap&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(4);
+    const minimap = page.getByTestId('flow-minimap');
+    await expect(minimap).toBeVisible({ timeout: 10_000 });
+
+    // the shipped rete-flow-background getComputedStyle idiom, piercing Lit's shadow root.
+    const cssVar = (name: string) =>
+      canvas.evaluate(
+        (el, n) => getComputedStyle(el).getPropertyValue(n).trim(),
+        name,
+      );
+    const bgColor = () =>
+      canvas.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const nodeBg = () =>
+      page
+        .locator('.rozie-flow-node')
+        .first()
+        .evaluate((el) => getComputedStyle(el).backgroundColor);
+    /**
+     * Resolve any CSS colour string to a CANONICAL `r,g,b,a` tuple through the browser's
+     * own colour parser (alpha rounded to 2dp — the quantization floor of 8-bit hex alpha).
+     *
+     * WHY NOT A RAW STRING COMPARE: `flowToken()` copies the token's TEXT verbatim into the
+     * SVG attribute, and the VR host's per-target builds serialize that text differently —
+     * the vue / react / svelte sub-builds emit a MINIFIED `.css` asset in which
+     * `rgba(0, 0, 0, 0.35)` has been rewritten to the equivalent `#00000059`, while
+     * angular / solid / lit carry the CSS unminified. Same colour, different bytes. This
+     * normalisation is NOT a loosening: r/g/b are still compared exactly and the two
+     * candidate colours here (dark `rgba(0,0,0,0.35)` vs the light fallback
+     * `rgba(15,23,42,0.18)`) are nowhere near each other, so a genuinely wrong colour —
+     * including a light-mode value surviving the flip — still fails.
+     */
+    const canonColor = async (raw: string | null): Promise<string> =>
+      page.evaluate((v) => {
+        const el = document.createElement('span');
+        el.style.color = v ?? '';
+        document.body.appendChild(el);
+        const c = getComputedStyle(el).color;
+        el.remove();
+        const m = c.match(/rgba?\(([^)]+)\)/);
+        if (!m) return `UNPARSEABLE:${c}`;
+        const p = m[1].split(',').map((s) => Number(s.trim()));
+        const a = p.length > 3 ? p[3] : 1;
+        return `${p[0]},${p[1]},${p[2]},${Math.round(a * 100) / 100}`;
+      }, raw);
+
+    const maskFill = async () =>
+      canonColor(
+        await page.locator('.rozie-flow-minimap__mask').first().getAttribute('fill'),
+      );
+    const viewportStroke = async () =>
+      canonColor(
+        await page
+          .locator('.rozie-flow-minimap__viewport')
+          .first()
+          .getAttribute('stroke'),
+      );
+
+    // The minimap redraw is rAF-coalesced and only scheduled off translate / zoom /
+    // node-move — a media flip alone never repaints it. Force one with the shipped
+    // minimap pointer-drag (pointerdown already calls setCenter → translate).
+    const forceMinimapRedraw = async () => {
+      const mm = await minimap.boundingBox();
+      if (!mm) throw new Error('minimap bounding box unavailable');
+      await page.mouse.move(mm.x + mm.width / 2, mm.y + mm.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(mm.x + 12, mm.y + 12, { steps: 6 });
+      await page.mouse.up();
+    };
+
+    // ---- 1. LIGHT baseline: the tokens are UNDEFINED; the fallbacks render ----
+    expect(
+      await cssVar('--rozie-flow-bg'),
+      'in a light context the component defines NO --rozie-flow-* tokens (themes/*.css is an opt-in import the VR demos never make) — the var() fallbacks do the work',
+    ).toBe('');
+    expect(await bgColor()).toBe('rgb(247, 248, 250)');
+    expect(await nodeBg()).toBe('rgb(255, 255, 255)');
+
+    // ---- 2. FLIP to dark ----
+    await page.emulateMedia({ colorScheme: 'dark' });
+
+    // ---- 3. DARK, DECLARATIVE: tokens defined AND rendered colours changed ----
+    await expect
+      .poll(() => cssVar('--rozie-flow-bg'), {
+        timeout: 10_000,
+        intervals: [100, 300, 600, 1000],
+      })
+      .toBe('#0f172a');
+    expect(await cssVar('--rozie-flow-node-bg')).toBe('#1e293b');
+    expect(await cssVar('--rozie-flow-accent')).toBe('#60a5fa');
+    // rendered, not merely declared — a declared-but-unapplied token passes a
+    // property-only check.
+    await expect.poll(bgColor, { timeout: 10_000 }).toBe('rgb(15, 23, 42)');
+    await expect.poll(nodeBg, { timeout: 10_000 }).toBe('rgb(30, 41, 59)');
+
+    // ---- 4. DARK, IMPERATIVE: the flowToken() path in the minimap SVG ----
+    await forceMinimapRedraw();
+    await expect
+      .poll(maskFill, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('0,0,0,0.35');
+    await expect
+      .poll(viewportStroke, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('96,165,250,1');
+
+    // ---- 5. BACK TO LIGHT: everything reverts (the media query did it, not a hardcode) ----
+    await page.emulateMedia({ colorScheme: 'light' });
+    await expect
+      .poll(() => cssVar('--rozie-flow-bg'), {
+        timeout: 10_000,
+        intervals: [100, 300, 600, 1000],
+      })
+      .toBe('');
+    await expect.poll(bgColor, { timeout: 10_000 }).toBe('rgb(247, 248, 250)');
+    await expect.poll(nodeBg, { timeout: 10_000 }).toBe('rgb(255, 255, 255)');
+
+    await forceMinimapRedraw();
+    await expect
+      .poll(maskFill, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('15,23,42,0.18');
+    await expect
+      .poll(viewportStroke, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe('59,130,246,1');
+  });
+}
+
+/**
+ * 32. SCALE — a 48-node / 86-edge real-world ETL pipeline (quick-260803-uwb).
+ *
+ * Every other rete-flow cell drives 1–5 nodes. This one drives the size of graph a real
+ * workflow-builder consumer hits: eight layers of source → transform/join → sink with
+ * genuine fan-in (1–3 in-edges per node), fan-out and long chains, plus mixed edge types,
+ * labels, strokes and dashed edges. `examples/demos/FlowCanvasLargeDemo.rozie` builds it in
+ * `$onMount` as a PURE function of the loop indices — no `Math.random`, no `Date.now` — so
+ * all six targets seed a byte-identical graph and this cell can pin '48' and '86' as exact
+ * literals rather than lower bounds.
+ *
+ *   1. SCALE RENDERS — the bound counts read '48'/'86', 48 node boxes mount, and 86 paths
+ *      are actually DRAWN (non-empty `d`, the house filter). A drawn count under 86 with 48
+ *      nodes green is the single-input EVICTION signature: check that every `<Port input>`
+ *      in the demo still carries `multiple` before suspecting the component.
+ *   2. MINIMAP AT SCALE — 48 imperative SVG node rects + the viewport window.
+ *   3. PRE-ARRANGE TANGLE — the geometry pass reports overlapping node rects (the seed
+ *      stacks layers 30px apart on ~140px-wide nodes). The "before" half of the proof,
+ *      mirroring the shipped 2-node arrange cell's START-OVERLAPPING discipline.
+ *   4. AUTO-ARRANGE — `autoArrange()` drives overlaps to ZERO across all 48, the bounding
+ *      box grows on both axes, the result is STABLE on re-sample (no write-back
+ *      oscillation), and the TOPOLOGY is untouched (still 48/86 — a layout must never
+ *      mutate the graph).
+ *   5. ZOOM-TO-FIT — the bound zoom drops below 1 (the verb echoes `$model.zoom`) and every
+ *      one of the 48 node centres lands inside the canvas viewport. This is the assertion
+ *      the scale ask is really about: the whole graph is on screen.
+ *   6. DRAG WRITE-BACK IN A DENSE GRAPH — run AFTER the fit so the target is on-screen;
+ *      `dragNodeBy` re-reads the live box, so the post-fit scale is handled. The bound
+ *      `drag-node-x` moves and then settles.
+ *   7. UNDO RESTORES — one undo returns `drag-node-x` to EXACTLY its pre-drag value.
+ *   8/9. SELECT-ALL + DUPLICATE-ALL AT SCALE — Ctrl/Cmd+A selects 48, Ctrl/Cmd+D clones the
+ *      lot to 96, and ONE undo restores 48. That is the "one gesture = one undo step"
+ *      contract (D-03) stressed at 48× rather than the 3 nodes the keyboard cell uses.
+ *
+ * `test.setTimeout` is raised because this is a SCALE cell: unlike the combobox-virtual
+ * perf-budget cell — whose wall-clock budget IS the assertion, so raising it would mask the
+ * defect — nothing here is guarded by elapsed time. The budget only has to be generous
+ * enough that elk (which runs through a web-worker) and 96 node mounts can finish.
+ *
+ * Behavioral-only. There is deliberately NO pixel cell for the arranged graph: autoArrange
+ * feeds elk the MEASURED node-view dimensions (FlowCanvas.rozie:3415-3445), so the layout
+ * depends on per-platform font metrics, and the shipped arrange cell already refuses
+ * exact-px assertions for that reason (rete-flow.spec.ts:1606).
+ */
+
+/**
+ * REACT is fixme'd for this ONE cell — an EMITTER seam, recorded as a finding by
+ * quick-260803-uwb and deliberately NOT worked around at the component source.
+ *
+ * SYMPTOM (steps 1-9 all pass on react EXCEPT step 2): with a graph seeded in `$onMount`,
+ * react renders all 48 node boxes and all 86 drawn paths, and the minimap host, mask and
+ * viewport rect all draw — but `.rozie-flow-minimap__node` stays at 0 forever (measured at
+ * t+3s, t+8s and after a pan that forces a redraw; every other target reports 48 at t+3s).
+ *
+ * SEAM — `packages/target-react`: the emitter ref-lowers `$props.X` reads that appear
+ * TEXTUALLY inside `$onMount` (the generated leaf carries `_graphRef`/`_snapGridRef`/… and
+ * the reconcile reads `_graphRef.current`), but a TOP-LEVEL helper that reads `$props.X`
+ * lowers to `useCallback(() => graph || …, [graph])`, closing over the RENDER-SCOPE value.
+ * `redrawMinimap` is defined inside the mount effect and therefore captures the FIRST
+ * render's `currentGraph` identity — permanently observing the MOUNT-TIME graph. That is
+ * empty here because this demo seeds in `$onMount` (the shipped `FlowCanvasMinimap` demo
+ * seeds in `<data>`, so its mount-time capture already holds the right nodes and the seam
+ * is invisible — which is why `rete-flow-minimap [react]` is green).
+ *
+ * Out of scope for a VR-coverage task (`packages/core` / `packages/target-*` are fenced
+ * off), and per feedback_emitter_owns_parity a component-side workaround — e.g. routing
+ * `redrawMinimap` through `lastWrittenGraph` — would be debt, not a fix. Fixme'd here so
+ * the finding stays visible rather than being silently absorbed by a softened assertion.
+ */
+const LARGE_KNOWN_FAILING: ReadonlySet<typeof TARGETS[number]> = new Set<
+  typeof TARGETS[number]
+>(['react']);
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner =
+    !built || KNOWN_FAILING.has(target) || LARGE_KNOWN_FAILING.has(target)
+      ? test.fixme
+      : test;
+  runner(`rete-flow-large [${target}]: a 48-node / 86-edge pipeline renders, auto-arranges without overlaps, fits on screen, and survives drag/undo + select-all/duplicate at scale`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+
+    await page.goto(`/?example=FlowCanvasLarge&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+
+    const nodeCount = page.getByTestId('node-count');
+    const connCount = page.getByTestId('conn-count');
+    const selectedCount = page.getByTestId('selected-count');
+    const zoomReadout = page.getByTestId('zoom-readout');
+    const bboxW = page.getByTestId('bbox-w');
+    const bboxH = page.getByTestId('bbox-h');
+    const dragNodeXReadout = page.getByTestId('drag-node-x');
+    const readNum = async (loc: typeof bboxW): Promise<number> =>
+      Number((await loc.textContent())?.trim() ?? 'NaN');
+
+    /**
+     * ONE geometry pass over the rendered node rects.
+     *
+     * NOT migrated to `_shadow-utils.ts` — same rationale as the two shipped twins in this
+     * file: the `deepQueryAll` walk is entangled with further geometry math in this same
+     * evaluate call, and `_shadow-utils.ts` exposes no geometry helper (verified).
+     *
+     * → { count, overlaps, unionW, unionH, insideCanvas }
+     *   overlaps      = pairs of node rects intersecting by > 4px on BOTH axes (a 4px
+     *                   slack absorbs sub-pixel layout rounding; a real stack overlaps by
+     *                   tens of px).
+     *   insideCanvas  = how many node-rect CENTRES fall inside the canvas rect (±2px).
+     */
+    const geometry = async () =>
+      page.evaluate(() => {
+        const deepQueryAll = (selector: string): Element[] => {
+          const out: Element[] = [];
+          const walk = (root: Document | ShadowRoot) => {
+            out.push(...Array.from(root.querySelectorAll(selector)));
+            for (const el of Array.from(root.querySelectorAll('*'))) {
+              const sr = (el as HTMLElement).shadowRoot;
+              if (sr) walk(sr);
+            }
+          };
+          walk(document);
+          return out;
+        };
+        const rects = deepQueryAll('.rozie-flow-node').map((e) =>
+          (e as HTMLElement).getBoundingClientRect(),
+        );
+        let overlaps = 0;
+        for (let i = 0; i < rects.length; i++) {
+          for (let j = i + 1; j < rects.length; j++) {
+            const a = rects[i];
+            const b = rects[j];
+            const dx = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+            const dy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+            if (dx > 4 && dy > 4) overlaps++;
+          }
+        }
+        const lefts = rects.map((r) => r.left);
+        const rights = rects.map((r) => r.right);
+        const tops = rects.map((r) => r.top);
+        const bottoms = rects.map((r) => r.bottom);
+        const unionW = rects.length ? Math.max(...rights) - Math.min(...lefts) : 0;
+        const unionH = rects.length ? Math.max(...bottoms) - Math.min(...tops) : 0;
+
+        const canvasEl = deepQueryAll('.rozie-flow-canvas')[0] as HTMLElement | undefined;
+        const cr = canvasEl ? canvasEl.getBoundingClientRect() : null;
+        let insideCanvas = 0;
+        if (cr) {
+          for (const r of rects) {
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+            if (
+              cx >= cr.left - 2 &&
+              cx <= cr.right + 2 &&
+              cy >= cr.top - 2 &&
+              cy <= cr.bottom + 2
+            ) {
+              insideCanvas++;
+            }
+          }
+        }
+        return { count: rects.length, overlaps, unionW, unionH, insideCanvas };
+      });
+
+    // counts DRAWN paths (non-empty `d`) — the house filter, piercing Lit's shadow root.
+    const drawnCount = async () =>
+      page
+        .locator('.rozie-flow-connection__path')
+        .evaluateAll(
+          (els) =>
+            els.filter((e) => (e.getAttribute('d') || '').trim().length > 0).length,
+        );
+
+    // ---- 1. SCALE RENDERS: exact bound counts, 48 boxes, 86 DRAWN paths ----
+    await expect(nodeCount).toHaveText('48', { timeout: 30_000 });
+    await expect(connCount).toHaveText('86', { timeout: 30_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 60_000,
+        intervals: [500, 1000, 2000, 4000],
+      })
+      .toBe(48);
+    await expect
+      .poll(drawnCount, { timeout: 60_000, intervals: [500, 1000, 2000, 4000] })
+      .toBe(86);
+
+    // ---- 2. MINIMAP REFLECTS THE SCALE ----
+    await expect
+      .poll(async () => page.locator('.rozie-flow-minimap__node').count(), {
+        timeout: 30_000,
+        intervals: [300, 600, 1000, 2000],
+      })
+      .toBe(48);
+    await expect(page.locator('.rozie-flow-minimap__viewport')).toHaveCount(1, {
+      timeout: 10_000,
+    });
+
+    // ---- 3. PRE-ARRANGE TANGLE (the "before" half of the arrange proof) ----
+    const before = await geometry();
+    expect(before.count).toBe(48);
+    expect(
+      before.overlaps,
+      'the seeded layout must START tangled (layers 30px apart on ~140px-wide nodes) — otherwise the arrange assertion proves nothing',
+    ).toBeGreaterThan(0);
+    const bboxW0 = await readNum(bboxW);
+    const bboxH0 = await readNum(bboxH);
+
+    // ---- 4. AUTO-ARRANGE: overlaps → 0, bbox grows, stable, topology untouched ----
+    await page.getByTestId('arrange-btn').click();
+    await expect
+      .poll(async () => (await geometry()).overlaps, {
+        timeout: 60_000,
+        intervals: [500, 1000, 2000, 4000],
+      })
+      .toBe(0);
+
+    await page.waitForTimeout(400);
+    const bboxW1 = await readNum(bboxW);
+    const bboxH1 = await readNum(bboxH);
+    expect(bboxW1, 'the layered layout spreads the graph horizontally').toBeGreaterThan(bboxW0);
+    expect(bboxH1, 'the layered layout spreads the graph vertically').toBeGreaterThan(bboxH0);
+    // STABLE on re-sample — no write-back → reconcile → write oscillation at scale.
+    await page.waitForTimeout(400);
+    expect(await readNum(bboxW), 'bbox-w is stable after arrange').toBe(bboxW1);
+    expect(await readNum(bboxH), 'bbox-h is stable after arrange').toBe(bboxH1);
+    // a LAYOUT must never mutate the topology.
+    await expect(nodeCount).toHaveText('48');
+    await expect(connCount).toHaveText('86');
+
+    // ---- 5. ZOOM-TO-FIT: the whole graph lands on screen ----
+    await page.getByTestId('fit-btn').click();
+    await expect
+      .poll(async () => Number((await zoomReadout.textContent())?.trim() ?? 'NaN'), {
+        timeout: 30_000,
+        intervals: [300, 600, 1000, 2000],
+      })
+      .toBeLessThan(1);
+    await expect
+      .poll(async () => (await geometry()).insideCanvas, {
+        timeout: 30_000,
+        intervals: [300, 600, 1000, 2000],
+      })
+      .toBe(48);
+
+    // ---- 6. DRAG WRITE-BACK IN A DENSE GRAPH (post-fit, so the target is on-screen) ----
+    const x0 = await readNum(dragNodeXReadout);
+    expect(x0, 'the L3N4 readout resolves a real node').toBeGreaterThan(-1);
+    // dragNodeBy re-reads the LIVE bounding box, so the post-fit scale is handled.
+    await dragNodeBy(page, 'L3N4', 60);
+    await expect
+      .poll(async () => readNum(dragNodeXReadout), {
+        timeout: 30_000,
+        intervals: [100, 300, 600, 1000],
+      })
+      .not.toBe(x0);
+    await page.waitForTimeout(400);
+    const xDragged = await readNum(dragNodeXReadout);
+    await page.waitForTimeout(400);
+    expect(await readNum(dragNodeXReadout), 'drag-node-x is stable after the drag settles').toBe(
+      xDragged,
+    );
+
+    // ---- 7. UNDO RESTORES the dragged node EXACTLY ----
+    await page.getByTestId('undo-btn').click();
+    await expect
+      .poll(async () => readNum(dragNodeXReadout), {
+        timeout: 30_000,
+        intervals: [100, 300, 600, 1000],
+      })
+      .toBe(x0);
+    await page.waitForTimeout(400);
+    expect(await readNum(dragNodeXReadout), 'the undone position HOLDS').toBe(x0);
+
+    // ---- 8. SELECT-ALL + DUPLICATE-ALL AT 48 NODES ----
+    await canvas.focus();
+    await page.keyboard.press(`${MOD}+a`);
+    await expect(selectedCount).toHaveText('48', { timeout: 30_000 });
+
+    await canvas.focus();
+    await page.keyboard.press(`${MOD}+d`);
+    await expect
+      .poll(async () => (await nodeCount.textContent())?.trim(), {
+        timeout: 60_000,
+        intervals: [500, 1000, 2000, 4000],
+      })
+      .toBe('96');
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 60_000,
+        intervals: [500, 1000, 2000, 4000],
+      })
+      .toBe(96);
+
+    // ---- 9. ONE UNDO RESTORES THE WHOLE 48-NODE DUPLICATION (D-03 at scale) ----
+    await page.getByTestId('undo-btn').click();
+    await expect
+      .poll(async () => (await nodeCount.textContent())?.trim(), {
+        timeout: 60_000,
+        intervals: [500, 1000, 2000, 4000],
+      })
+      .toBe('48');
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 60_000,
+        intervals: [500, 1000, 2000, 4000],
+      })
+      .toBe(48);
+    await page.waitForTimeout(500);
+    await expect(nodeCount).toHaveText('48');
+  });
+}
