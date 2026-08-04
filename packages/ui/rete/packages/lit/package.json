@@ -42,7 +42,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "custom-elements.json"
   ],
   "dependencies": {
     "@rozie/runtime-lit": "workspace:*"
@@ -105,5 +106,6 @@
   "sideEffects": [
     "./dist/index.mjs",
     "./dist/index.cjs"
-  ]
+  ],
+  "customElements": "custom-elements.json"
 }

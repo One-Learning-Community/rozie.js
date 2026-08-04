@@ -1,0 +1,443 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JetBrains/web-types/master/schema/web-types.json",
+  "name": "@rozie-ui/rete-vue",
+  "version": "0.1.2",
+  "description-markup": "markdown",
+  "framework": "vue",
+  "contributions": {
+    "html": {
+      "vue-components": [
+        {
+          "name": "FlowCanvas",
+          "source": {
+            "module": "@rozie-ui/rete-vue",
+            "symbol": "FlowCanvas"
+          },
+          "description": "Idiomatic Vue `FlowCanvas` — a cross-framework node-graph canvas compiled from one Rozie source wrapping the `rete` engine. Two-way `v-model:graph`, `v-model:zoom` and `v-model:mode`, built-in Controls + MiniMap, labeled and styled edges, undo/redo, auto-arrange, marquee select, a node toolbar slot, and a 27-verb imperative handle.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "graph",
+              "description": "The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data?, width?, height? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, type?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope; `width`/`height` are the explicit fixed box a `<NodeType resizable>` corner-drag persists (absent = auto-sized, and double-clicking a resize handle clears them back to auto). A connection's `type` is its path shape — `bezier` (default), `step`, `smoothstep`, or `straight`. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ]
+            },
+            {
+              "name": "validate-types",
+              "description": "Automatic typed-socket validation (default ON). When `true`, the canvas resolves each endpoint's port type from the per-`<NodeType>` `<Port type>` schema and auto-rejects a type-mismatched connection (firing `connection-rejected`). `canConnect` survives as the optional custom-rule override that runs in addition. Set `false` for pure-`canConnect` (type as metadata only).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "true"
+            },
+            {
+              "name": "zoom",
+              "description": "The viewport zoom level (two-way `r-model`). Scroll/pinch writes the new zoom back through the model (echo-guarded against the wrapper's own programmatic zooms); a consumer write zooms the live area. There is deliberately no `zoom`/`zoomed` emit — a same-named emit collides with the model on Vue and Angular — so the two-way binding is the channel for zoom changes.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "1"
+            },
+            {
+              "name": "pannable",
+              "description": "Whether the canvas can be panned by dragging the background. **Applied live** — flipping it after mount takes effect on the next gesture.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "true"
+            },
+            {
+              "name": "zoomable",
+              "description": "Whether the canvas can be zoomed by scroll/pinch. **Applied live** — flipping it after mount takes effect on the next gesture.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "true"
+            },
+            {
+              "name": "selectable",
+              "description": "Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope and surfaced to the consumer via the `@selection-change` event. Applied live — turning it off after mount clears the current selection and blocks further picks (including marquee, edge selection and the keyboard shortcuts).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "true"
+            },
+            {
+              "name": "readonly",
+              "description": "Read-only viewer mode — no node drag, no connection editing, and no selection. Applied live. View-only zoom/fit (Controls, the `zoomTo`/`zoomToFit` verbs) stay enabled, as do the imperative `undo()`/`redo()` verbs; the Ctrl/Cmd+Z / +Y **keyboard shortcuts** are suppressed along with every other canvas shortcut.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "min-zoom",
+              "description": "Minimum zoom level — the lower bound of the area's zoom restrictor. `0` disables the bound.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0.1"
+            },
+            {
+              "name": "max-zoom",
+              "description": "Maximum zoom level — the upper bound of the area's zoom restrictor. `0` disables the bound.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "4"
+            },
+            {
+              "name": "snap-grid",
+              "description": "Snap-to-grid size in pixels for node dragging. `0` turns snapping off. Applied live — changing it after mount affects the next drag. Snapping applies to user drags only; positions applied from the bound `graph` are never snapped.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0"
+            },
+            {
+              "name": "accumulate-on-ctrl",
+              "description": "When selectable, hold Ctrl to add to the current selection instead of replacing it.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "true"
+            },
+            {
+              "name": "curvature",
+              "description": "The bezier curvature of connection paths (`classicConnectionPath`).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0.3"
+            },
+            {
+              "name": "fit-on-mount",
+              "description": "After the initial graph mounts, pan/zoom the viewport to fit all nodes (`AreaExtensions.zoomAt`).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "true"
+            },
+            {
+              "name": "controls",
+              "description": "Render the built-in Controls overlay — a zoom in / zoom out / fit-view button cluster (the React Flow `<Controls/>` parity). The buttons drive the same zoom/fit path as the `zoomTo`/`zoomToFit` handle verbs (clamped to `minZoom`/`maxZoom`) and stay enabled in `readonly`. Opt out with `:controls=\"false\"`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "true"
+            },
+            {
+              "name": "minimap",
+              "description": "Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction — set it at mount time.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "background",
+              "description": "Canvas background pattern — 'dots' (default, today's grid) | 'lines' | 'cross' | 'none' (the React Flow <Background variant> parity). Gap/size/color stay CSS custom properties (--rozie-flow-grid-size, --rozie-flow-grid-dot-color, --rozie-flow-bg) — not separate props.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"dots\""
+            },
+            {
+              "name": "can-connect",
+              "description": "Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "function"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "history",
+              "description": "Undo/redo, on by default. Every gesture (drag, connect, disconnect, delete) pushes ONE capped (~100) snapshot of the bound graph (nodes incl. x/y + connections; not the viewport), and `undo()`/`redo()` plus Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, and Ctrl/Cmd+Y restore it through the two-way `graph` model (echo-guarded). One gesture = one undo step; a fresh edit after an undo discards the redo branch. Opt out with `:history=\"false\"` (the snapshot stack stays empty and the verbs no-op).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "true"
+            },
+            {
+              "name": "mode",
+              "description": "Two-way interaction mode (`r-model`) — the Figma-style pan ↔ select toggle, `'pan'` (default) or `'select'`. In `'pan'` an empty-canvas drag pans the viewport (unchanged). In `'select'` an empty-canvas drag draws a rubber-band marquee box that multi-selects the intersecting nodes (surfacing `@selection-change`). A node drag still drags the node in both modes — only the empty-canvas drag changes. The canvas writes it back when the built-in mode button toggles (see `marquee`).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"pan\""
+            },
+            {
+              "name": "marquee",
+              "description": "Render the 4th Controls button — the pan ↔ select mode toggle (it two-way-writes `mode`). Default OFF so the default Controls overlay keeps its three buttons. The marquee behavior works whenever `mode === 'select'` regardless of this flag (a consumer can drive `mode` directly); this only governs the built-in button.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "node-toolbar",
+              "description": "Render the opt-in NodeToolbar (default OFF) — a floating toolbar over the single selected node (positioned from the engine node-view rect + the area transform, re-tracked on pan/zoom/drag). Default content is Delete (cascading controlled-graph `deleteNode`) + Duplicate (clone the node spec at an offset with a new id into a fresh `graph` object); both fire `@node-action` (`name: 'delete' | 'duplicate'`). Override the content by filling the `#toolbar` reactive slot.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "edge-click",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "edge-selected",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "selection-change",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "connect-end",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "node-action",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "connection-rejected",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "connection-created",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "connection-removed",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "node-picked",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "node-moved",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "translated",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "context-menu",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "update:graph",
+                "description": "Emitted with the updated `graph` value; powers `v-model:graph`.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "update:zoom",
+                "description": "Emitted with the updated `zoom` value; powers `v-model:zoom`.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "update:mode",
+                "description": "Emitted with the updated `mode` value; powers `v-model:mode`.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "node",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ node: any; selected: any; emit: any }"
+            },
+            {
+              "name": "toolbar",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ node: any; emit: any }"
+            },
+            {
+              "name": "default",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            }
+          ]
+        },
+        {
+          "name": "NodeType",
+          "source": {
+            "module": "@rozie-ui/rete-vue",
+            "symbol": "NodeType"
+          },
+          "description": "Idiomatic Vue `NodeType` — a render-by-type node template for `<FlowCanvas>`. Declares how nodes of one `type` render (through the reactive `body` slot) plus their resize bounds; nest `<Port>` children to declare that type’s port schema. Renderless — it contributes configuration, not markup.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "type",
+              "description": "The node TYPE id (required). Every graph node whose `type` matches renders this template and uses this type's `<Port>` schema. There is no id/x/y here — this is a render-by-type TEMPLATE, not an instance; instance identity and position live in the bound `graph` model.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "required": true,
+              "type": [
+                "string"
+              ]
+            },
+            {
+              "name": "resizable",
+              "description": "Opt this node TYPE into corner-handle resizing (default OFF). When true, selecting a node of this type shows 4 corner drag handles (the React Flow <NodeResizer/> parity); dragging one persists an explicit node.width/node.height (a fixed box, D-07) that overrides auto-sizing for that node instance. A double-click on a handle resets the node back to auto-size.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "min-width",
+              "description": "Minimum width (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "min-height",
+              "description": "Minimum height (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "max-width",
+              "description": "Maximum width (px) a resize gesture may grow this type to. Unset = unbounded growth.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "max-height",
+              "description": "Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            }
+          ],
+          "js": {
+            "events": []
+          },
+          "slots": [
+            {
+              "name": "body",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ node: any; selected: any; emit: any }"
+            },
+            {
+              "name": "default",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            }
+          ]
+        },
+        {
+          "name": "Port",
+          "source": {
+            "module": "@rozie-ui/rete-vue",
+            "symbol": "Port"
+          },
+          "description": "Idiomatic Vue `Port` — the typed directional port schema for the enclosing `<NodeType>`. `output` / `input` picks the side, `type` gates which connections are legal, and `multiple` allows fan-out. Renderless — it contributes configuration, not markup.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "output",
+              "description": "Declares an OUTPUT port and names its key — set this (not `input`) so the port direction resolves to `output`. The attribute is `output`, not `out`: `out`/`in` are awkward bare identifiers, so `output`/`input` are used across all six targets.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "input",
+              "description": "Declares an INPUT port and names its key — set this (not `output`) so the port direction resolves to `input`. The attribute is `input`, not `in`: `in` is a JS reserved word that Svelte's mandatory `$props()` destructure rejects, so `input`/`output` are used instead.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "type",
+              "description": "The port TYPE — drives the canvas's typed-socket `:validate-types` (a type-mismatched connection is auto-rejected). It is the typed layer, NOT socket identity (a single shared Socket gates identity). Optional: an untyped port imposes no type constraint and connects to anything.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "label",
+              "description": "Optional socket label shown next to the port (defaults to the port key when omitted).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "multiple",
+              "description": "Allow multiple connections into/out of this socket. Left undefined by default to preserve the canvas's side asymmetry: outputs default to multi, inputs default to single. To force an explicit multi input, use the bare `multiple` attribute (`<Port ... multiple />`) — it resolves to `true` on all six targets.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "unknown"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "position",
+              "description": "Visual placement of the socket on the node: `left`, `right`, `top`, or `bottom`. Defaults by direction (input → left, output → right). `top`/`bottom` enable vertical flows (decision trees, top-down pipelines) — the canvas lays the socket out on that edge and the connection anchor shifts onto the matching axis.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            }
+          ],
+          "js": {
+            "events": []
+          },
+          "slots": []
+        }
+      ]
+    }
+  }
+}

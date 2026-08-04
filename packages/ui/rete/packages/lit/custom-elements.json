@@ -1,0 +1,993 @@
+{
+  "schemaVersion": "2.1.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "dist/index.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Idiomatic Lit `<rozie-flow-canvas>` — a cross-framework node-graph canvas compiled from one Rozie source wrapping the `rete` engine. Two-way `graph`, `zoom` and `mode` (each with a `<prop>-change` event), built-in Controls + MiniMap, labeled and styled edges, undo/redo, auto-arrange, marquee select, a node toolbar slot, and a 27-verb imperative handle.",
+          "name": "FlowCanvas",
+          "tagName": "rozie-flow-canvas",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "graph",
+              "description": "The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data?, width?, height? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, type?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope; `width`/`height` are the explicit fixed box a `<NodeType resizable>` corner-drag persists (absent = auto-sized, and double-clicking a resize handle clears them back to auto). A connection's `type` is its path shape — `bezier` (default), `step`, `smoothstep`, or `straight`. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "graph"
+            },
+            {
+              "kind": "field",
+              "name": "validateTypes",
+              "description": "Automatic typed-socket validation (default ON). When `true`, the canvas resolves each endpoint's port type from the per-`<NodeType>` `<Port type>` schema and auto-rejects a type-mismatched connection (firing `connection-rejected`). `canConnect` survives as the optional custom-rule override that runs in addition. Set `false` for pure-`canConnect` (type as metadata only).",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "validatetypes",
+              "default": "true"
+            },
+            {
+              "kind": "field",
+              "name": "zoom",
+              "description": "The viewport zoom level (two-way `r-model`). Scroll/pinch writes the new zoom back through the model (echo-guarded against the wrapper's own programmatic zooms); a consumer write zooms the live area. There is deliberately no `zoom`/`zoomed` emit — a same-named emit collides with the model on Vue and Angular — so the two-way binding is the channel for zoom changes.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "zoom",
+              "default": "1"
+            },
+            {
+              "kind": "field",
+              "name": "pannable",
+              "description": "Whether the canvas can be panned by dragging the background. **Applied live** — flipping it after mount takes effect on the next gesture.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "pannable",
+              "default": "true"
+            },
+            {
+              "kind": "field",
+              "name": "zoomable",
+              "description": "Whether the canvas can be zoomed by scroll/pinch. **Applied live** — flipping it after mount takes effect on the next gesture.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "zoomable",
+              "default": "true"
+            },
+            {
+              "kind": "field",
+              "name": "selectable",
+              "description": "Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope and surfaced to the consumer via the `@selection-change` event. Applied live — turning it off after mount clears the current selection and blocks further picks (including marquee, edge selection and the keyboard shortcuts).",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "selectable",
+              "default": "true"
+            },
+            {
+              "kind": "field",
+              "name": "readonly",
+              "description": "Read-only viewer mode — no node drag, no connection editing, and no selection. Applied live. View-only zoom/fit (Controls, the `zoomTo`/`zoomToFit` verbs) stay enabled, as do the imperative `undo()`/`redo()` verbs; the Ctrl/Cmd+Z / +Y **keyboard shortcuts** are suppressed along with every other canvas shortcut.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "readonly",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "minZoom",
+              "description": "Minimum zoom level — the lower bound of the area's zoom restrictor. `0` disables the bound.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "minzoom",
+              "default": "0.1"
+            },
+            {
+              "kind": "field",
+              "name": "maxZoom",
+              "description": "Maximum zoom level — the upper bound of the area's zoom restrictor. `0` disables the bound.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "maxzoom",
+              "default": "4"
+            },
+            {
+              "kind": "field",
+              "name": "snapGrid",
+              "description": "Snap-to-grid size in pixels for node dragging. `0` turns snapping off. Applied live — changing it after mount affects the next drag. Snapping applies to user drags only; positions applied from the bound `graph` are never snapped.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "snapgrid",
+              "default": "0"
+            },
+            {
+              "kind": "field",
+              "name": "accumulateOnCtrl",
+              "description": "When selectable, hold Ctrl to add to the current selection instead of replacing it.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "accumulateonctrl",
+              "default": "true"
+            },
+            {
+              "kind": "field",
+              "name": "curvature",
+              "description": "The bezier curvature of connection paths (`classicConnectionPath`).",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "curvature",
+              "default": "0.3"
+            },
+            {
+              "kind": "field",
+              "name": "fitOnMount",
+              "description": "After the initial graph mounts, pan/zoom the viewport to fit all nodes (`AreaExtensions.zoomAt`).",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "fitonmount",
+              "default": "true"
+            },
+            {
+              "kind": "field",
+              "name": "controls",
+              "description": "Render the built-in Controls overlay — a zoom in / zoom out / fit-view button cluster (the React Flow `<Controls/>` parity). The buttons drive the same zoom/fit path as the `zoomTo`/`zoomToFit` handle verbs (clamped to `minZoom`/`maxZoom`) and stay enabled in `readonly`. Opt out with `:controls=\"false\"`.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "controls",
+              "default": "true"
+            },
+            {
+              "kind": "field",
+              "name": "minimap",
+              "description": "Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction — set it at mount time.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "minimap",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "background",
+              "description": "Canvas background pattern — 'dots' (default, today's grid) | 'lines' | 'cross' | 'none' (the React Flow <Background variant> parity). Gap/size/color stay CSS custom properties (--rozie-flow-grid-size, --rozie-flow-grid-dot-color, --rozie-flow-bg) — not separate props.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "background",
+              "default": "\"dots\""
+            },
+            {
+              "kind": "field",
+              "name": "canConnect",
+              "description": "Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.",
+              "type": {
+                "text": "((...args: any[]) => any)"
+              },
+              "attribute": "canconnect",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "history",
+              "description": "Undo/redo, on by default. Every gesture (drag, connect, disconnect, delete) pushes ONE capped (~100) snapshot of the bound graph (nodes incl. x/y + connections; not the viewport), and `undo()`/`redo()` plus Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, and Ctrl/Cmd+Y restore it through the two-way `graph` model (echo-guarded). One gesture = one undo step; a fresh edit after an undo discards the redo branch. Opt out with `:history=\"false\"` (the snapshot stack stays empty and the verbs no-op).",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "history",
+              "default": "true"
+            },
+            {
+              "kind": "field",
+              "name": "mode",
+              "description": "Two-way interaction mode (`r-model`) — the Figma-style pan ↔ select toggle, `'pan'` (default) or `'select'`. In `'pan'` an empty-canvas drag pans the viewport (unchanged). In `'select'` an empty-canvas drag draws a rubber-band marquee box that multi-selects the intersecting nodes (surfacing `@selection-change`). A node drag still drags the node in both modes — only the empty-canvas drag changes. The canvas writes it back when the built-in mode button toggles (see `marquee`).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "mode",
+              "default": "\"pan\""
+            },
+            {
+              "kind": "field",
+              "name": "marquee",
+              "description": "Render the 4th Controls button — the pan ↔ select mode toggle (it two-way-writes `mode`). Default OFF so the default Controls overlay keeps its three buttons. The marquee behavior works whenever `mode === 'select'` regardless of this flag (a consumer can drive `mode` directly); this only governs the built-in button.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "marquee",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "nodeToolbar",
+              "description": "Render the opt-in NodeToolbar (default OFF) — a floating toolbar over the single selected node (positioned from the engine node-view rect + the area transform, re-tracked on pan/zoom/drag). Default content is Delete (cascading controlled-graph `deleteNode`) + Duplicate (clone the node spec at an offset with a new id into a fresh `graph` object); both fire `@node-action` (`name: 'delete' | 'duplicate'`). Override the content by filling the `#toolbar` reactive slot.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "nodetoolbar",
+              "default": "false"
+            },
+            {
+              "kind": "method",
+              "name": "getEditor",
+              "description": "Return the underlying Rete `NodeEditor` instance for direct graph-model access (the engine escape hatch)."
+            },
+            {
+              "kind": "method",
+              "name": "getArea",
+              "description": "Return the underlying Rete `AreaPlugin` instance (viewport transform, node views, pan/zoom)."
+            },
+            {
+              "kind": "method",
+              "name": "addNode",
+              "description": "Imperatively add a node — `addNode(spec)` where spec is `{ id, type, x, y, data? }`. The node's sockets come from its TYPE's `<Port>` schema (never a per-node port array) and its label from `data.label`. Returns the id. NOT reaped by the `graph` reconcile."
+            },
+            {
+              "kind": "method",
+              "name": "removeNode",
+              "description": "Imperatively remove a node and its connections by id — `removeNode(id)`. Returns whether it existed. The engine-only escape hatch — NOT written back to the bound `graph` model (use `deleteNode` for the controlled-graph delete)."
+            },
+            {
+              "kind": "method",
+              "name": "deleteNode",
+              "description": "Remove a node and its incident connections from the CONTROLLED graph — `deleteNode(id)` writes a fresh `graph` object back through the two-way model (the blessed cascading delete; the `$watch(graph)` reconcile reaps the live engine node/edges). Returns whether a node was removed. Contrast `removeNode`, the engine-only imperative escape hatch."
+            },
+            {
+              "kind": "method",
+              "name": "duplicateNode",
+              "description": "Clone a node in the CONTROLLED graph — `duplicateNode(id)` copies the node spec at a small offset with a FRESH unique id (never a colliding one), deep-cloning its `data` so the copy is independent of the source, and writes one fresh `graph` object back through the two-way model. Connections are NOT cloned — a duplicate is an isolated node (the React-Flow default). One history entry per duplicate. Returns the new id, or `null` for an unknown id. The same routine the NodeToolbar's Duplicate button and Ctrl/Cmd+D drive."
+            },
+            {
+              "kind": "method",
+              "name": "addConnection",
+              "description": "Imperatively add a connection — `addConnection({ id?, source, sourceOutput?, target, targetInput? })`. Returns the id. NOT reaped by the `graph` reconcile."
+            },
+            {
+              "kind": "method",
+              "name": "removeConnection",
+              "description": "Imperatively remove a connection by id — `removeConnection(id)`."
+            },
+            {
+              "kind": "method",
+              "name": "clear",
+              "description": "Remove every node and connection from the graph."
+            },
+            {
+              "kind": "method",
+              "name": "zoomToFit",
+              "description": "Pan and zoom the viewport to fit all nodes (Rete `AreaExtensions.zoomAt`)."
+            },
+            {
+              "kind": "method",
+              "name": "zoomTo",
+              "description": "Set the zoom level — `zoomTo(k)`. Echoes the new level back into the two-way `zoom` model."
+            },
+            {
+              "kind": "method",
+              "name": "setCenter",
+              "description": "Center the viewport on graph coordinates — `setCenter(x, y, { zoom? })`. Optionally sets the zoom. Echoes the level into the `zoom` model and fires `translated`. Powers the pannable built-in MiniMap."
+            },
+            {
+              "kind": "method",
+              "name": "setViewport",
+              "description": "Set the raw viewport transform — `setViewport({ x, y, k })` (any field omitted keeps its current value). Echoes `k` into the `zoom` model and fires `translated`."
+            },
+            {
+              "kind": "method",
+              "name": "screenToFlowPosition",
+              "description": "Project a screen/client coordinate to graph coordinates — `screenToFlowPosition(clientX, clientY)` → `{ x, y }` (or null before mount). The palette drag-drop primitive: on a canvas `@drop`, call it with the event client coords and push a fresh node into the bound `graph` at the result. The consumer owns the drag/drop; the canvas owns the projection."
+            },
+            {
+              "kind": "method",
+              "name": "getNodes",
+              "description": "Return a serialized snapshot of all nodes as `[{ id, label, x, y }]` (live positions from the area)."
+            },
+            {
+              "kind": "method",
+              "name": "getConnections",
+              "description": "Return a serialized snapshot of all connections as `[{ id, source, sourceOutput, target, targetInput }]`."
+            },
+            {
+              "kind": "method",
+              "name": "getTransform",
+              "description": "Return the current viewport transform `{ x, y, k }` (pan offset + zoom), or null before mount."
+            },
+            {
+              "kind": "method",
+              "name": "autoArrange",
+              "description": "Relayout the graph into a non-overlapping layered arrangement — `await autoArrange(opts?)` runs the elkjs-backed auto-layout, then reads the arranged node positions back through the two-way `graph` model (echo-guarded, one undoable gesture). Verb-only — never auto-triggered. `opts.options` forwards elk layout options (direction / spacing). No-op before mount."
+            },
+            {
+              "kind": "method",
+              "name": "undo",
+              "description": "Undo the most recent graph edit (drag / connect / disconnect / delete) — `undo()` restores the previous snapshot through the two-way `graph` model (echo-guarded). Graph-only (nodes + connections), NOT the viewport. One gesture = one step. No-op when there is nothing to undo. Also bound to Ctrl/Cmd+Z. Opt out with `:history=\"false\"`."
+            },
+            {
+              "kind": "method",
+              "name": "redo",
+              "description": "Redo the edit most recently undone — `redo()` re-applies the snapshot through the `graph` model (echo-guarded). A fresh edit after an undo discards the redo branch. No-op when there is nothing to redo. Also bound to Ctrl/Cmd+Shift+Z and Ctrl/Cmd+Y."
+            },
+            {
+              "kind": "method",
+              "name": "canUndo",
+              "description": "Return whether there is an edit to undo — `canUndo()` → boolean."
+            },
+            {
+              "kind": "method",
+              "name": "canRedo",
+              "description": "Return whether there is an edit to redo — `canRedo()` → boolean."
+            },
+            {
+              "kind": "method",
+              "name": "getSelectedNodes",
+              "description": "Return the currently-selected nodes as `[{ id, label, x, y }]` (the `getNodes()` shape, filtered to the live selection). Empty when nothing is selected. Complements the push-only `selection-change` event with an on-demand read."
+            },
+            {
+              "kind": "method",
+              "name": "selectNode",
+              "description": "Programmatically select a node by id — `selectNode(id, accumulate?)` (accumulate=true adds to the selection; falsy replaces it). Drives selection from a sidebar/search. No-op when selection is disabled (readonly / !selectable). NOT named bare `select` (inherited HTMLElement method → Lit shadow)."
+            },
+            {
+              "kind": "method",
+              "name": "clearSelection",
+              "description": "Clear the current node selection (and any selected edge) — `clearSelection()`."
+            },
+            {
+              "kind": "method",
+              "name": "selectAll",
+              "description": "Select every node — `selectAll()`. Also bound to Ctrl/Cmd+A from a focused canvas (the marquee only covers a dragged region). No-op when selection is disabled."
+            },
+            {
+              "kind": "method",
+              "name": "centerOnNode",
+              "description": "Pan (and optionally zoom via `opts.zoom`) to center the viewport on a node by id — `await centerOnNode(id, opts?)`. Measures the node to find its center in graph coords. No-op before mount or for an unknown id."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "graph",
+              "description": "The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data?, width?, height? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, type?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope; `width`/`height` are the explicit fixed box a `<NodeType resizable>` corner-drag persists (absent = auto-sized, and double-clicking a resize handle clears them back to auto). A connection's `type` is its path shape — `bezier` (default), `step`, `smoothstep`, or `straight`. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "graph"
+            },
+            {
+              "name": "validatetypes",
+              "description": "Automatic typed-socket validation (default ON). When `true`, the canvas resolves each endpoint's port type from the per-`<NodeType>` `<Port type>` schema and auto-rejects a type-mismatched connection (firing `connection-rejected`). `canConnect` survives as the optional custom-rule override that runs in addition. Set `false` for pure-`canConnect` (type as metadata only).",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "validateTypes",
+              "default": "true"
+            },
+            {
+              "name": "zoom",
+              "description": "The viewport zoom level (two-way `r-model`). Scroll/pinch writes the new zoom back through the model (echo-guarded against the wrapper's own programmatic zooms); a consumer write zooms the live area. There is deliberately no `zoom`/`zoomed` emit — a same-named emit collides with the model on Vue and Angular — so the two-way binding is the channel for zoom changes.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "zoom",
+              "default": "1"
+            },
+            {
+              "name": "pannable",
+              "description": "Whether the canvas can be panned by dragging the background. **Applied live** — flipping it after mount takes effect on the next gesture.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "pannable",
+              "default": "true"
+            },
+            {
+              "name": "zoomable",
+              "description": "Whether the canvas can be zoomed by scroll/pinch. **Applied live** — flipping it after mount takes effect on the next gesture.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "zoomable",
+              "default": "true"
+            },
+            {
+              "name": "selectable",
+              "description": "Whether nodes can be selected (click; ctrl-click to accumulate). Reflected as the `selected` flag in the `<NodeType>` `#body` scope and surfaced to the consumer via the `@selection-change` event. Applied live — turning it off after mount clears the current selection and blocks further picks (including marquee, edge selection and the keyboard shortcuts).",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "selectable",
+              "default": "true"
+            },
+            {
+              "name": "readonly",
+              "description": "Read-only viewer mode — no node drag, no connection editing, and no selection. Applied live. View-only zoom/fit (Controls, the `zoomTo`/`zoomToFit` verbs) stay enabled, as do the imperative `undo()`/`redo()` verbs; the Ctrl/Cmd+Z / +Y **keyboard shortcuts** are suppressed along with every other canvas shortcut.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "readonly",
+              "default": "false"
+            },
+            {
+              "name": "minzoom",
+              "description": "Minimum zoom level — the lower bound of the area's zoom restrictor. `0` disables the bound.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "minZoom",
+              "default": "0.1"
+            },
+            {
+              "name": "maxzoom",
+              "description": "Maximum zoom level — the upper bound of the area's zoom restrictor. `0` disables the bound.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "maxZoom",
+              "default": "4"
+            },
+            {
+              "name": "snapgrid",
+              "description": "Snap-to-grid size in pixels for node dragging. `0` turns snapping off. Applied live — changing it after mount affects the next drag. Snapping applies to user drags only; positions applied from the bound `graph` are never snapped.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "snapGrid",
+              "default": "0"
+            },
+            {
+              "name": "accumulateonctrl",
+              "description": "When selectable, hold Ctrl to add to the current selection instead of replacing it.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "accumulateOnCtrl",
+              "default": "true"
+            },
+            {
+              "name": "curvature",
+              "description": "The bezier curvature of connection paths (`classicConnectionPath`).",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "curvature",
+              "default": "0.3"
+            },
+            {
+              "name": "fitonmount",
+              "description": "After the initial graph mounts, pan/zoom the viewport to fit all nodes (`AreaExtensions.zoomAt`).",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "fitOnMount",
+              "default": "true"
+            },
+            {
+              "name": "controls",
+              "description": "Render the built-in Controls overlay — a zoom in / zoom out / fit-view button cluster (the React Flow `<Controls/>` parity). The buttons drive the same zoom/fit path as the `zoomTo`/`zoomToFit` handle verbs (clamped to `minZoom`/`maxZoom`) and stay enabled in `readonly`. Opt out with `:controls=\"false\"`.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "controls",
+              "default": "true"
+            },
+            {
+              "name": "minimap",
+              "description": "Render the built-in MiniMap overlay (opt-in, default OFF — the React Flow `<MiniMap/>` parity) — an absolute SVG panel (bottom-right) showing a scaled map of every node (sized from the measured engine node-view dims) plus the current viewport window (the area outside dimmed). It is pannable: dragging the minimap recenters the main viewport (via `setCenter`). Evaluated at construction — set it at mount time.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "minimap",
+              "default": "false"
+            },
+            {
+              "name": "background",
+              "description": "Canvas background pattern — 'dots' (default, today's grid) | 'lines' | 'cross' | 'none' (the React Flow <Background variant> parity). Gap/size/color stay CSS custom properties (--rozie-flow-grid-size, --rozie-flow-grid-dot-color, --rozie-flow-bg) — not separate props.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "background",
+              "default": "\"dots\""
+            },
+            {
+              "name": "canconnect",
+              "description": "Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule.",
+              "type": {
+                "text": "((...args: any[]) => any)"
+              },
+              "fieldName": "canConnect",
+              "default": "null"
+            },
+            {
+              "name": "history",
+              "description": "Undo/redo, on by default. Every gesture (drag, connect, disconnect, delete) pushes ONE capped (~100) snapshot of the bound graph (nodes incl. x/y + connections; not the viewport), and `undo()`/`redo()` plus Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, and Ctrl/Cmd+Y restore it through the two-way `graph` model (echo-guarded). One gesture = one undo step; a fresh edit after an undo discards the redo branch. Opt out with `:history=\"false\"` (the snapshot stack stays empty and the verbs no-op).",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "history",
+              "default": "true"
+            },
+            {
+              "name": "mode",
+              "description": "Two-way interaction mode (`r-model`) — the Figma-style pan ↔ select toggle, `'pan'` (default) or `'select'`. In `'pan'` an empty-canvas drag pans the viewport (unchanged). In `'select'` an empty-canvas drag draws a rubber-band marquee box that multi-selects the intersecting nodes (surfacing `@selection-change`). A node drag still drags the node in both modes — only the empty-canvas drag changes. The canvas writes it back when the built-in mode button toggles (see `marquee`).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "mode",
+              "default": "\"pan\""
+            },
+            {
+              "name": "marquee",
+              "description": "Render the 4th Controls button — the pan ↔ select mode toggle (it two-way-writes `mode`). Default OFF so the default Controls overlay keeps its three buttons. The marquee behavior works whenever `mode === 'select'` regardless of this flag (a consumer can drive `mode` directly); this only governs the built-in button.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "marquee",
+              "default": "false"
+            },
+            {
+              "name": "nodetoolbar",
+              "description": "Render the opt-in NodeToolbar (default OFF) — a floating toolbar over the single selected node (positioned from the engine node-view rect + the area transform, re-tracked on pan/zoom/drag). Default content is Delete (cascading controlled-graph `deleteNode`) + Duplicate (clone the node spec at an offset with a new id into a fresh `graph` object); both fire `@node-action` (`name: 'delete' | 'duplicate'`). Override the content by filling the `#toolbar` reactive slot.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "nodeToolbar",
+              "default": "false"
+            }
+          ],
+          "events": [
+            {
+              "name": "edge-click",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "edge-selected",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "selection-change",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "connect-end",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "node-action",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "connection-rejected",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "connection-created",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "connection-removed",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "node-picked",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "node-moved",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "translated",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "context-menu",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "graph-change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired with the updated `graph` (`event.detail`) when it changes."
+            },
+            {
+              "name": "zoom-change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired with the updated `zoom` (`event.detail`) when it changes."
+            },
+            {
+              "name": "mode-change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired with the updated `mode` (`event.detail`) when it changes."
+            }
+          ],
+          "slots": [
+            {
+              "name": "node",
+              "description": "Scoped slot — props: node, selected, emit."
+            },
+            {
+              "name": "toolbar",
+              "description": "Scoped slot — props: node, emit."
+            },
+            {
+              "name": ""
+            }
+          ]
+        },
+        {
+          "kind": "class",
+          "description": "Idiomatic Lit `<rozie-node-type>` — a render-by-type node template for `<rozie-flow-canvas>`. Declares how nodes of one `type` render (through the reactive `body` slot) plus their resize bounds; nest `<rozie-port>` children to declare that type’s port schema. Renderless — it contributes configuration, not markup.",
+          "name": "NodeType",
+          "tagName": "rozie-node-type",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "type",
+              "description": "The node TYPE id (required). Every graph node whose `type` matches renders this template and uses this type's `<Port>` schema. There is no id/x/y here — this is a render-by-type TEMPLATE, not an instance; instance identity and position live in the bound `graph` model.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "type"
+            },
+            {
+              "kind": "field",
+              "name": "resizable",
+              "description": "Opt this node TYPE into corner-handle resizing (default OFF). When true, selecting a node of this type shows 4 corner drag handles (the React Flow <NodeResizer/> parity); dragging one persists an explicit node.width/node.height (a fixed box, D-07) that overrides auto-sizing for that node instance. A double-click on a handle resets the node back to auto-size.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "resizable",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "minWidth",
+              "description": "Minimum width (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "minwidth",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "minHeight",
+              "description": "Minimum height (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "minheight",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "maxWidth",
+              "description": "Maximum width (px) a resize gesture may grow this type to. Unset = unbounded growth.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "maxwidth",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "maxHeight",
+              "description": "Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "maxheight",
+              "default": "null"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "type",
+              "description": "The node TYPE id (required). Every graph node whose `type` matches renders this template and uses this type's `<Port>` schema. There is no id/x/y here — this is a render-by-type TEMPLATE, not an instance; instance identity and position live in the bound `graph` model.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "type"
+            },
+            {
+              "name": "resizable",
+              "description": "Opt this node TYPE into corner-handle resizing (default OFF). When true, selecting a node of this type shows 4 corner drag handles (the React Flow <NodeResizer/> parity); dragging one persists an explicit node.width/node.height (a fixed box, D-07) that overrides auto-sizing for that node instance. A double-click on a handle resets the node back to auto-size.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "resizable",
+              "default": "false"
+            },
+            {
+              "name": "minwidth",
+              "description": "Minimum width (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "minWidth",
+              "default": "null"
+            },
+            {
+              "name": "minheight",
+              "description": "Minimum height (px) a resize gesture may shrink this type to. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "minHeight",
+              "default": "null"
+            },
+            {
+              "name": "maxwidth",
+              "description": "Maximum width (px) a resize gesture may grow this type to. Unset = unbounded growth.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "maxWidth",
+              "default": "null"
+            },
+            {
+              "name": "maxheight",
+              "description": "Maximum height (px) a resize gesture may grow this type to. Unset = unbounded growth.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "maxHeight",
+              "default": "null"
+            }
+          ],
+          "events": [],
+          "slots": [
+            {
+              "name": "body",
+              "description": "Scoped slot — props: node, selected, emit."
+            },
+            {
+              "name": ""
+            }
+          ]
+        },
+        {
+          "kind": "class",
+          "description": "Idiomatic Lit `<rozie-port>` — the typed directional port schema for the enclosing `<rozie-node-type>`. `output` / `input` picks the side, `type` gates which connections are legal, and `multiple` allows fan-out. Renderless — it contributes configuration, not markup.",
+          "name": "Port",
+          "tagName": "rozie-port",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "output",
+              "description": "Declares an OUTPUT port and names its key — set this (not `input`) so the port direction resolves to `output`. The attribute is `output`, not `out`: `out`/`in` are awkward bare identifiers, so `output`/`input` are used across all six targets.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "output",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "input",
+              "description": "Declares an INPUT port and names its key — set this (not `output`) so the port direction resolves to `input`. The attribute is `input`, not `in`: `in` is a JS reserved word that Svelte's mandatory `$props()` destructure rejects, so `input`/`output` are used instead.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "input",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "type",
+              "description": "The port TYPE — drives the canvas's typed-socket `:validate-types` (a type-mismatched connection is auto-rejected). It is the typed layer, NOT socket identity (a single shared Socket gates identity). Optional: an untyped port imposes no type constraint and connects to anything.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "type",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "label",
+              "description": "Optional socket label shown next to the port (defaults to the port key when omitted).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "label",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "multiple",
+              "description": "Allow multiple connections into/out of this socket. Left undefined by default to preserve the canvas's side asymmetry: outputs default to multi, inputs default to single. To force an explicit multi input, use the bare `multiple` attribute (`<Port ... multiple />`) — it resolves to `true` on all six targets.",
+              "type": {
+                "text": "unknown"
+              },
+              "attribute": "multiple",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "position",
+              "description": "Visual placement of the socket on the node: `left`, `right`, `top`, or `bottom`. Defaults by direction (input → left, output → right). `top`/`bottom` enable vertical flows (decision trees, top-down pipelines) — the canvas lays the socket out on that edge and the connection anchor shifts onto the matching axis.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "position",
+              "default": "undefined"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "output",
+              "description": "Declares an OUTPUT port and names its key — set this (not `input`) so the port direction resolves to `output`. The attribute is `output`, not `out`: `out`/`in` are awkward bare identifiers, so `output`/`input` are used across all six targets.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "output",
+              "default": "undefined"
+            },
+            {
+              "name": "input",
+              "description": "Declares an INPUT port and names its key — set this (not `output`) so the port direction resolves to `input`. The attribute is `input`, not `in`: `in` is a JS reserved word that Svelte's mandatory `$props()` destructure rejects, so `input`/`output` are used instead.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "input",
+              "default": "undefined"
+            },
+            {
+              "name": "type",
+              "description": "The port TYPE — drives the canvas's typed-socket `:validate-types` (a type-mismatched connection is auto-rejected). It is the typed layer, NOT socket identity (a single shared Socket gates identity). Optional: an untyped port imposes no type constraint and connects to anything.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "type",
+              "default": "undefined"
+            },
+            {
+              "name": "label",
+              "description": "Optional socket label shown next to the port (defaults to the port key when omitted).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "label",
+              "default": "undefined"
+            },
+            {
+              "name": "multiple",
+              "description": "Allow multiple connections into/out of this socket. Left undefined by default to preserve the canvas's side asymmetry: outputs default to multi, inputs default to single. To force an explicit multi input, use the bare `multiple` attribute (`<Port ... multiple />`) — it resolves to `true` on all six targets.",
+              "type": {
+                "text": "unknown"
+              },
+              "fieldName": "multiple",
+              "default": "undefined"
+            },
+            {
+              "name": "position",
+              "description": "Visual placement of the socket on the node: `left`, `right`, `top`, or `bottom`. Defaults by direction (input → left, output → right). `top`/`bottom` enable vertical flows (decision trees, top-down pipelines) — the canvas lays the socket out on that edge and the connection anchor shifts onto the matching axis.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "position",
+              "default": "undefined"
+            }
+          ],
+          "events": [],
+          "slots": []
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "FlowCanvas",
+          "declaration": {
+            "name": "FlowCanvas",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "FlowCanvas",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-flow-canvas",
+          "declaration": {
+            "name": "FlowCanvas",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "NodeType",
+          "declaration": {
+            "name": "NodeType",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-node-type",
+          "declaration": {
+            "name": "NodeType",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "Port",
+          "declaration": {
+            "name": "Port",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-port",
+          "declaration": {
+            "name": "Port",
+            "module": "dist/index.mjs"
+          }
+        }
+      ]
+    }
+  ]
+}
