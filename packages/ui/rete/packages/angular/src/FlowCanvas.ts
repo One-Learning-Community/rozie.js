@@ -457,7 +457,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
 })
 export class FlowCanvas {
   /**
-   * The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.
+   * The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data?, width?, height? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, type?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope; `width`/`height` are the explicit fixed box a `<NodeType resizable>` corner-drag persists (absent = auto-sized, and double-clicking a resize handle clears them back to auto). A connection's `type` is its path shape — `bezier` (default), `step`, `smoothstep`, or `straight`. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.
    * @example
    * <FlowCanvas r-model:graph="graph" :validate-types="true" />
    */
@@ -996,6 +996,22 @@ export class FlowCanvas {
           if (k === 'z' && e.shiftKey || k === 'y') {
             e.preventDefault();
             this.redo();
+            return;
+          }
+          // ── quick-260803-qwh — Ctrl/Cmd+A → select all; Ctrl/Cmd+D → duplicate the
+          // selection. Same guards as Delete/undo, inherited for free: the whole listener is
+          // only attached when `selectable && !readonly`, and the editable-focus guard above
+          // already returned for INPUT/TEXTAREA/contenteditable — so Ctrl+A inside a node's
+          // text field still reaches the browser's native select-all. preventDefault stops the
+          // page-level select-all / bookmark dialog. Ctrl+D is ONE undo step for N nodes. ──
+          if (k === 'a' && !e.shiftKey) {
+            e.preventDefault();
+            this.selectAll();
+            return;
+          }
+          if (k === 'd' && !e.shiftKey) {
+            e.preventDefault();
+            this.duplicateNodes(this.selectedNodeIds());
             return;
           }
         }
@@ -1662,6 +1678,11 @@ export class FlowCanvas {
     //      side (untyped port / unknown type) imposes no constraint → allow.
     //   2. `canConnect` OVERRIDE (Phase-40 contract, SURVIVES): a consumer custom rule;
     //      runs IN ADDITION to (after) the automatic check; returning false rejects.
+    // Each path TAGS its `connection-rejected` payload with a `reason` discriminator
+    // ('type-mismatch' | 'can-connect', quick-260803-qwh) so the consumer knows WHICH rule
+    // rejected. The tag goes on a FRESH payload object at each site — never mutated onto the
+    // shared `conn`, which is also handed to the consumer's `canConnect` predicate BEFORE the
+    // reason is known.
     // Cancelling makes editor.addConnection return false WITHOUT pushing the connection
     // or emitting `connectioncreated` — no ghost edge, no `connection-created`. Gates
     // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
@@ -1678,6 +1699,11 @@ export class FlowCanvas {
     //      side (untyped port / unknown type) imposes no constraint → allow.
     //   2. `canConnect` OVERRIDE (Phase-40 contract, SURVIVES): a consumer custom rule;
     //      runs IN ADDITION to (after) the automatic check; returning false rejects.
+    // Each path TAGS its `connection-rejected` payload with a `reason` discriminator
+    // ('type-mismatch' | 'can-connect', quick-260803-qwh) so the consumer knows WHICH rule
+    // rejected. The tag goes on a FRESH payload object at each site — never mutated onto the
+    // shared `conn`, which is also handed to the consumer's `canConnect` predicate BEFORE the
+    // reason is known.
     // Cancelling makes editor.addConnection return false WITHOUT pushing the connection
     // or emitting `connectioncreated` — no ghost edge, no `connection-created`. Gates
     // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
@@ -1703,13 +1729,19 @@ export class FlowCanvas {
           const srcType = portTypeOf(c.source, 'output', c.sourceOutput);
           const tgtType = portTypeOf(c.target, 'input', c.targetInput);
           if (srcType != null && tgtType != null && srcType !== tgtType) {
-            if (!this.programmatic) this.connectionRejected.emit(conn);
+            if (!this.programmatic) this.connectionRejected.emit({
+              ...conn,
+              reason: 'type-mismatch'
+            });
             return undefined; // ← CANCEL: type mismatch
           }
         }
         // 2. canConnect OVERRIDE (Phase-40 contract — custom rule, in addition).
         if (typeof __canConnect === 'function' && __canConnect(conn) === false) {
-          if (!this.programmatic) this.connectionRejected.emit(conn);
+          if (!this.programmatic) this.connectionRejected.emit({
+            ...conn,
+            reason: 'can-connect'
+          });
           return undefined; // ← CANCEL: Signal.emit halts, addConnection returns false
         }
       }
@@ -3438,9 +3470,8 @@ export class FlowCanvas {
     }
     return candidate;
   };
-  duplicateNode = (id: any) => {
-    if (id == null) return null;
-    const g = this.baseGraph();
+  duplicateInto = (g: any, id: any) => {
+    if (g == null || id == null) return null;
     const sid = String(id);
     const src = (g.nodes || []).find((n: any) => n && String(n.id) === sid);
     if (!src) return null;
@@ -3458,12 +3489,37 @@ export class FlowCanvas {
       y: (typeof src.y === 'number' ? src.y : 0) + 28,
       data: clonedData
     };
+    return {
+      graph: {
+        ...g,
+        nodes: [...(g.nodes || []), clone]
+      },
+      newId
+    };
+  };
+  duplicateNode = (id: any) => {
+    if (id == null) return null;
+    const r = this.duplicateInto(this.baseGraph(), id);
+    if (!r) return null;
     this.pushHistory();
-    this.commitGraph({
-      ...g,
-      nodes: [...(g.nodes || []), clone]
-    });
-    return newId;
+    this.commitGraph(r.graph);
+    return r.newId;
+  };
+  duplicateNodes = (ids: any) => {
+    if (!ids || ids.length === 0) return [];
+    const snap = this.snapshotCurrent();
+    let g = this.baseGraph();
+    const newIds = [];
+    for (const id of ids as any) {
+      const r = this.duplicateInto(g, id);
+      if (!r) continue;
+      g = r.graph;
+      newIds.push(r.newId);
+    }
+    if (newIds.length === 0) return [];
+    if (!this.programmatic) this.pushHistorySnapshot(snap);
+    this.commitGraph(g);
+    return newIds;
   };
   selectedNodeIds = () => {
     if (!this.selector || !this.selector.entities) return [];

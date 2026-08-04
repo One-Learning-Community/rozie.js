@@ -1,5 +1,5 @@
 ---
-surface_hash: f522b8a09a51
+surface_hash: 0af9f90c05e2
 ---
 
 # Node-flow editor libraries comparison
@@ -43,7 +43,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | **Typed-socket validation** (auto-reject mismatch) | ⚠️ consumer-glue | ⚠️ | ⚠️ | ⚠️ | ⚠️ | hand-roll | ✅ `:validate-types` from `<Port type>` + `canConnect` override |
 | Two-way zoom binding | ⚠️ controlled | ⚠️ | ⚠️ | ⚠️ | ⚠️ | hand-roll | ✅ `r-model:zoom` (echo-guarded) |
 | Graph events (moved / connected / picked) | ✅ | ✅ | ✅ | ✅ | ⚠️ | hand-roll | ✅ 8 structured events |
-| Imperative handle | ✅ `useReactFlow` | ✅ `useVueFlow` | ✅ | ✅ service | ⚠️ | hand-roll | ✅ uniform 26-verb `$expose` |
+| Imperative handle | ✅ `useReactFlow` | ✅ `useVueFlow` | ✅ | ✅ service | ⚠️ | hand-roll | ✅ uniform 27-verb `$expose` |
 | Selection surfaced + cascading delete | ✅ `onSelectionChange` / `deleteElements` | ✅ | ✅ | ⚠️ | ⚠️ | hand-roll | ✅ `@selection-change` + `deleteNode` verb / Delete key |
 | Direction arrowheads | ✅ `markerEnd` | ✅ | ✅ | ⚠️ | ⚠️ | hand-roll | ✅ per-edge SVG `marker-end` |
 | **Controls** overlay (zoom / fit) | ✅ `<Controls/>` | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ✅ built-in (`:controls`, opt-out) |
@@ -69,7 +69,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 - **The engine owns interaction, so behavior is identical by construction** — pan/zoom transform, node drag, edge drawing, and connection-handle hit-testing all live in Rete's `AreaPlugin` + `ConnectionPlugin`. Rozie never re-implements pointer math per target, so there is no cross-framework drift in *how the editor feels*.
 - **Built-in chrome on all six** — a **Controls** overlay (zoom in / out / fit, opt out with `:controls="false"`) and an opt-in **MiniMap** (`:minimap="true"`): an SVG overview that maps every node at its **measured** size + the current viewport window (outside dimmed) and is **pannable** (drag to recenter via `setCenter`). React Flow ships `<Controls/>` / `<MiniMap/>` only on React; here Solid and Lit — which have no node editor at all — get them too, pixel-identical.
 - **Workflow-builder essentials on all six** — **palette drag-drop** (`screenToFlowPosition` projects a drop point to graph coords so a sidebar item lands under the pointer), **top/bottom handle positioning** (`<Port position>` for vertical flows — decision trees, top-down pipelines), and **labeled / styled edges** (`connection.label` / `stroke` / `dashed` for conditional edges). The interactions that actually define a no-code / workflow builder, idiomatic on Solid and Lit too.
-- **A uniform 26-verb imperative handle** (`getEditor` / `getArea` / `addNode` / `removeNode` / `deleteNode` / `addConnection` / `removeConnection` / `clear` / `clearSelection` / `selectAll` / `selectNode` / `getSelectedNodes` / `centerOnNode` / `autoArrange` / `undo` / `redo` / `canUndo` / `canRedo` / `zoomToFit` / `zoomTo` / `setCenter` / `setViewport` / `screenToFlowPosition` / `getNodes` / `getConnections` / `getTransform`) grabbed with each framework's native ref — versus "however this library happens to expose its instance" (a hook, a service, a ref).
+- **A uniform 27-verb imperative handle** (`getEditor` / `getArea` / `addNode` / `removeNode` / `deleteNode` / `duplicateNode` / `addConnection` / `removeConnection` / `clear` / `clearSelection` / `selectAll` / `selectNode` / `getSelectedNodes` / `centerOnNode` / `autoArrange` / `undo` / `redo` / `canUndo` / `canRedo` / `zoomToFit` / `zoomTo` / `setCenter` / `setViewport` / `screenToFlowPosition` / `getNodes` / `getConnections` / `getTransform`) grabbed with each framework's native ref — versus "however this library happens to expose its instance" (a hook, a service, a ref).
 - **`getEditor()` / `getArea()` are always one hop from the raw engine**, so the full Rete API (custom plugins, `rete-engine` dataflow, `rete-auto-arrange-plugin`, …) is reachable on any target when the curated surface doesn't cover something.
 - **Zero-config styling that re-skins to any design system.** Rete ships *no* stylesheet, so the incumbents leave node / socket / connection chrome to consumer CSS. `@rozie-ui/rete` styles every value as a `--rozie-flow-*` CSS custom property with a built-in fallback — it looks right on drop-in, yet one `--rozie-flow-accent` override recolors every selection cue, and ready-made `themes/{base,shadcn,material,bootstrap}.css` bridges map it onto a design system. **Dark mode works with zero import** (a built-in `prefers-color-scheme` default on all six, Lit included); `themes/base.css` adds the app-toggled `.dark` class strategy on top. Same tokens on all six targets.
 
@@ -114,7 +114,7 @@ This page concedes where the standalone libraries are genuinely ahead — that's
 
 - **NodeResizer aspect-ratio lock, plus assorted second-tier chrome.** NodeResizer is free-form width/height only — a `keepAspectRatio` lock is deferred out of v1. Also still deferred (unchanged from Phase 44's list): subflows/grouping, copy/paste across canvases, export-to-PNG/SVG, controlled selection (bound selected-ids), and per-node locked/draggable/deletable flags.
 - **Big-framework depth on the home framework.** React Flow (Zustand store, deep node/edge-type catalogs, helper hooks, layouting integrations) is a mature, multi-year library; on React it exposes more surface than Rozie's curated set. Rozie's value is **not** "more than React Flow on React" — it's the **same idiomatic editor on all six frameworks from one source**, with the unserved **Solid and Lit** finally covered.
-- **`@rozie-ui/rete` is `0.1.2`.** The surface (21 props / 12 events / 26-verb handle / `<NodeType>` render-by-type body portal + typed `<Port>` schema with top/bottom positioning + built-in Controls & MiniMap + labeled/styled edges + palette drag-drop) is stable and gate-verified (behavioral parity across all six targets), but it is younger than the incumbents.
+- **`@rozie-ui/rete` is `0.1.2`.** The surface (21 props / 12 events / 27-verb handle / `<NodeType>` render-by-type body portal + typed `<Port>` schema with top/bottom positioning + built-in Controls & MiniMap + labeled/styled edges + palette drag-drop) is stable and gate-verified (behavioral parity across all six targets), but it is younger than the incumbents.
 
 ## Try it
 

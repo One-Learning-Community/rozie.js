@@ -312,7 +312,7 @@ interface ToolbarSlotCtx { node: any; emit: any; }
 
 interface FlowCanvasProps {
   /**
-   * The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.
+   * The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data?, width?, height? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, type?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope; `width`/`height` are the explicit fixed box a `<NodeType resizable>` corner-drag persists (absent = auto-sized, and double-clicking a resize handle clears them back to auto). A connection's `type` is its path shape — `bezier` (default), `step`, `smoothstep`, or `straight`. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.
    * @example
    * <FlowCanvas r-model:graph="graph" :validate-types="true" />
    */
@@ -429,6 +429,7 @@ export interface FlowCanvasHandle {
   addNode: (...args: any[]) => any;
   removeNode: (...args: any[]) => any;
   deleteNode: (...args: any[]) => any;
+  duplicateNode: (...args: any[]) => any;
   addConnection: (...args: any[]) => any;
   removeConnection: (...args: any[]) => any;
   clear: (...args: any[]) => any;
@@ -456,7 +457,7 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
   const _merged = mergeProps({ validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, background: 'dots', canConnect: null, history: true, marquee: false, nodeToolbar: false }, _props);
   const [local, attrs] = splitProps(_merged, ['graph', 'validateTypes', 'zoom', 'pannable', 'zoomable', 'selectable', 'readonly', 'minZoom', 'maxZoom', 'snapGrid', 'accumulateOnCtrl', 'curvature', 'fitOnMount', 'controls', 'minimap', 'background', 'canConnect', 'history', 'mode', 'marquee', 'nodeToolbar', 'children', 'ref', 'onEdgeClick', 'onEdgeSelected', 'onSelectionChange', 'onConnectEnd', 'onNodeAction', 'onConnectionRejected', 'onConnectionCreated', 'onConnectionRemoved', 'onNodePicked', 'onNodeMoved', 'onTranslated', 'onContextMenu']);
   const resolved = () => local.children;
-  onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo, getSelectedNodes, selectNode, clearSelection, selectAll, centerOnNode }); });
+  onMount(() => { local.ref?.({ getEditor, getArea, addNode, removeNode, deleteNode, duplicateNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo, getSelectedNodes, selectNode, clearSelection, selectAll, centerOnNode }); });
 
   const __ctx_rete_canvas = rozieContext("rete:canvas");
   const [graph, setGraph] = createControllableSignal<Record<string, any>>(_props as unknown as Record<string, unknown>, 'graph', (() => ({
@@ -765,6 +766,22 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
           if (k === 'z' && e.shiftKey || k === 'y') {
             e.preventDefault();
             redo();
+            return;
+          }
+          // ── quick-260803-qwh — Ctrl/Cmd+A → select all; Ctrl/Cmd+D → duplicate the
+          // selection. Same guards as Delete/undo, inherited for free: the whole listener is
+          // only attached when `selectable && !readonly`, and the editable-focus guard above
+          // already returned for INPUT/TEXTAREA/contenteditable — so Ctrl+A inside a node's
+          // text field still reaches the browser's native select-all. preventDefault stops the
+          // page-level select-all / bookmark dialog. Ctrl+D is ONE undo step for N nodes. ──
+          if (k === 'a' && !e.shiftKey) {
+            e.preventDefault();
+            selectAll();
+            return;
+          }
+          if (k === 'd' && !e.shiftKey) {
+            e.preventDefault();
+            duplicateNodes(selectedNodeIds());
             return;
           }
         }
@@ -1377,6 +1394,11 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     //      side (untyped port / unknown type) imposes no constraint → allow.
     //   2. `canConnect` OVERRIDE (Phase-40 contract, SURVIVES): a consumer custom rule;
     //      runs IN ADDITION to (after) the automatic check; returning false rejects.
+    // Each path TAGS its `connection-rejected` payload with a `reason` discriminator
+    // ('type-mismatch' | 'can-connect', quick-260803-qwh) so the consumer knows WHICH rule
+    // rejected. The tag goes on a FRESH payload object at each site — never mutated onto the
+    // shared `conn`, which is also handed to the consumer's `canConnect` predicate BEFORE the
+    // reason is known.
     // Cancelling makes editor.addConnection return false WITHOUT pushing the connection
     // or emitting `connectioncreated` — no ghost edge, no `connection-created`. Gates
     // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
@@ -1401,13 +1423,19 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
           const srcType = portTypeOf(c.source, 'output', c.sourceOutput);
           const tgtType = portTypeOf(c.target, 'input', c.targetInput);
           if (srcType != null && tgtType != null && srcType !== tgtType) {
-            if (!programmatic) _props.onConnectionRejected?.(conn);
+            if (!programmatic) _props.onConnectionRejected?.({
+              ...conn,
+              reason: 'type-mismatch'
+            });
             return undefined; // ← CANCEL: type mismatch
           }
         }
         // 2. canConnect OVERRIDE (Phase-40 contract — custom rule, in addition).
         if (typeof local.canConnect === 'function' && local.canConnect(conn) === false) {
-          if (!programmatic) _props.onConnectionRejected?.(conn);
+          if (!programmatic) _props.onConnectionRejected?.({
+            ...conn,
+            reason: 'can-connect'
+          });
           return undefined; // ← CANCEL: Signal.emit halts, addConnection returns false
         }
       }
@@ -3426,16 +3454,19 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     return candidate;
   }
 
-  // T2.8 — DUPLICATE the given node: clone its spec at a small offset with a NEW unique id
-  // into a FRESH `{ ...g, nodes:[...g.nodes, clone] }` object (the controlled-graph write-back
-  // contract — never an in-place push). The clone's `data` is deep-cloned ($clone strips
-  // any reactivity proxy) so the copy is independent of the source. Connections are NOT cloned
-  // (a duplicate is an isolated node — the React-Flow default). One history entry per
-  // duplicate gesture (pushHistory, gated on !programmatic + history). Returns the new id, or
-  // null if the source isn't found. NOT echo-guarded — a duplicate SHOULD update the model.
-  function duplicateNode(id: any) {
-    if (id == null) return null;
-    const g = baseGraph();
+  // T2.8 — the PURE duplicate kernel: given a graph object `g` and a node id, return a FRESH
+  // `{ graph: { ...g, nodes:[...g.nodes, clone] }, newId }` (the controlled-graph write-back
+  // contract — never an in-place push), or null if the source isn't found. The clone carries a
+  // NEW unique id and a small offset; its `data` is deep-cloned ($clone strips any reactivity
+  // proxy) so the copy is independent of the source. Connections are NOT cloned (a duplicate is
+  // an isolated node — the React-Flow default).
+  //
+  // This helper performs NO history push and NO commit — history/commit are the CALLER's, so a
+  // single-node gesture and a batch gesture each own their own coalescing (quick-260803-qwh:
+  // origin is encoded by CALL SITE, never by a mutable "suppress history" flag — a sync-set
+  // flag read on a later frame is a known-dead pattern here).
+  function duplicateInto(g: any, id: any) {
+    if (g == null || id == null) return null;
     const sid = String(id);
     const src = (g.nodes || []).find((n: any) => n && String(n.id) === sid);
     if (!src) return null;
@@ -3453,12 +3484,49 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
       y: (typeof src.y === 'number' ? src.y : 0) + 28,
       data: clonedData
     };
+    return {
+      graph: {
+        ...g,
+        nodes: [...(g.nodes || []), clone]
+      },
+      newId
+    };
+  }
+
+  // T2.8 — DUPLICATE the given node (the public verb + the NodeToolbar's Duplicate button).
+  // One history entry per duplicate gesture (pushHistory, gated on !programmatic + history).
+  // Returns the new id, or null if the source isn't found. NOT echo-guarded — a duplicate
+  // SHOULD update the model.
+  function duplicateNode(id: any) {
+    if (id == null) return null;
+    const r = duplicateInto(baseGraph(), id);
+    if (!r) return null;
     pushHistory();
-    commitGraph({
-      ...g,
-      nodes: [...(g.nodes || []), clone]
-    });
-    return newId;
+    commitGraph(r.graph);
+    return r.newId;
+  }
+
+  // DUPLICATE a SET of nodes as ONE gesture (the Ctrl/Cmd+D path — script-internal, NOT an
+  // exposed verb). Folds every id through a ROLLING `g` so `freshNodeId` sees the clones minted
+  // earlier in the same batch and cannot collide within it, then pushes the SINGLE pre-gesture
+  // snapshot + commits ONCE — the component's "one gesture = one undo step" contract (D-03),
+  // using the same snapshotCurrent/pushHistorySnapshot primitive the reconnect gesture
+  // coalesces with. Returns the new ids ([] when nothing was duplicated — no history, no write).
+  function duplicateNodes(ids: any) {
+    if (!ids || ids.length === 0) return [];
+    const snap = snapshotCurrent();
+    let g = baseGraph();
+    const newIds = [];
+    for (const id of ids as any) {
+      const r = duplicateInto(g, id);
+      if (!r) continue;
+      g = r.graph;
+      newIds.push(r.newId);
+    }
+    if (newIds.length === 0) return [];
+    if (!programmatic) pushHistorySnapshot(snap);
+    commitGraph(g);
+    return newIds;
   }
 
   // Collect the currently-SELECTED node ids from the live selector (Win 1 + Win 2). The
@@ -3980,8 +4048,9 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     clearEdgeSelection();
     scheduleSelectionEmit();
   }
-  // selectAll() — select every node (Ctrl+A is not bound; marquee only covers a
-  // dragged region). Mirrors the marquee's first-replaces / rest-accumulate pattern.
+  // selectAll() — select every node. Also the verb behind Ctrl/Cmd+A, which the canvas
+  // keydown handler binds to it (the marquee only ever covers a dragged region).
+  // Mirrors the marquee's first-replaces / rest-accumulate pattern.
   function selectAll() {
     if (!nodeSelectApi) return;
     let first = true;

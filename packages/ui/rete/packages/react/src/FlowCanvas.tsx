@@ -30,7 +30,7 @@ interface ToolbarCtx { node: any; emit: any; }
 
 interface FlowCanvasProps {
   /**
-   * The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.
+   * The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data?, width?, height? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, type?, label?, stroke?, dashed? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope; `width`/`height` are the explicit fixed box a `<NodeType resizable>` corner-drag persists (absent = auto-sized, and double-clicking a resize handle clears them back to auto). A connection's `type` is its path shape — `bezier` (default), `step`, `smoothstep`, or `straight`. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.
    * @example
    * <FlowCanvas r-model:graph="graph" :validate-types="true" />
    */
@@ -145,6 +145,7 @@ export interface FlowCanvasHandle {
   addNode: (...args: any[]) => any;
   removeNode: (...args: any[]) => any;
   deleteNode: (...args: any[]) => any;
+  duplicateNode: (...args: any[]) => any;
   addConnection: (...args: any[]) => any;
   removeConnection: (...args: any[]) => any;
   clear: (...args: any[]) => any;
@@ -270,8 +271,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   const redoStack = useRef([]);
   const dragFlushRaf = useRef(0);
   const selfWriteInFlight = useRef(false);
-  const selectedPathEl = useRef<any>(null);
   const lastSelectionIds = useRef<any>(null);
+  const selectedPathEl = useRef<any>(null);
   const resizeFlushRaf = useRef(0);
   const [graph, setGraph] = useControllableState({
     value: props.graph,
@@ -662,9 +663,8 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     }
     return candidate;
   }
-  const duplicateNode = useCallback((id: any) => {
-    if (id == null) return null;
-    const g = baseGraph();
+  function duplicateInto(g: any, id: any) {
+    if (g == null || id == null) return null;
     const sid = String(id);
     const src = (g.nodes || []).find((n: any) => n && String(n.id) === sid);
     if (!src) return null;
@@ -682,13 +682,38 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
       y: (typeof src.y === 'number' ? src.y : 0) + 28,
       data: clonedData
     };
+    return {
+      graph: {
+        ...g,
+        nodes: [...(g.nodes || []), clone]
+      },
+      newId
+    };
+  }
+  const duplicateNode = useCallback((id: any) => {
+    if (id == null) return null;
+    const r = duplicateInto(baseGraph(), id);
+    if (!r) return null;
     pushHistory();
-    commitGraph({
-      ...g,
-      nodes: [...(g.nodes || []), clone]
-    });
-    return newId;
-  }, [baseGraph, commitGraph, freshNodeId, pushHistory]);
+    commitGraph(r.graph);
+    return r.newId;
+  }, [baseGraph, commitGraph, duplicateInto, pushHistory]);
+  const duplicateNodes = useCallback((ids: any) => {
+    if (!ids || ids.length === 0) return [];
+    const snap = snapshotCurrent();
+    let g = baseGraph();
+    const newIds = [];
+    for (const id of ids as any) {
+      const r = duplicateInto(g, id);
+      if (!r) continue;
+      g = r.graph;
+      newIds.push(r.newId);
+    }
+    if (newIds.length === 0) return [];
+    if (!programmatic.current) pushHistorySnapshot(snap);
+    commitGraph(g);
+    return newIds;
+  }, [baseGraph, commitGraph, duplicateInto, pushHistorySnapshot, snapshotCurrent]);
   const selectedNodeIds = useCallback(() => {
     if (!selector.current || !selector.current.entities) return [];
     const ids = [];
@@ -1196,10 +1221,12 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     clearEdgeSelection();
     scheduleSelectionEmit();
   }
-  // selectAll() — select every node (Ctrl+A is not bound; marquee only covers a
-  // dragged region). Mirrors the marquee's first-replaces / rest-accumulate pattern.
-  // selectAll() — select every node (Ctrl+A is not bound; marquee only covers a
-  // dragged region). Mirrors the marquee's first-replaces / rest-accumulate pattern.
+  // selectAll() — select every node. Also the verb behind Ctrl/Cmd+A, which the canvas
+  // keydown handler binds to it (the marquee only ever covers a dragged region).
+  // Mirrors the marquee's first-replaces / rest-accumulate pattern.
+  // selectAll() — select every node. Also the verb behind Ctrl/Cmd+A, which the canvas
+  // keydown handler binds to it (the marquee only ever covers a dragged region).
+  // Mirrors the marquee's first-replaces / rest-accumulate pattern.
   function selectAll() {
     if (!nodeSelectApi.current) return;
     let first = true;
@@ -1525,6 +1552,22 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           if (k === 'z' && e.shiftKey || k === 'y') {
             e.preventDefault();
             redo();
+            return;
+          }
+          // ── quick-260803-qwh — Ctrl/Cmd+A → select all; Ctrl/Cmd+D → duplicate the
+          // selection. Same guards as Delete/undo, inherited for free: the whole listener is
+          // only attached when `selectable && !readonly`, and the editable-focus guard above
+          // already returned for INPUT/TEXTAREA/contenteditable — so Ctrl+A inside a node's
+          // text field still reaches the browser's native select-all. preventDefault stops the
+          // page-level select-all / bookmark dialog. Ctrl+D is ONE undo step for N nodes. ──
+          if (k === 'a' && !e.shiftKey) {
+            e.preventDefault();
+            selectAll();
+            return;
+          }
+          if (k === 'd' && !e.shiftKey) {
+            e.preventDefault();
+            duplicateNodes(selectedNodeIds());
             return;
           }
         }
@@ -2137,6 +2180,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     //      side (untyped port / unknown type) imposes no constraint → allow.
     //   2. `canConnect` OVERRIDE (Phase-40 contract, SURVIVES): a consumer custom rule;
     //      runs IN ADDITION to (after) the automatic check; returning false rejects.
+    // Each path TAGS its `connection-rejected` payload with a `reason` discriminator
+    // ('type-mismatch' | 'can-connect', quick-260803-qwh) so the consumer knows WHICH rule
+    // rejected. The tag goes on a FRESH payload object at each site — never mutated onto the
+    // shared `conn`, which is also handed to the consumer's `canConnect` predicate BEFORE the
+    // reason is known.
     // Cancelling makes editor.addConnection return false WITHOUT pushing the connection
     // or emitting `connectioncreated` — no ghost edge, no `connection-created`. Gates
     // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
@@ -2161,13 +2209,19 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           const srcType = portTypeOf(c.source, 'output', c.sourceOutput);
           const tgtType = portTypeOf(c.target, 'input', c.targetInput);
           if (srcType != null && tgtType != null && srcType !== tgtType) {
-            if (!programmatic.current) props.onConnectionRejected && props.onConnectionRejected(conn);
+            if (!programmatic.current) props.onConnectionRejected && props.onConnectionRejected({
+              ...conn,
+              reason: 'type-mismatch'
+            });
             return undefined; // ← CANCEL: type mismatch
           }
         }
         // 2. canConnect OVERRIDE (Phase-40 contract — custom rule, in addition).
         if (typeof props.canConnect === 'function' && props.canConnect(conn) === false) {
-          if (!programmatic.current) props.onConnectionRejected && props.onConnectionRejected(conn);
+          if (!programmatic.current) props.onConnectionRejected && props.onConnectionRejected({
+            ...conn,
+            reason: 'can-connect'
+          });
           return undefined; // ← CANCEL: Signal.emit halts, addConnection returns false
         }
       }
@@ -3449,9 +3503,9 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     });
   }, [zoom]);
 
-  const _rozieExposeRef = useRef({ getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo, getSelectedNodes, selectNode, clearSelection, selectAll, centerOnNode });
-  _rozieExposeRef.current = { getEditor, getArea, addNode, removeNode, deleteNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo, getSelectedNodes, selectNode, clearSelection, selectAll, centerOnNode };
-  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => _rozieExposeRef.current.getEditor(...args), getArea: (...args: Parameters<typeof getArea>): ReturnType<typeof getArea> => _rozieExposeRef.current.getArea(...args), addNode: (...args: Parameters<typeof addNode>): ReturnType<typeof addNode> => _rozieExposeRef.current.addNode(...args), removeNode: (...args: Parameters<typeof removeNode>): ReturnType<typeof removeNode> => _rozieExposeRef.current.removeNode(...args), deleteNode: (...args: Parameters<typeof deleteNode>): ReturnType<typeof deleteNode> => _rozieExposeRef.current.deleteNode(...args), addConnection: (...args: Parameters<typeof addConnection>): ReturnType<typeof addConnection> => _rozieExposeRef.current.addConnection(...args), removeConnection: (...args: Parameters<typeof removeConnection>): ReturnType<typeof removeConnection> => _rozieExposeRef.current.removeConnection(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), zoomToFit: (...args: Parameters<typeof zoomToFit>): ReturnType<typeof zoomToFit> => _rozieExposeRef.current.zoomToFit(...args), zoomTo: (...args: Parameters<typeof zoomTo>): ReturnType<typeof zoomTo> => _rozieExposeRef.current.zoomTo(...args), setCenter: (...args: Parameters<typeof setCenter>): ReturnType<typeof setCenter> => _rozieExposeRef.current.setCenter(...args), setViewport: (...args: Parameters<typeof setViewport>): ReturnType<typeof setViewport> => _rozieExposeRef.current.setViewport(...args), screenToFlowPosition: (...args: Parameters<typeof screenToFlowPosition>): ReturnType<typeof screenToFlowPosition> => _rozieExposeRef.current.screenToFlowPosition(...args), getNodes: (...args: Parameters<typeof getNodes>): ReturnType<typeof getNodes> => _rozieExposeRef.current.getNodes(...args), getConnections: (...args: Parameters<typeof getConnections>): ReturnType<typeof getConnections> => _rozieExposeRef.current.getConnections(...args), getTransform: (...args: Parameters<typeof getTransform>): ReturnType<typeof getTransform> => _rozieExposeRef.current.getTransform(...args), autoArrange: (...args: Parameters<typeof autoArrange>): ReturnType<typeof autoArrange> => _rozieExposeRef.current.autoArrange(...args), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => _rozieExposeRef.current.undo(...args), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => _rozieExposeRef.current.redo(...args), canUndo: (...args: Parameters<typeof canUndo>): ReturnType<typeof canUndo> => _rozieExposeRef.current.canUndo(...args), canRedo: (...args: Parameters<typeof canRedo>): ReturnType<typeof canRedo> => _rozieExposeRef.current.canRedo(...args), getSelectedNodes: (...args: Parameters<typeof getSelectedNodes>): ReturnType<typeof getSelectedNodes> => _rozieExposeRef.current.getSelectedNodes(...args), selectNode: (...args: Parameters<typeof selectNode>): ReturnType<typeof selectNode> => _rozieExposeRef.current.selectNode(...args), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => _rozieExposeRef.current.clearSelection(...args), selectAll: (...args: Parameters<typeof selectAll>): ReturnType<typeof selectAll> => _rozieExposeRef.current.selectAll(...args), centerOnNode: (...args: Parameters<typeof centerOnNode>): ReturnType<typeof centerOnNode> => _rozieExposeRef.current.centerOnNode(...args) }), []);
+  const _rozieExposeRef = useRef({ getEditor, getArea, addNode, removeNode, deleteNode, duplicateNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo, getSelectedNodes, selectNode, clearSelection, selectAll, centerOnNode });
+  _rozieExposeRef.current = { getEditor, getArea, addNode, removeNode, deleteNode, duplicateNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo, getSelectedNodes, selectNode, clearSelection, selectAll, centerOnNode };
+  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => _rozieExposeRef.current.getEditor(...args), getArea: (...args: Parameters<typeof getArea>): ReturnType<typeof getArea> => _rozieExposeRef.current.getArea(...args), addNode: (...args: Parameters<typeof addNode>): ReturnType<typeof addNode> => _rozieExposeRef.current.addNode(...args), removeNode: (...args: Parameters<typeof removeNode>): ReturnType<typeof removeNode> => _rozieExposeRef.current.removeNode(...args), deleteNode: (...args: Parameters<typeof deleteNode>): ReturnType<typeof deleteNode> => _rozieExposeRef.current.deleteNode(...args), duplicateNode: (...args: Parameters<typeof duplicateNode>): ReturnType<typeof duplicateNode> => _rozieExposeRef.current.duplicateNode(...args), addConnection: (...args: Parameters<typeof addConnection>): ReturnType<typeof addConnection> => _rozieExposeRef.current.addConnection(...args), removeConnection: (...args: Parameters<typeof removeConnection>): ReturnType<typeof removeConnection> => _rozieExposeRef.current.removeConnection(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), zoomToFit: (...args: Parameters<typeof zoomToFit>): ReturnType<typeof zoomToFit> => _rozieExposeRef.current.zoomToFit(...args), zoomTo: (...args: Parameters<typeof zoomTo>): ReturnType<typeof zoomTo> => _rozieExposeRef.current.zoomTo(...args), setCenter: (...args: Parameters<typeof setCenter>): ReturnType<typeof setCenter> => _rozieExposeRef.current.setCenter(...args), setViewport: (...args: Parameters<typeof setViewport>): ReturnType<typeof setViewport> => _rozieExposeRef.current.setViewport(...args), screenToFlowPosition: (...args: Parameters<typeof screenToFlowPosition>): ReturnType<typeof screenToFlowPosition> => _rozieExposeRef.current.screenToFlowPosition(...args), getNodes: (...args: Parameters<typeof getNodes>): ReturnType<typeof getNodes> => _rozieExposeRef.current.getNodes(...args), getConnections: (...args: Parameters<typeof getConnections>): ReturnType<typeof getConnections> => _rozieExposeRef.current.getConnections(...args), getTransform: (...args: Parameters<typeof getTransform>): ReturnType<typeof getTransform> => _rozieExposeRef.current.getTransform(...args), autoArrange: (...args: Parameters<typeof autoArrange>): ReturnType<typeof autoArrange> => _rozieExposeRef.current.autoArrange(...args), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => _rozieExposeRef.current.undo(...args), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => _rozieExposeRef.current.redo(...args), canUndo: (...args: Parameters<typeof canUndo>): ReturnType<typeof canUndo> => _rozieExposeRef.current.canUndo(...args), canRedo: (...args: Parameters<typeof canRedo>): ReturnType<typeof canRedo> => _rozieExposeRef.current.canRedo(...args), getSelectedNodes: (...args: Parameters<typeof getSelectedNodes>): ReturnType<typeof getSelectedNodes> => _rozieExposeRef.current.getSelectedNodes(...args), selectNode: (...args: Parameters<typeof selectNode>): ReturnType<typeof selectNode> => _rozieExposeRef.current.selectNode(...args), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => _rozieExposeRef.current.clearSelection(...args), selectAll: (...args: Parameters<typeof selectAll>): ReturnType<typeof selectAll> => _rozieExposeRef.current.selectAll(...args), centerOnNode: (...args: Parameters<typeof centerOnNode>): ReturnType<typeof centerOnNode> => _rozieExposeRef.current.centerOnNode(...args) }), []);
 
   return (
     <__ctx_rete_canvas.Provider value={{

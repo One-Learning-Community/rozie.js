@@ -85,8 +85,12 @@ const EXPECT = {
   // `autoArrange` (Phase 44 T2.6, D-08) = the elkjs-backed auto-layout verb (verb-only,
   // no auto-trigger; reads arranged positions back through the `graph` model). Collision-
   // clean (not a Lit lifecycle / inherited-DOM-method / emit / prop / React model-setter).
+  // `duplicateNode` (quick-260803-qwh) = the controlled-graph clone verb (fresh id + offset,
+  // deep-cloned `data`, no cloned connections), sibling of `deleteNode`. Also driven by the
+  // NodeToolbar's Duplicate button and Ctrl/Cmd+D. Collision-clean (`nodeToolbar` is the
+  // prop; `node-action` is the emit; not a Lit lifecycle / inherited-DOM-method name).
   expose: [
-    'getEditor', 'getArea', 'addNode', 'removeNode', 'deleteNode', 'addConnection',
+    'getEditor', 'getArea', 'addNode', 'removeNode', 'deleteNode', 'duplicateNode', 'addConnection',
     'removeConnection', 'clear', 'zoomToFit', 'zoomTo', 'setCenter', 'setViewport',
     'screenToFlowPosition', 'getNodes', 'getConnections', 'getTransform',
     'undo', 'redo', 'canUndo', 'canRedo', 'autoArrange',
@@ -140,7 +144,7 @@ describe('FlowCanvas.rozie surface gate', () => {
     expect(node?.isReactive, 'node should be REACTIVE').toBe(true);
   });
 
-  it('expose surface matches (26 verbs)', () => {
+  it('expose surface matches (27 verbs)', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

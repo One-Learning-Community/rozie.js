@@ -120,6 +120,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | `addNode` | Imperatively add a node — `addNode(spec)` where spec is `{ id, type, x, y, data? }`. The node's sockets come from its TYPE's `<Port>` schema (never a per-node port array) and its label from `data.label`. Returns the id. NOT reaped by the `graph` reconcile. |
 | `removeNode` | Imperatively remove a node and its connections by id — `removeNode(id)`. Returns whether it existed. The engine-only escape hatch — NOT written back to the bound `graph` model (use `deleteNode` for the controlled-graph delete). |
 | `deleteNode` | Remove a node and its incident connections from the CONTROLLED graph — `deleteNode(id)` writes a fresh `graph` object back through the two-way model (the blessed cascading delete; the `$watch(graph)` reconcile reaps the live engine node/edges). Returns whether a node was removed. Contrast `removeNode`, the engine-only imperative escape hatch. |
+| `duplicateNode` | Clone a node in the CONTROLLED graph — `duplicateNode(id)` copies the node spec at a small offset with a FRESH unique id (never a colliding one), deep-cloning its `data` so the copy is independent of the source, and writes one fresh `graph` object back through the two-way model. Connections are NOT cloned — a duplicate is an isolated node (the React-Flow default). One history entry per duplicate. Returns the new id, or `null` for an unknown id. The same routine the NodeToolbar's Duplicate button and Ctrl/Cmd+D drive. |
 | `addConnection` | Imperatively add a connection — `addConnection({ id?, source, sourceOutput?, target, targetInput? })`. Returns the id. NOT reaped by the `graph` reconcile. |
 | `removeConnection` | Imperatively remove a connection by id — `removeConnection(id)`. |
 | `clear` | Remove every node and connection from the graph. |
@@ -139,7 +140,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | `getSelectedNodes` | Return the currently-selected nodes as `[{ id, label, x, y }]` (the `getNodes()` shape, filtered to the live selection). Empty when nothing is selected. Complements the push-only `selection-change` event with an on-demand read. |
 | `selectNode` | Programmatically select a node by id — `selectNode(id, accumulate?)` (accumulate=true adds to the selection; falsy replaces it). Drives selection from a sidebar/search. No-op when selection is disabled (readonly / !selectable). NOT named bare `select` (inherited HTMLElement method → Lit shadow). |
 | `clearSelection` | Clear the current node selection (and any selected edge) — `clearSelection()`. |
-| `selectAll` | Select every node — `selectAll()` (Ctrl+A is not bound; the marquee only covers a dragged region). No-op when selection is disabled. |
+| `selectAll` | Select every node — `selectAll()`. Also bound to Ctrl/Cmd+A from a focused canvas (the marquee only covers a dragged region). No-op when selection is disabled. |
 | `centerOnNode` | Pan (and optionally zoom via `opts.zoom`) to center the viewport on a node by id — `await centerOnNode(id, opts?)`. Measures the node to find its center in graph coords. No-op before mount or for an unknown id. |
 
 ## Slots
