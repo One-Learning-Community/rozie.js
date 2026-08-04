@@ -2177,14 +2177,15 @@ export function emitScript(
   // IS the first-render value); only the emitted bytes move. Only reads inside
   // deferred closures change, and every one of those was a stale-snapshot bug.
   //
-  // Gating on `ir.props` mechanically excludes three shapes that are NOT this
-  // seam: (a) `props.on<Event>` from `$emit` lowering — that rewrite runs
-  // BEFORE `pairClonedLifecycle`, so those reads ARE visible to the walk and
-  // must be excluded deliberately, not accidentally; (b) `props.render<Slot>`
-  // portal renderers, which already have their own `_render<Pascal>Ref`
-  // machinery in emitPortals; (c) `props.slots` / `props.default<X>` /
-  // `props.on<X>Change`. The emit-handler variant is a real, distinct seam of
-  // the same class and is filed to the emitter-hardening backlog.
+  // Gating on `ir.props` alone would mechanically exclude three shapes. One of
+  // them has since been unioned back in; two remain deliberate exclusions:
+  // (a) `props.on<Event>` from `$emit` lowering — swj fenced these out pending
+  // the naming-collision question, and quick 260804-f0f measured that question
+  // closed and UNIONED THEM IN via the `ir.emits` loop below (they were always
+  // visible to the walk: the lowering runs BEFORE `pairClonedLifecycle`);
+  // (b) `props.render<Slot>` portal renderers, which already have their own
+  // `_render<Pascal>Ref` machinery in emitPortals; (c) `props.slots` /
+  // `props.default<X>` / `props.on<X>Change`.
   const mountReadablePropNames = new Set<string>();
   {
     // Collision guard — both this path and the portal-renderer path mint
@@ -2207,6 +2208,33 @@ export function emitScript(
       if (p.isModel) continue;
       if (portalRefIdents.has(`_${p.name}Ref`)) continue;
       mountReadablePropNames.add(p.name);
+    }
+    // Quick 260804-f0f — the `$emit` flavour of the same seam. `$emit('x', …)`
+    // lowers to `props.onX && props.onX(…)` (rewriteScript.ts:1365-1381) — a
+    // LogicalExpression over TWO plain `props.<X>` MemberExpressions, i.e.
+    // precisely the shape `findRefsInBody`'s MemberExpression visitor already
+    // matches and `rewriteWatchedPropReads` already rewrites. Nothing new is
+    // needed but membership.
+    //
+    // swj deliberately fenced these out (its comment above, and GREEN GUARD-4)
+    // pending the naming-collision question; measured answer: `_on<Pascal>Ref`
+    // is prefix-disjoint from the portal `_render<Pascal>Ref` family by
+    // construction, and disjoint from `actuallyRewrittenModelProps`, which
+    // mints BARE-name refs (`_valueRef`), never `_on…Ref`. A declared prop that
+    // happens to be NAMED `on<X>` is already in this set from the `ir.props`
+    // loop above and the `Set` dedupes it to one decl.
+    //
+    // Names come from emitPropsInterface's `toPascalCase` + empty-guard rather
+    // than a fourth local re-derivation, so the discovery set and the interface
+    // field it reads (`on<Pascal>?: (...args: any[]) => void`,
+    // emitPropsInterface.ts:160-164) cannot drift on a kebab emit name — the
+    // same move quick 260802-v1v seam 1 made at :2745.
+    for (const e of ir.emits) {
+      const eventPascal = toPascalCase(e);
+      if (eventPascal.length === 0) continue;
+      const name = `on${eventPascal}`;
+      if (portalRefIdents.has(`_${name}Ref`)) continue;
+      mountReadablePropNames.add(name);
     }
   }
 

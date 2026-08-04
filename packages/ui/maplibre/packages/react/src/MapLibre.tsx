@@ -266,6 +266,46 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   _maxZoomRef.current = props.maxZoom;
   const _minZoomRef = useRef(props.minZoom);
   _minZoomRef.current = props.minZoom;
+  const _onClickRef = useRef(props.onClick);
+  _onClickRef.current = props.onClick;
+  const _onContextmenuRef = useRef(props.onContextmenu);
+  _onContextmenuRef.current = props.onContextmenu;
+  const _onDblclickRef = useRef(props.onDblclick);
+  _onDblclickRef.current = props.onDblclick;
+  const _onDragRef = useRef(props.onDrag);
+  _onDragRef.current = props.onDrag;
+  const _onDragendRef = useRef(props.onDragend);
+  _onDragendRef.current = props.onDragend;
+  const _onDragstartRef = useRef(props.onDragstart);
+  _onDragstartRef.current = props.onDragstart;
+  const _onErrorRef = useRef(props.onError);
+  _onErrorRef.current = props.onError;
+  const _onIdleRef = useRef(props.onIdle);
+  _onIdleRef.current = props.onIdle;
+  const _onLoadRef = useRef(props.onLoad);
+  _onLoadRef.current = props.onLoad;
+  const _onMouseenterRef = useRef(props.onMouseenter);
+  _onMouseenterRef.current = props.onMouseenter;
+  const _onMouseleaveRef = useRef(props.onMouseleave);
+  _onMouseleaveRef.current = props.onMouseleave;
+  const _onMousemoveRef = useRef(props.onMousemove);
+  _onMousemoveRef.current = props.onMousemove;
+  const _onMoveRef = useRef(props.onMove);
+  _onMoveRef.current = props.onMove;
+  const _onMoveendRef = useRef(props.onMoveend);
+  _onMoveendRef.current = props.onMoveend;
+  const _onPitchendRef = useRef(props.onPitchend);
+  _onPitchendRef.current = props.onPitchend;
+  const _onRotateRef = useRef(props.onRotate);
+  _onRotateRef.current = props.onRotate;
+  const _onRotateendRef = useRef(props.onRotateend);
+  _onRotateendRef.current = props.onRotateend;
+  const _onSourcedataRef = useRef(props.onSourcedata);
+  _onSourcedataRef.current = props.onSourcedata;
+  const _onStyledataRef = useRef(props.onStyledata);
+  _onStyledataRef.current = props.onStyledata;
+  const _onZoomendRef = useRef(props.onZoomend);
+  _onZoomendRef.current = props.onZoomend;
   const _optionsRef = useRef(props.options);
   _optionsRef.current = props.options;
   const _popupsRef = useRef(props.popups);
@@ -674,24 +714,24 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     // zoom/pitch changes; consumers wanting an event get the terminal `zoomend` /
     // `pitchend` below. `move`/`rotate` have no such clash (the models are `center`
     // and `bearing`, not `move`/`rotate`), so those continuous events stay.
-    instance.current.on('load', (e: any) => props.onLoad && props.onLoad(e));
-    instance.current.on('idle', (e: any) => props.onIdle && props.onIdle(e));
-    instance.current.on('move', (e: any) => props.onMove && props.onMove(e));
-    instance.current.on('rotate', (e: any) => props.onRotate && props.onRotate(e));
-    instance.current.on('dragstart', (e: any) => props.onDragstart && props.onDragstart(e));
-    instance.current.on('drag', (e: any) => props.onDrag && props.onDrag(e));
-    instance.current.on('dragend', (e: any) => props.onDragend && props.onDragend(e));
-    instance.current.on('click', (e: any) => props.onClick && props.onClick(payload(e)));
-    instance.current.on('dblclick', (e: any) => props.onDblclick && props.onDblclick(payload(e)));
-    instance.current.on('contextmenu', (e: any) => props.onContextmenu && props.onContextmenu(payload(e)));
-    instance.current.on('mousemove', (e: any) => props.onMousemove && props.onMousemove(payload(e)));
-    instance.current.on('error', (e: any) => props.onError && props.onError(e));
-    instance.current.on('styledata', (e: any) => props.onStyledata && props.onStyledata(e));
-    instance.current.on('sourcedata', (e: any) => props.onSourcedata && props.onSourcedata(e));
+    instance.current.on('load', (e: any) => _onLoadRef.current && _onLoadRef.current(e));
+    instance.current.on('idle', (e: any) => _onIdleRef.current && _onIdleRef.current(e));
+    instance.current.on('move', (e: any) => _onMoveRef.current && _onMoveRef.current(e));
+    instance.current.on('rotate', (e: any) => _onRotateRef.current && _onRotateRef.current(e));
+    instance.current.on('dragstart', (e: any) => _onDragstartRef.current && _onDragstartRef.current(e));
+    instance.current.on('drag', (e: any) => _onDragRef.current && _onDragRef.current(e));
+    instance.current.on('dragend', (e: any) => _onDragendRef.current && _onDragendRef.current(e));
+    instance.current.on('click', (e: any) => _onClickRef.current && _onClickRef.current(payload(e)));
+    instance.current.on('dblclick', (e: any) => _onDblclickRef.current && _onDblclickRef.current(payload(e)));
+    instance.current.on('contextmenu', (e: any) => _onContextmenuRef.current && _onContextmenuRef.current(payload(e)));
+    instance.current.on('mousemove', (e: any) => _onMousemoveRef.current && _onMousemoveRef.current(payload(e)));
+    instance.current.on('error', (e: any) => _onErrorRef.current && _onErrorRef.current(e));
+    instance.current.on('styledata', (e: any) => _onStyledataRef.current && _onStyledataRef.current(e));
+    instance.current.on('sourcedata', (e: any) => _onSourcedataRef.current && _onSourcedataRef.current(e));
 
     // ─── camera-lifecycle + two-way echo (echo-guarded) ─────────────────────
     instance.current.on('moveend', (e: any) => {
-      props.onMoveend && props.onMoveend(e);
+      _onMoveendRef.current && _onMoveendRef.current(e);
       if (e.rozieProgrammatic) return;
       const c = instance.current.getCenter();
       const next = [c.lng, c.lat];
@@ -700,19 +740,19 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
       if (z !== _zoomRef.current) setZoom(z);
     });
     instance.current.on('zoomend', (e: any) => {
-      props.onZoomend && props.onZoomend(e);
+      _onZoomendRef.current && _onZoomendRef.current(e);
       if (e.rozieProgrammatic) return;
       const z = instance.current.getZoom();
       if (z !== _zoomRef.current) setZoom(z);
     });
     instance.current.on('rotateend', (e: any) => {
-      props.onRotateend && props.onRotateend(e);
+      _onRotateendRef.current && _onRotateendRef.current(e);
       if (e.rozieProgrammatic) return;
       const b = instance.current.getBearing();
       if (b !== _bearingRef.current) setBearing(b);
     });
     instance.current.on('pitchend', (e: any) => {
-      props.onPitchend && props.onPitchend(e);
+      _onPitchendRef.current && _onPitchendRef.current(e);
       if (e.rozieProgrammatic) return;
       const p = instance.current.getPitch();
       if (p !== _pitchRef.current) setPitch(p);
@@ -819,8 +859,8 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
       }
       for (const id of want as any) {
         if (featureListeners.has(id)) continue;
-        const enter = (e: any) => props.onMouseenter && props.onMouseenter(payload(e));
-        const leave = (e: any) => props.onMouseleave && props.onMouseleave(payload(e));
+        const enter = (e: any) => _onMouseenterRef.current && _onMouseenterRef.current(payload(e));
+        const leave = (e: any) => _onMouseleaveRef.current && _onMouseleaveRef.current(payload(e));
         instance.current.on('mouseenter', id, enter);
         instance.current.on('mouseleave', id, leave);
         featureListeners.set(id, {

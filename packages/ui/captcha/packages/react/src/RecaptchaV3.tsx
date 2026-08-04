@@ -62,6 +62,8 @@ const RecaptchaV3 = forwardRef<RecaptchaV3Handle, RecaptchaV3Props>(function Rec
   });
   const _executeOnMountRef = useRef(props.executeOnMount);
   _executeOnMountRef.current = props.executeOnMount;
+  const _onErrorRef = useRef(props.onError);
+  _onErrorRef.current = props.onError;
   const _sitekeyRef = useRef(props.sitekey);
   _sitekeyRef.current = props.sitekey;
 
@@ -108,14 +110,14 @@ const RecaptchaV3 = forwardRef<RecaptchaV3Handle, RecaptchaV3Props>(function Rec
       _executeRef.current();
     }).catch((err: any) => {
       if (disposed.current) return;
-      props.onError && props.onError({
+      _onErrorRef.current && _onErrorRef.current({
         error: err
       });
     });
     return () => {
       disposed.current = true;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const _rozieExposeRef = useRef({ execute });
   _rozieExposeRef.current = { execute };

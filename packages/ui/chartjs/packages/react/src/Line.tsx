@@ -109,6 +109,12 @@ const Line = forwardRef<LineHandle, LineProps>(function Line(_props: LineProps, 
   _dataRef.current = props.data;
   const _destroyDelayRef = useRef(props.destroyDelay);
   _destroyDelayRef.current = props.destroyDelay;
+  const _onClickRef = useRef(props.onClick);
+  _onClickRef.current = props.onClick;
+  const _onDatasetClickRef = useRef(props.onDatasetClick);
+  _onDatasetClickRef.current = props.onDatasetClick;
+  const _onHoverRef = useRef(props.onHover);
+  _onHoverRef.current = props.onHover;
   const _optionsRef = useRef(props.options);
   _optionsRef.current = props.options;
   const _pluginsRef = useRef(props.plugins);
@@ -235,7 +241,7 @@ const Line = forwardRef<LineHandle, LineProps>(function Line(_props: LineProps, 
       const nearest = chart.getElementsAtEventForMode(e, 'nearest', {
         intersect: true
       }, false);
-      props.onClick && props.onClick({
+      _onClickRef.current && _onClickRef.current({
         event: e,
         elements: nearest,
         chart
@@ -244,7 +250,7 @@ const Line = forwardRef<LineHandle, LineProps>(function Line(_props: LineProps, 
         intersect: true
       }, false);
       if (dataset.length) {
-        props.onDatasetClick && props.onDatasetClick({
+        _onDatasetClickRef.current && _onDatasetClickRef.current({
           event: e,
           elements: dataset,
           datasetIndex: dataset[0].datasetIndex,
@@ -255,7 +261,7 @@ const Line = forwardRef<LineHandle, LineProps>(function Line(_props: LineProps, 
     const composedOnHover = (e: any, activeEls: any, chart: any) => {
       const userOnHover = _optionsRef.current?.onHover;
       if (typeof userOnHover === 'function') userOnHover(e, activeEls, chart);
-      props.onHover && props.onHover({
+      _onHoverRef.current && _onHoverRef.current({
         event: e,
         elements: activeEls,
         chart

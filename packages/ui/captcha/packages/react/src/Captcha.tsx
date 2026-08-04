@@ -76,6 +76,8 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(function Captcha(_props:
     defaultValue: props.defaultToken ?? '',
     onValueChange: props.onTokenChange,
   });
+  const _onErrorRef = useRef(props.onError);
+  _onErrorRef.current = props.onError;
   const _providerRef = useRef(props.provider);
   _providerRef.current = props.provider;
   const widgetEl = useRef<HTMLDivElement | null>(null);
@@ -145,7 +147,7 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(function Captcha(_props:
       api.current = a;
       widgetId.current = api.current.render(widgetEl.current!, _buildConfigRef.current());
     }).catch((err: any) => {
-      props.onError && props.onError({
+      _onErrorRef.current && _onErrorRef.current({
         provider: _providerRef.current,
         error: err
       });
@@ -156,7 +158,7 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(function Captcha(_props:
       // Turnstile fully removes a widget; reCAPTCHA/hCaptcha only reset.
       if (typeof api.current.remove === 'function') api.current.remove(widgetId.current);else if (typeof api.current.reset === 'function') api.current.reset(widgetId.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const _rozieExposeRef = useRef({ reset, execute, getResponse });
   _rozieExposeRef.current = { reset, execute, getResponse };

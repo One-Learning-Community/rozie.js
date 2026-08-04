@@ -255,6 +255,22 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
   _nextArrowRef.current = props.nextArrow;
   const _noCalendarRef = useRef(props.noCalendar);
   _noCalendarRef.current = props.noCalendar;
+  const _onChangeRef = useRef(props.onChange);
+  _onChangeRef.current = props.onChange;
+  const _onCloseRef = useRef(props.onClose);
+  _onCloseRef.current = props.onClose;
+  const _onDayCreateRef = useRef(props.onDayCreate);
+  _onDayCreateRef.current = props.onDayCreate;
+  const _onMonthChangeRef = useRef(props.onMonthChange);
+  _onMonthChangeRef.current = props.onMonthChange;
+  const _onOpenRef = useRef(props.onOpen);
+  _onOpenRef.current = props.onOpen;
+  const _onReadyRef = useRef(props.onReady);
+  _onReadyRef.current = props.onReady;
+  const _onValueUpdateRef = useRef(props.onValueUpdate);
+  _onValueUpdateRef.current = props.onValueUpdate;
+  const _onYearChangeRef = useRef(props.onYearChange);
+  _onYearChangeRef.current = props.onYearChange;
   const _optionsRef = useRef(props.options);
   _optionsRef.current = props.options;
   const _parseDateRef = useRef(props.parseDate);
@@ -442,24 +458,24 @@ const Flatpickr = forwardRef<FlatpickrHandle, FlatpickrProps>(function Flatpickr
         }
         // Always surface BOTH the formatted string and the Date[] so consumers
         // that need the parsed objects (range bounds, multi-select) get them.
-        props.onChange && props.onChange({
+        _onChangeRef.current && _onChangeRef.current({
           value: dateStr,
           selectedDates
         });
       },
-      onReady: (d: any, s: any) => props.onReady && props.onReady({
+      onReady: (d: any, s: any) => _onReadyRef.current && _onReadyRef.current({
         value: s,
         selectedDates: d
       }),
-      onOpen: () => props.onOpen && props.onOpen(),
-      onClose: () => props.onClose && props.onClose(),
-      onMonthChange: () => props.onMonthChange && props.onMonthChange(),
-      onYearChange: () => props.onYearChange && props.onYearChange(),
-      onValueUpdate: (d: any, s: any) => props.onValueUpdate && props.onValueUpdate({
+      onOpen: () => _onOpenRef.current && _onOpenRef.current(),
+      onClose: () => _onCloseRef.current && _onCloseRef.current(),
+      onMonthChange: () => _onMonthChangeRef.current && _onMonthChangeRef.current(),
+      onYearChange: () => _onYearChangeRef.current && _onYearChangeRef.current(),
+      onValueUpdate: (d: any, s: any) => _onValueUpdateRef.current && _onValueUpdateRef.current({
         value: s,
         selectedDates: d
       }),
-      onDayCreate: (_d: any, _s: any, _fp: any, dayElem: any) => props.onDayCreate && props.onDayCreate(dayElem)
+      onDayCreate: (_d: any, _s: any, _fp: any, dayElem: any) => _onDayCreateRef.current && _onDayCreateRef.current(dayElem)
     });
     if (_disabledRef.current) instance.current.input.disabled = true;
     return () => instance.current?.destroy();

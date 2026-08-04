@@ -167,6 +167,14 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     defaultValue: props.defaultSelectedIndex ?? 0,
     onValueChange: props.onSelectedIndexChange,
   });
+  const _onPointerDownRef = useRef(props.onPointerDown);
+  _onPointerDownRef.current = props.onPointerDown;
+  const _onReInitRef = useRef(props.onReInit);
+  _onReInitRef.current = props.onReInit;
+  const _onSelectRef = useRef(props.onSelect);
+  _onSelectRef.current = props.onSelect;
+  const _onSettleRef = useRef(props.onSettle);
+  _onSettleRef.current = props.onSettle;
   const _thumbnailsRef = useRef(props.thumbnails);
   _thumbnailsRef.current = props.thumbnails;
   const [snaps, setSnaps] = useState<any[]>([]);
@@ -336,15 +344,15 @@ const Carousel = forwardRef<CarouselHandle, CarouselProps>(function Carousel(_pr
     embla.current.on('select', () => {
       const i = embla.current.selectedScrollSnap();
       setSelectedIndex(i);
-      props.onSelect && props.onSelect(i);
+      _onSelectRef.current && _onSelectRef.current(i);
       syncNav();
     });
-    embla.current.on('settle', () => props.onSettle && props.onSettle());
+    embla.current.on('settle', () => _onSettleRef.current && _onSettleRef.current());
     embla.current.on('reInit', () => {
-      props.onReInit && props.onReInit();
+      _onReInitRef.current && _onReInitRef.current();
       syncNav();
     });
-    embla.current.on('pointerDown', () => props.onPointerDown && props.onPointerDown());
+    embla.current.on('pointerDown', () => _onPointerDownRef.current && _onPointerDownRef.current());
     // Embla caches SLIDE sizes at init. If a slide's CSS (or a root width applied via
     // attribute fallthrough) settles a frame after $onMount, the snap COUNT measured
     // at init is stale — and a slide-size change (vs a viewport resize or slide

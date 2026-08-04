@@ -223,6 +223,14 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   _maxLengthRef.current = props.maxLength;
   const _nodeSpecsRef = useRef(props.nodeSpecs);
   _nodeSpecsRef.current = props.nodeSpecs;
+  const _onBlurRef = useRef(props.onBlur);
+  _onBlurRef.current = props.onBlur;
+  const _onFocusRef = useRef(props.onFocus);
+  _onFocusRef.current = props.onFocus;
+  const _onSelectionUpdateRef = useRef(props.onSelectionUpdate);
+  _onSelectionUpdateRef.current = props.onSelectionUpdate;
+  const _onUpdateRef = useRef(props.onUpdate);
+  _onUpdateRef.current = props.onUpdate;
   const _placeholderRef = useRef(props.placeholder);
   _placeholderRef.current = props.placeholder;
   const _starterKitRef = useRef(props.starterKit);
@@ -1079,14 +1087,14 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         if (next !== _htmlRef.current) setHtml(next);
         refreshCount();
         _refreshLinkRef.current();
-        props.onUpdate && props.onUpdate(next);
+        _onUpdateRef.current && _onUpdateRef.current(next);
       },
       onSelectionUpdate: () => {
         refreshActive();
         _refreshLinkRef.current();
-        props.onSelectionUpdate && props.onSelectionUpdate();
+        _onSelectionUpdateRef.current && _onSelectionUpdateRef.current();
       },
-      onFocus: () => props.onFocus && props.onFocus(),
+      onFocus: () => _onFocusRef.current && _onFocusRef.current(),
       onBlur: ({
         event
       }: any) => {
@@ -1098,7 +1106,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         // the next unrelated selection.
         const to = event && event.relatedTarget;
         if (!(to instanceof Node && linkEditorEl.current && linkEditorEl.current.contains(to))) openFlag.current = false;
-        props.onBlur && props.onBlur();
+        _onBlurRef.current && _onBlurRef.current();
       }
     });
     refreshActive();

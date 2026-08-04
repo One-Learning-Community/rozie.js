@@ -24,6 +24,8 @@ export default function Test(_props: TestProps): JSX.Element {
   })();
   const _gainRef = useRef(props.gain);
   _gainRef.current = props.gain;
+  const _onPingRef = useRef(props.onPing);
+  _onPingRef.current = props.onPing;
   const _pannableRef = useRef(props.pannable);
   _pannableRef.current = props.pannable;
   const [handler, setHandler] = useState<any>(null);
@@ -33,7 +35,7 @@ export default function Test(_props: TestProps): JSX.Element {
     const h = () => {
       if (!_pannableRef.current) return;
       use(_gainRef.current);
-      props.onPing && props.onPing();
+      _onPingRef.current && _onPingRef.current();
     };
     document.addEventListener('pointerdown', h);
     return () => document.removeEventListener('pointerdown', h);

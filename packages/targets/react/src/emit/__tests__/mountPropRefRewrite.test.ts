@@ -27,6 +27,23 @@
  * `readonly` happens to be a `$watch` source.
  *
  * Harness copied from `attrNameMap.test.ts`.
+ *
+ * ---
+ *
+ * Quick 260804-f0f SEAM 3 — the `$emit` flavour of the identical seam, and the
+ * fourth/final sibling of the `bcc1149c` / `9acd7737` staleness family.
+ *
+ * swj (above) deliberately fenced `props.on<Event>` reads OUT of the discovery
+ * set, pending a naming-collision question, and pinned that fence with
+ * `GREEN GUARD-4 (D-04)`. f0f measured the question closed and retired the
+ * fence: `ir.emits`-derived handler names are now unioned into
+ * `mountReadablePropNames` alongside `ir.props`, so `$emit('x')` inside a
+ * `$onMount` closure reads through `_onXRef.current` instead of freezing the
+ * first-render handler forever. GUARD-4 is inverted IN PLACE as `RED-4 (D-01)`
+ * rather than deleted, so the audit trail from fence → evidence → retirement
+ * survives in one file. `RED-5 / GUARD-5 (D-02)` adds the phase gate: one
+ * component with `$emit` in BOTH `$onMount` and `$onUpdate`, proving the mount
+ * half is indirected and the update half is untouched.
  */
 import { describe, it, expect } from 'vitest';
 import { parse } from '../../../../../core/src/parse.js';
@@ -170,16 +187,82 @@ $watch(() => $props.gain, (v) => { note(v); });
     expect(mountEffect(code).deps).toBe('[]');
   });
 
-  it('GREEN GUARD-4 (D-04) — $emit handlers are deliberately excluded', () => {
+  it('RED-4 (D-01) — $emit handlers are mirrored too', () => {
     const code = compile(SRC);
     const mount = mountEffect(code);
-    // `$emit` lowers to `props.on<Event>` BEFORE `pairClonedLifecycle` runs, so
-    // those reads ARE visible to the walk and must be excluded DELIBERATELY,
-    // not accidentally. Gating discovery on `ir.props` does that mechanically.
-    // The emit-handler variant is a real, distinct seam of the same class and
-    // is filed to the emitter-hardening backlog — this guard pins the fence.
-    expect(mount.body).toContain('props.onPing');
-    expect(code).not.toContain('_onPingRef');
+    // Quick 260804-f0f. This assertion was `GREEN GUARD-4 (D-04)` — the fence
+    // swj put up while the naming-collision question was open. Inverted in
+    // place (not deleted) so the audit trail survives. The evidence that
+    // retired the fence:
+    //
+    //   - SHAPE: `$emit('x', …)` lowers to `props.onX && props.onX(…)`
+    //     (`rewriteScript.ts:1365-1381`) — a LogicalExpression over TWO plain
+    //     `props.<X>` MemberExpressions, i.e. precisely what `findRefsInBody`'s
+    //     MemberExpression visitor already matches and `rewriteWatchedPropReads`
+    //     already rewrites. 184/184 corpus reads are `LOGICAL_AND_left` or
+    //     `CALLEE`; zero are optional-call or value-position, so the blocker
+    //     that killed w7b's value-position helper seam is structurally absent.
+    //   - COLLISION: `_on<Pascal>Ref` is prefix-disjoint from the portal
+    //     `_render<Pascal>Ref` family by construction, and disjoint from
+    //     `actuallyRewrittenModelProps`, which mints BARE-name refs (`_valueRef`)
+    //     and never an `on<X>Change` consumer field. Measured corpus
+    //     collisions: 0. A declared prop that happens to be NAMED `on<X>` is
+    //     already in this set from the `ir.props` loop and the `Set` dedupes it
+    //     to exactly one decl (same semantics RED-3 pins for `_gainRef`).
+    //   - STALENESS: 184/184 corpus reads sit in a DEFERRED closure; none is a
+    //     synchronous top-level statement of the effect body. Every rewrite is
+    //     a real fix, not a byte churn.
+    expect(code).toContain('const _onPingRef = useRef(props.onPing);');
+    expect(code).toContain('_onPingRef.current = props.onPing;');
+    expect(mount.body).toContain('_onPingRef.current && _onPingRef.current();');
+    expect(mount.body).not.toContain('props.onPing');
+  });
+
+  // Quick 260804-f0f D-02 — the phase gate, in ONE component so the two halves
+  // cannot drift apart: `$emit('ping')` inside a deferred closure in `$onMount`
+  // (must be indirected — the hook emits `[]` deps and freezes the handler),
+  // and `$emit('tick')` directly in `$onUpdate` (must stay RAW — that hook keeps
+  // a real dep array, so React re-creates its closures on dep change and there
+  // is no staleness to defend against). Same construction FlowCanvas gave w7b.
+  //
+  // This source is also the live probe that settled the dep-filter question:
+  // `onTick` is NOT in `[props.live, touch]`, because `setupDeps` is built from
+  // `$props.` sigil reads in the SOURCE (`core/src/reactivity/buildDepGraph.ts`)
+  // and `$emit('tick')` is a CallExpression on `$emit`, not a `$props` read. So
+  // `filteredSetupDeps` needs no new disjunct — unlike swj's and w7b's seams.
+  const SRC_EMIT_PHASE = `<rozie name="Test" inherit-attrs="false">
+<props>{ live: { type: Boolean, default: false } }</props>
+<emits>{ ping: null, tick: null }</emits>
+<script>
+$onMount(() => {
+  const h = () => { $emit('ping'); };
+  document.addEventListener('x', h);
+});
+$onUpdate(() => {
+  touch($props.live);
+  $emit('tick');
+});
+</script>
+<template><div>hi</div></template>
+</rozie>`;
+
+  it('RED-5 / GUARD-5 (D-02) — $emit is mirrored in $onMount and left raw in $onUpdate', () => {
+    const code = compile(SRC_EMIT_PHASE);
+
+    // RED-5 — the mount half. Red pre-fix.
+    expect(code).toContain('const _onPingRef = useRef(props.onPing);');
+    expect(code).toContain('_onPingRef.current = props.onPing;');
+    const mount = mountEffect(code);
+    expect(mount.body).toContain('_onPingRef.current && _onPingRef.current();');
+    expect(mount.body).not.toContain('props.onPing');
+
+    // GUARD-5 — the update half. Green pre-fix AND post-fix. The union lands in
+    // `mountReadablePropNames`, which `memberNamesForHook` gates on
+    // `lh.phase === 'mount'`, so an `$onUpdate` hook is byte-unchanged.
+    const update = extractEffects(code).find((e) => e.deps.includes('props.live'));
+    expect(update, 'expected an $onUpdate effect depending on props.live').toBeDefined();
+    expect(update!.body).toContain('props.onTick && props.onTick();');
+    expect(code).not.toContain('_onTickRef');
   });
 
   // Quick 260803-swj seam 2, follow-up — a lifecycle hook whose SETUP body has

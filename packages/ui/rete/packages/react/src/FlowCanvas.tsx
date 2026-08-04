@@ -311,6 +311,24 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   _minimapRef.current = props.minimap;
   const _nodeToolbarRef = useRef(props.nodeToolbar);
   _nodeToolbarRef.current = props.nodeToolbar;
+  const _onConnectEndRef = useRef(props.onConnectEnd);
+  _onConnectEndRef.current = props.onConnectEnd;
+  const _onConnectionCreatedRef = useRef(props.onConnectionCreated);
+  _onConnectionCreatedRef.current = props.onConnectionCreated;
+  const _onConnectionRejectedRef = useRef(props.onConnectionRejected);
+  _onConnectionRejectedRef.current = props.onConnectionRejected;
+  const _onConnectionRemovedRef = useRef(props.onConnectionRemoved);
+  _onConnectionRemovedRef.current = props.onConnectionRemoved;
+  const _onContextMenuRef = useRef(props.onContextMenu);
+  _onContextMenuRef.current = props.onContextMenu;
+  const _onNodeActionRef = useRef(props.onNodeAction);
+  _onNodeActionRef.current = props.onNodeAction;
+  const _onNodeMovedRef = useRef(props.onNodeMoved);
+  _onNodeMovedRef.current = props.onNodeMoved;
+  const _onNodePickedRef = useRef(props.onNodePicked);
+  _onNodePickedRef.current = props.onNodePicked;
+  const _onTranslatedRef = useRef(props.onTranslated);
+  _onTranslatedRef.current = props.onTranslated;
   const _pannableRef = useRef(props.pannable);
   _pannableRef.current = props.pannable;
   const _readonlyRef = useRef(props.readonly);
@@ -1542,7 +1560,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             pos = screenToFlowPosition(r.left + r.width / 2, r.top + r.height / 2);
           }
           if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
-            props.onConnectEnd && props.onConnectEnd({
+            _onConnectEndRef.current && _onConnectEndRef.current({
               source: cd.initial.nodeId,
               sourceOutput: cd.initial.key,
               position: {
@@ -1845,7 +1863,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
 
       // emit per-node event helper handed to the slot scope so a consumer node body
       // can raise a custom event carrying its id (e.g. a delete button).
-      const emit = (name: any, detail: any) => props.onNodeAction && props.onNodeAction({
+      const emit = (name: any, detail: any) => _onNodeActionRef.current && _onNodeActionRef.current({
         id,
         name,
         detail
@@ -2329,7 +2347,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           const srcType = portTypeOf(c.source, 'output', c.sourceOutput);
           const tgtType = portTypeOf(c.target, 'input', c.targetInput);
           if (srcType != null && tgtType != null && srcType !== tgtType) {
-            if (!programmatic.current) props.onConnectionRejected && props.onConnectionRejected({
+            if (!programmatic.current) _onConnectionRejectedRef.current && _onConnectionRejectedRef.current({
               ...conn,
               reason: 'type-mismatch'
             });
@@ -2338,7 +2356,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         }
         // 2. canConnect OVERRIDE (Phase-40 contract — custom rule, in addition).
         if (typeof _canConnectRef.current === 'function' && _canConnectRef.current(conn) === false) {
-          if (!programmatic.current) props.onConnectionRejected && props.onConnectionRejected({
+          if (!programmatic.current) _onConnectionRejectedRef.current && _onConnectionRejectedRef.current({
             ...conn,
             reason: 'can-connect'
           });
@@ -2359,7 +2377,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
           // WRITE-BACK: append the new connection into a fresh graph object (D4).
           _writeBackConnectionCreatedRef.current(context.data);
           // keep the discrete event too (back-compat).
-          props.onConnectionCreated && props.onConnectionCreated(serializeConn(context.data));
+          _onConnectionCreatedRef.current && _onConnectionCreatedRef.current(serializeConn(context.data));
         }
       } else if (context.type === 'connectionremoved') {
         connInstances.delete(context.data.id);
@@ -2367,7 +2385,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         if (!programmatic.current) {
           // WRITE-BACK: filter the removed connection out of a fresh graph object (D4).
           _writeBackConnectionRemovedRef.current(context.data.id);
-          props.onConnectionRemoved && props.onConnectionRemoved({
+          _onConnectionRemovedRef.current && _onConnectionRemovedRef.current({
             id: context.data.id
           });
         }
@@ -2377,7 +2395,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     area.current.addPipe((context: any) => {
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       if (context.type === 'nodepicked') {
-        props.onNodePicked && props.onNodePicked({
+        _onNodePickedRef.current && _onNodePickedRef.current({
           id: context.data.id
         });
         // T1.3 — pointer-DOWN: stash the PRE-drag graph snapshot (before any movement). It
@@ -2435,7 +2453,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
             y: pos.y
           });
           _scheduleDragFlushRef.current();
-          props.onNodeMoved && props.onNodeMoved({
+          _onNodeMovedRef.current && _onNodeMovedRef.current({
             id,
             x: pos.x,
             y: pos.y
@@ -2448,7 +2466,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         // Phase 74-03 — the resized/selected node moved → re-track its handles.
         if (scheduleResizerTrack.current) scheduleResizerTrack.current();
       } else if (context.type === 'translated') {
-        props.onTranslated && props.onTranslated({
+        _onTranslatedRef.current && _onTranslatedRef.current({
           x: context.data.position.x,
           y: context.data.position.y
         });
@@ -2479,7 +2497,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
         if (ev !== lastContextMenuEvent.current) {
           lastContextMenuEvent.current = ev;
           const ctx = context.data.context;
-          props.onContextMenu && props.onContextMenu({
+          _onContextMenuRef.current && _onContextMenuRef.current({
             id: ctx && ctx.id ? ctx.id : null
           });
         }
@@ -3067,7 +3085,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
     // override can raise its own actions too.
     const toolbarEmit = (name: any, detail: any) => {
       const id = toolbarSelectedId.current;
-      props.onNodeAction && props.onNodeAction({
+      _onNodeActionRef.current && _onNodeActionRef.current({
         id,
         name,
         detail

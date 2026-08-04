@@ -163,6 +163,16 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   _ghostClassRef.current = props.ghostClass;
   const _handleRef = useRef(props.handle);
   _handleRef.current = props.handle;
+  const _onAddRef = useRef(props.onAdd);
+  _onAddRef.current = props.onAdd;
+  const _onChangeRef = useRef(props.onChange);
+  _onChangeRef.current = props.onChange;
+  const _onEndRef = useRef(props.onEnd);
+  _onEndRef.current = props.onEnd;
+  const _onRemoveRef = useRef(props.onRemove);
+  _onRemoveRef.current = props.onRemove;
+  const _onStartRef = useRef(props.onStart);
+  _onStartRef.current = props.onStart;
   const _optionsRef = useRef(props.options);
   _optionsRef.current = props.options;
   const _swapThresholdRef = useRef(props.swapThreshold);
@@ -356,20 +366,20 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
         newIndex,
         item
       }: any) => {
-        if (kind === 'reorder') props.onChange && props.onChange({
+        if (kind === 'reorder') _onChangeRef.current && _onChangeRef.current({
           oldIndex,
           newIndex,
           item
-        });else if (kind === 'add') props.onAdd && props.onAdd({
+        });else if (kind === 'add') _onAddRef.current && _onAddRef.current({
           newIndex,
           item
-        });else if (kind === 'remove') props.onRemove && props.onRemove({
+        });else if (kind === 'remove') _onRemoveRef.current && _onRemoveRef.current({
           oldIndex,
           item
         });
       },
-      onStart: (e: any) => props.onStart && props.onStart(e),
-      onEnd: (e: any) => props.onEnd && props.onEnd(e)
+      onStart: (e: any) => _onStartRef.current && _onStartRef.current(e),
+      onEnd: (e: any) => _onEndRef.current && _onEndRef.current(e)
     });
     instance.current = sortable.instance;
     // $onMount's cleanup-return: closing over a setup-local (`sortable`) does

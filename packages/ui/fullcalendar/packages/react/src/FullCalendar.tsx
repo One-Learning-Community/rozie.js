@@ -194,6 +194,28 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
   _localeRef.current = props.locale;
   const _nowIndicatorRef = useRef(props.nowIndicator);
   _nowIndicatorRef.current = props.nowIndicator;
+  const _onDateClickRef = useRef(props.onDateClick);
+  _onDateClickRef.current = props.onDateClick;
+  const _onDatesSetRef = useRef(props.onDatesSet);
+  _onDatesSetRef.current = props.onDatesSet;
+  const _onEventClickRef = useRef(props.onEventClick);
+  _onEventClickRef.current = props.onEventClick;
+  const _onEventDropRef = useRef(props.onEventDrop);
+  _onEventDropRef.current = props.onEventDrop;
+  const _onEventMouseEnterRef = useRef(props.onEventMouseEnter);
+  _onEventMouseEnterRef.current = props.onEventMouseEnter;
+  const _onEventMouseLeaveRef = useRef(props.onEventMouseLeave);
+  _onEventMouseLeaveRef.current = props.onEventMouseLeave;
+  const _onEventResizeRef = useRef(props.onEventResize);
+  _onEventResizeRef.current = props.onEventResize;
+  const _onEventsSetRef = useRef(props.onEventsSet);
+  _onEventsSetRef.current = props.onEventsSet;
+  const _onLoadingRef = useRef(props.onLoading);
+  _onLoadingRef.current = props.onLoading;
+  const _onSelectRef = useRef(props.onSelect);
+  _onSelectRef.current = props.onSelect;
+  const _onUnselectRef = useRef(props.onUnselect);
+  _onUnselectRef.current = props.onUnselect;
   const _optionsRef = useRef(props.options);
   _optionsRef.current = props.options;
   const _selectableRef = useRef(props.selectable);
@@ -479,7 +501,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       // toolbar; the built-in default lives in the `headerToolbar` prop default.
       headerToolbar: _headerToolbarRef.current,
       eventClick: (info: any) => {
-        props.onEventClick && props.onEventClick({
+        _onEventClickRef.current && _onEventClickRef.current({
           event: {
             id: info.event.id,
             title: info.event.title,
@@ -490,14 +512,14 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         });
       },
       dateClick: (info: any) => {
-        props.onDateClick && props.onDateClick({
+        _onDateClickRef.current && _onDateClickRef.current({
           date: info.date,
           dateStr: info.dateStr,
           allDay: info.allDay
         });
       },
       eventDrop: (info: any) => {
-        props.onEventDrop && props.onEventDrop({
+        _onEventDropRef.current && _onEventDropRef.current({
           event: {
             id: info.event.id,
             title: info.event.title,
@@ -508,7 +530,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         });
       },
       select: (info: any) => {
-        props.onSelect && props.onSelect({
+        _onSelectRef.current && _onSelectRef.current({
           start: info.start,
           end: info.end,
           startStr: info.startStr,
@@ -517,7 +539,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         });
       },
       eventResize: (info: any) => {
-        props.onEventResize && props.onEventResize({
+        _onEventResizeRef.current && _onEventResizeRef.current({
           event: {
             id: info.event.id,
             title: info.event.title,
@@ -529,14 +551,14 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         });
       },
       datesSet: (info: any) => {
-        props.onDatesSet && props.onDatesSet({
+        _onDatesSetRef.current && _onDatesSetRef.current({
           start: info.start,
           end: info.end,
           view: info.view.type
         });
       },
       eventMouseEnter: (info: any) => {
-        props.onEventMouseEnter && props.onEventMouseEnter({
+        _onEventMouseEnterRef.current && _onEventMouseEnterRef.current({
           event: {
             id: info.event.id,
             title: info.event.title,
@@ -547,7 +569,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         });
       },
       eventMouseLeave: (info: any) => {
-        props.onEventMouseLeave && props.onEventMouseLeave({
+        _onEventMouseLeaveRef.current && _onEventMouseLeaveRef.current({
           event: {
             id: info.event.id,
             title: info.event.title,
@@ -558,21 +580,21 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
         });
       },
       unselect: (info: any) => {
-        props.onUnselect && props.onUnselect({
+        _onUnselectRef.current && _onUnselectRef.current({
           jsEvent: info.jsEvent
         });
       },
       loading: (isLoading: any) => {
         // FullCalendar's `loading` callback receives a bare boolean (not an info
         // object) — normalize to the structured `{ isLoading }` payload shape.
-        props.onLoading && props.onLoading({
+        _onLoadingRef.current && _onLoadingRef.current({
           isLoading
         });
       },
       eventsSet: (events: any) => {
         // `eventsSet` receives the array of current EventApi objects — map each to
         // the normalized floor shape for persistence/sync consumers.
-        props.onEventsSet && props.onEventsSet({
+        _onEventsSetRef.current && _onEventsSetRef.current({
           events: events.map((e: any) => ({
             id: e.id,
             title: e.title,
