@@ -75,17 +75,29 @@ The non-vue captcha leaves (`react`/`solid`/`lit`/`svelte`) declare `@rozie/runt
    ```bash
    pnpm turbo run build --force --filter=@rozie/core --filter=@rozie/cli ...  # mirror release.yml
    ```
-3. **Run the LOCAL gate** — the real pre-publish guard (full checks incl. version/dep timing; absent `dist/` = FAIL, so build first):
+3. **Run the UNSCOPED tarball-drift audit FIRST** — catches leaves the wave is
+   NOT bumping (check (f), §6 item 10 D1 mechanized). This is deliberately run
+   unscoped, in AUDIT mode (not `--gate`), because already-published is the
+   expected steady state for every package in a bump set — check (f) is the
+   only thing that can fire here:
+   ```bash
+   pnpm release:precheck --tarball
+   ```
+   Any unexpected `FAIL` means a leaf you are NOT touching this wave has
+   silently gone stale — investigate before continuing (either fold it into
+   this wave's bump set with an honest changelog, or file it as its own
+   follow-up; do not ignore it).
+4. **Run the LOCAL gate** — the real pre-publish guard (full checks incl. version/dep timing; absent `dist/` = FAIL, so build first). `--gate` implies `--tarball` (check (f) is part of the real pre-publish guard):
    ```bash
    pnpm release:precheck --gate
    # or scope it: pnpm release:precheck --gate --filter @rozie/core --filter @rozie-ui/captcha-react ...
    ```
-4. **Fix anything it flags.** Re-run until clean.
-5. **Commit + push** `main`.
-6. **`npm pack` spot-check** the risky leaves: svelte (`*.svelte.d.ts` present?), angular (APF `dist/fesm2022/*.mjs` + `dist/index.d.ts` present?).
-7. **Dispatch `release.yml` with `dry_run = true`**, watch it go green. The CI advisory precheck step surfaces any residual structural issue in the log without blocking.
-8. **Dispatch with `dry_run = false`**, watch it go green.
-9. **Verify on npm via direct registry GET** — `npm view` lags on first-ever names:
+5. **Fix anything it flags.** Re-run until clean.
+6. **Commit + push** `main`.
+7. **`npm pack` spot-check** the risky leaves: svelte (`*.svelte.d.ts` present?), angular (APF `dist/fesm2022/*.mjs` + `dist/index.d.ts` present?).
+8. **Dispatch `release.yml` with `dry_run = true`**, watch it go green. The CI advisory precheck step surfaces any residual structural issue in the log without blocking.
+9. **Dispatch with `dry_run = false`**, watch it go green.
+10. **Verify on npm via direct registry GET** — `npm view` lags on first-ever names:
    ```bash
    curl -s -o /dev/null -w "%{http_code}\n" https://registry.npmjs.org/<pkg>/<version>   # 200 = published
    ```
@@ -125,6 +137,7 @@ When a family becomes release-verified, widen the workflow — and mirror the sa
 10. **2026-08-04 react-staleness + component-prop-delivery patch wave (quick `260804-hzx`)** — no new family, no `--filter`-list edit needed (all 21 bumped packages were already wired). Two decisions the next releaser should inherit rather than re-litigate:
     - **D1 — the publish-baseline derivation is PER-LEAF against the published tarball, not a single commit-range cut.** Different leaves are last published from different commits — the 2026-08-04 rete debut published from `56340d74` while most leaves were last published from `2094f143`/`dcf9dce8` — so a single `git diff <release-commit>..HEAD` is unsound in **both** directions: it flags clean leaves and misses stale ones. Instead, for each leaf, `npm pack @rozie-ui/<family>-<target>@<current-local-version>` and compare every shipped file (minus `dist/`, a build artifact, and `CHANGELOG.md`) against the worktree, plus a reverse pass for worktree files that WOULD ship per the leaf's `files` field but are absent from the tarball. **Two pack-time normalizations are mandatory or you get ~100% false positives:** (i) pnpm rewrites `workspace:*` to a concrete version for every `@rozie/*` dep — map any `@rozie/`-scoped dep VALUE to a constant on both sides; (ii) pnpm reorders dependency keys at pack time — sort keys before comparing. Run the derivation **after** a cold `turbo run build --force`, never before: codegen regenerates leaf `src/`, and the comparison must read the post-codegen tree. Reference implementation: §1.2 of `.planning/quick/260804-hzx-react-staleness-patch-wave/PLAN.md`. Measured cost: ~5 min for 102 registry packs.
     - **D2 — a "runtime" commit can carry a core edit; derive the toolchain set from paths, never from the commit SUBJECT.** This wave's `15a97bf3` reads `feat(runtime): add normalizeComponentAttrs to runtime-react + runtime-solid`, but it also edited `packages/core/src/rewrite/reservedNames.ts` — which alone forces `@rozie/core` to bump, and with it `cli`/`unplugin`/`babel-plugin`, which pin core at an exact version AND bundle it. Use `git log <cut>..HEAD -- packages/core` and `git log <cut>..HEAD -- packages/targets` (the `@rozie/target-*` emitters are inlined into core's published `dist`, so a targets-only commit still means core changed). Confirm staleness directly rather than inferring it: `npm pack @rozie/cli@<published>` then grep the tarball for the new symbol — zero hits proves the published bundler is stale.
+11. **2026-08-04 `@rozie-ui` stale-publish reconciliation wave (quick `260804-lxk`)** — the item-10 D1 derivation is now MECHANIZED as **check (f) — published-tarball drift** in `scripts/release-precheck.mjs`, run with `pnpm release:precheck --tarball` (implied by `--gate`, never run under `--skip-npm`). Same method as item 10 D1 (npm pack the current local version, byte-compare every shipped file minus `dist/`/`CHANGELOG.md`/`package.json`, reverse pass for `files`-matched worktree files absent from the tarball, the two mandatory pnpm-pack normalizations), plus **a third normalization the mechanized port needed that the item-10 shell derivation didn't**: a package with no git-tracked `LICENSE` of its own gets one SYNTHESIZED by `pnpm publish` at pack time (copied from the workspace-root `LICENSE`) — every toolchain/runtime package hits this (none carries its own `LICENSE`), and without excluding it check (f) false-flagged all ten as `GONE:LICENSE`. A package that DOES carry its own git-tracked `LICENSE` (e.g. `captcha-angular`, `flatpickr-vue`) is still compared normally — that is exactly how the stale-copyright-holder class in those leaves is caught. The `files`-field matcher is negation-aware (`!src/**/__tests__/**` etc. — required for a leaf whose `files` field excludes test files, e.g. the runtimes). Self-validated unscoped against the live registry at plan time: reproduced the item-10 20-leaf finding EXACTLY (19 FAIL + `popover-lit` allowlisted WARN), with all six runtimes and all four toolchain packages clean. Run it as the FIRST step of §4 (unscoped, before bumping) — that is the only invocation that can see a leaf the current wave is NOT touching drift silently.
 
 ---
 
@@ -139,7 +152,8 @@ When a family becomes release-verified, widen the workflow — and mirror the sa
 - **`tsdown` dual packages emit `.d.mts`/`.d.cts`, not `.d.ts`** — a `types: "./dist/index.d.ts"` after a copy-paste will reference a nonexistent file. The precheck `(d)` check catches it.
 - **The CI precheck is ADVISORY by design** — a green CI run does **not** mean the version/dep timing checks passed. Those only run in your LOCAL `--gate`.
 - **"Pre-existing failure" baselines must be captured against the last GREEN PUSHED commit, not the current tree.** The 2026-08-03 wave captured its Task-0 baseline *after* the commit that broke the docs build, so a series-introduced regression was recorded as pre-existing and shipped. Identify the last green pushed commit (CI run history, not local state) and diff against that.
-- **20 `@rozie-ui` non-react leaves are currently STALE on npm** — their published tarball does not match committed source at the same version number. Found 2026-08-04 by the per-leaf tarball derivation (§6 item 10 D1), which is the only method that can see this class; the single-cut range diff structurally cannot. By target: angular 6, vue 7, svelte 4, lit 1, plus 2 vue IDE-sidecar cases. Several are consumer-visible, not cosmetic — `popover-lit` publishes a different public slot-scope type (`unknown` vs `any`), `toast-vue` is missing the stacked-offset feature entirely, `command-palette-{angular,svelte,vue}` are missing the whole `src/internal/parseKeyToken.ts` module, `data-table-angular` drifts on 11 files, and 4 leaves ship a stale `LICENSE` copyright holder. **Root cause of the class:** `pnpm publish` silently skips an already-published version, so any commit that regenerates a leaf without a version bump leaves the registry serving old bytes forever. Deliberately not folded into the `260804-hzx` wave (changelog attribution across months of history is a different task, and silently widening a publish set is the stealth-bump signature). Backlog: `.planning/todos/pending/rozie-ui-stale-publish-reconciliation.md`. The durable fix is a release-precheck check that runs the per-leaf tarball comparison so the class cannot re-accumulate.
+- **20 `@rozie-ui` non-react leaves were found STALE on npm 2026-08-04** — their published tarball did not match committed source at the same version number. Found by the per-leaf tarball derivation (§6 item 10 D1), which is the only method that can see this class; the single-cut range diff structurally cannot. By target: angular 6, vue 7, svelte 4, lit 1, plus 2 vue IDE-sidecar cases. Several were consumer-visible, not cosmetic — `toast-vue` was missing the stacked-offset feature entirely, `command-palette-{angular,svelte,vue}` were missing the whole `src/internal/parseKeyToken.ts` module, `data-table-angular` drifted on 11 files, and 4 leaves shipped a stale `LICENSE` copyright holder. **Root cause of the class:** `pnpm publish` silently skips an already-published version, so any commit that regenerates a leaf without a version bump leaves the registry serving old bytes forever. 19 of the 20 were reconciled in the `260804-lxk` follow-up wave (§6 item 11); `popover-lit` was deliberately excluded and stays allowlisted (next bullet). Backlog for the narrowed remainder: `.planning/todos/pending/rozie-ui-stale-publish-reconciliation.md`.
+- **`@rozie-ui/popover-lit@0.1.2` is allowlisted in check (f), not reconciled.** Its drift (`unknown`→`any` on the `anchor` render-prop slot-scope public type) is a real API-surface change, not a mechanical patch ripple — bumping it under a "reconciliation" changelog would ship a type loosening without a deliberate decision. `pnpm release:precheck --tarball` reports it as an ALLOWLISTED `WARN` (never `FAIL`) carrying the reason + the backlog pointer, keyed `name@version` so a future bump to `0.1.3` automatically re-arms the check (D-07). If you see this WARN, it is NOT noise — read the backlog item before dismissing it. Do not add a second allowlist entry to "fix" the warning; either resolve the underlying API decision and bump the leaf, or leave it be.
 
 ---
 
