@@ -378,8 +378,41 @@ const RBIND_HTML_TO_SOLID_ATTR: Readonly<Record<string, string>> = {
  * Solid target. Returns a NEW ObjectExpression (IR never mutated) with the
  * HTML-shape keys renamed to Solid-JSX naming, `class` KEPT (Solid difference),
  * and `__proto__`/`constructor`/`prototype` keys SKIPPED (T-14-06).
+ *
+ * Quick 260804-4cy: the alias table applies ONLY to real DOM elements
+ * (`elementTagKind === 'html'`, the default when unset). On a `<Component>` tag
+ * the literal's keys reach the child's `splitProps` key list, which is built
+ * from the child's `ir.props` — so `<Child r-bind="{ readonly: true }" />`
+ * emitting `{...{ readOnly: true }}` is a SILENT prop loss for a child that
+ * declared `readonly`. Component keys must pass through VERBATIM.
+ *
+ * This is the THIRD and final member of the component-tag rename class:
+ *   260711-i5m — react `:attr` (`react/…/emitTemplateAttribute.ts:349-353`)
+ *   260803-swj — solid `:attr` (`htmlAttrToSolidName`, `:269-276` above)
+ *   260804-4cy — react + solid `r-bind` literal (here)
+ *
+ * PARITY, not invention — the other four targets already emit these keys
+ * verbatim on a component tag. Vue and Svelte explicitly document "no key remap
+ * is applied here (D-03 is React/Solid-only)" (`vue:420-421`, `svelte:427-428`);
+ * Angular hands the literal to `__rozieApplyAttrs` unremapped; Lit defers the
+ * forbidden-key strip to the `rozieSpread` runtime directive.
+ *
+ * SCOPE FENCES:
+ *   - The `FORBIDDEN_SPREAD_KEYS` strip (T-14-06) stays ABOVE the gate and is
+ *     therefore unconditional on every tag kind — a security guard, not a
+ *     naming concern.
+ *   - `class` and `style` are absent from `RBIND_HTML_TO_SOLID_ATTR` (see its
+ *     comment above), so `splitClassStyleFromLiteral` is provably unaffected by
+ *     this gate and is NOT touched.
+ *   - The DYNAMIC `r-bind` path is deliberately out of scope: it lowers to
+ *     `{...normalizeAttrs(expr)}` (`emitSpread` below) and the runtime helper
+ *     remaps unconditionally AND performs its own `FORBIDDEN_KEYS` strip, so
+ *     gating it needs a new runtime signature. Tracked as emitter backlog.
  */
-function remapObjectKeysSolid(obj: t.ObjectExpression): t.ObjectExpression {
+function remapObjectKeysSolid(
+  obj: t.ObjectExpression,
+  elementTagKind?: 'html' | 'component' | 'self',
+): t.ObjectExpression {
   const cloned = t.cloneNode(obj, true, false) as t.ObjectExpression;
   const kept: t.ObjectExpression['properties'] = [];
   for (const prop of cloned.properties) {
@@ -394,7 +427,11 @@ function remapObjectKeysSolid(obj: t.ObjectExpression): t.ObjectExpression {
     if (keyName !== null) {
       // r-bind uses a distinct remap table — see comment on
       // RBIND_HTML_TO_SOLID_ATTR for why this is NOT htmlAttrToSolidName.
-      const mapped = RBIND_HTML_TO_SOLID_ATTR[keyName.toLowerCase()] ?? keyName;
+      // Quick 260804-4cy — DOM elements only; a component's keys pass through.
+      const mapped =
+        elementTagKind === 'component' || elementTagKind === 'self'
+          ? keyName
+          : (RBIND_HTML_TO_SOLID_ATTR[keyName.toLowerCase()] ?? keyName);
       if (mapped !== keyName) {
         prop.key = t.identifier(mapped);
         prop.computed = false;
@@ -978,7 +1015,8 @@ function emitSpread(
   }
   if (t.isObjectExpression(attr.expression)) {
     // D-03 LITERAL — compile-time key remap, zero runtime cost.
-    const remapped = remapObjectKeysSolid(attr.expression);
+    // Quick 260804-4cy — gated on tag kind; component keys pass through.
+    const remapped = remapObjectKeysSolid(attr.expression, ctx.elementTagKind);
     if (hasExplicitClass) {
       const { rest } = splitClassStyleFromLiteral(remapped);
       return `{...${renderExpr(rest, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams })}}`;
@@ -1056,11 +1094,15 @@ export function emitListenerSpreadAsMergePartial(
  */
 function extractLiteralClassStyle(
   attr: Extract<AttributeBinding, { kind: 'spreadBinding' }>,
+  ctx: EmitAttrCtx,
 ): { classValue: t.Expression | null; styleValue: t.Expression | null } {
   if (isAttrsIdentifier(attr.expression) || !t.isObjectExpression(attr.expression)) {
     return { classValue: null, styleValue: null };
   }
-  const remapped = remapObjectKeysSolid(attr.expression);
+  // Quick 260804-4cy — same tag-kind gate as `emitSpread`, so the object this
+  // split sees is byte-identical to the one that gets spread. `class`/`style`
+  // are absent from the alias table, so the split itself is unaffected (D-03).
+  const remapped = remapObjectKeysSolid(attr.expression, ctx.elementTagKind);
   const { classValue, styleValue } = splitClassStyleFromLiteral(remapped);
   return { classValue, styleValue };
 }
@@ -1137,7 +1179,7 @@ export function emitAttributes(
   if (hasExplicitClass) {
     for (const a of attrs) {
       if (a.kind !== 'spreadBinding') continue;
-      const { classValue } = extractLiteralClassStyle(a);
+      const { classValue } = extractLiteralClassStyle(a, ctx);
       if (classValue !== null) {
         literalClassBindings.set(a, {
           kind: 'binding',

@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitTemplateAttribute (Solid) — r-bind LITERAL keys must bypass the DOM attr map on component tags (Quick 260804-4cy) > GREEN GUARD-3 (D-03) — the component-tag class merge is byte-identical; class/style splitting is untouched 1`] = `
+"<>
+      <div {...attrs} data-rozie-s-8fd6d49e="">
+        <Child2 class={('x') + " " + ('c')} {...{ id: 'k' }} data-rozie-s-8fd6d49e="" />
+      </div>
+    </>"
+`;
+
+exports[`emitTemplateAttribute (Solid) — r-bind LITERAL keys must bypass the DOM attr map on component tags (Quick 260804-4cy) > RED-1 — r-bind literal keys pass through VERBATIM on a COMPONENT tag 1`] = `
+"<>
+      <div {...attrs} data-rozie-s-8fd6d49e="">
+        <Child {...{ readonly: true, tabindex: 0, for: 'x', id: 'k' }} data-rozie-s-8fd6d49e="" />
+        <input {...{ readOnly: true, tabIndex: 0, htmlFor: 'x', id: 'k' }} data-rozie-s-8fd6d49e="" />
+      </div>
+    </>"
+`;
