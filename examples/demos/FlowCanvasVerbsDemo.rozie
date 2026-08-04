@@ -1,0 +1,221 @@
+<!--
+  FlowCanvasVerbsDemo.rozie — BEHAVIORAL consumer for quick-260803-uwb: the UNTESTED
+  TAIL of the FlowCanvas surface. Four things had shipped with no VR coverage at all:
+
+    1. `accumulateOnCtrl` at its DEFAULT (true) — Ctrl/Cmd-click ADDS to the selection
+       instead of replacing it (the accumulate-OFF half lives in its own demo — see
+       FlowCanvasAccumOffDemo, and the reason it must be a second MOUNT rather than a
+       toggle is that `accumulateOnCtrl` is consumed exactly ONCE at construction,
+       FlowCanvas.rozie:2278-2282).
+    2. `@context-menu` — the canvas preventDefault()s the native browser menu over the
+       canvas and surfaces `{ id }` instead: the node id for a node right-click, and
+       `null` for a pane right-click (rete hands the string 'root' as the context there,
+       which has no `.id`). A context menu is a PURE EMIT — it must never mutate the graph.
+    3. The five IMPERATIVE SELECTION VERBS from `$expose` (FlowCanvas.rozie:3521-3541):
+       `selectNode` / `selectAll` / `clearSelection` / `getSelectedNodes` / `centerOnNode`,
+       plus `getTransform` — driven through a CONSUMER `$refs` handle, which is the path
+       that actually differs per target (refs-lowering), not the verb bodies.
+    4. The Ctrl/Cmd+A (select all) and Ctrl/Cmd+D (duplicate selection) keybinds added in
+       quick-260803-qwh, including their "ONE gesture = ONE undo step" contract (D-03,
+       FlowCanvas.rozie:1046-1061) and their inertness under `readonly` (the LIVE
+       `selectable === false || readonly === true` gate at FlowCanvas.rozie:1490-1506).
+
+  A DEDICATED demo (NOT folded into FlowCanvasDemo / FlowCanvasReactive) so every existing
+  rete-flow cell + the FlowCanvasScreenshot pixel baseline stay byte-untouched.
+
+  The graph is 3 `task` nodes Alpha / Bravo / Charlie with a→b connected, seeded at fixed
+  positions with `:fit-on-mount="false"` so the geometry the spec clicks is deterministic.
+  Charlie sits far right so `centerOnNode('c')` produces a clearly non-zero recenter that
+  `@translated` surfaces (the `translated` emit is UNCONDITIONAL — not `!programmatic`
+  gated — so a PROGRAMMATIC recenter is observable, FlowCanvas.rozie:2173-2174).
+
+  `readonly` is bound off local state (the FlowCanvasReactive precedent) purely so the
+  keyboard cell can prove Ctrl+A / Ctrl+D go inert under it and come back.
+
+  Readouts are read off the BOUND MODEL (`$data.graph`) wherever a model exists — the
+  discipline every other rete-flow demo follows; a count-only pass once masked a totally
+  non-rendering feature on THIS component. Boolean readouts render `String(...)` so the
+  value stringifies identically on all 6 targets.
+
+  Container needs explicit height/width (the VR host mounts at max-content).
+-->
+
+<rozie name="FlowCanvasVerbsDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  // driven locally (one-way onto the canvas) so the keyboard cell can flip it mid-session
+  // and prove Ctrl+A / Ctrl+D are inert while readonly — then reversible.
+  readonly: false,
+  // settled selected-node count (from @selection-change).
+  selectedCount: 0,
+  // @context-menu payload: the node id, or '(pane)' when the right-click hit empty canvas
+  // (the emit carries `id: null` there — rete's context is the string 'root', no `.id`).
+  ctxId: '(none)',
+  // how many @context-menu emits have arrived (a right-click MUST fire exactly one).
+  ctxCount: 0,
+  // getSelectedNodes() → sorted, comma-joined ids. Written ONLY by the read-sel button, so
+  // the spec proves the VERB returns the right nodes — not merely that a count changed.
+  selIds: '',
+  // getTransform().x, rounded — written ONLY by the read-transform button.
+  tx: 0,
+  // last viewport translate x (from @translated) — how a PROGRAMMATIC centerOnNode is
+  // observed (the translated emit is unconditional).
+  vx: 0,
+  // THE SINGLE SOURCE OF TRUTH. a/b stack in the left column, c sits far right so a
+  // centerOnNode('c') recenter is unambiguous. a→b connected; the edge exists so the
+  // context-menu cell can assert a right-click leaves BOTH counts untouched.
+  graph: {
+    nodes: [
+      { id: 'a', type: 'task', x: 40,  y: 40,  data: { label: 'Alpha' } },
+      { id: 'b', type: 'task', x: 40,  y: 190, data: { label: 'Bravo' } },
+      { id: 'c', type: 'task', x: 420, y: 40,  data: { label: 'Charlie' } },
+    ],
+    connections: [
+      { id: 'ab', source: 'a', sourceOutput: 'out', target: 'b', targetInput: 'in' },
+    ],
+  },
+}
+</data>
+
+<script>
+// @selection-change surfaces the selected node id set ({ ids }) — record the SETTLED count.
+const onSelectionChange = (e) => {
+  $data.selectedCount = e && Array.isArray(e.ids) ? e.ids.length : 0
+}
+// @translated surfaces a viewport pan (x, y). Records x so the spec can observe a
+// PROGRAMMATIC centerOnNode (the translated emit is NOT !programmatic-gated).
+const onTranslated = (e) => { $data.vx = e && typeof e.x === 'number' ? Math.round(e.x) : $data.vx }
+// @context-menu surfaces { id } — the node id for a node right-click, null for the pane.
+// Bump a counter too: the spec asserts EXACTLY one emit per right-click.
+const onContextMenu = (e) => {
+  $data.ctxCount = $data.ctxCount + 1
+  $data.ctxId = e && e.id != null ? String(e.id) : '(pane)'
+}
+
+// The imperative $expose verbs, driven through the CONSUMER $refs handle — read inside the
+// click handlers (post-mount), never eagerly (ROZ123-safe). All synchronous: no async /
+// await / .then() inside these bodies (project_emitter_redirect_nested_this_gap).
+const doSelectB = () => { const c = $refs.canvas; if (c && c.selectNode) c.selectNode('b') }
+const doSelectAll = () => { const c = $refs.canvas; if (c && c.selectAll) c.selectAll() }
+const doClear = () => { const c = $refs.canvas; if (c && c.clearSelection) c.clearSelection() }
+// fire-and-forget: centerOnNode's effect is observed via @translated → viewport-x.
+const doCenterC = () => { const c = $refs.canvas; if (c && c.centerOnNode) c.centerOnNode('c') }
+// getSelectedNodes() returns the selected GRAPH nodes — sort+join their ids so the readout
+// is order-independent across targets.
+const doReadSel = () => {
+  const c = $refs.canvas
+  if (!c || !c.getSelectedNodes) return
+  const ns = c.getSelectedNodes()
+  $data.selIds = (Array.isArray(ns) ? ns : []).map((n) => String(n.id)).sort().join(',')
+}
+const doReadTransform = () => {
+  const c = $refs.canvas
+  if (!c || !c.getTransform) return
+  const t = c.getTransform()
+  $data.tx = t && typeof t.x === 'number' ? Math.round(t.x) : $data.tx
+}
+const doUndo = () => { const c = $refs.canvas; if (c && c.undo) c.undo() }
+
+const toggleReadonly = () => { $data.readonly = !$data.readonly }
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — selection verbs, context menu, keyboard (behavioral)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="select-b-btn" @click="doSelectB">selectNode(b)</button>
+    <button type="button" data-testid="select-all-btn" @click="doSelectAll">selectAll</button>
+    <button type="button" data-testid="clear-btn" @click="doClear">clearSelection</button>
+    <button type="button" data-testid="center-c-btn" @click="doCenterC">centerOnNode(c)</button>
+  </div>
+
+  <div class="controls">
+    <button type="button" data-testid="read-sel-btn" @click="doReadSel">getSelectedNodes</button>
+    <button type="button" data-testid="read-transform-btn" @click="doReadTransform">getTransform</button>
+    <button type="button" data-testid="undo-btn" @click="doUndo">undo</button>
+    <button type="button" data-testid="readonly-btn" @click="toggleReadonly">readonly</button>
+  </div>
+
+  <div class="controls">
+    <!-- all read off the BOUND graph model — a dead write-back fails here. -->
+    <span class="readout" data-testid="node-count">{{ $data.graph.nodes.length }}</span>
+    <span class="readout" data-testid="conn-count">{{ $data.graph.connections.length }}</span>
+    <span class="readout" data-testid="selected-count">{{ $data.selectedCount }}</span>
+    <span class="readout" data-testid="sel-ids">{{ $data.selIds }}</span>
+    <span class="readout" data-testid="ctx-id">{{ $data.ctxId }}</span>
+    <span class="readout" data-testid="ctx-count">{{ $data.ctxCount }}</span>
+    <span class="readout" data-testid="tx">{{ $data.tx }}</span>
+    <span class="readout" data-testid="viewport-x">{{ $data.vx }}</span>
+    <span class="readout" data-testid="readonly-state">{{ String($data.readonly) }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 400px; width: 760px">
+    <FlowCanvas
+      ref="canvas"
+      r-model:graph="$data.graph"
+      :fit-on-mount="false"
+      :readonly="$data.readonly"
+      @selection-change="onSelectionChange"
+      @translated="onTranslated"
+      @context-menu="onContextMenu"
+    >
+      <NodeType type="task">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+          </div>
+        </template>
+        <Port input="in" label="in" multiple />
+        <Port output="out" label="out" />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 800px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+
+:root {
+  /* the #body chrome teleports into the engine node element inside the canvas shadow
+     root (render-by-type bodyRenderer → $portals.body), so on Lit a plain scoped rule
+     cannot reach it — :root emits document-level CSS adopted into the shadow root.
+     NOT :global() (ROZ128 hard error). */
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

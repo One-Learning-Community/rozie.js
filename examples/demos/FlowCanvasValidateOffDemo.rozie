@@ -1,0 +1,169 @@
+<!--
+  FlowCanvasValidateOffDemo.rozie — BEHAVIORAL consumer for the quick-260803-uwb
+  `validateTypes = false` cell. FlowCanvasAdvancedDemo already proves typed validation
+  when it is ON (`:validate-types="true"`); the OFF branch had never been driven.
+
+  `$props.validateTypes` is read LIVE inside the `connectioncreate` pipe —
+  `if ($props.validateTypes !== false) { … }` (FlowCanvas.rozie:2060-2080) — so a toggle
+  takes effect on the very NEXT connect attempt with no remount. That "live, not one-shot"
+  property is what this demo exists to make assertable: the spec drives the SAME cross-type
+  drag three times, with validation ON → OFF → ON, and the same gesture must be refused,
+  then allowed, then refused again.
+
+  Typed-pipeline shape, modelled on FlowCanvasAdvancedDemo's per-TYPE port schema:
+    - `source` declares BOTH a `number` AND a `string` OUTPUT port,
+    - `merge`  declares BOTH a `number` AND a `string` INPUT port, both `multiple`.
+  Both inputs are `multiple` for the FlowCanvasAdvancedDemo reason: a SINGLE input EVICTS
+  its existing edge to make room for a replacement BEFORE the rule can reject, which would
+  make the drawn-path counts un-assertable (Port.rozie:79-87 — `<Port input>` defaults
+  single, `<Port output>` defaults multiple).
+
+  The graph starts with ZERO connections so accept/reject counts begin from a clean 0, and
+  `:fit-on-mount="false"` keeps the seeded positions so the socket geometry the spec drags
+  between is deterministic. The two nodes sit far apart (40 / 420) so no socket overlaps.
+
+  `reject-reason` surfaces `e.reason` — the rejection is TAGGED `'type-mismatch'` (typed
+  validation) vs `'can-connect'` (a consumer predicate), FlowCanvas.rozie:2077/2083 — so
+  the spec proves WHICH rule refused the drag, not merely that something did.
+
+  Readouts read the BOUND model (`$data.graph.connections.length`) wherever a model exists.
+  Container needs explicit height/width (the VR host mounts at max-content).
+-->
+
+<rozie name="FlowCanvasValidateOffDemo">
+
+<components>
+{
+  FlowCanvas: '../../packages/ui/rete/src/FlowCanvas.rozie',
+  NodeType:   '../../packages/ui/rete/src/NodeType.rozie',
+  Port:       '../../packages/ui/rete/src/Port.rozie',
+}
+</components>
+
+<data>
+{
+  // driven locally (one-way onto the canvas); the validate-btn flips it mid-session and the
+  // canvas must obey on the NEXT connect attempt (the live read).
+  validate: true,
+  // @connection-created count — climbs only when a drag actually commits.
+  accepted: 0,
+  // the rejected edge, as 'src:out → tgt:in' (which drag was refused).
+  rejected: '',
+  // e.reason from @connection-rejected: 'type-mismatch' (typed validation) or
+  // 'can-connect' (a consumer predicate). Proves WHICH rule refused.
+  reason: '',
+  // THE SINGLE SOURCE OF TRUTH. Zero connections so the baseline is a clean 0.
+  graph: {
+    nodes: [
+      { id: 'src', type: 'source', x: 40,  y: 40, data: { label: 'Number Source' } },
+      { id: 'mrg', type: 'merge',  x: 420, y: 40, data: { label: 'Merge' } },
+    ],
+    connections: [],
+  },
+}
+</data>
+
+<script>
+// @connection-created — a drag committed; bump the count. The canvas has ALREADY written
+// the edge back into $data.graph.connections (the conn-count readout reflects that).
+const onConnect = () => { $data.accepted = $data.accepted + 1 }
+
+// @connection-rejected — the SOLE writer of $data.rejected / $data.reason. The payload is
+// the attempted conn { source, sourceOutput, target, targetInput, reason }.
+const onReject = (c) => {
+  const from = (c && c.source != null ? c.source : '?') + ':' + (c && c.sourceOutput != null ? c.sourceOutput : '?')
+  const to = (c && c.target != null ? c.target : '?') + ':' + (c && c.targetInput != null ? c.targetInput : '?')
+  $data.rejected = from + ' → ' + to
+  $data.reason = c && c.reason != null ? String(c.reason) : ''
+}
+
+// flips :validate-types mid-session — the canvas re-reads it on the next connectioncreate.
+const toggleValidate = () => { $data.validate = !$data.validate }
+</script>
+
+<template>
+<div class="flow-demo">
+  <h3>FlowCanvas — validateTypes live toggle (behavioral)</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="validate-btn" @click="toggleValidate">validateTypes</button>
+    <span class="readout" data-testid="validate-state">{{ String($data.validate) }}</span>
+    <span class="readout" data-testid="node-count">{{ $data.graph.nodes.length }}</span>
+    <span class="readout" data-testid="conn-count">{{ $data.graph.connections.length }}</span>
+    <span class="readout" data-testid="accepted">{{ $data.accepted }}</span>
+    <span class="readout" data-testid="reject-reason">{{ $data.reason }}</span>
+    <span class="readout readout--rejected" data-testid="reject-text">{{ $data.rejected }}</span>
+  </div>
+
+  <div class="flow-wrap" style="height: 360px; width: 760px">
+    <FlowCanvas
+      ref="canvas"
+      r-model:graph="$data.graph"
+      :validate-types="$data.validate"
+      :fit-on-mount="false"
+      @connection-created="onConnect"
+      @connection-rejected="onReject"
+    >
+      <!-- source: ONE type, BOTH a number AND a string OUTPUT port. -->
+      <NodeType type="source">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+          </div>
+        </template>
+        <Port output="num" type="number" label="number" />
+        <Port output="str" type="string" label="string" />
+      </NodeType>
+
+      <!-- merge: ONE type, BOTH a number AND a string INPUT port, both `multiple` so a
+           drag onto them never evicts a prior edge (the drawn-path counts stay assertable). -->
+      <NodeType type="merge">
+        <template #body="{ node }">
+          <div class="rozie-demo-node">
+            <strong>{{ node.data.label }}</strong>
+          </div>
+        </template>
+        <Port input="num" type="number" label="number" multiple />
+        <Port input="str" type="string" label="string" multiple />
+      </NodeType>
+    </FlowCanvas>
+  </div>
+</div>
+</template>
+
+<style>
+.flow-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 800px;
+}
+.flow-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.controls .readout {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  min-width: 2ch;
+}
+.controls .readout--rejected { color: #b91c1c; min-width: 8ch; }
+
+:root {
+  /* the #body chrome teleports into the engine node element inside the canvas shadow
+     root, so on Lit a plain scoped rule cannot reach it — :root emits document-level
+     CSS adopted into the shadow root. NOT :global() (ROZ128 hard error). */
+  .rozie-flow-canvas .rozie-demo-node {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    color: #111827;
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>

@@ -484,6 +484,38 @@ export const EXAMPLES = [
   // canvas obeys it on the very next gesture — the proof that none of the five is
   // construction-time any more. Behavioral-only; NOT a screenshot cell.
   'FlowCanvasReactive',
+  // quick-260803-uwb (untested-tail coverage) — FlowCanvasVerbs is the BEHAVIORAL cell
+  // (loader → examples/demos/FlowCanvasVerbsDemo.rozie): a 3-node / 1-edge controlled
+  // graph (Alpha/Bravo/Charlie, `:fit-on-mount="false"`) bound with `@context-menu`,
+  // `@selection-change` and `@translated`, plus buttons driving the imperative $expose
+  // verbs through a consumer `$refs` handle (`select-b-btn`/`select-all-btn`/`clear-btn`/
+  // `center-c-btn`/`read-sel-btn`/`read-transform-btn`/`undo-btn`) and a `readonly-btn`.
+  // Readouts: `node-count`/`conn-count`/`selected-count`/`sel-ids`/`ctx-id`/`ctx-count`/
+  // `tx`/`viewport-x`/`readonly-state`. Four specs drive it: rete-flow-accumulate (part A,
+  // accumulate ON = the default), rete-flow-context-menu, rete-flow-selection-verbs and
+  // rete-flow-keyboard (Ctrl/Cmd+A / +D incl. the one-undo-per-gesture contract and
+  // inertness under readonly). Behavioral-only; NOT a screenshot cell.
+  'FlowCanvasVerbs',
+  // quick-260803-uwb — FlowCanvasAccumOff is the accumulate-OFF half of
+  // rete-flow-accumulate (loader → examples/demos/FlowCanvasAccumOffDemo.rozie): the same
+  // 3-node / 1-edge graph with `:accumulate-on-ctrl="false"`, a `selected-count` readout
+  // and no verb buttons. A SEPARATE example (not a toggle on FlowCanvasVerbs) because
+  // `accumulateOnCtrl` is CONSTRUCTION-TIME — consumed once at the $onMount
+  // `AreaExtensions.selectableNodes(...)` install (FlowCanvas.rozie:2278-2282) — so the
+  // cell covers the false branch with a second `page.goto` (the NodeToolbar-cell
+  // precedent). Behavioral-only; NOT a screenshot cell.
+  'FlowCanvasAccumOff',
+  // quick-260803-uwb — FlowCanvasValidateOff is the BEHAVIORAL cell for the
+  // `validateTypes = false` branch (loader → examples/demos/FlowCanvasValidateOffDemo.rozie):
+  // a typed 2-node pipeline (a `source` with number+string OUTPUTs, a `merge` with
+  // number+string `multiple` INPUTs, zero seeded connections) with
+  // `:validate-types="$data.validate"` driven by its own `validate-btn`, plus
+  // `validate-state`/`conn-count`/`accepted`/`reject-reason`/`reject-text` readouts. The
+  // spec (rete-flow-validate-off) drives the SAME cross-type drag with validation
+  // ON → OFF → ON, proving `$props.validateTypes` is read LIVE inside the
+  // `connectioncreate` pipe (FlowCanvas.rozie:2060-2080), not captured at construction.
+  // Behavioral-only; NOT a screenshot cell.
+  'FlowCanvasValidateOff',
   // Embla Carousel (Embla v8) — the carousel two-way-index + drag cells. Carousel
   // is the BEHAVIORAL cell (loader → examples/demos/CarouselDemo.rozie, which
   // imports ../../packages/ui/embla/src/Carousel.rozie). It drives a 5-slide
@@ -1285,6 +1317,13 @@ export const LIT_TAGS: Record<Example, string> = {
   FlowCanvasResize: 'rozie-flow-canvas-resize',
   // quick-260803-s3m reactive-props cell — '-demo' appended → 'rozie-flow-canvas-reactive-demo'.
   FlowCanvasReactive: 'rozie-flow-canvas-reactive',
+  // quick-260803-uwb untested-tail cells — the lit entry appends '-demo' itself, so these
+  // map to 'rozie-flow-canvas-verbs-demo' / 'rozie-flow-canvas-accum-off-demo' /
+  // 'rozie-flow-canvas-validate-off-demo' = kebab of FlowCanvasVerbsDemo /
+  // FlowCanvasAccumOffDemo / FlowCanvasValidateOffDemo.
+  FlowCanvasVerbs: 'rozie-flow-canvas-verbs',
+  FlowCanvasAccumOff: 'rozie-flow-canvas-accum-off',
+  FlowCanvasValidateOff: 'rozie-flow-canvas-validate-off',
   // Embla Carousel — the lit entry appends '-demo' → tags 'rozie-carousel-demo' /
   // 'rozie-carousel-screenshot-demo' = kebab of CarouselDemo / CarouselScreenshotDemo
   // (the wrapper component is name="Carousel" → 'rozie-carousel').
@@ -1722,6 +1761,14 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // own buttons). No parent props; no MODEL_PROPS entry (graph/zoom are bound internally
   // — the FlowCanvas precedent; the five interaction props are one-way, not models).
   FlowCanvasReactive: {},
+  // quick-260803-uwb — all three untested-tail demos are self-contained (each seeds its own
+  // graph, and FlowCanvasVerbs/FlowCanvasValidateOff drive their own local `readonly` /
+  // `validate` state from their own buttons). No parent props; no MODEL_PROPS entry
+  // (graph/zoom are bound internally — the FlowCanvas precedent; `accumulateOnCtrl`,
+  // `readonly` and `validateTypes` are one-way, not models).
+  FlowCanvasVerbs: {},
+  FlowCanvasAccumOff: {},
+  FlowCanvasValidateOff: {},
   // Embla Carousel — both demos are self-contained: CarouselDemo seeds idx:0 in
   // <data> and SLIDES in <script>; CarouselScreenshotDemo hardcodes SLIDES in
   // <script>. CarouselDemo binds selectedIndex via r-model internally (not

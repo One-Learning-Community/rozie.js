@@ -2341,6 +2341,19 @@ function nodeByLabel(page: Page, label: string) {
 }
 
 /**
+ * The accumulate / shortcut modifier key (quick-260803-uwb).
+ *
+ * BOTH keys work on BOTH platforms — rete's `accumulateOnCtrl()` tracks a DOCUMENT
+ * keydown/keyup for `e.key === 'Control' || e.key === 'Meta'` (rete-area-plugin
+ * .esm.js:966-979), and the canvas's own keydown handler tests `e.ctrlKey || e.metaKey`
+ * (FlowCanvas.rozie:1490-1506). We pick `Meta` on darwin anyway because on macOS a
+ * Ctrl+LEFT-CLICK is remapped by the OS into a CONTEXT-MENU gesture, which would corrupt
+ * the accumulate cell locally while still passing in Linux Docker — a divergence that only
+ * shows up in CI. `Meta` sidesteps it entirely and is the native macOS idiom besides.
+ */
+const MOD: 'Meta' | 'Control' = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+/**
  * Drag the labelled node by (dx, dy) using the house grab/step technique: grab near the
  * node's top-left label area (`+14, +10`) — away from the right-edge output socket — so
  * this is a node-MOVE gesture and never a connect gesture, then two stepped moves so the
@@ -2367,6 +2380,28 @@ async function clickNodeBody(page: Page, label: string): Promise<void> {
   const nb = await node.boundingBox();
   if (!nb) throw new Error(`${label} node bounding box unavailable`);
   await page.mouse.click(nb.x + 14, nb.y + 10);
+}
+
+/**
+ * Click the labelled node's body while the accumulate MODIFIER is HELD (quick-260803-uwb).
+ *
+ * `keyboard.down(MOD)` / `keyboard.up(MOD)` around the click — NOT `click({ modifiers })` —
+ * because rete's accumulate predicate reads a DOCUMENT-level keydown/keyup pair it tracks
+ * itself (rete-area-plugin.esm.js:966-979), not the `ctrlKey`/`metaKey` flag on the click
+ * event. A modifiers-only click never fires the keydown, so the predicate would stay false
+ * and the cell would "prove" a non-accumulating selection on a correctly-accumulating build.
+ */
+async function modClickNode(page: Page, label: string): Promise<void> {
+  const node = nodeByLabel(page, label);
+  await expect(node).toBeVisible({ timeout: 10_000 });
+  const nb = await node.boundingBox();
+  if (!nb) throw new Error(`${label} node bounding box unavailable`);
+  await page.keyboard.down(MOD);
+  try {
+    await page.mouse.click(nb.x + 14, nb.y + 10);
+  } finally {
+    await page.keyboard.up(MOD);
+  }
 }
 
 /**
@@ -2783,5 +2818,584 @@ for (const target of TARGETS) {
       freeX % 25,
       `snapGrid=0 must stop snapping — node0-x settled at ${freeX} (a multiple of 25)`,
     ).not.toBe(0);
+  });
+}
+
+/**
+ * 26. `accumulateOnCtrl` — Ctrl/Cmd-click ADDS to the selection, and turning it off makes
+ * the modified click REPLACE instead (quick-260803-uwb, brief #1).
+ *
+ * `accumulateOnCtrl` (default `true`, FlowCanvas.rozie:174-178) had shipped with NO VR
+ * coverage on either branch. It is CONSTRUCTION-TIME — consumed exactly once at the
+ * `$onMount` `AreaExtensions.selectableNodes(area, selector, { accumulating: … })` install
+ * (FlowCanvas.rozie:2278-2282, whose own comment says it "stays construction-time — it is
+ * not one of the five live props") — so the false branch cannot be reached by a toggle.
+ * This cell therefore does TWO `page.goto`s in ONE test against two dedicated demos (the
+ * shipped NodeToolbar-cell precedent, which re-navigates mid-test); an `r-if` remount would
+ * drag full engine teardown/re-init across 6 targets into a coverage cell.
+ *
+ * PART A — `?example=FlowCanvasVerbs` (accumulate ON, the default):
+ *   1. baseline: the 3 nodes render and nothing is selected.
+ *   2. a plain click on 'Alpha' selects 1.
+ *   3. MOD-click 'Bravo' → 2 — the modified pick ACCUMULATED.
+ *   4. MOD-click 'Charlie' → 3 — it keeps accumulating (not a 2-item cap).
+ *   5. a PLAIN click on 'Alpha' → back to 1 — an unmodified pick still REPLACES.
+ *   6. corroborated at the DOM: exactly one `.rozie-flow-node.is-selected` box.
+ *
+ * PART B — `?example=FlowCanvasAccumOff` (`:accumulate-on-ctrl="false"`):
+ *   7. a plain click on 'Alpha' selects 1 (selection itself still works).
+ *   8. MOD-click 'Bravo' → STILL 1, and the single `.is-selected` box is BRAVO's.
+ *      That second half is the load-bearing one: a bare '1' would ALSO pass if the
+ *      modified click had been vetoed outright and Alpha were still the selected node.
+ *      The contract is "the pick still happens, it just replaces instead of accumulating".
+ *
+ * The modifier is held via explicit `keyboard.down/up` (see `modClickNode`) because rete
+ * tracks a DOCUMENT keydown/keyup pair, not the click event's `ctrlKey`/`metaKey` flag.
+ *
+ * Asserts the BOUND `selected-count` (fed by @selection-change) AND the rendered
+ * `.is-selected` classes. Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-accumulate [${target}]: Ctrl/Cmd-click accumulates the selection by default, and replaces it when :accumulate-on-ctrl is false`, async ({
+    page,
+  }) => {
+    const selectedCount = page.getByTestId('selected-count');
+    const selectedBoxes = page.locator('.rozie-flow-node.is-selected');
+
+    // ─────────── PART A: accumulate ON (the default) ───────────
+    await page.goto(`/?example=FlowCanvasVerbs&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+    await expect(selectedCount).toHaveText('0');
+
+    // ---- 2. plain pick → 1 ----
+    await clickNodeBody(page, 'Alpha');
+    await expect(selectedCount).toHaveText('1', { timeout: 10_000 });
+
+    // ---- 3. MOD-click 'Bravo' → ACCUMULATES to 2 ----
+    await modClickNode(page, 'Bravo');
+    await expect(selectedCount).toHaveText('2', { timeout: 10_000 });
+
+    // ---- 4. MOD-click 'Charlie' → keeps accumulating to 3 ----
+    await modClickNode(page, 'Charlie');
+    await expect(selectedCount).toHaveText('3', { timeout: 10_000 });
+    await expect(selectedBoxes).toHaveCount(3, { timeout: 10_000 });
+
+    // ---- 5. a PLAIN pick REPLACES the accumulated selection ----
+    await clickNodeBody(page, 'Alpha');
+    await expect(selectedCount).toHaveText('1', { timeout: 10_000 });
+    // ---- 6. corroborate at the DOM (not count-only on the model) ----
+    await expect(selectedBoxes).toHaveCount(1, { timeout: 10_000 });
+
+    // ─────────── PART B: accumulate OFF (a SECOND MOUNT — S2) ───────────
+    await page.goto(`/?example=FlowCanvasAccumOff&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvasOff = page.locator('.rozie-flow-canvas').first();
+    await expect(canvasOff).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+    await expect(selectedCount).toHaveText('0');
+
+    // ---- 7. a plain pick still works with accumulation off ----
+    await clickNodeBody(page, 'Alpha');
+    await expect(selectedCount).toHaveText('1', { timeout: 10_000 });
+
+    // ---- 8. the MOD-click REPLACES (does not accumulate) — and the pick DID happen ----
+    await modClickNode(page, 'Bravo');
+    await expect(selectedCount).toHaveText('1', { timeout: 10_000 });
+    await expect(selectedBoxes).toHaveCount(1, { timeout: 10_000 });
+    // THE LOAD-BEARING HALF: the surviving selection is BRAVO's box, not Alpha's — the
+    // modified click was honoured as a replacing pick, not vetoed.
+    await expect(
+      page.locator('.rozie-flow-node.is-selected', { hasText: 'Bravo' }),
+    ).toHaveCount(1, { timeout: 10_000 });
+  });
+}
+
+/**
+ * 27. `@context-menu` — the canvas suppresses the native browser menu and surfaces
+ * `{ id }` instead, WITHOUT touching the graph (quick-260803-uwb, brief #2).
+ *
+ * `examples/demos/FlowCanvasVerbsDemo.rozie` binds `@context-menu="onContextMenu"`, which
+ * bumps `ctx-count` and writes `ctx-id` (the node id, or the literal '(pane)' when the
+ * payload's `id` is null).
+ *
+ * The component calls `context.data.event.preventDefault()` and then
+ * `$emit('context-menu', { id: ctx && ctx.id ? ctx.id : null })` (FlowCanvas.rozie:
+ * 2192-2197). rete's contextmenu payload is `{ event, context: 'root' | Node | Connection }`
+ * (rete-area-plugin/_types/base.d.ts:46-50), so a PANE right-click hands the string 'root',
+ * which has no `.id` ⇒ the emit carries `id: null` ⇒ the demo renders '(pane)'.
+ *
+ * Emit-assertion style copied from the shipped `@connect-end` cell: poll the COUNT first,
+ * then assert the payload readout — a payload assertion alone can race the emit.
+ *
+ *   1. baseline — no emit has fired (`ctx-count` '0', `ctx-id` '(none)'), 3 nodes / 1 edge.
+ *   2. right-click the 'Bravo' NODE body → exactly one emit, `ctx-id` 'b' (the node id).
+ *   3. right-click EMPTY canvas (bottom-right corner — the shipped deselect-point) → a
+ *      second emit, `ctx-id` '(pane)' (the null-id branch).
+ *   4. THE GRAPH IS UNTOUCHED after a settle: `node-count` '3' and `conn-count` '1'. A
+ *      context menu is a PURE EMIT — it must never mutate the bound model.
+ *
+ * Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-context-menu [${target}]: right-click surfaces @context-menu with the node id (pane → null) and never mutates the graph`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasVerbs&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    const ctxCount = page.getByTestId('ctx-count');
+    const ctxId = page.getByTestId('ctx-id');
+    const nodeCount = page.getByTestId('node-count');
+    const connCount = page.getByTestId('conn-count');
+
+    // ---- 1. baseline: nothing emitted yet; the seeded graph is 3 nodes / 1 edge ----
+    await expect(ctxCount).toHaveText('0');
+    await expect(ctxId).toHaveText('(none)');
+    await expect(nodeCount).toHaveText('3');
+    await expect(connCount).toHaveText('1');
+
+    // ---- 2. right-click the 'Bravo' NODE body → { id: 'b' } ----
+    const bravo = nodeByLabel(page, 'Bravo');
+    await expect(bravo).toBeVisible({ timeout: 10_000 });
+    const nb = await bravo.boundingBox();
+    if (!nb) throw new Error('Bravo node bounding box unavailable');
+    // +14/+10 = the house grab point: inside the body, away from the edge sockets.
+    await page.mouse.click(nb.x + 14, nb.y + 10, { button: 'right' });
+
+    await expect
+      .poll(async () => Number((await ctxCount.textContent())?.trim() ?? 'NaN'), {
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(1);
+    await expect(ctxId).toHaveText('b', { timeout: 10_000 });
+    // exactly ONE emit for one right-click (not a double-fire through the pipe).
+    await expect(ctxCount).toHaveText('1');
+
+    // ---- 3. right-click EMPTY canvas → the null-id ('root' context) branch ----
+    const cb = await canvas.boundingBox();
+    if (!cb) throw new Error('canvas bounding box unavailable');
+    // bottom-right corner — away from every node (they sit upper-left); the same
+    // empty-canvas point the shipped selection cell uses to deselect.
+    await page.mouse.click(cb.x + cb.width - 12, cb.y + cb.height - 12, {
+      button: 'right',
+    });
+    await expect(ctxCount).toHaveText('2', { timeout: 10_000 });
+    await expect(ctxId).toHaveText('(pane)', { timeout: 10_000 });
+
+    // ---- 4. PURE EMIT: the bound graph never moved ----
+    await page.waitForTimeout(400);
+    await expect(nodeCount).toHaveText('3');
+    await expect(connCount).toHaveText('1');
+    // and no further emits arrived on their own.
+    await expect(ctxCount).toHaveText('2');
+  });
+}
+
+/**
+ * 28. IMPERATIVE SELECTION VERBS — `selectNode` / `selectAll` / `clearSelection` /
+ * `getSelectedNodes` / `centerOnNode` + `getTransform`, driven through a CONSUMER `$refs`
+ * handle (quick-260803-uwb, brief #3).
+ *
+ * All six are in `$expose` (FlowCanvas.rozie:3521-3541) but only ever exercised
+ * indirectly (the marquee cell drives the internal selector; nothing drove the verbs from a
+ * consumer). The verb BODIES are target-agnostic — what actually differs per target is the
+ * `$refs.<child>` handle resolution (refs-lowering), so a consumer-ref cell is the useful one.
+ *
+ * `examples/demos/FlowCanvasVerbsDemo.rozie` wires each verb to a button and each result to
+ * a readout.
+ *
+ *   1. `selectNode('b')` — the BOUND `selected-count` reads 1, the RENDERED `.is-selected`
+ *      box is BRAVO's (`.is-selected` is toggled from the render pipe,
+ *      FlowCanvas.rozie:1578/1596 — so a programmatic select must light it up too), and
+ *      `getSelectedNodes()` returns exactly `['b']` (the verb returns the NODES, not a count).
+ *   2. `selectAll()` — 3 selected on the model, 3 `.is-selected` boxes, `sel-ids` 'a,b,c'.
+ *   3. `clearSelection()` — 0 / 0 / '' on all three surfaces.
+ *   4. `centerOnNode('c')` — observed via `@translated`, which is emitted UNCONDITIONALLY
+ *      (NOT `!programmatic`-gated, FlowCanvas.rozie:2173-2174/3283-3285), so a PROGRAMMATIC
+ *      recenter still surfaces. Then `getTransform()` is re-read and must agree with what
+ *      `@translated` reported — a live cross-check that the getter reads the CURRENT
+ *      transform rather than a stale snapshot.
+ *   5. ECHO-SAFETY — after a settle the viewport readout is stable on re-sample and
+ *      `node-count` is untouched: selection and viewport ops never write the graph model.
+ *
+ * Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-selection-verbs [${target}]: selectNode / selectAll / clearSelection / getSelectedNodes / centerOnNode / getTransform drive from a consumer ref`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasVerbs&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    const selectedCount = page.getByTestId('selected-count');
+    const selectedBoxes = page.locator('.rozie-flow-node.is-selected');
+    const selIds = page.getByTestId('sel-ids');
+    const nodeCount = page.getByTestId('node-count');
+    const tx = page.getByTestId('tx');
+    const viewportX = page.getByTestId('viewport-x');
+    const readSelBtn = page.getByTestId('read-sel-btn');
+    const readTransformBtn = page.getByTestId('read-transform-btn');
+
+    await expect(selectedCount).toHaveText('0');
+    await expect(selectedBoxes).toHaveCount(0);
+
+    // ---- 1. selectNode('b') ----
+    await page.getByTestId('select-b-btn').click();
+    await expect(selectedCount).toHaveText('1', { timeout: 10_000 });
+    // the RENDERED selection ring landed on the RIGHT node (not merely "some node").
+    await expect(
+      page.locator('.rozie-flow-node.is-selected', { hasText: 'Bravo' }),
+    ).toHaveCount(1, { timeout: 10_000 });
+    await expect(selectedBoxes).toHaveCount(1);
+    // getSelectedNodes() returns the selected NODES — the demo maps→sorts→joins their ids.
+    await readSelBtn.click();
+    await expect(selIds).toHaveText('b', { timeout: 10_000 });
+
+    // ---- 2. selectAll() ----
+    await page.getByTestId('select-all-btn').click();
+    await expect(selectedCount).toHaveText('3', { timeout: 10_000 });
+    await expect(selectedBoxes).toHaveCount(3, { timeout: 10_000 });
+    await readSelBtn.click();
+    await expect(selIds).toHaveText('a,b,c', { timeout: 10_000 });
+
+    // ---- 3. clearSelection() ----
+    await page.getByTestId('clear-btn').click();
+    await expect(selectedCount).toHaveText('0', { timeout: 10_000 });
+    await expect(selectedBoxes).toHaveCount(0, { timeout: 10_000 });
+    await readSelBtn.click();
+    await expect(selIds).toHaveText('', { timeout: 10_000 });
+
+    // ---- 4. centerOnNode('c') + getTransform() cross-check ----
+    // pre-call: read the transform through the verb, and note where @translated stands.
+    await readTransformBtn.click();
+    await expect
+      .poll(async () => (await tx.textContent())?.trim(), { timeout: 10_000 })
+      .not.toBe('');
+    const tx0 = (await tx.textContent())?.trim();
+    const vx0 = (await viewportX.textContent())?.trim();
+
+    await page.getByTestId('center-c-btn').click();
+    // the PROGRAMMATIC recenter surfaced through the UNCONDITIONAL @translated emit.
+    await expect
+      .poll(async () => (await viewportX.textContent())?.trim(), {
+        timeout: 10_000,
+        intervals: [100, 300, 600, 1000],
+      })
+      .not.toBe(vx0);
+    await page.waitForTimeout(400);
+    const vxAfter = (await viewportX.textContent())?.trim();
+
+    // re-read the transform through the verb: it moved, AND it agrees with what
+    // @translated reported (the getter is live, not a stale mount-time snapshot).
+    await readTransformBtn.click();
+    await expect
+      .poll(async () => (await tx.textContent())?.trim(), {
+        timeout: 10_000,
+        intervals: [100, 300, 600, 1000],
+      })
+      .not.toBe(tx0);
+    expect(
+      (await tx.textContent())?.trim(),
+      'getTransform().x must agree with the x @translated reported',
+    ).toBe(vxAfter);
+
+    // ---- 5. ECHO-SAFETY: the viewport settles and the MODEL was never touched ----
+    await page.waitForTimeout(400);
+    expect((await viewportX.textContent())?.trim(), 'viewport-x is stable after the recenter').toBe(
+      vxAfter,
+    );
+    await expect(nodeCount).toHaveText('3');
+  });
+}
+
+/**
+ * 29. Ctrl/Cmd+A (select all) and Ctrl/Cmd+D (duplicate selection) keybinds
+ * (quick-260803-uwb, brief #4 — the quick-260803-qwh keybinds, previously untested).
+ *
+ * The handler (FlowCanvas.rozie:1490-1506) runs `if ($props.selectable === false ||
+ * $props.readonly === true) return` FIRST — the LIVE gate — then, under
+ * `(e.ctrlKey || e.metaKey) && !e.altKey`, maps `k === 'a'` → `selectAll()` and
+ * `k === 'd'` → `duplicateNodes(selectedNodeIds())`.
+ *
+ * The listener lives on the CANVAS element (`tabindex="0"`, FlowCanvas.rozie:1463-1481,
+ * template :3545), NOT on `document` — a shadow-scoped listener is the only reliably
+ * cross-target path — so the cell focuses the canvas before every key (the shipped
+ * Delete-cell precedent).
+ *
+ *   1. baseline: 3 nodes, nothing selected.
+ *   2. MOD+A → all 3 selected, on the bound model AND as 3 rendered `.is-selected` boxes.
+ *   3. MOD+D → `node-count` 6: the 3 clones landed in the BOUND graph (and 6 boxes render).
+ *   4. ONE UNDO RESTORES ALL THREE CLONES (the D-03 "one gesture = one undo step"
+ *      contract, FlowCanvas.rozie:1046-1061: `duplicateNodes` takes ONE snapshot and
+ *      commits ONCE for N nodes). A single undo click must return the count to exactly 3
+ *      and HOLD there — a per-node history push would need three undos and would leave
+ *      the count at 5 here. This is the load-bearing step.
+ *   5. INERT UNDER `readonly` — flipping it clears the selection through the shipped
+ *      `$watch` (FlowCanvas.rozie:3519), and neither MOD+A nor MOD+D does anything.
+ *   6. REVERSIBLE — flipping `readonly` back off restores the keybinds with no remount.
+ *
+ * Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-keyboard [${target}]: Ctrl/Cmd+A selects all and Ctrl/Cmd+D duplicates it as ONE undo step — and both go inert under :readonly`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasVerbs&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBeGreaterThanOrEqual(3);
+
+    const nodeCount = page.getByTestId('node-count');
+    const selectedCount = page.getByTestId('selected-count');
+    const selectedBoxes = page.locator('.rozie-flow-node.is-selected');
+    const readonlyState = page.getByTestId('readonly-state');
+    const readonlyBtn = page.getByTestId('readonly-btn');
+
+    // ---- 1. baseline ----
+    await expect(nodeCount).toHaveText('3');
+    await expect(selectedCount).toHaveText('0');
+    await expect(readonlyState).toHaveText('false');
+
+    // ---- 2. MOD+A → select all ----
+    await canvas.focus();
+    await page.keyboard.press(`${MOD}+a`);
+    await expect(selectedCount).toHaveText('3', { timeout: 10_000 });
+    await expect(selectedBoxes).toHaveCount(3, { timeout: 10_000 });
+
+    // ---- 3. MOD+D → duplicate the whole selection into the BOUND graph ----
+    await canvas.focus();
+    await page.keyboard.press(`${MOD}+d`);
+    await expect(nodeCount).toHaveText('6', { timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 15_000,
+        intervals: [100, 300, 600, 1000],
+      })
+      .toBe(6);
+
+    // ---- 4. ONE undo undoes the WHOLE duplication (D-03) ----
+    await page.getByTestId('undo-btn').click();
+    await expect(nodeCount).toHaveText('3', { timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), {
+        timeout: 15_000,
+        intervals: [100, 300, 600, 1000],
+      })
+      .toBe(3);
+    // HOLD: a per-node history push would have left extra entries and the count would
+    // still be settling / would need further undos.
+    await page.waitForTimeout(400);
+    await expect(nodeCount).toHaveText('3');
+
+    // ---- 5. INERT UNDER readonly (the live gate at the top of the handler) ----
+    await readonlyBtn.click();
+    await expect(readonlyState).toHaveText('true', { timeout: 5_000 });
+    // the shipped $watch clears the selection when readonly flips on.
+    await expect(selectedCount).toHaveText('0', { timeout: 10_000 });
+
+    await canvas.focus();
+    await page.keyboard.press(`${MOD}+a`);
+    await page.waitForTimeout(500);
+    expect(
+      (await selectedCount.textContent())?.trim(),
+      'Ctrl/Cmd+A must be inert while readonly',
+    ).toBe('0');
+
+    await canvas.focus();
+    await page.keyboard.press(`${MOD}+d`);
+    await page.waitForTimeout(500);
+    expect(
+      (await nodeCount.textContent())?.trim(),
+      'Ctrl/Cmd+D must be inert while readonly',
+    ).toBe('3');
+
+    // ---- 6. REVERSIBLE ----
+    await readonlyBtn.click();
+    await expect(readonlyState).toHaveText('false', { timeout: 5_000 });
+    await canvas.focus();
+    await page.keyboard.press(`${MOD}+a`);
+    await expect(selectedCount).toHaveText('3', { timeout: 10_000 });
+  });
+}
+
+/**
+ * 30. `validateTypes = false` — the opt-out branch, and the proof that the prop is read
+ * LIVE (quick-260803-uwb, brief #6).
+ *
+ * `rete-flow-advanced` covers typed validation when it is ON. The OFF branch had never
+ * been driven, and neither had the LIVENESS of the read: `$props.validateTypes` is tested
+ * INSIDE the `connectioncreate` pipe — `if ($props.validateTypes !== false) { … }`
+ * (FlowCanvas.rozie:2060-2080) — so a toggle takes effect on the very next connect attempt.
+ *
+ * `examples/demos/FlowCanvasValidateOffDemo.rozie` seeds a typed 2-node pipeline with ZERO
+ * connections: a `source` with number+string OUTPUTs and a `merge` with number+string
+ * `multiple` INPUTs. Both merge inputs are `multiple` so a drag never EVICTS a prior edge
+ * (the shipped single-input eviction would make the drawn-path counts un-assertable).
+ * Sockets are located by the `typedSocketOf` port-row technique from the advanced cell —
+ * both nodes are multi-port, so `.first()` would ambiguously pick num-vs-str.
+ *
+ * The SAME cross-type drag is driven three times:
+ *   1. baseline — 2 nodes, 0 drawn paths, `conn-count` '0', `validate-state` 'true'.
+ *   2. ON (regression guard) — number-out → string-in is REFUSED: nothing draws, the bound
+ *      count stays '0', and `reject-reason` is 'type-mismatch' (the payload is TAGGED per
+ *      rule, FlowCanvas.rozie:2077/2083 — so we prove WHICH rule refused, not merely that
+ *      something did).
+ *   3. OFF (the new proof) — after `validate-btn`, the IDENTICAL drag is ALLOWED: one path
+ *      draws, `conn-count` climbs to '1', `accepted` to '1', and no new rejection fired.
+ *   4. BACK ON (proves live, not one-shot) — the other cross-type pair (string-out →
+ *      number-in, onto a still-free input) is refused again, and `reject-text` now names
+ *      the NEW edge. Asserting the reject TEXT rather than only the reason matters here:
+ *      the reason was already 'type-mismatch' from step 2, so a reason-only assertion
+ *      would pass even if no fresh rejection had fired at all.
+ *
+ * Behavioral-only — no `toHaveScreenshot`.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`rete-flow-validate-off [${target}]: :validate-types is read LIVE — a cross-type drag is refused, then allowed with it off, then refused again`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=FlowCanvasValidateOff&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const canvas = page.locator('.rozie-flow-canvas').first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(async () => page.locator('.rozie-flow-node').count(), { timeout: 15_000 })
+      .toBe(2);
+
+    // counts DRAWN paths (non-empty `d`), piercing Lit's open shadow root.
+    const drawnCount = async () =>
+      page
+        .locator('.rozie-flow-connection__path')
+        .evaluateAll(
+          (els) =>
+            els.filter((e) => (e.getAttribute('d') || '').trim().length > 0).length,
+        );
+
+    // The TYPED socket-row locator (the advanced-cell technique): the port ROW whose label
+    // span reads 'number'/'string' inside the named node, then that row's socket. `.first()`
+    // would be ambiguous — both nodes carry two ports on the relevant side.
+    const typedSocketOf = (node: string, side: 'output' | 'input', portLabel: string) =>
+      page
+        .locator('.rozie-flow-node', { hasText: node })
+        .locator(`.rozie-flow-port--${side}`, { hasText: portLabel })
+        .locator('.rozie-flow-socket')
+        .first();
+
+    const center = async (locator: ReturnType<typeof typedSocketOf>) => {
+      await expect(locator).toBeVisible({ timeout: 10_000 });
+      const box = await locator.boundingBox();
+      if (!box) throw new Error('socket bounding box unavailable');
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    };
+
+    const drag = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 8 });
+      await page.mouse.move(to.x, to.y, { steps: 8 });
+      await page.mouse.up();
+    };
+
+    const connCount = page.getByTestId('conn-count');
+    const accepted = page.getByTestId('accepted');
+    const rejectReason = page.getByTestId('reject-reason');
+    const rejectText = page.getByTestId('reject-text');
+    const validateState = page.getByTestId('validate-state');
+    const validateBtn = page.getByTestId('validate-btn');
+
+    // ---- 1. baseline ----
+    await expect.poll(drawnCount, { timeout: 10_000 }).toBe(0);
+    await expect(connCount).toHaveText('0');
+    await expect(accepted).toHaveText('0');
+    await expect(validateState).toHaveText('true');
+
+    // ---- 2. validation ON: number-out → string-in is REFUSED ----
+    const numOut = await center(typedSocketOf('Number Source', 'output', 'number'));
+    const mergeStrIn = await center(typedSocketOf('Merge', 'input', 'string'));
+    await drag(numOut, mergeStrIn);
+
+    await expect(rejectReason).toHaveText('type-mismatch', { timeout: 10_000 });
+    await expect(rejectText).toHaveText('src:num → mrg:str', { timeout: 10_000 });
+    await expect.poll(drawnCount, { timeout: 5_000 }).toBe(0);
+    await expect(connCount).toHaveText('0');
+    await expect(accepted).toHaveText('0');
+
+    // ---- 3. validation OFF: the IDENTICAL drag is now ALLOWED (the live read) ----
+    await validateBtn.click();
+    await expect(validateState).toHaveText('false', { timeout: 5_000 });
+
+    const numOut2 = await center(typedSocketOf('Number Source', 'output', 'number'));
+    const mergeStrIn2 = await center(typedSocketOf('Merge', 'input', 'string'));
+    await drag(numOut2, mergeStrIn2);
+
+    await expect
+      .poll(drawnCount, { timeout: 10_000, intervals: [100, 300, 600, 1000] })
+      .toBe(1);
+    await expect(connCount).toHaveText('1', { timeout: 10_000 });
+    await expect(accepted).toHaveText('1', { timeout: 10_000 });
+    // no fresh rejection fired on the accepted drag (the readout still shows step 2's).
+    await expect(rejectText).toHaveText('src:num → mrg:str');
+
+    // ---- 4. validation BACK ON: the OTHER cross-type pair is refused again ----
+    await validateBtn.click();
+    await expect(validateState).toHaveText('true', { timeout: 5_000 });
+
+    const strOut = await center(typedSocketOf('Number Source', 'output', 'string'));
+    const mergeNumIn = await center(typedSocketOf('Merge', 'input', 'number'));
+    await drag(strOut, mergeNumIn);
+
+    // the NEW edge is named in the reject readout — proving a FRESH rejection fired
+    // (the reason alone was already 'type-mismatch' from step 2).
+    await expect(rejectText).toHaveText('src:str → mrg:num', { timeout: 10_000 });
+    await expect(rejectReason).toHaveText('type-mismatch');
+    await expect(connCount).toHaveText('1');
+    await expect.poll(drawnCount, { timeout: 5_000 }).toBe(1);
+    await expect(accepted).toHaveText('1');
   });
 }
