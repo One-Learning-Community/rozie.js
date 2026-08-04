@@ -249,7 +249,28 @@ function hasNullishBranch(expr: t.Expression): boolean {
   return false;
 }
 
-function htmlAttrToSolidName(name: string): string {
+/**
+ * Translate a bare DOM attribute name (lowercased) to its Solid JSX prop name.
+ * For non-mapped names, returns the input unchanged.
+ *
+ * Quick 260803-swj (seam 1): the alias table applies ONLY to actual DOM
+ * elements (`elementTagKind === 'html'`, the default when unset). A
+ * `<Component>` custom prop that happens to share a name with an HTML
+ * attribute (`readonly`, `tabindex`, `contenteditable`, …) must pass through
+ * VERBATIM — the child's `splitProps` key list is built from its `ir.props`,
+ * so aliasing here silently breaks the binding (`<Child :readonly="x" />`
+ * emitted `readOnly={x}`, which a child declaring `readonly` never receives).
+ *
+ * This is a straight port of the React twin, which fixed the identical shape
+ * after a VR failure — see `react/src/emit/emitTemplateAttribute.ts:349-353`
+ * (quick 260711-i5m, editor-owns-focus contract). The two files stay
+ * structurally parallel.
+ */
+function htmlAttrToSolidName(
+  name: string,
+  elementTagKind?: 'html' | 'component' | 'self',
+): string {
+  if (elementTagKind === 'component' || elementTagKind === 'self') return name;
   const lower = name.toLowerCase();
   return HTML_TO_SOLID_ATTR[lower] ?? name;
 }
@@ -415,14 +436,22 @@ function splitClassStyleFromLiteral(obj: t.ObjectExpression): {
   return { classValue, styleValue, rest };
 }
 
-function colonPropToSolidName(name: string): string {
+function colonPropToSolidName(
+  name: string,
+  elementTagKind?: 'html' | 'component' | 'self',
+): string {
   const bare = name.startsWith(':') ? name.slice(1) : name;
   if (bare.startsWith('aria-') || bare.startsWith('data-')) return bare;
   let out = bare;
+  // kebab→camel runs on EVERY tag kind — `:my-prop` → `myProp` is the
+  // component-prop convention (D-141), and React performs the same conversion
+  // BEFORE its own gate (`react/…/emitTemplateAttribute.ts:373-378`).
   if (out.includes('-')) {
     out = out.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
   }
-  return htmlAttrToSolidName(out);
+  // Apply the HTML→Solid alias map — native DOM elements only (see
+  // `htmlAttrToSolidName`).
+  return htmlAttrToSolidName(out, elementTagKind);
 }
 
 function escapeJsxAttrLiteral(s: string): string {
@@ -766,7 +795,7 @@ function emitNonClassAttribute(
   }
 
   if (attr.kind === 'static') {
-    const jsxName = htmlAttrToSolidName(attr.name);
+    const jsxName = htmlAttrToSolidName(attr.name, ctx.elementTagKind);
     if (NUMERIC_HTML_ATTRS.has(attr.name.toLowerCase()) && /^-?\d+(?:\.\d+)?$/.test(attr.value)) {
       return { jsx: `${jsxName}={${attr.value}}`, diagnostics };
     }
@@ -792,7 +821,7 @@ function emitNonClassAttribute(
       }
       // ObjectExpression falls through to the generic binding emit.
     }
-    const jsxName = colonPropToSolidName(attr.name);
+    const jsxName = colonPropToSolidName(attr.name, ctx.elementTagKind);
     const exprCode = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
     // Phase 26 (D-06/SPEC-4) — attribute-binding wrap on an HTML host attribute
     // text position only (structural component props / controlled-input props
@@ -864,12 +893,12 @@ function emitNonClassAttribute(
     // (e.g. unplugin pipeline edge cases).
     const target = resolveTwoWayTarget(attr.expression, ctx.ir);
     if (target === null) {
-      const jsxNameFallback = colonPropToSolidName(attr.name);
+      const jsxNameFallback = colonPropToSolidName(attr.name, ctx.elementTagKind);
       const exprCodeFallback = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
       return { jsx: `${jsxNameFallback}={${exprCodeFallback}}`, diagnostics };
     }
     const { local, setter } = target;
-    const jsxName = colonPropToSolidName(attr.name);
+    const jsxName = colonPropToSolidName(attr.name, ctx.elementTagKind);
     const eventProp = `on${capitalize(jsxName)}Change`;
     return {
       jsx: `${jsxName}={${local}()} ${eventProp}={${setter}}`,
@@ -888,7 +917,7 @@ function emitNonClassAttribute(
   }
 
   // interpolated
-  const jsxName = colonPropToSolidName(attr.name);
+  const jsxName = colonPropToSolidName(attr.name, ctx.elementTagKind);
   let lit = '';
   for (const seg of attr.segments) {
     if (seg.kind === 'static') {

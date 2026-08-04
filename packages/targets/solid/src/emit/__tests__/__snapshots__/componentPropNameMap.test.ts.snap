@@ -1,0 +1,16 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitTemplateAttribute (Solid) — component props must bypass the DOM attr map (Quick 260803-swj seam 1) > GREEN GUARD-2 (D-02) — kebab→camel still runs on a component tag 1`] = `
+"<>
+      <Child myProp={local.ro} data-rozie-s-8fd6d49e="" />
+    </>"
+`;
+
+exports[`emitTemplateAttribute (Solid) — component props must bypass the DOM attr map (Quick 260803-swj seam 1) > a mapped attribute name is renamed on a NATIVE tag but passes through VERBATIM on a COMPONENT tag 1`] = `
+"<>
+      <div {...attrs} data-rozie-s-8fd6d49e="">
+        <Child readonly={local.ro} tabindex={local.ti} contenteditable="true" data-rozie-s-8fd6d49e="" />
+        <input readOnly={local.ro} tabIndex={local.ti} contentEditable="true" data-rozie-s-8fd6d49e="" />
+      </div>
+    </>"
+`;
