@@ -65,6 +65,22 @@ function buildGuardCode(direction: SwipeDirection): string {
 }
 
 /**
+ * Phase 77 — `ModifierArg` gained a THIRD `'expr'` kind (the
+ * `.grid($data.cols)`-only `$`-path reactive-expression form; see
+ * `@rozie/core`'s `parseModifierChain.ts`). This dogfood plugin never
+ * receives an `'expr'`-kind arg in practice (swipe args are always a bare
+ * string literal), but the union widened, so this describer must stay
+ * exhaustive for the diagnostic-message error path below. Mirrors the SAME
+ * `'expr'` fallback branch added to the six first-party target emitters'
+ * `renderModifierArg`/`renderModifierArgInline` in Phase 77 Plan 02.
+ */
+function describeArg(a: ModifierArg): unknown {
+  if (a.kind === 'literal') return a.value;
+  if (a.kind === 'expr') return a.raw;
+  return `$refs.${a.ref}`;
+}
+
+/**
  * The swipe modifier. Exported as a named const so the test suite can register
  * it onto a fresh ModifierRegistry per test.
  *
@@ -91,7 +107,7 @@ export const swipeModifier: EventModifierImpl = {
         // a bare string literal is the canary's only error-code dependency.
         code: 'ROZ111',
         severity: 'error',
-        message: `swipe modifier expects one argument: 'left' | 'right' | 'up' | 'down' (got ${JSON.stringify(args.map((a) => (a.kind === 'literal' ? a.value : `$refs.${a.ref}`)))})`,
+        message: `swipe modifier expects one argument: 'left' | 'right' | 'up' | 'down' (got ${JSON.stringify(args.map(describeArg))})`,
         loc: ctx.sourceLoc,
       });
       return { entries: [], diagnostics };
