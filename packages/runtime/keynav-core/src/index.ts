@@ -15,6 +15,7 @@ export type {
   KeynavItemMeta,
   KeynavKeyboardEvent,
   KeynavHost,
+  KeynavPageDetail,
 } from './types.js';
 
 export type { KeynavWindower, SourceArrayFallback } from './windower.js';

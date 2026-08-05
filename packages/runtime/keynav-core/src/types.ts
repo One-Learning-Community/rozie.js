@@ -27,6 +27,35 @@ export interface KeynavConfig {
   typeahead: boolean;
   /** `.skipdisabled` — skip `disabled` items on arrow moves (default: on). */
   skipDisabled: boolean;
+  /**
+   * `.grid(<expr>)` — the SOLE switch that selects the 2D grid branch of
+   * `onKeydown` (SPEC §3, §7.1). `columns()` is a GETTER, not a plain
+   * number, so a dynamic/reactive column count (e.g. `$data.cols`) is
+   * re-read on every keydown rather than captured once at machine
+   * construction — no re-instantiation is required for the stride to
+   * change (SPEC §10). Absent (`undefined`) means "1D mode": every
+   * existing `orientation`/`loop`/`skipDisabled` behavior is unchanged
+   * (SPEC §5, §7.1).
+   */
+  grid?: {
+    columns(): number;
+  };
+}
+
+/**
+ * Payload for the `@keynav-page` event (SPEC §3). The grid branch of the
+ * reducer NEVER moves `active` on a page/boundary key — it only reports the
+ * attempted move so the author (who owns the dataset) can advance a page and
+ * set the landing index themselves (SPEC §4.1).
+ *
+ * `axis` is `'column'` for PageUp/PageDown and for a vertical (ArrowUp/
+ * ArrowDown) boundary hit, and `'row'` for a horizontal (ArrowLeft/
+ * ArrowRight) boundary hit.
+ */
+export interface KeynavPageDetail {
+  direction: 1 | -1;
+  reason: 'pageup' | 'pagedown' | 'boundary';
+  axis: 'row' | 'column';
 }
 
 /** Per-item metadata resolved from `r-keynav-item="{ label?, disabled? }"`. */
@@ -62,4 +91,11 @@ export interface KeynavHost {
   commit(i: number): void;
   /** Optional full-dataset addressing for virtualized lists (SPEC §10). */
   windower?: import('./windower.js').KeynavWindower;
+  /**
+   * Optional boundary/paging hook (grid mode, SPEC §4/§4.1). OPTIONAL is
+   * load-bearing: every existing 1D host literal (all six controllers plus
+   * the pre-existing unit suite) keeps satisfying `KeynavHost` with no edit,
+   * which is what makes this an additive minor rather than a major.
+   */
+  page?(detail: KeynavPageDetail): void;
 }
