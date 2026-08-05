@@ -1847,7 +1847,34 @@ Two semantics are worth knowing by name before you reach for it:
 
 The argument is the column-count expression — a numeric literal (`7`) or a reactive read (`$data.cols`); rows are derived (`ceil(count / columns)`). `.grid()` owns both axes, so it cannot combine with `.vertical`/`.horizontal`/`.both`; it replaces wrapping with boundary events, so it cannot combine with `.loop`. `.typeahead` and `.skipdisabled` still compose normally.
 
-**Multiple nav groups per component** are legal — no new syntax. Each `r-keynav` root claims the `r-keynav-item`s in its own template subtree by nearest-ancestor containment; roots must be siblings or cousins, never ancestors of one another. A single-root component keeps the looser Phase-71 component-membership association (the activedescendant/combobox cross-subtree shape still works unchanged) — containment scoping only kicks in once a component has two or more roots, since that's when it's needed to disambiguate which group an item belongs to.
+**Grid keyboard map:**
+
+| Key | Action |
+| --- | --- |
+| `←` / `→` | ±1, flowing continuously through the flat cell list (crosses row ends — the calendar reading order). Past the first/last cell, active does not move; fires `@keynav-page { reason: 'boundary', axis: 'row' }` instead |
+| `↑` / `↓` | ±`columns` (a whole row). A landing index outside the grid does not move active; fires `@keynav-page { reason: 'boundary', axis: 'column' }` instead |
+| `Home` / `End` | first / last cell **of the active row** |
+| `Ctrl`+`Home` / `Ctrl`+`End` | first / last cell **of the whole grid** |
+| `PageUp` / `PageDown` | no active change; fires `@keynav-page { reason: 'pageup' \| 'pagedown', axis: 'column' }` |
+| `Enter` | commit — a no-op when the active cell is disabled |
+
+A ragged last row (`count % columns !== 0`, e.g. a trailing partial week) is legal: `↓` from the row above a missing trailing cell fires a column-axis `@keynav-page` boundary event rather than landing out of bounds, `End` on that row resolves to the last cell that actually exists, and `Ctrl`+`End` always resolves to `count - 1`.
+
+**The paging event and its contract — the machine never lands.** `@keynav-page` fires whenever a key would move active past a grid edge (an arrow/Home/End boundary) or on `PageUp`/`PageDown`; in every case the state machine leaves `active` untouched. The payload is:
+
+```ts
+interface KeynavPageDetail {
+  direction: 1 | -1;
+  reason: 'pageup' | 'pagedown' | 'boundary';
+  axis: 'row' | 'column';   // which axis the move was on ('column' for PageUp/PageDown)
+}
+```
+
+You own the dataset and the active-index model, so you own what a page means: swap in the next/previous chunk of data, then set the active-index binding to wherever the newly-rendered grid should land focus. **If you don't handle `@keynav-page` at all, boundary/paging keys are safe no-ops** — clamp-equivalent, nothing crashes, active simply stays put.
+
+**Disabled cells in grid mode are focusable-but-inert by default** — the opposite of the 1D-list default. Arrows/Home/End/Ctrl+Home/Ctrl+End land on a disabled cell exactly like any other cell (it takes DOM focus / `aria-activedescendant` normally), but `commit()` no-ops and `@keynav-commit` never fires for it. `.skipdisabled` on a grid root opts back into the 1D skip-walk behavior (walking in ±`columns` strides along the movement axis; an all-disabled walk is a no-op, never a crash) — it's the grid opt-out for authors who want the 1D skip semantics instead of inert cells. 1D lists are untouched by any of this: skip stays the grid-off default, unchanged.
+
+**Multiple nav groups per component** are legal — no new syntax. Each `r-keynav-item` belongs to whichever `r-keynav` root is its **nearest ancestor** in the template — that's the containment rule multi-group scoping uses to disambiguate which group an item belongs to; roots must be siblings or cousins, never ancestors of one another (nesting one root inside another is an error, see `ROZ996` below). A single-root component keeps the looser Phase-71 component-membership association instead (the activedescendant/combobox cross-subtree shape still works unchanged) — nearest-ancestor containment only kicks in once a component has two or more roots, since a single group has nothing to disambiguate.
 
 **Explicit item index** — `r-keynav-item="{ index: <expr> }"` supplies the item's flat index directly, for the case where the nearest enclosing `r-for` isn't the right one (e.g. a day-grid nested inside week/panel loops, where the item's *column* index isn't its *flat grid* index).
 

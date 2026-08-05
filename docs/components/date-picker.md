@@ -53,8 +53,11 @@ The grid follows the WAI-ARIA grid pattern:
 | `←` / `→` | Move one day (crossing months at the edges) |
 | `↑` / `↓` | Move one week |
 | `Home` / `End` | Move to the start / end of the current week |
+| `Ctrl`+`Home` / `Ctrl`+`End` | Jump to the first / last day of the whole rendered view (spans every month when `numberOfMonths` > 1) |
 | `PageUp` / `PageDown` | Move to the previous / next month |
 | `Enter` / `Space` | Select the focused day |
+
+The month/year drill panels (`monthYearNav`) follow the same grid pattern over their 12 cells — arrow/Home/End/Ctrl+Home/Ctrl+End navigate the months or years, `Enter`/`Space` picks one, and `Escape` returns to the day grid with focus landing back inside it, never dropping to the page body.
 
 ## Headless header
 
