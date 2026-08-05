@@ -108,7 +108,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { resolveTwoWayTarget } from './resolveTwoWayTarget.js';
-import type { RuntimeSolidImportCollector } from '../rewrite/collectSolidImports.js';
+import type { RuntimeSolidImportCollector, SolidImportCollector } from '../rewrite/collectSolidImports.js';
 
 // Synthesized (never author-visible) identifier names — namespaced
 // `__rozieKeynav*` so they can never collide with a `<script>`-declared
@@ -117,10 +117,21 @@ import type { RuntimeSolidImportCollector } from '../rewrite/collectSolidImports
 // later groups append the index (see `suffixFor` below) — the mechanism
 // that keeps single-root emit unchanged.
 const ROOT_REF_VAR = '__rozieKeynavRootRef';
+const SET_ROOT_REF_VAR = '__setRozieKeynavRootRef';
 const GROUP_ID_VAR = '__rozieKeynavGroupId';
 
 function suffixFor(groupIndex: number): string {
   return groupIndex === 0 ? '' : String(groupIndex);
+}
+
+/**
+ * 77-07 — the `createSignal` setter identifier paired with a minted,
+ * conditional-root ref getter (`rootRefVar`, e.g. `__rozieKeynavRootRef1`).
+ * Only ever called when `mintedRootRef && insideConditional` — see
+ * `KeynavEmitPlan.insideConditional`'s doc comment.
+ */
+function rootRefSetterVar(rootRefVar: string): string {
+  return `${SET_ROOT_REF_VAR}${rootRefVar.slice(ROOT_REF_VAR.length)}`;
 }
 
 export interface KeynavEmitPlan {
@@ -150,6 +161,21 @@ export interface KeynavEmitPlan {
   /** The active-index get (Accessor-call, e.g. `active()`) / set (bare Setter identifier) pair. */
   activeGet: string;
   activeSet: string;
+  /**
+   * 77-07 — true when the root sits inside a `TemplateConditional`/
+   * `TemplateMatch` (`r-if`/`r-match`) branch, i.e. its DOM element is torn
+   * down and recreated each time the branch toggles. ONLY meaningful when
+   * `mintedRootRef` is also true (an author-reused `$refs`-declared ref is
+   * untouched by this fix — out of scope, see `createKeynav.ts`'s module
+   * doc comment); combined with `mintedRootRef`, this selects a
+   * `createSignal`-backed ref instead of a plain `let` variable so
+   * `createKeynav`'s effect can reactively detect the root (re)appearing
+   * (`createKeynav.ts`'s `createEffect`-over-`onMount` fix). `false` for
+   * EVERY pre-77-07 fixture (no existing `r-keynav` root sits behind a
+   * conditional), which is what keeps this fix's emit change unreachable —
+   * and therefore byte-identical — for the whole pre-existing corpus.
+   */
+  insideConditional: boolean;
 }
 
 function findStaticAttrValue(el: TemplateElementIR, name: string): string | null {
@@ -169,44 +195,57 @@ function findStaticAttrValue(el: TemplateElementIR, name: string): string | null
  * already stamped `groupIndex` onto).
  */
 function collectAllKeynavNodes(root: TemplateNode): {
-  roots: { element: TemplateElementIR; keynavRoot: KeynavRootIR }[];
+  roots: { element: TemplateElementIR; keynavRoot: KeynavRootIR; insideConditional: boolean }[];
   items: { element: TemplateElementIR; keynavItem: KeynavItemIR; enclosingLoop: TemplateLoopIR | null }[];
 } {
-  const roots: { element: TemplateElementIR; keynavRoot: KeynavRootIR }[] = [];
+  const roots: { element: TemplateElementIR; keynavRoot: KeynavRootIR; insideConditional: boolean }[] = [];
   const items: { element: TemplateElementIR; keynavItem: KeynavItemIR; enclosingLoop: TemplateLoopIR | null }[] = [];
 
-  const walk = (node: TemplateNode, enclosingLoop: TemplateLoopIR | null): void => {
+  // 77-07 — `insideConditional` threads through the SAME recursive walk as
+  // `enclosingLoop`, flipping to `true` the moment the walk descends into a
+  // `TemplateConditional`/`TemplateMatch` (`r-if`/`r-match`) branch and
+  // staying `true` for everything nested inside it (a root inside a loop
+  // inside a conditional is still conditional). See `KeynavEmitPlan.
+  // insideConditional`'s doc comment for why this drives the
+  // createSignal-vs-plain-let ref choice below.
+  const walk = (
+    node: TemplateNode,
+    enclosingLoop: TemplateLoopIR | null,
+    insideConditional: boolean,
+  ): void => {
     switch (node.type) {
       case 'TemplateElement': {
         if (node.keynavRoot) {
-          roots.push({ element: node, keynavRoot: node.keynavRoot });
+          roots.push({ element: node, keynavRoot: node.keynavRoot, insideConditional });
         }
         if (node.keynavItem) {
           items.push({ element: node, keynavItem: node.keynavItem, enclosingLoop });
         }
-        for (const child of node.children) walk(child, enclosingLoop);
+        for (const child of node.children) walk(child, enclosingLoop, insideConditional);
         if (node.slotFillers) {
           for (const filler of node.slotFillers) {
-            for (const child of filler.body) walk(child, enclosingLoop);
+            for (const child of filler.body) walk(child, enclosingLoop, insideConditional);
           }
         }
         break;
       }
       case 'TemplateLoop':
-        for (const child of node.body) walk(child, node);
+        for (const child of node.body) walk(child, node, insideConditional);
         break;
       case 'TemplateFragment':
-        for (const child of node.children) walk(child, enclosingLoop);
+        for (const child of node.children) walk(child, enclosingLoop, insideConditional);
         break;
       case 'TemplateConditional':
-        for (const branch of node.branches) for (const child of branch.body) walk(child, enclosingLoop);
+        for (const branch of node.branches)
+          for (const child of branch.body) walk(child, enclosingLoop, true);
         break;
       case 'TemplateMatch':
-        for (const branch of node.branches) for (const child of branch.body) walk(child, enclosingLoop);
-        if (node.hostElement) walk(node.hostElement, enclosingLoop);
+        for (const branch of node.branches)
+          for (const child of branch.body) walk(child, enclosingLoop, true);
+        if (node.hostElement) walk(node.hostElement, enclosingLoop, insideConditional);
         break;
       case 'TemplateSlotInvocation':
-        for (const child of node.fallback) walk(child, enclosingLoop);
+        for (const child of node.fallback) walk(child, enclosingLoop, insideConditional);
         break;
       // TemplateInterpolation / TemplateStaticText — leaves.
       default:
@@ -214,7 +253,7 @@ function collectAllKeynavNodes(root: TemplateNode): {
     }
   };
 
-  walk(root, null);
+  walk(root, null, false);
   return { roots, items };
 }
 
@@ -271,6 +310,7 @@ export function resolveKeynavPlans(ir: IRComponent): KeynavEmitPlan[] {
       // Setter already matches `(i: number) => void`.
       activeGet: `${activeTarget.local}()`,
       activeSet: activeTarget.setter,
+      insideConditional: root.insideConditional,
     };
   });
 }
@@ -392,12 +432,28 @@ function buildOnPageCode(root: TemplateElementIR, ir: IRComponent): string | nul
 export function buildKeynavScriptInjections(
   plan: KeynavEmitPlan,
   ir: IRComponent,
-  collectors: { runtime: RuntimeSolidImportCollector },
+  collectors: { runtime: RuntimeSolidImportCollector; solid: SolidImportCollector },
 ): string[] {
   const lines: string[] = [];
 
   if (plan.mintedRootRef) {
-    lines.push(`let ${plan.rootRefVar}: HTMLElement | null = null;`);
+    if (plan.insideConditional) {
+      // 77-07 — a `createSignal`-backed ref, NOT the plain `let` every other
+      // minted ref uses: the root sits behind `r-if`/`r-match`, so its DOM
+      // element is torn down and recreated each time the branch toggles.
+      // `createKeynav`'s effect (`createEffect`, not `onMount` — see its
+      // module doc comment) needs a genuinely TRACKED read to detect the
+      // node (re)appearing; a plain variable gives it nothing to track.
+      // Unreachable for any pre-77-07 fixture (see `KeynavEmitPlan.
+      // insideConditional`'s doc comment), so this branch never touches the
+      // existing corpus's emit.
+      collectors.solid.add('createSignal');
+      lines.push(
+        `const [${plan.rootRefVar}, ${rootRefSetterVar(plan.rootRefVar)}] = createSignal<HTMLElement | null>(null);`,
+      );
+    } else {
+      lines.push(`let ${plan.rootRefVar}: HTMLElement | null = null;`);
+    }
   }
 
   // Component-unique group id (T-71-07-02) — Solid's component function
@@ -436,7 +492,16 @@ export function buildKeynavScriptInjections(
   if (onPageCode !== null) {
     optsLines.push(`  onPage: ${onPageCode},`);
   }
-  lines.push(`createKeynav(() => ${plan.rootRefVar}, {\n${optsLines.join('\n')}\n});`);
+  // 77-07 — the conditional-root case's `rootRefVar` IS already a
+  // `createSignal` Accessor (`() => T`), so it's passed BARE, matching
+  // `createKeynav`'s `rootRef: () => HTMLElement | null | undefined`
+  // signature directly. Every other case (plain `let` variable, minted or
+  // author-reused) keeps the pre-77-07 `() => rootRefVar` wrapper — the
+  // unreachable-for-existing-corpus branch above is the ONLY thing that
+  // changes this line's output for any pre-77-07 fixture (it never fires).
+  const rootRefArg =
+    plan.mintedRootRef && plan.insideConditional ? plan.rootRefVar : `() => ${plan.rootRefVar}`;
+  lines.push(`createKeynav(${rootRefArg}, {\n${optsLines.join('\n')}\n});`);
 
   return lines;
 }
@@ -453,7 +518,20 @@ export function keynavRootAttrs(plan: KeynavEmitPlan | null, node: TemplateEleme
   if (plan === null || node.keynavRoot === undefined) return [];
   const attrs: string[] = [];
   if (plan.mintedRootRef) {
-    attrs.push(`ref={(el) => { ${plan.rootRefVar} = el as HTMLElement; }}`);
+    if (plan.insideConditional) {
+      // 77-07 — calls the `createSignal` setter (see `buildKeynavScriptInjections`)
+      // instead of assigning a plain variable. Solid's callback ref is ALSO
+      // invoked with `undefined` on unmount (the element being torn down by
+      // the surrounding `r-if`/`r-match`), so this naturally clears the
+      // signal back to `null` when the branch flips away — `createKeynav`'s
+      // effect sees that transition too, tearing down its own listeners
+      // (see `createKeynav.ts`).
+      attrs.push(
+        `ref={(el) => { ${rootRefSetterVar(plan.rootRefVar)}(el as HTMLElement | null); }}`,
+      );
+    } else {
+      attrs.push(`ref={(el) => { ${plan.rootRefVar} = el as HTMLElement; }}`);
+    }
   }
   if (plan.keynavRoot.focusModel === 'activedescendant') {
     attrs.push(

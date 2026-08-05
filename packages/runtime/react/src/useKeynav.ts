@@ -9,38 +9,72 @@
  * React-idiomatic wiring, split into two effects per SPEC §8 ("generic
  * behavior -> per-target runtime controller"):
  *
- *   1. **Mount-once** — instantiates the state machine and attaches a single
- *      root `keydown`/`pointerdown` delegation (no per-item listeners, SPEC
- *      §8). Uses the SAME latest-ref pattern as `useOutsideClick` (stash every
- *      callback/config in a ref, updated every render) so this effect NEVER
- *      re-attaches when `opts`'s callbacks/config change identity across
- *      renders — `rootRef` is the only real dependency, and it's stable for
- *      the component's lifetime.
+ *   1. **Root-identity-tracked setup** — instantiates the state machine and
+ *      attaches a single root `keydown`/`pointerdown` delegation (no
+ *      per-item listeners, SPEC §8). Uses the SAME latest-ref pattern as
+ *      `useOutsideClick` (stash every callback/config in a ref, updated
+ *      every render) so this effect never TEARS DOWN AND REBUILDS merely
+ *      because `opts`'s callbacks/config change identity across renders.
+ *
+ *      77-07 — this effect has NO dependency array (it runs after every
+ *      commit) and internally diffs `rootRef.current` against the last DOM
+ *      node it actually attached to, doing real work ONLY when that identity
+ *      changes. This matters because `rootRef` itself is a stable object for
+ *      the component's whole lifetime — React never re-invokes a
+ *      `[rootRef]`-keyed effect merely because `.current` was mutated — so a
+ *      root behind conditional rendering (`r-if`), which is torn down and
+ *      recreated as a NEW DOM node each time the surrounding condition
+ *      flips, would otherwise only ever get ONE setup attempt for the
+ *      component's entire lifetime: the very first commit, when a
+ *      conditionally-hidden root is still `null`. The date-picker drill
+ *      retrofit (77-07) is the first consumer to place an `r-keynav` root
+ *      behind `r-if`, which is what surfaced this gap. A persistently-
+ *      mounted root (the pre-77-07 common case) still pays setup cost
+ *      exactly once — `root === lastRoot` is true from the second render
+ *      onward, so the body returns immediately.
  *
  *      Phase 77 — `onPage` (grid boundary/paging, forwarded as `host.page`)
  *      and `gridColumns` (the `.grid(<expr>)` column-count getter) are both
- *      OPTIONAL and their PRESENCE is snapshotted once at mount, mirroring
- *      the pre-existing `windower` convention ("no v1 fixture swaps a
- *      windower's identity mid-lifecycle") — an author does not flip a
- *      component between grid/non-grid or paged/non-paged mid-lifecycle.
+ *      OPTIONAL and their PRESENCE is snapshotted at EACH (re)attachment,
+ *      mirroring the pre-existing `windower` convention ("no v1 fixture
+ *      swaps a windower's identity mid-lifecycle") — an author does not flip
+ *      a component between grid/non-grid or paged/non-paged mid-lifecycle.
  *      `gridColumns` itself is NOT read directly into the machine's config —
  *      `buildConfigCode` (the per-target compiler emitter) never embeds a
  *      reactive expression inside the (fully-statically-known) `config`
- *      object, because `config` is captured ONCE by this same mount effect.
- *      Instead the machine's `config.grid.columns` getter permanently
- *      delegates through `optsRef.current.gridColumns!()` — the SAME
- *      latest-ref indirection every other callback here uses — so a dynamic
- *      `$data.cols` read stays live across re-renders without re-
- *      instantiating the machine (SPEC §10).
+ *      object, because `config` is captured once per (re)attachment by this
+ *      same effect. Instead the machine's `config.grid.columns` getter
+ *      permanently delegates through `optsRef.current.gridColumns!()` — the
+ *      SAME latest-ref indirection every other callback here uses — so a
+ *      dynamic `$data.cols` read stays live across re-renders without
+ *      re-instantiating the machine (SPEC §10).
  *
- *   2. **Reactive to `active`** — the imperative-only concerns that a
- *      declarative JSX binding genuinely cannot express: DOM `.focus()` for
- *      the tabindex model, the SPEC §9 active-class toggle, and
- *      scroll-into-view / windower `scrollToIndex` follow. Runs ONLY when the
- *      active index changes (SPEC §9: "evaluated once ... toggles the token
- *      set on active-change" — not a live per-render `:class` merge), reading
- *      every other option through the SAME latest-ref so an `activeClass`/
- *      `config` identity change alone never re-triggers it.
+ *   2. **Reactive to `active` OR root identity** — the imperative-only
+ *      concerns that a declarative JSX binding genuinely cannot express: DOM
+ *      `.focus()` for the tabindex model, the SPEC §9 active-class toggle,
+ *      and scroll-into-view / windower `scrollToIndex` follow. Runs when
+ *      EITHER the active index changes value OR the root DOM node identity
+ *      changes (SPEC §9: "evaluated once ... toggles the token set on
+ *      active-change" — not a live per-render `:class` merge; a root
+ *      identity change is not "per unrelated render," it's the panel
+ *      (re)appearing and therefore always warrants a fresh apply even when
+ *      the numeric active value happens to be unchanged from the last time
+ *      this effect ran against the PREVIOUS incarnation of the root — see
+ *      the 77-07 module note below), reading every other option through the
+ *      SAME latest-ref so an `activeClass`/`config` identity change alone
+ *      never re-triggers it.
+ *
+ *      77-07 — like effect 1, this has NO dependency array and diffs
+ *      `{ root, active }` against what it last actually applied, so a
+ *      re-render where NEITHER changed remains a cheap no-op (preserving the
+ *      "evaluated once per active-change" guarantee for the common,
+ *      persistently-mounted case) while a conditionally-mounted root that
+ *      RE-ENTERS with the SAME resolved active index (e.g. re-drilling into
+ *      a months panel whose selected month hasn't changed) still gets its
+ *      focus/scroll/class pass re-applied — without this, the SECOND (and
+ *      every subsequent) entry into an `r-if`-gated panel would silently
+ *      drop keyboard focus continuity, since React's plain active-value
+ *      dependency has nothing to observe when the value repeats.
  *
  *      Phase 77 — an author may set the active index in the SAME tick a
  *      dataset swaps (grid paging), so the item element for the new index may
@@ -49,7 +83,8 @@
  *      element is found for the current active index, it schedules exactly
  *      ONE `requestAnimationFrame`-deferred re-query (cancelled on cleanup,
  *      and guarded so it only re-applies if `active` is STILL the value it
- *      was scheduled for — a stale pass must never steal focus from a newer
+ *      was scheduled for AND the root is STILL the one the pass was
+ *      scheduled against — a stale pass must never steal focus from a newer
  *      navigation, T-77-03-03). No polling loop, no bespoke scheduler.
  *
  * **What this hook does NOT do**: it never writes `data-rozie-keynav-active`
@@ -74,6 +109,7 @@ import {
   type KeynavConfig,
   type KeynavHost,
   type KeynavPageDetail,
+  type KeynavStateMachine,
   type KeynavWindower,
 } from '@rozie/runtime-keynav-core';
 
@@ -124,20 +160,50 @@ export function useKeynav(
   opts: UseKeynavOpts,
 ): void {
   // Latest-ref stash — mirrors `useOutsideClick`'s stale-closure defense
-  // (D-61) so BOTH effects below always read the freshest `opts` without
+  // (D-61) so both effects below always read the freshest `opts` without
   // needing to re-run on every identity change.
   const optsRef = useRef(opts);
   optsRef.current = opts;
 
   // Read the CURRENT active value during render — a pure read through the
-  // author's own getter, used ONLY as the dependency for the second effect
-  // below so imperative side effects (focus/scroll/class) fire exactly once
-  // per active-change, never once per unrelated render.
+  // author's own getter. 77-07: no longer used as a dependency-array entry
+  // (see the module doc comment on why a plain value dependency can't detect
+  // a conditionally-mounted root re-appearing) — read here once per render
+  // and diffed manually inside effect 2 below.
   const active = opts.getActive();
 
-  // ---- Effect 1 (mount-once): state machine + root keydown/pointer delegation ----
+  // 77-07 — per-instance attachment state, persisted across renders in a
+  // ref (not React state, since updating it must never itself trigger a
+  // re-render). `attach.root` is the DOM node the state machine/listeners
+  // are CURRENTLY built against; `apply.root`/`apply.active` are the
+  // (root, active) pair the focus/scroll/class pass was LAST applied for.
+  // Both effects below run unconditionally (no dependency array) and use
+  // these to cheaply no-op when nothing relevant changed.
+  const attachRef = useRef<{
+    root: HTMLElement | null;
+    machine: KeynavStateMachine | null;
+    onKeyDown: ((e: KeyboardEvent) => void) | null;
+    onPointerDown: ((e: PointerEvent) => void) | null;
+  }>({ root: null, machine: null, onKeyDown: null, onPointerDown: null });
+
+  // ---- Effect 1 (root-identity-tracked): state machine + root keydown/pointer delegation ----
   useEffect(() => {
     const root = rootRef.current;
+    const attach = attachRef.current;
+    if (root === attach.root) return; // unchanged root — no work to do.
+
+    // Tear down whatever was attached to the PREVIOUS root (a different
+    // element, or none) before (re)attaching to the current one.
+    if (attach.root && attach.onKeyDown && attach.onPointerDown) {
+      attach.root.removeEventListener('keydown', attach.onKeyDown);
+      attach.root.removeEventListener('pointerdown', attach.onPointerDown);
+    }
+    attach.machine?.dispose();
+    attach.root = null;
+    attach.machine = null;
+    attach.onKeyDown = null;
+    attach.onPointerDown = null;
+
     if (!root) return;
 
     // `exactOptionalPropertyTypes` — build `windower` via conditional
@@ -151,13 +217,13 @@ export function useKeynav(
       setActive: (i) => optsRef.current.setActive(i),
       commit: (i) => optsRef.current.onCommit(i),
     };
-    // Snapshot at mount — no v1 fixture swaps a windower's identity
+    // Snapshot at (re)attachment — no v1 fixture swaps a windower's identity
     // mid-lifecycle (SPEC §10 wiring lands with a future virtualized-list
     // plan); revisit if that changes.
     if (optsRef.current.windower !== undefined) {
       host.windower = optsRef.current.windower;
     }
-    // Phase 77 — `onPage` presence snapshotted once at mount (same
+    // Phase 77 — `onPage` presence snapshotted at (re)attachment (same
     // convention as `windower` above); the forwarded function itself always
     // delegates through the latest ref, so a re-rendered handler identity
     // never requires re-attaching the root listeners.
@@ -165,14 +231,14 @@ export function useKeynav(
       host.page = (detail) => optsRef.current.onPage?.(detail);
     }
 
-    // Phase 77 — grid config. `gridColumns` presence is ALSO snapshotted
-    // once at mount; when present, the machine's config gains a `grid` entry
-    // whose `columns()` getter permanently delegates through the latest ref
-    // (never captures a single render's closure directly — see the module
-    // doc comment) so a dynamic/reactive column count stays live across
-    // re-renders without re-instantiating the machine. Absent: `config` is
-    // handed to the machine completely unmodified — no `grid` key, byte-
-    // identical to pre-Phase-77 1D behavior.
+    // Phase 77 — grid config. `gridColumns` presence is ALSO snapshotted at
+    // (re)attachment; when present, the machine's config gains a `grid`
+    // entry whose `columns()` getter permanently delegates through the
+    // latest ref (never captures a single render's closure directly — see
+    // the module doc comment) so a dynamic/reactive column count stays live
+    // across re-renders without re-instantiating the machine. Absent:
+    // `config` is handed to the machine completely unmodified — no `grid`
+    // key, byte-identical to pre-Phase-77 1D behavior.
     const config: KeynavConfig =
       optsRef.current.gridColumns !== undefined
         ? {
@@ -211,19 +277,52 @@ export function useKeynav(
 
     root.addEventListener('keydown', onKeyDown);
     root.addEventListener('pointerdown', onPointerDown);
-    return () => {
-      root.removeEventListener('keydown', onKeyDown);
-      root.removeEventListener('pointerdown', onPointerDown);
-      machine.dispose();
-    };
-    // `rootRef` is a ref object (stable identity) — eslint-plugin-react-hooks
-    // exempts it from exhaustive-deps, same as `useOutsideClick`'s `[]`.
-  }, [rootRef]);
 
-  // ---- Effect 2 (reactive to `active`): focus / scroll / active-class ----
+    attach.root = root;
+    attach.machine = machine;
+    attach.onKeyDown = onKeyDown;
+    attach.onPointerDown = onPointerDown;
+    // No dependency array — see the module doc comment (77-07): this must run
+    // after EVERY commit so a conditionally-mounted root is correctly
+    // (re)initialized every time it reappears, while the internal
+    // `root === attach.root` check keeps a persistently-mounted root's cost
+    // at exactly one real setup, matching the pre-77-07 `[rootRef]` behavior.
+  });
+
+  // Final unmount cleanup — a separate mount-once effect (stable `[]` deps)
+  // so the teardown above (which now runs on every root CHANGE, not on
+  // every unmount) doesn't need to double as the component-unmount path.
+  useEffect(() => {
+    return () => {
+      const attach = attachRef.current;
+      if (attach.root && attach.onKeyDown && attach.onPointerDown) {
+        attach.root.removeEventListener('keydown', attach.onKeyDown);
+        attach.root.removeEventListener('pointerdown', attach.onPointerDown);
+      }
+      attach.machine?.dispose();
+      attach.root = null;
+      attach.machine = null;
+    };
+  }, []);
+
+  // ---- Effect 2 (reactive to `active` OR root identity): focus / scroll / active-class ----
+  const appliedRef = useRef<{ root: HTMLElement | null; active: number | null }>({
+    root: null,
+    active: null,
+  });
+
   useEffect(() => {
     const root = rootRef.current;
     if (!root || !Number.isFinite(active)) return;
+
+    const applied = appliedRef.current;
+    // 77-07: re-apply when EITHER the active value changed OR the root
+    // identity changed (a conditionally-mounted panel re-appearing) — see
+    // the module doc comment for why a plain active-value diff alone misses
+    // a re-entry that happens to resolve to the SAME index as last time.
+    if (applied.root === root && applied.active === active) return;
+    applied.root = root;
+    applied.active = active;
 
     // Extracted so it can run a SECOND time from the deferred rAF pass below
     // (Phase 77) without duplicating the focus/scroll/class-toggle logic.
@@ -274,13 +373,15 @@ export function useKeynav(
     // active index may not exist yet at effect time. Retry EXACTLY ONCE
     // after the browser has painted — no polling loop, no bespoke scheduler.
     // The retry is cancelled on cleanup and guarded so it only re-applies if
-    // `active` is STILL the value it was scheduled for; a stale pass must
-    // never steal focus from a newer navigation.
+    // `active` is STILL the value it was scheduled for AND the root is
+    // STILL the one the pass was scheduled against; a stale pass must never
+    // steal focus from a newer navigation.
     let rafId: number | null = null;
     if (!found) {
       rafId = requestAnimationFrame(() => {
         rafId = null;
         if (optsRef.current.getActive() !== active) return;
+        if (rootRef.current !== root) return;
         applyActiveEffects();
       });
     }
@@ -288,8 +389,11 @@ export function useKeynav(
     return () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
-    // Deliberately keyed on `active` ALONE (+ the stable `rootRef`) — see the
-    // module doc comment: this is an active-CHANGE effect, not a live
-    // per-render binding. Every other option is read via `optsRef.current`.
-  }, [active, rootRef]);
+    // No dependency array — see the module doc comment (77-07): this must
+    // run after every commit so a conditionally-mounted root's re-entry is
+    // detected even when the resolved active index repeats; the internal
+    // `{ root, active }` diff keeps a persistently-mounted, unrelated
+    // re-render a cheap no-op (preserving the "evaluated once per
+    // active-change" guarantee SPEC §9 requires).
+  });
 }

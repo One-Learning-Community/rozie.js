@@ -618,16 +618,24 @@ const onDayKeydown = (iso: any, e: any) => {
 // does not cover either).
 
 // @keynav-commit fires with the panel's own active index already resolved by
-// the primitive; selectMonth/selectYear already gate on the cell's own
-// `disabled` flag (the pointer-path guard), so committing a disabled cell is
-// a safe no-op even though the primitive itself never commits one to begin
-// with (grid mode's inert-by-default contract, SPEC §5).
-const onMonthCommit = () => {
-  const cell = monthList().months[activeMonth.value];
+// the primitive — read via the handler's OWN `i` parameter (the SAME index
+// the primitive just wrote through `r-keynav:tabindex`'s setter), NOT via
+// $data.activeMonth/$data.activeYear: on a POINTER commit (click on a
+// non-active cell) the primitive calls setActive(i) THEN commit(i) in the
+// same synchronous pass, and on React specifically `setState` is
+// async — a handler that re-reads $data.activeMonth here would see the
+// PRE-click value, committing the WRONG cell (found via 77-07 Task 3's
+// real-DOM run). `i` is always correct regardless of target/timing.
+// selectMonth/selectYear already gate on the cell's own `disabled` flag (the
+// pointer-path guard), so committing a disabled cell is a safe no-op even
+// though the primitive itself never commits one to begin with (grid mode's
+// inert-by-default contract, SPEC §5).
+const onMonthCommit = (i: any) => {
+  const cell = monthList().months[i];
   if (cell) selectMonth(cell.iso);
 };
-const onYearCommit = () => {
-  const cell = yearGrid().years[activeYear.value];
+const onYearCommit = (i: any) => {
+  const cell = yearGrid().years[i];
   if (cell) selectYear(cell.iso);
 };
 // The drills have no pageable dataset (12 fixed cells, never paged) — SPEC
@@ -797,7 +805,7 @@ useKeynav(__rozieKeynavRootRef, {
   getSource: () => (monthList().months).map((cell) => ({ label: cell.label, disabled: cell.disabled })),
   getActive: () => activeMonth.value,
   setActive: (v) => { activeMonth.value = v; },
-  onCommit: (i) => { onMonthCommit(); },
+  onCommit: (i) => { onMonthCommit(i); },
   gridColumns: () => 3,
   onPage: (detail) => { onDrillPage(); },
 });
@@ -808,7 +816,7 @@ useKeynav(__rozieKeynavRootRef1, {
   getSource: () => (yearGrid().years).map((cell) => ({ label: String(cell.year), disabled: cell.disabled })),
   getActive: () => activeYear.value,
   setActive: (v) => { activeYear.value = v; },
-  onCommit: (i) => { onYearCommit(); },
+  onCommit: (i) => { onYearCommit(i); },
   gridColumns: () => 3,
   onPage: (detail) => { onDrillPage(); },
 });

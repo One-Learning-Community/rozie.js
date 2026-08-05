@@ -400,7 +400,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
     getSource: () => (this.monthList().months).map((cell) => ({ label: cell.label, disabled: cell.disabled })),
     getActive: () => this._activeMonth.value,
     setActive: (i: number) => { this._activeMonth.value = i; },
-    onCommit: (i) => { this.onMonthCommit(); },
+    onCommit: (i) => { this.onMonthCommit(i); },
     gridColumns: () => 3,
     onPage: (detail) => { this.onDrillPage(); },
     rootMarker: '0',
@@ -411,7 +411,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
     getSource: () => (this.yearGrid().years).map((cell) => ({ label: String(cell.year), disabled: cell.disabled })),
     getActive: () => this._activeYear.value,
     setActive: (i: number) => { this._activeYear.value = i; },
-    onCommit: (i) => { this.onYearCommit(); },
+    onCommit: (i) => { this.onYearCommit(i); },
     gridColumns: () => 3,
     onPage: (detail) => { this.onDrillPage(); },
     rootMarker: '1',
@@ -911,13 +911,13 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   }
 };
 
-  onMonthCommit = () => {
-  const cell = this.monthList().months[this._activeMonth.value];
+  onMonthCommit = (i: any) => {
+  const cell = this.monthList().months[i];
   if (cell) this.selectMonth(cell.iso);
 };
 
-  onYearCommit = () => {
-  const cell = this.yearGrid().years[this._activeYear.value];
+  onYearCommit = (i: any) => {
+  const cell = this.yearGrid().years[i];
   if (cell) this.selectYear(cell.iso);
 };
 

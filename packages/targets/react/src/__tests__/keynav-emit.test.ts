@@ -424,7 +424,23 @@ describe('React r-keynav emitter — multi-root, grid, page, explicit index (Pla
     expect(code).toMatch(/tabIndex=\{active === w \* 7 \+ d \? 0 : -1\}/);
   });
 
-  it('BYTE-IDENTITY: the Phase-71 menu fixture emits character-for-character the same output as before this plan', () => {
+  it('77-07: the minted root ref is typed by the root element\'s OWN tag (HTMLDivElement here), not a bare HTMLElement', () => {
+    // Was a BYTE-IDENTITY assertion through Plan 77-06 — `useRef<HTMLElement
+    // | null>` for EVERY minted keynav root regardless of its actual tag.
+    // 77-07 (the date-picker drill retrofit) is the first real PUBLISHED
+    // leaf to place a fresh r-keynav root on a `<div>` and run `tsc
+    // --noEmit` against it, which surfaced a genuine, pre-existing bug:
+    // `useRef<HTMLElement | null>` is NOT assignable to a `<div ref={X}>`'s
+    // `LegacyRef<HTMLDivElement>` (TS2322 — a `<div>`-specific quirk in
+    // React's DOM typings: `HTMLElement` is missing the deprecated `align`
+    // property `HTMLDivElement` still carries). `htmlElementTypeForTag`
+    // (shared with `emitTemplateAttribute.ts`'s `$refs` ref-typing) fixes
+    // this for every consumer, not just date-picker — this fixture (a
+    // `<div r-keynav:...>` root, same shape as the drill panels) is the
+    // ONLY existing corpus member affected (`pnpm --filter @rozie/target-react
+    // test` full-suite green confirms no other fixture's expected output
+    // changed) — snapshot-tests-cement-bugs: a fixture asserting the OLD,
+    // provably-broken type is not an invariant worth preserving.
     const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
     const { code } = emitReact(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
     expect(code).toBe(
@@ -448,7 +464,7 @@ describe('React r-keynav emitter — multi-root, grid, page, explicit index (Pla
         '  const run = useCallback((item: any) => {\n' +
         '    console.log(item);\n' +
         '  }, []);\n\n' +
-        '  const __rozieKeynavRootRef = useRef<HTMLElement | null>(null);\n' +
+        '  const __rozieKeynavRootRef = useRef<HTMLDivElement | null>(null);\n' +
         '  const __rozieKeynavGroupId = useId();\n' +
         '  useKeynav(__rozieKeynavRootRef, {\n' +
         "    config: { focusModel: 'tabindex', orientation: 'vertical', loop: true, typeahead: false, skipDisabled: true },\n" +

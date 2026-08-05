@@ -43,11 +43,37 @@
  * effect in this codebase already follows (e.g. `emitScript.ts`'s `$watch`
  * lowering).
  *
- * The effect is registered INSIDE `onMount` (not at `createKeynav`'s top
- * level) for the SAME load-bearing reason the Vue reference documents:
- * `rootRef()` is `null`/`undefined` until after the component's initial JSX
- * tree is built, so a top-level effect's first (mount-time) pass would
- * silently no-op against a null root.
+ * 77-07 — the OUTER setup (state machine + listener attach + the inner
+ * active-effect) is now itself wrapped in a `createEffect(() => { const root
+ * = rootRef(); ... })`, not a one-shot `onMount`. This is a load-bearing
+ * change for the date-picker drill retrofit (77-07), the first `r-keynav`
+ * consumer to place a root behind conditional rendering (`r-if`): a
+ * one-shot `onMount` that reads `rootRef()` a single time would only ever
+ * see a non-null root if the panel happened to be visible on the
+ * component's very first mount, permanently no-op'ing for an
+ * initially-hidden panel on every LATER (re)appearance — no listeners ever
+ * attached, no focus/active-class effect ever applied. Wrapping in
+ * `createEffect` is SAFE and BACKWARD-COMPATIBLE for the pre-77-07 shape
+ * (a plain `let` variable ref, `rootRef` closing over no tracked signal):
+ * `createEffect` still fires exactly once at creation when nothing inside
+ * it is reactively tracked — byte-identical behavior to the old `onMount`.
+ * It becomes load-bearing ONLY when the compiler emits a `createSignal`-
+ * backed ref for a keynav root behind `r-if` (see `emitKeynav.ts`'s
+ * `mintedRootRef` — the freshly-synthesized-ref case), in which case reading
+ * `rootRef()` — now a genuine signal getter — inside this effect makes Solid
+ * track it, so the WHOLE setup correctly (re)runs every time the DOM node
+ * identity changes, including null -> element (first appearance) and
+ * element -> element (a conditionally-rendered root torn down and
+ * recreated). `onCleanup` (called INSIDE the effect) tears down the
+ * PREVIOUS root's listeners/machine/inner-effect automatically right before
+ * the next (re)run or on disposal — Solid's idiomatic equivalent of the
+ * Vue reference's outer-watch-with-onCleanup fix for the identical
+ * underlying gap. An author-declared `$refs`-reused root (the OTHER,
+ * non-minted branch of `emitKeynav.ts`) still emits a plain variable and is
+ * therefore unaffected — this fix's blast radius is confined to the
+ * freshly-minted-ref path, which is the emitter's default for every
+ * existing `r-keynav` root and the ONLY shape this retrofit's drill panels
+ * use.
  *
  * Phase 77 — `onPage` (grid boundary/paging, forwarded as `host.page`) and
  * `gridColumns` (the `.grid(<expr>)` column-count getter) are both OPTIONAL.
@@ -91,7 +117,7 @@
  *
  * @public — runtime API consumed by emitted .tsx files with an `r-keynav` root.
  */
-import { onMount, onCleanup, createEffect } from 'solid-js';
+import { onCleanup, createEffect } from 'solid-js';
 import {
   createKeynavStateMachine,
   normalizeClassTokens,
@@ -146,7 +172,13 @@ export function createKeynav(
   rootRef: () => HTMLElement | null | undefined,
   opts: CreateKeynavOpts,
 ): void {
-  onMount(() => {
+  // 77-07 — `createEffect` (not `onMount`): see the module doc comment.
+  // Reading `rootRef()` here is what lets Solid track it as a dependency
+  // WHEN it closes over an actual signal (the freshly-minted-ref case);
+  // when it closes over a plain variable (the `$refs`-reused case), nothing
+  // here is trackable and this behaves exactly like the old `onMount` —
+  // fires once, never again.
+  createEffect(() => {
     const root = rootRef();
     if (!root) return;
 

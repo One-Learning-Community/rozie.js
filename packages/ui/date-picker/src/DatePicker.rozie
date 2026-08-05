@@ -751,16 +751,24 @@ const onDayKeydown = (iso, e) => {
 // does not cover either).
 
 // @keynav-commit fires with the panel's own active index already resolved by
-// the primitive; selectMonth/selectYear already gate on the cell's own
-// `disabled` flag (the pointer-path guard), so committing a disabled cell is
-// a safe no-op even though the primitive itself never commits one to begin
-// with (grid mode's inert-by-default contract, SPEC §5).
-const onMonthCommit = () => {
-  const cell = monthList().months[$data.activeMonth]
+// the primitive — read via the handler's OWN `i` parameter (the SAME index
+// the primitive just wrote through `r-keynav:tabindex`'s setter), NOT via
+// $data.activeMonth/$data.activeYear: on a POINTER commit (click on a
+// non-active cell) the primitive calls setActive(i) THEN commit(i) in the
+// same synchronous pass, and on React specifically `setState` is
+// async — a handler that re-reads $data.activeMonth here would see the
+// PRE-click value, committing the WRONG cell (found via 77-07 Task 3's
+// real-DOM run). `i` is always correct regardless of target/timing.
+// selectMonth/selectYear already gate on the cell's own `disabled` flag (the
+// pointer-path guard), so committing a disabled cell is a safe no-op even
+// though the primitive itself never commits one to begin with (grid mode's
+// inert-by-default contract, SPEC §5).
+const onMonthCommit = (i) => {
+  const cell = monthList().months[i]
   if (cell) selectMonth(cell.iso)
 }
-const onYearCommit = () => {
-  const cell = yearGrid().years[$data.activeYear]
+const onYearCommit = (i) => {
+  const cell = yearGrid().years[i]
   if (cell) selectYear(cell.iso)
 }
 
@@ -1049,7 +1057,7 @@ $expose({ focus, goToToday, clear })
       role="grid"
       aria-label="Choose month"
       r-keynav:tabindex.grid(3)="$data.activeMonth"
-      @keynav-commit="onMonthCommit()"
+      @keynav-commit="onMonthCommit(i)"
       @keynav-page="onDrillPage()"
     >
       <button
@@ -1081,7 +1089,7 @@ $expose({ focus, goToToday, clear })
       role="grid"
       aria-label="Choose year"
       r-keynav:tabindex.grid(3)="$data.activeYear"
-      @keynav-commit="onYearCommit()"
+      @keynav-commit="onYearCommit(i)"
       @keynav-page="onDrillPage()"
     >
       <button

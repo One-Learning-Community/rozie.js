@@ -943,16 +943,24 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // does not cover either).
 
   // @keynav-commit fires with the panel's own active index already resolved by
-  // the primitive; selectMonth/selectYear already gate on the cell's own
-  // `disabled` flag (the pointer-path guard), so committing a disabled cell is
-  // a safe no-op even though the primitive itself never commits one to begin
-  // with (grid mode's inert-by-default contract, SPEC §5).
-  function onMonthCommit() {
-    const cell = monthList().months[activeMonth()];
+  // the primitive — read via the handler's OWN `i` parameter (the SAME index
+  // the primitive just wrote through `r-keynav:tabindex`'s setter), NOT via
+  // $data.activeMonth/$data.activeYear: on a POINTER commit (click on a
+  // non-active cell) the primitive calls setActive(i) THEN commit(i) in the
+  // same synchronous pass, and on React specifically `setState` is
+  // async — a handler that re-reads $data.activeMonth here would see the
+  // PRE-click value, committing the WRONG cell (found via 77-07 Task 3's
+  // real-DOM run). `i` is always correct regardless of target/timing.
+  // selectMonth/selectYear already gate on the cell's own `disabled` flag (the
+  // pointer-path guard), so committing a disabled cell is a safe no-op even
+  // though the primitive itself never commits one to begin with (grid mode's
+  // inert-by-default contract, SPEC §5).
+  function onMonthCommit(i: any) {
+    const cell = monthList().months[i];
     if (cell) selectMonth(cell.iso);
   }
-  function onYearCommit() {
-    const cell = yearGrid().years[activeYear()];
+  function onYearCommit(i: any) {
+    const cell = yearGrid().years[i];
     if (cell) selectYear(cell.iso);
   }
 
@@ -1128,30 +1136,30 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
     }
   }
 
-  let __rozieKeynavRootRef: HTMLElement | null = null;
+  const [__rozieKeynavRootRef, __setRozieKeynavRootRef] = createSignal<HTMLElement | null>(null);
 
   const __rozieKeynavGroupId = `keynav-${Math.random().toString(36).slice(2)}`;
 
-  createKeynav(() => __rozieKeynavRootRef, {
+  createKeynav(__rozieKeynavRootRef, {
     config: { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false },
     getSource: () => (monthList().months).map((cell) => ({ label: cell.label, disabled: cell.disabled })),
     getActive: () => activeMonth(),
     setActive: setActiveMonth,
-    onCommit: (i) => { onMonthCommit(); },
+    onCommit: (i) => { onMonthCommit(i); },
     gridColumns: () => 3,
     onPage: (detail) => { onDrillPage(); },
   });
 
-  let __rozieKeynavRootRef1: HTMLElement | null = null;
+  const [__rozieKeynavRootRef1, __setRozieKeynavRootRef1] = createSignal<HTMLElement | null>(null);
 
   const __rozieKeynavGroupId1 = `keynav-${Math.random().toString(36).slice(2)}`;
 
-  createKeynav(() => __rozieKeynavRootRef1, {
+  createKeynav(__rozieKeynavRootRef1, {
     config: { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false },
     getSource: () => (yearGrid().years).map((cell) => ({ label: String(cell.year), disabled: cell.disabled })),
     getActive: () => activeYear(),
     setActive: setActiveYear,
-    onCommit: (i) => { onYearCommit(); },
+    onCommit: (i) => { onYearCommit(i); },
     gridColumns: () => 3,
     onPage: (detail) => { onDrillPage(); },
   });
@@ -1183,14 +1191,14 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
         <div class={"rozie-datepicker-drill-header"} data-rozie-s-6800c7a2="">
           <button type="button" aria-disabled={!!local.disabled} aria-label="Change year" class={"rozie-datepicker-drill-label"} disabled={!!local.disabled} onClick={enterYearsView} data-rozie-s-6800c7a2="">{rozieDisplay(monthList().year)}</button>
         </div>
-        <div class={"rozie-datepicker-drill-grid"} role="grid" aria-label="Choose month" ref={(el) => { __rozieKeynavRootRef = el as HTMLElement; }} data-rozie-s-6800c7a2="">
+        <div class={"rozie-datepicker-drill-grid"} role="grid" aria-label="Choose month" ref={(el) => { __setRozieKeynavRootRef(el as HTMLElement | null); }} data-rozie-s-6800c7a2="">
           <Key each={monthList().months as readonly any[]} by={(cell) => cell.iso}>{(cell, __rozieKeynavIndex) => <button type="button" role="gridcell" data-month={rozieAttr(cell().iso)} aria-disabled={!!cell().disabled} aria-selected={!!cell().selected} class={"rozie-datepicker-month" + " " + rozieClass({ 'is-selected': cell().selected, 'is-current': cell().current })} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { selectMonth(cell().iso); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onMonthCellKeydown(cell().iso, $event); }} id={`${__rozieKeynavGroupId}-item-${__rozieKeynavIndex()}`} data-rozie-keynav-item={__rozieKeynavIndex()} data-rozie-keynav-active={activeMonth() === __rozieKeynavIndex() ? '' : undefined} tabIndex={activeMonth() === __rozieKeynavIndex() ? 0 : -1} data-rozie-s-6800c7a2="">{rozieDisplay(cell().label)}</button>}</Key>
         </div>
       </div></Show>}{<Show when={showsYearsView()}><div class={"rozie-datepicker-years"} data-rozie-s-6800c7a2="">
         <div class={"rozie-datepicker-drill-header"} data-rozie-s-6800c7a2="">
           <span class={"rozie-datepicker-drill-label"} aria-live="polite" data-rozie-s-6800c7a2="">{rozieDisplay(yearRangeLabel())}</span>
         </div>
-        <div class={"rozie-datepicker-drill-grid"} role="grid" aria-label="Choose year" ref={(el) => { __rozieKeynavRootRef1 = el as HTMLElement; }} data-rozie-s-6800c7a2="">
+        <div class={"rozie-datepicker-drill-grid"} role="grid" aria-label="Choose year" ref={(el) => { __setRozieKeynavRootRef1(el as HTMLElement | null); }} data-rozie-s-6800c7a2="">
           <Key each={yearGrid().years as readonly any[]} by={(cell) => cell.iso}>{(cell, __rozieKeynavIndex) => <button type="button" role="gridcell" data-year={rozieAttr(cell().iso)} aria-disabled={!!cell().disabled} aria-selected={!!cell().selected} class={"rozie-datepicker-year" + " " + rozieClass({ 'is-selected': cell().selected, 'is-current': cell().current })} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { selectYear(cell().iso); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onYearCellKeydown(cell().iso, $event); }} id={`${__rozieKeynavGroupId1}-item-${__rozieKeynavIndex()}`} data-rozie-keynav-item={__rozieKeynavIndex()} data-rozie-keynav-active={activeYear() === __rozieKeynavIndex() ? '' : undefined} tabIndex={activeYear() === __rozieKeynavIndex() ? 0 : -1} data-rozie-s-6800c7a2="">{rozieDisplay(cell().year)}</button>}</Key>
         </div>
       </div></Show>}{(_props.footerSlot ?? _props.slots?.['footer'])?.({ today: selectToday, clear, todayIso: todayIso() }) ?? <Show when={showsFooter()}><div class={"rozie-datepicker-footer"} data-rozie-s-6800c7a2="">

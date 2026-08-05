@@ -65,6 +65,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { resolveTwoWayTarget } from './resolveTwoWayTarget.js';
+import { htmlElementTypeForTag } from './emitTemplateAttribute.js';
 import type {
   ReactImportCollector,
   RuntimeReactImportCollector,
@@ -360,7 +361,15 @@ export function buildKeynavScriptInjections(
 
   if (plan.rootRefVar === `${ROOT_REF_VAR}${suffixFor(plan.groupIndex)}`) {
     collectors.react.add('useRef');
-    injections.push(`const ${plan.rootRefVar} = useRef<HTMLElement | null>(null);`);
+    // 77-07 — typed by the root's ACTUAL element tag (e.g. `HTMLDivElement`
+    // for a `<div r-keynav:...>` root), not a bare `HTMLElement`: React's
+    // JSX `ref=` typing is invariant on `RefObject['current']`, so
+    // `useRef<HTMLElement | null>` is NOT assignable to a `<div ref={X}>`'s
+    // `LegacyRef<HTMLDivElement>` (TS2322) — unreachable before this plan,
+    // since no prior r-keynav consumer minted a fresh ref on a `<div>` (see
+    // `htmlElementTypeForTag`'s doc comment).
+    const refType = htmlElementTypeForTag(plan.rootElement.tagName);
+    injections.push(`const ${plan.rootRefVar} = useRef<${refType} | null>(null);`);
   }
 
   collectors.react.add('useId');

@@ -144,6 +144,25 @@ export class KeynavController implements ReactiveController {
   /** Undefined until the first `hostUpdated()` runs — forces the initial active-change side effects to apply once, mirroring `useKeynav`'s effect running on mount. */
   private lastActive: number | undefined = undefined;
   /**
+   * 77-07 — the element `applyActiveSideEffects` last actually focused (or
+   * `null` if none was found). `hostConnected()`/`hostDisconnected()` are
+   * tied to the CUSTOM ELEMENT's own connection to the document, which never
+   * toggles for content conditionally rendered INSIDE that element's shadow
+   * root (e.g. the date-picker drill panels behind `r-if`) — so, unlike
+   * React/Vue's controllers, this controller's listener attachment was never
+   * broken by a conditionally-mounted root (delegation lives on the
+   * persistent `renderRoot`). The gap here is narrower but real: the
+   * `lastActive`-only diff in `hostUpdated()` below would skip re-applying
+   * focus when a panel is torn down and RECREATED (a fresh DOM subtree) but
+   * happens to resolve to the SAME numeric active index as its previous
+   * incarnation — the OLD focused element reference is gone, but nothing
+   * would notice, since the diff only compares two numbers. Tracking
+   * `.isConnected` on the last-applied element lets `hostUpdated()` detect
+   * "the DOM I last focused no longer exists" and force a fresh apply even
+   * when `active` itself repeats.
+   */
+  private lastAppliedEl: HTMLElement | null = null;
+  /**
    * Phase 77 (T-77-05-03) — the single outstanding `requestAnimationFrame`
    * retry id (or `null`), mirroring the React reference's `rafId` local —
    * cancelled on a newer active-change and on `hostDisconnected()`.
@@ -284,6 +303,7 @@ export class KeynavController implements ReactiveController {
     // at least once per connect (mirrors useKeynav's effect running on
     // mount, since `active` is always a "change" from the undefined baseline).
     this.lastActive = undefined;
+    this.lastAppliedEl = null;
   }
 
   hostDisconnected(): void {
@@ -329,7 +349,16 @@ export class KeynavController implements ReactiveController {
    */
   hostUpdated(): void {
     const active = this.opts.getActive();
-    if (active === this.lastActive) return;
+    // 77-07 — re-apply when EITHER `active` changed OR the last-focused
+    // element is no longer connected (its subtree was torn down and
+    // recreated by a conditionally-rendered — `r-if` — ancestor, e.g. the
+    // date-picker drill panels; see the module doc comment on
+    // `lastAppliedEl`). Without the second condition, re-entering such a
+    // panel with the SAME resolved active index as its previous incarnation
+    // would silently skip re-focusing, since the diff would only ever see
+    // two equal numbers.
+    const staleEl = this.lastAppliedEl !== null && !this.lastAppliedEl.isConnected;
+    if (active === this.lastActive && !staleEl) return;
     this.lastActive = active;
     this.cancelPendingRetry();
     if (!Number.isFinite(active)) return;
@@ -382,6 +411,12 @@ export class KeynavController implements ReactiveController {
     } else if (activeEl) {
       activeEl.scrollIntoView({ block: 'nearest' });
     }
+
+    // 77-07 — remember which element (if any) this pass actually applied
+    // to, so a future `hostUpdated()` can detect "that element is gone"
+    // even when `active`'s numeric value repeats (see `lastAppliedEl`'s
+    // doc comment).
+    this.lastAppliedEl = activeEl;
 
     return activeEl !== null;
   }

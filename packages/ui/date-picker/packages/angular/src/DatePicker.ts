@@ -591,7 +591,7 @@ export class DatePicker {
       getSource: () => (this.monthList().months).map((cell) => ({ label: cell.label, disabled: cell.disabled })),
       getActive: () => this.activeMonth(),
       setActive: (i) => { this.activeMonth.set(i); },
-      commit: (i) => { this.onMonthCommit(); },
+      commit: (i) => { this.onMonthCommit(i); },
       page: (detail) => { this.onDrillPage(); },
     }, { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false, grid: { columns: () => 3 } });
     {
@@ -624,7 +624,7 @@ export class DatePicker {
       getSource: () => (this.yearGrid().years).map((cell) => ({ label: String(cell.year), disabled: cell.disabled })),
       getActive: () => this.activeYear(),
       setActive: (i) => { this.activeYear.set(i); },
-      commit: (i) => { this.onYearCommit(); },
+      commit: (i) => { this.onYearCommit(i); },
       page: (detail) => { this.onDrillPage(); },
     }, { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false, grid: { columns: () => 3 } });
     {
@@ -965,12 +965,12 @@ export class DatePicker {
       }
     }
   };
-  onMonthCommit = () => {
-    const cell = this.monthList().months[this.activeMonth()];
+  onMonthCommit = (i: any) => {
+    const cell = this.monthList().months[i];
     if (cell) this.selectMonth(cell.iso);
   };
-  onYearCommit = () => {
-    const cell = this.yearGrid().years[this.activeYear()];
+  onYearCommit = (i: any) => {
+    const cell = this.yearGrid().years[i];
     if (cell) this.selectYear(cell.iso);
   };
   onDrillPage = () => {};

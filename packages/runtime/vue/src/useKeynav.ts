@@ -37,16 +37,33 @@
  * re-instantiating the machine — here it's simply because `opts.gridColumns`
  * is itself the emitted `() => cols.value` closure, already reactive).
  *
- * The reactive-to-`active` `watch(...)` call is registered INSIDE
- * `onMounted` (not at the top level of the composable) for a load-bearing
- * reason: `{ immediate: true }` fires SYNCHRONOUSLY at watcher-creation
- * time, and `rootRef.value` is `null` until after the component mounts. A
- * top-level `watch(..., { immediate: true })` would therefore run its first
- * (initial-active-state) pass against a null root and silently no-op the
- * mount-time focus/scroll/active-class application. Registering the watcher
- * inside `onMounted` (which still runs within the component's active effect
- * scope, so Vue auto-stops it on unmount — no manual cleanup needed) means
- * the immediate first fire sees a populated `rootRef.value`.
+ * 77-07 — BOTH the mount-time setup (state machine + listeners) and the
+ * reactive-to-`active` `watch(...)` are driven by an OUTER
+ * `watch(() => rootRef.value, ..., { immediate: true })` rather than a
+ * one-shot `onMounted` callback. `rootRef` is a genuine Vue `Ref` — its
+ * `.value` IS reactively tracked, so watching it directly (instead of
+ * reading it once inside `onMounted`) means the ENTIRE inner setup
+ * (re-)runs every time the DOM node behind `rootRef` changes identity, not
+ * just once for the component's whole lifetime. This matters because the
+ * date-picker drill retrofit (77-07) is the first `r-keynav` consumer to
+ * place a root behind conditional rendering (`v-if`/`r-if`): the root
+ * element is torn down and recreated each time the panel toggles, so a
+ * ONE-SHOT `onMounted` that reads `rootRef.value` a single time would only
+ * ever see a non-null root if the panel happened to be visible on the
+ * component's very first mount — for an initially-hidden panel it would
+ * permanently no-op, never attaching listeners OR ever applying the
+ * mount-time focus/active-class pass, on ANY subsequent (re)appearance. The
+ * outer watch's teardown-then-rebuild on each `rootRef.value` change (via
+ * the returned cleanup from the `watch` callback, mirroring `watchEffect`'s
+ * own automatic-previous-cleanup semantics) fixes this while keeping a
+ * persistently-mounted root's setup cost at exactly one real (re)attachment
+ * — Vue's watch fires again on a genuine `.value` identity CHANGE only,
+ * never for a same-value re-render.
+ *
+ * The FIRST (immediate) fire of the outer watch sees whatever `rootRef.value`
+ * is at watcher-creation time — `null` for an initially-hidden `r-if`'d
+ * panel, in which case the inner setup is simply skipped until the panel
+ * first appears and the watch fires again with the real element.
  *
  * Phase 77 — an author may set the active index in the SAME tick a dataset
  * swaps (grid paging), so the item element for the new active index may not
@@ -77,7 +94,7 @@
  *
  * @public — runtime API consumed by emitted Vue SFCs with an `r-keynav` root.
  */
-import { onMounted, onBeforeUnmount, watch, type Ref } from 'vue';
+import { onMounted, watch, type Ref } from 'vue';
 import {
   createKeynavStateMachine,
   normalizeClassTokens,
@@ -133,165 +150,202 @@ export function useKeynav(
   opts: UseKeynavOpts,
 ): void {
   onMounted(() => {
-    const root = rootRef.value;
-    if (!root) return;
-
-    // `exactOptionalPropertyTypes` — build `windower` via conditional
-    // property assignment rather than an object-literal `windower:
-    // possiblyUndefined` (mirrors 71-03's `itemMetaAt` / the React
-    // reference's identical fix): `KeynavHost['windower']` is optional-but-
-    // absent, not optional-but-explicit-`undefined`.
-    const host: KeynavHost = {
-      getSource: () => opts.getSource(),
-      getActive: () => opts.getActive(),
-      setActive: (i) => opts.setActive(i),
-      commit: (i) => opts.onCommit(i),
-    };
-    if (opts.windower !== undefined) {
-      host.windower = opts.windower;
-    }
-    // Phase 77 — `onPage` forwards to `host.page` when the author wired
-    // `@keynav-page`; absent entirely otherwise (no grid/page usage stays
-    // byte-identical to pre-Phase-77).
-    if (opts.onPage !== undefined) {
-      host.page = (detail) => opts.onPage?.(detail);
-    }
-
-    // Phase 77 — grid config. When `gridColumns` is supplied, the machine's
-    // config gains a `grid` entry whose `columns()` getter delegates through
-    // `opts.gridColumns` on every call — see the module doc comment for why
-    // no extra latest-ref indirection is needed here (Vue's setup-runs-once
-    // model means `opts` itself never goes stale). Absent: `config` is
-    // handed to the machine completely unmodified — no `grid` key, byte-
-    // identical to pre-Phase-77 1D behavior.
-    const config: KeynavConfig =
-      opts.gridColumns !== undefined
-        ? { ...opts.config, grid: { columns: () => opts.gridColumns!() } }
-        : opts.config;
-    const machine = createKeynavStateMachine(host, config);
-
-    // T-71-05-01 (threat register) — `data-rozie-keynav-item` is an
-    // UNTRUSTED DOM marker. Parse with `Number()` and bounds-check against
-    // the current item count BEFORE it ever reaches the reducer; the reducer
-    // also clamps as a second line of defense (71-03's `onPointerActivate`),
-    // but a malformed/out-of-range index is REJECTED here first, never
-    // silently coerced.
-    const resolveItemIndex = (target: EventTarget | null): number | null => {
-      if (!(target instanceof Element)) return null;
-      const el = target.closest('[data-rozie-keynav-item]');
-      if (!el) return null;
-      const raw = el.getAttribute('data-rozie-keynav-item');
-      if (raw === null) return null;
-      const idx = Number(raw);
-      if (!Number.isInteger(idx) || idx < 0) return null;
-      const total = opts.windower ? opts.windower.count() : opts.getSource().length;
-      if (idx >= total) return null;
-      return idx;
-    };
-
-    const onKeyDown = (e: KeyboardEvent): void => machine.onKeydown(e);
-    const onPointerDown = (e: PointerEvent): void => {
-      const idx = resolveItemIndex(e.target);
-      if (idx !== null) machine.onPointerActivate(idx);
-    };
-
-    root.addEventListener('keydown', onKeyDown);
-    root.addEventListener('pointerdown', onPointerDown);
-
-    // Phase 77 (T-77-03-03) — tracks the currently-pending deferred rAF pass
-    // (if any) so a NEW active-change can cancel it before scheduling its
-    // own, and so unmount cleanup can cancel a still-pending pass.
-    let activeRafId: number | null = null;
-
-    onBeforeUnmount(() => {
-      root.removeEventListener('keydown', onKeyDown);
-      root.removeEventListener('pointerdown', onPointerDown);
-      if (activeRafId !== null) {
-        cancelAnimationFrame(activeRafId);
-        activeRafId = null;
-      }
-      machine.dispose();
-    });
-
-    // ---- Reactive to `active`: focus / scroll / active-class ----
-    // A getter-form `watch` source: Vue tracks whatever reactive state
-    // `opts.getActive()` reads INSIDE this call (the author's own
-    // `ref`/`defineModel` binding), so the callback below fires exactly once
-    // per active-change — never once per unrelated parent render. `{
-    // immediate: true }` applies the initial (mount-time) active state; see
-    // this module's doc comment for why the watcher is registered HERE
-    // (inside onMounted) rather than at the composable's top level.
+    // 77-07 — outer watch on `rootRef.value` itself (a genuine reactive
+    // `Ref`, unlike a one-shot `onMounted` read): re-runs the ENTIRE setup
+    // whenever the DOM node identity changes, including null -> element
+    // (first appearance) and element -> element (a conditionally-rendered
+    // root torn down and recreated). The watch callback's OWN return value
+    // is Vue's `onCleanup`-equivalent for a getter-form watch — returning a
+    // teardown function here has it invoked automatically right before the
+    // NEXT fire (a new root) or on scope disposal (component unmount), so
+    // this single watch owns the full attach/detach symmetry that used to
+    // be split across the one-shot `onMounted` body + a separate
+    // `onBeforeUnmount`. See the module doc comment for why this fixes a
+    // conditionally-mounted (`r-if`) root.
     watch(
-      () => opts.getActive(),
-      (active) => {
-        if (!Number.isFinite(active)) return;
+      () => rootRef.value,
+      (root, _oldRoot, onCleanup) => {
+        if (!root) return;
 
-        // A new active-change supersedes any still-pending deferred pass
-        // from the PREVIOUS change — mirrors the React reference's
-        // effect-cleanup-cancels-prior-rAF behavior.
-        if (activeRafId !== null) {
-          cancelAnimationFrame(activeRafId);
-          activeRafId = null;
+        // `exactOptionalPropertyTypes` — build `windower` via conditional
+        // property assignment rather than an object-literal `windower:
+        // possiblyUndefined` (mirrors 71-03's `itemMetaAt` / the React
+        // reference's identical fix): `KeynavHost['windower']` is optional-
+        // but-absent, not optional-but-explicit-`undefined`.
+        const host: KeynavHost = {
+          getSource: () => opts.getSource(),
+          getActive: () => opts.getActive(),
+          setActive: (i) => opts.setActive(i),
+          commit: (i) => opts.onCommit(i),
+        };
+        if (opts.windower !== undefined) {
+          host.windower = opts.windower;
+        }
+        // Phase 77 — `onPage` forwards to `host.page` when the author wired
+        // `@keynav-page`; absent entirely otherwise (no grid/page usage
+        // stays byte-identical to pre-Phase-77).
+        if (opts.onPage !== undefined) {
+          host.page = (detail) => opts.onPage?.(detail);
         }
 
-        // Extracted so it can run a SECOND time from the deferred rAF pass
-        // below (Phase 77) without duplicating the focus/scroll/class-toggle
-        // logic. Returns whether an element for `active` was found in the DOM.
-        const applyActiveEffects = (): boolean => {
-          const activeEl = root.querySelector<HTMLElement>(
-            `[data-rozie-keynav-item="${active}"]`,
-          );
+        // Phase 77 — grid config. When `gridColumns` is supplied, the
+        // machine's config gains a `grid` entry whose `columns()` getter
+        // delegates through `opts.gridColumns` on every call — see the
+        // module doc comment for why no extra latest-ref indirection is
+        // needed here (Vue's setup-runs-once model means `opts` itself
+        // never goes stale). Absent: `config` is handed to the machine
+        // completely unmodified — no `grid` key, byte-identical to
+        // pre-Phase-77 1D behavior.
+        const config: KeynavConfig =
+          opts.gridColumns !== undefined
+            ? { ...opts.config, grid: { columns: () => opts.gridColumns!() } }
+            : opts.config;
+        const machine = createKeynavStateMachine(host, config);
 
-          // SPEC §9 — additive active-class toggle. `data-rozie-keynav-active`
-          // is ALWAYS present (emitter-owned, declarative, SPEC §9 first
-          // paragraph); this is the OPTIONAL extra author-class toggle,
-          // necessarily imperative because there is no reactive-render slot
-          // for "the currently active list item" the way `:class` merges the
-          // rest of an element's classes.
-          if (opts.activeClass !== undefined) {
-            const tokens = normalizeClassTokens(opts.activeClass);
-            if (tokens.length > 0) {
-              for (const el of root.querySelectorAll<HTMLElement>('[data-rozie-keynav-item]')) {
-                el.classList.remove(...tokens);
-              }
-              if (activeEl) activeEl.classList.add(...tokens);
-            }
-          }
-
-          // Tabindex model (SPEC §3) — DOM focus follows the active item. The
-          // `tabindex` VALUE itself is a declarative template binding
-          // (emitter-owned); only the imperative `.focus()` call belongs here.
-          if (opts.config.focusModel === 'tabindex' && activeEl) {
-            activeEl.focus();
-          }
-
-          // SPEC §10 — windower present: drive its `scrollToIndex`. No
-          // windower: fall back to `scrollIntoView` on the rendered node.
-          if (opts.windower) {
-            opts.windower.scrollToIndex(active, { align: 'nearest' });
-          } else if (activeEl) {
-            activeEl.scrollIntoView({ block: 'nearest' });
-          }
-
-          return activeEl !== null;
+        // T-71-05-01 (threat register) — `data-rozie-keynav-item` is an
+        // UNTRUSTED DOM marker. Parse with `Number()` and bounds-check
+        // against the current item count BEFORE it ever reaches the
+        // reducer; the reducer also clamps as a second line of defense
+        // (71-03's `onPointerActivate`), but a malformed/out-of-range index
+        // is REJECTED here first, never silently coerced.
+        const resolveItemIndex = (target: EventTarget | null): number | null => {
+          if (!(target instanceof Element)) return null;
+          const el = target.closest('[data-rozie-keynav-item]');
+          if (!el) return null;
+          const raw = el.getAttribute('data-rozie-keynav-item');
+          if (raw === null) return null;
+          const idx = Number(raw);
+          if (!Number.isInteger(idx) || idx < 0) return null;
+          const total = opts.windower ? opts.windower.count() : opts.getSource().length;
+          if (idx >= total) return null;
+          return idx;
         };
 
-        const found = applyActiveEffects();
+        const onKeyDown = (e: KeyboardEvent): void => machine.onKeydown(e);
+        const onPointerDown = (e: PointerEvent): void => {
+          const idx = resolveItemIndex(e.target);
+          if (idx !== null) machine.onPointerActivate(idx);
+        };
 
-        // Phase 77 (T-77-03-03) — an author may set the active index in the
-        // SAME tick a dataset swaps (grid paging), so the item element for
-        // the new active index may not exist yet at watch-callback time.
-        // Retry EXACTLY ONCE after the browser has painted — no polling
-        // loop, no bespoke scheduler. Guarded so it only re-applies if
-        // `active` is STILL the value it was scheduled for; a stale pass
-        // must never steal focus from a newer navigation.
-        if (!found) {
-          activeRafId = requestAnimationFrame(() => {
+        root.addEventListener('keydown', onKeyDown);
+        root.addEventListener('pointerdown', onPointerDown);
+
+        // Phase 77 (T-77-03-03) — tracks the currently-pending deferred rAF
+        // pass (if any) so a NEW active-change can cancel it before
+        // scheduling its own, and so teardown can cancel a still-pending
+        // pass.
+        let activeRafId: number | null = null;
+
+        // ---- Reactive to `active`: focus / scroll / active-class ----
+        // A getter-form `watch` source: Vue tracks whatever reactive state
+        // `opts.getActive()` reads INSIDE this call (the author's own
+        // `ref`/`defineModel` binding), so the callback below fires exactly
+        // once per active-change — never once per unrelated parent render.
+        // `{ immediate: true }` applies the (re)attachment-time active
+        // state — load-bearing for the 77-07 fix: a conditionally-mounted
+        // root's re-entry always gets a fresh apply here even when the
+        // resolved active index happens to repeat the value from its
+        // PREVIOUS incarnation, because this inner watch itself is torn
+        // down and freshly created (with a NEW immediate fire) every time
+        // the OUTER watch above sees a new root.
+        const stopActiveWatch = watch(
+          () => opts.getActive(),
+          (active) => {
+            if (!Number.isFinite(active)) return;
+
+            // A new active-change supersedes any still-pending deferred
+            // pass from the PREVIOUS change — mirrors the React reference's
+            // effect-cleanup-cancels-prior-rAF behavior.
+            if (activeRafId !== null) {
+              cancelAnimationFrame(activeRafId);
+              activeRafId = null;
+            }
+
+            // Extracted so it can run a SECOND time from the deferred rAF
+            // pass below (Phase 77) without duplicating the
+            // focus/scroll/class-toggle logic. Returns whether an element
+            // for `active` was found in the DOM.
+            const applyActiveEffects = (): boolean => {
+              const activeEl = root.querySelector<HTMLElement>(
+                `[data-rozie-keynav-item="${active}"]`,
+              );
+
+              // SPEC §9 — additive active-class toggle.
+              // `data-rozie-keynav-active` is ALWAYS present (emitter-owned,
+              // declarative, SPEC §9 first paragraph); this is the OPTIONAL
+              // extra author-class toggle, necessarily imperative because
+              // there is no reactive-render slot for "the currently active
+              // list item" the way `:class` merges the rest of an element's
+              // classes.
+              if (opts.activeClass !== undefined) {
+                const tokens = normalizeClassTokens(opts.activeClass);
+                if (tokens.length > 0) {
+                  for (const el of root.querySelectorAll<HTMLElement>(
+                    '[data-rozie-keynav-item]',
+                  )) {
+                    el.classList.remove(...tokens);
+                  }
+                  if (activeEl) activeEl.classList.add(...tokens);
+                }
+              }
+
+              // Tabindex model (SPEC §3) — DOM focus follows the active
+              // item. The `tabindex` VALUE itself is a declarative template
+              // binding (emitter-owned); only the imperative `.focus()`
+              // call belongs here.
+              if (opts.config.focusModel === 'tabindex' && activeEl) {
+                activeEl.focus();
+              }
+
+              // SPEC §10 — windower present: drive its `scrollToIndex`. No
+              // windower: fall back to `scrollIntoView` on the rendered
+              // node.
+              if (opts.windower) {
+                opts.windower.scrollToIndex(active, { align: 'nearest' });
+              } else if (activeEl) {
+                activeEl.scrollIntoView({ block: 'nearest' });
+              }
+
+              return activeEl !== null;
+            };
+
+            const found = applyActiveEffects();
+
+            // Phase 77 (T-77-03-03) — an author may set the active index in
+            // the SAME tick a dataset swaps (grid paging), so the item
+            // element for the new active index may not exist yet at
+            // watch-callback time. Retry EXACTLY ONCE after the browser has
+            // painted — no polling loop, no bespoke scheduler. Guarded so
+            // it only re-applies if `active` is STILL the value it was
+            // scheduled for; a stale pass must never steal focus from a
+            // newer navigation.
+            if (!found) {
+              activeRafId = requestAnimationFrame(() => {
+                activeRafId = null;
+                if (opts.getActive() !== active) return;
+                applyActiveEffects();
+              });
+            }
+          },
+          { immediate: true },
+        );
+
+        // The outer watch's teardown for THIS root, registered via the
+        // getter-form watch callback's own `onCleanup` (Vue's `WatchCallback`
+        // signature — NOT a return value, unlike `watchEffect`): stop the
+        // inner active-watch, cancel any pending rAF, remove listeners,
+        // dispose the machine. Runs automatically right before the outer
+        // watch's NEXT fire (a different root) or on component unmount.
+        onCleanup(() => {
+          stopActiveWatch();
+          if (activeRafId !== null) {
+            cancelAnimationFrame(activeRafId);
             activeRafId = null;
-            if (opts.getActive() !== active) return;
-            applyActiveEffects();
-          });
-        }
+          }
+          root.removeEventListener('keydown', onKeyDown);
+          root.removeEventListener('pointerdown', onPointerDown);
+          machine.dispose();
+        });
       },
       { immediate: true },
     );

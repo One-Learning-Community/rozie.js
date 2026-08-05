@@ -1027,13 +1027,18 @@ function bucket(attrs: AttributeBinding[]): Map<string, AttributeBinding[]> {
 }
 
 /**
- * Determine the React DOM event-handler arg shape based on the ref's element
- * tag. Used for `ref={X}` in JSX.
+ * Tag-name → specific HTML element interface, shared by every React `useRef`
+ * declaration that needs a `ref={X}`-compatible type. React's JSX `ref=`
+ * typing is INVARIANT on `RefObject['current']` (a mutable property), so a
+ * `useRef<HTMLElement | null>` is NOT assignable to a `<div ref={X}>`'s
+ * expected `LegacyRef<HTMLDivElement>` — TS2322, "Property 'align' is
+ * missing in type 'HTMLElement'" (a `<div>`-specific quirk in React's DOM
+ * typings). 77-07 — exported (was `inferRefDomType`'s private switch) so
+ * `emitKeynav.ts`'s minted keynav-root ref can reuse the SAME tag→type
+ * mapping instead of hard-coding a second, driftable copy.
  */
-function inferRefDomType(refName: string, refs: RefDecl[]): string {
-  const r = refs.find((x) => x.name === refName);
-  if (!r) return 'HTMLElement';
-  switch (r.elementTag.toLowerCase()) {
+export function htmlElementTypeForTag(tagName: string): string {
+  switch (tagName.toLowerCase()) {
     case 'input':
       return 'HTMLInputElement';
     case 'textarea':
@@ -1056,6 +1061,16 @@ function inferRefDomType(refName: string, refs: RefDecl[]): string {
       return 'HTMLLIElement';
   }
   return 'HTMLElement';
+}
+
+/**
+ * Determine the React DOM event-handler arg shape based on the ref's element
+ * tag. Used for `ref={X}` in JSX.
+ */
+function inferRefDomType(refName: string, refs: RefDecl[]): string {
+  const r = refs.find((x) => x.name === refName);
+  if (!r) return 'HTMLElement';
+  return htmlElementTypeForTag(r.elementTag);
 }
 
 /**

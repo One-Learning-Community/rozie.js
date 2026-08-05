@@ -459,14 +459,14 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       }
     }
   }, [_rozieProp_onChange, daysInMonthSpan, moveFocus, onDaySelect, props.disabled, props.selectionMode, readRange, setValue, weekdayOffset]);
-  const onMonthCommit = useCallback(() => {
-    const cell = monthList().months[activeMonth];
+  const onMonthCommit = useCallback((i: any) => {
+    const cell = monthList().months[i];
     if (cell) selectMonth(cell.iso);
-  }, [activeMonth, monthList, selectMonth]);
-  const onYearCommit = useCallback(() => {
-    const cell = yearGrid().years[activeYear];
+  }, [monthList, selectMonth]);
+  const onYearCommit = useCallback((i: any) => {
+    const cell = yearGrid().years[i];
     if (cell) selectYear(cell.iso);
-  }, [activeYear, selectYear, yearGrid]);
+  }, [selectYear, yearGrid]);
   const onDrillPage = useCallback(() => {}, []);
   const onMonthCellKeydown = useCallback((iso: any, e: any) => {
     if (props.disabled) return;
@@ -587,25 +587,25 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     setViewIso(_viewMonthGridRef.current());
   }, []);
 
-  const __rozieKeynavRootRef = useRef<HTMLElement | null>(null);
+  const __rozieKeynavRootRef = useRef<HTMLDivElement | null>(null);
   const __rozieKeynavGroupId = useId();
   useKeynav(__rozieKeynavRootRef, {
     config: { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false },
     getSource: () => (monthList().months).map((cell) => ({ label: cell.label, disabled: cell.disabled })),
     getActive: () => activeMonth,
     setActive: setActiveMonth,
-    onCommit: (i) => { onMonthCommit(); },
+    onCommit: (i) => { onMonthCommit(i); },
     gridColumns: () => 3,
     onPage: (detail) => { onDrillPage(); },
   });
-  const __rozieKeynavRootRef1 = useRef<HTMLElement | null>(null);
+  const __rozieKeynavRootRef1 = useRef<HTMLDivElement | null>(null);
   const __rozieKeynavGroupId1 = useId();
   useKeynav(__rozieKeynavRootRef1, {
     config: { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false },
     getSource: () => (yearGrid().years).map((cell) => ({ label: String(cell.year), disabled: cell.disabled })),
     getActive: () => activeYear,
     setActive: setActiveYear,
-    onCommit: (i) => { onYearCommit(); },
+    onCommit: (i) => { onYearCommit(i); },
     gridColumns: () => 3,
     onPage: (detail) => { onDrillPage(); },
   });
