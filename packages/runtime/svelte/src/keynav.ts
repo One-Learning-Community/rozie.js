@@ -1,19 +1,20 @@
 /**
  * `keynav` — the Svelte 5 action for the `r-keynav` primitive (SPEC.md,
- * Phase 71). Modeled on the React REFERENCE implementation (Plan 71-04,
+ * Phase 71 + Phase 77 grid/multi-group extension). Modeled on the React
+ * REFERENCE implementation (Plan 71-04, extended Plan 77-03,
  * `packages/runtime/react/src/useKeynav.ts`) and the Vue target-pair (Plan
- * 71-05, `packages/runtime/vue/src/useKeynav.ts`) — same
- * `@rozie/runtime-keynav-core` wiring, Svelte-idiomatic shell (SPEC §8 table:
- * "Svelte 5 | `keynav` action / `$effect`").
+ * 71-05, extended Plan 77-04, `packages/runtime/vue/src/useKeynav.ts`) —
+ * same `@rozie/runtime-keynav-core` wiring, Svelte-idiomatic shell (SPEC §8
+ * table: "Svelte 5 | `keynav` action / `$effect`").
  *
  * Wraps `@rozie/runtime-keynav-core`'s framework-neutral
- * `createKeynavStateMachine` (Plan 71-03) with a mount-time root
- * `keydown`/`pointerdown` delegation (no per-item listeners, SPEC §8) plus
- * the imperative-only concerns a declarative template binding genuinely
- * cannot express: DOM `.focus()` for the tabindex model, the SPEC §9
- * active-class toggle (via `normalizeClassTokens`, the SAME normalizer the
- * native `:class`/`rozieClass` path uses, per SPEC §9's "factor that
- * normalizer out cleanly so the two paths cannot drift"), and
+ * `createKeynavStateMachine` (Plan 71-03, grid branch Plan 77-01) with a
+ * mount-time root `keydown`/`pointerdown` delegation (no per-item listeners,
+ * SPEC §8) plus the imperative-only concerns a declarative template binding
+ * genuinely cannot express: DOM `.focus()` for the tabindex model, the
+ * SPEC §9 active-class toggle (via `normalizeClassTokens`, the SAME
+ * normalizer the native `:class`/`rozieClass` path uses, per SPEC §9's
+ * "factor that normalizer out cleanly so the two paths cannot drift"), and
  * scroll-into-view / windower `scrollToIndex` follow.
  *
  * SVELTE-5-SPECIFIC SHAPE — an action `update()`, not a separate `$effect`
@@ -42,6 +43,29 @@
  * runs once at mount for the STARTING active value. No `$effect` is needed:
  * Svelte's own template reactivity IS the "watch active" mechanism here.
  *
+ * Phase 77 — `onPage` (grid boundary/paging, forwarded as `host.page`) and
+ * `gridColumns` (the `.grid(<expr>)` column-count getter) are both OPTIONAL;
+ * presence is snapshotted from the INITIAL `opts` at action-mount time
+ * (mirrors the pre-existing `windower` convention: no v1 fixture flips a
+ * component between grid/non-grid or paged/non-paged mid-lifecycle), while
+ * the VALUE `gridColumns()` returns is re-read fresh on every keydown via
+ * `currentOpts.gridColumns!()` — the SAME `currentOpts` indirection every
+ * other opt already goes through on `update()`, so a rune-backed column
+ * count stays live across re-renders without re-instantiating the machine.
+ *
+ * Phase 77 (T-77-03-03) — an author may set the active index in the SAME
+ * tick a dataset swaps (grid paging), so the item element for the new active
+ * index may not exist in the DOM yet when `applyActiveEffects` runs (at
+ * mount OR from `update()`). `runActiveEffects` (below) applies the normal
+ * focus/scroll/class-toggle pass once synchronously; if no element is found,
+ * it schedules exactly ONE `requestAnimationFrame`-deferred re-query. A new
+ * active-change (a fresh `update()` call) cancels any still-pending deferred
+ * pass from the PREVIOUS change before running its own (mirrors the React
+ * reference's effect-cleanup-cancels-prior-rAF behavior); the deferred
+ * callback is additionally guarded so it only re-applies if `active` is
+ * STILL the value it was scheduled for — a stale pass must never steal focus
+ * from a newer navigation. No polling loop, no bespoke scheduler.
+ *
  * **What this action does NOT do**: it never writes
  * `data-rozie-keynav-active` or `tabindex` itself — those are DECLARATIVE
  * template bindings the compiler emitter stamps onto each item (comparing
@@ -50,7 +74,11 @@
  * render pass as the rest of the component with zero imperative DOM writes
  * (SPEC §8's "idiomatic wiring -> compiler emission" half of the split).
  * This action owns only what the template cannot: focus, scroll, and the
- * imperative `r-keynav-active-class` toggle.
+ * imperative `r-keynav-active-class` toggle. It also never computes grid
+ * stride/boundary arithmetic itself — that is entirely the reducer's job
+ * (`@rozie/runtime-keynav-core`'s grid branch); this action's only new
+ * Phase-77 responsibility is plumbing `onPage`/`gridColumns` through to the
+ * machine.
  *
  * @public — runtime API consumed by emitted `.svelte` files with an
  * `r-keynav` root.
@@ -61,6 +89,7 @@ import {
   type ClassValue,
   type KeynavConfig,
   type KeynavHost,
+  type KeynavPageDetail,
   type KeynavWindower,
 } from '@rozie/runtime-keynav-core';
 
@@ -95,6 +124,25 @@ export interface KeynavActionOpts {
   activeClass?: ClassValue;
   /** Optional full-dataset addressing for virtualized lists (SPEC §10). */
   windower?: KeynavWindower;
+  /**
+   * `@keynav-page` (SPEC §3, §4.1, Phase 77) — forwarded as the state
+   * machine's `host.page` hook. The grid branch of the reducer never moves
+   * `active` on a boundary/page key; it reports the attempted move and the
+   * author (who owns the dataset) advances the page and sets the landing
+   * index. Read through `currentOpts`, same as `onCommit`.
+   */
+  onPage?: (detail: KeynavPageDetail) => void;
+  /**
+   * `.grid(<expr>)` (SPEC §3, §7.1, Phase 77) — the column-count getter that
+   * selects the 2D grid branch of the reducer. Presence is snapshotted once
+   * at action-mount time (same convention as `windower`); the VALUE it
+   * returns is re-read fresh on every keydown via `currentOpts.gridColumns`,
+   * so a dynamic/reactive column count (`$state`-backed) never goes stale.
+   * Absent means 1D mode — `config` is handed to the machine completely
+   * unmodified (no `grid` key), which is what keeps every existing 1D
+   * behavior and emitted call byte-identical.
+   */
+  gridColumns?: () => number;
 }
 
 /**
@@ -103,14 +151,16 @@ export interface KeynavActionOpts {
  * the tabindex model, and scroll-into-view / windower `scrollToIndex`
  * follow. Called once at mount (for the starting active value) and again
  * from `update()` on every subsequent active-change (see this module's doc
- * comment for why `update()` fires reliably).
+ * comment for why `update()` fires reliably). Returns whether an element for
+ * `active` was found in the DOM — Phase 77's `runActiveEffects` uses this to
+ * decide whether to schedule a deferred retry (T-77-03-03).
  */
 function applyActiveEffects(
   node: Element,
   active: number,
   opts: KeynavActionOpts,
-): void {
-  if (!Number.isFinite(active)) return;
+): boolean {
+  if (!Number.isFinite(active)) return true;
   const activeEl = node.querySelector<HTMLElement>(
     `[data-rozie-keynav-item="${active}"]`,
   );
@@ -152,17 +202,19 @@ function applyActiveEffects(
   } else if (activeEl) {
     activeEl.scrollIntoView({ block: 'nearest' });
   }
+
+  return activeEl !== null;
 }
 
 /**
  * Svelte 5 action: `use:keynav={{ config, active, getSource, getActive,
- * setActive, onCommit, activeClass?, windower? }}` on the `r-keynav` root
- * element. Attaches a single root `keydown`/`pointerdown` delegation (no
- * per-item listeners, SPEC §8) driving `@rozie/runtime-keynav-core`'s state
- * machine, and applies the imperative active-change effects (see
- * `applyActiveEffects`) once at mount and again on every subsequent
- * `update()` call (fired by Svelte whenever `opts.active` changes — see this
- * module's doc comment).
+ * setActive, onCommit, activeClass?, windower?, onPage?, gridColumns? }}` on
+ * the `r-keynav` root element. Attaches a single root
+ * `keydown`/`pointerdown` delegation (no per-item listeners, SPEC §8)
+ * driving `@rozie/runtime-keynav-core`'s state machine, and applies the
+ * imperative active-change effects (see `applyActiveEffects`) once at mount
+ * and again on every subsequent `update()` call (fired by Svelte whenever
+ * `opts.active` changes — see this module's doc comment).
  */
 export function keynav(
   node: HTMLElement,
@@ -190,7 +242,27 @@ export function keynav(
   if (opts.windower !== undefined) {
     host.windower = opts.windower;
   }
-  const machine = createKeynavStateMachine(host, opts.config);
+  // Phase 77 — `onPage` presence snapshotted once at mount (same convention
+  // as `windower` above); the forwarded function itself always delegates
+  // through `currentOpts`, so a re-rendered handler identity never requires
+  // re-attaching the root listeners.
+  if (opts.onPage !== undefined) {
+    host.page = (detail) => currentOpts.onPage?.(detail);
+  }
+
+  // Phase 77 — grid config. `gridColumns` presence is ALSO snapshotted once
+  // at mount; when present, the machine's config gains a `grid` entry whose
+  // `columns()` getter permanently delegates through `currentOpts` (never
+  // captures a single mount's closure directly — see the module doc
+  // comment) so a dynamic/reactive column count stays live across
+  // `update()` calls without re-instantiating the machine. Absent: `config`
+  // is handed to the machine completely unmodified — no `grid` key, byte-
+  // identical to pre-Phase-77 1D behavior.
+  const config: KeynavConfig =
+    opts.gridColumns !== undefined
+      ? { ...opts.config, grid: { columns: () => currentOpts.gridColumns!() } }
+      : opts.config;
+  const machine = createKeynavStateMachine(host, config);
 
   // T-71-06-01 (threat register) — `data-rozie-keynav-item` is an
   // UNTRUSTED DOM marker. Parse with `Number()` and bounds-check against the
@@ -222,20 +294,51 @@ export function keynav(
   node.addEventListener('keydown', onKeyDown);
   node.addEventListener('pointerdown', onPointerDown);
 
+  // Phase 77 (T-77-03-03) — tracks the currently-pending deferred rAF pass
+  // (if any) so a NEW active-change can cancel it before scheduling its
+  // own, and so `destroy()` can cancel a still-pending pass.
+  let activeRafId: number | null = null;
+
+  // Runs `applyActiveEffects` once synchronously; if no element was found
+  // for `active` (e.g. a same-tick grid-paging dataset swap hasn't rendered
+  // the landing item yet), schedules exactly ONE `requestAnimationFrame`-
+  // deferred re-query, guarded so it only re-applies if `active` is STILL
+  // the value it was scheduled for — a stale pass must never steal focus
+  // from a newer navigation. Called both at mount and from every subsequent
+  // `update()`.
+  function runActiveEffects(active: number, opts: KeynavActionOpts): void {
+    if (activeRafId !== null) {
+      cancelAnimationFrame(activeRafId);
+      activeRafId = null;
+    }
+    const found = applyActiveEffects(node, active, opts);
+    if (!found) {
+      activeRafId = requestAnimationFrame(() => {
+        activeRafId = null;
+        if (currentOpts.getActive() !== active) return;
+        applyActiveEffects(node, active, currentOpts);
+      });
+    }
+  }
+
   // Apply the STARTING active value's imperative effects at mount — mirrors
   // the Vue reference's `{ immediate: true }` watch (the active-class/focus/
   // scroll wiring applies for index 0's initial state too, not merely
   // subsequent changes).
-  applyActiveEffects(node, opts.getActive(), opts);
+  runActiveEffects(opts.getActive(), opts);
 
   return {
     update(next) {
       currentOpts = next;
-      applyActiveEffects(node, next.getActive(), next);
+      runActiveEffects(next.getActive(), next);
     },
     destroy() {
       node.removeEventListener('keydown', onKeyDown);
       node.removeEventListener('pointerdown', onPointerDown);
+      if (activeRafId !== null) {
+        cancelAnimationFrame(activeRafId);
+        activeRafId = null;
+      }
       machine.dispose();
     },
   };

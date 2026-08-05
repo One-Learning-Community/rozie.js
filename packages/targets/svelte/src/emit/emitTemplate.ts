@@ -23,9 +23,10 @@ import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
 import type { SvelteScriptInjection } from './emitScript.js';
-// Phase 71 (r-keynav) — Svelte target-pair (Plan 71-06), modeled on the
-// React/Vue references (see emitKeynav.ts's module doc comment).
-import { resolveKeynavPlan, buildKeynavScriptInjections } from './emitKeynav.js';
+// Phase 71 (r-keynav) — Svelte target-pair (Plan 71-06), extended Phase 77
+// (Plan 04) — modeled on the React/Vue references (see emitKeynav.ts's
+// module doc comment).
+import { resolveKeynavPlans, buildKeynavScriptInjections } from './emitKeynav.js';
 
 export interface EmitTemplateResult {
   template: string;
@@ -60,16 +61,19 @@ export function emitTemplate(
     };
   }
 
-  // Phase 71 (r-keynav) — resolve the per-component keynav emission plan
+  // Phase 71 (r-keynav) — resolve the per-component keynav emission plans
   // ONCE (mirrors the React/Vue references' identical "resolve once, thread
-  // through ctx" discipline). `null` for the overwhelming majority of
-  // components (no `r-keynav` root) — every downstream call site
-  // short-circuits on `null`, so a non-keynav component's emit is
-  // completely untouched (SPEC §11: "no corpus rebless").
-  const keynavPlan = resolveKeynavPlan(ir);
-  if (keynavPlan !== null) {
+  // through ctx" discipline). Phase 77 — one plan PER root, `[]` for the
+  // overwhelming majority of components (no `r-keynav` root) — every
+  // downstream call site short-circuits on an empty array, so a non-keynav
+  // component's emit is completely untouched (SPEC §7.4: "no corpus
+  // rebless").
+  const keynavPlans = resolveKeynavPlans(ir);
+  if (keynavPlans.length > 0) {
     runtimeImports.add('keynav');
-    scriptInjections.push(...buildKeynavScriptInjections(keynavPlan));
+    for (const plan of keynavPlans) {
+      scriptInjections.push(...buildKeynavScriptInjections(plan));
+    }
   }
 
   const ctx: EmitNodeCtx = {
@@ -80,7 +84,7 @@ export function emitTemplate(
     injectionCounter: { next: 0 },
     runtimeImports,
     scopeAttr,
-    keynav: keynavPlan,
+    keynav: keynavPlans,
   };
 
   const template = emitNode(ir.template, ctx);

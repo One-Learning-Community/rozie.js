@@ -54,13 +54,14 @@ import {
   emitDynamicSnippetsProp,
 } from './emitSlotFiller.js';
 import type { SvelteScriptInjection } from './emitScript.js';
-// Phase 71 (r-keynav) — Svelte target-pair (Plan 71-06), modeled on the
-// React/Vue references (see emitKeynav.ts's module doc comment).
+// Phase 71 (r-keynav) — Svelte target-pair (Plan 71-06), extended Phase 77
+// (Plan 04) — modeled on the React/Vue references (see emitKeynav.ts's
+// module doc comment).
 import {
   keynavItemAttrs,
   keynavRootAttrs,
   loopBodyHasKeynavItem,
-  stripKeynavCommitEvent,
+  stripKeynavSyntheticEvents,
   type KeynavEmitPlan,
 } from './emitKeynav.js';
 
@@ -128,12 +129,16 @@ export interface EmitNodeCtx {
    */
   enclosingLoopVars?: ReadonlySet<string>;
   /**
-   * Phase 71 (r-keynav) — the per-component keynav emission plan (resolved
-   * ONCE by `emitTemplate.ts` via `resolveKeynavPlan`), or `null` when the
-   * component has no `r-keynav` root. `undefined` (the default, back-compat
-   * for callers that don't thread it) is treated identically to `null`.
+   * Phase 71 (r-keynav), extended Phase 77 (multi-root) — the per-component
+   * keynav emission plans (resolved ONCE by `emitTemplate.ts` via
+   * `resolveKeynavPlans`), one entry per `r-keynav` root in document order.
+   * Empty array (the default, back-compat for callers that don't thread it)
+   * when the component has no `r-keynav` root. Element-level emit code
+   * SELECTS the plan matching that element's own `keynavRoot.groupIndex` /
+   * `keynavItem.groupIndex` (each defaulting to 0) — never assumes "the"
+   * plan, since a multi-root component now has several.
    */
-  keynav?: KeynavEmitPlan | null;
+  keynav?: KeynavEmitPlan[];
   /**
    * Phase 71 (r-keynav) — the CURRENT `r-for` loop's index-alias identifier,
    * threaded down by `emitLoop` for the duration of that loop's body subtree
@@ -299,7 +304,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   // `loopBodyHasKeynavItem` deliberately does not recurse into a NESTED
   // r-for, so this synthesis never fires for an unrelated outer loop.
   const needsKeynavIndex =
-    (ctx.keynav ?? null) !== null &&
+    (ctx.keynav ?? []).length > 0 &&
     node.indexAlias === null &&
     loopBodyHasKeynavItem(node.body);
   const sourceIndexAlias = node.indexAlias ?? (needsKeynavIndex ? '__rozieKeynavIndex' : null);
@@ -503,13 +508,14 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
 }
 
 function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
-  // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
-  // BEFORE any listener emission runs; it's routed into the `keynav`
-  // action's `onCommit` option by emitKeynav.ts, never as an
-  // `onkeynav-commit=` template attribute (see `stripKeynavCommitEvent`'s
-  // doc comment). No-op (returns the SAME node) for every element that
-  // isn't a keynav root.
-  let node = stripKeynavCommitEvent(origNode);
+  // Phase 71 (r-keynav), extended Phase 77 — strip the synthetic
+  // `@keynav-commit`/`@keynav-page` listeners BEFORE any listener emission
+  // runs; both are routed into the `keynav` action's `onCommit`/`onPage`
+  // options by emitKeynav.ts, never as `onkeynav-commit=`/`onkeynav-page=`
+  // template attributes (see `stripKeynavSyntheticEvents`'s doc comment).
+  // No-op (returns the SAME node) for every element that isn't a keynav
+  // root.
+  let node = stripKeynavSyntheticEvents(origNode);
 
   // Keyed-remount codegen Task 4 — when this element carries a
   // `remountKeyExpression` (a component-level `:key`, not an r-for loop
@@ -634,17 +640,27 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
 
   const rHtml = findRHtml(node.attributes);
 
-  // Phase 71 (r-keynav) — root `bind:this=`/`use:keynav=`/`aria-
-  // activedescendant` and item `id`/`data-rozie-keynav-item`/`data-rozie-
-  // keynav-active`/`tabindex` fragments. Both resolve to `[]` for the
-  // overwhelming majority of elements (no keynav plan, or this element
-  // carries neither marker) — a cheap two-property check, not a tree walk,
-  // so non-keynav components pay no emission cost (SPEC §11: "no corpus
-  // rebless").
-  const keynav = ctx.keynav ?? null;
+  // Phase 71 (r-keynav), extended Phase 77 (multi-root) — root
+  // `bind:this=`/`use:keynav=`/`aria-activedescendant` and item
+  // `id`/`data-rozie-keynav-item`/`data-rozie-keynav-active`/`tabindex`
+  // fragments. Both resolve to `[]` for the overwhelming majority of
+  // elements (no keynav plans, or this element carries neither marker) — a
+  // cheap two-property check, not a tree walk, so non-keynav components pay
+  // no emission cost (SPEC §7.4: "no corpus rebless"). Each element selects
+  // the plan matching ITS OWN root's/item's `groupIndex` (defaulting to 0) —
+  // never "the" plan, since a multi-root component has several.
+  const keynavPlans = ctx.keynav ?? [];
+  const keynavRootPlan =
+    node.keynavRoot !== undefined
+      ? (keynavPlans.find((p) => p.groupIndex === (node.keynavRoot!.groupIndex ?? 0)) ?? null)
+      : null;
+  const keynavItemPlan =
+    node.keynavItem !== undefined
+      ? (keynavPlans.find((p) => p.groupIndex === (node.keynavItem!.groupIndex ?? 0)) ?? null)
+      : null;
   const keynavAttrs = [
-    ...keynavRootAttrs(keynav, node, ctx.ir),
-    ...keynavItemAttrs(keynav, node, ctx.keynavItemIndexAlias ?? null, ctx.ir),
+    ...keynavRootAttrs(keynavRootPlan, node, ctx.ir),
+    ...keynavItemAttrs(keynavItemPlan, node, ctx.keynavItemIndexAlias ?? null, ctx.ir),
   ];
 
   const partsHead: string[] = [];
