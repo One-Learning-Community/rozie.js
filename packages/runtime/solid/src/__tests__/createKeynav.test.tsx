@@ -441,6 +441,20 @@ describe('createKeynav (Solid) — grid config, @keynav-page, deferred focus (Pl
     document.body.innerHTML = '';
   });
 
+  it('a malformed/out-of-range data-rozie-keynav-item marker is rejected, never coerced (T-77-04-01)', () => {
+    const commit = vi.fn();
+    const { root, dispose } = buildGridMenu({ config: GRID_CONFIG, columns: 3, onCommit: commit });
+
+    const rogue = document.createElement('button');
+    rogue.setAttribute('data-rozie-keynav-item', '999');
+    root.appendChild(rogue);
+    rogue.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+
+    expect(commit).not.toHaveBeenCalled();
+
+    dispose();
+  });
+
   it('grid: onPage receives a boundary detail when an arrow hits the edge (SPEC §4.1)', () => {
     const commit = vi.fn();
     const onPage = vi.fn();

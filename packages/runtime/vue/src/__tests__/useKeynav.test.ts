@@ -358,6 +358,22 @@ function stubRaf(): {
 }
 
 describe('useKeynav (Vue) — grid config, @keynav-page, deferred focus (Plan 77-04 Task 1)', () => {
+  it('a malformed/out-of-range data-rozie-keynav-item marker is rejected, never coerced (T-77-04-01)', async () => {
+    const commit = vi.fn();
+    const wrapper = mountGridMenu({ config: GRID_CONFIG, columns: 3, onCommit: commit });
+    const root = wrapper.get('[data-testid="root"]').element as HTMLElement;
+
+    const rogue = document.createElement('button');
+    rogue.setAttribute('data-rozie-keynav-item', '999');
+    root.appendChild(rogue);
+    rogue.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    await nextTick();
+
+    expect(commit).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+  });
+
   it('grid: onPage receives a boundary detail when an arrow hits the edge (SPEC §4.1)', async () => {
     const commit = vi.fn();
     const onPage = vi.fn();
