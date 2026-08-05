@@ -1,16 +1,18 @@
 /**
  * `useKeynav` — the Vue composable for the `r-keynav` primitive (SPEC.md,
- * Phase 71). Modeled on the React REFERENCE implementation (Plan 71-04,
+ * Phase 71 + Phase 77 grid/multi-group extension). Modeled on the React
+ * REFERENCE implementation (Plan 71-04, extended Plan 77-03,
  * `packages/runtime/react/src/useKeynav.ts`) — same split, same
  * `@rozie/runtime-keynav-core` wiring, Vue-idiomatic shell.
  *
  * Wraps `@rozie/runtime-keynav-core`'s framework-neutral
- * `createKeynavStateMachine` (Plan 71-03) with a `onMounted` root
- * `keydown`/`pointerdown` delegation (no per-item listeners, SPEC §8) plus a
- * `watch(...)` keyed on the live active index for the imperative-only
- * concerns a declarative template binding genuinely cannot express: DOM
- * `.focus()` for the tabindex model, the SPEC §9 active-class toggle, and
- * scroll-into-view / windower `scrollToIndex` follow.
+ * `createKeynavStateMachine` (Plan 71-03, grid branch Plan 77-01) with a
+ * `onMounted` root `keydown`/`pointerdown` delegation (no per-item
+ * listeners, SPEC §8) plus a `watch(...)` keyed on the live active index for
+ * the imperative-only concerns a declarative template binding genuinely
+ * cannot express: DOM `.focus()` for the tabindex model, the SPEC §9
+ * active-class toggle, and scroll-into-view / windower `scrollToIndex`
+ * follow.
  *
  * VUE-SPECIFIC SIMPLIFICATION vs React: Vue's `setup()` runs EXACTLY ONCE
  * per component instance (the "setup-runs-once" reactivity model, see
@@ -23,6 +25,18 @@
  * defend against re-render-driven stale closures, a class of bug that does
  * not exist here.
  *
+ * Phase 77 — `onPage` (grid boundary/paging, forwarded as `host.page`) and
+ * `gridColumns` (the `.grid(<expr>)` column-count getter) are both OPTIONAL,
+ * mirroring the pre-existing `windower` convention. Because `opts` is
+ * captured once (no per-render identity churn to defend against), there is
+ * no separate "presence snapshot" step the way React needs one — `opts`
+ * itself IS the stable, whole-lifetime snapshot. `gridColumns` is NOT read
+ * directly into `config` — the machine's `config.grid.columns` getter
+ * delegates through `opts.gridColumns!()` on every call (the SAME reason the
+ * React reference gives: a reactive `$data.cols` read must stay live without
+ * re-instantiating the machine — here it's simply because `opts.gridColumns`
+ * is itself the emitted `() => cols.value` closure, already reactive).
+ *
  * The reactive-to-`active` `watch(...)` call is registered INSIDE
  * `onMounted` (not at the top level of the composable) for a load-bearing
  * reason: `{ immediate: true }` fires SYNCHRONOUSLY at watcher-creation
@@ -34,6 +48,19 @@
  * scope, so Vue auto-stops it on unmount — no manual cleanup needed) means
  * the immediate first fire sees a populated `rootRef.value`.
  *
+ * Phase 77 — an author may set the active index in the SAME tick a dataset
+ * swaps (grid paging), so the item element for the new active index may not
+ * exist in the DOM yet when the watch callback runs. The callback applies
+ * its normal focus/scroll/class-toggle pass once synchronously; if no
+ * element is found for the current active index, it schedules exactly ONE
+ * `requestAnimationFrame`-deferred re-query. A new active-change cancels any
+ * still-pending deferred pass from the PREVIOUS change before running its
+ * own (mirrors the React reference's effect-cleanup-cancels-prior-rAF
+ * behavior); the deferred callback is additionally guarded so it only
+ * re-applies if `active` is STILL the value it was scheduled for — a stale
+ * pass must never steal focus from a newer navigation (T-77-03-03). No
+ * polling loop, no bespoke scheduler.
+ *
  * **What this composable does NOT do**: it never writes
  * `data-rozie-keynav-active` or `tabindex` itself — those are DECLARATIVE
  * template bindings the compiler emitter stamps onto each item (comparing
@@ -42,7 +69,11 @@
  * render pass as the rest of the component with zero imperative DOM writes
  * (SPEC §8's "idiomatic wiring -> compiler emission" half of the split).
  * This composable owns only what the template cannot: focus, scroll, and
- * the imperative `r-keynav-active-class` toggle.
+ * the imperative `r-keynav-active-class` toggle. It also never computes grid
+ * stride/boundary arithmetic itself — that is entirely the reducer's job
+ * (`@rozie/runtime-keynav-core`'s grid branch); this composable's only new
+ * Phase-77 responsibility is plumbing `onPage`/`gridColumns` through to the
+ * machine.
  *
  * @public — runtime API consumed by emitted Vue SFCs with an `r-keynav` root.
  */
@@ -53,6 +84,7 @@ import {
   type ClassValue,
   type KeynavConfig,
   type KeynavHost,
+  type KeynavPageDetail,
   type KeynavWindower,
 } from '@rozie/runtime-keynav-core';
 
@@ -78,6 +110,22 @@ export interface UseKeynavOpts {
   activeClass?: ClassValue;
   /** Optional full-dataset addressing for virtualized lists (SPEC §10). */
   windower?: KeynavWindower;
+  /**
+   * `@keynav-page` (SPEC §3, §4.1, Phase 77) — forwarded as the state
+   * machine's `host.page` hook. The grid branch of the reducer never moves
+   * `active` on a boundary/page key; it reports the attempted move and the
+   * author (who owns the dataset) advances the page and sets the landing
+   * index.
+   */
+  onPage?: (detail: KeynavPageDetail) => void;
+  /**
+   * `.grid(<expr>)` (SPEC §3, §7.1, Phase 77) — the column-count getter that
+   * selects the 2D grid branch of the reducer. Absent means 1D mode —
+   * `config` is handed to the machine completely unmodified (no `grid` key),
+   * which is what keeps every existing 1D behavior and emitted call
+   * byte-identical.
+   */
+  gridColumns?: () => number;
 }
 
 export function useKeynav(
@@ -102,7 +150,25 @@ export function useKeynav(
     if (opts.windower !== undefined) {
       host.windower = opts.windower;
     }
-    const machine = createKeynavStateMachine(host, opts.config);
+    // Phase 77 — `onPage` forwards to `host.page` when the author wired
+    // `@keynav-page`; absent entirely otherwise (no grid/page usage stays
+    // byte-identical to pre-Phase-77).
+    if (opts.onPage !== undefined) {
+      host.page = (detail) => opts.onPage?.(detail);
+    }
+
+    // Phase 77 — grid config. When `gridColumns` is supplied, the machine's
+    // config gains a `grid` entry whose `columns()` getter delegates through
+    // `opts.gridColumns` on every call — see the module doc comment for why
+    // no extra latest-ref indirection is needed here (Vue's setup-runs-once
+    // model means `opts` itself never goes stale). Absent: `config` is
+    // handed to the machine completely unmodified — no `grid` key, byte-
+    // identical to pre-Phase-77 1D behavior.
+    const config: KeynavConfig =
+      opts.gridColumns !== undefined
+        ? { ...opts.config, grid: { columns: () => opts.gridColumns!() } }
+        : opts.config;
+    const machine = createKeynavStateMachine(host, config);
 
     // T-71-05-01 (threat register) — `data-rozie-keynav-item` is an
     // UNTRUSTED DOM marker. Parse with `Number()` and bounds-check against
@@ -131,9 +197,19 @@ export function useKeynav(
 
     root.addEventListener('keydown', onKeyDown);
     root.addEventListener('pointerdown', onPointerDown);
+
+    // Phase 77 (T-77-03-03) — tracks the currently-pending deferred rAF pass
+    // (if any) so a NEW active-change can cancel it before scheduling its
+    // own, and so unmount cleanup can cancel a still-pending pass.
+    let activeRafId: number | null = null;
+
     onBeforeUnmount(() => {
       root.removeEventListener('keydown', onKeyDown);
       root.removeEventListener('pointerdown', onPointerDown);
+      if (activeRafId !== null) {
+        cancelAnimationFrame(activeRafId);
+        activeRafId = null;
+      }
       machine.dispose();
     });
 
@@ -149,39 +225,72 @@ export function useKeynav(
       () => opts.getActive(),
       (active) => {
         if (!Number.isFinite(active)) return;
-        const activeEl = root.querySelector<HTMLElement>(
-          `[data-rozie-keynav-item="${active}"]`,
-        );
 
-        // SPEC §9 — additive active-class toggle. `data-rozie-keynav-active`
-        // is ALWAYS present (emitter-owned, declarative, SPEC §9 first
-        // paragraph); this is the OPTIONAL extra author-class toggle,
-        // necessarily imperative because there is no reactive-render slot
-        // for "the currently active list item" the way `:class` merges the
-        // rest of an element's classes.
-        if (opts.activeClass !== undefined) {
-          const tokens = normalizeClassTokens(opts.activeClass);
-          if (tokens.length > 0) {
-            for (const el of root.querySelectorAll<HTMLElement>('[data-rozie-keynav-item]')) {
-              el.classList.remove(...tokens);
+        // A new active-change supersedes any still-pending deferred pass
+        // from the PREVIOUS change — mirrors the React reference's
+        // effect-cleanup-cancels-prior-rAF behavior.
+        if (activeRafId !== null) {
+          cancelAnimationFrame(activeRafId);
+          activeRafId = null;
+        }
+
+        // Extracted so it can run a SECOND time from the deferred rAF pass
+        // below (Phase 77) without duplicating the focus/scroll/class-toggle
+        // logic. Returns whether an element for `active` was found in the DOM.
+        const applyActiveEffects = (): boolean => {
+          const activeEl = root.querySelector<HTMLElement>(
+            `[data-rozie-keynav-item="${active}"]`,
+          );
+
+          // SPEC §9 — additive active-class toggle. `data-rozie-keynav-active`
+          // is ALWAYS present (emitter-owned, declarative, SPEC §9 first
+          // paragraph); this is the OPTIONAL extra author-class toggle,
+          // necessarily imperative because there is no reactive-render slot
+          // for "the currently active list item" the way `:class` merges the
+          // rest of an element's classes.
+          if (opts.activeClass !== undefined) {
+            const tokens = normalizeClassTokens(opts.activeClass);
+            if (tokens.length > 0) {
+              for (const el of root.querySelectorAll<HTMLElement>('[data-rozie-keynav-item]')) {
+                el.classList.remove(...tokens);
+              }
+              if (activeEl) activeEl.classList.add(...tokens);
             }
-            if (activeEl) activeEl.classList.add(...tokens);
           }
-        }
 
-        // Tabindex model (SPEC §3) — DOM focus follows the active item. The
-        // `tabindex` VALUE itself is a declarative template binding
-        // (emitter-owned); only the imperative `.focus()` call belongs here.
-        if (opts.config.focusModel === 'tabindex' && activeEl) {
-          activeEl.focus();
-        }
+          // Tabindex model (SPEC §3) — DOM focus follows the active item. The
+          // `tabindex` VALUE itself is a declarative template binding
+          // (emitter-owned); only the imperative `.focus()` call belongs here.
+          if (opts.config.focusModel === 'tabindex' && activeEl) {
+            activeEl.focus();
+          }
 
-        // SPEC §10 — windower present: drive its `scrollToIndex`. No
-        // windower: fall back to `scrollIntoView` on the rendered node.
-        if (opts.windower) {
-          opts.windower.scrollToIndex(active, { align: 'nearest' });
-        } else if (activeEl) {
-          activeEl.scrollIntoView({ block: 'nearest' });
+          // SPEC §10 — windower present: drive its `scrollToIndex`. No
+          // windower: fall back to `scrollIntoView` on the rendered node.
+          if (opts.windower) {
+            opts.windower.scrollToIndex(active, { align: 'nearest' });
+          } else if (activeEl) {
+            activeEl.scrollIntoView({ block: 'nearest' });
+          }
+
+          return activeEl !== null;
+        };
+
+        const found = applyActiveEffects();
+
+        // Phase 77 (T-77-03-03) — an author may set the active index in the
+        // SAME tick a dataset swaps (grid paging), so the item element for
+        // the new active index may not exist yet at watch-callback time.
+        // Retry EXACTLY ONCE after the browser has painted — no polling
+        // loop, no bespoke scheduler. Guarded so it only re-applies if
+        // `active` is STILL the value it was scheduled for; a stale pass
+        // must never steal focus from a newer navigation.
+        if (!found) {
+          activeRafId = requestAnimationFrame(() => {
+            activeRafId = null;
+            if (opts.getActive() !== active) return;
+            applyActiveEffects();
+          });
         }
       },
       { immediate: true },

@@ -1,28 +1,45 @@
 /**
- * emitKeynav — Phase 71 Plan 05 (Vue target).
+ * emitKeynav — Phase 71 Plan 05 (Vue target), reworked by Phase 77 Plan 04
+ * from one-plan-per-component to one-plan-per-root (77-SPEC.md §6, §7.3),
+ * mirroring the React reference's Plan 77-03 rework.
  *
  * Bridges the compiler front-end IR (`keynavRoot?`/`keynavItem?` on
- * `TemplateElementIR`, Phase 71 Plan 02) to the `useKeynav` Vue composable
- * (Phase 71 Plan 03's `@rozie/runtime-keynav-core` + this plan's Task 1
- * composable). Modeled directly on the React REFERENCE implementation
- * (`packages/targets/react/src/emit/emitKeynav.ts`, Plan 71-04) — same two
- * responsibilities, resolved ONCE per component:
+ * `TemplateElementIR`, Phase 71 Plan 02, extended Phase 77 Plan 02 with
+ * `grid`/`groupIndex`/`indexExpression`) to the `useKeynav` Vue composable
+ * (Phase 71 Plan 03's `@rozie/runtime-keynav-core` + Phase 77 Plan 04's
+ * `onPage`/`gridColumns` extension). Modeled directly on the React REFERENCE
+ * implementation (`packages/targets/react/src/emit/emitKeynav.ts`, Plan
+ * 71-04, extended Plan 77-03) — same two responsibilities, resolved ONCE per
+ * component:
  *
- *   1. `resolveKeynavPlan(ir)` — locates the (at most one, SPEC §7 v1)
- *      `keynavRoot` element and the FIRST `keynavItem` element + its
- *      enclosing `r-for` loop. Mirrors core's own `resolveKeynavGroups` walk.
- *      Returns `null` for the overwhelming majority case (no `r-keynav` in
- *      the component) — every call site below short-circuits on `null`, so a
- *      non-keynav component's emit is completely untouched (SPEC §11: "no
- *      corpus rebless").
+ *   1. `resolveKeynavPlans(ir)` — locates EVERY `keynavRoot` element in the
+ *      component and, for each, the FIRST `keynavItem` associated to THAT
+ *      root (via `KeynavItemIR.groupIndex`, defaulting to 0 — core's
+ *      `resolveKeynavGroups` owns the association rule; the emitter never
+ *      re-derives containment) + its enclosing `r-for` loop, mirroring
+ *      core's own walk (`packages/core/src/ir/resolveKeynavGroups.ts`).
+ *      Returns one plan per root, in document order. Returns `[]` for the
+ *      overwhelming majority case (no `r-keynav` in the component) — every
+ *      call site below short-circuits on an empty array, so a non-keynav
+ *      component's emit is completely untouched (SPEC §7.4: "no corpus
+ *      rebless").
  *
- *   2. `buildKeynavScriptInjections(plan, ir)` — renders the
- *      `useKeynav(...)` call plus its `ref()`/group-id scaffolding as a
- *      SINGLE `ScriptInjection` (Vue's existing debounce/throttle/r-match
- *      hoist mechanism, `emitTemplateEvent.ts`). `mergeScriptInjections`
- *      (emitVue.ts) already places every injection's `decl` at the BOTTOM of
- *      the script body — required because `onCommit` may reference a
- *      user-authored handler (e.g. `@keynav-commit="run(items[$data.active])"`).
+ *   2. `buildKeynavScriptInjections(plan, ir)` — renders ONE `useKeynav(...)`
+ *      call plus its `ref()`/group-id scaffolding as a SINGLE
+ *      `ScriptInjection` (Vue's existing debounce/throttle/r-match hoist
+ *      mechanism, `emitTemplateEvent.ts`) per resolved plan, so a two-root
+ *      component gets two independent controller calls.
+ *      `mergeScriptInjections` (emitVue.ts) already places every injection's
+ *      `decl` at the BOTTOM of the script body — required because
+ *      `onCommit`/`onPage` may reference a user-authored handler (e.g.
+ *      `@keynav-commit="run(items[$data.active])"`).
+ *
+ * **Identifier naming (mirrors the React reference exactly):** the root-ref
+ * and group-id identifiers keep their PRE-PHASE-77 spelling for group index
+ * 0 and append the index for later groups (`__rozieKeynavGroupId` /
+ * `__rozieKeynavGroupId1` / `__rozieKeynavGroupId2` …) — the mechanism that
+ * keeps a single-root, non-grid component's emitted output byte-identical to
+ * before this plan.
  *
  * VUE-SPECIFIC DIVERGENCE FROM REACT — two expression-rewrite contexts:
  * Vue's template compiler auto-unwraps top-level `ref()`/`defineModel()`
@@ -48,7 +65,11 @@
  * `rHtml`/`extraDirective` raw-string-splice pattern (and the `r-match`
  * hoist's `ScriptInjection` push) rather than routing through the
  * `AttributeBinding`/`emitMergedAttributes` machinery, since these markers
- * are emitter-synthesized, not author-authored bindings.
+ * are emitter-synthesized, not author-authored bindings. `emitTemplateNode.ts`
+ * selects the CORRECT plan for each element by comparing the element's own
+ * `keynavRoot.groupIndex`/`keynavItem.groupIndex` (each defaulting to 0)
+ * against `KeynavEmitPlan.groupIndex` — never by using "the" plan, since
+ * there may now be several.
  *
  * @experimental — shape may change before v1.0
  */
@@ -88,11 +109,24 @@ function flattenInlineCode(code: string): string {
 // Synthesized (never author-visible) identifier names — namespaced
 // `__rozieKeynav*` so they can never collide with a `<script>`-declared
 // binding (mirrors the React reference's `__rozieMatch_N`/`__rozieExposeRef`
-// convention).
+// convention). Group index 0 keeps the bare spelling; later groups append
+// the index (see `suffixFor` below) — the mechanism that keeps single-root
+// emit unchanged.
 const ROOT_REF_VAR = '__rozieKeynavRootRef';
 const GROUP_ID_VAR = '__rozieKeynavGroupId';
 
+function suffixFor(groupIndex: number): string {
+  return groupIndex === 0 ? '' : String(groupIndex);
+}
+
 export interface KeynavEmitPlan {
+  /**
+   * Phase 77 — document-order group index (0-based). `0` for a single-root
+   * component (mirrors `KeynavRootIR.groupIndex`'s `undefined`-defaults-to-0
+   * convention) — this is what keeps a single-root component's identifier
+   * spelling and emitted config unchanged from pre-Phase-77.
+   */
+  groupIndex: number;
   rootElement: TemplateElementIR;
   keynavRoot: KeynavRootIR;
   itemElement: TemplateElementIR | null;
@@ -230,28 +264,26 @@ function findStaticAttrValue(el: TemplateElementIR, name: string): string | null
  * Mirrors `resolveKeynavGroups.collectKeynavNodes` (core) — the SAME
  * traversal shape (incl. `slotFillers` bodies, `TemplateMatch.hostElement`)
  * so a keynav marker inside a slot-fill body or match host is found exactly
- * the way core already validated it. Only needs the FIRST root and FIRST
- * item — a second root is a core-level `KEYNAV_MULTIPLE_ROOTS` diagnostic
- * (ROZ986) that already fired upstream (D-08 collected-not-thrown: this is a
- * best-effort emit for an already-erroring input, not a re-validation pass).
+ * the way core already validated it. Collects EVERY root and EVERY item (not
+ * just the first, per Phase 77 — core's `resolveKeynavGroups` already did
+ * the association work; this walk only needs to LOCATE the nodes core
+ * already stamped `groupIndex` onto).
  */
-function collectFirstKeynavNodes(root: TemplateNode): {
-  root: { element: TemplateElementIR; keynavRoot: KeynavRootIR } | null;
-  item: { element: TemplateElementIR; keynavItem: KeynavItemIR; enclosingLoop: TemplateLoopIR | null } | null;
+function collectAllKeynavNodes(root: TemplateNode): {
+  roots: { element: TemplateElementIR; keynavRoot: KeynavRootIR }[];
+  items: { element: TemplateElementIR; keynavItem: KeynavItemIR; enclosingLoop: TemplateLoopIR | null }[];
 } {
-  const found: {
-    root: { element: TemplateElementIR; keynavRoot: KeynavRootIR } | null;
-    item: { element: TemplateElementIR; keynavItem: KeynavItemIR; enclosingLoop: TemplateLoopIR | null } | null;
-  } = { root: null, item: null };
+  const roots: { element: TemplateElementIR; keynavRoot: KeynavRootIR }[] = [];
+  const items: { element: TemplateElementIR; keynavItem: KeynavItemIR; enclosingLoop: TemplateLoopIR | null }[] = [];
 
   const walk = (node: TemplateNode, enclosingLoop: TemplateLoopIR | null): void => {
     switch (node.type) {
       case 'TemplateElement': {
-        if (node.keynavRoot && found.root === null) {
-          found.root = { element: node, keynavRoot: node.keynavRoot };
+        if (node.keynavRoot) {
+          roots.push({ element: node, keynavRoot: node.keynavRoot });
         }
-        if (node.keynavItem && found.item === null) {
-          found.item = { element: node, keynavItem: node.keynavItem, enclosingLoop };
+        if (node.keynavItem) {
+          items.push({ element: node, keynavItem: node.keynavItem, enclosingLoop });
         }
         for (const child of node.children) walk(child, enclosingLoop);
         if (node.slotFillers) {
@@ -284,37 +316,46 @@ function collectFirstKeynavNodes(root: TemplateNode): {
   };
 
   walk(root, null);
-  return found;
+  return { roots, items };
 }
 
 /**
- * Resolve the per-component keynav emission plan. Returns `null` when the
- * component has no `r-keynav` root — the overwhelmingly common case, and the
- * one that MUST stay byte-identical to pre-Phase-71 emit (SPEC §11).
+ * Resolve the per-component keynav emission plans — ONE per `r-keynav` root,
+ * in document order. Returns `[]` when the component has no `r-keynav`
+ * root — the overwhelmingly common case, and the one that MUST stay
+ * byte-identical to pre-Phase-71 emit (SPEC §7.4).
  */
-export function resolveKeynavPlan(ir: IRComponent): KeynavEmitPlan | null {
-  if (ir.template === null) return null;
-  const { root, item } = collectFirstKeynavNodes(ir.template);
-  if (root === null) return null;
+export function resolveKeynavPlans(ir: IRComponent): KeynavEmitPlan[] {
+  if (ir.template === null) return [];
+  const { roots, items } = collectAllKeynavNodes(ir.template);
+  if (roots.length === 0) return [];
 
-  // Reuse an author-declared `ref="x"` on the SAME element when present —
-  // Vue permits only one `ref=` attribute per element, so silently
-  // overwriting an author's own ref would be a Rule-1-class bug. Mirrors the
-  // React reference's identical defensive check (untested by a dedicated
-  // fixture there too — SPEC §3.1 has no example combining both).
-  const existingRef = findStaticAttrValue(root.element, 'ref');
-  const mintedRootRef = !(existingRef !== null && ir.refs.some((r) => r.name === existingRef));
-  const rootRefVar = mintedRootRef ? ROOT_REF_VAR : `${existingRef}Ref`;
+  return roots.map((root) => {
+    const groupIndex = root.keynavRoot.groupIndex ?? 0;
+    const itemsForGroup = items.filter((it) => (it.keynavItem.groupIndex ?? 0) === groupIndex);
+    const firstItem = itemsForGroup[0] ?? null;
+    const suffix = suffixFor(groupIndex);
 
-  return {
-    rootElement: root.element,
-    keynavRoot: root.keynavRoot,
-    itemElement: item?.element ?? null,
-    itemLoop: item?.enclosingLoop ?? null,
-    rootRefVar,
-    mintedRootRef,
-    groupIdVar: GROUP_ID_VAR,
-  };
+    // Reuse an author-declared `ref="x"` on the SAME element when present —
+    // Vue permits only one `ref=` attribute per element, so silently
+    // overwriting an author's own ref would be a Rule-1-class bug. Mirrors the
+    // React reference's identical defensive check (untested by a dedicated
+    // fixture there too — SPEC §3.1 has no example combining both).
+    const existingRef = findStaticAttrValue(root.element, 'ref');
+    const mintedRootRef = !(existingRef !== null && ir.refs.some((r) => r.name === existingRef));
+    const rootRefVar = mintedRootRef ? `${ROOT_REF_VAR}${suffix}` : `${existingRef}Ref`;
+
+    return {
+      groupIndex,
+      rootElement: root.element,
+      keynavRoot: root.keynavRoot,
+      itemElement: firstItem?.element ?? null,
+      itemLoop: firstItem?.enclosingLoop ?? null,
+      rootRefVar,
+      mintedRootRef,
+      groupIdVar: `${GROUP_ID_VAR}${suffix}`,
+    };
+  });
 }
 
 /** `KeynavConfig` object literal — every field is statically known at compile time. */
@@ -358,9 +399,32 @@ function buildGetSourceCode(plan: KeynavEmitPlan, ir: IRComponent): string {
   return `() => (${sourceCode}).map((${plan.itemLoop.itemAlias}) => ({ ${fields.join(', ')} }))`;
 }
 
-/** Find the `@keynav-commit` template-event Listener on the root, if authored. */
-function findCommitListener(root: TemplateElementIR) {
-  return root.events.find((e) => e.event === 'keynav-commit') ?? null;
+/** Find a template-event Listener of the given synthetic event name on the root. */
+function findRootListener(root: TemplateElementIR, event: string) {
+  return root.events.find((e) => e.event === event) ?? null;
+}
+
+/**
+ * Shared bare-identifier-vs-arbitrary-expression convention every synthetic
+ * keynav event uses (mirrors `emitTemplateEvent`'s same convention for every
+ * other template event): a bare identifier is passed BY REFERENCE — the
+ * runtime calls it directly, so the author's handler naturally receives the
+ * callback's own parameter. An arbitrary expression is wrapped in
+ * `(<paramName>) => { ...; }`.
+ */
+function buildHandlerCode(
+  root: TemplateElementIR,
+  ir: IRComponent,
+  event: string,
+  paramName: string,
+): string | null {
+  const listener = findRootListener(root, event);
+  if (!listener) return null;
+  const handlerCode = rewriteScriptExpression(listener.handler, ir);
+  if (/^[A-Za-z_$][\w$]*$/.test(handlerCode)) {
+    return handlerCode;
+  }
+  return `(${paramName}) => { ${handlerCode}; }`;
 }
 
 /**
@@ -371,13 +435,18 @@ function findCommitListener(root: TemplateElementIR) {
  * arbitrary expression is wrapped in `(i) => { ...; }`.
  */
 function buildOnCommitCode(root: TemplateElementIR, ir: IRComponent): string {
-  const listener = findCommitListener(root);
-  if (!listener) return '() => {}';
-  const handlerCode = rewriteScriptExpression(listener.handler, ir);
-  if (/^[A-Za-z_$][\w$]*$/.test(handlerCode)) {
-    return handlerCode;
-  }
-  return `(i) => { ${handlerCode}; }`;
+  return buildHandlerCode(root, ir, 'keynav-commit', 'i') ?? '() => {}';
+}
+
+/**
+ * `onPage: (detail: KeynavPageDetail) => void` (Phase 77, SPEC §3, §4.1).
+ * Mirrors `buildOnCommitCode`'s convention exactly. Returns `null` (not a
+ * fallback no-op) when `@keynav-page` isn't authored on this root — the
+ * caller OMITS the `onPage` opts line entirely in that case, which is what
+ * keeps a component with no `.grid`/`@keynav-page` usage byte-identical.
+ */
+function buildOnPageCode(root: TemplateElementIR, ir: IRComponent): string | null {
+  return buildHandlerCode(root, ir, 'keynav-page', 'detail');
 }
 
 /**
@@ -431,7 +500,7 @@ export function buildKeynavScriptInjections(
   const declLines: string[] = [];
 
   if (plan.mintedRootRef) {
-    declLines.push(`const ${ROOT_REF_VAR} = ref<HTMLElement | null>(null);`);
+    declLines.push(`const ${plan.rootRefVar} = ref<HTMLElement | null>(null);`);
   }
 
   // Component-unique group id (T-71-05-02) — Vue's setup runs exactly ONCE
@@ -458,6 +527,20 @@ export function buildKeynavScriptInjections(
     optsLines.push(
       `  activeClass: ${rewriteScriptExpression(plan.keynavRoot.activeClassExpression, ir)},`,
     );
+  }
+  // Phase 77 — grid columns. Only present when the root carries `.grid()`;
+  // absent entirely otherwise, which is what keeps a non-grid root's
+  // useKeynav call byte-identical to pre-Phase-77. Rendered via
+  // `rewriteScriptExpression` (SCRIPT context — see this module's doc
+  // comment), NOT `rewriteTemplateExpression`.
+  if (plan.keynavRoot.grid) {
+    const columnsCode = rewriteScriptExpression(plan.keynavRoot.grid.columnsExpression, ir);
+    optsLines.push(`  gridColumns: () => ${columnsCode},`);
+  }
+  // Phase 77 — `@keynav-page`, mirroring `onCommit`'s wiring exactly.
+  const onPageCode = buildOnPageCode(plan.rootElement, ir);
+  if (onPageCode !== null) {
+    optsLines.push(`  onPage: ${onPageCode},`);
   }
   declLines.push(`useKeynav(${plan.rootRefVar}, {\n${optsLines.join('\n')}\n});`);
 
@@ -487,7 +570,7 @@ export function keynavRootAttrs(
   if (plan === null || node.keynavRoot === undefined) return [];
   const attrs: string[] = [];
   if (plan.mintedRootRef) {
-    attrs.push(`ref="${ROOT_REF_VAR}"`);
+    attrs.push(`ref="${plan.rootRefVar}"`);
   }
   if (plan.keynavRoot.focusModel === 'activedescendant') {
     const activeCode = rewriteTemplateExpression(plan.keynavRoot.activeExpression, ir);
@@ -503,18 +586,35 @@ export function keynavRootAttrs(
  * `:data-rozie-keynav-item` delegation/bounds-check marker (SPEC §8, triple
  * duty), the always-present `:data-rozie-keynav-active` marker (SPEC §9),
  * and — tabindex focus model only — the `:tabindex` roving binding. All FOUR
- * compare `indexExpr` (the loop's item index, see `keynavItemIndexAlias` in
- * `emitTemplateNode.ts`) against the live active value — declarative Vue
+ * compare `indexExpr` against the live active value — declarative Vue
  * template bindings (`useKeynav` never writes these directly; see its module
- * doc comment). Returns `[]` when `indexExpr` is unavailable.
+ * doc comment).
+ *
+ * Phase 77 (planner Gap B) — an item's OWN explicit index expression
+ * (`r-keynav-item="{ index: <expr> }"`, rewritten via
+ * `rewriteTemplateExpression` — TEMPLATE context, same as every other keynav
+ * template-side expression) takes priority over `loopIndexExpr` (the
+ * enclosing loop's synthesized/authored index alias) when present. This is
+ * what makes an explicit index correct even when the item's nearest
+ * enclosing loop is a NESTED inner loop (e.g. the date-picker's panels ->
+ * weeks -> days triple-nested day grid) — the expression's own identifier
+ * references are already bound to whichever loop scope it was authored in,
+ * regardless of nesting depth.
+ *
+ * Returns `[]` when neither an explicit index nor a loop index is available.
  */
 export function keynavItemAttrs(
   plan: KeynavEmitPlan | null,
   node: TemplateElementIR,
-  indexExpr: string | null,
+  loopIndexExpr: string | null,
   ir: IRComponent,
 ): string[] {
-  if (plan === null || node.keynavItem === undefined || indexExpr === null) return [];
+  if (plan === null || node.keynavItem === undefined) return [];
+  const explicitIndexExpr = node.keynavItem.indexExpression
+    ? rewriteTemplateExpression(node.keynavItem.indexExpression, ir)
+    : null;
+  const indexExpr = explicitIndexExpr ?? loopIndexExpr;
+  if (indexExpr === null) return [];
   const activeCode = rewriteTemplateExpression(plan.keynavRoot.activeExpression, ir);
   const attrs: string[] = [
     `:id="\`\${${plan.groupIdVar}}-item-\${${indexExpr}}\`"`,
@@ -528,15 +628,18 @@ export function keynavItemAttrs(
 }
 
 /**
- * Strips the `@keynav-commit` template-event Listener out of the root
- * element's `events` array — it is consumed by `buildOnCommitCode` above and
- * routed into `useKeynav`'s `onCommit` option, NEVER as a Vue `@keynav-commit=`
- * template attribute (which would be inert — `keynav-commit` is a synthetic
- * event, not a real DOM event a host element dispatches).
+ * Strips the synthetic `@keynav-commit` / `@keynav-page` template-event
+ * Listeners out of the root element's `events` array — both are consumed by
+ * `buildOnCommitCode`/`buildOnPageCode` above and routed into `useKeynav`'s
+ * `onCommit`/`onPage` options, NEVER as Vue `@keynav-commit=`/`@keynav-page=`
+ * template attributes (which would be inert — neither is a real DOM event a
+ * host element dispatches).
  */
-export function stripKeynavCommitEvent(node: TemplateElementIR): TemplateElementIR {
+export function stripKeynavSyntheticEvents(node: TemplateElementIR): TemplateElementIR {
   if (node.keynavRoot === undefined) return node;
-  const filtered = node.events.filter((e) => e.event !== 'keynav-commit');
+  const filtered = node.events.filter(
+    (e) => e.event !== 'keynav-commit' && e.event !== 'keynav-page',
+  );
   if (filtered.length === node.events.length) return node;
   return { ...node, events: filtered };
 }
@@ -546,7 +649,11 @@ export function stripKeynavCommitEvent(node: TemplateElementIR): TemplateElement
  * `r-for` — that loop synthesizes its own index) contains at least one
  * `keynavItem`-bearing element. Drives `emitLoop`'s index-alias synthesis in
  * `emitTemplateNode.ts`: an author who didn't write `(it, idx) in items`
- * still gets a working `:data-rozie-keynav-item="index"` marker.
+ * still gets a working `:data-rozie-keynav-item="index"` marker. Fires even
+ * for an item carrying an explicit `index` expression (Phase 77) —
+ * synthesizing an alias that ends up unused for that one item is harmless,
+ * and a MIXED loop body (some items explicit, some relying on the loop
+ * context) still needs the alias for the ones that don't override it.
  */
 export function loopBodyHasKeynavItem(body: TemplateNode[]): boolean {
   const walk = (node: TemplateNode): boolean => {

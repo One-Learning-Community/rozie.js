@@ -23,7 +23,7 @@ import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
 import type { ScriptInjection } from './emitTemplateEvent.js';
-import { buildKeynavScriptInjections, resolveKeynavPlan } from './emitKeynav.js';
+import { buildKeynavScriptInjections, resolveKeynavPlans } from './emitKeynav.js';
 
 export interface EmitTemplateResult {
   template: string;
@@ -39,7 +39,9 @@ export interface EmitTemplateResult {
    * emitScript.ts's own collector, and TWO `import { ref } from 'vue'`
    * statements naming the same binding is a TS2300 duplicate-identifier
    * error. Empty array for every non-keynav component (byte-identical,
-   * SPEC §11).
+   * SPEC §7.4). May contain duplicate `'ref'` entries for a multi-root
+   * component with several minted refs — `mergeVueImportsAndListeners`
+   * dedupes via a `Set`.
    */
   extraVueImportNames: string[];
 }
@@ -61,11 +63,12 @@ export function emitTemplate(
   }
 
   // Phase 71 (r-keynav) — resolved ONCE per component (not per element; see
-  // emitKeynav.ts's module doc comment). `null` for the overwhelming
-  // majority of components (no r-keynav root) — every downstream keynav
-  // call site short-circuits on `null`, so this stays a cheap no-op for
-  // every existing fixture (SPEC §11: "no corpus rebless").
-  const keynav = resolveKeynavPlan(ir);
+  // emitKeynav.ts's module doc comment). Phase 77 — one plan PER root, `[]`
+  // for the overwhelming majority of components (no r-keynav root) — every
+  // downstream keynav call site short-circuits on an empty array, so this
+  // stays a cheap no-op for every existing fixture (SPEC §7.4: "no corpus
+  // rebless").
+  const keynavPlans = resolveKeynavPlans(ir);
 
   const ctx: EmitNodeCtx = {
     ir,
@@ -74,15 +77,18 @@ export function emitTemplate(
     scriptInjections,
     injectionCounter: { next: 0 },
     indent: '',
-    keynav,
+    keynav: keynavPlans,
   };
 
   const template = emitNode(ir.template, ctx);
 
+  // Phase 71 (r-keynav), extended Phase 77 — ONE `useKeynav(...)` call + its
+  // `ref()`/group-id scaffolding PER resolved plan, so a two-root component
+  // gets two independent controller calls.
   const extraVueImportNames: string[] = [];
-  if (keynav !== null) {
-    scriptInjections.push(...buildKeynavScriptInjections(keynav, ir));
-    if (keynav.mintedRootRef) {
+  for (const plan of keynavPlans) {
+    scriptInjections.push(...buildKeynavScriptInjections(plan, ir));
+    if (plan.mintedRootRef) {
       extraVueImportNames.push('ref');
     }
   }
