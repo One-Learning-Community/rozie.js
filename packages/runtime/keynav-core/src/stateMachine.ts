@@ -4,6 +4,15 @@
  * boundary (SPEC §6: the machine owns *active* — index/focus intent/commit
  * signal — and NEVER reads or writes selection state).
  *
+ * Also implements the 2D grid branch (Phase 77 SPEC §4/§4.1/§4.2/§4.3/§5):
+ * row/column stride arrows, PageUp/PageDown, row-wise Home/End with
+ * Ctrl+Home/End grid corners, boundary→`host.page` events (the machine NEVER
+ * lands active on a boundary or page key — SPEC §4.1), and focusable-but-
+ * inert disabled cells by default (`.skipdisabled` opts back into the 1D
+ * skip-walk). `config.grid` is the SOLE switch between the two branches; the
+ * 1D branch below is untouched and reachable exactly as before when it is
+ * absent.
+ *
  * Framework-free: every side effect is delegated to the `KeynavHost` adapter
  * a per-target controller implements. This file must never import a
  * framework or the DOM lib (verified by `grep` in the plan's acceptance
@@ -11,7 +20,14 @@
  *
  * @public — runtime API consumed by all six per-target keynav controllers.
  */
-import type { KeynavConfig, KeynavHost, KeynavItemMeta, KeynavKeyboardEvent, KeynavOrientation } from './types.js';
+import type {
+  KeynavConfig,
+  KeynavHost,
+  KeynavItemMeta,
+  KeynavKeyboardEvent,
+  KeynavOrientation,
+  KeynavPageDetail,
+} from './types.js';
 
 const TYPEAHEAD_RESET_MS = 500;
 
@@ -38,6 +54,46 @@ function directionForKey(key: string, orientation: KeynavOrientation): -1 | 1 | 
 
 function isPrintable(e: KeynavKeyboardEvent): boolean {
   return e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+}
+
+/**
+ * Coerces a `config.grid.columns()` read to a positive integer stride with a
+ * floor of 1 (SPEC §10 dynamic columns; threat T-77-01-01) — a zero,
+ * negative, `NaN`, or fractional column count can never produce a
+ * non-integer active index or a division hazard.
+ */
+function coerceGridColumns(raw: number): number {
+  if (!Number.isFinite(raw)) return 1;
+  return Math.max(1, Math.floor(raw));
+}
+
+interface GridArrowMove {
+  /** Signed step added to the active index: ±1 (row) or ±columns (column). */
+  signedStride: number;
+  direction: 1 | -1;
+  axis: 'row' | 'column';
+}
+
+/**
+ * Maps the four arrow keys to a signed stride in grid mode (SPEC §4).
+ * Horizontal keys always stride by 1 through the flat list (row-end
+ * continuity); vertical keys stride by the resolved column count.
+ * Orientation config is intentionally ignored here — grid mode owns both
+ * axes (SPEC §3.1); the compiler rejects `.grid()` + orientation upstream.
+ */
+function gridArrowMove(key: string, columns: number): GridArrowMove | null {
+  switch (key) {
+    case 'ArrowRight':
+      return { signedStride: 1, direction: 1, axis: 'row' };
+    case 'ArrowLeft':
+      return { signedStride: -1, direction: -1, axis: 'row' };
+    case 'ArrowDown':
+      return { signedStride: columns, direction: 1, axis: 'column' };
+    case 'ArrowUp':
+      return { signedStride: -columns, direction: -1, axis: 'column' };
+    default:
+      return null;
+  }
 }
 
 export function createKeynavStateMachine(host: KeynavHost, config: KeynavConfig): KeynavStateMachine {
@@ -156,7 +212,120 @@ export function createKeynavStateMachine(host: KeynavHost, config: KeynavConfig)
     }
   }
 
+  /**
+   * The 2D grid branch of `onKeydown` (SPEC §4/§4.1/§4.2/§4.3/§5). Reads
+   * `config.grid.columns()` fresh on every call so a dynamic/reactive
+   * column count takes effect without re-instantiating the machine
+   * (SPEC §10). Structured as a standalone function rather than
+   * conditionals sprinkled through the 1D helpers above, so the 1D code
+   * paths in `onKeydown` stay literally unchanged and reachable when
+   * `config.grid` is absent.
+   */
+  function onKeydownGrid(e: KeynavKeyboardEvent): void {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const active = host.getActive();
+      // Grid mode is inert-by-default (SPEC §5): a disabled active cell
+      // takes focus like any cell, but Enter never commits it.
+      if (!isDisabled(active)) {
+        host.commit(active);
+      }
+      return;
+    }
+
+    if (e.key === 'PageUp' || e.key === 'PageDown') {
+      // The machine NEVER lands active on a page key (SPEC §4.1) — it only
+      // reports the attempted page so the author (who owns the dataset)
+      // can advance it and set the landing index.
+      e.preventDefault();
+      const direction: 1 | -1 = e.key === 'PageDown' ? 1 : -1;
+      const detail: KeynavPageDetail = {
+        direction,
+        reason: e.key === 'PageDown' ? 'pagedown' : 'pageup',
+        axis: 'column',
+      };
+      host.page?.(detail);
+      return;
+    }
+
+    // `config.grid` is guaranteed present — `onKeydown` only forks into
+    // this function when it is.
+    const columns = coerceGridColumns(config.grid!.columns());
+
+    if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      const total = count();
+      if (total === 0) return;
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl(/Meta)+Home / +End resolve to the whole-grid corners
+        // (SPEC §4).
+        host.setActive(e.key === 'Home' ? 0 : total - 1);
+        return;
+      }
+      // Home/End resolve within the ACTIVE ROW (SPEC §4), ignoring the 1D
+      // enabled-only rule `firstEnabledIndex`/`lastEnabledIndex` apply —
+      // grid mode is inert-by-default, so a disabled row bound is a legal
+      // landing (SPEC §5). End clamps to `count - 1` so a ragged trailing
+      // row resolves to its last EXISTING cell (SPEC §4.3), never past it.
+      const active = host.getActive();
+      const rowStart = Math.floor(active / columns) * columns;
+      const landing = e.key === 'Home' ? rowStart : Math.min(rowStart + columns - 1, total - 1);
+      host.setActive(landing);
+      return;
+    }
+
+    const arrowMove = gridArrowMove(e.key, columns);
+    if (arrowMove !== null) {
+      // Always preventDefault an arrow key in grid mode, regardless of
+      // whether it lands or pages (SPEC §4).
+      e.preventDefault();
+      const total = count();
+      if (total === 0) return;
+      const active = host.getActive();
+
+      if (!config.skipDisabled) {
+        // Inert default (SPEC §5): a move whose landing index falls
+        // outside [0, count) does NOT move active — it pages instead
+        // (SPEC §4.1). Otherwise it lands even on a disabled cell.
+        const landing = active + arrowMove.signedStride;
+        if (landing < 0 || landing >= total) {
+          host.page?.({ direction: arrowMove.direction, reason: 'boundary', axis: arrowMove.axis });
+          return;
+        }
+        host.setActive(landing);
+        return;
+      }
+
+      // `.skipdisabled` opts back into a skip-walk along the movement axis
+      // (SPEC §4.2). Grid mode never loops (`.grid()` + `.loop` is a
+      // compile-time error), so this walk is strictly monotonic — bounded
+      // by `total` steps, an all-disabled grid terminates at the boundary
+      // rather than spinning (threat T-77-01-02), and the terminal
+      // boundary fires the same `host.page` call as the non-skip path.
+      let next = active;
+      for (;;) {
+        next += arrowMove.signedStride;
+        if (next < 0 || next >= total) {
+          host.page?.({ direction: arrowMove.direction, reason: 'boundary', axis: arrowMove.axis });
+          return;
+        }
+        if (!isDisabled(next)) {
+          host.setActive(next);
+          return;
+        }
+      }
+    }
+
+    if (config.typeahead && isPrintable(e)) {
+      handleTypeahead(e.key);
+    }
+  }
+
   function onKeydown(e: KeynavKeyboardEvent): void {
+    if (config.grid) {
+      onKeydownGrid(e);
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
       host.commit(host.getActive());
@@ -194,6 +363,10 @@ export function createKeynavStateMachine(host: KeynavHost, config: KeynavConfig)
     if (total === 0) return;
     const idx = clamp(i, total);
     host.setActive(idx);
+    // Grid mode: pointer activation on a disabled cell sets active
+    // (consistent with keyboard landing) but does not commit (SPEC §5).
+    // The 1D path keeps its unconditional commit.
+    if (config.grid && isDisabled(idx)) return;
     host.commit(idx);
   }
 
