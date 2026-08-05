@@ -157,6 +157,13 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   border-top-right-radius: var(--rozie-datepicker-day-radius, 6px);
   border-bottom-right-radius: var(--rozie-datepicker-day-radius, 6px);
 }
+.rozie-datepicker-day.is-selected[data-rozie-s-6800c7a2]:hover:not([aria-disabled='true'][data-rozie-s-6800c7a2]),
+.rozie-datepicker-day.is-range-start[data-rozie-s-6800c7a2]:hover:not([aria-disabled='true'][data-rozie-s-6800c7a2]),
+.rozie-datepicker-day.is-range-end[data-rozie-s-6800c7a2]:hover:not([aria-disabled='true'][data-rozie-s-6800c7a2]) {
+  color: var(--rozie-datepicker-selected-fg, #fff);
+  background: var(--rozie-datepicker-selected-hover-bg, color-mix(in srgb, var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc)) 85%, #000));
+  border-color: var(--rozie-datepicker-selected-hover-bg, color-mix(in srgb, var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc)) 85%, #000));
+}
 .rozie-datepicker-day[aria-disabled='true'][data-rozie-s-6800c7a2] {
   cursor: not-allowed;
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);

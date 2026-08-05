@@ -1033,6 +1033,13 @@ useKeynav(__rozieKeynavRootRef2, {
   border-top-right-radius: var(--rozie-datepicker-day-radius, 6px);
   border-bottom-right-radius: var(--rozie-datepicker-day-radius, 6px);
 }
+.rozie-datepicker-day.is-selected:hover:not([aria-disabled='true']),
+.rozie-datepicker-day.is-range-start:hover:not([aria-disabled='true']),
+.rozie-datepicker-day.is-range-end:hover:not([aria-disabled='true']) {
+  color: var(--rozie-datepicker-selected-fg, #fff);
+  background: var(--rozie-datepicker-selected-hover-bg, color-mix(in srgb, var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc)) 85%, #000));
+  border-color: var(--rozie-datepicker-selected-hover-bg, color-mix(in srgb, var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc)) 85%, #000));
+}
 .rozie-datepicker-day[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);

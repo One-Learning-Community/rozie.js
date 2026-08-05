@@ -62,6 +62,7 @@
   --rozie-datepicker-today-border: var(--rozie-datepicker-accent);
   --rozie-datepicker-selected-fg: #fff;
   --rozie-datepicker-selected-bg: var(--rozie-datepicker-accent);
+  --rozie-datepicker-selected-hover-bg: color-mix(in srgb, var(--rozie-datepicker-selected-bg) 85%, #000);
   --rozie-datepicker-selected-weight: 600;
 
   /* disabled */
