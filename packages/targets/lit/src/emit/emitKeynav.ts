@@ -1,49 +1,90 @@
 /**
- * emitKeynav — Phase 71 Plan 08 (Lit target).
+ * emitKeynav — Phase 71 Plan 08 (Lit target), reworked by Phase 77 Plan 05
+ * from one-plan-per-component to one-plan-per-root (77-SPEC.md §6, §7.3),
+ * mirroring the React reference's Plan 77-03 rework (also replicated by Vue/
+ * Svelte/Solid, Plan 77-04).
  *
  * Bridges the compiler front-end IR (`keynavRoot?`/`keynavItem?` on
- * `TemplateElementIR`, Phase 71 Plan 02) to the `KeynavController` Lit
+ * `TemplateElementIR`, Phase 71 Plan 02, extended Phase 77 Plan 02 with
+ * `grid`/`groupIndex`/`indexExpression`) to the `KeynavController` Lit
  * `ReactiveController` (Phase 71 Plan 03's `@rozie/runtime-keynav-core` +
- * this plan's Task 1 controller). Modeled directly on the React REFERENCE
- * implementation (`packages/targets/react/src/emit/emitKeynav.ts`,
- * Plan 71-04) — same two responsibilities, resolved ONCE per component:
+ * this plan's `onPage`/`gridColumns`/`rootMarker` extension). Two
+ * responsibilities, resolved ONCE per component:
  *
- *   1. `resolveKeynavPlan(ir)` — locates the (at most one, SPEC §7 v1)
- *      `keynavRoot` element and the FIRST `keynavItem` element + its
- *      enclosing `r-for` loop. Mirrors core's own `resolveKeynavGroups` walk.
- *      Returns `null` for the overwhelming majority case (no `r-keynav` in
- *      the component) — every call site below short-circuits on `null`, so a
- *      non-keynav component's emit is completely untouched (SPEC §11: "no
- *      corpus rebless").
+ *   1. `resolveKeynavPlans(ir)` — locates EVERY `keynavRoot` element in the
+ *      component and, for each, the FIRST `keynavItem` associated to THAT
+ *      root (via `KeynavItemIR.groupIndex`, defaulting to 0 — core's
+ *      `resolveKeynavGroups` owns the association rule; the emitter never
+ *      re-derives containment) + its enclosing `r-for` loop. Returns one plan
+ *      per root, in document order. Returns `[]` for the overwhelming
+ *      majority case (no `r-keynav` in the component) — every call site below
+ *      short-circuits on an empty array, so a non-keynav component's emit is
+ *      completely untouched (SPEC §7.4: "no corpus rebless").
  *
- *   2. `buildKeynavFieldDecls(plan, ir, collectors)` — renders the
- *      group-id field + the `new KeynavController(this, {...})` field
- *      initializer as CLASS-BODY field declarations (NOT scriptInjection
- *      lines placed before a `return` — Lit has no per-render function body;
- *      the controller is instantiated exactly once, in the implicit
- *      constructor, via a `private` field initializer — mirrors
- *      `createLitControllableProperty`'s identical class-field convention).
- *      `emitTemplate.ts` folds these into `EmitTemplateResult.keynavFieldDecls`,
- *      and `emitLit.ts` splices them into the class body alongside the other
- *      field declarations.
+ *   2. `buildKeynavFieldDecls(plan, ir, collectors)` — renders the group-id
+ *      field + the `new KeynavController(this, {...})` field initializer as
+ *      CLASS-BODY field declarations (NOT scriptInjection lines placed before
+ *      a `return` — Lit has no per-render function body; the controller is
+ *      instantiated exactly once, in the implicit constructor, via a
+ *      `private` field initializer — mirrors `createLitControllableProperty`'s
+ *      identical class-field convention). `emitTemplate.ts` calls this ONCE
+ *      PER resolved plan and folds the results into
+ *      `EmitTemplateResult.keynavFieldDecls`; `emitLit.ts` splices them into
+ *      the class body alongside the other field declarations.
  *
- * LIT-SPECIFIC DIVERGENCE FROM REACT — NO ROOT REF IS MINTED. Landmine 6
- * (Plan 71-08's own frontmatter): delegation and marker queries operate
- * INSIDE the shadow root (`host.renderRoot`), not against a specific queried
- * element. `KeynavController` therefore attaches its delegated
- * `keydown`/`pointerdown` listeners directly on the component's OWN shadow
- * root — every emitted Lit component has exactly one shadow root, and SPEC
- * §7 permits at most one `r-keynav` group per component, so "the shadow
- * root" and "the r-keynav root element's subtree" coincide for every v1
- * shape. This eliminates the entire `ROOT_REF_VAR` / minted-vs-reused-ref
- * bookkeeping the React/Solid/Vue references carry — there is no `ref=`
- * attribute to emit on the root element at all.
+ * **Identifier naming (mirrors the React reference exactly):** the group-id
+ * and controller field identifiers keep their PRE-PHASE-77 spelling for group
+ * index 0 and append the index for later groups (`_rozieKeynavGroupId` /
+ * `_rozieKeynavGroupId1` / `_rozieKeynavGroupId2` …) — the mechanism that
+ * keeps a single-root, non-grid component's emitted output byte-identical to
+ * before this plan.
  *
- * The group id is minted via a `Math.random()`-derived string class field
- * (mirrors the Vue/Solid references — Lit has no React-`useId()` equivalent,
- * and a Lit class instance's constructor runs exactly once per element
- * instance, so a field initializer is stable for the component's whole
- * lifetime and collision-safe across instances).
+ * LIT-SPECIFIC DIVERGENCE FROM REACT/SOLID — NO PER-ROOT DOM REF IS MINTED.
+ * The other five targets each mint a distinct DOM ref/node PER root and
+ * attach that root's listeners directly on it, so containment scoping for a
+ * multi-root component falls out of ordinary DOM event bubbling for free.
+ * Lit's `KeynavController` instead delegates a SINGLE `keydown`/`pointerdown`
+ * listener pair on the component's OWN shadow root (`host.renderRoot`,
+ * Landmine 6, Plan 71-08) — there is only ONE shadow root per component, so
+ * with the pre-Phase-77 "at most one r-keynav group per component" rule this
+ * coincided exactly with "the r-keynav root's subtree". SPEC §6 lifts that
+ * rule, so a NAIVE port (every controller instance delegating on the SAME
+ * shared `renderRoot`) would cross-fire: a keydown/pointerdown originating in
+ * group A's subtree would ALSO reach group B's controller instance, which
+ * has no notion of "was this event actually inside MY subtree" (the reducer
+ * is stateful, not target-aware — see `stateMachine.ts`).
+ *
+ * The fix, WITHOUT re-architecting the controller into a per-root-ref design
+ * (SPEC §6: "the per-target change is dropping the 'single group' assumption
+ * ..., not re-architecting controllers") — only emitted for a MULTI-root
+ * component (`needsRootMarker`, `roots.length > 1`; a single-root component
+ * emits nothing new here, preserving byte-identity):
+ *
+ *   - Each root element additionally stamps a STATIC
+ *     `data-rozie-keynav-root="<groupIndex>"` marker attribute (`groupIndex`
+ *     is compile-time-known, so this is a plain string literal, not a
+ *     template binding).
+ *   - Each controller construction gets a `rootMarker: '<groupIndex>'` opt.
+ *   - `KeynavController` (this plan's Task 1) checks, on EVERY delegated
+ *     event, whether `e.target.closest('[data-rozie-keynav-root="<marker>"]')`
+ *     resolves — i.e. whether the event actually originated inside ITS OWN
+ *     root's subtree — before ever touching the reducer. This is a
+ *     containment CHECK performed lazily at real event-dispatch time (always
+ *     well after the component's first render, since a user can't interact
+ *     with DOM that doesn't exist yet), so it needs no new "wait for the
+ *     first update" bookkeeping — it reuses the SAME closest()-based
+ *     containment idiom `resolveItemIndex` already uses for the untrusted
+ *     `data-rozie-keynav-item` marker (T-71-08-01). The controller's
+ *     `hostUpdated()`-scoped item queries (`applyActiveSideEffects`) use the
+ *     SAME marker to scope their `querySelector`/`querySelectorAll` calls to
+ *     the owning root's subtree, so a same-index item in a DIFFERENT group
+ *     is never targeted by mistake.
+ *
+ * The group id itself is minted via a `Math.random()`-derived string class
+ * field (mirrors the Vue/Solid references — Lit has no React-`useId()`
+ * equivalent, and a Lit class instance's constructor runs exactly once per
+ * element instance, so a field initializer is stable for the component's
+ * whole lifetime and collision-safe across instances).
  *
  * The two-way active-index get/set pair reuses the EXISTING
  * `resolveLitSetterText` helper (pre-Phase-71, TWO-WAY-03) rather than a
@@ -55,16 +96,21 @@
  * React's `local`/`setter` pair is, because a Lit signal member expression is
  * both readable and assignable through the identical text.
  *
- * Per-element attribute emission (root `aria-activedescendant`, item
- * `id`/`data-rozie-keynav-item`/`data-rozie-keynav-active`/`tabindex`) is
- * built by `keynavRootAttrs`/`keynavItemAttrs` below and spliced directly
- * into `emitTemplate.ts`'s `emitElementOpenTag` `parts` array — mirroring the
+ * Per-element attribute emission (root `data-rozie-keynav-root`/
+ * `aria-activedescendant`, item `id`/`data-rozie-keynav-item`/
+ * `data-rozie-keynav-active`/`tabindex`) is built by
+ * `keynavRootAttrs`/`keynavItemAttrs` below and spliced directly into
+ * `emitTemplate.ts`'s `emitElementOpenTag` `parts` array — mirroring the
  * existing `refAttr`/`data-rozie-s-<hash>` raw-string-splice pattern rather
  * than routing through the `AttributeBinding` machinery, since these markers
- * are emitter-synthesized, not author-authored bindings. `aria-activedescendant`
- * routes through the existing `rozieAttr` runtime helper so a `< 0` (no
- * active item) value drops the attribute via lit-html's `nothing` sentinel,
- * matching the other five targets' nullish-drops-attribute convention.
+ * are emitter-synthesized, not author-authored bindings. `emitTemplate.ts`
+ * selects the CORRECT plan for each element by comparing the element's own
+ * `keynavRoot.groupIndex`/`keynavItem.groupIndex` (each defaulting to 0)
+ * against `KeynavEmitPlan.groupIndex` — never by using "the" plan, since
+ * there may now be several. `aria-activedescendant` routes through the
+ * existing `rozieAttr` runtime helper so a `< 0` (no active item) value drops
+ * the attribute via lit-html's `nothing` sentinel, matching the other five
+ * targets' nullish-drops-attribute convention.
  *
  * @experimental — shape may change before v1.0
  */
@@ -86,47 +132,78 @@ import type { RuntimeLitImportCollector } from '../rewrite/collectLitImports.js'
 // `<script>`-declared binding (mirrors the React/Vue/Solid references'
 // `__rozieMatch_N`/`__rozieExposeRef` convention; the Lit class-field forms
 // use a leading underscore to match this target's OWN private-field naming
-// idiom, e.g. `_refX`/`_xControllable`).
+// idiom, e.g. `_refX`/`_xControllable`). Group index 0 keeps the bare
+// spelling; later groups append the index (see `suffixFor` below) — the
+// mechanism that keeps single-root emit unchanged.
 const GROUP_ID_FIELD = '_rozieKeynavGroupId';
 const CONTROLLER_FIELD = '_rozieKeynavController';
+const ROOT_MARKER_ATTR = 'data-rozie-keynav-root';
+
+function suffixFor(groupIndex: number): string {
+  return groupIndex === 0 ? '' : String(groupIndex);
+}
 
 export interface KeynavEmitPlan {
+  /**
+   * Phase 77 — document-order group index (0-based). `0` for a single-root
+   * component (mirrors `KeynavRootIR.groupIndex`'s `undefined`-defaults-to-0
+   * convention) — this is what keeps a single-root component's identifier
+   * spelling and emitted config unchanged from pre-Phase-77.
+   */
+  groupIndex: number;
+  /**
+   * True when the component has MORE THAN ONE `r-keynav` root — the ONLY
+   * condition under which the `data-rozie-keynav-root`/`rootMarker` DOM
+   * containment-scoping machinery (module doc comment) is emitted at all.
+   * False for every pre-Phase-77 single-root fixture, which is what keeps
+   * their emit byte-identical.
+   */
+  needsRootMarker: boolean;
   rootElement: TemplateElementIR;
   keynavRoot: KeynavRootIR;
   itemElement: TemplateElementIR | null;
   itemLoop: TemplateLoopIR | null;
-  /** `this._rozieKeynavGroupId` — the field-read text used by root/item attrs. */
+  /** `this._rozieKeynavGroupId[<suffix>]` — the field-read text used by root/item attrs. */
   groupIdField: string;
   /** The active-index read/write text (e.g. `this._active.value`) — doubles as get AND set target. */
   activeGet: string;
+}
+
+interface FoundRoot {
+  element: TemplateElementIR;
+  keynavRoot: KeynavRootIR;
+}
+
+interface FoundItem {
+  element: TemplateElementIR;
+  keynavItem: KeynavItemIR;
+  enclosingLoop: TemplateLoopIR | null;
 }
 
 /**
  * Mirrors `resolveKeynavGroups.collectKeynavNodes` (core) — the SAME
  * traversal shape (incl. `slotFillers` bodies, `TemplateMatch.hostElement`)
  * so a keynav marker inside a slot-fill body or match host is found exactly
- * the way core already validated it. Only needs the FIRST root and FIRST
- * item — a second root is a core-level `KEYNAV_MULTIPLE_ROOTS` diagnostic
- * (ROZ986) that already fired upstream (D-08 collected-not-thrown: this is a
- * best-effort emit for an already-erroring input, not a re-validation pass).
+ * the way core already validated it. Collects EVERY root and EVERY item (not
+ * just the first, per Phase 77 — core's `resolveKeynavGroups` already did
+ * the association work; this walk only needs to LOCATE the nodes core
+ * already stamped `groupIndex` onto).
  */
-function collectFirstKeynavNodes(root: TemplateNode): {
-  root: { element: TemplateElementIR; keynavRoot: KeynavRootIR } | null;
-  item: { element: TemplateElementIR; keynavItem: KeynavItemIR; enclosingLoop: TemplateLoopIR | null } | null;
+function collectAllKeynavNodes(root: TemplateNode): {
+  roots: FoundRoot[];
+  items: FoundItem[];
 } {
-  const found: {
-    root: { element: TemplateElementIR; keynavRoot: KeynavRootIR } | null;
-    item: { element: TemplateElementIR; keynavItem: KeynavItemIR; enclosingLoop: TemplateLoopIR | null } | null;
-  } = { root: null, item: null };
+  const roots: FoundRoot[] = [];
+  const items: FoundItem[] = [];
 
   const walk = (node: TemplateNode, enclosingLoop: TemplateLoopIR | null): void => {
     switch (node.type) {
       case 'TemplateElement': {
-        if (node.keynavRoot && found.root === null) {
-          found.root = { element: node, keynavRoot: node.keynavRoot };
+        if (node.keynavRoot) {
+          roots.push({ element: node, keynavRoot: node.keynavRoot });
         }
-        if (node.keynavItem && found.item === null) {
-          found.item = { element: node, keynavItem: node.keynavItem, enclosingLoop };
+        if (node.keynavItem) {
+          items.push({ element: node, keynavItem: node.keynavItem, enclosingLoop });
         }
         for (const child of node.children) walk(child, enclosingLoop);
         if (node.slotFillers) {
@@ -159,30 +236,48 @@ function collectFirstKeynavNodes(root: TemplateNode): {
   };
 
   walk(root, null);
-  return found;
+  return { roots, items };
 }
 
 /**
- * Resolve the per-component keynav emission plan. Returns `null` when the
- * component has no `r-keynav` root — the overwhelmingly common case, and the
- * one that MUST stay byte-identical to pre-Phase-71 emit (SPEC §11).
+ * Resolve the per-component keynav emission plans — ONE per `r-keynav` root,
+ * in document order. Returns `[]` when the component has no `r-keynav`
+ * root — the overwhelmingly common case, and the one that MUST stay
+ * byte-identical to pre-Phase-71 emit (SPEC §7.4).
  */
-export function resolveKeynavPlan(ir: IRComponent): KeynavEmitPlan | null {
-  if (ir.template === null) return null;
-  const { root, item } = collectFirstKeynavNodes(ir.template);
-  if (root === null) return null;
+export function resolveKeynavPlans(ir: IRComponent): KeynavEmitPlan[] {
+  if (ir.template === null) return [];
+  const { roots, items } = collectAllKeynavNodes(ir.template);
+  if (roots.length === 0) return [];
+  const needsRootMarker = roots.length > 1;
 
-  return {
-    rootElement: root.element,
-    keynavRoot: root.keynavRoot,
-    itemElement: item?.element ?? null,
-    itemLoop: item?.enclosingLoop ?? null,
-    groupIdField: `this.${GROUP_ID_FIELD}`,
-    activeGet: resolveLitSetterText(root.keynavRoot.activeExpression, ir),
-  };
+  return roots.map((root) => {
+    const groupIndex = root.keynavRoot.groupIndex ?? 0;
+    const itemsForGroup = items.filter((it) => (it.keynavItem.groupIndex ?? 0) === groupIndex);
+    const firstItem = itemsForGroup[0] ?? null;
+    const suffix = suffixFor(groupIndex);
+
+    return {
+      groupIndex,
+      needsRootMarker,
+      rootElement: root.element,
+      keynavRoot: root.keynavRoot,
+      itemElement: firstItem?.element ?? null,
+      itemLoop: firstItem?.enclosingLoop ?? null,
+      groupIdField: `this.${GROUP_ID_FIELD}${suffix}`,
+      activeGet: resolveLitSetterText(root.keynavRoot.activeExpression, ir),
+    };
+  });
 }
 
-/** `KeynavConfig` object literal — every field is statically known at compile time. */
+/**
+ * `KeynavConfig` object literal — every field is statically known at compile
+ * time. Deliberately NEVER gains a `grid` key here (Phase 77): grid columns
+ * are a reactive expression, threaded through the DEDICATED `gridColumns`
+ * controller option instead (see `buildKeynavFieldDecls`), which
+ * `KeynavController` re-reads on every keydown. A root without `.grid` emits
+ * the EXACT literal it emitted pre-Phase-77.
+ */
 function buildConfigCode(k: KeynavRootIR): string {
   return `{ focusModel: '${k.focusModel}', orientation: '${k.orientation}', loop: ${k.loop}, typeahead: ${k.typeahead}, skipDisabled: ${k.skipDisabled} }`;
 }
@@ -235,19 +330,18 @@ function buildGetSourceCode(plan: KeynavEmitPlan, ir: IRComponent): string {
   return `() => (${sourceCode}).map((${plan.itemLoop.itemAlias}) => ({ ${fields.join(', ')} }))`;
 }
 
-/** Find the `@keynav-commit` template-event Listener on the root, if authored. */
-function findCommitListener(root: TemplateElementIR) {
-  return root.events.find((e) => e.event === 'keynav-commit') ?? null;
+/** Find a template-event Listener of the given synthetic event name on the root. */
+function findRootListener(root: TemplateElementIR, event: string) {
+  return root.events.find((e) => e.event === event) ?? null;
 }
 
 /**
- * `onCommit: (i: number) => void`. Mirrors the SAME bare-identifier-vs-
- * arbitrary-expression convention Lit's own template-event emit already uses
+ * Shared bare-identifier-vs-arbitrary-expression convention every synthetic
+ * keynav event uses, mirroring Lit's own template-event emit convention
  * (`buildEventParts`): a bare identifier (e.g. `@keynav-commit="handleCommit"`)
- * is passed BY REFERENCE — `KeynavController` calls it as `onCommit(i)`, so
- * the author's handler naturally receives the active index as its own
- * parameter. An arbitrary expression (SPEC's own `run(items[$data.active])`)
- * is wrapped in `(i) => { ...; }`.
+ * is passed BY REFERENCE — the runtime calls it directly, so the author's
+ * handler naturally receives the callback's own parameter. An arbitrary
+ * expression is wrapped in `(<paramName>) => { ...; }`.
  *
  * LIT-SPECIFIC FIX vs. the React/Solid references: bareness MUST be tested
  * on the ORIGINAL (pre-rewrite) AST node (`bt.isIdentifier(listener.handler)`),
@@ -260,14 +354,35 @@ function findCommitListener(root: TemplateElementIR) {
  * wrap branch, which would emit a dead `(i) => { this.choose; }` statement
  * that references but never CALLS the handler.
  */
-function buildOnCommitCode(root: TemplateElementIR, ir: IRComponent): string {
-  const listener = findCommitListener(root);
-  if (!listener) return '() => {}';
+function buildHandlerCode(
+  root: TemplateElementIR,
+  ir: IRComponent,
+  event: string,
+  paramName: string,
+): string | null {
+  const listener = findRootListener(root, event);
+  if (!listener) return null;
   const handlerCode = rewriteTemplateExpression(listener.handler, ir);
   if (bt.isIdentifier(listener.handler)) {
     return handlerCode;
   }
-  return `(i) => { ${handlerCode}; }`;
+  return `(${paramName}) => { ${handlerCode}; }`;
+}
+
+/** `onCommit: (i: number) => void`. See `buildHandlerCode`'s doc comment. */
+function buildOnCommitCode(root: TemplateElementIR, ir: IRComponent): string {
+  return buildHandlerCode(root, ir, 'keynav-commit', 'i') ?? '() => {}';
+}
+
+/**
+ * `onPage: (detail: KeynavPageDetail) => void` (Phase 77, SPEC §3, §4.1).
+ * Mirrors `buildOnCommitCode`'s convention exactly. Returns `null` (not a
+ * fallback no-op) when `@keynav-page` isn't authored on this root — the
+ * caller OMITS the `onPage` opts line entirely in that case, which is what
+ * keeps a component with no `.grid`/`@keynav-page` usage byte-identical.
+ */
+function buildOnPageCode(root: TemplateElementIR, ir: IRComponent): string | null {
+  return buildHandlerCode(root, ir, 'keynav-page', 'detail');
 }
 
 /**
@@ -276,8 +391,9 @@ function buildOnCommitCode(root: TemplateElementIR, ir: IRComponent): string {
  * function body to inject a hook call into — a Lit class instance's
  * constructor runs exactly once, so BOTH fields are `private` field
  * initializers, mirroring `createLitControllableProperty`'s identical
- * per-model-prop field convention). `emitLit.ts` splices these alongside the
- * other class-field declarations.
+ * per-model-prop field convention). `emitTemplate.ts` calls this ONCE PER
+ * resolved plan and splices the results alongside the other class-field
+ * declarations.
  */
 export function buildKeynavFieldDecls(
   plan: KeynavEmitPlan,
@@ -285,9 +401,12 @@ export function buildKeynavFieldDecls(
   collectors: { runtime: RuntimeLitImportCollector },
 ): string[] {
   const lines: string[] = [];
+  const suffix = suffixFor(plan.groupIndex);
+  const groupIdField = `${GROUP_ID_FIELD}${suffix}`;
+  const controllerField = `${CONTROLLER_FIELD}${suffix}`;
 
   lines.push(
-    `  private ${GROUP_ID_FIELD} = \`keynav-\${Math.random().toString(36).slice(2)}\`;`,
+    `  private ${groupIdField} = \`keynav-\${Math.random().toString(36).slice(2)}\`;`,
   );
 
   collectors.runtime.add('KeynavController');
@@ -303,9 +422,27 @@ export function buildKeynavFieldDecls(
       `    activeClass: ${rewriteTemplateExpression(plan.keynavRoot.activeClassExpression, ir)},`,
     );
   }
+  // Phase 77 — grid columns. Only present when the root carries `.grid()`;
+  // absent entirely otherwise, which is what keeps a non-grid root's
+  // KeynavController construction byte-identical to pre-Phase-77.
+  if (plan.keynavRoot.grid) {
+    const columnsCode = rewriteTemplateExpression(plan.keynavRoot.grid.columnsExpression, ir);
+    optsLines.push(`    gridColumns: () => ${columnsCode},`);
+  }
+  // Phase 77 — `@keynav-page`, mirroring `onCommit`'s wiring exactly.
+  const onPageCode = buildOnPageCode(plan.rootElement, ir);
+  if (onPageCode !== null) {
+    optsLines.push(`    onPage: ${onPageCode},`);
+  }
+  // Phase 77 — multi-root DOM containment scoping (module doc comment). Only
+  // present when the component has more than one `r-keynav` root; a
+  // single-root component omits this entirely (byte-identical to before).
+  if (plan.needsRootMarker) {
+    optsLines.push(`    rootMarker: '${plan.groupIndex}',`);
+  }
   lines.push(
     [
-      `  private ${CONTROLLER_FIELD} = new KeynavController(this, {`,
+      `  private ${controllerField} = new KeynavController(this, {`,
       ...optsLines,
       `  });`,
     ].join('\n'),
@@ -315,12 +452,13 @@ export function buildKeynavFieldDecls(
 }
 
 /**
- * Root-element template attribute fragments — `aria-activedescendant` for the
- * activedescendant focus model ONLY (no `ref=` — see the module doc comment's
- * "NO ROOT REF IS MINTED" section), pointing at the active item's id, routed
- * through `rozieAttr` so a `< 0` value (no active item, e.g. an empty source)
- * DROPS the attribute via lit-html's `nothing` sentinel rather than rendering
- * a literal `"undefined"` string.
+ * Root-element template attribute fragments — the multi-root DOM
+ * containment-scoping marker (module doc comment; ONLY when
+ * `plan.needsRootMarker`) and `aria-activedescendant` for the
+ * activedescendant focus model, pointing at the active item's id, routed
+ * through `rozieAttr` so a `< 0` value (no active item, e.g. an empty
+ * source) DROPS the attribute via lit-html's `nothing` sentinel rather than
+ * rendering a literal `"undefined"` string.
  */
 export function keynavRootAttrs(
   plan: KeynavEmitPlan | null,
@@ -328,11 +466,19 @@ export function keynavRootAttrs(
   runtime: RuntimeLitImportCollector,
 ): string[] {
   if (plan === null || node.keynavRoot === undefined) return [];
-  if (plan.keynavRoot.focusModel !== 'activedescendant') return [];
-  runtime.add('rozieAttr');
-  return [
-    `aria-activedescendant=\${rozieAttr(${plan.activeGet} >= 0 ? \`\${${plan.groupIdField}}-item-\${${plan.activeGet}}\` : undefined)}`,
-  ];
+  const attrs: string[] = [];
+  if (plan.needsRootMarker) {
+    // `groupIndex` is compile-time-known — a plain string-literal attribute,
+    // not a template binding, so it never appears in a single-root emit.
+    attrs.push(`${ROOT_MARKER_ATTR}="${plan.groupIndex}"`);
+  }
+  if (plan.keynavRoot.focusModel === 'activedescendant') {
+    runtime.add('rozieAttr');
+    attrs.push(
+      `aria-activedescendant=\${rozieAttr(${plan.activeGet} >= 0 ? \`\${${plan.groupIdField}}-item-\${${plan.activeGet}}\` : undefined)}`,
+    );
+  }
+  return attrs;
 }
 
 /**
@@ -346,16 +492,33 @@ export function keynavRootAttrs(
  * whether or not the author declared one; see `emitTemplate.ts`'s `emitLoop`)
  * against the live active value — they update on the SAME render pass as the
  * rest of the component (`KeynavController` never writes these directly; see
- * its module doc comment). Returns `[]` when `indexExpr` is unavailable (e.g.
- * a `keynavItem` authored outside any `r-for` — an unsupported v1 shape;
- * degrades to a no-op rather than emitting malformed template markup).
+ * its module doc comment).
+ *
+ * Phase 77 (planner Gap B) — an item's OWN explicit index expression
+ * (`r-keynav-item="{ index: <expr> }"`, rewritten in the item's own loop
+ * scope — it was parsed there, exactly like `label`/`disabled`) takes
+ * priority over `loopIndexExpr` when present. This is what makes an explicit
+ * index correct even when the item's nearest enclosing loop is a NESTED
+ * inner loop (e.g. the date-picker's panels -> weeks -> days triple-nested
+ * day grid) — the expression's own identifier references are already bound
+ * to whichever loop scope it was authored in, regardless of nesting depth.
+ *
+ * Returns `[]` when neither an explicit index nor a loop index is available
+ * (e.g. a `keynavItem` authored outside any `r-for` — an unsupported v1
+ * shape; degrades to a no-op rather than emitting malformed template markup).
  */
 export function keynavItemAttrs(
   plan: KeynavEmitPlan | null,
   node: TemplateElementIR,
-  indexExpr: string | null,
+  loopIndexExpr: string | null,
+  ir: IRComponent,
 ): string[] {
-  if (plan === null || node.keynavItem === undefined || indexExpr === null) return [];
+  if (plan === null || node.keynavItem === undefined) return [];
+  const explicitIndexExpr = node.keynavItem.indexExpression
+    ? rewriteTemplateExpression(node.keynavItem.indexExpression, ir)
+    : null;
+  const indexExpr = explicitIndexExpr ?? loopIndexExpr;
+  if (indexExpr === null) return [];
   const attrs: string[] = [
     // Whole-value single interpolation — unquoted, mirrors the
     // `data-rozie-keynav-item=${…}` / `.value=${…}` convention immediately
@@ -373,16 +536,18 @@ export function keynavItemAttrs(
 }
 
 /**
- * Strips the `@keynav-commit` template-event Listener out of the root
- * element's `events` array — it is consumed by `buildOnCommitCode` above and
- * routed into `KeynavController`'s `onCommit` option, NEVER as a
- * `@keynavCommit=${...}` template binding (which would be inert —
- * `keynav-commit` is a synthetic event, not a real DOM event a host element
- * dispatches).
+ * Strips the `@keynav-commit` / `@keynav-page` template-event Listeners out
+ * of the root element's `events` array — both are consumed by
+ * `buildOnCommitCode`/`buildOnPageCode` above and routed into
+ * `KeynavController`'s `onCommit`/`onPage` options, NEVER as
+ * `@keynavCommit=${...}` / `@keynavPage=${...}` template bindings (which
+ * would be inert — neither is a real DOM event a host element dispatches).
  */
-export function stripKeynavCommitEvent(node: TemplateElementIR): TemplateElementIR {
+export function stripKeynavSyntheticEvents(node: TemplateElementIR): TemplateElementIR {
   if (node.keynavRoot === undefined) return node;
-  const filtered = node.events.filter((e) => e.event !== 'keynav-commit');
+  const filtered = node.events.filter(
+    (e) => e.event !== 'keynav-commit' && e.event !== 'keynav-page',
+  );
   if (filtered.length === node.events.length) return node;
   return { ...node, events: filtered };
 }

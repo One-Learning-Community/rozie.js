@@ -68,6 +68,7 @@ import {
   type ClassValue,
   type KeynavConfig,
   type KeynavHost,
+  type KeynavPageDetail,
   type KeynavStateMachine,
   type KeynavWindower,
 } from '@rozie/runtime-keynav-core';
@@ -92,6 +93,39 @@ export interface KeynavControllerOpts {
   activeClass?: ClassValue;
   /** Optional full-dataset addressing for virtualized lists (SPEC §10). */
   windower?: KeynavWindower;
+  /**
+   * `@keynav-page` (SPEC §3, §4.1, Phase 77) — forwarded as the state
+   * machine's `host.page` hook. The grid branch of the reducer never moves
+   * `active` on a boundary/page key; it reports the attempted move and the
+   * author (who owns the dataset) advances the page and sets the landing
+   * index.
+   */
+  onPage?: (detail: KeynavPageDetail) => void;
+  /**
+   * `.grid(<expr>)` (SPEC §3, §7.1, Phase 77) — the column-count getter that
+   * selects the 2D grid branch of the reducer. Read fresh on every keydown
+   * via `this.opts.gridColumns!()` — a Lit class instance's `opts` object is
+   * long-lived and its closures already read live `this.<field>` state on
+   * every call (no `useRef`-style latest-ref indirection needed, unlike the
+   * React reference — see the module doc comment). Absent means 1D mode —
+   * `config` is handed to the machine completely unmodified (no `grid` key),
+   * which is what keeps every existing 1D behavior and emitted construction
+   * byte-identical.
+   */
+  gridColumns?: () => number;
+  /**
+   * Phase 77 multi-root DOM containment scoping (SPEC §6; see
+   * `emitKeynav.ts`'s module doc comment for the full rationale). ONLY
+   * present when the component has more than one `r-keynav` root — every
+   * delegated event this controller handles is first checked against
+   * `e.target.closest('[data-rozie-keynav-root="<rootMarker>"]')`, and every
+   * `hostUpdated()` item query is scoped to that SAME subtree, so a
+   * same-index item in a DIFFERENT group is never touched. Absent (the
+   * overwhelming single-root case) disables the check entirely — every event
+   * is processed and every query runs against the whole shadow root, exactly
+   * as before Phase 77.
+   */
+  rootMarker?: string;
 }
 
 /**
@@ -109,6 +143,12 @@ export class KeynavController implements ReactiveController {
   private machine: KeynavStateMachine | null = null;
   /** Undefined until the first `hostUpdated()` runs — forces the initial active-change side effects to apply once, mirroring `useKeynav`'s effect running on mount. */
   private lastActive: number | undefined = undefined;
+  /**
+   * Phase 77 (T-77-05-03) — the single outstanding `requestAnimationFrame`
+   * retry id (or `null`), mirroring the React reference's `rafId` local —
+   * cancelled on a newer active-change and on `hostDisconnected()`.
+   */
+  private pendingRafId: number | null = null;
 
   constructor(host: KeynavControllerHost, opts: KeynavControllerOpts) {
     this.host = host;
@@ -117,13 +157,54 @@ export class KeynavController implements ReactiveController {
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
+    if (!this.matchesRootScope(e.target)) return;
     this.machine?.onKeydown(e);
   };
 
   private readonly onPointerDown = (e: PointerEvent): void => {
+    if (!this.matchesRootScope(e.target)) return;
     const idx = this.resolveItemIndex(e.target);
     if (idx !== null) this.machine?.onPointerActivate(idx);
   };
+
+  /**
+   * Phase 77 multi-root DOM containment scoping (SPEC §6; `emitKeynav.ts`'s
+   * module doc comment). `opts.rootMarker` is ONLY present for a component
+   * with more than one `r-keynav` root — every other (single-root) component
+   * skips this check entirely and processes every delegated event, exactly
+   * as before Phase 77. When present, an event is in scope only if its
+   * target has a `[data-rozie-keynav-root="<rootMarker>"]` ancestor — i.e.
+   * it actually originated inside THIS group's subtree, not a sibling
+   * group's. Evaluated lazily at real event-dispatch time (always after the
+   * component's first render — nothing can dispatch a DOM event against
+   * content that doesn't exist yet), so this needs no additional
+   * first-update bookkeeping.
+   */
+  private matchesRootScope(target: EventTarget | null): boolean {
+    if (this.opts.rootMarker === undefined) return true;
+    if (!(target instanceof Element)) return false;
+    return (
+      target.closest(`[data-rozie-keynav-root="${this.opts.rootMarker}"]`) !==
+      null
+    );
+  }
+
+  /**
+   * The DOM subtree this controller's item queries (`applyActiveSideEffects`)
+   * are scoped to — the specific root element identified by `rootMarker` for
+   * a multi-root component, else the whole shadow root (single-root case,
+   * unchanged from before Phase 77). Falls back to the shadow root if the
+   * marked element can't be found (defensive; should not happen once the
+   * component has rendered at least once).
+   */
+  private queryScope(): ParentNode {
+    if (this.opts.rootMarker === undefined) return this.host.renderRoot;
+    return (
+      this.host.renderRoot.querySelector(
+        `[data-rozie-keynav-root="${this.opts.rootMarker}"]`,
+      ) ?? this.host.renderRoot
+    );
+  }
 
   /**
    * T-71-08-01 (threat register) — `data-rozie-keynav-item` is an UNTRUSTED
@@ -161,13 +242,40 @@ export class KeynavController implements ReactiveController {
     if (this.opts.windower !== undefined) {
       host.windower = this.opts.windower;
     }
-    this.machine = createKeynavStateMachine(host, this.opts.config);
+    // Phase 77 — `onPage` forwards to the state machine's `host.page` hook,
+    // reading through `this.opts` on every call (long-lived class-field
+    // opts object — no latest-ref indirection needed, see the module doc
+    // comment).
+    if (this.opts.onPage !== undefined) {
+      host.page = (detail) => this.opts.onPage?.(detail);
+    }
+
+    // Phase 77 — grid config. `config` gains a `grid` entry ONLY when
+    // `gridColumns` is present; the `columns()` getter permanently
+    // delegates through `this.opts.gridColumns!()` so a dynamic/reactive
+    // column count stays live without re-instantiating the machine (SPEC
+    // §10). Absent: `config` is handed to the machine completely
+    // unmodified — no `grid` key, byte-identical to pre-Phase-77 1D
+    // behavior.
+    const config: KeynavConfig =
+      this.opts.gridColumns !== undefined
+        ? {
+            ...this.opts.config,
+            grid: { columns: () => this.opts.gridColumns!() },
+          }
+        : this.opts.config;
+    this.machine = createKeynavStateMachine(host, config);
 
     // Landmine 6 — delegation attaches on the SHADOW ROOT (`renderRoot`),
     // never `document`: `r-keynav-item`-marked children live behind the
     // shadow boundary, and a document-level listener would also miss
     // events that never cross the boundary depending on composed-path
-    // semantics for non-composed synthetic events in tests.
+    // semantics for non-composed synthetic events in tests. Phase 77 —
+    // STILL true for a multi-root component: rather than minting a
+    // per-root listener target (a controller re-architecture SPEC §6
+    // explicitly avoids), every controller instance delegates on the SAME
+    // shared shadow root and filters by `matchesRootScope()` inside the
+    // handlers above.
     const root = this.host.renderRoot;
     root.addEventListener('keydown', this.onKeyDown as EventListener);
     root.addEventListener('pointerdown', this.onPointerDown as EventListener);
@@ -185,8 +293,16 @@ export class KeynavController implements ReactiveController {
       'pointerdown',
       this.onPointerDown as EventListener,
     );
+    this.cancelPendingRetry();
     this.machine?.dispose();
     this.machine = null;
+  }
+
+  private cancelPendingRetry(): void {
+    if (this.pendingRafId !== null) {
+      cancelAnimationFrame(this.pendingRafId);
+      this.pendingRafId = null;
+    }
   }
 
   /**
@@ -198,17 +314,39 @@ export class KeynavController implements ReactiveController {
    * the same guarantee `useKeynav`'s `[active, rootRef]`-keyed effect gives
    * React, expressed here via manual diffing instead of a dependency array
    * because `ReactiveController` has no built-in dependency-array concept.
+   *
+   * Phase 77 (T-77-05-03) — an author may set the active index in the SAME
+   * tick a dataset swaps (grid paging); by the time `hostUpdated()` runs the
+   * DOM HAS been patched (Lit's own guarantee — this hook never fires before
+   * the host's first update completes, reusing that existing ordering
+   * guarantee rather than inventing a new "have we rendered yet" flag), but
+   * the item for the NEW active index specifically may still be a frame
+   * away if it depends on a second, cascading re-render. Mirrors the React
+   * reference exactly: apply the normal pass once synchronously; if no
+   * element was found, schedule exactly ONE `requestAnimationFrame`-deferred
+   * retry, cancelled on a newer active-change/disconnect and guarded so it
+   * only re-applies if `active` is STILL the value it was scheduled for.
    */
   hostUpdated(): void {
     const active = this.opts.getActive();
     if (active === this.lastActive) return;
     this.lastActive = active;
-    this.applyActiveSideEffects(active);
+    this.cancelPendingRetry();
+    if (!Number.isFinite(active)) return;
+
+    const found = this.applyActiveSideEffects(active);
+    if (!found) {
+      this.pendingRafId = requestAnimationFrame(() => {
+        this.pendingRafId = null;
+        if (this.opts.getActive() !== active) return;
+        this.applyActiveSideEffects(active);
+      });
+    }
   }
 
-  private applyActiveSideEffects(active: number): void {
-    if (!Number.isFinite(active)) return;
-    const root = this.host.renderRoot;
+  /** Returns whether an element for `active` was found in the DOM. */
+  private applyActiveSideEffects(active: number): boolean {
+    const root = this.queryScope();
     const activeEl = root.querySelector<HTMLElement>(
       `[data-rozie-keynav-item="${active}"]`,
     );
@@ -244,5 +382,7 @@ export class KeynavController implements ReactiveController {
     } else if (activeEl) {
       activeEl.scrollIntoView({ block: 'nearest' });
     }
+
+    return activeEl !== null;
   }
 }

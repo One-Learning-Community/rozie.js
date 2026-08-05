@@ -69,8 +69,8 @@ import {
   buildKeynavFieldDecls,
   keynavItemAttrs,
   keynavRootAttrs,
-  resolveKeynavPlan,
-  stripKeynavCommitEvent,
+  resolveKeynavPlans,
+  stripKeynavSyntheticEvents,
   type KeynavEmitPlan,
 } from './emitKeynav.js';
 
@@ -101,14 +101,16 @@ export interface EmitTemplateOpts {
    */
   scopeHash?: string;
   /**
-   * Phase 71 (r-keynav) — the per-component keynav emission plan (resolved
-   * ONCE by `emitTemplate.ts`'s exported `emitTemplate()` via
-   * `resolveKeynavPlan`), or `null` when the component has no `r-keynav`
-   * root. `undefined` (the default, back-compat for every existing call
-   * site/test-fixture) is treated identically to `null` at every read site
-   * (`opts.keynav ?? null`).
+   * Phase 71 (r-keynav), extended Phase 77 (multi-root) — the per-component
+   * keynav emission plans (resolved ONCE by `emitTemplate.ts`'s exported
+   * `emitTemplate()` via `resolveKeynavPlans`), one per `r-keynav` root, in
+   * document order. `[]`/`undefined` (the default, back-compat for every
+   * existing call site/test-fixture) means the component has no `r-keynav`
+   * root at all. Each element selects the plan matching ITS OWN
+   * `keynavRoot.groupIndex`/`keynavItem.groupIndex` (defaulting to 0) —
+   * never "the" plan, since a multi-root component has several.
    */
-  keynav?: KeynavEmitPlan | null;
+  keynav?: readonly KeynavEmitPlan[];
   /**
    * Phase 71 (r-keynav) — the CURRENT `r-for` loop's index-alias identifier
    * text, threaded by `emitLoop` so a deeply-nested `keynavItem` element can
@@ -1691,16 +1693,27 @@ function emitElementOpenTag(
     );
   }
 
-  // Phase 71 (r-keynav) — root `aria-activedescendant` and item
+  // Phase 71 (r-keynav), extended Phase 77 (multi-root) — root
+  // `data-rozie-keynav-root`/`aria-activedescendant` and item
   // `id`/`data-rozie-keynav-item`/`data-rozie-keynav-active`/`tabindex`
   // markers (see emitKeynav.ts's module doc comment). `[]` for every
-  // element outside a keynav plan (no keynav plan, or this element carries
+  // element outside a keynav plan (no keynav plans, or this element carries
   // neither marker) — a cheap two-property check, not a tree walk, so
-  // non-keynav components pay zero emission cost.
-  const keynav = opts.keynav ?? null;
+  // non-keynav components pay zero emission cost. Each element selects the
+  // plan matching ITS OWN root's/item's `groupIndex` (defaulting to 0) —
+  // never "the" plan, since a multi-root component has several.
+  const keynavPlans = opts.keynav ?? [];
+  const keynavRootPlan =
+    node.keynavRoot !== undefined
+      ? (keynavPlans.find((p) => p.groupIndex === (node.keynavRoot!.groupIndex ?? 0)) ?? null)
+      : null;
+  const keynavItemPlan =
+    node.keynavItem !== undefined
+      ? (keynavPlans.find((p) => p.groupIndex === (node.keynavItem!.groupIndex ?? 0)) ?? null)
+      : null;
   parts.push(
-    ...keynavRootAttrs(keynav, node, opts.runtime),
-    ...keynavItemAttrs(keynav, node, opts.keynavItemIndexAlias ?? null),
+    ...keynavRootAttrs(keynavRootPlan, node, opts.runtime),
+    ...keynavItemAttrs(keynavItemPlan, node, opts.keynavItemIndexAlias ?? null, ir),
   );
 
   // Phase 07.6 — producer-side CSS scope stamp on `tagKind === 'html'`
@@ -1811,13 +1824,14 @@ function emitElementInner(
   hostListenerWiring: string[],
   opts: EmitTemplateOpts,
 ): string {
-  // Phase 71 (r-keynav) — strip the synthetic `@keynav-commit` listener
-  // BEFORE any listener emission runs; it's routed into `KeynavController`'s
-  // `onCommit` option by `emitKeynav.ts`'s `buildKeynavFieldDecls`, never as
-  // a `@keynavCommit=${...}` template binding (see `stripKeynavCommitEvent`'s
-  // doc comment). No-op (returns the SAME node) for every element that isn't
-  // a keynav root.
-  const node = stripKeynavCommitEvent(origNode);
+  // Phase 71 (r-keynav), extended Phase 77 (@keynav-page) — strip the
+  // synthetic `@keynav-commit`/`@keynav-page` listeners BEFORE any listener
+  // emission runs; both are routed into `KeynavController`'s
+  // `onCommit`/`onPage` options by `emitKeynav.ts`'s `buildKeynavFieldDecls`,
+  // never as `@keynavCommit=${...}`/`@keynavPage=${...}` template bindings
+  // (see `stripKeynavSyntheticEvents`'s doc comment). No-op (returns the
+  // SAME node) for every element that isn't a keynav root.
+  const node = stripKeynavSyntheticEvents(origNode);
   const tagName = resolveTagName(node, ir.name);
   const { open, selfClose } = emitElementOpenTag(node, ir, ir.name, opts);
   if (selfClose) return open;
@@ -2318,17 +2332,17 @@ export function emitTemplate(
     portalCount: 0,
     diagnostics,
   };
-  // Phase 71 (r-keynav) — resolved ONCE per component (not per element; see
-  // emitKeynav.ts's module doc comment). `null` for the overwhelming
-  // majority of components (no r-keynav root) — every downstream keynav
-  // read site short-circuits on `null`/`undefined`, so a non-keynav
-  // component's emit is completely untouched (SPEC §11: "no corpus rebless").
-  const keynav = resolveKeynavPlan(ir);
-  const optsWithState: EmitTemplateOpts = { ...opts, keynav, _state: state };
-  const keynavFieldDecls =
-    keynav !== null
-      ? buildKeynavFieldDecls(keynav, ir, { runtime: opts.runtime })
-      : [];
+  // Phase 71 (r-keynav), extended Phase 77 (multi-root) — resolved ONCE per
+  // component (not per element; see emitKeynav.ts's module doc comment).
+  // `[]` for the overwhelming majority of components (no r-keynav root) —
+  // every downstream keynav read site short-circuits on an empty array, so a
+  // non-keynav component's emit is completely untouched (SPEC §7.4: "no
+  // corpus rebless").
+  const keynavPlans = resolveKeynavPlans(ir);
+  const optsWithState: EmitTemplateOpts = { ...opts, keynav: keynavPlans, _state: state };
+  const keynavFieldDecls = keynavPlans.flatMap((plan) =>
+    buildKeynavFieldDecls(plan, ir, { runtime: opts.runtime }),
+  );
 
   if (!ir.template) {
     // CR-01 fix (Phase 07.4 review): the early-return path now uses the same
