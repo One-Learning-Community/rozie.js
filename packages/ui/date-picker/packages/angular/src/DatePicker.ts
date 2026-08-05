@@ -521,6 +521,7 @@ export class DatePicker {
   hoverIso = signal('');
   viewMode = signal('days');
   activeDay = signal(0);
+  activeDayReal = signal(0);
   activeMonth = signal(0);
   activeYear = signal(0);
   root = viewChild<ElementRef<HTMLDivElement>>('root');
@@ -844,11 +845,16 @@ export class DatePicker {
     numberOfMonths: this.numberOfMonths(),
     anchor: this.selected() !== '' ? this.selected() : this.selectionMode() === 'range' ? this.readRange().start : ''
   });
+  currentActiveDay = () => this.activeDay() === ROVING_DAY_NONE ? this.activeDayReal() : this.activeDay();
   seedActiveDay = (viewIsoOverride?: string, assumeDaysView?: boolean) => {
     const next = resolveRovingDayIndex(this.allDayCells(viewIsoOverride, assumeDaysView), this.rovingDayInput(viewIsoOverride));
-    if (next === this.activeDay()) {
+    if (next === this.currentActiveDay()) {
       this.activeDay.set(ROVING_DAY_NONE);
     }
+    // `activeDayReal` is updated SYNCHRONOUSLY (no rAF defer) — pure
+    // bookkeeping, never read for DOM focus/UI, so it must always reflect the
+    // latest INTENDED target the instant it's known, not one frame later.
+    this.activeDayReal.set(next);
     requestAnimationFrame(() => {
       this.activeDay.set(next);
     });
@@ -985,12 +991,15 @@ export class DatePicker {
   onDayPage = (detail: any) => {
     this.viewIso.set(addMonths(this.viewMonthGrid(), detail.direction));
     const nextCells = this.allDayCells();
-    if (detail.reason === 'boundary') {
-      this.activeDay.set(detail.direction > 0 ? 0 : nextCells.length - 1);
-    } else {
-      const column = this.activeDay() % 7;
-      this.activeDay.set(Math.min(column, nextCells.length - 1));
+    const current = this.currentActiveDay();
+    const next = detail.reason === 'boundary' ? detail.direction > 0 ? 0 : nextCells.length - 1 : Math.min(current, nextCells.length - 1);
+    if (next === current) {
+      this.activeDay.set(ROVING_DAY_NONE);
     }
+    this.activeDayReal.set(next);
+    requestAnimationFrame(() => {
+      this.activeDay.set(next);
+    });
   };
   monthEnabled = (iso: any) => {
     const cell = this.monthList().months.find((m: any) => m.iso === iso);

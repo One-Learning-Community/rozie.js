@@ -394,6 +394,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   private _hoverIso = signal('');
   private _viewMode = signal('days');
   private _activeDay = signal(0);
+  private _activeDayReal = signal(0);
   private _activeMonth = signal(0);
   private _activeYear = signal(0);
   @query('[data-rozie-ref="root"]') private _refRoot!: HTMLElement;
@@ -661,11 +662,17 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   anchor: this.selected() !== '' ? this.selected() : this.selectionMode === 'range' ? this.readRange().start : ''
 });
 
+  currentActiveDay = () => this._activeDay.value === ROVING_DAY_NONE ? this._activeDayReal.value : this._activeDay.value;
+
   seedActiveDay = (viewIsoOverride?: string, assumeDaysView?: boolean) => {
   const next = resolveRovingDayIndex(this.allDayCells(viewIsoOverride, assumeDaysView), this.rovingDayInput(viewIsoOverride));
-  if (next === this._activeDay.value) {
+  if (next === this.currentActiveDay()) {
     this._activeDay.value = ROVING_DAY_NONE;
   }
+  // `activeDayReal` is updated SYNCHRONOUSLY (no rAF defer) — pure
+  // bookkeeping, never read for DOM focus/UI, so it must always reflect the
+  // latest INTENDED target the instant it's known, not one frame later.
+  this._activeDayReal.value = next;
   requestAnimationFrame(() => {
     this._activeDay.value = next;
   });
@@ -834,12 +841,15 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   onDayPage = (detail: any) => {
   this._viewIso.value = addMonths(this.viewMonthGrid(), detail.direction);
   const nextCells = this.allDayCells();
-  if (detail.reason === 'boundary') {
-    this._activeDay.value = detail.direction > 0 ? 0 : nextCells.length - 1;
-  } else {
-    const column = this._activeDay.value % 7;
-    this._activeDay.value = Math.min(column, nextCells.length - 1);
+  const current = this.currentActiveDay();
+  const next = detail.reason === 'boundary' ? detail.direction > 0 ? 0 : nextCells.length - 1 : Math.min(current, nextCells.length - 1);
+  if (next === current) {
+    this._activeDay.value = ROVING_DAY_NONE;
   }
+  this._activeDayReal.value = next;
+  requestAnimationFrame(() => {
+    this._activeDay.value = next;
+  });
 };
 
   monthEnabled = (iso: any) => {

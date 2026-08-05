@@ -139,6 +139,7 @@ const viewIso = ref('');
 const hoverIso = ref('');
 const viewMode = ref('days');
 const activeDay = ref(0);
+const activeDayReal = ref(0);
 const activeMonth = ref(0);
 const activeYear = ref(0);
 
@@ -360,11 +361,28 @@ const rovingDayInput = (viewIsoOverride?: string) => ({
 // target, with no observable flicker (never a retry loop, and still never
 // queries the DOM or calls .focus() itself — the primitive's own effect
 // keeps owning that once it sees activeDay actually move).
+// [77-09 fix] Resolves the CURRENT day-grid position, safe to call even
+// while a settle is mid-flight (`$data.activeDay === ROVING_DAY_NONE`).
+// `$data.activeDay` is authoritative WHENEVER it holds a real value — this
+// covers every ordinary primitive-driven move (arrows, Home/End, Ctrl+Home/
+// End, pointer clicks, the focusin sync) transparently, since none of those
+// ever write the sentinel; they write straight through the
+// `r-keynav:tabindex.grid(7)="$data.activeDay"` two-way binding. Only when
+// `activeDay` is CURRENTLY the sentinel (a settle this same module started
+// is still in flight) does this fall back to `activeDayReal`, the shadow
+// both seedActiveDay and onDayPage keep pointed at their own last-computed
+// target — see `activeDayReal`'s own <data> doc comment for why a plain
+// `$data.activeDay` read is unsafe in that window.
+const currentActiveDay = () => activeDay.value === ROVING_DAY_NONE ? activeDayReal.value : activeDay.value;
 const seedActiveDay = (viewIsoOverride?: string, assumeDaysView?: boolean) => {
   const next = resolveRovingDayIndex(allDayCells(viewIsoOverride, assumeDaysView), rovingDayInput(viewIsoOverride));
-  if (next === activeDay.value) {
+  if (next === currentActiveDay()) {
     activeDay.value = ROVING_DAY_NONE;
   }
+  // `activeDayReal` is updated SYNCHRONOUSLY (no rAF defer) — pure
+  // bookkeeping, never read for DOM focus/UI, so it must always reflect the
+  // latest INTENDED target the instant it's known, not one frame later.
+  activeDayReal.value = next;
   requestAnimationFrame(() => {
     activeDay.value = next;
   });
@@ -566,11 +584,15 @@ const onDayCommit = (i: any) => {
 // at the OPPOSITE edge of the freshly rendered set — forward lands at the
 // first cell (index 0), backward at the last.
 //
-// 'pageup'/'pagedown': swing the view by one month and keep the SAME COLUMN
-// (SPEC §4.1's sameWeekdayIndex illustration, mirroring KeynavGridDemo's own
-// onPage) — every panel is exactly 42 cells (6 rows x 7 columns), so
-// `activeDay % 7` recovers the weekday column regardless of which panel/row
-// the active cell was in.
+// 'pageup'/'pagedown': swing the view by one month and land on the SAME FLAT
+// INDEX (SPEC §4.1's sameWeekdayIndex illustration, mirroring KeynavGridDemo's
+// own onPage) — every panel is unconditionally 42 cells (6 rows x 7 columns)
+// and numberOfMonths never changes mid-page, so preserving the flat index
+// preserves BOTH the row and the weekday column. [77-09 fix, bug report
+// 2026-08-05] The prior implementation only preserved the COLUMN
+// (`activeDay % 7`), which silently discarded the row and always re-landed
+// on row 0 — visibly "jumping to the top row" on every PageUp/PageDown press
+// whenever the active cell wasn't already there.
 //
 // Reuses addMonths — the family's existing month arithmetic (T-77-08-03: one
 // month per event, no unbounded loop) — no new date math.
@@ -581,15 +603,54 @@ const onDayCommit = (i: any) => {
 // is unconditionally 42 cells, so the flat array's length is `numberOfMonths
 // * 42` regardless of WHICH month $data.viewIso currently names — nothing
 // here depends on the just-written value actually having landed yet.
+//
+// [77-09 fix] EVERY write below settles through the ROVING_DAY_NONE sentinel
+// first, then the real landing index one animation frame later — the SAME
+// safety net seedActiveDay uses (see its own doc comment) and for the SAME
+// reason: a page/boundary event always tears down and recreates the day-cell
+// DOM nodes (fresh content-based :key per week/panel for the new month) even
+// when the computed landing INDEX happens to repeat the value activeDay
+// already held (which the fixed 'pageup'/'pagedown' math above now does by
+// design whenever the grid shape is unchanged). When that happens, the
+// per-target controller's own "only re-apply focus on a genuine active-value
+// change" guard sees no change at all and never re-queries the (brand new)
+// DOM for the landing cell — silently dropping focus. This was the exact
+// mechanism behind the reported "second PageUp press loses focus entirely"
+// symptom: the first press (previously) computed a DIFFERENT column-only
+// value than the starting index, so it visibly (if wrongly) refocused; the
+// second press then computed the SAME value as the first, hit the
+// no-genuine-change guard, and focus vanished. Settling through the sentinel
+// forces a genuine reactive change on every press, regardless of whether the
+// computed index happens to repeat.
+//
+// [77-09 fix, real-DOM regression] The landing-index math below reads
+// `currentActiveDay()` (the sentinel-safe resolver), NOT `$data.activeDay`
+// directly. `activeDay` transiently sits at ROVING_DAY_NONE between the
+// synchronous settle-write below and the rAF-deferred real-value write one
+// frame later — a real hazard under RAPID REPEATED presses (PageDown held
+// down; OS key-repeat comfortably outpaces a single animation frame): a
+// second onDayPage call landing inside that transient window would read the
+// SENTINEL as "the current position," permanently corrupting every
+// subsequent landing index to -1 and dropping focus forever (confirmed via
+// real-DOM testing — a fast repeated-PageDown sequence never recovered
+// within a 10s poll). `currentActiveDay()` falls back to `activeDayReal`
+// (kept synchronously current below) ONLY during that window, and is
+// `$data.activeDay` itself the rest of the time — which is what keeps an
+// ORDINARY move (Control+Home, arrows, Home/End — none of which ever write
+// the sentinel) correctly visible here too, rather than a stale shadow from
+// whenever the day grid was last paged.
 const onDayPage = (detail: any) => {
   viewIso.value = addMonths(viewMonthGrid(), detail.direction);
   const nextCells = allDayCells();
-  if (detail.reason === 'boundary') {
-    activeDay.value = detail.direction > 0 ? 0 : nextCells.length - 1;
-  } else {
-    const column = activeDay.value % 7;
-    activeDay.value = Math.min(column, nextCells.length - 1);
+  const current = currentActiveDay();
+  const next = detail.reason === 'boundary' ? detail.direction > 0 ? 0 : nextCells.length - 1 : Math.min(current, nextCells.length - 1);
+  if (next === current) {
+    activeDay.value = ROVING_DAY_NONE;
   }
+  activeDayReal.value = next;
+  requestAnimationFrame(() => {
+    activeDay.value = next;
+  });
 };
 // The native `disabled` attribute is gone from the month/year drill buttons
 // (D-3 — focusable-but-inert, matching the day cells), so selectMonth/

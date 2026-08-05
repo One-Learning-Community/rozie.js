@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type Locator } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -73,6 +73,23 @@ async function activeElementInfo(page: Page): Promise<{
       ariaDisabled: active.getAttribute('aria-disabled'),
     };
   });
+}
+
+/**
+ * Resolves the CURRENTLY FOCUSED day cell's flat position within the day
+ * grid's own render-order `[data-day]` list (0-indexed) — used to assert
+ * PageUp/PageDown preserve the SAME grid position (row AND column) across a
+ * month swing, rather than just the ISO date (which necessarily differs
+ * month to month). `mount.locator(...)` pierces shadow roots automatically
+ * (Playwright locator semantics), so this works unmodified on Lit too.
+ */
+async function focusedDayGridIndex(page: Page, mount: Locator): Promise<number> {
+  const info = await activeElementInfo(page);
+  if (!info?.dataDay) return -1;
+  const allDays = await mount
+    .locator('[data-day]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-day')));
+  return allDays.indexOf(info.dataDay);
 }
 
 for (const target of TARGETS) {
@@ -260,6 +277,125 @@ for (const target of TARGETS) {
     await expect
       .poll(async () => (await activeElementInfo(page))?.dataDay, { timeout: 10_000 })
       .toBe('2025-07-19');
+
+    expect(pageErrors, `uncaught page errors: ${pageErrors.join('; ')}`).toEqual([]);
+    expect(consoleErrors, `console errors: ${consoleErrors.join('; ')}`).toEqual([]);
+  });
+
+  // -----------------------------------------------------------------------
+  // 5. PageUp/PageDown preserve the grid position (row AND column), and
+  //    focus never drops across repeated presses (77-09 bug report
+  //    2026-08-05). RED before the fix: onDayPage's old landing math only
+  //    preserved the COLUMN (`activeDay % 7`), discarding the row — the
+  //    FIRST press visibly jumped to the top row, and because that landing
+  //    index then repeated on every SUBSEQUENT press (a same-value write the
+  //    per-target controller's active-diff guard treats as a no-op), the
+  //    SECOND press dropped focus entirely even though the underlying
+  //    day-cell DOM nodes had been torn down and recreated for the new
+  //    month.
+  // -----------------------------------------------------------------------
+  runner(`date-picker-keyboard [${target}]: PageUp/PageDown preserve grid position, no lost focus on repeated presses`, async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    const consoleErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+
+    await page.goto(`/?example=DatePickerBehavior&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+    await expect(mount.locator('[data-day="2025-06-15"]')).toBeVisible({ timeout: 10_000 });
+
+    // 2025-06-15 is a Sunday (June 2025 starts on a Sunday, weekStartsOn=0) —
+    // row 2, column 0 of the 42-cell month grid: flat index 14. NOT the top
+    // row, so a naive "collapse to column" landing would visibly shift it.
+    await mount.locator('[data-day="2025-06-15"]').focus();
+    expect(await focusedDayGridIndex(page, mount)).toBe(14);
+
+    // ---- first PageUp: month swings back, grid position must be UNCHANGED
+    //      (same row AND column — index 14 in the new month's grid), not
+    //      collapsed to the top row (index 0-6) ----
+    await page.keyboard.press('PageUp');
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataDay, { timeout: 10_000 })
+      .not.toBeNull();
+    await expect
+      .poll(() => focusedDayGridIndex(page, mount), { timeout: 10_000 })
+      .toBe(14);
+
+    // ---- second PageUp: focus must NOT drop even though the landing index
+    //      repeats (14 -> 14) and the day-cell DOM nodes were recreated for
+    //      yet another new month ----
+    await page.keyboard.press('PageUp');
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataDay, { timeout: 10_000 })
+      .not.toBeNull();
+    await expect
+      .poll(() => focusedDayGridIndex(page, mount), { timeout: 10_000 })
+      .toBe(14);
+
+    // ---- PageDown mirrors the same guarantee, across two presses back
+    //      toward (and past) the starting month ----
+    await page.keyboard.press('PageDown');
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataDay, { timeout: 10_000 })
+      .not.toBeNull();
+    await expect
+      .poll(() => focusedDayGridIndex(page, mount), { timeout: 10_000 })
+      .toBe(14);
+
+    await page.keyboard.press('PageDown');
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataDay, { timeout: 10_000 })
+      .not.toBeNull();
+    await expect
+      .poll(() => focusedDayGridIndex(page, mount), { timeout: 10_000 })
+      .toBe(14);
+
+    expect(pageErrors, `uncaught page errors: ${pageErrors.join('; ')}`).toEqual([]);
+    expect(consoleErrors, `console errors: ${consoleErrors.join('; ')}`).toEqual([]);
+  });
+
+  // -----------------------------------------------------------------------
+  // 6. PageUp from a TOP-ROW starting cell — Dan's exact repro condition
+  //    ("having the focused index in the top row before pressing"). With
+  //    the pre-fix column-only landing math, index 0 -> column 0 -> index 0
+  //    again: a same-value write on the VERY FIRST press, dropping focus
+  //    immediately instead of after a second press.
+  // -----------------------------------------------------------------------
+  runner(`date-picker-keyboard [${target}]: PageUp from a top-row cell does not drop focus on the first press`, async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    const consoleErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+
+    await page.goto(`/?example=DatePickerBehavior&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+    await expect(mount.locator('[data-day="2025-06-15"]')).toBeVisible({ timeout: 10_000 });
+
+    // Land on the grid's TOP-LEFT cell (row 0, col 0 — flat index 0) via
+    // Control+Home before pressing PageUp at all.
+    await mount.locator('[data-day="2025-06-15"]').focus();
+    await page.keyboard.press('Control+Home');
+    await expect
+      .poll(() => focusedDayGridIndex(page, mount), { timeout: 10_000 })
+      .toBe(0);
+
+    await page.keyboard.press('PageUp');
+    await expect
+      .poll(async () => (await activeElementInfo(page))?.dataDay, { timeout: 10_000 })
+      .not.toBeNull();
+    await expect
+      .poll(() => focusedDayGridIndex(page, mount), { timeout: 10_000 })
+      .toBe(0);
 
     expect(pageErrors, `uncaught page errors: ${pageErrors.join('; ')}`).toEqual([]);
     expect(consoleErrors, `console errors: ${consoleErrors.join('; ')}`).toEqual([]);

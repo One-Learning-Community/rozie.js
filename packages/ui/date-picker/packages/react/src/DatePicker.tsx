@@ -123,6 +123,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   const [hoverIso, setHoverIso] = useState('');
   const [viewMode, setViewMode] = useState('days');
   const [activeDay, setActiveDay] = useState(0);
+  const [activeDayReal, setActiveDayReal] = useState(0);
   const [activeMonth, setActiveMonth] = useState(0);
   const [activeYear, setActiveYear] = useState(0);
   const root = useRef<HTMLDivElement | null>(null);
@@ -225,15 +226,22 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       anchor: selected() !== '' ? selected() : props.selectionMode === 'range' ? readRange().start : ''
     };
   }
+  function currentActiveDay() {
+    return activeDay === ROVING_DAY_NONE ? activeDayReal : activeDay;
+  }
   const seedActiveDay = useCallback((viewIsoOverride?: string, assumeDaysView?: boolean) => {
     const next = resolveRovingDayIndex(allDayCells(viewIsoOverride, assumeDaysView), rovingDayInput(viewIsoOverride));
-    if (next === activeDay) {
+    if (next === currentActiveDay()) {
       setActiveDay(ROVING_DAY_NONE);
     }
+    // `activeDayReal` is updated SYNCHRONOUSLY (no rAF defer) — pure
+    // bookkeeping, never read for DOM focus/UI, so it must always reflect the
+    // latest INTENDED target the instant it's known, not one frame later.
+    setActiveDayReal(next);
     requestAnimationFrame(() => {
       setActiveDay(next);
     });
-  }, [activeDay, allDayCells, rovingDayInput]);
+  }, [allDayCells, currentActiveDay, rovingDayInput]);
   function monthHeading() {
     return monthLabel(viewMonthGrid(), props.locale);
   }
@@ -374,13 +382,16 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   const onDayPage = useCallback((detail: any) => {
     setViewIso(addMonths(viewMonthGrid(), detail.direction));
     const nextCells = allDayCells();
-    if (detail.reason === 'boundary') {
-      setActiveDay(detail.direction > 0 ? 0 : nextCells.length - 1);
-    } else {
-      const column = activeDay % 7;
-      setActiveDay(Math.min(column, nextCells.length - 1));
+    const current = currentActiveDay();
+    const next = detail.reason === 'boundary' ? detail.direction > 0 ? 0 : nextCells.length - 1 : Math.min(current, nextCells.length - 1);
+    if (next === current) {
+      setActiveDay(ROVING_DAY_NONE);
     }
-  }, [activeDay, allDayCells, viewMonthGrid]);
+    setActiveDayReal(next);
+    requestAnimationFrame(() => {
+      setActiveDay(next);
+    });
+  }, [allDayCells, currentActiveDay, viewMonthGrid]);
   function monthEnabled(iso: any) {
     const cell = monthList().months.find((m: any) => m.iso === iso);
     return !cell || !cell.disabled;
