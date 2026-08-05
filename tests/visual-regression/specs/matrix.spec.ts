@@ -456,6 +456,13 @@ const EXAMPLES = [
   // same shared `${name}.png`; baseline-gates to test.fixme via
   // baselineExists() until the Linux-Docker PNG lands.
   'KeynavGrid',
+  // Phase 77 Plan 06 (r-keynav multi-group) — KeynavMultiGroup doubles as
+  // BOTH the DOM-driven behavioral cell (keynav-grid-behavior.spec.ts) AND
+  // this pixel-baseline cell, same precedent as KeynavGrid immediately
+  // above. Per D-10 all 6 targets diff against the same shared
+  // `${name}.png`; baseline-gates to test.fixme via baselineExists() until
+  // the Linux-Docker PNG lands.
+  'KeynavMultiGroup',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -1073,6 +1080,19 @@ async function settleExample(
   // before clipping (a no-op wait on targets where it's already true).
   if (example === 'KeynavGrid') {
     await expect(page.locator('[data-rozie-keynav-item="0"]')).toBeFocused({
+      timeout: 10_000,
+    });
+  }
+  // KeynavMultiGroup (Phase 77, r-keynav multi-group): TWO roots, both
+  // tabindex-model, both mount-focus their own active item — only ONE can
+  // hold real browser focus. Root declaration order (Root A's controller
+  // mounts before Root B's) makes the LAST-declared root's mount effect win
+  // deterministically per target, but WHICH root wins is an emitter-internal
+  // detail this pixel gate does not hard-code — it only waits for focus to
+  // land on ANY keynav item before clipping, so the baseline is
+  // deterministic without depending on that internal ordering.
+  if (example === 'KeynavMultiGroup') {
+    await expect(page.locator('[data-rozie-keynav-item]:focus')).toHaveCount(1, {
       timeout: 10_000,
     });
   }

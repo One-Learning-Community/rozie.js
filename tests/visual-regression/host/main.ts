@@ -1175,6 +1175,15 @@ export const EXAMPLES = [
   // cell (matrix.spec.ts), mirroring the Phase-71 KeynavMenu/KeynavCombobox
   // precedent immediately above.
   'KeynavGrid',
+  // Phase 77 Plan 06 (r-keynav multi-group) — KeynavMultiGroup (loader →
+  // examples/demos/KeynavMultiGroupDemo.rozie): one component with TWO
+  // SIBLING r-keynav roots (a 1D list + a `.grid(3)`), proving containment
+  // scoping and fully independent per-root state (SPEC §6, §9.3).
+  // Self-contained (no existing @rozie-ui family touched — the scope
+  // fence). Doubles as BOTH the DOM-driven behavioral cell
+  // (keynav-grid-behavior.spec.ts) AND a VR pixel-baseline cell
+  // (matrix.spec.ts), same precedent as KeynavGrid immediately above.
+  'KeynavMultiGroup',
   // Phase 76 (@rozie-ui/lexical, D-09) — the cross-framework Lexical rich-text
   // editor family. SIX-target family (react/vue/svelte/angular/solid/lit — Lit
   // graduated from v1.1 staging into the shipped family in 76-09, D-10), so these
@@ -1578,6 +1587,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 77 Plan 06 (r-keynav grid) — the Lit entry appends '-demo' →
   // tag 'rozie-keynav-grid-demo' = kebab of KeynavGridDemo.
   KeynavGrid: 'rozie-keynav-grid',
+  // Phase 77 Plan 06 (r-keynav multi-group) — the Lit entry appends '-demo'
+  // → tag 'rozie-keynav-multi-group-demo' = kebab of KeynavMultiGroupDemo.
+  KeynavMultiGroup: 'rozie-keynav-multi-group',
   // Phase 76 (@rozie-ui/lexical) — 6-target family incl. Lit (graduated in 76-09,
   // D-10). The lit entry IS routed for these cells; lexical.spec.ts iterates all six
   // (react/vue/svelte/angular/solid/lit) and the lit build resolves the real
@@ -2006,6 +2018,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 77 Plan 06 (r-keynav grid) — self-contained (all page data lives
   // in <data>/<script>); no parent-supplied props.
   KeynavGrid: {},
+  // Phase 77 Plan 06 (r-keynav multi-group) — self-contained (LIST_A/GRID_B
+  // live in <script>, active indices in <data>); no parent-supplied props.
+  KeynavMultiGroup: {},
   // Phase 76 (@rozie-ui/lexical) — both are demo cells (isDemo → mounted with `{}`,
   // DEFAULT_PROPS skipped); these entries exist only to satisfy the Record<Example>
   // type. State is composed inside the demo (seed / controls props on the driver).

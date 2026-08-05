@@ -1,0 +1,199 @@
+<!--
+  KeynavMultiGroupDemo — fresh proof of Phase-77 multi-group containment
+  scoping (77-SPEC.md §6, §9.3): ONE component, TWO independent `r-keynav`
+  roots, each with its own active-index model, its own commit handler, and
+  its own readout.
+
+  Root A ("list") is a plain 1D vertical roving-tabindex list (no grid).
+  Root B ("grid") is a small roving-tabindex GRID with a LITERAL column
+  count (`.grid(3)`). Root A and Root B are SIBLINGS in the template below —
+  NEITHER contains the other. Nesting one root inside the other's subtree is
+  the ROZ996 (KEYNAV_NESTED_ROOTS) diagnostic (SPEC §6) — do not "simplify"
+  this markup by moving Root B's container inside Root A's, or vice versa.
+
+  Because `resolveKeynavGroups` associates each `r-keynav-item` to its
+  NEAREST ANCESTOR root once a component has 2+ roots (SPEC §6, §10.5
+  amendment 1), each root's items live inside that root's OWN subtree so the
+  containment association is unambiguous — this is the load-bearing shape
+  the multi-group spec proves, not merely two roots existing side by side.
+
+  Self-contained (no `<components>` import, no existing @rozie-ui family
+  touched — the scope fence). Both roots use the tabindex focus model, so
+  DOM focus is real and roving; whichever root's mount effect runs LAST
+  (declaration order — Root B, here) wins actual browser focus at first
+  paint, which is what makes the default-mount pixel baseline deterministic.
+  Doubles as BOTH the DOM-driven behavioral cell
+  (keynav-grid-behavior.spec.ts) AND a VR pixel-baseline cell
+  (matrix.spec.ts).
+-->
+<rozie name="KeynavMultiGroupDemo">
+
+<data>
+{
+  activeA: 0,
+  activeB: 0,
+  committedA: '',
+  committedB: '',
+}
+</data>
+
+<script>
+const LIST_A = [
+  { id: 'red', label: 'Red' },
+  { id: 'green', label: 'Green' },
+  { id: 'blue', label: 'Blue', disabled: true },
+  { id: 'yellow', label: 'Yellow' },
+]
+
+const GRID_B = [
+  { id: 'b1', label: '1' },
+  { id: 'b2', label: '2' },
+  { id: 'b3', label: '3' },
+  { id: 'b4', label: '4' },
+  { id: 'b5', label: '5', disabled: true },
+  { id: 'b6', label: '6' },
+]
+
+function commitA(item) {
+  $data.committedA = item ? item.label : ''
+}
+
+function commitB(cell) {
+  $data.committedB = cell ? cell.label : ''
+}
+</script>
+
+<template>
+<div class="keynav-multigroup-demo" data-keynav-multigroup-demo>
+  <h3>Multi-group — two independent r-keynav roots</h3>
+
+  <!--
+    Root A and Root B are SIBLINGS at this level — neither is nested inside
+    the other's subtree. This is the shape SPEC §6 legalizes; nesting one
+    inside the other is the ROZ996 diagnostic.
+  -->
+  <div class="group" data-testid="root-a-container">
+    <h4>Root A — 1D list</h4>
+    <span class="readout" data-testid="readout-committed-a">{{ $data.committedA }}</span>
+    <div role="menu" class="list"
+         r-keynav:tabindex.vertical="$data.activeA"
+         r-keynav-active-class="'is-active'"
+         @keynav-commit="commitA(LIST_A[$data.activeA])">
+      <button type="button" role="menuitem" r-for="it in LIST_A" :key="it.id"
+              r-keynav-item="{ label: it.label, disabled: it.disabled }"
+              class="list-item"
+              :aria-disabled="!!it.disabled"
+              :class="{ 'list-item--disabled': it.disabled }">
+        {{ it.label }}
+      </button>
+    </div>
+  </div>
+
+  <div class="group" data-testid="root-b-container">
+    <h4>Root B — grid (.grid(3))</h4>
+    <span class="readout" data-testid="readout-committed-b">{{ $data.committedB }}</span>
+    <div role="grid" class="grid"
+         r-keynav:tabindex.grid(3)="$data.activeB"
+         r-keynav-active-class="'is-active'"
+         @keynav-commit="commitB(GRID_B[$data.activeB])">
+      <button type="button" role="gridcell" r-for="cell in GRID_B" :key="cell.id"
+              r-keynav-item="{ label: cell.label, disabled: cell.disabled }"
+              class="cell"
+              :aria-disabled="!!cell.disabled"
+              :class="{ 'cell--disabled': cell.disabled }">
+        {{ cell.label }}
+      </button>
+    </div>
+  </div>
+</div>
+</template>
+
+<style>
+.keynav-multigroup-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.keynav-multigroup-demo h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.keynav-multigroup-demo h4 {
+  margin: 0 0 0.35rem 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #444;
+}
+.keynav-multigroup-demo .readout {
+  min-width: 4ch;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  background: #f0f0f0;
+  border-radius: 3px;
+  padding: 0.1rem 0.35rem;
+  margin-bottom: 0.35rem;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  padding: 4px;
+}
+.list-item {
+  appearance: none;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+  color: #1a1a1a;
+}
+.list-item[data-rozie-keynav-active] {
+  background: #2563eb;
+  color: #fff;
+}
+.list-item--disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(2rem, 1fr));
+  gap: 2px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  padding: 4px;
+}
+.cell {
+  appearance: none;
+  border: none;
+  background: transparent;
+  text-align: center;
+  padding: 0.4rem 0.2rem;
+  border-radius: 4px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  color: #1a1a1a;
+}
+.cell[data-rozie-keynav-active] {
+  background: #2563eb;
+  color: #fff;
+}
+.cell--disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+</style>
+
+</rozie>
