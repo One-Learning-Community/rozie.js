@@ -92,6 +92,27 @@ async function focusedDayGridIndex(page: Page, mount: Locator): Promise<number> 
   return allDays.indexOf(info.dataDay);
 }
 
+/**
+ * Resolves the CURRENTLY FOCUSED drill cell's (months or years panel) flat
+ * position within its own render-order `[data-month]`/`[data-year]` list
+ * (0-indexed) — the drill-panel sibling of `focusedDayGridIndex` above. Same
+ * shadow-piercing `mount.locator(...)` approach, so Lit works unmodified.
+ * Returns -1 when nothing matching `attr` is currently focused.
+ */
+async function focusedDrillIndex(
+  page: Page,
+  mount: Locator,
+  attr: 'data-month' | 'data-year',
+): Promise<number> {
+  const info = await activeElementInfo(page);
+  const focusedValue = attr === 'data-month' ? info?.dataMonth : info?.dataYear;
+  if (!focusedValue) return -1;
+  const allValues = await mount
+    .locator(`[${attr}]`)
+    .evaluateAll((els, a) => els.map((el) => el.getAttribute(a)), attr);
+  return allValues.indexOf(focusedValue);
+}
+
 for (const target of TARGETS) {
   const runner = runnerFor(target);
 
@@ -396,6 +417,157 @@ for (const target of TARGETS) {
     await expect
       .poll(() => focusedDayGridIndex(page, mount), { timeout: 10_000 })
       .toBe(0);
+
+    expect(pageErrors, `uncaught page errors: ${pageErrors.join('; ')}`).toEqual([]);
+    expect(consoleErrors, `console errors: ${consoleErrors.join('; ')}`).toEqual([]);
+  });
+
+  // -----------------------------------------------------------------------
+  // 7. Drill-panel r-keynav grid keys (77-11 gap closure — KNG-08). The
+  //    months and years panels are `r-keynav:tabindex.grid(3)` roots exactly
+  //    like the day grid, but NOTHING ever pressed a key inside them before
+  //    this test — the coverage hole the verifier named. RED on Angular
+  //    without plan 77-10's reactive re-attach fix (dead delegation on any
+  //    keynav root, drill panels included).
+  //
+  //    INDEX-RELATIVE by construction: every assertion is anchored by a
+  //    Control+Home press FIRST, so the sequence is independent of the
+  //    drill's entry-seeding value and stays green on Lit despite the filed
+  //    drill-seeding deferral (deferred-items.md) — only the SEEDED entry
+  //    value is a known Lit gap, not the r-keynav delegation this test
+  //    proves. Control+Home is itself an r-keynav-delegated key, so it is
+  //    the very first assertion that goes red when delegation is dead.
+  //
+  //    Column stride is 3 (r-keynav:tabindex.grid(3)), 12 cells per drill
+  //    (0-11): ArrowRight +1, ArrowDown +3, End/Home resolve within the
+  //    active row, Ctrl+Home/Ctrl+End resolve the whole-grid corners.
+  //    PageUp/PageDown are proven explicit no-ops (`onDrillPage` — SPEC
+  //    §4.1's clamp-equivalent default; see 77-07-SUMMARY.md).
+  // -----------------------------------------------------------------------
+  runner(`date-picker-keyboard [${target}]: drill panels navigate with r-keynav grid keys`, async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    const consoleErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+
+    await page.goto(`/?example=DatePickerBehavior&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+    await expect(mount.locator('[data-day="2025-06-15"]')).toBeVisible({ timeout: 10_000 });
+
+    // ---- Months drill panel ----
+    await mount.locator('.rozie-datepicker-heading-button').focus();
+    await page.keyboard.press('Enter');
+    await expect(mount.locator('.rozie-datepicker-months')).toBeVisible({ timeout: 10_000 });
+
+    await page.keyboard.press('Control+Home');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-month'), { timeout: 10_000 })
+      .toBe(0);
+
+    await page.keyboard.press('ArrowRight');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-month'), { timeout: 10_000 })
+      .toBe(1);
+
+    await page.keyboard.press('ArrowDown');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-month'), { timeout: 10_000 })
+      .toBe(4);
+
+    await page.keyboard.press('End');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-month'), { timeout: 10_000 })
+      .toBe(5);
+
+    await page.keyboard.press('Home');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-month'), { timeout: 10_000 })
+      .toBe(3);
+
+    await page.keyboard.press('ArrowUp');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-month'), { timeout: 10_000 })
+      .toBe(0);
+
+    await page.keyboard.press('Control+End');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-month'), { timeout: 10_000 })
+      .toBe(11);
+
+    await page.keyboard.press('ArrowLeft');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-month'), { timeout: 10_000 })
+      .toBe(10);
+
+    // Paging no-op: onDrillPage is an explicit no-op — the machine never
+    // lands active on a page event, so the index must not move either way.
+    await page.keyboard.press('PageDown');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-month'), { timeout: 10_000 })
+      .toBe(10);
+    await page.keyboard.press('PageUp');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-month'), { timeout: 10_000 })
+      .toBe(10);
+
+    // ---- Years drill panel (drill further via the months header label) ----
+    await mount.locator('.rozie-datepicker-months .rozie-datepicker-drill-label').focus();
+    await page.keyboard.press('Enter');
+    await expect(mount.locator('.rozie-datepicker-years')).toBeVisible({ timeout: 10_000 });
+
+    await page.keyboard.press('Control+Home');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-year'), { timeout: 10_000 })
+      .toBe(0);
+
+    await page.keyboard.press('ArrowRight');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-year'), { timeout: 10_000 })
+      .toBe(1);
+
+    await page.keyboard.press('ArrowDown');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-year'), { timeout: 10_000 })
+      .toBe(4);
+
+    await page.keyboard.press('End');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-year'), { timeout: 10_000 })
+      .toBe(5);
+
+    await page.keyboard.press('Home');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-year'), { timeout: 10_000 })
+      .toBe(3);
+
+    await page.keyboard.press('ArrowUp');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-year'), { timeout: 10_000 })
+      .toBe(0);
+
+    await page.keyboard.press('Control+End');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-year'), { timeout: 10_000 })
+      .toBe(11);
+
+    await page.keyboard.press('ArrowLeft');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-year'), { timeout: 10_000 })
+      .toBe(10);
+
+    await page.keyboard.press('PageDown');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-year'), { timeout: 10_000 })
+      .toBe(10);
+    await page.keyboard.press('PageUp');
+    await expect
+      .poll(() => focusedDrillIndex(page, mount, 'data-year'), { timeout: 10_000 })
+      .toBe(10);
 
     expect(pageErrors, `uncaught page errors: ${pageErrors.join('; ')}`).toEqual([]);
     expect(consoleErrors, `console errors: ${consoleErrors.join('; ')}`).toEqual([]);
