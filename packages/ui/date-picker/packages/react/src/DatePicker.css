@@ -42,6 +42,9 @@
   outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
   outline-offset: var(--rozie-datepicker-ring-offset, 1px);
 }
+.rozie-datepicker-grids[data-rozie-s-6800c7a2] {
+  display: contents;
+}
 .rozie-datepicker-grid[data-rozie-s-6800c7a2] {
   display: grid;
   gap: var(--rozie-datepicker-cell-gap, 0.125rem);

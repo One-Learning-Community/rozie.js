@@ -74,25 +74,27 @@ function __rozieAttr(v: unknown): string | null {
     }
 
       
-      @for (g of daysGrids(); track gi; let gi = $index) {
+      <div class="rozie-datepicker-grids">
+        @for (g of daysGrids(); track gi; let gi = $index) {
     <div class="rozie-datepicker-grid" role="grid" (mouseleave)="hoverIso.set('')">
-        <div class="rozie-datepicker-weekdays" role="row">
-          @for (wd of weekdays(); track wi; let wi = $index) {
+          <div class="rozie-datepicker-weekdays" role="row">
+            @for (wd of weekdays(); track wi; let wi = $index) {
     <span class="rozie-datepicker-weekday" role="columnheader" [attr.aria-label]="rozieAttr(wd)">{{ rozieDisplay(wd) }}</span>
     }
-        </div>
+          </div>
 
-        @for (week of g.weeks; track wk; let wk = $index) {
+          @for (week of g.weeks; track wk; let wk = $index) {
     <div class="rozie-datepicker-week" role="row">
-          @for (day of week; track day.iso) {
+            @for (day of week; track day.iso) {
     <span class="rozie-datepicker-cell" role="gridcell" [attr.aria-selected]="!!(day.selected || day.rangeStart || day.rangeEnd)">
-            <button type="button" class="rozie-datepicker-day" [ngClass]="{ 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }" [attr.data-day]="rozieAttr(day.iso)" [attr.tabindex]="rozieAttr(dayTabIndex(day))" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!day.disabled" [attr.aria-label]="rozieAttr(day.iso)" [attr.aria-current]="rozieAttr(day.today ? 'date' : null)" (click)="onDaySelect(day.iso)" (mouseenter)="onDayHover(day.iso)" (focus)="onDayHover(day.iso)" (keydown)="onDayKeydown(day.iso, $event)">{{ rozieDisplay(day.day) }}</button>
-          </span>
+              <button type="button" class="rozie-datepicker-day" [ngClass]="{ 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }" [attr.data-day]="rozieAttr(day.iso)" [attr.tabindex]="rozieAttr(dayTabIndex(day))" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!day.disabled" [attr.aria-label]="rozieAttr(day.iso)" [attr.aria-current]="rozieAttr(day.today ? 'date' : null)" (click)="onDaySelect(day.iso)" (mouseenter)="onDayHover(day.iso)" (focus)="onDayHover(day.iso)" (keydown)="onDayKeydown(day.iso, $event)">{{ rozieDisplay(day.day) }}</button>
+            </span>
+    }
+          </div>
     }
         </div>
     }
       </div>
-    }
 
       
       @if (showsMonthsView()) {
@@ -190,6 +192,9 @@ function __rozieAttr(v: unknown): string | null {
     .rozie-datepicker-day:focus-visible {
       outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
       outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+    }
+    .rozie-datepicker-grids {
+      display: contents;
     }
     .rozie-datepicker-grid {
       display: grid;
@@ -720,6 +725,7 @@ export class DatePicker {
   });
   yearRangeLabel = () => this.yearGrid().rangeLabel;
   daysGrids = () => this.showsDaysView() ? this.grids() : [];
+  allDayCells = () => this.daysGrids().flatMap((g: any) => g.weeks.flatMap((row: any) => row));
   rovingDayIso = (): string => resolveRovingIso({
     viewIso: this.viewMonthGrid(),
     value: this.selected(),

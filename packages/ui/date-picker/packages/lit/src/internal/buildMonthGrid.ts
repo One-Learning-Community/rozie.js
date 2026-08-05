@@ -568,6 +568,32 @@ export function resolveRovingDrillIndex<T extends RovingDrillCell>(cells: T[]): 
   return cells.findIndex((c) => c.iso === iso);
 }
 
+/** Sentinel returned by {@link resolveRovingDayIndex} when no cell is
+ * selectable (mirrors {@link resolveRovingIso}'s `''` — this only happens
+ * when the whole control is `disabled`, or when the flat `cells` array is
+ * empty because the days view isn't currently showing). */
+export const ROVING_DAY_NONE = -1;
+
+/**
+ * The `r-keynav` grid primitive owns an ACTIVE-INDEX model, not an iso
+ * model — this is the thin adapter between the two for the DAY grid (mirrors
+ * {@link resolveRovingDrillIndex} for the month/year drills). Delegates
+ * entirely to {@link resolveRovingIso} and looks the winning iso back up in
+ * the flat `cells` array (render order: panel, then week, then day — see
+ * `DatePicker.rozie`'s `allDayCells()`), matched against `inMonth` so a
+ * duplicate iso rendered as a leading/trailing spill day in a NEIGHBOURING
+ * panel is never mistaken for the true owning cell — the exact guard the
+ * pre-retrofit `dayTabIndex` used (`day.inMonth && day.iso === rovingDayIso()`).
+ * Returns {@link ROVING_DAY_NONE} when `resolveRovingIso` returns `''`, or
+ * when no `inMonth` cell in `cells` matches the resolved iso (e.g. `cells`
+ * is `[]` because the days view isn't showing).
+ */
+export function resolveRovingDayIndex(cells: CalendarDay[], input: RovingDayInput): number {
+  const iso = resolveRovingIso(input);
+  if (iso === '') return ROVING_DAY_NONE;
+  return cells.findIndex((c) => c.inMonth && c.iso === iso);
+}
+
 /**
  * The seven weekday header labels, ordered from `weekStartsOn`. Localized via
  * `Intl` (short names) with an English fallback.

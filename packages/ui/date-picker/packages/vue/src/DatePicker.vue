@@ -10,15 +10,17 @@
   </slot>
 
   
-  <div v-for="(g, gi) in daysGrids()" :key="gi" class="rozie-datepicker-grid" role="grid" @mouseleave="hoverIso = ''">
-    <div class="rozie-datepicker-weekdays" role="row">
-      <span v-for="(wd, wi) in weekdays()" :key="wi" class="rozie-datepicker-weekday" role="columnheader" :aria-label="wd">{{ wd }}</span>
-    </div>
+  <div class="rozie-datepicker-grids">
+    <div v-for="(g, gi) in daysGrids()" :key="gi" class="rozie-datepicker-grid" role="grid" @mouseleave="hoverIso = ''">
+      <div class="rozie-datepicker-weekdays" role="row">
+        <span v-for="(wd, wi) in weekdays()" :key="wi" class="rozie-datepicker-weekday" role="columnheader" :aria-label="wd">{{ wd }}</span>
+      </div>
 
-    <div v-for="(week, wk) in g.weeks" :key="wk" class="rozie-datepicker-week" role="row">
-      <span v-for="day in week" :key="day.iso" class="rozie-datepicker-cell" role="gridcell" :aria-selected="!!(day.selected || day.rangeStart || day.rangeEnd)">
-        <button type="button" :class="['rozie-datepicker-day', { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]" :data-day="day.iso" :tabindex="(dayTabIndex(day)) ?? undefined" :disabled="!!props.disabled" :aria-disabled="!!day.disabled" :aria-label="day.iso" :aria-current="day.today ? 'date' : undefined" @click="onDaySelect(day.iso)" @mouseenter="onDayHover(day.iso)" @focus="onDayHover(day.iso)" @keydown="onDayKeydown(day.iso, $event)">{{ day.day }}</button>
-      </span>
+      <div v-for="(week, wk) in g.weeks" :key="wk" class="rozie-datepicker-week" role="row">
+        <span v-for="day in week" :key="day.iso" class="rozie-datepicker-cell" role="gridcell" :aria-selected="!!(day.selected || day.rangeStart || day.rangeEnd)">
+          <button type="button" :class="['rozie-datepicker-day', { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]" :data-day="day.iso" :tabindex="(dayTabIndex(day)) ?? undefined" :disabled="!!props.disabled" :aria-disabled="!!day.disabled" :aria-label="day.iso" :aria-current="day.today ? 'date' : undefined" @click="onDaySelect(day.iso)" @mouseenter="onDayHover(day.iso)" @focus="onDayHover(day.iso)" @keydown="onDayKeydown(day.iso, $event)">{{ day.day }}</button>
+        </span>
+      </div>
     </div>
   </div>
 
@@ -242,9 +244,20 @@ const yearRangeLabel = () => yearGrid().rangeLabel;
 // The day-grid iterable for the template: the N month grids in the 'days' view,
 // or an empty array in the months/years drill views. Gating the r-for through an
 // EMPTY array (rather than an r-if on the same element) keeps the day-grid
-// element free of an r-if+r-for combo, and at numberOfMonths === 1 it yields a
-// single grid with NO extra wrapper element (the byte-identical single-month path).
+// element free of an r-if+r-for combo. The panels render inside the ONE
+// layout-neutral `.rozie-datepicker-grids` wrapper (77-08 — the r-keynav day
+// grid's root; `display: contents` in the style block below keeps it out of
+// the render tree, so this stays present regardless of numberOfMonths without
+// perturbing the single-month layout).
 const daysGrids = () => showsDaysView() ? grids() : [];
+// The flat, render-order concatenation of every rendered panel's day cells
+// (panels in order, weeks in order, days in order) — the r-keynav day grid's
+// `:source` (77-08). Every panel is always exactly 42 cells (6 weeks x 7
+// days), so a cell's flat index is `panelIndex * 42 + weekIndex * 7 +
+// columnIndex` — the day button's own explicit r-keynav-item index expression
+// computes this exactly. Empty while a drill panel is showing, mirroring
+// daysGrids()'s own gate.
+const allDayCells = () => daysGrids().flatMap((g: any) => g.weeks.flatMap((row: any) => row));
 // The single roving tab stop for the day grid: the resolved anchor-in-view →
 // today-in-view → first-enabled-in-month-day fallback (resolveRovingIso,
 // buildMonthGrid.ts), scanning every rendered panel under numberOfMonths > 1.
@@ -866,6 +879,9 @@ useKeynav(__rozieKeynavRootRef1, {
 .rozie-datepicker-day:focus-visible {
   outline: var(--rozie-datepicker-ring-width, 2px) solid var(--rozie-datepicker-ring, var(--rozie-datepicker-accent, #0066cc));
   outline-offset: var(--rozie-datepicker-ring-offset, 1px);
+}
+.rozie-datepicker-grids {
+  display: contents;
 }
 .rozie-datepicker-grid {
   display: grid;
