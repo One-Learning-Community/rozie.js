@@ -249,11 +249,13 @@ describe('r-keynav multi-group scoping — containment (77-02 Task 3)', () => {
   it('two SIBLING roots each with their own r-for items produce ZERO diagnostics, each synthesizing its own subtree source', () => {
     const { ir, diagnostics } = lower(
       rozie(
-        `<div role="menu" r-keynav:tabindex.vertical="$data.activeA">
-          <button r-for="a in listA" :key="a.id" r-keynav-item="{ label: a.label }">{{ a.label }}</button>
-        </div>
-        <div role="grid" r-keynav:tabindex.grid(3)="$data.activeB">
-          <button r-for="b in listB" :key="b.id" r-keynav-item="{ label: b.label }">{{ b.label }}</button>
+        `<div>
+          <div role="menu" r-keynav:tabindex.vertical="$data.activeA">
+            <button r-for="a in listA" :key="a.id" r-keynav-item="{ label: a.label }">{{ a.label }}</button>
+          </div>
+          <div role="grid" r-keynav:tabindex.grid(3)="$data.activeB">
+            <button r-for="b in listB" :key="b.id" r-keynav-item="{ label: b.label }">{{ b.label }}</button>
+          </div>
         </div>`,
         '{ activeA: 0, activeB: 0, listA: [], listB: [] }',
       ),
@@ -272,11 +274,13 @@ describe('r-keynav multi-group scoping — containment (77-02 Task 3)', () => {
   it('with 2+ roots, each root and each item carries a groupIndex assigned in document order, matching containment', () => {
     const { ir, diagnostics } = lower(
       rozie(
-        `<div role="menu" r-keynav:tabindex.vertical="$data.activeA">
-          <button r-for="a in listA" :key="a.id" r-keynav-item="{ label: a.label }">{{ a.label }}</button>
-        </div>
-        <div role="grid" r-keynav:tabindex.grid(3)="$data.activeB">
-          <button r-for="b in listB" :key="b.id" r-keynav-item="{ label: b.label }">{{ b.label }}</button>
+        `<div>
+          <div role="menu" r-keynav:tabindex.vertical="$data.activeA">
+            <button r-for="a in listA" :key="a.id" r-keynav-item="{ label: a.label }">{{ a.label }}</button>
+          </div>
+          <div role="grid" r-keynav:tabindex.grid(3)="$data.activeB">
+            <button r-for="b in listB" :key="b.id" r-keynav-item="{ label: b.label }">{{ b.label }}</button>
+          </div>
         </div>`,
         '{ activeA: 0, activeB: 0, listA: [], listB: [] }',
       ),
@@ -322,13 +326,15 @@ describe('r-keynav multi-group scoping — containment (77-02 Task 3)', () => {
   it('MULTI-root, orphan item: an item outside BOTH subtrees reports exactly one ROZ984', () => {
     const { diagnostics } = lower(
       rozie(
-        `<div role="menu" r-keynav:tabindex.vertical="$data.activeA">
-          <button r-for="a in listA" :key="a.id" r-keynav-item="{ label: a.label }">{{ a.label }}</button>
-        </div>
-        <div role="grid" r-keynav:tabindex.grid(3)="$data.activeB">
-          <button r-for="b in listB" :key="b.id" r-keynav-item="{ label: b.label }">{{ b.label }}</button>
-        </div>
-        <button r-keynav-item="{ label: 'orphan' }">orphan</button>`,
+        `<div>
+          <div role="menu" r-keynav:tabindex.vertical="$data.activeA">
+            <button r-for="a in listA" :key="a.id" r-keynav-item="{ label: a.label }">{{ a.label }}</button>
+          </div>
+          <div role="grid" r-keynav:tabindex.grid(3)="$data.activeB">
+            <button r-for="b in listB" :key="b.id" r-keynav-item="{ label: b.label }">{{ b.label }}</button>
+          </div>
+          <button r-keynav-item="{ label: 'orphan' }">orphan</button>
+        </div>`,
         '{ activeA: 0, activeB: 0, listA: [], listB: [] }',
       ),
     );

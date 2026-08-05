@@ -904,11 +904,17 @@ export const RozieErrorCode = {
   // Task 1 (parser/lowerer front-end) claims ROZ982; Task 2
   // (resolveKeynavGroups, the whole-component association pass) claims
   // ROZ983..ROZ987. ROZ982 is the next free code after ROZ981.
-  KEYNAV_UNKNOWN_MODIFIER: 'ROZ982', // error — unknown r-keynav modifier (did-you-mean among .vertical/.horizontal/.both/.loop/.typeahead/.skipdisabled)
+  KEYNAV_UNKNOWN_MODIFIER: 'ROZ982', // error — unknown r-keynav modifier (did-you-mean among .vertical/.horizontal/.both/.loop/.typeahead/.skipdisabled/.grid)
   KEYNAV_NO_ITEMS: 'ROZ983', // error — r-keynav root has no associated r-keynav-item in the component
-  KEYNAV_ORPHAN_ITEM: 'ROZ984', // error — r-keynav-item with no r-keynav root in the component
+  KEYNAV_ORPHAN_ITEM: 'ROZ984', // error — r-keynav-item with no enclosing r-keynav root (ancestor-containment wording, reworded Phase 77 — see ROZ996)
   KEYNAV_BAD_FOCUS_MODEL: 'ROZ985', // error — missing/unrecognized r-keynav focus-model argument (valid: tabindex, activedescendant)
-  KEYNAV_MULTIPLE_ROOTS: 'ROZ986', // error — more than one r-keynav root in one component (v1 = one group per component; named groups deferred)
+  // RETIRED Phase 77 (SPEC.md §6/§8, plan 77-02 Task 3) — multiple r-keynav
+  // roots per component are now LEGAL (containment-scoped multi-group); this
+  // code is never emitted anywhere in packages/core/src. Nested roots (a
+  // root inside another root's subtree) are the new error shape and use
+  // ROZ996 (KEYNAV_NESTED_ROOTS) instead. Kept per the append-only codes
+  // file — the exported constant survives, documented retired.
+  KEYNAV_MULTIPLE_ROOTS: 'ROZ986', // RETIRED — was: more than one r-keynav root in one component (v1 = one group per component); superseded by containment-scoped multi-group + ROZ996 (Phase 77)
   KEYNAV_SOURCE_UNRESOLVED: 'ROZ987', // error — r-keynav :source neither provided nor synthesizable from a co-located r-for
 
   // ---- Phase 75 published-primitive manifest — ROZ988..ROZ989 ----

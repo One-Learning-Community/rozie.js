@@ -1831,18 +1831,42 @@ Two semantics are worth knowing by name before you reach for it:
 1. **Evaluated once (static config), not a live per-render binding.** The controller normalizes the class spec at setup and toggles the token set on active-change — it does not re-evaluate on every render the way a template `:class` binding would. If the active item's styling needs to change *while* it stays active (a value that changes without the active index changing), bind off the always-present `[data-rozie-keynav-active]` attribute instead — that one *is* live, because it's a plain declarative binding the compiler emits per item, not an imperative toggle.
 2. **The object form composes with activeness.** `r-keynav-active-class="{ 'is-active': cond }"` applies the `is-active` class only when the item **is active AND** `cond` holds — both conditions, not either. An item that is active but whose `cond` is falsy gets no class from this rule (though it still carries `[data-rozie-keynav-active]`, since that hook is unconditional).
 
+### Grid focus-model and multi-group
+
+`.grid(<expr>)` switches an `r-keynav` root to the 2D grid focus-model (ARIA grid pattern) — column stride, PageUp/PageDown, row-wise Home/End, boundary→paging events (`@keynav-page`), and focusable-but-inert disabled cells by default:
+
+```html
+<div role="grid"
+     r-keynav:tabindex.grid(7)="$data.active"
+     @keynav-page="onPage($event)">
+  <button r-for="day in days" :key="day.iso" r-keynav-item="{ label: day.label, disabled: day.disabled }">
+    {{ day.num }}
+  </button>
+</div>
+```
+
+The argument is the column-count expression — a numeric literal (`7`) or a reactive read (`$data.cols`); rows are derived (`ceil(count / columns)`). `.grid()` owns both axes, so it cannot combine with `.vertical`/`.horizontal`/`.both`; it replaces wrapping with boundary events, so it cannot combine with `.loop`. `.typeahead` and `.skipdisabled` still compose normally.
+
+**Multiple nav groups per component** are legal — no new syntax. Each `r-keynav` root claims the `r-keynav-item`s in its own template subtree by nearest-ancestor containment; roots must be siblings or cousins, never ancestors of one another. A single-root component keeps the looser Phase-71 component-membership association (the activedescendant/combobox cross-subtree shape still works unchanged) — containment scoping only kicks in once a component has two or more roots, since that's when it's needed to disambiguate which group an item belongs to.
+
+**Explicit item index** — `r-keynav-item="{ index: <expr> }"` supplies the item's flat index directly, for the case where the nearest enclosing `r-for` isn't the right one (e.g. a day-grid nested inside week/panel loops, where the item's *column* index isn't its *flat grid* index).
+
 ### Diagnostics
 
-Six compile-time diagnostics catch malformed `r-keynav` forms (each collected, not thrown):
+Ten compile-time diagnostics catch malformed `r-keynav` forms (each collected, not thrown):
 
 | Code | When |
 | --- | --- |
-| `ROZ982` `KEYNAV_UNKNOWN_MODIFIER` | an unrecognized modifier (did-you-mean among `.vertical`/`.horizontal`/`.both`/`.loop`/`.typeahead`/`.skipdisabled`) |
-| `ROZ983` `KEYNAV_NO_ITEMS` | an `r-keynav` root with no associated `r-keynav-item` in the component |
-| `ROZ984` `KEYNAV_ORPHAN_ITEM` | an `r-keynav-item` with no `r-keynav` root in the component |
+| `ROZ982` `KEYNAV_UNKNOWN_MODIFIER` | an unrecognized modifier (did-you-mean among `.vertical`/`.horizontal`/`.both`/`.loop`/`.typeahead`/`.skipdisabled`/`.grid`) |
+| `ROZ983` `KEYNAV_NO_ITEMS` | an `r-keynav` root with no associated `r-keynav-item` in its subtree |
+| `ROZ984` `KEYNAV_ORPHAN_ITEM` | an `r-keynav-item` with no enclosing `r-keynav` root (ancestor-containment wording; in a single-root component this means no root anywhere in the component) |
 | `ROZ985` `KEYNAV_BAD_FOCUS_MODEL` | a missing or unrecognized focus-model argument (valid: `tabindex`, `activedescendant`) |
-| `ROZ986` `KEYNAV_MULTIPLE_ROOTS` | more than one `r-keynav` root in one component (v1 is one group per component — named groups are a future extension) |
+| `ROZ986` `KEYNAV_MULTIPLE_ROOTS` | **RETIRED** (Phase 77) — multiple `r-keynav` roots per component are now legal (containment-scoped multi-group); never emitted. Superseded by `ROZ996` for the actual illegal shape (nested roots). |
 | `ROZ987` `KEYNAV_SOURCE_UNRESOLVED` | `:source` is neither provided nor synthesizable from a co-located `r-for` |
+| `ROZ993` `KEYNAV_GRID_ORIENTATION_CONFLICT` | `.grid()` combined with `.vertical`/`.horizontal`/`.both` — grid owns both axes |
+| `ROZ994` `KEYNAV_GRID_LOOP_CONFLICT` | `.grid()` combined with `.loop` — boundary/`@keynav-page` events replace wrapping in grid mode |
+| `ROZ995` `KEYNAV_GRID_BAD_COLUMNS` | `.grid` missing its argument, or the argument isn't a numeric literal or a parseable reactive expression |
+| `ROZ996` `KEYNAV_NESTED_ROOTS` | an `r-keynav` root found inside another `r-keynav` root's subtree — roots must be siblings/cousins, never ancestors of one another |
 
 See the [Diagnostics reference](/reference/diagnostics) for the full code table.
 

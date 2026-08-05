@@ -1,12 +1,18 @@
 // Phase 71 Plan 02 Task 2 — resolveKeynavGroups diagnostic cluster coverage.
+// Updated by Phase 77 Plan 02 Task 3: KEYNAV_MULTIPLE_ROOTS (ROZ986) is
+// RETIRED — two sibling r-keynav roots are now LEGAL (containment-scoped
+// multi-group, 77-SPEC.md §6) — so the former "more than one root is an
+// error" case below is flipped to assert ZERO diagnostics on that exact
+// source. The keynav code-list constant grows the four new Phase-77 codes
+// (ROZ993..ROZ996) so a future diagnostic-cluster sweep test stays complete.
 //
 // Red-first fixture per new code (per feedback_emitter_seam_surgical_per_seam
 // / 71-02-PLAN.md Task 2 acceptance criteria): each of ROZ982 (Task 1's
-// KEYNAV_UNKNOWN_MODIFIER) and ROZ983-987 (Task 2's resolveKeynavGroups
-// cluster — KEYNAV_NO_ITEMS / KEYNAV_ORPHAN_ITEM / KEYNAV_BAD_FOCUS_MODEL /
-// KEYNAV_MULTIPLE_ROOTS / KEYNAV_SOURCE_UNRESOLVED) fires on its bad-input
-// fixture, and a valid menu + valid combobox fixture emit ZERO keynav
-// diagnostics.
+// KEYNAV_UNKNOWN_MODIFIER) and ROZ983-987 minus the retired ROZ986 (Task 2's
+// resolveKeynavGroups cluster — KEYNAV_NO_ITEMS / KEYNAV_ORPHAN_ITEM /
+// KEYNAV_BAD_FOCUS_MODEL / KEYNAV_SOURCE_UNRESOLVED) fires on its bad-input
+// fixture, and a valid menu + valid combobox + valid two-sibling-roots
+// fixture each emit ZERO keynav diagnostics.
 //
 // Harness mirrors landmine1-probe.test.ts / parse-lower.test.ts.
 import { describe, it, expect } from 'vitest';
@@ -73,8 +79,24 @@ function byCode(diags: Diagnostic[], code: string): Diagnostic[] {
   return diags.filter((d) => d.code === code);
 }
 
-/** The full r-keynav diagnostic cluster (Task 1's ROZ982 + Task 2's ROZ983-987). */
-const KEYNAV_CODES = ['ROZ982', 'ROZ983', 'ROZ984', 'ROZ985', 'ROZ986', 'ROZ987'];
+/**
+ * The full r-keynav diagnostic cluster (Task 1's ROZ982, Task 2's
+ * ROZ983-987 — ROZ986 RETIRED Phase 77, kept here for completeness since the
+ * constant is never emitted, and Phase 77's ROZ993-996 grid/multi-group
+ * cluster).
+ */
+const KEYNAV_CODES = [
+  'ROZ982',
+  'ROZ983',
+  'ROZ984',
+  'ROZ985',
+  'ROZ986',
+  'ROZ987',
+  'ROZ993',
+  'ROZ994',
+  'ROZ995',
+  'ROZ996',
+];
 
 function keynavDiagnostics(diags: Diagnostic[]): Diagnostic[] {
   return diags.filter((d) => KEYNAV_CODES.includes(d.code));
@@ -142,7 +164,7 @@ describe('r-keynav diagnostic cluster (71-02 Task 2 — resolveKeynavGroups)', (
     expect(hits[0]!.severity).toBe('error');
   });
 
-  it('ROZ986 KEYNAV_MULTIPLE_ROOTS — more than one r-keynav root in one component', () => {
+  it('ROZ986 RETIRED (Phase 77) — more than one r-keynav root in one component is now LEGAL, zero ROZ986', () => {
     const { diagnostics } = lower(
       rozie(
         `<div role="menu" r-keynav:tabindex.vertical="$data.active">
@@ -154,9 +176,8 @@ describe('r-keynav diagnostic cluster (71-02 Task 2 — resolveKeynavGroups)', (
         '{ active: 0, active2: 0, items: [], items2: [] }',
       ),
     );
-    const hits = byCode(diagnostics, 'ROZ986');
-    expect(hits.length).toBe(1);
-    expect(hits[0]!.severity).toBe('error');
+    expect(byCode(diagnostics, 'ROZ986')).toEqual([]);
+    expect(keynavDiagnostics(diagnostics)).toEqual([]);
   });
 
   it('ROZ987 KEYNAV_SOURCE_UNRESOLVED — no :source and no co-located r-for to synthesize from', () => {
