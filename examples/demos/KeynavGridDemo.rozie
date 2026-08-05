@@ -42,6 +42,7 @@
   cols: 7,
   committed: '',
   pageReason: '',
+  cells: [],
 }
 </data>
 
@@ -62,7 +63,24 @@ function buildPage(index) {
   }))
 }
 
-const cells = $computed(() => buildPage($data.pageIndex))
+// `$data.cells` (NOT `$computed`) is the r-for source: a bare `$computed`
+// name referenced inside a keynav expression (the co-located r-for
+// iterable, or `@keynav-commit`'s handler expression) is a documented
+// per-target emitter limitation — the keynav emitter's single-expression
+// script-context rewriter has no bare-computed-name unwrap (unlike the
+// whole-Program script rewriter every plain `<script>` statement goes
+// through). `$data.cells` routes through the same well-established
+// `$data`-rewrite path every other r-keynav demo/fixture already uses.
+// Populated via `$onMount` (NOT a bare top-level write) — React re-invokes
+// a function component's whole body on every render, so an unguarded
+// top-level `$data.cells = …` write would re-fire on every render it
+// itself triggers (an infinite-render footgun); `$onMount` runs exactly
+// once. The two paging branches below additionally set `$data.cells`
+// directly (same tick as `$data.active`) — that is the deliberate
+// same-tick seam under test, not an initial-population concern.
+$onMount(() => {
+  $data.cells = buildPage($data.pageIndex)
+})
 
 // T-77-06-01: clamp the page index to the generated page range so repeated
 // boundary/page events can never walk the dataset unbounded.
@@ -81,18 +99,21 @@ function commit(cell) {
 function onPage(detail) {
   $data.pageReason = detail.reason
   const nextPage = clampPage($data.pageIndex + detail.direction)
+  const nextCells = buildPage(nextPage)
   if (detail.reason === 'boundary') {
     // Arrow continuity: forward paging lands at index 0, backward paging
     // lands at the new page's last cell.
     $data.pageIndex = nextPage
-    $data.active = detail.direction > 0 ? 0 : buildPage(nextPage).length - 1
+    $data.cells = nextCells
+    $data.active = detail.direction > 0 ? 0 : nextCells.length - 1
   } else {
     // PageUp/PageDown: page the dataset but keep the SAME column — the
     // machine itself never moves active on any page event (SPEC §4.1); this
     // is purely the author's own landing choice.
     const column = $data.active % $data.cols
     $data.pageIndex = nextPage
-    $data.active = Math.min(column, buildPage(nextPage).length - 1)
+    $data.cells = nextCells
+    $data.active = Math.min(column, nextCells.length - 1)
   }
 }
 
@@ -119,9 +140,9 @@ function toggleCols() {
        :style="'grid-template-columns: repeat(' + $data.cols + ', minmax(2rem, 1fr))'"
        r-keynav:tabindex.grid($data.cols)="$data.active"
        r-keynav-active-class="'is-active'"
-       @keynav-commit="commit(cells[$data.active])"
-       @keynav-page="onPage">
-    <button type="button" role="gridcell" r-for="cell in cells" :key="cell.label"
+       @keynav-commit="commit($data.cells[$data.active])"
+       @keynav-page="onPage(detail)">
+    <button type="button" role="gridcell" r-for="cell in $data.cells" :key="cell.label"
             r-keynav-item="{ label: cell.label, disabled: cell.disabled }"
             class="cell"
             :aria-disabled="!!cell.disabled"
