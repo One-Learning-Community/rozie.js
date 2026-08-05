@@ -26,6 +26,14 @@
   clamped to `[0, PAGE_COUNT)` so a run of boundary/page events can never
   walk the dataset unbounded (T-77-06-01).
 
+  [77-09 fix, Dan's decision 2026-08-05: "Clamp — no move"] A page event that
+  would NOT actually change the page (a boundary arrow at the LAST page's far
+  edge, or the FIRST page's near edge) is a full no-op — active stays exactly
+  where it was, no in-page wrap to the opposite edge. This matches the ARIA
+  grid pattern (arrow at a bounded grid's edge does nothing) and closes a bug
+  where terminal pages visibly looped focus back to their own opposite edge
+  instead of clamping.
+
   Self-contained (no `<components>` import, no existing @rozie-ui family
   touched — the scope fence). The column-count toggle control is NOT
   interacted with on first paint, so the default-mount pixel baseline stays
@@ -96,9 +104,29 @@ function commit(cell) {
 // swap-plus-active-set code, exercised in real DOM by
 // keynav-grid-behavior.spec.ts before the date-picker retrofit depends on
 // the same shape.
+//
+// [77-09 fix, bug report 2026-08-05 — Dan's decision: "Clamp — no move"]
+// `clampPage` already bounds `nextPage` to `[0, PAGE_COUNT)`, but the OLD
+// code below unconditionally rewrote `$data.active`/`$data.cells` even when
+// `nextPage` came back UNCHANGED (i.e. the page event fired at a TERMINAL
+// page — the last page for a forward boundary/PageDown, the first page for a
+// backward boundary/PageUp). Since `$data.cells`/`$data.pageIndex` didn't
+// actually change but `$data.active` was still force-set to the opposite
+// edge, the effect was an in-place visual "loop" back to the opposite edge
+// of the SAME page — wrong, since a terminal page has nowhere left to page
+// to. The machine itself never moves active on a page/boundary event (SPEC
+// §4.1) — this was purely this handler's own bug. Per the ARIA grid pattern
+// (arrow at the edge of a bounded grid is a no-op) and Dan's explicit
+// decision, a page event that would NOT actually change the page is now a
+// full no-op: focus stays exactly where it was, on the current edge cell.
 function onPage(detail) {
-  $data.pageReason = detail.reason
   const nextPage = clampPage($data.pageIndex + detail.direction)
+  if (nextPage === $data.pageIndex) {
+    // Terminal page: no page change occurred, so no cell/active/reason
+    // change either — a genuine full no-op, clamp rather than wrap.
+    return
+  }
+  $data.pageReason = detail.reason
   const nextCells = buildPage(nextPage)
   if (detail.reason === 'boundary') {
     // Arrow continuity: forward paging lands at index 0, backward paging

@@ -296,6 +296,91 @@ for (const target of TARGETS) {
   });
 
   // ---------------------------------------------------------------------
+  // Terminal-page boundary clamp (SPEC §4.1 clamp-equivalent default; Dan's
+  // explicit decision 2026-08-05: "Clamp — no move"). A boundary event that
+  // fires at a TERMINAL page (the last page going forward, the first page
+  // going backward) must NOT wrap active to the opposite edge of the SAME
+  // page — there is no next/previous page to land on, so the correct
+  // behavior is a full no-op, matching the ARIA grid pattern (arrow at a
+  // bounded grid's edge does nothing). RED before the 77-09 fix: a terminal
+  // boundary event silently looped active back to the opposite edge of the
+  // page it was already on.
+  // ---------------------------------------------------------------------
+  runner(`keynav-grid-behavior [${target}]: terminal-page boundary clamp (no in-page wrap when a page/boundary event changes nothing)`, async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    const consoleErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+
+    await page.goto(`/?example=KeynavGrid&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+    await expect(mount.locator('[data-rozie-keynav-item]')).toHaveCount(35, {
+      timeout: 10_000,
+    });
+
+    const activeItem = () => mount.locator('[data-rozie-keynav-active]');
+    const readoutPage = mount.getByTestId('readout-page');
+    const readoutReason = mount.getByTestId('readout-reason');
+
+    await activeItem().focus();
+
+    // ---- FIRST page (0), backward boundary: ArrowLeft at index 0 must
+    //      CLAMP (stay at index 0), not wrap to the opposite (last) edge ----
+    await expect(activeItem()).toHaveAttribute('data-rozie-keynav-item', '0');
+    await page.keyboard.press('ArrowLeft');
+    await expect(readoutPage).toHaveText('0');
+    await expect(activeItem()).toHaveAttribute('data-rozie-keynav-item', '0');
+    // A genuine full no-op — the reason readout (never yet written) proves
+    // onPage's early return never even reached `$data.pageReason`.
+    await expect(readoutReason).toHaveText('');
+
+    // ---- same page, backward COLUMN-axis boundary: ArrowUp at row 0 must
+    //      also clamp, not wrap to the last row ----
+    await page.keyboard.press('ArrowUp');
+    await expect(readoutPage).toHaveText('0');
+    await expect(activeItem()).toHaveAttribute('data-rozie-keynav-item', '0');
+    await expect(readoutReason).toHaveText('');
+
+    // ---- navigate all the way to the LAST page (2) ----
+    await page.keyboard.press('Control+End');
+    await expect(activeItem()).toHaveAttribute('data-rozie-keynav-item', '34');
+    await page.keyboard.press('ArrowRight'); // page 0 -> 1 (ragged, 24 cells)
+    await expect(readoutPage).toHaveText('1');
+    await expect
+      .poll(() => focusedItemIndex(page), { timeout: 10_000 })
+      .toBe('0');
+    await page.keyboard.press('Control+End');
+    await expect(activeItem()).toHaveAttribute('data-rozie-keynav-item', '23');
+    await page.keyboard.press('ArrowRight'); // page 1 -> 2 (full, 35 cells)
+    await expect(readoutPage).toHaveText('2');
+    await expect
+      .poll(() => focusedItemIndex(page), { timeout: 10_000 })
+      .toBe('0');
+    await page.keyboard.press('Control+End');
+    await expect(activeItem()).toHaveAttribute('data-rozie-keynav-item', '34');
+
+    // ---- LAST page (2), forward boundary: ArrowRight at the last cell must
+    //      CLAMP (stay at index 34), not wrap to the opposite (first) edge ----
+    await page.keyboard.press('ArrowRight');
+    await expect(readoutPage).toHaveText('2');
+    await expect(activeItem()).toHaveAttribute('data-rozie-keynav-item', '34');
+
+    // ---- same page, forward COLUMN-axis boundary: ArrowDown at the last
+    //      row must also clamp, not wrap to the first row ----
+    await page.keyboard.press('ArrowDown');
+    await expect(readoutPage).toHaveText('2');
+    await expect(activeItem()).toHaveAttribute('data-rozie-keynav-item', '34');
+
+    expect(pageErrors, `uncaught page errors: ${pageErrors.join('; ')}`).toEqual([]);
+    expect(consoleErrors, `console errors: ${consoleErrors.join('; ')}`).toEqual([]);
+  });
+
+  // ---------------------------------------------------------------------
   // Reactive columns (SPEC §10): toggling the column count changes the
   // vertical arrow stride at runtime — no re-instantiation required.
   // ---------------------------------------------------------------------
