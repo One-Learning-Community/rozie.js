@@ -295,6 +295,11 @@ const HEADLESS_CORE_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'headless-core', 
 // swept by the existing glob-driven `DEMOS_DIR` cleanup below (no hand-listed
 // basename needed, matching the DataTableGridProbeDemo self-contained
 // precedent).
+// Phase 77 Plan 06 (r-keynav grid) — KeynavGridDemo (examples/demos/) is the
+// SAME self-contained shape: no new SRC const / prebuildExtraRoots entry
+// needed, its `.rozie.ts` Angular disk-cache artefact lands under
+// `examples/demos/` and is swept by the existing glob-driven `DEMOS_DIR`
+// cleanup below.
 const REFERENCE_BASENAMES = [
   'Counter',
   'SearchInput',

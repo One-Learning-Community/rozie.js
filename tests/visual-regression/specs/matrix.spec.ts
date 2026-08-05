@@ -447,6 +447,15 @@ const EXAMPLES = [
   // baselineExists() until the Linux-Docker PNG lands.
   'KeynavMenu',
   'KeynavCombobox',
+  // Phase 77 Plan 06 (r-keynav grid focus-model) — KeynavGrid doubles as
+  // BOTH the DOM-driven behavioral cell (keynav-grid-behavior.spec.ts) AND
+  // this pixel-baseline cell: the default first-paint (page 0, active
+  // index 0, no interaction — the column-toggle control is never clicked)
+  // is fully deterministic, mirroring the Phase-71 KeynavMenu/KeynavCombobox
+  // precedent immediately above. Per D-10 all 6 targets diff against the
+  // same shared `${name}.png`; baseline-gates to test.fixme via
+  // baselineExists() until the Linux-Docker PNG lands.
+  'KeynavGrid',
 ] as const;
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
 
@@ -1051,6 +1060,18 @@ async function settleExample(
   // no-op wait on the 5 targets where it's already true by the time the
   // mount locator settles).
   if (example === 'KeynavMenu') {
+    await expect(page.locator('[data-rozie-keynav-item="0"]')).toBeFocused({
+      timeout: 10_000,
+    });
+  }
+  // KeynavGrid (Phase 77, r-keynav grid focus-model): SAME MOUNT-focus
+  // contract as KeynavMenu above — the tabindex-model active-change effect
+  // calls `.focus()` on the active cell (index 0, page 0) as part of mount
+  // itself. Item 0 is DISABLED in this demo (the calendar "weekend" column
+  // pattern) — disabled cells are focusable-but-inert (SPEC §5), so mount
+  // focus lands there exactly like any other cell. Wait for real DOM focus
+  // before clipping (a no-op wait on targets where it's already true).
+  if (example === 'KeynavGrid') {
     await expect(page.locator('[data-rozie-keynav-item="0"]')).toBeFocused({
       timeout: 10_000,
     });

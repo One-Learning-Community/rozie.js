@@ -1164,6 +1164,17 @@ export const EXAMPLES = [
   // sweep) and import no cross-tree package.
   'KeynavMenu',
   'KeynavCombobox',
+  // Phase 77 Plan 06 (r-keynav grid focus-model) — KeynavGrid (loader →
+  // examples/demos/KeynavGridDemo.rozie): a calendar-shaped 7-column grid
+  // (`.grid($data.cols)`) proving the full SPEC §4 grid key map, the
+  // `@keynav-page` dataset-swap-plus-active-set focus-after-render seam
+  // (SPEC §4.1), inert disabled cells (SPEC §5) and reactive columns
+  // (SPEC §10) in a real browser. Self-contained (no existing @rozie-ui
+  // family touched — the scope fence). Doubles as BOTH the DOM-driven
+  // behavioral cell (keynav-grid-behavior.spec.ts) AND a VR pixel-baseline
+  // cell (matrix.spec.ts), mirroring the Phase-71 KeynavMenu/KeynavCombobox
+  // precedent immediately above.
+  'KeynavGrid',
   // Phase 76 (@rozie-ui/lexical, D-09) — the cross-framework Lexical rich-text
   // editor family. SIX-target family (react/vue/svelte/angular/solid/lit — Lit
   // graduated from v1.1 staging into the shipped family in 76-09, D-10), so these
@@ -1564,6 +1575,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // KeynavMenuDemo / KeynavComboboxDemo.
   KeynavMenu: 'rozie-keynav-menu',
   KeynavCombobox: 'rozie-keynav-combobox',
+  // Phase 77 Plan 06 (r-keynav grid) — the Lit entry appends '-demo' →
+  // tag 'rozie-keynav-grid-demo' = kebab of KeynavGridDemo.
+  KeynavGrid: 'rozie-keynav-grid',
   // Phase 76 (@rozie-ui/lexical) — 6-target family incl. Lit (graduated in 76-09,
   // D-10). The lit entry IS routed for these cells; lexical.spec.ts iterates all six
   // (react/vue/svelte/angular/solid/lit) and the lit build resolves the real
@@ -1989,6 +2003,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // in <script>, active index in <data>); no parent-supplied props.
   KeynavMenu: {},
   KeynavCombobox: {},
+  // Phase 77 Plan 06 (r-keynav grid) — self-contained (all page data lives
+  // in <data>/<script>); no parent-supplied props.
+  KeynavGrid: {},
   // Phase 76 (@rozie-ui/lexical) — both are demo cells (isDemo → mounted with `{}`,
   // DEFAULT_PROPS skipped); these entries exist only to satisfy the Record<Example>
   // type. State is composed inside the demo (seed / controls props on the driver).

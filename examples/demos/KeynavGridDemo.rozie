@@ -1,0 +1,192 @@
+<!--
+  KeynavGridDemo — fresh proof of the Phase-77 2D grid focus-model
+  (`.grid(<expr>)` modifier, `@keynav-page`, row-wise Home/End, focusable-
+  but-inert disabled cells, reactive columns; 77-SPEC.md §3, §4, §4.1, §5,
+  §10). Calendar-shaped: a 7-column grid whose active index is bound via
+  `r-keynav:tabindex.grid($data.cols)` — the column count itself is a
+  reactive `$data` read, so toggling it changes the vertical stride at
+  runtime (SPEC §10).
+
+  Two page "shapes" cycle by page index: pages 0 and 2 are FULL (35 cells —
+  5 full rows of 7), page 1 is deliberately RAGGED (24 cells — 3 full rows
+  of 7 plus a partial 4th row of 3), exercising the SPEC §4.3 ragged-last-row
+  rules in a real browser. Every cell in column 0 or column 6 (mirroring a
+  calendar's weekend columns) is `disabled` — inert-by-default (SPEC §5), so
+  the DEFAULT first-paint (page 0, active index 0) lands on a disabled cell,
+  which is itself a live proof that arrows/focus land on disabled cells
+  without landmine.
+
+  `onPage` (bound via `@keynav-page`) is the demo's most important code —
+  the same-tick dataset-swap-plus-active-set seam (SPEC §4.1) that the
+  date-picker retrofit (77-07/77-08) depends on: on a `reason: 'boundary'`
+  event it advances the page and lands active at the OPPOSITE edge (forward
+  paging lands at index 0, backward paging lands at the last index); on a
+  `reason: 'pageup'/'pagedown'` event it advances the page and keeps the
+  SAME COLUMN (the SPEC §4.1 `sameWeekdayIndex` analogue). The page index is
+  clamped to `[0, PAGE_COUNT)` so a run of boundary/page events can never
+  walk the dataset unbounded (T-77-06-01).
+
+  Self-contained (no `<components>` import, no existing @rozie-ui family
+  touched — the scope fence). The column-count toggle control is NOT
+  interacted with on first paint, so the default-mount pixel baseline stays
+  fully deterministic. Doubles as BOTH the DOM-driven behavioral cell
+  (keynav-grid-behavior.spec.ts) AND a VR pixel-baseline cell (matrix.spec.ts),
+  mirroring the Phase-71 KeynavMenuDemo precedent.
+-->
+<rozie name="KeynavGridDemo">
+
+<data>
+{
+  pageIndex: 0,
+  active: 0,
+  cols: 7,
+  committed: '',
+  pageReason: '',
+}
+</data>
+
+<script>
+const COLS_WIDE = 7
+const COLS_NARROW = 5
+const PAGE_COUNT = 3
+
+// Page 1 is deliberately RAGGED (24 cells — not a multiple of 7) so the
+// SPEC §4.3 ragged-last-row rules are exercised. Pages 0 and 2 are FULL (35
+// cells — 5 full rows of 7). Every column-0/column-6 cell (the calendar
+// "weekend" columns) is disabled, mirroring the 260802-hla contract.
+function buildPage(index) {
+  const count = index === 1 ? 24 : 35
+  return Array.from({ length: count }, (_, i) => ({
+    label: String(i + 1),
+    disabled: i % 7 === 0 || i % 7 === 6,
+  }))
+}
+
+const cells = $computed(() => buildPage($data.pageIndex))
+
+// T-77-06-01: clamp the page index to the generated page range so repeated
+// boundary/page events can never walk the dataset unbounded.
+function clampPage(i) {
+  return Math.min(Math.max(i, 0), PAGE_COUNT - 1)
+}
+
+function commit(cell) {
+  $data.committed = cell ? cell.label : ''
+}
+
+// The paging/focus-after-render seam (SPEC §4.1) — the demo's own dataset-
+// swap-plus-active-set code, exercised in real DOM by
+// keynav-grid-behavior.spec.ts before the date-picker retrofit depends on
+// the same shape.
+function onPage(detail) {
+  $data.pageReason = detail.reason
+  const nextPage = clampPage($data.pageIndex + detail.direction)
+  if (detail.reason === 'boundary') {
+    // Arrow continuity: forward paging lands at index 0, backward paging
+    // lands at the new page's last cell.
+    $data.pageIndex = nextPage
+    $data.active = detail.direction > 0 ? 0 : buildPage(nextPage).length - 1
+  } else {
+    // PageUp/PageDown: page the dataset but keep the SAME column — the
+    // machine itself never moves active on any page event (SPEC §4.1); this
+    // is purely the author's own landing choice.
+    const column = $data.active % $data.cols
+    $data.pageIndex = nextPage
+    $data.active = Math.min(column, buildPage(nextPage).length - 1)
+  }
+}
+
+function toggleCols() {
+  $data.cols = $data.cols === COLS_WIDE ? COLS_NARROW : COLS_WIDE
+}
+</script>
+
+<template>
+<div class="keynav-grid-demo" data-keynav-grid-demo>
+  <h3>Grid — r-keynav:tabindex.grid()</h3>
+
+  <div class="controls">
+    <span class="readout" data-testid="readout-committed">{{ $data.committed }}</span>
+    <span class="readout" data-testid="readout-page">{{ $data.pageIndex }}</span>
+    <span class="readout" data-testid="readout-reason">{{ $data.pageReason }}</span>
+    <span class="readout" data-testid="readout-cols">{{ $data.cols }}</span>
+    <button type="button" data-testid="control-toggle-cols" @click="toggleCols()">
+      Toggle columns
+    </button>
+  </div>
+
+  <div role="grid" class="grid"
+       :style="'grid-template-columns: repeat(' + $data.cols + ', minmax(2rem, 1fr))'"
+       r-keynav:tabindex.grid($data.cols)="$data.active"
+       r-keynav-active-class="'is-active'"
+       @keynav-commit="commit(cells[$data.active])"
+       @keynav-page="onPage">
+    <button type="button" role="gridcell" r-for="cell in cells" :key="cell.label"
+            r-keynav-item="{ label: cell.label, disabled: cell.disabled }"
+            class="cell"
+            :aria-disabled="!!cell.disabled"
+            :class="{ 'cell--disabled': cell.disabled }">
+      {{ cell.label }}
+    </button>
+  </div>
+</div>
+</template>
+
+<style>
+.keynav-grid-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 320px;
+}
+.keynav-grid-demo h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.keynav-grid-demo .controls {
+  margin-bottom: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.keynav-grid-demo .readout {
+  min-width: 2ch;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  background: #f0f0f0;
+  border-radius: 3px;
+  padding: 0.1rem 0.35rem;
+}
+.grid {
+  display: grid;
+  gap: 2px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  padding: 4px;
+}
+.cell {
+  appearance: none;
+  border: none;
+  background: transparent;
+  text-align: center;
+  padding: 0.4rem 0.2rem;
+  border-radius: 4px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  color: #1a1a1a;
+}
+.cell[data-rozie-keynav-active] {
+  background: #2563eb;
+  color: #fff;
+}
+.cell--disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+</style>
+
+</rozie>
