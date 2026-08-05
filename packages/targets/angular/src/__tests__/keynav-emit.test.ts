@@ -386,6 +386,78 @@ const EXPLICIT_INDEX_SRC = `<rozie name="KeynavExplicitIndex">
 
 </rozie>`;
 
+// Plan 77-10 (KNG-06 gap closure) — a `.grid(3)` keynav root nested inside an
+// `r-if` branch. This is the exact shape the date-picker's drill panels have
+// (a grid keynav root whose nearest ancestor chain crosses a conditional),
+// and Angular had zero fixtures of this shape before this plan.
+const CONDITIONAL_ROOT_SRC = `<rozie name="KeynavConditionalRoot">
+
+<props>
+{
+  cells: { type: Array, default: () => [] },
+}
+</props>
+
+<data>
+{
+  active: 0,
+  open: false,
+}
+</data>
+
+<template>
+<div>
+  <div r-if="$data.open">
+    <div role="grid" r-keynav:tabindex.grid(3)="$data.active">
+      <button role="gridcell" r-for="cell in $props.cells" :key="cell.id"
+              r-keynav-item="{ label: cell.label }">{{ cell.label }}</button>
+    </div>
+  </div>
+</div>
+</template>
+
+</rozie>`;
+
+// Plan 77-10 — two SIBLING conditional roots, mirroring DatePicker.rozie's
+// months/years drill pair, so group-index isolation is exercised for the
+// real consumer shape.
+const TWO_CONDITIONAL_ROOTS_SRC = `<rozie name="KeynavTwoConditionalRoots">
+
+<props>
+{
+  months: { type: Array, default: () => [] },
+  years: { type: Array, default: () => [] },
+}
+</props>
+
+<data>
+{
+  showMonths: false,
+  showYears: false,
+  monthActive: 0,
+  yearActive: 0,
+}
+</data>
+
+<template>
+<div>
+  <div r-if="$data.showMonths">
+    <div role="grid" r-keynav:tabindex.grid(3)="$data.monthActive">
+      <button role="gridcell" r-for="month in $props.months" :key="month.id"
+              r-keynav-item="{ label: month.label }">{{ month.label }}</button>
+    </div>
+  </div>
+  <div r-if="$data.showYears">
+    <div role="grid" r-keynav:tabindex.grid(3)="$data.yearActive">
+      <button role="gridcell" r-for="year in $props.years" :key="year.id"
+              r-keynav-item="{ label: year.label }">{{ year.label }}</button>
+    </div>
+  </div>
+</div>
+</template>
+
+</rozie>`;
+
 function emitMenu() {
   const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
   return emitAngular(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
@@ -404,6 +476,22 @@ function emitGridPage(src: string = GRID_PAGE_SRC) {
 function emitExplicitIndex() {
   const ir = compile(EXPLICIT_INDEX_SRC, 'KeynavExplicitIndex.rozie');
   return emitAngular(ir, { filename: 'KeynavExplicitIndex.rozie', source: EXPLICIT_INDEX_SRC });
+}
+
+function emitConditionalRoot() {
+  const ir = compile(CONDITIONAL_ROOT_SRC, 'KeynavConditionalRoot.rozie');
+  return emitAngular(ir, {
+    filename: 'KeynavConditionalRoot.rozie',
+    source: CONDITIONAL_ROOT_SRC,
+  });
+}
+
+function emitTwoConditionalRoots() {
+  const ir = compile(TWO_CONDITIONAL_ROOTS_SRC, 'KeynavTwoConditionalRoots.rozie');
+  return emitAngular(ir, {
+    filename: 'KeynavTwoConditionalRoots.rozie',
+    source: TWO_CONDITIONAL_ROOTS_SRC,
+  });
 }
 
 describe('Angular r-keynav emitter — multi-root, grid, page, explicit index (Plan 77-05 Task 2)', () => {
@@ -546,5 +634,101 @@ describe('Angular r-keynav emitter — multi-root, grid, page, explicit index (P
     expect(code).not.toContain('__rozieKeynavGroupId1');
     expect(code).not.toContain('__rozieKeynavController1');
     expect(code).not.toContain('data-rozie-keynav-root');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 77-10 — KNG-06 gap closure: Angular's inlined `r-keynav` listener
+// delegation must be reactive and identity-diffed so a root behind `r-if`
+// receives keyboard delegation the moment it resolves — not only at
+// `ngAfterViewInit` time. Mirrors React's no-deps effect / Vue's
+// `watch(..., { immediate: true })` / Lit's persistent-attach re-attach idiom.
+// ---------------------------------------------------------------------------
+
+describe('Angular r-keynav emitter — conditional-root re-attach (Plan 77-10)', () => {
+  it('declares a per-group attached-root anchor and detach slot', () => {
+    const { code } = emitConditionalRoot();
+    expect(code).toContain('private __rozieKeynavAttachedRoot: HTMLElement | null = null;');
+    expect(code).toContain('private __rozieKeynavDetach: (() => void) | null = null;');
+  });
+
+  it('emits the three Renderer2.listen(...) delegation calls inside an arrow-field attach method, BEFORE the ngAfterViewInit boundary', () => {
+    const { code } = emitConditionalRoot();
+    const attachMethodIndex = code.indexOf('private __rozieKeynavAttachRoot = () => {');
+    expect(attachMethodIndex).toBeGreaterThan(-1);
+    const afterViewInitBoundary = code.indexOf('ngAfterViewInit() {');
+    expect(afterViewInitBoundary).toBeGreaterThan(-1);
+
+    const preBoundarySlice = code.slice(0, afterViewInitBoundary);
+    const postBoundarySlice = code.slice(afterViewInitBoundary);
+
+    for (const eventName of ['keydown', 'pointerdown', 'focusin']) {
+      const listenSubstr = `this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, '${eventName}',`;
+      expect(preBoundarySlice).toContain(listenSubstr);
+      expect(postBoundarySlice).not.toContain(listenSubstr);
+    }
+    // The attach method itself must open before the boundary too.
+    expect(attachMethodIndex).toBeLessThan(afterViewInitBoundary);
+  });
+
+  it('the constructor effect() calling the attach method runs BEFORE the effect() calling the active-sync method', () => {
+    const { code } = emitConditionalRoot();
+    expect(code).toContain('effect(() => {');
+    const attachCallIndex = code.indexOf('this.__rozieKeynavAttachRoot();');
+    const syncCallIndex = code.indexOf('this.__rozieKeynavSyncActive();');
+    expect(attachCallIndex).toBeGreaterThan(-1);
+    expect(syncCallIndex).toBeGreaterThan(-1);
+    expect(attachCallIndex).toBeLessThan(syncCallIndex);
+  });
+
+  it('the attach method identity-diffs the freshly-read root and detaches before re-attaching to a different one', () => {
+    const { code } = emitConditionalRoot();
+    expect(code).toContain(
+      'if (__rozieKeynavRootEl === this.__rozieKeynavAttachedRoot) return;',
+    );
+    const detachGuardIndex = code.indexOf(
+      'if (this.__rozieKeynavDetach) { this.__rozieKeynavDetach(); this.__rozieKeynavDetach = null; }',
+    );
+    const storeAttachedIndex = code.indexOf(
+      'this.__rozieKeynavAttachedRoot = __rozieKeynavRootEl;',
+    );
+    expect(detachGuardIndex).toBeGreaterThan(-1);
+    expect(storeAttachedIndex).toBeGreaterThan(-1);
+    expect(detachGuardIndex).toBeLessThan(storeAttachedIndex);
+  });
+
+  it('DestroyRef.onDestroy registers unconditionally in ngAfterViewInit — not nested inside a root-present guard — and ngAfterViewInit no longer contains any listen(...) call', () => {
+    const { code } = emitConditionalRoot();
+    const afterViewInitMatch = code.match(/ngAfterViewInit\(\) \{([\s\S]*?)\n {2}\}/);
+    expect(afterViewInitMatch).not.toBeNull();
+    const afterViewInitBody = afterViewInitMatch![1];
+    expect(afterViewInitBody).toContain('this.__rozieDestroyRef.onDestroy(');
+    expect(afterViewInitBody).not.toContain('this.__rozieKeynavRenderer.listen(');
+  });
+
+  it('two sibling conditional roots emit two fully independent, suffix-isolated attach fields/method/effect', () => {
+    const { code } = emitTwoConditionalRoots();
+    expect(code).toContain('private __rozieKeynavAttachRoot = () => {');
+    expect(code).toContain('private __rozieKeynavAttachRoot1 = () => {');
+    expect(code).toContain('private __rozieKeynavAttachedRoot: HTMLElement | null = null;');
+    expect(code).toContain('private __rozieKeynavAttachedRoot1: HTMLElement | null = null;');
+    expect(code).toContain('private __rozieKeynavDetach: (() => void) | null = null;');
+    expect(code).toContain('private __rozieKeynavDetach1: (() => void) | null = null;');
+
+    const attachEffectMatches =
+      code.match(/effect\(\(\) => \{\n\s*this\.__rozieKeynavAttachRoot\d*\(\);\n\s*\}\);/g) ?? [];
+    expect(attachEffectMatches.length).toBe(2);
+
+    // Group 1's effect body references ONLY the 1-suffixed method.
+    expect(code).toMatch(/effect\(\(\) => \{\n\s*this\.__rozieKeynavAttachRoot1\(\);\n\s*\}\);/);
+  });
+
+  it('the T-71-09-01 marker-validation guards survive verbatim in the new attach method (both pointerdown and focusin paths)', () => {
+    const { code } = emitConditionalRoot();
+    const guardOccurrences = (
+      code.match(/if \(!Number\.isInteger\(__rozieKeynavIdx\) \|\| __rozieKeynavIdx < 0\) return;/g) ??
+      []
+    ).length;
+    expect(guardOccurrences).toBe(2);
   });
 });
