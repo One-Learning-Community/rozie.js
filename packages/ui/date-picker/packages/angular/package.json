@@ -22,6 +22,6 @@
   "peerDependenciesMeta": { "@angular/core": { "optional": false }, "@angular/common": { "optional": false }, "@angular/forms": { "optional": false } },
   "scripts": { "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json", "typecheck": "echo 'source+dist; ng-packagr declaration emit at build'" },
   "publishConfig": { "access": "public" },
-  "dependencies": { "tslib": "^2" },
+  "dependencies": { "@rozie/runtime-keynav-core": "workspace:*", "tslib": "^2" },
   "devDependencies": { "@angular/common": "^19", "@angular/compiler": "^19", "@angular/compiler-cli": "^19", "@angular/core": "^19", "@angular/forms": "^19", "ng-packagr": "^19", "typescript": "~5.6.0" }
 }

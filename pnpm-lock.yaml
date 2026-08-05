@@ -3133,6 +3133,9 @@ importers:
 
   packages/ui/date-picker/packages/angular:
     dependencies:
+      '@rozie/runtime-keynav-core':
+        specifier: workspace:*
+        version: link:../../../../runtime/keynav-core
       tslib:
         specifier: ^2
         version: 2.8.1

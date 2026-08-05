@@ -1,8 +1,9 @@
 import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { createKeynavStateMachine, type KeynavStateMachine } from '@rozie/runtime-keynav-core';
 
-import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDrillIso, resolveRovingIso, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDrillIndex, resolveRovingIso, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
@@ -99,9 +100,9 @@ function __rozieAttr(v: unknown): string | null {
         <div class="rozie-datepicker-drill-header">
           <button type="button" class="rozie-datepicker-drill-label" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" aria-label="Change year" (click)="enterYearsView()">{{ rozieDisplay(monthList().year) }}</button>
         </div>
-        <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose month">
+        <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose month" #__rozieKeynavRootRef>
           @for (cell of monthList().months; track cell.iso) {
-    <button type="button" class="rozie-datepicker-month" [ngClass]="{ 'is-selected': cell.selected, 'is-current': cell.current }" role="gridcell" [attr.data-month]="rozieAttr(cell.iso)" [attr.tabindex]="rozieAttr(monthTabIndex(cell))" [attr.aria-disabled]="!!cell.disabled" [attr.aria-selected]="!!cell.selected" (click)="selectMonth(cell.iso)" (keydown)="onMonthKeydown(cell.iso, $event)">{{ rozieDisplay(cell.label) }}</button>
+    <button type="button" class="rozie-datepicker-month" [ngClass]="{ 'is-selected': cell.selected, 'is-current': cell.current }" role="gridcell" [attr.data-month]="rozieAttr(cell.iso)" [attr.aria-disabled]="!!cell.disabled" [attr.aria-selected]="!!cell.selected" (click)="selectMonth(cell.iso)" (keydown)="onMonthCellKeydown(cell.iso, $event)" [id]="\`\${__rozieKeynavGroupId}-item-\${$index}\`" [attr.data-rozie-keynav-item]="$index" [attr.data-rozie-keynav-active]="activeMonth() === $index ? '' : undefined" [tabIndex]="activeMonth() === $index ? 0 : -1">{{ rozieDisplay(cell.label) }}</button>
     }
         </div>
       </div>
@@ -110,9 +111,9 @@ function __rozieAttr(v: unknown): string | null {
         <div class="rozie-datepicker-drill-header">
           <span class="rozie-datepicker-drill-label" aria-live="polite">{{ rozieDisplay(yearRangeLabel()) }}</span>
         </div>
-        <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year">
+        <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year" #__rozieKeynavRootRef1>
           @for (cell of yearGrid().years; track cell.iso) {
-    <button type="button" class="rozie-datepicker-year" [ngClass]="{ 'is-selected': cell.selected, 'is-current': cell.current }" role="gridcell" [attr.data-year]="rozieAttr(cell.iso)" [attr.tabindex]="rozieAttr(yearTabIndex(cell))" [attr.aria-disabled]="!!cell.disabled" [attr.aria-selected]="!!cell.selected" (click)="selectYear(cell.iso)" (keydown)="onYearKeydown(cell.iso, $event)">{{ rozieDisplay(cell.year) }}</button>
+    <button type="button" class="rozie-datepicker-year" [ngClass]="{ 'is-selected': cell.selected, 'is-current': cell.current }" role="gridcell" [attr.data-year]="rozieAttr(cell.iso)" [attr.aria-disabled]="!!cell.disabled" [attr.aria-selected]="!!cell.selected" (click)="selectYear(cell.iso)" (keydown)="onYearCellKeydown(cell.iso, $event)" [id]="\`\${__rozieKeynavGroupId1}-item-\${$index}\`" [attr.data-rozie-keynav-item]="$index" [attr.data-rozie-keynav-active]="activeYear() === $index ? '' : undefined" [tabIndex]="activeYear() === $index ? 0 : -1">{{ rozieDisplay(cell.year) }}</button>
     }
         </div>
       </div>
@@ -513,6 +514,8 @@ export class DatePicker {
   viewIso = signal('');
   hoverIso = signal('');
   viewMode = signal('days');
+  activeMonth = signal(0);
+  activeYear = signal(0);
   root = viewChild<ElementRef<HTMLDivElement>>('root');
   change = output<unknown>();
   rangeComplete = output<unknown>();
@@ -520,9 +523,136 @@ export class DatePicker {
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
   @ContentChild('presets', { read: TemplateRef }) presetsTpl?: TemplateRef<PresetsCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  private __rozieKeynavGroupId = 'rozie-keynav-' + Math.random().toString(36).slice(2);
+  private __rozieKeynavRootRef = viewChild<ElementRef<HTMLElement>>('__rozieKeynavRootRef');
+  private __rozieKeynavRenderer = inject(Renderer2);
+  private __rozieKeynavController: KeynavStateMachine | null = null;
+  private __rozieKeynavRafId: number | null = null;
+  private __rozieKeynavApplyActive = (__rozieKeynavRootEl: HTMLElement, __rozieKeynavActive: number): boolean => {
+    const __rozieKeynavActiveEl = __rozieKeynavRootEl.querySelector<HTMLElement>(`[data-rozie-keynav-item="${__rozieKeynavActive}"]`);
+    __rozieKeynavActiveEl?.focus();
+    __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });
+    return __rozieKeynavActiveEl !== null;
+  };
+  private __rozieKeynavSyncActive = () => {
+    const __rozieKeynavActive = this.activeMonth();
+    const __rozieKeynavRootEl = this.__rozieKeynavRootRef()?.nativeElement;
+    if (this.__rozieKeynavRafId !== null) { cancelAnimationFrame(this.__rozieKeynavRafId); this.__rozieKeynavRafId = null; }
+    if (!__rozieKeynavRootEl || !Number.isFinite(__rozieKeynavActive)) return;
+    const __rozieKeynavFound = this.__rozieKeynavApplyActive(__rozieKeynavRootEl, __rozieKeynavActive);
+    if (!__rozieKeynavFound) {
+      this.__rozieKeynavRafId = requestAnimationFrame(() => {
+        this.__rozieKeynavRafId = null;
+        if (this.activeMonth() !== __rozieKeynavActive) return;
+        const __rozieKeynavRetryRootEl = this.__rozieKeynavRootRef()?.nativeElement;
+        if (__rozieKeynavRetryRootEl) this.__rozieKeynavApplyActive(__rozieKeynavRetryRootEl, __rozieKeynavActive);
+      });
+    }
+  };
+  private __rozieKeynavGroupId1 = 'rozie-keynav-' + Math.random().toString(36).slice(2);
+  private __rozieKeynavRootRef1 = viewChild<ElementRef<HTMLElement>>('__rozieKeynavRootRef1');
+  private __rozieKeynavController1: KeynavStateMachine | null = null;
+  private __rozieKeynavRafId1: number | null = null;
+  private __rozieKeynavApplyActive1 = (__rozieKeynavRootEl: HTMLElement, __rozieKeynavActive: number): boolean => {
+    const __rozieKeynavActiveEl = __rozieKeynavRootEl.querySelector<HTMLElement>(`[data-rozie-keynav-item="${__rozieKeynavActive}"]`);
+    __rozieKeynavActiveEl?.focus();
+    __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });
+    return __rozieKeynavActiveEl !== null;
+  };
+  private __rozieKeynavSyncActive1 = () => {
+    const __rozieKeynavActive = this.activeYear();
+    const __rozieKeynavRootEl = this.__rozieKeynavRootRef1()?.nativeElement;
+    if (this.__rozieKeynavRafId1 !== null) { cancelAnimationFrame(this.__rozieKeynavRafId1); this.__rozieKeynavRafId1 = null; }
+    if (!__rozieKeynavRootEl || !Number.isFinite(__rozieKeynavActive)) return;
+    const __rozieKeynavFound = this.__rozieKeynavApplyActive1(__rozieKeynavRootEl, __rozieKeynavActive);
+    if (!__rozieKeynavFound) {
+      this.__rozieKeynavRafId1 = requestAnimationFrame(() => {
+        this.__rozieKeynavRafId1 = null;
+        if (this.activeYear() !== __rozieKeynavActive) return;
+        const __rozieKeynavRetryRootEl = this.__rozieKeynavRootRef1()?.nativeElement;
+        if (__rozieKeynavRetryRootEl) this.__rozieKeynavApplyActive1(__rozieKeynavRetryRootEl, __rozieKeynavActive);
+      });
+    }
+  };
+  private __rozieDestroyRef = inject(DestroyRef);
+
+  constructor() {
+    effect(() => {
+      this.__rozieKeynavSyncActive();
+    });
+    effect(() => {
+      this.__rozieKeynavSyncActive1();
+    });
+  }
 
   ngAfterViewInit() {
     this.viewIso.set(this.viewMonthGrid());
+    this.__rozieKeynavController = createKeynavStateMachine({
+      getSource: () => (this.monthList().months).map((cell) => ({ label: cell.label, disabled: cell.disabled })),
+      getActive: () => this.activeMonth(),
+      setActive: (i) => { this.activeMonth.set(i); },
+      commit: (i) => { this.onMonthCommit(); },
+      page: (detail) => { this.onDrillPage(); },
+    }, { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false, grid: { columns: () => 3 } });
+    {
+      const __rozieKeynavRootEl = this.__rozieKeynavRootRef()?.nativeElement;
+      if (__rozieKeynavRootEl) {
+        const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.__rozieKeynavController?.onKeydown($event); };
+        const __rozieKeynavHandlePointer = ($event: PointerEvent) => {
+          const __rozieKeynavTarget = $event.target;
+          if (!(__rozieKeynavTarget instanceof Element)) return;
+          const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');
+          if (!__rozieKeynavMarker) return;
+          const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');
+          if (__rozieKeynavRaw === null) return;
+          const __rozieKeynavIdx = Number(__rozieKeynavRaw);
+          if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;
+          this.__rozieKeynavController?.onPointerActivate(__rozieKeynavIdx);
+        };
+        const __rozieKeynavUnlistenKeydown = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'keydown', __rozieKeynavHandleKeydown);
+        const __rozieKeynavUnlistenPointer = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'pointerdown', __rozieKeynavHandlePointer);
+        this.__rozieDestroyRef.onDestroy(() => {
+          __rozieKeynavUnlistenKeydown();
+          __rozieKeynavUnlistenPointer();
+          if (this.__rozieKeynavRafId !== null) cancelAnimationFrame(this.__rozieKeynavRafId);
+          this.__rozieKeynavController?.dispose();
+        });
+      }
+    }
+    this.__rozieKeynavSyncActive();
+    this.__rozieKeynavController1 = createKeynavStateMachine({
+      getSource: () => (this.yearGrid().years).map((cell) => ({ label: String(cell.year), disabled: cell.disabled })),
+      getActive: () => this.activeYear(),
+      setActive: (i) => { this.activeYear.set(i); },
+      commit: (i) => { this.onYearCommit(); },
+      page: (detail) => { this.onDrillPage(); },
+    }, { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false, grid: { columns: () => 3 } });
+    {
+      const __rozieKeynavRootEl = this.__rozieKeynavRootRef1()?.nativeElement;
+      if (__rozieKeynavRootEl) {
+        const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.__rozieKeynavController1?.onKeydown($event); };
+        const __rozieKeynavHandlePointer = ($event: PointerEvent) => {
+          const __rozieKeynavTarget = $event.target;
+          if (!(__rozieKeynavTarget instanceof Element)) return;
+          const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');
+          if (!__rozieKeynavMarker) return;
+          const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');
+          if (__rozieKeynavRaw === null) return;
+          const __rozieKeynavIdx = Number(__rozieKeynavRaw);
+          if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;
+          this.__rozieKeynavController1?.onPointerActivate(__rozieKeynavIdx);
+        };
+        const __rozieKeynavUnlistenKeydown = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'keydown', __rozieKeynavHandleKeydown);
+        const __rozieKeynavUnlistenPointer = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'pointerdown', __rozieKeynavHandlePointer);
+        this.__rozieDestroyRef.onDestroy(() => {
+          __rozieKeynavUnlistenKeydown();
+          __rozieKeynavUnlistenPointer();
+          if (this.__rozieKeynavRafId1 !== null) cancelAnimationFrame(this.__rozieKeynavRafId1);
+          this.__rozieKeynavController1?.dispose();
+        });
+      }
+    }
+    this.__rozieKeynavSyncActive1();
   }
 
   todayIso = () => {
@@ -689,15 +819,13 @@ export class DatePicker {
   showsYearsView = (): boolean => this.viewMode() === 'years';
   enterMonthsView = () => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
-    const target = resolveRovingDrillIso(this.monthList().months);
+    this.activeMonth.set(resolveRovingDrillIndex(this.monthList().months));
     this.viewMode.set('months');
-    this.scheduleFocus('month', target);
   };
   enterYearsView = () => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
-    const target = resolveRovingDrillIso(this.yearGrid().years);
+    this.activeYear.set(resolveRovingDrillIndex(this.yearGrid().years));
     this.viewMode.set('years');
-    this.scheduleFocus('year', target);
   };
   selectMonth = (iso: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
@@ -713,7 +841,7 @@ export class DatePicker {
     if (!this.yearEnabled(iso)) return;
     this.viewIso.set(iso);
     this.viewMode.set('months');
-    this.scheduleFocus('month', resolveRovingDrillIso(this.monthList().months));
+    this.activeMonth.set(resolveRovingDrillIndex(this.monthList().months));
   };
   exitToDaysView = () => {
     this.viewMode.set('days');
@@ -734,41 +862,10 @@ export class DatePicker {
     }
     return false;
   };
-  monthCells = () => {
-    const root = this.root()?.nativeElement;
-    if (!root) return [];
-    return Array.from(root.querySelectorAll('[data-month]')) as HTMLElement[];
-  };
-  focusMonthIso = (iso: any) => {
-    const cells = this.monthCells();
-    for (let i = 0; i < cells.length; i++) {
-      if (cells[i].getAttribute('data-month') === iso) {
-        cells[i].focus();
-        return true;
-      }
-    }
-    return false;
-  };
-  yearCells = () => {
-    const root = this.root()?.nativeElement;
-    if (!root) return [];
-    return Array.from(root.querySelectorAll('[data-year]')) as HTMLElement[];
-  };
-  focusYearIso = (iso: any) => {
-    const cells = this.yearCells();
-    for (let i = 0; i < cells.length; i++) {
-      if (cells[i].getAttribute('data-year') === iso) {
-        cells[i].focus();
-        return true;
-      }
-    }
-    return false;
-  };
   focusRequest = '';
   dispatchFocus = (kind: any, iso: any) => {
     if (kind === 'day') return this.focusDayIso(iso);
-    if (kind === 'month') return this.focusMonthIso(iso);
-    return this.focusYearIso(iso);
+    return false;
   };
   scheduleFocus = (kind: any, iso: any) => {
     if (!iso) return;
@@ -789,8 +886,6 @@ export class DatePicker {
     }
     if (!scheduled) setTimeout(pass, 0);
   };
-  monthTabIndex = (cell: any): number | undefined => cell.iso === resolveRovingDrillIso(this.monthList().months) ? 0 : -1;
-  yearTabIndex = (cell: any): number | undefined => cell.iso === resolveRovingDrillIso(this.yearGrid().years) ? 0 : -1;
   monthEnabled = (iso: any) => {
     const cell = this.monthList().months.find((m: any) => m.iso === iso);
     return !cell || !cell.disabled;
@@ -870,46 +965,36 @@ export class DatePicker {
       }
     }
   };
-  DRILL_COLS = 3;
-  onMonthKeydown = (iso: any, e: any) => {
+  onMonthCommit = () => {
+    const cell = this.monthList().months[this.activeMonth()];
+    if (cell) this.selectMonth(cell.iso);
+  };
+  onYearCommit = () => {
+    const cell = this.yearGrid().years[this.activeYear()];
+    if (cell) this.selectYear(cell.iso);
+  };
+  onDrillPage = () => {};
+  onMonthCellKeydown = (iso: any, e: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     const key = e ? e.key : '';
-    const cells = this.monthList().months;
-    let idx = -1;
-    for (let i = 0; i < cells.length; i++) if (cells[i].iso === iso) idx = i;
-    if (idx < 0) return;
-    let next = idx;
-    if (key === 'ArrowLeft') next = Math.max(0, idx - 1);else if (key === 'ArrowRight') next = Math.min(11, idx + 1);else if (key === 'ArrowUp') next = Math.max(0, idx - this.DRILL_COLS);else if (key === 'ArrowDown') next = Math.min(11, idx + this.DRILL_COLS);else if (key === 'Home') next = idx - idx % this.DRILL_COLS;else if (key === 'End') next = idx - idx % this.DRILL_COLS + (this.DRILL_COLS - 1);else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+    if (key === ' ' || key === 'Spacebar') {
       e.preventDefault();
       this.selectMonth(iso);
-      return;
     } else if (key === 'Escape') {
       e.preventDefault();
       this.exitToDaysView();
-      return;
-    } else return;
-    e.preventDefault();
-    this.focusMonthIso(cells[next].iso);
+    }
   };
-  onYearKeydown = (iso: any, e: any) => {
+  onYearCellKeydown = (iso: any, e: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     const key = e ? e.key : '';
-    const cells = this.yearGrid().years;
-    let idx = -1;
-    for (let i = 0; i < cells.length; i++) if (cells[i].iso === iso) idx = i;
-    if (idx < 0) return;
-    let next = idx;
-    if (key === 'ArrowLeft') next = Math.max(0, idx - 1);else if (key === 'ArrowRight') next = Math.min(11, idx + 1);else if (key === 'ArrowUp') next = Math.max(0, idx - this.DRILL_COLS);else if (key === 'ArrowDown') next = Math.min(11, idx + this.DRILL_COLS);else if (key === 'Home') next = idx - idx % this.DRILL_COLS;else if (key === 'End') next = idx - idx % this.DRILL_COLS + (this.DRILL_COLS - 1);else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+    if (key === ' ' || key === 'Spacebar') {
       e.preventDefault();
       this.selectYear(iso);
-      return;
     } else if (key === 'Escape') {
       e.preventDefault();
       this.exitToDaysView();
-      return;
-    } else return;
-    e.preventDefault();
-    this.focusYearIso(cells[next].iso);
+    }
   };
   weekdayOffset = (iso: any) => {
     for (const g of this.grids() as any) {
@@ -1024,8 +1109,6 @@ export class DatePicker {
   ): _ctx is HeaderCtx | FooterCtx | PresetsCtx {
     return true;
   }
-
-  private __rozieDestroyRef = inject(DestroyRef);
 
   private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
 

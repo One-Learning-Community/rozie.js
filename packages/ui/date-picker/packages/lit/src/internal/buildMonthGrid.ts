@@ -549,6 +549,25 @@ export function resolveRovingDrillIso<T extends RovingDrillCell>(cells: T[]): st
   return '';
 }
 
+/** Sentinel returned by {@link resolveRovingDrillIndex} when no cell is
+ * selectable (mirrors {@link resolveRovingDrillIso}'s `''` — every cell
+ * disabled, and none selected/current). */
+export const ROVING_DRILL_NONE = -1;
+
+/**
+ * The `r-keynav` grid primitive owns an ACTIVE-INDEX model, not an iso model —
+ * this is the thin adapter between the two. Delegates entirely to
+ * {@link resolveRovingDrillIso} and looks the winning iso back up in `cells`,
+ * so the two resolvers can never disagree (no duplicated selection chain).
+ * Returns {@link ROVING_DRILL_NONE} when `resolveRovingDrillIso` returns `''`
+ * (every cell disabled, nothing selected/current).
+ */
+export function resolveRovingDrillIndex<T extends RovingDrillCell>(cells: T[]): number {
+  const iso = resolveRovingDrillIso(cells);
+  if (iso === '') return ROVING_DRILL_NONE;
+  return cells.findIndex((c) => c.iso === iso);
+}
+
 /**
  * The seven weekday header labels, ordered from `weekStartsOn`. Localized via
  * `Intl` (short names) with an English fallback.
