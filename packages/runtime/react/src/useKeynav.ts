@@ -311,6 +311,12 @@ export function useKeynav(
     // at exactly one real setup, matching the pre-77-07 `[rootRef]` behavior.
   });
 
+  // T-77-09-01 (found via this plan's whole-repo VR union — a KeynavGrid·
+  // react mount-focus regression) — the pending deferred-focus retry's rAF
+  // handle, hoisted OUT of effect 2's per-invocation closure into a ref that
+  // OUTLIVES a single commit. See the note inside effect 2 below for why.
+  const focusRafIdRef = useRef<number | null>(null);
+
   // Final unmount cleanup — a separate mount-once effect (stable `[]` deps)
   // so the teardown above (which now runs on every root CHANGE, not on
   // every unmount) doesn't need to double as the component-unmount path.
@@ -325,6 +331,10 @@ export function useKeynav(
       attach.machine?.dispose();
       attach.root = null;
       attach.machine = null;
+      if (focusRafIdRef.current !== null) {
+        cancelAnimationFrame(focusRafIdRef.current);
+        focusRafIdRef.current = null;
+      }
     };
   }, []);
 
@@ -395,23 +405,38 @@ export function useKeynav(
     // tick a dataset swaps (grid paging), so the item element for the new
     // active index may not exist yet at effect time. Retry EXACTLY ONCE
     // after the browser has painted — no polling loop, no bespoke scheduler.
-    // The retry is cancelled on cleanup and guarded so it only re-applies if
-    // `active` is STILL the value it was scheduled for AND the root is
-    // STILL the one the pass was scheduled against; a stale pass must never
-    // steal focus from a newer navigation.
-    let rafId: number | null = null;
+    // Guarded so it only re-applies if `active` is STILL the value it was
+    // scheduled for AND the root is STILL the one the pass was scheduled
+    // against; a stale pass must never steal focus from a newer navigation.
+    //
+    // T-77-09-01 — the pending rAF handle lives in `focusRafIdRef` (a ref
+    // that OUTLIVES a single effect invocation), NOT a per-invocation local
+    // returned as this effect's cleanup. This effect has no dependency
+    // array, so with a per-invocation cleanup, ANY subsequent commit —
+    // including one wholly unrelated to `active`/`root` — would run that
+    // cleanup and cancel a still-pending, still-relevant retry before it
+    // ever got to fire, permanently dropping mount focus. (KeynavGridDemo
+    // exposed this: `$data.cells` starts `[]` and is populated by a
+    // SEPARATE `$onMount` write on a LATER commit than the mount commit
+    // that scheduled this retry — `active` doesn't change between the two
+    // commits, but the intervening commit's cleanup was cancelling the
+    // pending retry regardless.) Cancelling the PREVIOUS pending retry here,
+    // before scheduling a new one, still supersedes a genuinely stale pass
+    // the instant a NEWER navigation resolves synchronously; the guard
+    // inside the callback below is the second, redundant line of defense
+    // for the case a stale pass fires before this line ever runs again.
+    if (focusRafIdRef.current !== null) {
+      cancelAnimationFrame(focusRafIdRef.current);
+      focusRafIdRef.current = null;
+    }
     if (!found) {
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
+      focusRafIdRef.current = requestAnimationFrame(() => {
+        focusRafIdRef.current = null;
         if (optsRef.current.getActive() !== active) return;
         if (rootRef.current !== root) return;
         applyActiveEffects();
       });
     }
-
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
     // No dependency array — see the module doc comment (77-07): this must
     // run after every commit so a conditionally-mounted root's re-entry is
     // detected even when the resolved active index repeats; the internal
