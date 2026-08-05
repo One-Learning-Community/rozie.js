@@ -81,20 +81,40 @@
  *     single bare signal-call read, so no method-hoisting is needed in
  *     practice for the shapes the parser can produce.
  *
- *   - **The state machine is instantiated in `ngAfterViewInit`, not a field
- *     initializer** — `viewChild()` signals return `undefined` until after
- *     view init. The class field itself is declared eagerly; `ngAfterViewInit`
- *     assigns it once the root's `nativeElement` is guaranteed to exist. Root
- *     keydown/pointer delegation (`Renderer2.listen`) and its
- *     `DestroyRef`-registered teardown live in the SAME `ngAfterViewInit`
- *     block — both need the guaranteed-populated root element. Because each
- *     root mints its OWN `viewChild()` ref (or reuses an author `ref=`) and
- *     `Renderer2.listen` attaches DIRECTLY on that root's `nativeElement`
- *     (never a shared delegation surface the way Lit's single shadow root
- *     forces), a multi-root component's per-group listeners are naturally
- *     scoped by ordinary DOM event bubbling — Angular needs NO
- *     `data-rozie-keynav-root` containment marker the way Lit does (see
- *     Lit's `emitKeynav.ts` module doc comment for the contrast).
+ *   - **The state machine is constructed ONCE in `ngAfterViewInit`; root
+ *     keydown/pointer/focusin delegation is a REACTIVE, identity-diffed
+ *     re-attach (Plan 77-10, KNG-06)** — `viewChild()` signals return
+ *     `undefined` until after view init, so the class field itself is
+ *     declared eagerly and `createKeynavStateMachine(...)` is assigned once
+ *     `ngAfterViewInit` runs (the machine's only internal state is a
+ *     typeahead buffer that never captures the root element, so
+ *     re-constructing it per root identity would needlessly reset
+ *     typeahead — construct-once is safe). Root delegation, however, is NOT
+ *     safe to do only once at mount time: a `r-keynav` root nested inside an
+ *     `r-if`/`@if` branch may not exist yet at `ngAfterViewInit` time, or may
+ *     disappear and a DIFFERENT root element may later take its place. The
+ *     generated `__rozieKeynavAttachRoot{suffix}` arrow-field method reads
+ *     the root through `viewChild()`, identity-diffs it against a tracked
+ *     `__rozieKeynavAttachedRoot{suffix}` anchor (a no-op re-run when
+ *     unchanged), detaches the previous `Renderer2.listen(...)` set via a
+ *     stored `__rozieKeynavDetach{suffix}` teardown when the root identity
+ *     changed, then re-attaches. It runs from a constructor `effect()`
+ *     (auto-tracking the `viewChild()` signal read — so it re-fires the
+ *     moment a conditional branch resolves a fresh root) AND once explicitly
+ *     in `ngAfterViewInit` (mirroring the `__rozieKeynavSyncActive{suffix}`
+ *     explicit-call precedent, 71-11: a constructor effect's first flush is
+ *     not guaranteed to observe an already-resolved `viewChild()` signal).
+ *     `DestroyRef.onDestroy(...)` registration is UNCONDITIONAL (not nested
+ *     inside a root-present guard) so a root that never resolves, or
+ *     resolves and later closes, still gets its detach/rAF-cancel/dispose
+ *     run on component destroy. Because each root mints its OWN `viewChild()`
+ *     ref (or reuses an author `ref=`) and `Renderer2.listen` attaches
+ *     DIRECTLY on that root's `nativeElement` (never a shared delegation
+ *     surface the way Lit's single shadow root forces), a multi-root
+ *     component's per-group listeners are naturally scoped by ordinary DOM
+ *     event bubbling — Angular needs NO `data-rozie-keynav-root` containment
+ *     marker the way Lit does (see Lit's `emitKeynav.ts` module doc comment
+ *     for the contrast).
  *
  *   - **The active-change imperative work (focus/scroll/`r-keynav-active-class`
  *     toggle) is a `constructor`-body `effect()`** — Angular's signal
@@ -152,6 +172,16 @@ const CONTROLLER_VAR = '__rozieKeynavController';
 const SYNC_ACTIVE_METHOD = '__rozieKeynavSyncActive';
 const APPLY_ACTIVE_METHOD = '__rozieKeynavApplyActive';
 const RAF_ID_FIELD = '__rozieKeynavRafId';
+/**
+ * Plan 77-10 (KNG-06 gap closure) — the identity-diff anchor for the
+ * currently-attached root, the stored teardown for that attachment, and the
+ * reactive attach/re-attach method itself. See this module's doc comment
+ * ("Root delegation is a reactive, identity-diffed attach") for the full
+ * rationale.
+ */
+const ATTACHED_ROOT_FIELD = '__rozieKeynavAttachedRoot';
+const DETACH_FIELD = '__rozieKeynavDetach';
+const ATTACH_ROOT_METHOD = '__rozieKeynavAttachRoot';
 
 function suffixFor(groupIndex: number): string {
   return groupIndex === 0 ? '' : String(groupIndex);
@@ -496,6 +526,9 @@ export function buildKeynavClassEmission(
     const syncMethod = `${SYNC_ACTIVE_METHOD}${suffix}`;
     const applyMethod = `${APPLY_ACTIVE_METHOD}${suffix}`;
     const rafField = `${RAF_ID_FIELD}${suffix}`;
+    const attachedRootField = `${ATTACHED_ROOT_FIELD}${suffix}`;
+    const detachField = `${DETACH_FIELD}${suffix}`;
+    const attachMethod = `${ATTACH_ROOT_METHOD}${suffix}`;
     const rootRefExpr = `this.${plan.rootRefVar}()?.nativeElement`;
 
     const active = resolveActiveScriptTarget(plan.keynavRoot.activeExpression);
@@ -543,6 +576,10 @@ export function buildKeynavClassEmission(
     // Phase 77 (T-77-05-03) — the single outstanding rAF retry id for THIS
     // group, mirroring the React/Lit references' `rafId`/`pendingRafId`.
     fieldDecls.push(`private ${rafField}: number | null = null;`);
+    // Plan 77-10 (KNG-06) — the identity-diff anchor for the currently
+    // attached root, and the stored teardown for that attachment.
+    fieldDecls.push(`private ${attachedRootField}: HTMLElement | null = null;`);
+    fieldDecls.push(`private ${detachField}: (() => void) | null = null;`);
 
     // Shared active-item sync (focus/scroll/`r-keynav-active-class` toggle,
     // SPEC §9), extracted into its own arrow-field method — see the 71-11
@@ -590,41 +627,42 @@ export function buildKeynavClassEmission(
       ].join('\n'),
     );
 
-    const hostLines = [
-      `this.${controllerVar} = createKeynavStateMachine({`,
-      `  getSource: ${getSourceCode},`,
-      `  getActive: () => ${active.get},`,
-      `  setActive: ${active.set},`,
-      `  commit: ${commitCode},`,
-    ];
-    if (pageCode !== null) {
-      hostLines.push(`  page: ${pageCode},`);
-    }
-    hostLines.push(`}, ${configCode});`);
-    afterViewInitLines.push(hostLines.join('\n'));
-
-    afterViewInitLines.push(
+    // Plan 77-10 (KNG-06 gap closure) — the reactive, identity-diffed
+    // attach/re-attach method. Runs from a constructor `effect()` (so it
+    // re-fires the moment a conditional root's `viewChild()` signal first
+    // resolves) AND once explicitly at `ngAfterViewInit` time (mirroring the
+    // `${syncMethod}` explicit-call precedent above, 71-11). The three
+    // `Renderer2.listen(...)` delegation lines and the T-71-09-01
+    // marker-validation guards below are MOVED CHARACTER-FOR-CHARACTER from
+    // the pre-Plan-77-10 inline `ngAfterViewInit` delegation block — this is
+    // what keeps every pre-existing substring assertion a literal match with
+    // zero test edits (the same technique Plan 77-05 used extracting
+    // `${APPLY_ACTIVE_METHOD}`).
+    fieldDecls.push(
       [
-        `{`,
-        `  const __rozieKeynavRootEl = ${rootRefExpr};`,
-        `  if (__rozieKeynavRootEl) {`,
-        `    const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.${controllerVar}?.onKeydown($event); };`,
-        `    const __rozieKeynavHandlePointer = ($event: PointerEvent) => {`,
-        `      const __rozieKeynavTarget = $event.target;`,
-        `      if (!(__rozieKeynavTarget instanceof Element)) return;`,
-        `      const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');`,
-        `      if (!__rozieKeynavMarker) return;`,
-        `      const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');`,
-        `      if (__rozieKeynavRaw === null) return;`,
+        `private ${attachMethod} = () => {`,
+        `  const __rozieKeynavRootEl = ${rootRefExpr} ?? null;`,
+        `  if (__rozieKeynavRootEl === this.${attachedRootField}) return;`,
+        `  if (this.${detachField}) { this.${detachField}(); this.${detachField} = null; }`,
+        `  this.${attachedRootField} = __rozieKeynavRootEl;`,
+        `  if (!__rozieKeynavRootEl) return;`,
+        `  const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.${controllerVar}?.onKeydown($event); };`,
+        `  const __rozieKeynavHandlePointer = ($event: PointerEvent) => {`,
+        `    const __rozieKeynavTarget = $event.target;`,
+        `    if (!(__rozieKeynavTarget instanceof Element)) return;`,
+        `    const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');`,
+        `    if (!__rozieKeynavMarker) return;`,
+        `    const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');`,
+        `    if (__rozieKeynavRaw === null) return;`,
         // T-71-09-01 (threat register) — Number() + bounds-check on the
         // untrusted DOM marker BEFORE it reaches the reducer. The reducer
         // also clamps as a second line of defense (71-03's
         // onPointerActivate), but a malformed/negative index is rejected
         // here first, never coerced.
-        `      const __rozieKeynavIdx = Number(__rozieKeynavRaw);`,
-        `      if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;`,
-        `      this.${controllerVar}?.onPointerActivate(__rozieKeynavIdx);`,
-        `    };`,
+        `    const __rozieKeynavIdx = Number(__rozieKeynavRaw);`,
+        `    if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;`,
+        `    this.${controllerVar}?.onPointerActivate(__rozieKeynavIdx);`,
+        `  };`,
         // DOM focus can land on an item WITHOUT a keydown or pointerdown
         // ever firing on the root — a programmatic `.focus()` call
         // (assistive tech, test automation) is the common case, but it's
@@ -639,34 +677,71 @@ export function buildKeynavClassEmission(
         // date-picker's 260802-hla spec `.focus()`s a day cell directly,
         // then presses ArrowRight, which used to move relative to whatever
         // `active` happened to be BEFORE that focus call).
-        `    const __rozieKeynavHandleFocusIn = ($event: FocusEvent) => {`,
-        `      const __rozieKeynavTarget = $event.target;`,
-        `      if (!(__rozieKeynavTarget instanceof Element)) return;`,
-        `      const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');`,
-        `      if (!__rozieKeynavMarker) return;`,
-        `      const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');`,
-        `      if (__rozieKeynavRaw === null) return;`,
-        `      const __rozieKeynavIdx = Number(__rozieKeynavRaw);`,
-        `      if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;`,
-        `      this.${controllerVar}?.moveTo(__rozieKeynavIdx);`,
-        `    };`,
-        `    const __rozieKeynavUnlistenKeydown = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'keydown', __rozieKeynavHandleKeydown);`,
-        `    const __rozieKeynavUnlistenPointer = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'pointerdown', __rozieKeynavHandlePointer);`,
-        `    const __rozieKeynavUnlistenFocusIn = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'focusin', __rozieKeynavHandleFocusIn);`,
-        `    this.__rozieDestroyRef.onDestroy(() => {`,
-        `      __rozieKeynavUnlistenKeydown();`,
-        `      __rozieKeynavUnlistenPointer();`,
-        `      __rozieKeynavUnlistenFocusIn();`,
-        `      if (this.${rafField} !== null) cancelAnimationFrame(this.${rafField});`,
-        `      this.${controllerVar}?.dispose();`,
-        `    });`,
-        `  }`,
-        `}`,
+        `  const __rozieKeynavHandleFocusIn = ($event: FocusEvent) => {`,
+        `    const __rozieKeynavTarget = $event.target;`,
+        `    if (!(__rozieKeynavTarget instanceof Element)) return;`,
+        `    const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');`,
+        `    if (!__rozieKeynavMarker) return;`,
+        `    const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');`,
+        `    if (__rozieKeynavRaw === null) return;`,
+        `    const __rozieKeynavIdx = Number(__rozieKeynavRaw);`,
+        `    if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;`,
+        `    this.${controllerVar}?.moveTo(__rozieKeynavIdx);`,
+        `  };`,
+        `  const __rozieKeynavUnlistenKeydown = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'keydown', __rozieKeynavHandleKeydown);`,
+        `  const __rozieKeynavUnlistenPointer = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'pointerdown', __rozieKeynavHandlePointer);`,
+        `  const __rozieKeynavUnlistenFocusIn = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'focusin', __rozieKeynavHandleFocusIn);`,
+        `  this.${detachField} = () => {`,
+        `    __rozieKeynavUnlistenKeydown();`,
+        `    __rozieKeynavUnlistenPointer();`,
+        `    __rozieKeynavUnlistenFocusIn();`,
+        `  };`,
+        `};`,
       ].join('\n'),
     );
-    // Explicit mount-time sync — see the field decl's doc comment above for
-    // why this cannot be left to the constructor effect() alone (71-11).
+
+    const hostLines = [
+      `this.${controllerVar} = createKeynavStateMachine({`,
+      `  getSource: ${getSourceCode},`,
+      `  getActive: () => ${active.get},`,
+      `  setActive: ${active.set},`,
+      `  commit: ${commitCode},`,
+    ];
+    if (pageCode !== null) {
+      hostLines.push(`  page: ${pageCode},`);
+    }
+    hostLines.push(`}, ${configCode});`);
+    afterViewInitLines.push(hostLines.join('\n'));
+
+    // Explicit mount-time attach + sync — mirrors the `${syncMethod}`
+    // explicit-call precedent (71-11): a constructor `effect()`'s FIRST
+    // flush is not guaranteed to observe a resolved `viewChild()` query
+    // signal, so an unconditional root still needs its listeners attached
+    // here too, not only from the effect below.
+    afterViewInitLines.push(`this.${attachMethod}();`);
     afterViewInitLines.push(`this.${syncMethod}();`);
+    // Plan 77-10 (KNG-06) — teardown registration is now UNCONDITIONAL (no
+    // longer nested inside an `if (root)` guard) so a conditional root that
+    // never resolves, or resolves and later closes, still gets its
+    // controller disposed and rAF cancelled on destroy.
+    afterViewInitLines.push(
+      [
+        `this.__rozieDestroyRef.onDestroy(() => {`,
+        `  this.${detachField}?.();`,
+        `  if (this.${rafField} !== null) cancelAnimationFrame(this.${rafField});`,
+        `  this.${controllerVar}?.dispose();`,
+        `});`,
+      ].join('\n'),
+    );
+
+    // Attach-ROOT effect (Plan 77-10, KNG-06) — re-runs whenever
+    // `${rootRefExpr}`'s `viewChild()` query signal changes identity, which
+    // is exactly when a conditional root's branch opens/closes/swaps.
+    // Pushed BEFORE the active-sync effect so a newly-appeared root owns its
+    // listeners before the active-sync focus pass runs against it.
+    constructorLines.push(
+      [`effect(() => {`, `  this.${attachMethod}();`, `});`].join('\n'),
+    );
 
     // Active-CHANGE effect (SPEC §9: "evaluated once ... toggles on
     // active-change, not a live per-render binding") — the `this.<prop>()`
