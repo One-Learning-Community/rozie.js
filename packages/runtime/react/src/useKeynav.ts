@@ -184,7 +184,8 @@ export function useKeynav(
     machine: KeynavStateMachine | null;
     onKeyDown: ((e: KeyboardEvent) => void) | null;
     onPointerDown: ((e: PointerEvent) => void) | null;
-  }>({ root: null, machine: null, onKeyDown: null, onPointerDown: null });
+    onFocusIn: ((e: FocusEvent) => void) | null;
+  }>({ root: null, machine: null, onKeyDown: null, onPointerDown: null, onFocusIn: null });
 
   // ---- Effect 1 (root-identity-tracked): state machine + root keydown/pointer delegation ----
   useEffect(() => {
@@ -194,15 +195,17 @@ export function useKeynav(
 
     // Tear down whatever was attached to the PREVIOUS root (a different
     // element, or none) before (re)attaching to the current one.
-    if (attach.root && attach.onKeyDown && attach.onPointerDown) {
+    if (attach.root && attach.onKeyDown && attach.onPointerDown && attach.onFocusIn) {
       attach.root.removeEventListener('keydown', attach.onKeyDown);
       attach.root.removeEventListener('pointerdown', attach.onPointerDown);
+      attach.root.removeEventListener('focusin', attach.onFocusIn);
     }
     attach.machine?.dispose();
     attach.root = null;
     attach.machine = null;
     attach.onKeyDown = null;
     attach.onPointerDown = null;
+    attach.onFocusIn = null;
 
     if (!root) return;
 
@@ -274,14 +277,33 @@ export function useKeynav(
       const idx = resolveItemIndex(e.target);
       if (idx !== null) machine.onPointerActivate(idx);
     };
+    // DOM focus can land on an item WITHOUT a keydown or pointerdown ever
+    // firing on the root — a programmatic `.focus()` call (assistive tech,
+    // test automation) is the common case, but it's really any focus arrival
+    // this delegation model can't otherwise observe. `focusin` bubbles (unlike
+    // `focus`), so a single root listener catches it the same way keydown/
+    // pointerdown already do. `moveTo` only sets `active`, never commits —
+    // syncing the roving-tabindex model's notion of "current item" to
+    // wherever DOM focus ACTUALLY is, so a subsequent arrow key moves
+    // relative to the real focus target instead of a stale prior `active`
+    // (T-77-08-05 — found via 77-08's real-DOM Docker VR run: date-picker's
+    // 260802-hla spec `.focus()`s a day cell directly, then presses
+    // ArrowRight, which used to move relative to whatever `active` happened
+    // to be BEFORE that focus call).
+    const onFocusIn = (e: FocusEvent): void => {
+      const idx = resolveItemIndex(e.target);
+      if (idx !== null) machine.moveTo(idx);
+    };
 
     root.addEventListener('keydown', onKeyDown);
     root.addEventListener('pointerdown', onPointerDown);
+    root.addEventListener('focusin', onFocusIn);
 
     attach.root = root;
     attach.machine = machine;
     attach.onKeyDown = onKeyDown;
     attach.onPointerDown = onPointerDown;
+    attach.onFocusIn = onFocusIn;
     // No dependency array — see the module doc comment (77-07): this must run
     // after EVERY commit so a conditionally-mounted root is correctly
     // (re)initialized every time it reappears, while the internal
@@ -295,9 +317,10 @@ export function useKeynav(
   useEffect(() => {
     return () => {
       const attach = attachRef.current;
-      if (attach.root && attach.onKeyDown && attach.onPointerDown) {
+      if (attach.root && attach.onKeyDown && attach.onPointerDown && attach.onFocusIn) {
         attach.root.removeEventListener('keydown', attach.onKeyDown);
         attach.root.removeEventListener('pointerdown', attach.onPointerDown);
+        attach.root.removeEventListener('focusin', attach.onFocusIn);
       }
       attach.machine?.dispose();
       attach.root = null;

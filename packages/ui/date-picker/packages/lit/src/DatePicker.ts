@@ -3,7 +3,7 @@ import { customElement, property, query, queryAssignedElements, state } from 'li
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { KeynavController, createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
-import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
@@ -494,8 +494,9 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   firstUpdated(): void {
     this._armListeners();
 
-    this._viewIso.value = this.viewMonthGrid();
-    this.seedActiveDay();
+    const nextViewIso = this.viewMonthGrid();
+    this._viewIso.value = nextViewIso;
+    this.seedActiveDay(nextViewIso);
   }
 
   disconnectedCallback(): void {
@@ -526,15 +527,15 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
   
   <div class="rozie-datepicker-grids" data-rozie-keynav-root="0" data-rozie-s-6800c7a2>
-    ${repeat<any>(this.daysGrids(), (g, gi) => gi, (g, gi) => html`<div class="rozie-datepicker-grid" role="grid" @mouseleave=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this._hoverIso.value = ''; }} data-rozie-s-6800c7a2>
+    ${repeat<any>(this.daysGrids(), (g, gi) => g.year + '-' + g.month, (g, gi) => html`<div class="rozie-datepicker-grid" role="grid" @mouseleave=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this._hoverIso.value = ''; }} data-rozie-s-6800c7a2>
       <div class="rozie-datepicker-weekdays" role="row" data-rozie-s-6800c7a2>
         ${repeat<any>(this.weekdays(), (wd, wi) => wi, (wd, wi) => html`<span class="rozie-datepicker-weekday" role="columnheader" aria-label=${rozieAttr(wd)} data-rozie-s-6800c7a2>${rozieDisplay(wd)}</span>`)}
       </div>
 
-      ${repeat<any>(g.weeks, (week, wk) => wk, (week, wk) => html`<div class="rozie-datepicker-week" role="row" data-rozie-s-6800c7a2>
+      ${repeat<any>(g.weeks, (week, wk) => week[0].iso, (week, wk) => html`<div class="rozie-datepicker-week" role="row" data-rozie-s-6800c7a2>
         
         ${repeat<any>(week, (day, dc) => day.iso, (day, dc) => html`<span class="rozie-datepicker-cell" role="gridcell" aria-selected=${!!(day.selected || day.rangeStart || day.rangeEnd)} data-rozie-s-6800c7a2>
-          <button class="${Object.entries({ "rozie-datepicker-day": true, 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" data-day=${rozieAttr(day.iso)} ?disabled=${!!this.disabled} aria-disabled=${!!day.disabled} aria-label=${rozieAttr(day.iso)} aria-current=${rozieAttr(day.today ? 'date' : null)} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDaySelect(day.iso); }} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayHover(day.iso); }} @focus=${($event: FocusEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayHover(day.iso); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayCellKeydown(day.iso, $event); }} id=${`${this._rozieKeynavGroupId}-item-${gi * 42 + wk * 7 + dc}`} data-rozie-keynav-item=${gi * 42 + wk * 7 + dc} ?data-rozie-keynav-active=${this._activeDay.value === gi * 42 + wk * 7 + dc} tabindex=${this._activeDay.value === gi * 42 + wk * 7 + dc ? 0 : -1} data-rozie-s-6800c7a2>${rozieDisplay(day.day)}</button>
+          <button class="${Object.entries({ "rozie-datepicker-day": true, 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" data-day=${rozieAttr(day.iso)} ?disabled=${!!this.disabled} aria-disabled=${!!day.disabled} aria-label=${rozieAttr(day.iso)} aria-current=${rozieAttr(day.today ? 'date' : null)} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayHover(day.iso); }} @focus=${($event: FocusEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayHover(day.iso); }} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onDayCellKeydown(day.iso, $event); }} id=${`${this._rozieKeynavGroupId}-item-${gi * 42 + wk * 7 + dc}`} data-rozie-keynav-item=${gi * 42 + wk * 7 + dc} ?data-rozie-keynav-active=${this._activeDay.value === gi * 42 + wk * 7 + dc} tabindex=${this._activeDay.value === gi * 42 + wk * 7 + dc ? 0 : -1} data-rozie-s-6800c7a2>${rozieDisplay(day.day)}</button>
         </span>`)}
       </div>`)}
     </div>`)}
@@ -586,8 +587,8 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   return '';
 };
 
-  viewMonthGrid = () => resolveViewIso({
-  viewIso: this._viewIso.value,
+  viewMonthGrid = (viewIsoOverride?: string) => resolveViewIso({
+  viewIso: viewIsoOverride !== undefined ? viewIsoOverride : this._viewIso.value,
   value: this.viewAnchor(),
   today: this.todayIso()
 });
@@ -607,10 +608,10 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   previewEnd: this.selectionMode === 'range' ? this._hoverIso.value : undefined
 });
 
-  grids = () => Array.from({
+  grids = (viewIsoOverride?: string) => Array.from({
   length: this.numberOfMonths
 }, (_: any, i: any) => buildMonthGrid({
-  viewIso: addMonths(this.viewMonthGrid(), i),
+  viewIso: addMonths(this.viewMonthGrid(viewIsoOverride), i),
   value: this.selected(),
   today: this.todayIso(),
   min: this.min,
@@ -641,12 +642,12 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
   yearRangeLabel = () => this.yearGrid().rangeLabel;
 
-  daysGrids = () => this.showsDaysView() ? this.grids() : [];
+  daysGrids = (viewIsoOverride?: string, assumeDaysView?: boolean) => assumeDaysView || this.showsDaysView() ? this.grids(viewIsoOverride) : [];
 
-  allDayCells = () => this.daysGrids().flatMap((g: any) => g.weeks.flatMap((row: any) => row));
+  allDayCells = (viewIsoOverride?: string, assumeDaysView?: boolean) => this.daysGrids(viewIsoOverride, assumeDaysView).flatMap((g: any) => g.weeks.flatMap((row: any) => row));
 
-  rovingDayInput = () => ({
-  viewIso: this.viewMonthGrid(),
+  rovingDayInput = (viewIsoOverride?: string) => ({
+  viewIso: this.viewMonthGrid(viewIsoOverride),
   value: this.selected(),
   today: this.todayIso(),
   min: this.min,
@@ -660,8 +661,14 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   anchor: this.selected() !== '' ? this.selected() : this.selectionMode === 'range' ? this.readRange().start : ''
 });
 
-  seedActiveDay = () => {
-  this._activeDay.value = resolveRovingDayIndex(this.allDayCells(), this.rovingDayInput());
+  seedActiveDay = (viewIsoOverride?: string, assumeDaysView?: boolean) => {
+  const next = resolveRovingDayIndex(this.allDayCells(viewIsoOverride, assumeDaysView), this.rovingDayInput(viewIsoOverride));
+  if (next === this._activeDay.value) {
+    this._activeDay.value = ROVING_DAY_NONE;
+  }
+  requestAnimationFrame(() => {
+    this._activeDay.value = next;
+  });
 };
 
   monthHeading = () => monthLabel(this.viewMonthGrid(), this.locale);
@@ -758,10 +765,14 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   goToMonth = (delta: any) => {
   if (this.disabled) return;
   const unit = this._viewMode.value === 'years' ? 144 : this._viewMode.value === 'months' ? 12 : 1;
-  this._viewIso.value = addMonths(this.viewMonthGrid(), delta * unit);
+  const nextViewIso = addMonths(this.viewMonthGrid(), delta * unit);
+  this._viewIso.value = nextViewIso;
   // The rendered day set changed without going through the r-keynav page
   // mechanism (a direct header nav click) — reseed the tab stop (77-08).
-  this.seedActiveDay();
+  // Pass the freshly-computed viewIso directly (staleness fix, see
+  // seedActiveDay's own doc comment) — $data.viewMode is UNCHANGED by this
+  // function, so the live showsDaysView() read stays correct un-overridden.
+  this.seedActiveDay(nextViewIso);
 };
 
   goPrevMonth = () => this.goToMonth(-1);
@@ -792,7 +803,10 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   if (!this.monthEnabled(iso)) return;
   this._viewIso.value = iso;
   this._viewMode.value = 'days';
-  this.seedActiveDay();
+  // Both the view anchor AND the days-view transition are fresh in THIS
+  // call — pass both explicitly (staleness fix, see seedActiveDay's own doc
+  // comment).
+  this.seedActiveDay(iso, true);
 };
 
   selectYear = (iso: any) => {
@@ -806,7 +820,10 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
   exitToDaysView = () => {
   this._viewMode.value = 'days';
-  this.seedActiveDay();
+  // $data.viewIso is unchanged here (no fresher value to pass), but the
+  // days-view transition IS fresh in THIS call — say so explicitly
+  // (staleness fix, see seedActiveDay's own doc comment).
+  this.seedActiveDay(undefined, true);
 };
 
   onDayCommit = (i: any) => {
@@ -944,8 +961,11 @@ export default class DatePicker extends SignalWatcher(LitElement) {
 
   goToToday = () => {
   if (this.disabled) return;
-  this._viewIso.value = this.todayIso();
-  this.seedActiveDay();
+  const nextViewIso = this.todayIso();
+  this._viewIso.value = nextViewIso;
+  // Fresh viewIso passed directly (staleness fix, see seedActiveDay's own
+  // doc comment); $data.viewMode is unchanged here.
+  this.seedActiveDay(nextViewIso);
 };
 
   selectToday = () => {

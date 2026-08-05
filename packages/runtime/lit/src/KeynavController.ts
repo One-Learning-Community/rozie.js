@@ -186,6 +186,25 @@ export class KeynavController implements ReactiveController {
     if (idx !== null) this.machine?.onPointerActivate(idx);
   };
 
+  // DOM focus can land on an item WITHOUT a keydown or pointerdown ever
+  // firing on the root — a programmatic `.focus()` call (assistive tech,
+  // test automation) is the common case, but it's really any focus arrival
+  // this delegation model can't otherwise observe. `focusin` bubbles AND
+  // composes across the shadow boundary (unlike `focus`), so the SAME
+  // renderRoot-level listener catches it exactly like keydown/pointerdown
+  // already do. `moveTo` only sets `active`, never commits — syncing the
+  // roving-tabindex model's notion of "current item" to wherever DOM focus
+  // ACTUALLY is, so a subsequent arrow key moves relative to the real focus
+  // target instead of a stale prior `active` (T-77-08-05 — found via 77-08's
+  // real-DOM Docker VR run: date-picker's 260802-hla spec `.focus()`s a day
+  // cell directly, then presses ArrowRight, which used to move relative to
+  // whatever `active` happened to be BEFORE that focus call).
+  private readonly onFocusIn = (e: FocusEvent): void => {
+    if (!this.matchesRootScope(e.target)) return;
+    const idx = this.resolveItemIndex(e.target);
+    if (idx !== null) this.machine?.moveTo(idx);
+  };
+
   /**
    * Phase 77 multi-root DOM containment scoping (SPEC §6; `emitKeynav.ts`'s
    * module doc comment). `opts.rootMarker` is ONLY present for a component
@@ -298,6 +317,7 @@ export class KeynavController implements ReactiveController {
     const root = this.host.renderRoot;
     root.addEventListener('keydown', this.onKeyDown as EventListener);
     root.addEventListener('pointerdown', this.onPointerDown as EventListener);
+    root.addEventListener('focusin', this.onFocusIn as EventListener);
 
     // Force the next hostUpdated() to apply the active-change side effects
     // at least once per connect (mirrors useKeynav's effect running on
@@ -313,6 +333,7 @@ export class KeynavController implements ReactiveController {
       'pointerdown',
       this.onPointerDown as EventListener,
     );
+    root.removeEventListener('focusin', this.onFocusIn as EventListener);
     this.cancelPendingRetry();
     this.machine?.dispose();
     this.machine = null;

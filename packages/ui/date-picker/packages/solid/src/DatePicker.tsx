@@ -2,7 +2,7 @@ import type { JSX } from 'solid-js';
 import { For, Show, createSignal, mergeProps, onMount, splitProps } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, createControllableSignal, createKeynav, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
-import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
@@ -402,8 +402,9 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   const [activeMonth, setActiveMonth] = createSignal(0);
   const [activeYear, setActiveYear] = createSignal(0);
   onMount(() => {
-    setViewIso(viewMonthGrid());
-    seedActiveDay();
+    const nextViewIso = viewMonthGrid();
+    setViewIso(nextViewIso);
+    seedActiveDay(nextViewIso);
   });
   let rootRef: HTMLElement | null = null;
 
@@ -446,9 +447,23 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
     if (local.selectionMode === 'range') return readRange().start;
     return '';
   }
-  function viewMonthGrid() {
+  // `viewIsoOverride` (77-08): callers that just wrote $data.viewIso in the
+  // SAME synchronous call (goToMonth/goToToday/selectMonth) can pass the
+  // FRESH value directly instead of relying on this function's own
+  // $data.viewIso read. This matters because a callback that reads $data.viewIso
+  // is a JS CLOSURE captured at a point in time — on React specifically, no
+  // amount of setTimeout/rAF deferral makes an ALREADY-CAPTURED closure
+  // observe a state write made by the SAME synchronous call that created it
+  // (React's setState is async; the closure was bound before that write even
+  // scheduled a new render). Passing the value the caller already computed
+  // sidesteps the staleness entirely (mirrors 77-07's onMonthCommit/
+  // onYearCommit `i`-parameter fix for the identical class of bug). Omitted
+  // (undefined) falls back to the live $data.viewIso read — correct for every
+  // call site with no fresher value in hand ($onMount, the focus() expose
+  // handle, template reads).
+  function viewMonthGrid(viewIsoOverride?: string) {
     return resolveViewIso({
-      viewIso: viewIso(),
+      viewIso: viewIsoOverride !== undefined ? viewIsoOverride : viewIso(),
       value: viewAnchor(),
       today: todayIso()
     });
@@ -482,11 +497,13 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // so `numberOfMonths` renders side by side. A PLAIN function (uniform x6),
   // mirroring grid() exactly but with the view anchor advanced by `i` months.
   // numberOfMonths === 1 yields a one-element array whose single grid === grid().
-  function grids() {
+  // `viewIsoOverride` threads through to viewMonthGrid() — see its own doc
+  // comment (77-08 staleness fix).
+  function grids(viewIsoOverride?: string) {
     return Array.from({
       length: local.numberOfMonths
     }, (_: any, i: any) => buildMonthGrid({
-      viewIso: addMonths(viewMonthGrid(), i),
+      viewIso: addMonths(viewMonthGrid(viewIsoOverride), i),
       value: selected(),
       today: todayIso(),
       min: local.min,
@@ -537,8 +554,16 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // grid's root; `display: contents` in the style block below keeps it out of
   // the render tree, so this stays present regardless of numberOfMonths without
   // perturbing the single-month layout).
-  function daysGrids() {
-    return showsDaysView() ? grids() : [];
+  //
+  // `viewIsoOverride` threads to viewMonthGrid() (77-08 staleness fix, see its
+  // doc comment). `assumeDaysView`, when true, bypasses the showsDaysView()
+  // gate — for a caller (selectMonth/exitToDaysView) that just wrote
+  // $data.viewMode = 'days' in the SAME synchronous call: reading
+  // $data.viewMode back here would observe the PRE-write value for the exact
+  // same closure-staleness reason, so the caller that KNOWS it is
+  // transitioning into the days view says so explicitly instead.
+  function daysGrids(viewIsoOverride?: string, assumeDaysView?: boolean) {
+    return assumeDaysView || showsDaysView() ? grids(viewIsoOverride) : [];
   }
 
   // The flat, render-order concatenation of every rendered panel's day cells
@@ -547,9 +572,9 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // days), so a cell's flat index is `panelIndex * 42 + weekIndex * 7 +
   // columnIndex` — the day button's own explicit r-keynav-item index expression
   // computes this exactly. Empty while a drill panel is showing, mirroring
-  // daysGrids()'s own gate.
-  function allDayCells() {
-    return daysGrids().flatMap((g: any) => g.weeks.flatMap((row: any) => row));
+  // daysGrids()'s own gate. Both params thread straight through to daysGrids().
+  function allDayCells(viewIsoOverride?: string, assumeDaysView?: boolean) {
+    return daysGrids(viewIsoOverride, assumeDaysView).flatMap((g: any) => g.weeks.flatMap((row: any) => row));
   }
 
   // The day grid's roving/active-index resolution input — the SAME shape the
@@ -558,10 +583,11 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // entry focus and the focus() expose handle can never disagree (the
   // 260802-hla invariant). `anchor` mirrors the existing viewAnchor() funnel —
   // the selected value in single mode, else the in-progress range anchor — so
-  // a range picker gets a tab stop too.
-  function rovingDayInput() {
+  // a range picker gets a tab stop too. `viewIsoOverride` threads to
+  // viewMonthGrid() (77-08 staleness fix).
+  function rovingDayInput(viewIsoOverride?: string) {
     return {
-      viewIso: viewMonthGrid(),
+      viewIso: viewMonthGrid(viewIsoOverride),
       value: selected(),
       today: todayIso(),
       min: local.min,
@@ -581,11 +607,63 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // (resolveRovingDayIndex, buildMonthGrid.ts) — called on mount, after a
   // direct month/today nav, and whenever a drill panel returns to the days
   // view (selectMonth/exitToDaysView). The r-keynav grid controller lands DOM
-  // focus itself whenever this value changes — see the day grid's template
+  // focus itself whenever this value CHANGES — see the day grid's template
   // root. NOT called from onDayPage below, which computes its own precise
   // landing index per SPEC §4.1 instead of this fallback chain.
-  function seedActiveDay() {
-    setActiveDay(resolveRovingDayIndex(allDayCells(), rovingDayInput()));
+  //
+  // `viewIsoOverride`/`assumeDaysView` thread straight through to
+  // allDayCells()/rovingDayInput() — every caller that just wrote
+  // $data.viewIso and/or $data.viewMode passes the fresh value(s) it already
+  // computed instead of letting this function re-derive them from $data. This
+  // is NOT a timing/ordering issue — no amount of setTimeout/rAF deferral
+  // fixes it: on React, reading a state variable inside a callback observes
+  // whatever that CLOSURE captured at creation time, and a synchronous
+  // $data.X = newValue write inside the SAME calling function does not
+  // retroactively update a closure that already exists (React's setState is
+  // async — the closure calling this was bound BEFORE that write even
+  // scheduled a new render). Passing the value the caller already has
+  // sidesteps the staleness entirely (mirrors 77-07's onMonthCommit/
+  // onYearCommit `i`-parameter fix for the identical class of bug; found via
+  // 77-08's real-DOM Docker VR run — "step forward a month" resolved the
+  // fallback against the OLD month, and a drill exit resolved against an
+  // empty day source because $data.viewMode hadn't "visibly" flipped back to
+  // 'days' from this function's point of view). Omitted at a call site with
+  // no fresher value in hand (focus() expose handle) falls back to the live
+  // $data reads, correctly.
+  //
+  // The day grid's own root never remounts (unlike the drills' r-if roots,
+  // 77-07) — it's the SAME wrapper the whole time, so the controller's own
+  // {root,active} diff (its "only re-apply on a genuine change" guard) sees
+  // NO change at all when the freshly-resolved index happens to repeat the
+  // value $data.activeDay already held, and silently skips re-applying DOM
+  // focus. That drops focus continuity on exactly the 260802-hla regression
+  // case this retrofit must keep green: drilling into months/years and back
+  // out WITHOUT the selection changing (so the day tab stop resolves to the
+  // SAME index both times) — meanwhile the day buttons themselves were
+  // removed and recreated while the drill panel was showing, so REAL DOM
+  // focus has already been lost by the time this runs. Force a genuine
+  // change the reactive system actually observes: settle through the
+  // ROVING_DAY_NONE sentinel first, then the real value one animation frame
+  // later.
+  //
+  // EVERY write to $data.activeDay below is deferred one animation frame,
+  // even in the plain (not-same-value) case — found empirically via 77-08's
+  // real-DOM Docker VR run: a synchronous write from a real click handler
+  // (not a mount effect, and with a CORRECTLY fresh-computed `next` value —
+  // this is NOT the closure-staleness class of bug the viewIsoOverride
+  // parameters above fix) still silently failed to reach the template on one
+  // target. A single rAF deferral committed correctly every time on every
+  // target, with no observable flicker (never a retry loop, and still never
+  // queries the DOM or calls .focus() itself — the primitive's own effect
+  // keeps owning that once it sees activeDay actually move).
+  function seedActiveDay(viewIsoOverride?: string, assumeDaysView?: boolean) {
+    const next = resolveRovingDayIndex(allDayCells(viewIsoOverride, assumeDaysView), rovingDayInput(viewIsoOverride));
+    if (next === activeDay()) {
+      setActiveDay(ROVING_DAY_NONE);
+    }
+    requestAnimationFrame(() => {
+      setActiveDay(next);
+    });
   }
 
   // The localized month-year heading. NAMED `monthHeading`, NOT `label` — a bare
@@ -698,10 +776,14 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   function goToMonth(delta: any) {
     if (local.disabled) return;
     const unit = viewMode() === 'years' ? 144 : viewMode() === 'months' ? 12 : 1;
-    setViewIso(addMonths(viewMonthGrid(), delta * unit));
+    const nextViewIso = addMonths(viewMonthGrid(), delta * unit);
+    setViewIso(nextViewIso);
     // The rendered day set changed without going through the r-keynav page
     // mechanism (a direct header nav click) — reseed the tab stop (77-08).
-    seedActiveDay();
+    // Pass the freshly-computed viewIso directly (staleness fix, see
+    // seedActiveDay's own doc comment) — $data.viewMode is UNCHANGED by this
+    // function, so the live showsDaysView() read stays correct un-overridden.
+    seedActiveDay(nextViewIso);
   }
   function goPrevMonth() {
     return goToMonth(-1);
@@ -753,7 +835,10 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
     if (!monthEnabled(iso)) return;
     setViewIso(iso);
     setViewMode('days');
-    seedActiveDay();
+    // Both the view anchor AND the days-view transition are fresh in THIS
+    // call — pass both explicitly (staleness fix, see seedActiveDay's own doc
+    // comment).
+    seedActiveDay(iso, true);
   }
   // Pick a year → move the view anchor's year, drill back UP toward months, and
   // re-seed $data.activeMonth (mirrors enterMonthsView — the primitive lands
@@ -772,7 +857,10 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // (the r-keynav controller lands it) instead of dropping it to <body>.
   function exitToDaysView() {
     setViewMode('days');
-    seedActiveDay();
+    // $data.viewIso is unchanged here (no fresher value to pass), but the
+    // days-view transition IS fresh in THIS call — say so explicitly
+    // (staleness fix, see seedActiveDay's own doc comment).
+    seedActiveDay(undefined, true);
   }
 
   // ---- day grid r-keynav wiring (77-08 retrofit) --------------------------
@@ -985,7 +1073,11 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // ---- lifecycle + imperative handle -------------------------------------
   // Seed the view month from value / today on mount, then seed the day grid's
   // active-index model (77-08) — the SAME resolveRovingDayIndex chain the tab
-  // stop uses, so mount, keyboard Tab and this handle can never disagree.
+  // stop uses, so mount, keyboard Tab and this handle can never disagree. The
+  // fresh viewIso is passed directly (staleness fix, see seedActiveDay's own
+  // doc comment); seedActiveDay() defers its own write internally, so this
+  // call is a plain, synchronous fire-and-forget like every other
+  // seedActiveDay() call site.
 
   // focus() — resolve + set $data.activeDay through the SAME roving-tabindex
   // chain the tab stop uses (seedActiveDay/resolveRovingDayIndex), so this
@@ -1000,8 +1092,11 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // goToToday() — swing the view to the current month (no selection change).
   function goToToday() {
     if (local.disabled) return;
-    setViewIso(todayIso());
-    seedActiveDay();
+    const nextViewIso = todayIso();
+    setViewIso(nextViewIso);
+    // Fresh viewIso passed directly (staleness fix, see seedActiveDay's own
+    // doc comment); $data.viewMode is unchanged here.
+    seedActiveDay(nextViewIso);
   }
 
   // ---- footer moves (Today / Clear row) ----------------------------------
@@ -1104,18 +1199,18 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
 
       
       <div class={"rozie-datepicker-grids"} ref={(el) => { __rozieKeynavRootRef = el as HTMLElement; }} data-rozie-s-6800c7a2="">
-        <For each={daysGrids()}>{(g, gi) => <div role="grid" class={"rozie-datepicker-grid"} onMouseLeave={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setHoverIso(''); }} data-rozie-s-6800c7a2="">
+        <Key each={daysGrids() as readonly any[]} by={(g) => g.year + '-' + g.month}>{(g, gi) => <div role="grid" class={"rozie-datepicker-grid"} onMouseLeave={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { setHoverIso(''); }} data-rozie-s-6800c7a2="">
           <div class={"rozie-datepicker-weekdays"} role="row" data-rozie-s-6800c7a2="">
             <For each={weekdays()}>{(wd, wi) => <span class={"rozie-datepicker-weekday"} role="columnheader" aria-label={rozieAttr(wd)} data-rozie-s-6800c7a2="">{rozieDisplay(wd)}</span>}</For>
           </div>
 
-          <For each={g.weeks}>{(week, wk) => <div class={"rozie-datepicker-week"} role="row" data-rozie-s-6800c7a2="">
+          <Key each={g().weeks as readonly any[]} by={(week) => week[0].iso}>{(week, wk) => <div class={"rozie-datepicker-week"} role="row" data-rozie-s-6800c7a2="">
             
-            <Key each={week as readonly any[]} by={(day) => day.iso}>{(day, dc) => <span class={"rozie-datepicker-cell"} role="gridcell" aria-selected={!!(day().selected || day().rangeStart || day().rangeEnd)} data-rozie-s-6800c7a2="">
-              <button type="button" data-day={rozieAttr(day().iso)} aria-disabled={!!day().disabled} aria-label={rozieAttr(day().iso)} aria-current={rozieAttr(day().today ? 'date' : null)} class={"rozie-datepicker-day" + " " + rozieClass({ 'is-selected': day().selected, 'is-today': day().today, 'is-outside': !day().inMonth, 'is-in-range': day().inRange, 'is-range-start': day().rangeStart, 'is-range-end': day().rangeEnd, 'is-in-preview': day().inPreview })} disabled={!!local.disabled} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onDaySelect(day().iso); }} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onDayHover(day().iso); }} onFocus={($event: FocusEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onDayHover(day().iso); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onDayCellKeydown(day().iso, $event); }} id={`${__rozieKeynavGroupId}-item-${gi() * 42 + wk() * 7 + dc()}`} data-rozie-keynav-item={gi() * 42 + wk() * 7 + dc()} data-rozie-keynav-active={activeDay() === gi() * 42 + wk() * 7 + dc() ? '' : undefined} tabIndex={activeDay() === gi() * 42 + wk() * 7 + dc() ? 0 : -1} data-rozie-s-6800c7a2="">{rozieDisplay(day().day)}</button>
+            <Key each={week() as readonly any[]} by={(day) => day.iso}>{(day, dc) => <span class={"rozie-datepicker-cell"} role="gridcell" aria-selected={!!(day().selected || day().rangeStart || day().rangeEnd)} data-rozie-s-6800c7a2="">
+              <button type="button" data-day={rozieAttr(day().iso)} aria-disabled={!!day().disabled} aria-label={rozieAttr(day().iso)} aria-current={rozieAttr(day().today ? 'date' : null)} class={"rozie-datepicker-day" + " " + rozieClass({ 'is-selected': day().selected, 'is-today': day().today, 'is-outside': !day().inMonth, 'is-in-range': day().inRange, 'is-range-start': day().rangeStart, 'is-range-end': day().rangeEnd, 'is-in-preview': day().inPreview })} disabled={!!local.disabled} onMouseEnter={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onDayHover(day().iso); }} onFocus={($event: FocusEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onDayHover(day().iso); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onDayCellKeydown(day().iso, $event); }} id={`${__rozieKeynavGroupId}-item-${gi() * 42 + wk() * 7 + dc()}`} data-rozie-keynav-item={gi() * 42 + wk() * 7 + dc()} data-rozie-keynav-active={activeDay() === gi() * 42 + wk() * 7 + dc() ? '' : undefined} tabIndex={activeDay() === gi() * 42 + wk() * 7 + dc() ? 0 : -1} data-rozie-s-6800c7a2="">{rozieDisplay(day().day)}</button>
             </span>}</Key>
-          </div>}</For>
-        </div>}</For>
+          </div>}</Key>
+        </div>}</Key>
       </div>
 
       

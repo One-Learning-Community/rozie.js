@@ -290,9 +290,27 @@ export function keynav(
     const idx = resolveItemIndex(e.target);
     if (idx !== null) machine.onPointerActivate(idx);
   };
+  // DOM focus can land on an item WITHOUT a keydown or pointerdown ever
+  // firing on the node — a programmatic `.focus()` call (assistive tech,
+  // test automation) is the common case, but it's really any focus arrival
+  // this delegation model can't otherwise observe. `focusin` bubbles (unlike
+  // `focus`), so a single node listener catches it the same way keydown/
+  // pointerdown already do. `moveTo` only sets `active`, never commits —
+  // syncing the roving-tabindex model's notion of "current item" to
+  // wherever DOM focus ACTUALLY is, so a subsequent arrow key moves
+  // relative to the real focus target instead of a stale prior `active`
+  // (T-77-08-05 — found via 77-08's real-DOM Docker VR run: date-picker's
+  // 260802-hla spec `.focus()`s a day cell directly, then presses
+  // ArrowRight, which used to move relative to whatever `active` happened
+  // to be BEFORE that focus call).
+  const onFocusIn = (e: FocusEvent): void => {
+    const idx = resolveItemIndex(e.target);
+    if (idx !== null) machine.moveTo(idx);
+  };
 
   node.addEventListener('keydown', onKeyDown);
   node.addEventListener('pointerdown', onPointerDown);
+  node.addEventListener('focusin', onFocusIn);
 
   // Phase 77 (T-77-03-03) — tracks the currently-pending deferred rAF pass
   // (if any) so a NEW active-change can cancel it before scheduling its
@@ -335,6 +353,7 @@ export function keynav(
     destroy() {
       node.removeEventListener('keydown', onKeyDown);
       node.removeEventListener('pointerdown', onPointerDown);
+      node.removeEventListener('focusin', onFocusIn);
       if (activeRafId !== null) {
         cancelAnimationFrame(activeRafId);
         activeRafId = null;

@@ -3,7 +3,7 @@ import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { createKeynavStateMachine, type KeynavStateMachine } from '@rozie/runtime-keynav-core';
 
-import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
@@ -75,7 +75,7 @@ function __rozieAttr(v: unknown): string | null {
 
       
       <div class="rozie-datepicker-grids" #__rozieKeynavRootRef>
-        @for (g of daysGrids(); track gi; let gi = $index) {
+        @for (g of daysGrids(); track g.year + '-' + g.month; let gi = $index) {
     <div class="rozie-datepicker-grid" role="grid" (mouseleave)="hoverIso.set('')">
           <div class="rozie-datepicker-weekdays" role="row">
             @for (wd of weekdays(); track wi; let wi = $index) {
@@ -83,12 +83,12 @@ function __rozieAttr(v: unknown): string | null {
     }
           </div>
 
-          @for (week of g.weeks; track wk; let wk = $index) {
+          @for (week of g.weeks; track week[0].iso; let wk = $index) {
     <div class="rozie-datepicker-week" role="row">
             
             @for (day of week; track day.iso; let dc = $index) {
     <span class="rozie-datepicker-cell" role="gridcell" [attr.aria-selected]="!!(day.selected || day.rangeStart || day.rangeEnd)">
-              <button type="button" class="rozie-datepicker-day" [ngClass]="{ 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }" [attr.data-day]="rozieAttr(day.iso)" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!day.disabled" [attr.aria-label]="rozieAttr(day.iso)" [attr.aria-current]="rozieAttr(day.today ? 'date' : null)" (click)="onDaySelect(day.iso)" (mouseenter)="onDayHover(day.iso)" (focus)="onDayHover(day.iso)" (keydown)="onDayCellKeydown(day.iso, $event)" [id]="\`\${__rozieKeynavGroupId}-item-\${gi * 42 + wk * 7 + dc}\`" [attr.data-rozie-keynav-item]="gi * 42 + wk * 7 + dc" [attr.data-rozie-keynav-active]="activeDay() === gi * 42 + wk * 7 + dc ? '' : undefined" [tabIndex]="activeDay() === gi * 42 + wk * 7 + dc ? 0 : -1">{{ rozieDisplay(day.day) }}</button>
+              <button type="button" class="rozie-datepicker-day" [ngClass]="{ 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }" [attr.data-day]="rozieAttr(day.iso)" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!day.disabled" [attr.aria-label]="rozieAttr(day.iso)" [attr.aria-current]="rozieAttr(day.today ? 'date' : null)" (mouseenter)="onDayHover(day.iso)" (focus)="onDayHover(day.iso)" (keydown)="onDayCellKeydown(day.iso, $event)" [id]="\`\${__rozieKeynavGroupId}-item-\${gi * 42 + wk * 7 + dc}\`" [attr.data-rozie-keynav-item]="gi * 42 + wk * 7 + dc" [attr.data-rozie-keynav-active]="activeDay() === gi * 42 + wk * 7 + dc ? '' : undefined" [tabIndex]="activeDay() === gi * 42 + wk * 7 + dc ? 0 : -1">{{ rozieDisplay(day.day) }}</button>
             </span>
     }
           </div>
@@ -621,8 +621,9 @@ export class DatePicker {
   }
 
   ngAfterViewInit() {
-    this.viewIso.set(this.viewMonthGrid());
-    this.seedActiveDay();
+    const nextViewIso = this.viewMonthGrid();
+    this.viewIso.set(nextViewIso);
+    this.seedActiveDay(nextViewIso);
     this.__rozieKeynavController = createKeynavStateMachine({
       getSource: () => (this.allDayCells()).map((day) => ({ disabled: day.disabled })),
       getActive: () => this.activeDay(),
@@ -645,11 +646,24 @@ export class DatePicker {
           if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;
           this.__rozieKeynavController?.onPointerActivate(__rozieKeynavIdx);
         };
+        const __rozieKeynavHandleFocusIn = ($event: FocusEvent) => {
+          const __rozieKeynavTarget = $event.target;
+          if (!(__rozieKeynavTarget instanceof Element)) return;
+          const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');
+          if (!__rozieKeynavMarker) return;
+          const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');
+          if (__rozieKeynavRaw === null) return;
+          const __rozieKeynavIdx = Number(__rozieKeynavRaw);
+          if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;
+          this.__rozieKeynavController?.moveTo(__rozieKeynavIdx);
+        };
         const __rozieKeynavUnlistenKeydown = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'keydown', __rozieKeynavHandleKeydown);
         const __rozieKeynavUnlistenPointer = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'pointerdown', __rozieKeynavHandlePointer);
+        const __rozieKeynavUnlistenFocusIn = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'focusin', __rozieKeynavHandleFocusIn);
         this.__rozieDestroyRef.onDestroy(() => {
           __rozieKeynavUnlistenKeydown();
           __rozieKeynavUnlistenPointer();
+          __rozieKeynavUnlistenFocusIn();
           if (this.__rozieKeynavRafId !== null) cancelAnimationFrame(this.__rozieKeynavRafId);
           this.__rozieKeynavController?.dispose();
         });
@@ -678,11 +692,24 @@ export class DatePicker {
           if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;
           this.__rozieKeynavController1?.onPointerActivate(__rozieKeynavIdx);
         };
+        const __rozieKeynavHandleFocusIn = ($event: FocusEvent) => {
+          const __rozieKeynavTarget = $event.target;
+          if (!(__rozieKeynavTarget instanceof Element)) return;
+          const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');
+          if (!__rozieKeynavMarker) return;
+          const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');
+          if (__rozieKeynavRaw === null) return;
+          const __rozieKeynavIdx = Number(__rozieKeynavRaw);
+          if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;
+          this.__rozieKeynavController1?.moveTo(__rozieKeynavIdx);
+        };
         const __rozieKeynavUnlistenKeydown = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'keydown', __rozieKeynavHandleKeydown);
         const __rozieKeynavUnlistenPointer = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'pointerdown', __rozieKeynavHandlePointer);
+        const __rozieKeynavUnlistenFocusIn = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'focusin', __rozieKeynavHandleFocusIn);
         this.__rozieDestroyRef.onDestroy(() => {
           __rozieKeynavUnlistenKeydown();
           __rozieKeynavUnlistenPointer();
+          __rozieKeynavUnlistenFocusIn();
           if (this.__rozieKeynavRafId1 !== null) cancelAnimationFrame(this.__rozieKeynavRafId1);
           this.__rozieKeynavController1?.dispose();
         });
@@ -711,11 +738,24 @@ export class DatePicker {
           if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;
           this.__rozieKeynavController2?.onPointerActivate(__rozieKeynavIdx);
         };
+        const __rozieKeynavHandleFocusIn = ($event: FocusEvent) => {
+          const __rozieKeynavTarget = $event.target;
+          if (!(__rozieKeynavTarget instanceof Element)) return;
+          const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');
+          if (!__rozieKeynavMarker) return;
+          const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');
+          if (__rozieKeynavRaw === null) return;
+          const __rozieKeynavIdx = Number(__rozieKeynavRaw);
+          if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;
+          this.__rozieKeynavController2?.moveTo(__rozieKeynavIdx);
+        };
         const __rozieKeynavUnlistenKeydown = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'keydown', __rozieKeynavHandleKeydown);
         const __rozieKeynavUnlistenPointer = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'pointerdown', __rozieKeynavHandlePointer);
+        const __rozieKeynavUnlistenFocusIn = this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'focusin', __rozieKeynavHandleFocusIn);
         this.__rozieDestroyRef.onDestroy(() => {
           __rozieKeynavUnlistenKeydown();
           __rozieKeynavUnlistenPointer();
+          __rozieKeynavUnlistenFocusIn();
           if (this.__rozieKeynavRafId2 !== null) cancelAnimationFrame(this.__rozieKeynavRafId2);
           this.__rozieKeynavController2?.dispose();
         });
@@ -739,8 +779,8 @@ export class DatePicker {
     if (this.selectionMode() === 'range') return this.readRange().start;
     return '';
   };
-  viewMonthGrid = () => resolveViewIso({
-    viewIso: this.viewIso(),
+  viewMonthGrid = (viewIsoOverride?: string) => resolveViewIso({
+    viewIso: viewIsoOverride !== undefined ? viewIsoOverride : this.viewIso(),
     value: this.viewAnchor(),
     today: this.todayIso()
   });
@@ -758,10 +798,10 @@ export class DatePicker {
     selection: this.selectionMode() === 'range' ? this.readRange() : undefined,
     previewEnd: this.selectionMode() === 'range' ? this.hoverIso() : undefined
   });
-  grids = () => Array.from({
+  grids = (viewIsoOverride?: string) => Array.from({
     length: this.numberOfMonths()
   }, (_: any, i: any) => buildMonthGrid({
-    viewIso: addMonths(this.viewMonthGrid(), i),
+    viewIso: addMonths(this.viewMonthGrid(viewIsoOverride), i),
     value: this.selected(),
     today: this.todayIso(),
     min: this.min(),
@@ -788,10 +828,10 @@ export class DatePicker {
     today: this.todayIso()
   });
   yearRangeLabel = () => this.yearGrid().rangeLabel;
-  daysGrids = () => this.showsDaysView() ? this.grids() : [];
-  allDayCells = () => this.daysGrids().flatMap((g: any) => g.weeks.flatMap((row: any) => row));
-  rovingDayInput = () => ({
-    viewIso: this.viewMonthGrid(),
+  daysGrids = (viewIsoOverride?: string, assumeDaysView?: boolean) => assumeDaysView || this.showsDaysView() ? this.grids(viewIsoOverride) : [];
+  allDayCells = (viewIsoOverride?: string, assumeDaysView?: boolean) => this.daysGrids(viewIsoOverride, assumeDaysView).flatMap((g: any) => g.weeks.flatMap((row: any) => row));
+  rovingDayInput = (viewIsoOverride?: string) => ({
+    viewIso: this.viewMonthGrid(viewIsoOverride),
     value: this.selected(),
     today: this.todayIso(),
     min: this.min(),
@@ -804,8 +844,14 @@ export class DatePicker {
     numberOfMonths: this.numberOfMonths(),
     anchor: this.selected() !== '' ? this.selected() : this.selectionMode() === 'range' ? this.readRange().start : ''
   });
-  seedActiveDay = () => {
-    this.activeDay.set(resolveRovingDayIndex(this.allDayCells(), this.rovingDayInput()));
+  seedActiveDay = (viewIsoOverride?: string, assumeDaysView?: boolean) => {
+    const next = resolveRovingDayIndex(this.allDayCells(viewIsoOverride, assumeDaysView), this.rovingDayInput(viewIsoOverride));
+    if (next === this.activeDay()) {
+      this.activeDay.set(ROVING_DAY_NONE);
+    }
+    requestAnimationFrame(() => {
+      this.activeDay.set(next);
+    });
   };
   monthHeading = () => monthLabel(this.viewMonthGrid(), this.locale());
   weekdays = () => weekdayLabels(this.weekStartsOn(), this.locale());
@@ -882,10 +928,14 @@ export class DatePicker {
     const __viewMode = this.viewMode();
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     const unit = __viewMode === 'years' ? 144 : __viewMode === 'months' ? 12 : 1;
-    this.viewIso.set(addMonths(this.viewMonthGrid(), delta * unit));
+    const nextViewIso = addMonths(this.viewMonthGrid(), delta * unit);
+    this.viewIso.set(nextViewIso);
     // The rendered day set changed without going through the r-keynav page
     // mechanism (a direct header nav click) — reseed the tab stop (77-08).
-    this.seedActiveDay();
+    // Pass the freshly-computed viewIso directly (staleness fix, see
+    // seedActiveDay's own doc comment) — $data.viewMode is UNCHANGED by this
+    // function, so the live showsDaysView() read stays correct un-overridden.
+    this.seedActiveDay(nextViewIso);
   };
   goPrevMonth = () => this.goToMonth(-1);
   goNextMonth = () => this.goToMonth(1);
@@ -908,7 +958,10 @@ export class DatePicker {
     if (!this.monthEnabled(iso)) return;
     this.viewIso.set(iso);
     this.viewMode.set('days');
-    this.seedActiveDay();
+    // Both the view anchor AND the days-view transition are fresh in THIS
+    // call — pass both explicitly (staleness fix, see seedActiveDay's own doc
+    // comment).
+    this.seedActiveDay(iso, true);
   };
   selectYear = (iso: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
@@ -920,7 +973,10 @@ export class DatePicker {
   };
   exitToDaysView = () => {
     this.viewMode.set('days');
-    this.seedActiveDay();
+    // $data.viewIso is unchanged here (no fresher value to pass), but the
+    // days-view transition IS fresh in THIS call — say so explicitly
+    // (staleness fix, see seedActiveDay's own doc comment).
+    this.seedActiveDay(undefined, true);
   };
   onDayCommit = (i: any) => {
     const cell = this.allDayCells()[i];
@@ -1033,8 +1089,11 @@ export class DatePicker {
   };
   goToToday = () => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
-    this.viewIso.set(this.todayIso());
-    this.seedActiveDay();
+    const nextViewIso = this.todayIso();
+    this.viewIso.set(nextViewIso);
+    // Fresh viewIso passed directly (staleness fix, see seedActiveDay's own
+    // doc comment); $data.viewMode is unchanged here.
+    this.seedActiveDay(nextViewIso);
   };
   selectToday = () => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;

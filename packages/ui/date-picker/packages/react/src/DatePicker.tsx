@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef,
 import type { ReactNode } from 'react';
 import { clsx, rozieAttr, rozieDisplay, useControllableState, useKeynav } from '@rozie/runtime-react';
 import './DatePicker.css';
-import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
@@ -144,8 +144,8 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     if (props.selectionMode === 'range') return readRange().start;
     return '';
   }
-  const viewMonthGrid = useCallback(() => resolveViewIso({
-    viewIso: viewIso,
+  const viewMonthGrid = useCallback((viewIsoOverride?: string) => resolveViewIso({
+    viewIso: viewIsoOverride !== undefined ? viewIsoOverride : viewIso,
     value: viewAnchor(),
     today: todayIso()
   }), [todayIso, viewAnchor, viewIso]);
@@ -165,11 +165,11 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       previewEnd: props.selectionMode === 'range' ? hoverIso : undefined
     });
   }
-  function grids() {
+  function grids(viewIsoOverride?: string) {
     return Array.from({
       length: props.numberOfMonths
     }, (_: any, i: any) => buildMonthGrid({
-      viewIso: addMonths(viewMonthGrid(), i),
+      viewIso: addMonths(viewMonthGrid(viewIsoOverride), i),
       value: selected(),
       today: todayIso(),
       min: props.min,
@@ -203,15 +203,15 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   function yearRangeLabel() {
     return yearGrid().rangeLabel;
   }
-  function daysGrids() {
-    return showsDaysView() ? grids() : [];
+  function daysGrids(viewIsoOverride?: string, assumeDaysView?: boolean) {
+    return assumeDaysView || showsDaysView() ? grids(viewIsoOverride) : [];
   }
-  function allDayCells() {
-    return daysGrids().flatMap((g: any) => g.weeks.flatMap((row: any) => row));
+  function allDayCells(viewIsoOverride?: string, assumeDaysView?: boolean) {
+    return daysGrids(viewIsoOverride, assumeDaysView).flatMap((g: any) => g.weeks.flatMap((row: any) => row));
   }
-  function rovingDayInput() {
+  function rovingDayInput(viewIsoOverride?: string) {
     return {
-      viewIso: viewMonthGrid(),
+      viewIso: viewMonthGrid(viewIsoOverride),
       value: selected(),
       today: todayIso(),
       min: props.min,
@@ -225,9 +225,15 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
       anchor: selected() !== '' ? selected() : props.selectionMode === 'range' ? readRange().start : ''
     };
   }
-  const seedActiveDay = useCallback(() => {
-    setActiveDay(resolveRovingDayIndex(allDayCells(), rovingDayInput()));
-  }, [allDayCells, rovingDayInput]);
+  const seedActiveDay = useCallback((viewIsoOverride?: string, assumeDaysView?: boolean) => {
+    const next = resolveRovingDayIndex(allDayCells(viewIsoOverride, assumeDaysView), rovingDayInput(viewIsoOverride));
+    if (next === activeDay) {
+      setActiveDay(ROVING_DAY_NONE);
+    }
+    requestAnimationFrame(() => {
+      setActiveDay(next);
+    });
+  }, [activeDay, allDayCells, rovingDayInput]);
   function monthHeading() {
     return monthLabel(viewMonthGrid(), props.locale);
   }
@@ -299,16 +305,20 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     const r = readRange();
     if (r.start !== '' && r.end === '') setHoverIso(iso);
   }, [props.selectionMode, readRange]);
-  const onDaySelect = useCallback((iso: any) => {
+  function onDaySelect(iso: any) {
     if (props.selectionMode === 'range') commitRange(iso);else commitValue(iso);
-  }, [commitRange, commitValue, props.selectionMode]);
+  }
   function goToMonth(delta: any) {
     if (props.disabled) return;
     const unit = viewMode === 'years' ? 144 : viewMode === 'months' ? 12 : 1;
-    setViewIso(addMonths(viewMonthGrid(), delta * unit));
+    const nextViewIso = addMonths(viewMonthGrid(), delta * unit);
+    setViewIso(nextViewIso);
     // The rendered day set changed without going through the r-keynav page
     // mechanism (a direct header nav click) — reseed the tab stop (77-08).
-    seedActiveDay();
+    // Pass the freshly-computed viewIso directly (staleness fix, see
+    // seedActiveDay's own doc comment) — $data.viewMode is UNCHANGED by this
+    // function, so the live showsDaysView() read stays correct un-overridden.
+    seedActiveDay(nextViewIso);
   }
   const goPrevMonth = useCallback(() => goToMonth(-1), [goToMonth]);
   const goNextMonth = useCallback(() => goToMonth(1), [goToMonth]);
@@ -337,7 +347,10 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     if (!monthEnabled(iso)) return;
     setViewIso(iso);
     setViewMode('days');
-    seedActiveDay();
+    // Both the view anchor AND the days-view transition are fresh in THIS
+    // call — pass both explicitly (staleness fix, see seedActiveDay's own doc
+    // comment).
+    seedActiveDay(iso, true);
   }, [monthEnabled, props.disabled, seedActiveDay]);
   const selectYear = useCallback((iso: any) => {
     if (props.disabled) return;
@@ -349,7 +362,10 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   }, [monthList, props.disabled, yearEnabled]);
   function exitToDaysView() {
     setViewMode('days');
-    seedActiveDay();
+    // $data.viewIso is unchanged here (no fresher value to pass), but the
+    // days-view transition IS fresh in THIS call — say so explicitly
+    // (staleness fix, see seedActiveDay's own doc comment).
+    seedActiveDay(undefined, true);
   }
   const onDayCommit = useCallback((i: any) => {
     const cell = allDayCells()[i];
@@ -464,8 +480,11 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   }
   function goToToday() {
     if (props.disabled) return;
-    setViewIso(todayIso());
-    seedActiveDay();
+    const nextViewIso = todayIso();
+    setViewIso(nextViewIso);
+    // Fresh viewIso passed directly (staleness fix, see seedActiveDay's own
+    // doc comment); $data.viewMode is unchanged here.
+    seedActiveDay(nextViewIso);
   }
   const selectToday = useCallback(() => {
     if (props.disabled) return;
@@ -508,8 +527,9 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   const _viewMonthGridRef = useRef(viewMonthGrid);
   _viewMonthGridRef.current = viewMonthGrid;
   useEffect(() => {
-    setViewIso(_viewMonthGridRef.current());
-    _seedActiveDayRef.current();
+    const nextViewIso = _viewMonthGridRef.current();
+    setViewIso(nextViewIso);
+    _seedActiveDayRef.current(nextViewIso);
   }, []);
 
   const __rozieKeynavRootRef = useRef<HTMLDivElement | null>(null);
@@ -561,15 +581,15 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
 
       
       <div className={"rozie-datepicker-grids"} ref={__rozieKeynavRootRef} data-rozie-s-6800c7a2="">
-        {daysGrids().map((g, gi) => <div key={gi} className={"rozie-datepicker-grid"} role="grid" onMouseLeave={($event) => { setHoverIso(''); }} data-rozie-s-6800c7a2="">
+        {daysGrids().map((g, gi) => <div key={g.year + '-' + g.month} className={"rozie-datepicker-grid"} role="grid" onMouseLeave={($event) => { setHoverIso(''); }} data-rozie-s-6800c7a2="">
           <div className={"rozie-datepicker-weekdays"} role="row" data-rozie-s-6800c7a2="">
             {weekdays().map((wd, wi) => <span key={wi} className={"rozie-datepicker-weekday"} role="columnheader" aria-label={rozieAttr(wd)} data-rozie-s-6800c7a2="">{rozieDisplay(wd)}</span>)}
           </div>
 
-          {g.weeks.map((week, wk) => <div key={wk} className={"rozie-datepicker-week"} role="row" data-rozie-s-6800c7a2="">
+          {g.weeks.map((week, wk) => <div key={week[0].iso} className={"rozie-datepicker-week"} role="row" data-rozie-s-6800c7a2="">
             
             {week.map((day, dc) => <span key={day.iso} className={"rozie-datepicker-cell"} role="gridcell" aria-selected={!!(day.selected || day.rangeStart || day.rangeEnd)} data-rozie-s-6800c7a2="">
-              <button type="button" className={clsx("rozie-datepicker-day", { "is-selected": day.selected, "is-today": day.today, "is-outside": !day.inMonth, "is-in-range": day.inRange, "is-range-start": day.rangeStart, "is-range-end": day.rangeEnd, "is-in-preview": day.inPreview })} data-day={rozieAttr(day.iso)} disabled={!!props.disabled} aria-disabled={!!day.disabled} aria-label={rozieAttr(day.iso)} aria-current={rozieAttr(day.today ? 'date' : undefined)} onClick={($event) => { onDaySelect(day.iso); }} onMouseEnter={($event) => { onDayHover(day.iso); }} onFocus={($event) => { onDayHover(day.iso); }} onKeyDown={($event) => { onDayCellKeydown(day.iso, $event); }} id={`${__rozieKeynavGroupId}-item-${gi * 42 + wk * 7 + dc}`} data-rozie-keynav-item={gi * 42 + wk * 7 + dc} data-rozie-keynav-active={activeDay === gi * 42 + wk * 7 + dc ? '' : undefined} tabIndex={activeDay === gi * 42 + wk * 7 + dc ? 0 : -1} data-rozie-s-6800c7a2="">{rozieDisplay(day.day)}</button>
+              <button type="button" className={clsx("rozie-datepicker-day", { "is-selected": day.selected, "is-today": day.today, "is-outside": !day.inMonth, "is-in-range": day.inRange, "is-range-start": day.rangeStart, "is-range-end": day.rangeEnd, "is-in-preview": day.inPreview })} data-day={rozieAttr(day.iso)} disabled={!!props.disabled} aria-disabled={!!day.disabled} aria-label={rozieAttr(day.iso)} aria-current={rozieAttr(day.today ? 'date' : undefined)} onMouseEnter={($event) => { onDayHover(day.iso); }} onFocus={($event) => { onDayHover(day.iso); }} onKeyDown={($event) => { onDayCellKeydown(day.iso, $event); }} id={`${__rozieKeynavGroupId}-item-${gi * 42 + wk * 7 + dc}`} data-rozie-keynav-item={gi * 42 + wk * 7 + dc} data-rozie-keynav-active={activeDay === gi * 42 + wk * 7 + dc ? '' : undefined} tabIndex={activeDay === gi * 42 + wk * 7 + dc ? 0 : -1} data-rozie-s-6800c7a2="">{rozieDisplay(day.day)}</button>
             </span>)}
           </div>)}
         </div>)}

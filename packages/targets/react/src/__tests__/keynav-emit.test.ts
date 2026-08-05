@@ -424,6 +424,24 @@ describe('React r-keynav emitter — multi-root, grid, page, explicit index (Pla
     expect(code).toMatch(/tabIndex=\{active === w \* 7 \+ d \? 0 : -1\}/);
   });
 
+  it('77-08: an explicit :source="…" binding on the root is consumed by getSource and NEVER leaks onto the root element as a literal JSX prop', () => {
+    // EXPLICIT_INDEX_SRC's root already carries `:source="$data.flatDays"` —
+    // this fixture existed since Plan 77-03 but nothing here ever asserted
+    // on the ROOT element's own emitted attributes (only the item's four).
+    // `resolveKeynavGroups`'s own module doc comment flags that it does NOT
+    // strip an explicit `:source` binding out of `attributes` — every
+    // per-target emitter must do that itself. Latent since 77-03 (every
+    // prior keynav-root fixture, incl. this one, synthesized its source from
+    // a co-located r-for OR was never run through `tsc`) until the
+    // date-picker day grid's flat, triple-nested-loop source (77-08) — a
+    // real PUBLISHED leaf with its own `tsc --noEmit` gate — surfaced it as
+    // TS2322 (`source` is not a valid <div> DOM prop).
+    const ir = compile(EXPLICIT_INDEX_SRC, 'KeynavExplicitIndex.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavExplicitIndex.rozie', source: EXPLICIT_INDEX_SRC });
+    expect(code).not.toMatch(/<div role="grid"[^>]*\bsource=/);
+    expect(code).toContain('getSource: () => (flatDays).map((day) => ({ label: day.label })),');
+  });
+
   it('77-07: the minted root ref is typed by the root element\'s OWN tag (HTMLDivElement here), not a bare HTMLElement', () => {
     // Was a BYTE-IDENTITY assertion through Plan 77-06 — `useRef<HTMLElement
     // | null>` for EVERY minted keynav root regardless of its actual tag.

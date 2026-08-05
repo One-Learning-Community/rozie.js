@@ -373,7 +373,23 @@ export function createKeynavStateMachine(host: KeynavHost, config: KeynavConfig)
   function moveTo(i: number): void {
     const total = count();
     if (total === 0) return;
-    host.setActive(clamp(i, total));
+    const idx = clamp(i, total);
+    // No-op when already active (T-77-08-06 — found via 77-08's real-DOM
+    // testing): `moveTo` is the target of a root-level `focusin` listener
+    // (SPEC's focus-sync fix, T-77-08-05) — DOM focus landing on an item is
+    // JUST AS LIKELY to be the PRIMITIVE'S OWN `.focus()` call (applying an
+    // active-change) as it is an external focus arrival (programmatic
+    // `.focus()`, assistive tech). Calling `host.setActive(idx)` again with
+    // the SAME value it already holds is a redundant re-entrant write —
+    // on a synchronous-commit target it can re-trigger the active-change
+    // effect from WITHIN that effect's own `.focus()` call, and in at least
+    // one observed case that reentrancy left NOTHING focused. Skipping the
+    // write when the index doesn't actually change avoids the reentrancy
+    // entirely without weakening the sync fix for a genuine external arrival
+    // (which by definition targets a DIFFERENT index than the one currently
+    // active).
+    if (idx === host.getActive()) return;
+    host.setActive(idx);
   }
 
   function dispose(): void {

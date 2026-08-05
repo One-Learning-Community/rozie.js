@@ -625,11 +625,38 @@ export function buildKeynavClassEmission(
         `      if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;`,
         `      this.${controllerVar}?.onPointerActivate(__rozieKeynavIdx);`,
         `    };`,
+        // DOM focus can land on an item WITHOUT a keydown or pointerdown
+        // ever firing on the root — a programmatic `.focus()` call
+        // (assistive tech, test automation) is the common case, but it's
+        // really any focus arrival this delegation model can't otherwise
+        // observe. `focusin` bubbles (unlike `focus`), so a single root
+        // listener catches it the same way keydown/pointerdown already do.
+        // `moveTo` only sets `active`, never commits — syncing the
+        // roving-tabindex model's notion of "current item" to wherever DOM
+        // focus ACTUALLY is, so a subsequent arrow key moves relative to
+        // the real focus target instead of a stale prior `active`
+        // (T-77-08-05 — found via 77-08's real-DOM Docker VR run:
+        // date-picker's 260802-hla spec `.focus()`s a day cell directly,
+        // then presses ArrowRight, which used to move relative to whatever
+        // `active` happened to be BEFORE that focus call).
+        `    const __rozieKeynavHandleFocusIn = ($event: FocusEvent) => {`,
+        `      const __rozieKeynavTarget = $event.target;`,
+        `      if (!(__rozieKeynavTarget instanceof Element)) return;`,
+        `      const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');`,
+        `      if (!__rozieKeynavMarker) return;`,
+        `      const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');`,
+        `      if (__rozieKeynavRaw === null) return;`,
+        `      const __rozieKeynavIdx = Number(__rozieKeynavRaw);`,
+        `      if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;`,
+        `      this.${controllerVar}?.moveTo(__rozieKeynavIdx);`,
+        `    };`,
         `    const __rozieKeynavUnlistenKeydown = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'keydown', __rozieKeynavHandleKeydown);`,
         `    const __rozieKeynavUnlistenPointer = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'pointerdown', __rozieKeynavHandlePointer);`,
+        `    const __rozieKeynavUnlistenFocusIn = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'focusin', __rozieKeynavHandleFocusIn);`,
         `    this.__rozieDestroyRef.onDestroy(() => {`,
         `      __rozieKeynavUnlistenKeydown();`,
         `      __rozieKeynavUnlistenPointer();`,
+        `      __rozieKeynavUnlistenFocusIn();`,
         `      if (this.${rafField} !== null) cancelAnimationFrame(this.${rafField});`,
         `      this.${controllerVar}?.dispose();`,
         `    });`,
