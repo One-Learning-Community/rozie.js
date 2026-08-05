@@ -52,13 +52,14 @@ export interface EmitTemplateOpts {
   /** Phase 23 — true when CVA-receiving AND a `disabled` prop is declared. */
   cvaMergeDisabled?: boolean | undefined;
   /**
-   * Phase 71 (r-keynav) — the per-component keynav emission plan, resolved
-   * ONCE by `emitAngular.ts` via `resolveKeynavPlan` and threaded here so the
-   * template walk stamps the declarative root/item attribute fragments.
-   * `null`/`undefined` for the overwhelming majority of components (no
-   * `r-keynav` root) — every downstream call site short-circuits (SPEC §11).
+   * Phase 71 (r-keynav), extended Phase 77 (multi-root) — the per-component
+   * keynav emission plans, resolved ONCE by `emitAngular.ts` via
+   * `resolveKeynavPlans` and threaded here so the template walk stamps the
+   * declarative root/item attribute fragments. `[]`/`undefined` for the
+   * overwhelming majority of components (no `r-keynav` root) — every
+   * downstream call site short-circuits (SPEC §7.4).
    */
-  keynavPlan?: KeynavEmitPlan | null | undefined;
+  keynavPlans?: readonly KeynavEmitPlan[] | undefined;
 }
 
 export interface EmitTemplateResult {
@@ -285,7 +286,7 @@ export function emitTemplate(
     classMembers: opts.classMembers,
     cvaModelProp: opts.cvaModelProp ?? null,
     cvaMergeDisabled: opts.cvaMergeDisabled ?? false,
-    keynav: opts.keynavPlan ?? null,
+    keynav: opts.keynavPlans ?? [],
   };
 
   const template = emitNode(ir.template, ctx);

@@ -76,8 +76,9 @@ import {
 import { buildSlotCtx, buildNgTemplateContextGuard } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
-// Phase 71 Plan 09 (r-keynav, Angular — highest blast radius) — inline
-// controller class-body wiring (see emitKeynav.ts's module doc comment).
+// Phase 71 Plan 09 (r-keynav, Angular — highest blast radius), extended
+// Phase 77 Plan 05 (multi-root) — inline controller class-body wiring (see
+// emitKeynav.ts's module doc comment).
 import { buildKeynavClassEmission, type KeynavEmitPlan } from './emitKeynav.js';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
@@ -865,13 +866,14 @@ export interface EmitScriptOptions {
    */
   cvaModelProp?: PropDecl | null;
   /**
-   * Phase 71 (r-keynav) — the per-component keynav emission plan, resolved
-   * ONCE by `emitAngular.ts` via `resolveKeynavPlan` and threaded here so
-   * the inline controller's field decls / `ngAfterViewInit` instantiation /
-   * constructor `effect()` are spliced into the class body. `null`/omitted
-   * for the overwhelming majority of components (no `r-keynav` root).
+   * Phase 71 (r-keynav), extended Phase 77 (multi-root) — the per-component
+   * keynav emission plans, resolved ONCE by `emitAngular.ts` via
+   * `resolveKeynavPlans` and threaded here so the inline controller's field
+   * decls / `ngAfterViewInit` instantiation / constructor `effect()` (one
+   * full set per root) are spliced into the class body. `[]`/omitted for
+   * the overwhelming majority of components (no `r-keynav` root).
    */
-  keynavPlan?: KeynavEmitPlan | null;
+  keynavPlans?: readonly KeynavEmitPlan[];
 }
 
 /**
@@ -1327,15 +1329,17 @@ export function emitScript(
     for (const field of contextEmit.injectFields) fieldLines.push(field);
   }
 
-  // Phase 71 (r-keynav) — inline controller class-body wiring. Gated on
-  // `opts.keynavPlan !== null` (the overwhelming majority of components have
-  // no `r-keynav` root, SPEC §11 "no corpus rebless"). Mirrors the
-  // emitPortals/emitContext wiring shape immediately above: field decls +
-  // ngAfterViewInit splice + import registration + the shared
-  // needsDestroyRefField union.
+  // Phase 71 (r-keynav), extended Phase 77 (multi-root) — inline controller
+  // class-body wiring. Gated on `opts.keynavPlans` being non-empty (the
+  // overwhelming majority of components have no `r-keynav` root, SPEC §7.4
+  // "no corpus rebless"). Mirrors the emitPortals/emitContext wiring shape
+  // immediately above: field decls + ngAfterViewInit splice + import
+  // registration + the shared needsDestroyRefField union. A SINGLE call
+  // handles every resolved root (see `buildKeynavClassEmission`'s doc
+  // comment for why the whole array is passed rather than looping here).
   let keynavRuntimeImportLine = '';
-  if (opts.keynavPlan != null) {
-    const keynavEmission = buildKeynavClassEmission(opts.keynavPlan, ir, {
+  if (opts.keynavPlans != null && opts.keynavPlans.length > 0) {
+    const keynavEmission = buildKeynavClassEmission(opts.keynavPlans, ir, {
       collisionRenames: rewriteResult.collisionRenames,
       classMembers: rewriteResult.classMembers,
       signalMembers: rewriteResult.signalMembers,

@@ -107,11 +107,11 @@ import {
   deconflictReservedDataRefNames,
   deconflictRefsAgainstUserBindings,
 } from '../../../core/src/rewrite/deconflict.js';
-// Phase 71 Plan 09 (r-keynav, Angular — highest blast radius) — resolved
-// ONCE here and threaded through both emitScript (class-body wiring) and
-// emitTemplate (declarative attribute stamping). See emitKeynav.ts's module
-// doc comment.
-import { resolveKeynavPlan } from './emit/emitKeynav.js';
+// Phase 71 Plan 09 (r-keynav, Angular — highest blast radius), extended
+// Phase 77 Plan 05 (multi-root) — resolved ONCE here and threaded through
+// both emitScript (class-body wiring) and emitTemplate (declarative
+// attribute stamping). See emitKeynav.ts's module doc comment.
+import { resolveKeynavPlans } from './emit/emitKeynav.js';
 
 /**
  * Bug 5: build a handler-name → parameter-count map from the (un-rewritten)
@@ -591,23 +591,23 @@ export function emitAngular(
   // has no native scope-hash infra (it uses `_ngcontent-*`); the shared
   // helper gives the identical FNV-1a value the other targets compute.
   const portalScopeHash = computeScopeHash(ir.name, opts.filename);
-  // Phase 71 (r-keynav) — resolved ONCE per component (not per element).
-  // `null` for the overwhelming majority of components (no `r-keynav` root)
-  // — every downstream keynav call site short-circuits on `null`, so this
-  // stays a cheap no-op for every existing fixture (SPEC §11: "no corpus
-  // rebless").
-  const keynavPlan = resolveKeynavPlan(ir);
+  // Phase 71 (r-keynav), extended Phase 77 (multi-root) — resolved ONCE per
+  // component (not per element). `[]` for the overwhelming majority of
+  // components (no `r-keynav` root) — every downstream keynav call site
+  // short-circuits on an empty array, so this stays a cheap no-op for every
+  // existing fixture (SPEC §7.4: "no corpus rebless").
+  const keynavPlans = resolveKeynavPlans(ir);
   const scriptOpts: {
     filename?: string;
     portalScopeHash?: string;
     cvaModelProp?: PropDecl | null;
-    keynavPlan?: ReturnType<typeof resolveKeynavPlan>;
+    keynavPlans?: ReturnType<typeof resolveKeynavPlans>;
   } = {
     portalScopeHash,
     // Phase 23 — thread the single CVA gate so emitScript appends the four CVA
     // methods + three private members when (and only when) it is non-null.
     cvaModelProp,
-    keynavPlan,
+    keynavPlans,
   };
   if (opts.filename !== undefined) scriptOpts.filename = opts.filename;
   const scriptResult = emitScript(ir, scriptOpts);
@@ -629,7 +629,7 @@ export function emitAngular(
     classMembers,
     cvaModelProp: cvaModelProp !== null ? cvaModelProp.name : null,
     cvaMergeDisabled,
-    keynavPlan,
+    keynavPlans,
   });
 
   // 3. Listeners-block emission.

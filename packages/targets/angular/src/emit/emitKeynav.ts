@@ -1,66 +1,125 @@
 /**
  * emitKeynav — Phase 71 Plan 09 (Angular target — highest blast radius,
- * Landmine 3).
+ * Landmine 3), reworked by Phase 77 Plan 05 from one-plan-per-component to
+ * one-plan-per-root (77-SPEC.md §6, §7.3), mirroring the React reference's
+ * Plan 77-03 rework (also replicated by Vue/Svelte/Solid Plan 77-04, Lit
+ * Plan 77-05 Task 1).
  *
  * Bridges the compiler front-end IR (`keynavRoot?`/`keynavItem?` on
- * `TemplateElementIR`, Phase 71 Plan 02) to an INLINE controller emitted
+ * `TemplateElementIR`, Phase 71 Plan 02, extended Phase 77 Plan 02 with
+ * `grid`/`groupIndex`/`indexExpression`) to an INLINE controller emitted
  * directly into the component class — per the 71-01 Wave-2 binding decision,
- * there is NO `@rozie/runtime-angular` package. The heavy keydown/typeahead
- * state-machine logic is still NOT duplicated per component: this module
- * imports `createKeynavStateMachine`/`normalizeClassTokens` from the
- * framework-neutral `@rozie/runtime-keynav-core` (Plan 71-03) and generates
- * only a thin bridge — the SAME hybrid architecture (SPEC §8) every other
- * target's dedicated controller (`useKeynav`/`createKeynav`/`KeynavController`)
- * implements, expressed here as generated class members instead of a
- * hand-authored runtime package.
+ * there is NO dedicated Angular runtime package for this primitive, and
+ * SPEC §6/§7.3 keep it that way for Phase 77 too. The heavy keydown/
+ * typeahead state-machine logic is
+ * still NOT duplicated per component: this module imports
+ * `createKeynavStateMachine`/`normalizeClassTokens` from the framework-
+ * neutral `@rozie/runtime-keynav-core` (Plan 71-03, grid branch Plan 77-01)
+ * and generates only a thin bridge — the SAME hybrid architecture (SPEC §8)
+ * every other target's dedicated controller implements, expressed here as
+ * generated class members instead of a hand-authored runtime package.
  *
- * Modeled on the React REFERENCE (`packages/targets/react/src/emit/emitKeynav.ts`,
- * Plan 71-04) and the Vue port (Plan 71-05) — same `resolveKeynavPlan`/
- * `keynavRootAttrs`/`keynavItemAttrs`/`stripKeynavCommitEvent` shape — plus a
- * NEW `buildKeynavClassEmission` responsibility unique to Angular: because
- * there is no separate runtime hook/composable to call, the controller
- * wiring itself (field decls + `ngAfterViewInit` instantiation + a
- * `constructor`-body `effect()`) is generated INLINE by this module and
- * spliced into the class body by `emitScript.ts`.
+ * Two responsibilities, resolved ONCE per component:
  *
- * ANGULAR-SPECIFIC DIVERGENCES FROM THE OTHER FIVE TARGETS:
+ *   1. `resolveKeynavPlans(ir)` — locates EVERY `keynavRoot` element in the
+ *      component and, for each, the FIRST `keynavItem` associated to THAT
+ *      root (via `KeynavItemIR.groupIndex`, defaulting to 0 — core's
+ *      `resolveKeynavGroups` owns the association rule; the emitter never
+ *      re-derives containment) + its enclosing `r-for` loop. Returns one plan
+ *      per root, in document order. Returns `[]` for the overwhelming
+ *      majority case (no `r-keynav` in the component) — every call site
+ *      below short-circuits on an empty array, so a non-keynav component's
+ *      emit is completely untouched (SPEC §7.4: "no corpus rebless").
+ *
+ *   2. `buildKeynavClassEmission(plans, ir, listenerOpts)` — generates the
+ *      class-body wiring for ALL resolved plans at once (field decls +
+ *      `ngAfterViewInit` instantiation/delegation + a constructor `effect()`
+ *      per root), consumed by `emitScript.ts` the SAME way it already
+ *      consumes `emitPortals`'s `PortalsEmit` shape — reuse of an
+ *      established integration seam, not a new one. Taking the WHOLE plans
+ *      array (rather than being called once per plan) keeps `emitScript.ts`'s
+ *      call site a SINGLE call, and lets this module de-duplicate the ONE
+ *      genuinely shared piece of infrastructure across roots — the injected
+ *      `Renderer2` (see `RENDERER_FIELD` below).
+ *
+ * **Identifier naming (mirrors the React reference exactly):** the group-id/
+ * root-ref/controller-var/sync-method identifiers keep their PRE-PHASE-77
+ * spelling for group index 0 and append the index for later groups
+ * (`__rozieKeynavGroupId` / `__rozieKeynavGroupId1` / `__rozieKeynavGroupId2`
+ * …) — the mechanism that keeps a single-root, non-grid component's emitted
+ * identifiers unchanged from pre-Phase-77.
+ *
+ * ANGULAR-SPECIFIC DIVERGENCES FROM THE OTHER FIVE TARGETS (Phase 71,
+ * unchanged in shape by Phase 77):
  *
  *   - **Two expression-rewrite contexts**, mirroring the Vue reference's
  *     identical split: `rewriteListenerExpression` (SCRIPT context — `this.`
  *     prefixed, signal-call reads, `.set()` writes) for everything wired into
  *     `ngAfterViewInit`/the constructor `effect()` (getSource/getActive/
- *     setActive/commit/activeClass), and `rewriteTemplateExpression`
- *     (TEMPLATE context — bare, no `this.`) for the `keynavRootAttrs`/
- *     `keynavItemAttrs` template-attribute fragments, which genuinely render
- *     inside the Angular template compilation unit.
+ *     setActive/commit/page/gridColumns/activeClass), and
+ *     `rewriteTemplateExpression` (TEMPLATE context — bare, no `this.`) for
+ *     the `keynavRootAttrs`/`keynavItemAttrs` template-attribute fragments.
+ *
+ *   - **Grid columns are embedded DIRECTLY in `config.grid`, not a SIBLING
+ *     controller option** — unlike React/Vue/Svelte/Solid/Lit's dedicated
+ *     hook/controller wrapper (whose `config` object is captured ONCE at
+ *     mount, so a reactive columns closure inside it would go stale across
+ *     re-renders), Angular's `createKeynavStateMachine(host, config)` call
+ *     happens exactly ONCE inside `ngAfterViewInit` — there is no
+ *     "controller options object the wrapper re-reads every render" concept
+ *     here at all, since Angular has no per-render re-invocation the way
+ *     React does. `config.grid.columns` is still a CLOSURE
+ *     (`() => this.cols()`), not a captured value, so it reads the LIVE
+ *     signal on every keydown exactly like every other target's design —
+ *     it just doesn't need the sibling-option indirection to stay live,
+ *     because the closure itself is the live part. Follows the standing
+ *     Angular constraint that a columns EXPRESSION must be a pure
+ *     expression (never inline-arrow inside a TEMPLATE interpolation) — this
+ *     is SCRIPT-context generated code, not a template binding, so an arrow
+ *     here is ordinary valid TS; the `.grid(<expr>)` grammar (SPEC §10.5.2)
+ *     only accepts a `$`-prefixed dotted path, which always rewrites to a
+ *     single bare signal-call read, so no method-hoisting is needed in
+ *     practice for the shapes the parser can produce.
  *
  *   - **The state machine is instantiated in `ngAfterViewInit`, not a field
  *     initializer** — `viewChild()` signals return `undefined` until after
- *     view init (the SAME reason `$onMount` bodies bucket into
- *     `ngAfterViewInit`, see `emitScript.ts`'s `renderLifecycleHook` doc
- *     comment). The class field itself is declared eagerly
- *     (`private __rozieKeynavController: KeynavStateMachine | null = null;`)
- *     so every method can reference it; `ngAfterViewInit` assigns it once the
- *     root's `nativeElement` is guaranteed to exist. Root keydown/pointer
- *     delegation (`Renderer2.listen`) and its `DestroyRef`-registered
- *     teardown live in the SAME `ngAfterViewInit` block, right after the
- *     controller is built — both need the guaranteed-populated root element.
+ *     view init. The class field itself is declared eagerly; `ngAfterViewInit`
+ *     assigns it once the root's `nativeElement` is guaranteed to exist. Root
+ *     keydown/pointer delegation (`Renderer2.listen`) and its
+ *     `DestroyRef`-registered teardown live in the SAME `ngAfterViewInit`
+ *     block — both need the guaranteed-populated root element. Because each
+ *     root mints its OWN `viewChild()` ref (or reuses an author `ref=`) and
+ *     `Renderer2.listen` attaches DIRECTLY on that root's `nativeElement`
+ *     (never a shared delegation surface the way Lit's single shadow root
+ *     forces), a multi-root component's per-group listeners are naturally
+ *     scoped by ordinary DOM event bubbling — Angular needs NO
+ *     `data-rozie-keynav-root` containment marker the way Lit does (see
+ *     Lit's `emitKeynav.ts` module doc comment for the contrast).
  *
  *   - **The active-change imperative work (focus/scroll/`r-keynav-active-class`
  *     toggle) is a `constructor`-body `effect()`** — Angular's signal
  *     `effect()` auto-tracks the `getActive()`-equivalent signal read
- *     (`this.<prop>()`) performed directly inside its callback, giving the
- *     EXACT "runs once per active-change" semantics SPEC §9 requires with
- *     zero framework dependency-array machinery, mirroring the pre-existing
- *     `$watch` → `effect()` lowering already established in `emitScript.ts`.
+ *     performed directly inside its callback. Phase 77 — a same-tick
+ *     dataset swap (grid paging) may set the active index before the
+ *     landing item exists in the DOM; `__rozieKeynavSyncActive` (per-group,
+ *     suffixed) now schedules a SINGLE `requestAnimationFrame`-deferred
+ *     retry (cancelled on a newer active-change and on `DestroyRef.onDestroy`,
+ *     guarded so a stale pass never steals focus from a newer navigation) —
+ *     mirrors the React reference's identical pattern, applied here to the
+ *     71-11-fixed `ngAfterViewInit`-explicit-sync design rather than
+ *     invented fresh. The pre-existing per-active-change body is UNCHANGED —
+ *     it moves into an extracted `__rozieKeynavApplyActive` method the
+ *     scheduling wrapper calls, so every pre-Phase-77 emitted line still
+ *     appears verbatim, just inside a different method.
  *
- *   - **No `@rozie/runtime-angular` hook/composable/primitive/controller
- *     exists to call** — `buildKeynavClassEmission` generates the field
- *     decls + `ngAfterViewInit` lines + constructor `effect()` text directly,
- *     consumed by `emitScript.ts` the SAME way it already consumes
- *     `emitPortals`'s `PortalsEmit` shape (field decls / `ngAfterViewInit`
- *     splice / `needsDestroyRefField` / `angularImports`) — reuse of an
- *     established integration seam, not a new one.
+ *   - **No dedicated Angular runtime package's hook/composable/primitive/
+ *     controller exists to call, and Phase 77 keeps it that way** —
+ *     `buildKeynavClassEmission`
+ *     generates the field decls + `ngAfterViewInit` lines + constructor
+ *     `effect()` text directly, one full set per resolved plan, EXCEPT the
+ *     injected `Renderer2` field (`RENDERER_FIELD`), which is genuinely
+ *     shared, stateless infrastructure — declared once (group index 0 only)
+ *     and referenced bare (unsuffixed) by every group's delegation block.
  *
  * @experimental — shape may change before v1.0
  */
@@ -81,15 +140,31 @@ import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.
 
 // Synthesized (never author-visible) identifier names — namespaced
 // `__rozieKeynav*` so they can never collide with a `<script>`-declared
-// binding (mirrors the React/Vue reference's `__rozieMatch_N`/
-// `__rozieExposeRef` convention).
+// binding (mirrors the React/Vue/Solid/Lit references' identical
+// convention). Group index 0 keeps the bare spelling; later groups append
+// the index (see `suffixFor` below) — the mechanism that keeps single-root
+// emit unchanged.
 const ROOT_REF_VAR = '__rozieKeynavRootRef';
 const GROUP_ID_VAR = '__rozieKeynavGroupId';
+/** Genuinely SHARED infrastructure — declared once (group 0 only), referenced bare by every group. */
 const RENDERER_FIELD = '__rozieKeynavRenderer';
 const CONTROLLER_VAR = '__rozieKeynavController';
 const SYNC_ACTIVE_METHOD = '__rozieKeynavSyncActive';
+const APPLY_ACTIVE_METHOD = '__rozieKeynavApplyActive';
+const RAF_ID_FIELD = '__rozieKeynavRafId';
+
+function suffixFor(groupIndex: number): string {
+  return groupIndex === 0 ? '' : String(groupIndex);
+}
 
 export interface KeynavEmitPlan {
+  /**
+   * Phase 77 — document-order group index (0-based). `0` for a single-root
+   * component (mirrors `KeynavRootIR.groupIndex`'s `undefined`-defaults-to-0
+   * convention) — this is what keeps a single-root component's identifier
+   * spelling and emitted config unchanged from pre-Phase-77.
+   */
+  groupIndex: number;
   rootElement: TemplateElementIR;
   keynavRoot: KeynavRootIR;
   itemElement: TemplateElementIR | null;
@@ -109,40 +184,41 @@ function findStaticAttrValue(el: TemplateElementIR, name: string): string | null
   return null;
 }
 
+interface FoundRoot {
+  element: TemplateElementIR;
+  keynavRoot: KeynavRootIR;
+}
+
+interface FoundItem {
+  element: TemplateElementIR;
+  keynavItem: KeynavItemIR;
+  enclosingLoop: TemplateLoopIR | null;
+}
+
 /**
  * Mirrors `resolveKeynavGroups.collectKeynavNodes` (core) — the SAME
  * traversal shape (incl. `slotFillers` bodies, `TemplateMatch.hostElement`)
  * so a keynav marker inside a slot-fill body or match host is found exactly
- * the way core already validated it. Only needs the FIRST root and FIRST
- * item — a second root is a core-level `KEYNAV_MULTIPLE_ROOTS` diagnostic
- * (ROZ986) that already fired upstream (D-08 collected-not-thrown: this is a
- * best-effort emit for an already-erroring input, not a re-validation pass).
+ * the way core already validated it. Collects EVERY root and EVERY item (not
+ * just the first, per Phase 77 — core's `resolveKeynavGroups` already did
+ * the association work; this walk only needs to LOCATE the nodes core
+ * already stamped `groupIndex` onto).
  */
-function collectFirstKeynavNodes(root: TemplateNode): {
-  root: { element: TemplateElementIR; keynavRoot: KeynavRootIR } | null;
-  item: {
-    element: TemplateElementIR;
-    keynavItem: KeynavItemIR;
-    enclosingLoop: TemplateLoopIR | null;
-  } | null;
+function collectAllKeynavNodes(root: TemplateNode): {
+  roots: FoundRoot[];
+  items: FoundItem[];
 } {
-  const found: {
-    root: { element: TemplateElementIR; keynavRoot: KeynavRootIR } | null;
-    item: {
-      element: TemplateElementIR;
-      keynavItem: KeynavItemIR;
-      enclosingLoop: TemplateLoopIR | null;
-    } | null;
-  } = { root: null, item: null };
+  const roots: FoundRoot[] = [];
+  const items: FoundItem[] = [];
 
   const walk = (node: TemplateNode, enclosingLoop: TemplateLoopIR | null): void => {
     switch (node.type) {
       case 'TemplateElement': {
-        if (node.keynavRoot && found.root === null) {
-          found.root = { element: node, keynavRoot: node.keynavRoot };
+        if (node.keynavRoot) {
+          roots.push({ element: node, keynavRoot: node.keynavRoot });
         }
-        if (node.keynavItem && found.item === null) {
-          found.item = { element: node, keynavItem: node.keynavItem, enclosingLoop };
+        if (node.keynavItem) {
+          items.push({ element: node, keynavItem: node.keynavItem, enclosingLoop });
         }
         for (const child of node.children) walk(child, enclosingLoop);
         if (node.slotFillers) {
@@ -177,42 +253,75 @@ function collectFirstKeynavNodes(root: TemplateNode): {
   };
 
   walk(root, null);
-  return found;
+  return { roots, items };
 }
 
 /**
- * Resolve the per-component keynav emission plan. Returns `null` when the
- * component has no `r-keynav` root — the overwhelmingly common case, and the
- * one that MUST stay byte-identical to pre-Phase-71 emit (SPEC §11).
+ * Resolve the per-component keynav emission plans — ONE per `r-keynav` root,
+ * in document order. Returns `[]` when the component has no `r-keynav`
+ * root — the overwhelmingly common case, and the one that MUST stay
+ * byte-identical to pre-Phase-71 emit (SPEC §7.4).
  */
-export function resolveKeynavPlan(ir: IRComponent): KeynavEmitPlan | null {
-  if (ir.template === null) return null;
-  const { root, item } = collectFirstKeynavNodes(ir.template);
-  if (root === null) return null;
+export function resolveKeynavPlans(ir: IRComponent): KeynavEmitPlan[] {
+  if (ir.template === null) return [];
+  const { roots, items } = collectAllKeynavNodes(ir.template);
+  if (roots.length === 0) return [];
 
-  // Reuse an author-declared `ref="x"` on the SAME element when present —
-  // Angular permits only one `#name` template-ref per element, so silently
-  // overwriting an author's own ref would be a Rule-1-class bug. Mirrors the
-  // React/Vue reference's identical defensive check (untested by a dedicated
-  // fixture there too — SPEC §3.1 has no example combining both).
-  const existingRef = findStaticAttrValue(root.element, 'ref');
-  const mintedRootRef = !(existingRef !== null && ir.refs.some((r) => r.name === existingRef));
-  const rootRefVar = mintedRootRef ? ROOT_REF_VAR : existingRef!;
+  return roots.map((root) => {
+    const groupIndex = root.keynavRoot.groupIndex ?? 0;
+    const suffix = suffixFor(groupIndex);
 
-  return {
-    rootElement: root.element,
-    keynavRoot: root.keynavRoot,
-    itemElement: item?.element ?? null,
-    itemLoop: item?.enclosingLoop ?? null,
-    rootRefVar,
-    mintedRootRef,
-    groupIdVar: GROUP_ID_VAR,
-  };
+    // Reuse an author-declared `ref="x"` on the SAME element when present —
+    // Angular permits only one `#name` template-ref per element, so silently
+    // overwriting an author's own ref would be a Rule-1-class bug. Mirrors
+    // the React/Vue/Solid/Lit references' identical defensive check.
+    const existingRef = findStaticAttrValue(root.element, 'ref');
+    const mintedRootRef = !(existingRef !== null && ir.refs.some((r) => r.name === existingRef));
+    const rootRefVar = mintedRootRef ? `${ROOT_REF_VAR}${suffix}` : existingRef!;
+
+    // itemElement/itemLoop resolved per-group below, using the SAME `items`
+    // collection filtered by this root's groupIndex.
+    const itemsForGroup = items.filter((it) => (it.keynavItem.groupIndex ?? 0) === groupIndex);
+    const firstItem = itemsForGroup[0] ?? null;
+
+    return {
+      groupIndex,
+      rootElement: root.element,
+      keynavRoot: root.keynavRoot,
+      itemElement: firstItem?.element ?? null,
+      itemLoop: firstItem?.enclosingLoop ?? null,
+      rootRefVar,
+      mintedRootRef,
+      groupIdVar: `${GROUP_ID_VAR}${suffix}`,
+    };
+  });
 }
 
-/** `KeynavConfig` object literal — every field is statically known at compile time. */
-function buildConfigCode(k: KeynavRootIR): string {
-  return `{ focusModel: '${k.focusModel}', orientation: '${k.orientation}', loop: ${k.loop}, typeahead: ${k.typeahead}, skipDisabled: ${k.skipDisabled} }`;
+/**
+ * `KeynavConfig` object literal — every field is statically known at compile
+ * time EXCEPT the grid entry, which (Angular-only, see module doc comment)
+ * is embedded directly here as a closure rather than threaded as a sibling
+ * controller option: `createKeynavStateMachine(host, config)` is called
+ * exactly ONCE inside `ngAfterViewInit`, so there is no "config captured
+ * once at mount, would go stale across re-renders" hazard the other five
+ * targets' dedicated hook/controller wrapper designs guard against. A root
+ * without `.grid` emits the EXACT literal it emitted pre-Phase-77.
+ */
+function buildConfigCode(
+  plan: KeynavEmitPlan,
+  ir: IRComponent,
+  listenerOpts: RewriteListenerOpts,
+): string {
+  const k = plan.keynavRoot;
+  const base = `{ focusModel: '${k.focusModel}', orientation: '${k.orientation}', loop: ${k.loop}, typeahead: ${k.typeahead}, skipDisabled: ${k.skipDisabled}`;
+  if (!k.grid) return `${base} }`;
+  // SPEC §10.5.2 — `.grid(<expr>)`'s grammar only accepts a `$`-prefixed
+  // dotted path, which `rewriteListenerExpression` always lowers to a single
+  // bare signal-call read (e.g. `this.cols()`) — always a pure expression,
+  // never statement-shaped, so no method-hoisting is needed for any shape
+  // the parser can actually produce.
+  const columnsCode = rewriteListenerExpression(k.grid.columnsExpression, ir, listenerOpts);
+  return `${base}, grid: { columns: () => ${columnsCode} } }`;
 }
 
 /**
@@ -258,47 +367,69 @@ function buildGetSourceCode(
   return `() => (${sourceCode}).map((${plan.itemLoop.itemAlias}) => ({ ${fields.join(', ')} }))`;
 }
 
-/** Find the `@keynav-commit` template-event Listener on the root, if authored. */
-function findCommitListener(root: TemplateElementIR) {
-  return root.events.find((e) => e.event === 'keynav-commit') ?? null;
+/** Find a template-event Listener of the given synthetic event name on the root. */
+function findRootListener(root: TemplateElementIR, event: string) {
+  return root.events.find((e) => e.event === event) ?? null;
 }
 
 /**
- * `commit: (i: number) => void` — the `KeynavHost.commit` field, called
- * DIRECTLY by the state machine (no intermediate `onCommit` opts indirection
- * the way the hook/composable-based targets have — this IS the host object).
- * Mirrors the SAME bare-identifier-vs-arbitrary-expression convention
- * `emitListeners.ts`'s `renderListener` already uses for `<listeners>`-block
- * handlers: a bare identifier (e.g. `@keynav-commit="handleCommit"`) rewrites
- * to `this.handleCommit` (an arrow class field — safe to pass BY REFERENCE,
+ * `commit: (i: number) => void` / `page: (detail: KeynavPageDetail) => void`
+ * — the `KeynavHost.commit`/`.page` fields, called DIRECTLY by the state
+ * machine (no intermediate opts indirection the way the hook/composable-
+ * based targets have — this IS the host object). Mirrors the SAME
+ * bare-identifier-vs-arbitrary-expression convention `emitListeners.ts`'s
+ * `renderListener` already uses for `<listeners>`-block handlers: a bare
+ * identifier (e.g. `@keynav-commit="handleCommit"`) rewrites to
+ * `this.handleCommit` (an arrow class field — safe to pass BY REFERENCE,
  * since arrow class fields close over `this` lexically) and is passed
- * directly; an arbitrary expression (SPEC's own `run(items[$data.active])`)
- * is wrapped in `(i) => { ...; }`.
+ * directly; an arbitrary expression is wrapped in `(<paramName>) => { ...; }`.
  */
+function buildHandlerCode(
+  root: TemplateElementIR,
+  ir: IRComponent,
+  listenerOpts: RewriteListenerOpts,
+  event: string,
+  paramName: string,
+): string | null {
+  const listener = findRootListener(root, event);
+  if (!listener) return null;
+  const handlerCode = rewriteListenerExpression(listener.handler, ir, listenerOpts);
+  if (/^this\.[A-Za-z_$][\w$]*$/.test(handlerCode)) {
+    return handlerCode;
+  }
+  return `(${paramName}) => { ${handlerCode}; }`;
+}
+
+/** `commit: (i: number) => void`. See `buildHandlerCode`'s doc comment. */
 function buildCommitCode(
   root: TemplateElementIR,
   ir: IRComponent,
   listenerOpts: RewriteListenerOpts,
 ): string {
-  const listener = findCommitListener(root);
-  if (!listener) return '() => {}';
-  const handlerCode = rewriteListenerExpression(listener.handler, ir, listenerOpts);
-  if (/^this\.[A-Za-z_$][\w$]*$/.test(handlerCode)) {
-    return handlerCode;
-  }
-  return `(i) => { ${handlerCode}; }`;
+  return buildHandlerCode(root, ir, listenerOpts, 'keynav-commit', 'i') ?? '() => {}';
+}
+
+/**
+ * `page: (detail: KeynavPageDetail) => void` (Phase 77, SPEC §3, §4.1).
+ * Mirrors `buildCommitCode`'s convention exactly. Returns `null` (not a
+ * fallback no-op) when `@keynav-page` isn't authored on this root — the
+ * caller OMITS the `page` host field entirely in that case, which is what
+ * keeps a component with no `.grid`/`@keynav-page` usage byte-identical.
+ */
+function buildPageCode(
+  root: TemplateElementIR,
+  ir: IRComponent,
+  listenerOpts: RewriteListenerOpts,
+): string | null {
+  return buildHandlerCode(root, ir, listenerOpts, 'keynav-page', 'detail');
 }
 
 /**
  * Resolve the writable get/set pair for `keynavRoot.activeExpression` in
- * SCRIPT context — `this.<prop>()` read, `this.<prop>.set(i)` write. Mirrors
- * `rewriteListenerExpression.ts`'s own `buildAngularSetterCall` shape (both
- * `$data.X` and model `$props.X` lower IDENTICALLY on Angular — both are
- * signal fields). A deep chain reaching this defensive throw would indicate
- * `resolveKeynavGroups` (core) validated a non-writable active-index shape
- * that should never reach emit — mirrors the React/Vue reference's identical
- * defensive throw (D-08: a regression here should surface immediately rather
- * than silently emitting malformed script).
+ * SCRIPT context — `this.<prop>()` read, `this.<prop>.set(i)` write. A deep
+ * chain reaching this defensive throw would indicate `resolveKeynavGroups`
+ * (core) validated a non-writable active-index shape that should never
+ * reach emit (D-08).
  */
 function resolveActiveScriptTarget(expr: t.Expression): { get: string; set: string } {
   if (
@@ -312,18 +443,18 @@ function resolveActiveScriptTarget(expr: t.Expression): { get: string; set: stri
     return { get: `this.${prop}()`, set: `(i) => { this.${prop}.set(i); }` };
   }
   throw new Error(
-    'resolveActiveScriptTarget: unexpected r-keynav active-index expression shape reached the Angular emitter.',
+    'resolveKeynavPlans: unexpected r-keynav active-index expression shape reached the Angular emitter.',
   );
 }
 
 export interface KeynavClassEmission {
-  /** Class-body field declarations (group id, root viewChild, injected Renderer2, controller field). */
+  /** Class-body field declarations (group id, root viewChild, injected Renderer2, controller field) for ALL resolved plans. */
   fieldDecls: string[];
-  /** `constructor()`-body lines — the active-change `effect()` (focus/scroll/active-class). */
+  /** `constructor()`-body lines — one active-change `effect()` per plan. */
   constructorLines: string[];
-  /** `ngAfterViewInit()`-body lines — controller instantiation + root keydown/pointer delegation + DestroyRef teardown. */
+  /** `ngAfterViewInit()`-body lines — one controller instantiation + root keydown/pointer delegation + DestroyRef teardown per plan. */
   afterViewInitLines: string[];
-  /** Always true — `ngAfterViewInit`'s teardown registers via `this.__rozieDestroyRef.onDestroy(...)`. */
+  /** True when at least one plan was emitted — `ngAfterViewInit`'s teardown registers via `this.__rozieDestroyRef.onDestroy(...)`. */
   needsDestroyRefField: boolean;
   /** `@angular/core` symbol names this emission references — caller adds them to the import collector. */
   angularImports: string[];
@@ -332,172 +463,212 @@ export interface KeynavClassEmission {
 }
 
 /**
- * Generate the INLINE controller's class-body wiring — field decls +
- * `ngAfterViewInit` instantiation/delegation + a constructor `effect()` for
- * active-change imperative work. See this module's doc comment for the full
- * rationale of each piece's placement.
+ * Generate the INLINE controller's class-body wiring for ALL resolved
+ * `r-keynav` roots — field decls + `ngAfterViewInit` instantiation/
+ * delegation + a constructor `effect()`, one full set per plan (except the
+ * genuinely shared `Renderer2` field, declared once at group index 0). See
+ * this module's doc comment for the full rationale of each piece's
+ * placement.
  */
 export function buildKeynavClassEmission(
-  plan: KeynavEmitPlan,
+  plans: readonly KeynavEmitPlan[],
   ir: IRComponent,
   /**
    * The REAL (not preview) `rewriteRozieIdentifiers` result from
    * `emitScript.ts`'s own Step 3 — threading `classMembers`/`signalMembers`/
    * `collisionRenames` so a `<script>`-declared handler referenced from
-   * `getSource`/`commit`/`activeClass` (e.g. `run` in
-   * `@keynav-commit="run($props.items[$data.active])"`) correctly rewrites
-   * to `this.run(...)`, exactly like every other class-context rewrite site
-   * in this target (mirrors `emitListeners()`'s identical parameter threading).
+   * `getSource`/`commit`/`page`/`activeClass` correctly rewrites to
+   * `this.run(...)`, exactly like every other class-context rewrite site in
+   * this target (mirrors `emitListeners()`'s identical parameter threading).
    */
   listenerOpts: RewriteListenerOpts,
 ): KeynavClassEmission {
-  const rootRefExpr = `this.${plan.rootRefVar}()?.nativeElement`;
-  const active = resolveActiveScriptTarget(plan.keynavRoot.activeExpression);
-  const getSourceCode = buildGetSourceCode(plan, ir, listenerOpts);
-  const commitCode = buildCommitCode(plan.rootElement, ir, listenerOpts);
-  const configCode = buildConfigCode(plan.keynavRoot);
+  const fieldDecls: string[] = [];
+  const constructorLines: string[] = [];
+  const afterViewInitLines: string[] = [];
+  const angularImports = new Set<string>();
+  const runtimeImports = new Set<string>(['createKeynavStateMachine', 'type KeynavStateMachine']);
 
-  // `type KeynavStateMachine` — the emitted field declaration
-  // (`private __rozieKeynavController: KeynavStateMachine | null = null;`)
-  // needs the TYPE imported too; inline `type` specifier form (TS 5.6+, per
-  // the project's floor) lets it share the SAME import statement as the
-  // value import `createKeynavStateMachine`.
-  const runtimeImports = ['createKeynavStateMachine', 'type KeynavStateMachine'];
-  const activeClassLines: string[] = [];
-  if (plan.keynavRoot.activeClassExpression) {
-    runtimeImports.push('normalizeClassTokens');
-    const activeClassCode = rewriteListenerExpression(
-      plan.keynavRoot.activeClassExpression,
-      ir,
-      listenerOpts,
-    );
-    activeClassLines.push(
-      `  const __rozieKeynavTokens = normalizeClassTokens(${activeClassCode});`,
-      `  if (__rozieKeynavTokens.length > 0) {`,
-      `    __rozieKeynavRootEl.querySelectorAll('[data-rozie-keynav-item]').forEach((__rozieKeynavItemEl) => __rozieKeynavItemEl.classList.remove(...__rozieKeynavTokens));`,
-      `    __rozieKeynavActiveEl?.classList.add(...__rozieKeynavTokens);`,
-      `  }`,
-    );
-  }
+  for (const plan of plans) {
+    const suffix = suffixFor(plan.groupIndex);
+    const groupIdVar = plan.groupIdVar;
+    const controllerVar = `${CONTROLLER_VAR}${suffix}`;
+    const syncMethod = `${SYNC_ACTIVE_METHOD}${suffix}`;
+    const applyMethod = `${APPLY_ACTIVE_METHOD}${suffix}`;
+    const rafField = `${RAF_ID_FIELD}${suffix}`;
+    const rootRefExpr = `this.${plan.rootRefVar}()?.nativeElement`;
 
-  const focusLines: string[] =
-    plan.keynavRoot.focusModel === 'tabindex' ? ['  __rozieKeynavActiveEl?.focus();'] : [];
+    const active = resolveActiveScriptTarget(plan.keynavRoot.activeExpression);
+    const getSourceCode = buildGetSourceCode(plan, ir, listenerOpts);
+    const commitCode = buildCommitCode(plan.rootElement, ir, listenerOpts);
+    const pageCode = buildPageCode(plan.rootElement, ir, listenerOpts);
+    const configCode = buildConfigCode(plan, ir, listenerOpts);
 
-  const fieldDecls: string[] = [
-    `private ${GROUP_ID_VAR} = 'rozie-keynav-' + Math.random().toString(36).slice(2);`,
-  ];
-  if (plan.mintedRootRef) {
+    const activeClassLines: string[] = [];
+    if (plan.keynavRoot.activeClassExpression) {
+      runtimeImports.add('normalizeClassTokens');
+      const activeClassCode = rewriteListenerExpression(
+        plan.keynavRoot.activeClassExpression,
+        ir,
+        listenerOpts,
+      );
+      activeClassLines.push(
+        `  const __rozieKeynavTokens = normalizeClassTokens(${activeClassCode});`,
+        `  if (__rozieKeynavTokens.length > 0) {`,
+        `    __rozieKeynavRootEl.querySelectorAll('[data-rozie-keynav-item]').forEach((__rozieKeynavItemEl) => __rozieKeynavItemEl.classList.remove(...__rozieKeynavTokens));`,
+        `    __rozieKeynavActiveEl?.classList.add(...__rozieKeynavTokens);`,
+        `  }`,
+      );
+    }
+
+    const focusLines: string[] =
+      plan.keynavRoot.focusModel === 'tabindex' ? ['  __rozieKeynavActiveEl?.focus();'] : [];
+
     fieldDecls.push(
-      `private ${ROOT_REF_VAR} = viewChild<ElementRef<HTMLElement>>('${ROOT_REF_VAR}');`,
+      `private ${groupIdVar} = 'rozie-keynav-' + Math.random().toString(36).slice(2);`,
     );
-  }
-  fieldDecls.push(`private ${RENDERER_FIELD} = inject(Renderer2);`);
-  fieldDecls.push(`private ${CONTROLLER_VAR}: KeynavStateMachine | null = null;`);
-  // Shared active-item sync (focus/scroll/`r-keynav-active-class` toggle,
-  // SPEC §9). Extracted into its own arrow-field method — rather than inlined
-  // ONLY in the constructor `effect()` below — because Angular's viewChild()
-  // query signal (`this.${plan.rootRefVar}()`) does not reliably notify an
-  // effect created in the CONSTRUCTOR of its FIRST post-view-init resolution
-  // in every Angular version/CD configuration: the effect can be created
-  // (and read the still-`undefined` query signal) before the view-query
-  // refresh that populates it, and its subsequent notification is not
-  // guaranteed to re-flush that constructor effect within the SAME initial
-  // render — leaving item 0's mount-time focus ring (tabindex model) and
-  // `r-keynav-active-class` toggle silently un-applied until an UNRELATED
-  // active-change happens to fire the effect again (empirically confirmed:
-  // a real-DOM VR pixel cell caught item 0 never receiving DOM focus on
-  // mount, while `ngAfterViewInit`'s OWN synchronous read of the identical
-  // `${rootRefExpr}` expression — used one line below for the keydown/
-  // pointer delegation attach — reliably resolves a real element every
-  // time). `ngAfterViewInit` is the one lifecycle point BOTH the root and
-  // every `r-keynav-item` are GUARANTEED rendered, so this method is called
-  // there explicitly once (below) in addition to the constructor `effect()`
-  // that continues to own every SUBSEQUENT active-change — idempotent by
-  // construction (re-focusing/re-toggling the same element twice is a no-op),
-  // so calling it from both places is safe regardless of whichever path the
-  // constructor effect's own dependency tracking happens to take.
-  fieldDecls.push(
-    [
-      `private ${SYNC_ACTIVE_METHOD} = () => {`,
-      `  const __rozieKeynavActive = ${active.get};`,
-      `  const __rozieKeynavRootEl = ${rootRefExpr};`,
-      `  if (!__rozieKeynavRootEl || !Number.isFinite(__rozieKeynavActive)) return;`,
-      `  const __rozieKeynavActiveEl = __rozieKeynavRootEl.querySelector<HTMLElement>(\`[data-rozie-keynav-item="\${__rozieKeynavActive}"]\`);`,
-      ...activeClassLines,
-      ...focusLines,
-      `  __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });`,
-      `};`,
-    ].join('\n'),
-  );
+    if (plan.mintedRootRef) {
+      fieldDecls.push(
+        `private ${plan.rootRefVar} = viewChild<ElementRef<HTMLElement>>('${plan.rootRefVar}');`,
+      );
+    }
+    // `RENDERER_FIELD` is genuinely SHARED, stateless infrastructure —
+    // declared exactly ONCE (group index 0, always present when ANY plan
+    // exists — core assigns groupIndex in document order starting at 0), and
+    // referenced bare (unsuffixed) by every group's delegation block below.
+    if (plan.groupIndex === 0) {
+      fieldDecls.push(`private ${RENDERER_FIELD} = inject(Renderer2);`);
+    }
+    fieldDecls.push(`private ${controllerVar}: KeynavStateMachine | null = null;`);
+    // Phase 77 (T-77-05-03) — the single outstanding rAF retry id for THIS
+    // group, mirroring the React/Lit references' `rafId`/`pendingRafId`.
+    fieldDecls.push(`private ${rafField}: number | null = null;`);
 
-  const afterViewInitLines: string[] = [
-    [
-      `this.${CONTROLLER_VAR} = createKeynavStateMachine({`,
+    // Shared active-item sync (focus/scroll/`r-keynav-active-class` toggle,
+    // SPEC §9), extracted into its own arrow-field method — see the 71-11
+    // landmine fix this preserves (`ngAfterViewInit` explicit call in
+    // addition to the constructor `effect()`, since a constructor effect's
+    // FIRST flush is not guaranteed to observe a resolved `viewChild()`
+    // query signal). Phase 77 splits this into TWO methods:
+    // `${applyMethod}` (the pre-existing per-active-change body, UNCHANGED —
+    // every pre-Phase-77 emitted line still appears, just here instead of
+    // inline) and `${syncMethod}` (a scheduling wrapper that calls it once
+    // synchronously and, if the landing item wasn't found — SPEC §77-03-03,
+    // a same-tick dataset swap — schedules exactly ONE
+    // `requestAnimationFrame`-deferred retry, cancelled on a newer
+    // active-change/disconnect and guarded so a stale pass never steals
+    // focus from a newer navigation; mirrors the React reference's identical
+    // pattern).
+    fieldDecls.push(
+      [
+        `private ${applyMethod} = (__rozieKeynavRootEl: HTMLElement, __rozieKeynavActive: number): boolean => {`,
+        `  const __rozieKeynavActiveEl = __rozieKeynavRootEl.querySelector<HTMLElement>(\`[data-rozie-keynav-item="\${__rozieKeynavActive}"]\`);`,
+        ...activeClassLines,
+        ...focusLines,
+        `  __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });`,
+        `  return __rozieKeynavActiveEl !== null;`,
+        `};`,
+      ].join('\n'),
+    );
+    fieldDecls.push(
+      [
+        `private ${syncMethod} = () => {`,
+        `  const __rozieKeynavActive = ${active.get};`,
+        `  const __rozieKeynavRootEl = ${rootRefExpr};`,
+        `  if (this.${rafField} !== null) { cancelAnimationFrame(this.${rafField}); this.${rafField} = null; }`,
+        `  if (!__rozieKeynavRootEl || !Number.isFinite(__rozieKeynavActive)) return;`,
+        `  const __rozieKeynavFound = this.${applyMethod}(__rozieKeynavRootEl, __rozieKeynavActive);`,
+        `  if (!__rozieKeynavFound) {`,
+        `    this.${rafField} = requestAnimationFrame(() => {`,
+        `      this.${rafField} = null;`,
+        `      if (${active.get} !== __rozieKeynavActive) return;`,
+        `      const __rozieKeynavRetryRootEl = ${rootRefExpr};`,
+        `      if (__rozieKeynavRetryRootEl) this.${applyMethod}(__rozieKeynavRetryRootEl, __rozieKeynavActive);`,
+        `    });`,
+        `  }`,
+        `};`,
+      ].join('\n'),
+    );
+
+    const hostLines = [
+      `this.${controllerVar} = createKeynavStateMachine({`,
       `  getSource: ${getSourceCode},`,
       `  getActive: () => ${active.get},`,
       `  setActive: ${active.set},`,
       `  commit: ${commitCode},`,
-      `}, ${configCode});`,
-    ].join('\n'),
-    [
-      `{`,
-      `  const __rozieKeynavRootEl = ${rootRefExpr};`,
-      `  if (__rozieKeynavRootEl) {`,
-      `    const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.${CONTROLLER_VAR}?.onKeydown($event); };`,
-      `    const __rozieKeynavHandlePointer = ($event: PointerEvent) => {`,
-      `      const __rozieKeynavTarget = $event.target;`,
-      `      if (!(__rozieKeynavTarget instanceof Element)) return;`,
-      `      const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');`,
-      `      if (!__rozieKeynavMarker) return;`,
-      `      const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');`,
-      `      if (__rozieKeynavRaw === null) return;`,
-      // T-71-09-01 (threat register) — Number() + bounds-check on the
-      // untrusted DOM marker BEFORE it reaches the reducer. The reducer also
-      // clamps as a second line of defense (71-03's onPointerActivate), but a
-      // malformed/negative index is rejected here first, never coerced.
-      `      const __rozieKeynavIdx = Number(__rozieKeynavRaw);`,
-      `      if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;`,
-      `      this.${CONTROLLER_VAR}?.onPointerActivate(__rozieKeynavIdx);`,
-      `    };`,
-      `    const __rozieKeynavUnlistenKeydown = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'keydown', __rozieKeynavHandleKeydown);`,
-      `    const __rozieKeynavUnlistenPointer = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'pointerdown', __rozieKeynavHandlePointer);`,
-      `    this.__rozieDestroyRef.onDestroy(() => {`,
-      `      __rozieKeynavUnlistenKeydown();`,
-      `      __rozieKeynavUnlistenPointer();`,
-      `      this.${CONTROLLER_VAR}?.dispose();`,
-      `    });`,
-      `  }`,
-      `}`,
-    ].join('\n'),
+    ];
+    if (pageCode !== null) {
+      hostLines.push(`  page: ${pageCode},`);
+    }
+    hostLines.push(`}, ${configCode});`);
+    afterViewInitLines.push(hostLines.join('\n'));
+
+    afterViewInitLines.push(
+      [
+        `{`,
+        `  const __rozieKeynavRootEl = ${rootRefExpr};`,
+        `  if (__rozieKeynavRootEl) {`,
+        `    const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.${controllerVar}?.onKeydown($event); };`,
+        `    const __rozieKeynavHandlePointer = ($event: PointerEvent) => {`,
+        `      const __rozieKeynavTarget = $event.target;`,
+        `      if (!(__rozieKeynavTarget instanceof Element)) return;`,
+        `      const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');`,
+        `      if (!__rozieKeynavMarker) return;`,
+        `      const __rozieKeynavRaw = __rozieKeynavMarker.getAttribute('data-rozie-keynav-item');`,
+        `      if (__rozieKeynavRaw === null) return;`,
+        // T-71-09-01 (threat register) — Number() + bounds-check on the
+        // untrusted DOM marker BEFORE it reaches the reducer. The reducer
+        // also clamps as a second line of defense (71-03's
+        // onPointerActivate), but a malformed/negative index is rejected
+        // here first, never coerced.
+        `      const __rozieKeynavIdx = Number(__rozieKeynavRaw);`,
+        `      if (!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0) return;`,
+        `      this.${controllerVar}?.onPointerActivate(__rozieKeynavIdx);`,
+        `    };`,
+        `    const __rozieKeynavUnlistenKeydown = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'keydown', __rozieKeynavHandleKeydown);`,
+        `    const __rozieKeynavUnlistenPointer = this.${RENDERER_FIELD}.listen(__rozieKeynavRootEl, 'pointerdown', __rozieKeynavHandlePointer);`,
+        `    this.__rozieDestroyRef.onDestroy(() => {`,
+        `      __rozieKeynavUnlistenKeydown();`,
+        `      __rozieKeynavUnlistenPointer();`,
+        `      if (this.${rafField} !== null) cancelAnimationFrame(this.${rafField});`,
+        `      this.${controllerVar}?.dispose();`,
+        `    });`,
+        `  }`,
+        `}`,
+      ].join('\n'),
+    );
     // Explicit mount-time sync — see the field decl's doc comment above for
-    // why this cannot be left to the constructor effect() alone.
-    `this.${SYNC_ACTIVE_METHOD}();`,
-  ];
+    // why this cannot be left to the constructor effect() alone (71-11).
+    afterViewInitLines.push(`this.${syncMethod}();`);
 
-  // Active-CHANGE effect (SPEC §9: "evaluated once ... toggles on
-  // active-change, not a live per-render binding") — the `this.<prop>()`
-  // signal read happens DIRECTLY inside `${SYNC_ACTIVE_METHOD}`'s body,
-  // called from this effect's callback, so Angular's auto-tracking still
-  // subscribes to it (a signal read during an effect callback's synchronous
-  // execution is tracked through any depth of nested function calls). Every
-  // SUBSEQUENT active-change is owned by this effect exactly as before; the
-  // mount-time invocation is now the explicit `ngAfterViewInit` call above.
-  const constructorLines: string[] = [
-    [`effect(() => {`, `  this.${SYNC_ACTIVE_METHOD}();`, `});`].join('\n'),
-  ];
+    // Active-CHANGE effect (SPEC §9: "evaluated once ... toggles on
+    // active-change, not a live per-render binding") — the `this.<prop>()`
+    // signal read happens DIRECTLY inside `${applyMethod}`'s call chain
+    // (via `${syncMethod}`), so Angular's auto-tracking still subscribes to
+    // it. Every SUBSEQUENT active-change is owned by this effect exactly as
+    // before; the mount-time invocation is the explicit `ngAfterViewInit`
+    // call above.
+    constructorLines.push(
+      [`effect(() => {`, `  this.${syncMethod}();`, `});`].join('\n'),
+    );
 
-  const angularImports = ['inject', 'Renderer2', 'DestroyRef', 'effect'];
-  if (plan.mintedRootRef) {
-    angularImports.push('viewChild', 'ElementRef');
+    angularImports.add('inject');
+    angularImports.add('Renderer2');
+    angularImports.add('DestroyRef');
+    angularImports.add('effect');
+    if (plan.mintedRootRef) {
+      angularImports.add('viewChild');
+      angularImports.add('ElementRef');
+    }
   }
 
   return {
     fieldDecls,
     constructorLines,
     afterViewInitLines,
-    needsDestroyRefField: true,
-    angularImports,
-    runtimeImports,
+    needsDestroyRefField: plans.length > 0,
+    angularImports: [...angularImports],
+    runtimeImports: [...runtimeImports],
   };
 }
 
@@ -509,6 +680,10 @@ export function buildKeynavClassEmission(
  * activedescendant focus model, pointing at the active item's id. Rendered
  * via `rewriteTemplateExpression` (TEMPLATE context — bare, no `this.`)
  * since these genuinely render inside the Angular template.
+ *
+ * `plan` must be the plan whose `groupIndex` matches THIS element's own
+ * `keynavRoot.groupIndex` (defaulting to 0) — callers select it via
+ * `emitTemplateNode.ts`'s per-node plan lookup, never "the" single plan.
  */
 export function keynavRootAttrs(
   plan: KeynavEmitPlan | null,
@@ -518,7 +693,7 @@ export function keynavRootAttrs(
   if (plan === null || node.keynavRoot === undefined) return [];
   const attrs: string[] = [];
   if (plan.mintedRootRef) {
-    attrs.push(`#${ROOT_REF_VAR}`);
+    attrs.push(`#${plan.rootRefVar}`);
   }
   if (plan.keynavRoot.focusModel === 'activedescendant') {
     const activeCode = rewriteTemplateExpression(plan.keynavRoot.activeExpression, ir);
@@ -536,20 +711,36 @@ export function keynavRootAttrs(
  * (SPEC §9), and — tabindex focus model only — the `[tabIndex]` roving
  * binding. All FOUR compare `indexExpr` (the loop's item index — for
  * Angular, `@for`'s implicit `$index` context variable is ALWAYS available
- * bare inside the block with no `let` alias needed, per Angular's own
- * `@for` docs; see `emitTemplateNode.ts`'s `emitLoop` for the
- * `node.indexAlias ?? '$index'` threading, which needs NO loop-declaration
- * synthesis unlike the React/Vue/Solid references) against the live active
+ * bare inside the block with no `let` alias needed) against the live active
  * value — declarative Angular template bindings (the inline controller never
- * writes these directly). Returns `[]` when `indexExpr` is unavailable.
+ * writes these directly).
+ *
+ * Phase 77 (planner Gap B) — an item's OWN explicit index expression
+ * (`r-keynav-item="{ index: <expr> }"`, rewritten via
+ * `rewriteTemplateExpression` — TEMPLATE context, same as every other
+ * fragment here) takes priority over `indexExpr` (the enclosing `@for`
+ * block's `$index`) when present. This is what makes an explicit index
+ * correct even when the item's nearest enclosing loop is a NESTED inner
+ * loop — the expression's own identifier references are already bound to
+ * whichever loop scope it was authored in, regardless of nesting depth.
+ *
+ * Returns `[]` when neither an explicit index nor a loop index is
+ * available. `plan` must be the plan whose `groupIndex` matches THIS
+ * element's own `keynavItem.groupIndex` (defaulting to 0) — see
+ * `keynavRootAttrs`'s doc comment.
  */
 export function keynavItemAttrs(
   plan: KeynavEmitPlan | null,
   node: TemplateElementIR,
-  indexExpr: string | null,
+  loopIndexExpr: string | null,
   ir: IRComponent,
 ): string[] {
-  if (plan === null || node.keynavItem === undefined || indexExpr === null) return [];
+  if (plan === null || node.keynavItem === undefined) return [];
+  const explicitIndexExpr = node.keynavItem.indexExpression
+    ? rewriteTemplateExpression(node.keynavItem.indexExpression, ir)
+    : null;
+  const indexExpr = explicitIndexExpr ?? loopIndexExpr;
+  if (indexExpr === null) return [];
   const activeCode = rewriteTemplateExpression(plan.keynavRoot.activeExpression, ir);
   const attrs: string[] = [
     `[id]="\`\${${plan.groupIdVar}}-item-\${${indexExpr}}\`"`,
@@ -563,16 +754,18 @@ export function keynavItemAttrs(
 }
 
 /**
- * Strips the `@keynav-commit` template-event Listener out of the root
- * element's `events` array — it is consumed by `buildCommitCode` above and
- * routed into the inline controller's `KeynavHost.commit`, NEVER as an
- * Angular `(keynavCommit)=` template binding (which would be inert —
- * `keynav-commit` is a synthetic event, not a real DOM event a host element
- * dispatches).
+ * Strips the `@keynav-commit` / `@keynav-page` template-event Listeners out
+ * of the root element's `events` array — both are consumed by
+ * `buildCommitCode`/`buildPageCode` above and routed into the inline
+ * controller's `KeynavHost.commit`/`.page`, NEVER as an Angular
+ * `(keynavCommit)=`/`(keynavPage)=` template binding (which would be inert —
+ * neither is a real DOM event a host element dispatches).
  */
-export function stripKeynavCommitEvent(node: TemplateElementIR): TemplateElementIR {
+export function stripKeynavSyntheticEvents(node: TemplateElementIR): TemplateElementIR {
   if (node.keynavRoot === undefined) return node;
-  const filtered = node.events.filter((e) => e.event !== 'keynav-commit');
+  const filtered = node.events.filter(
+    (e) => e.event !== 'keynav-commit' && e.event !== 'keynav-page',
+  );
   if (filtered.length === node.events.length) return node;
   return { ...node, events: filtered };
 }

@@ -281,3 +281,270 @@ describe('Angular r-keynav emitter (Plan 71-09 Task 2)', () => {
     expect(code).not.toContain('__rozieKeynav');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 77 Plan 05 Task 2 — multi-root plans, grid config, @keynav-page,
+// explicit item index, and the deferred one-frame-late focus retry. Fixtures
+// are kept SEPARATE from the Phase-71 fixtures above so every pre-existing
+// assertion (checked with toContain/toMatch, never toBe) stays a substring of
+// the new output — the byte-identity proof for a NON-GRID single root.
+// Mirrors the React reference's (Plan 77-03) fixtures/tests, replicated by
+// Vue/Svelte/Solid (Plan 77-04) and Lit (Plan 77-05 Task 1).
+// ---------------------------------------------------------------------------
+
+// Two independent 1D roots (SPEC §6 — no new syntax; multi-group is legal by
+// having 2+ r-keynav roots). Distinct active bindings, distinct item shapes.
+const TWO_ROOT_SRC = `<rozie name="KeynavTwoGroups">
+
+<props>
+{
+  rows: { type: Array, default: () => [] },
+  cells: { type: Array, default: () => [] },
+}
+</props>
+
+<data>
+{
+  rowActive: 0,
+  cellActive: 0,
+}
+</data>
+
+<template>
+<div>
+  <ul role="listbox" r-keynav:tabindex="$data.rowActive">
+    <li role="option" r-for="row in $props.rows" :key="row.id" r-keynav-item="{ label: row.label }">{{ row.label }}</li>
+  </ul>
+  <div role="grid" r-keynav:tabindex="$data.cellActive">
+    <button role="gridcell" r-for="cell in $props.cells" :key="cell.id" r-keynav-item="{ label: cell.label }">{{ cell.label }}</button>
+  </div>
+</div>
+</template>
+
+</rozie>`;
+
+// A grid root (`.grid($data.cols)` — reactive columns expression) carrying
+// `@keynav-page` (SPEC §3, §4.1). Both features composed on one root, as the
+// SPEC's own §3 authoring example does.
+const GRID_PAGE_SRC = `<rozie name="KeynavGridPage">
+
+<props>
+{
+  cells: { type: Array, default: () => [] },
+}
+</props>
+
+<data>
+{
+  active: 0,
+  cols: 7,
+}
+</data>
+
+<script>
+const onBoundary = (detail) => {
+  console.log(detail)
+}
+</script>
+
+<template>
+<div role="grid" r-keynav:tabindex.grid($data.cols)="$data.active" @keynav-page="onBoundary">
+  <button role="gridcell" r-for="cell in $props.cells" :key="cell.id" r-keynav-item="{ label: cell.label }">{{ cell.label }}</button>
+</div>
+</template>
+
+</rozie>`;
+
+// Planner Gap B (77-SPEC.md §10.5 amendment 3) — an explicit `index` on
+// `r-keynav-item` overrides a NESTED inner loop's own index alias. Mirrors
+// the date-picker's panels -> weeks -> days shape: the item's nearest
+// enclosing loop is the INNER (day) loop, whose own index (`d`) would be the
+// wrong (weekday 0-6) value; `index: w * 7 + d` supplies the flat grid
+// index. `:source` is explicit (not r-for-synthesized) — sidesteps the
+// unrelated, pre-existing ":source synthesizes from the FIRST item's
+// enclosing loop" mechanic, which is not what this fixture is testing.
+const EXPLICIT_INDEX_SRC = `<rozie name="KeynavExplicitIndex">
+
+<data>
+{
+  active: 0,
+  weeks: [],
+  flatDays: [],
+}
+</data>
+
+<template>
+<div role="grid" r-keynav:tabindex.grid(7)="$data.active" :source="$data.flatDays">
+  <div r-for="(week, w) in $data.weeks" :key="w">
+    <button role="gridcell" r-for="(day, d) in week" :key="d"
+            r-keynav-item="{ label: day.label, index: w * 7 + d }">
+      {{ day.label }}
+    </button>
+  </div>
+</div>
+</template>
+
+</rozie>`;
+
+function emitMenu() {
+  const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
+  return emitAngular(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
+}
+
+function emitTwoRoot() {
+  const ir = compile(TWO_ROOT_SRC, 'KeynavTwoGroups.rozie');
+  return emitAngular(ir, { filename: 'KeynavTwoGroups.rozie', source: TWO_ROOT_SRC });
+}
+
+function emitGridPage(src: string = GRID_PAGE_SRC) {
+  const ir = compile(src, 'KeynavGridPage.rozie');
+  return emitAngular(ir, { filename: 'KeynavGridPage.rozie', source: src });
+}
+
+function emitExplicitIndex() {
+  const ir = compile(EXPLICIT_INDEX_SRC, 'KeynavExplicitIndex.rozie');
+  return emitAngular(ir, { filename: 'KeynavExplicitIndex.rozie', source: EXPLICIT_INDEX_SRC });
+}
+
+describe('Angular r-keynav emitter — multi-root, grid, page, explicit index (Plan 77-05 Task 2)', () => {
+  it('multi-root: two r-keynav roots emit TWO independent createKeynavStateMachine(...) controller calls', () => {
+    const { code } = emitTwoRoot();
+    const callCount = (code.match(/= createKeynavStateMachine\(\{/g) ?? []).length;
+    expect(callCount).toBe(2);
+  });
+
+  it('multi-root: each root gets its own suffixed group-id/root-ref/controller identifiers', () => {
+    const { code } = emitTwoRoot();
+    expect(code).toContain(
+      "private __rozieKeynavGroupId = 'rozie-keynav-' + Math.random().toString(36).slice(2);",
+    );
+    expect(code).toContain(
+      "private __rozieKeynavGroupId1 = 'rozie-keynav-' + Math.random().toString(36).slice(2);",
+    );
+    expect(code).toContain("private __rozieKeynavRootRef = viewChild<ElementRef<HTMLElement>>('__rozieKeynavRootRef');");
+    expect(code).toContain("private __rozieKeynavRootRef1 = viewChild<ElementRef<HTMLElement>>('__rozieKeynavRootRef1');");
+    expect(code).toContain('this.__rozieKeynavController = createKeynavStateMachine({');
+    expect(code).toContain('this.__rozieKeynavController1 = createKeynavStateMachine({');
+  });
+
+  it('multi-root: the injected Renderer2 field is declared exactly ONCE and shared by every group\'s delegation block', () => {
+    const { code } = emitTwoRoot();
+    const rendererFieldCount = (
+      code.match(/private __rozieKeynavRenderer = inject\(Renderer2\);/g) ?? []
+    ).length;
+    expect(rendererFieldCount).toBe(1);
+    expect(code).toContain("this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'keydown',");
+  });
+
+  it('multi-root: each root carries its OWN active-index get/set binding', () => {
+    const { code } = emitTwoRoot();
+    expect(code).toContain('getActive: () => this.rowActive(),');
+    expect(code).toContain('setActive: (i) => { this.rowActive.set(i); },');
+    expect(code).toContain('getActive: () => this.cellActive(),');
+    expect(code).toContain('setActive: (i) => { this.cellActive.set(i); },');
+  });
+
+  it("multi-root: each item's four attributes are keyed to ITS OWN root's group id and active binding", () => {
+    const { code } = emitTwoRoot();
+    // The nested JS template-literal (backtick + `${...}`) is backslash-escaped
+    // by emitDecorator's whole-template escape pass so the OUTER `template:
+    // \`...\`` TS literal parses — mirrors the pre-existing "SEAM: id" test's
+    // identical escaping convention.
+    // Group 0 (rows) — bare group-id/active identifiers.
+    expect(code).toContain('[id]="\\`\\${__rozieKeynavGroupId}-item-\\${$index}\\`"');
+    expect(code).toContain('[attr.data-rozie-keynav-active]="rowActive() === $index ? \'\' : undefined"');
+    // Group 1 (cells) — suffixed group-id/active identifiers.
+    expect(code).toContain('[id]="\\`\\${__rozieKeynavGroupId1}-item-\\${$index}\\`"');
+    expect(code).toContain('[attr.data-rozie-keynav-active]="cellActive() === $index ? \'\' : undefined"');
+  });
+
+  it('multi-root: each root mints its OWN viewChild()-backed template ref, scoping Renderer2.listen naturally via DOM structure (no shared-delegation containment marker needed)', () => {
+    const { code } = emitTwoRoot();
+    expect(code).toContain('#__rozieKeynavRootRef');
+    expect(code).toContain('#__rozieKeynavRootRef1');
+    // Angular never needs Lit's data-rozie-keynav-root marker — each root's
+    // Renderer2.listen call attaches DIRECTLY on its own nativeElement.
+    expect(code).not.toContain('data-rozie-keynav-root');
+  });
+
+  it('grid: the config literal gains a grid entry ONLY when .grid() is used — the columns getter is a closure inside config, not a captured value', () => {
+    const { code } = emitGridPage();
+    expect(code).toContain(
+      "{ focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false, grid: { columns: () => this.cols() } }",
+    );
+  });
+
+  it('page: @keynav-page routes into the KeynavHost.page field and never appears as an Angular template binding', () => {
+    const { code } = emitGridPage();
+    // Bare-identifier handler — passed BY REFERENCE (mirrors commit's convention).
+    expect(code).toContain('page: this.onBoundary,');
+    expect(code).not.toContain('(keynavPage)=');
+    expect(code).not.toContain('@keynav-page');
+  });
+
+  it('page: an arbitrary @keynav-page expression is wrapped in a (detail) => { ...; } arrow', () => {
+    const src = GRID_PAGE_SRC.replace(
+      '@keynav-page="onBoundary"',
+      '@keynav-page="onBoundary($props.cells)"',
+    );
+    const { code } = emitGridPage(src);
+    expect(code).toContain('page: (detail) => { this.onBoundary(this.cells()); },');
+  });
+
+  it('grid: a root with no .grid() modifier omits the grid config key entirely', () => {
+    const { code } = emitMenu();
+    expect(code).not.toContain('grid:');
+  });
+
+  it("explicit item index: an item's own index expression overrides a NESTED inner loop's index alias in all four attributes", () => {
+    const { code } = emitExplicitIndex();
+    expect(code).toContain('[id]="\\`\\${__rozieKeynavGroupId}-item-\\${w * 7 + d}\\`"');
+    expect(code).toContain('[attr.data-rozie-keynav-item]="w * 7 + d"');
+    expect(code).toContain(
+      '[attr.data-rozie-keynav-active]="active() === w * 7 + d ? \'\' : undefined"',
+    );
+    expect(code).toContain('[tabIndex]="active() === w * 7 + d ? 0 : -1"');
+  });
+
+  it('deferred focus: a same-tick-dataset-swap active change schedules exactly one requestAnimationFrame retry, cancelled on a newer active-change and on destroy', () => {
+    const { code } = emitGridPage();
+    expect(code).toContain(
+      'if (this.__rozieKeynavRafId !== null) { cancelAnimationFrame(this.__rozieKeynavRafId); this.__rozieKeynavRafId = null; }',
+    );
+    expect(code).toContain('this.__rozieKeynavRafId = requestAnimationFrame(() => {');
+    expect(code).toContain('if (this.active() !== __rozieKeynavActive) return;');
+    expect(code).toContain('if (this.__rozieKeynavRafId !== null) cancelAnimationFrame(this.__rozieKeynavRafId);');
+  });
+
+  it("after-view-init active sync: the generated class calls this.__rozieKeynavSyncActive() explicitly at the end of ngAfterViewInit, in addition to the constructor effect() (71-11 lesson)", () => {
+    const { code } = emitMenu();
+    const afterViewInitMatch = code.match(/ngAfterViewInit\(\) \{([\s\S]*?)\n {2}\}/);
+    expect(afterViewInitMatch).not.toBeNull();
+    expect(afterViewInitMatch![1]).toContain('this.__rozieKeynavSyncActive();');
+    expect(code).toContain('effect(() => {\n      this.__rozieKeynavSyncActive();\n    });');
+  });
+
+  it('BYTE-IDENTITY (non-grid single root): every pre-existing Phase-71 assertion string is still a literal substring of the menu fixture\'s emit', () => {
+    const { code } = emitMenu();
+    expect(code).toContain(
+      "}, { focusModel: 'tabindex', orientation: 'vertical', loop: true, typeahead: false, skipDisabled: true });",
+    );
+    expect(code).toContain('getActive: () => this.active(),');
+    expect(code).toContain('setActive: (i) => { this.active.set(i); },');
+    expect(code).toContain('commit: (i) => { this.run(this.items()[this.active()]); },');
+    expect(code).toContain(
+      'getSource: () => (this.items()).map((it) => ({ label: it.label, disabled: it.disabled })),',
+    );
+    expect(code).toContain("this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'keydown',");
+    expect(code).toContain("this.__rozieKeynavRenderer.listen(__rozieKeynavRootEl, 'pointerdown',");
+    expect(code).toContain('Number(__rozieKeynavRaw)');
+    expect(code).toContain('!Number.isInteger(__rozieKeynavIdx) || __rozieKeynavIdx < 0');
+    expect(code).toContain('this.__rozieDestroyRef.onDestroy(() => {');
+    expect(code).toContain("const __rozieKeynavTokens = normalizeClassTokens('is-active');");
+    expect(code).toContain('const __rozieKeynavActive = this.active();');
+    // No multi-root machinery leaks into a single-root emit.
+    expect(code).not.toContain('__rozieKeynavGroupId1');
+    expect(code).not.toContain('__rozieKeynavController1');
+    expect(code).not.toContain('data-rozie-keynav-root');
+  });
+});
