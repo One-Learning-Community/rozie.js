@@ -11,9 +11,9 @@
  * hook itself never touches those two attributes).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent, screen } from '@testing-library/react';
+import { render, fireEvent, screen, act } from '@testing-library/react';
 import { useRef, useState } from 'react';
-import type { KeynavConfig } from '@rozie/runtime-keynav-core';
+import type { KeynavConfig, KeynavPageDetail } from '@rozie/runtime-keynav-core';
 import { useKeynav } from '../useKeynav.js';
 
 interface Item {
@@ -176,5 +176,241 @@ describe('useKeynav (Plan 71-04 Task 1)', () => {
 
     expect(isActive(screen.getByText('Charlie'))).toBe(true);
     expect(document.activeElement).toBe(root);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 77-03 Task 1 — `onPage` + `gridColumns` + the deferred one-frame-late
+// focus pass. A separate harness (`GridMenu`) keeps the pre-existing `Menu`
+// cases above completely untouched (SPEC §7.4 additive invariant).
+// ---------------------------------------------------------------------------
+
+const GRID_ITEMS: Item[] = [
+  { id: 'a', label: 'A' },
+  { id: 'b', label: 'B' },
+  { id: 'c', label: 'C' },
+  { id: 'd', label: 'D' },
+  { id: 'e', label: 'E' },
+  { id: 'f', label: 'F' },
+];
+
+// `orientation: 'both'` is what the 1D branch falls back to when `gridColumns`
+// is NOT supplied — deliberately reused for both the grid and no-grid cases
+// below so the harness proves grid semantics are selected by `gridColumns`
+// PRESENCE alone, not by anything in `config` itself.
+const GRID_CONFIG: KeynavConfig = {
+  focusModel: 'tabindex',
+  orientation: 'both',
+  loop: false,
+  typeahead: false,
+  skipDisabled: false,
+};
+
+function GridMenu({
+  config,
+  columns,
+  onPage,
+  onCommit,
+  items = GRID_ITEMS,
+}: {
+  config: KeynavConfig;
+  /** Omitted entirely to exercise the "no gridColumns" (1D) branch. */
+  columns?: number | (() => number);
+  onPage?: (detail: KeynavPageDetail) => void;
+  onCommit: (i: number) => void;
+  items?: Item[];
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [active, setActive] = useState(0);
+  useKeynav(rootRef, {
+    config,
+    getSource: () => items,
+    getActive: () => active,
+    setActive,
+    onCommit,
+    ...(columns !== undefined
+      ? { gridColumns: typeof columns === 'function' ? columns : () => columns }
+      : {}),
+    ...(onPage !== undefined ? { onPage } : {}),
+  });
+  return (
+    <div role="grid" ref={rootRef} tabIndex={-1} data-testid="root">
+      {items.map((it, i) => (
+        <button
+          type="button"
+          key={it.id}
+          role="gridcell"
+          data-rozie-keynav-item={i}
+          data-rozie-keynav-active={active === i ? '' : undefined}
+          tabIndex={active === i ? 0 : -1}
+        >
+          {it.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Harness for the "item renders one frame late" cases — item 5 is only
+// present once the `revealed` prop flips, standing in for a dataset swap
+// (grid paging) whose landing element isn't in the DOM at effect time yet.
+function LateGrid({ revealed, onCommit }: { revealed: boolean; onCommit: (i: number) => void }) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [active, setActive] = useState(0);
+  useKeynav(rootRef, {
+    config: GRID_CONFIG,
+    getSource: () => GRID_ITEMS,
+    getActive: () => active,
+    setActive,
+    onCommit,
+    gridColumns: () => 3,
+  });
+  return (
+    <div role="grid" ref={rootRef} tabIndex={-1} data-testid="root">
+      {GRID_ITEMS.map((it, i) =>
+        i === 5 && !revealed ? null : (
+          <button
+            type="button"
+            key={it.id}
+            role="gridcell"
+            data-rozie-keynav-item={i}
+            data-rozie-keynav-active={active === i ? '' : undefined}
+            tabIndex={active === i ? 0 : -1}
+          >
+            {it.label}
+          </button>
+        ),
+      )}
+    </div>
+  );
+}
+
+/** Stubs `requestAnimationFrame`/`cancelAnimationFrame` for manual, deterministic control. */
+function stubRaf(): {
+  callbacks: FrameRequestCallback[];
+  cancelSpy: ReturnType<typeof vi.fn>;
+  restore: () => void;
+} {
+  const callbacks: FrameRequestCallback[] = [];
+  const rafSpy = vi.fn((cb: FrameRequestCallback) => {
+    callbacks.push(cb);
+    return callbacks.length;
+  });
+  const cancelSpy = vi.fn();
+  vi.stubGlobal('requestAnimationFrame', rafSpy);
+  vi.stubGlobal('cancelAnimationFrame', cancelSpy);
+  return { callbacks, cancelSpy, restore: () => vi.unstubAllGlobals() };
+}
+
+describe('useKeynav — grid config, @keynav-page, deferred focus (Plan 77-03 Task 1)', () => {
+  it('grid: onPage receives a boundary detail when an arrow hits the edge (SPEC §4.1)', () => {
+    const commit = vi.fn();
+    const onPage = vi.fn();
+    render(<GridMenu config={GRID_CONFIG} columns={3} onCommit={commit} onPage={onPage} />);
+    const root = screen.getByTestId('root');
+
+    fireEvent.keyDown(root, { key: 'ArrowLeft' }); // active starts at 0 -> row-axis boundary
+
+    expect(onPage).toHaveBeenCalledWith({ direction: -1, reason: 'boundary', axis: 'row' });
+    // The machine never lands on a boundary key (SPEC §4.1) — active unmoved.
+    expect(screen.getByText('A').getAttribute('data-rozie-keynav-active')).toBe('');
+  });
+
+  it('grid: ArrowDown moves active by the column-stride count', () => {
+    const commit = vi.fn();
+    render(<GridMenu config={GRID_CONFIG} columns={3} onCommit={commit} />);
+    const root = screen.getByTestId('root');
+
+    fireEvent.keyDown(root, { key: 'ArrowDown' });
+
+    expect(screen.getByText('D').getAttribute('data-rozie-keynav-active')).toBe('');
+  });
+
+  it('grid: a dynamic columns() getter changes the stride between keydowns without re-instantiating the machine', () => {
+    const commit = vi.fn();
+    const { rerender } = render(<GridMenu config={GRID_CONFIG} columns={3} onCommit={commit} />);
+    const root = screen.getByTestId('root');
+
+    fireEvent.keyDown(root, { key: 'ArrowDown' }); // stride 3: 0 -> 3 (D)
+    expect(screen.getByText('D').getAttribute('data-rozie-keynav-active')).toBe('');
+
+    // A fresh `columns` closure lands via a re-render — same mechanism a
+    // reactive `$data.cols` read would exercise in emitted code.
+    rerender(<GridMenu config={GRID_CONFIG} columns={2} onCommit={commit} />);
+    fireEvent.keyDown(root, { key: 'ArrowDown' }); // stride 2: 3 -> 5 (F)
+
+    expect(screen.getByText('F').getAttribute('data-rozie-keynav-active')).toBe('');
+  });
+
+  it('no gridColumns: the config handed to the machine has no grid key — 1D arrow semantics (±1), onPage never fires', () => {
+    const commit = vi.fn();
+    const onPage = vi.fn();
+    render(<GridMenu config={GRID_CONFIG} onCommit={commit} onPage={onPage} />);
+    const root = screen.getByTestId('root');
+
+    fireEvent.keyDown(root, { key: 'ArrowDown' }); // 1D: ±1, NOT ±columns
+
+    expect(screen.getByText('B').getAttribute('data-rozie-keynav-active')).toBe('');
+    expect(onPage).not.toHaveBeenCalled();
+  });
+
+  it('grid: a one-frame-late item render still receives focus once it appears (T-77-03-03)', () => {
+    const raf = stubRaf();
+    try {
+      const commit = vi.fn();
+      const { rerender } = render(<LateGrid revealed={false} onCommit={commit} />);
+      const root = screen.getByTestId('root');
+
+      fireEvent.keyDown(root, { key: 'End', ctrlKey: true }); // grid corner -> index 5, not yet rendered
+      expect(screen.queryByText('F')).toBeNull();
+      expect(raf.callbacks).toHaveLength(1);
+
+      // The browser "paints" the newly-swapped dataset one frame later.
+      rerender(<LateGrid revealed={true} onCommit={commit} />);
+      const revealedEl = screen.getByText('F');
+      expect(revealedEl.getAttribute('data-rozie-keynav-active')).toBe('');
+      expect(document.activeElement).not.toBe(revealedEl);
+
+      // Fire the deferred pass — the element exists now, so focus lands.
+      act(() => {
+        raf.callbacks[0]!(0);
+      });
+      expect(document.activeElement).toBe(revealedEl);
+    } finally {
+      raf.restore();
+    }
+  });
+
+  it('grid: a stale deferred pass never steals focus after a newer navigation supersedes it (T-77-03-03)', () => {
+    const raf = stubRaf();
+    try {
+      const commit = vi.fn();
+      const { rerender } = render(<LateGrid revealed={false} onCommit={commit} />);
+      const root = screen.getByTestId('root');
+
+      // First navigation lands on the not-yet-rendered index 5 — schedules a
+      // deferred pass scoped to active === 5.
+      fireEvent.keyDown(root, { key: 'End', ctrlKey: true });
+      expect(raf.callbacks).toHaveLength(1);
+      const stalePass = raf.callbacks[0]!;
+
+      // A second navigation (to an ALREADY-rendered item) supersedes it
+      // before the deferred pass ever runs.
+      fireEvent.keyDown(root, { key: 'Home', ctrlKey: true });
+      const aEl = screen.getByText('A');
+      expect(aEl.getAttribute('data-rozie-keynav-active')).toBe('');
+      expect(document.activeElement).toBe(aEl);
+
+      rerender(<LateGrid revealed={true} onCommit={commit} />);
+
+      // The stale pass (still scoped to the superseded active === 5) fires —
+      // it must no-op, never stealing focus back from the current item.
+      act(() => {
+        stalePass(0);
+      });
+      expect(document.activeElement).toBe(aEl);
+    } finally {
+      raf.restore();
+    }
   });
 });
