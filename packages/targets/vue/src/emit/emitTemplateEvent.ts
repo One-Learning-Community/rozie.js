@@ -87,6 +87,14 @@ function renderModifierArg(arg: ModifierArg): string {
   if (arg.kind === 'literal') {
     return JSON.stringify(arg.value);
   }
+  // Phase 77 — `'expr'` (the `.grid($data.cols)`-only `$`-path kind) never
+  // reaches this general modifier-arg renderer in practice: `.grid` is
+  // resolved by the bespoke keynav resolver, never registered on the
+  // `ModifierRegistry` this <listeners>/@event pipeline consumes. Handled
+  // here only for type-exhaustiveness — falls back to the raw source text.
+  if (arg.kind === 'expr') {
+    return arg.raw;
+  }
   // refExpr — `$refs.x` style. The arg.ref carries the full expression text.
   // For template event wraps (Plan 03 only sees debounce/throttle which take
   // numeric literals), refExpr args shouldn't appear; render conservatively.

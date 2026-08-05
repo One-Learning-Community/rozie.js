@@ -142,6 +142,13 @@ function renderRemoveListenerOptions(listenerOpts: Set<string>): string {
  */
 function renderModifierArg(arg: ModifierArg): string {
   if (arg.kind === 'literal') return JSON.stringify(arg.value);
+  // Phase 77 — `'expr'` (the `.grid($data.cols)`-only `$`-path kind) never
+  // reaches this general modifier-arg renderer in practice: `.grid` is
+  // resolved by the bespoke keynav resolver, never registered on the
+  // `ModifierRegistry` this <listeners>/@event pipeline consumes. Handled
+  // here only for type-exhaustiveness — falls back to the raw source text
+  // (no `Ref` suffix — that suffix is refExpr-specific, Pitfall 4).
+  if (arg.kind === 'expr') return arg.raw;
   // refExpr — peggy grammar already stripped `$refs.` prefix; arg.ref is
   // the bare identifier (e.g. `x`). Append the `Ref` suffix per Pitfall 4.
   return arg.ref + 'Ref';

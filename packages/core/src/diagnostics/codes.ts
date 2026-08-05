@@ -930,6 +930,15 @@ export const RozieErrorCode = {
   PORTAL_DIRECTIVE_ON_SLOT: 'ROZ990', // error — `r-portal="expr"` used on a <slot> element; redirect to the boolean `portal` attribute (slot-content portalling is a distinct, orthogonal primitive)
   PORTAL_DIRECTIVE_ON_COMPONENT: 'ROZ991', // error — `r-portal` used on a <components>-registered child component element; v1 only supports plain/host elements
   PORTAL_DIRECTIVE_EMPTY_VALUE: 'ROZ992', // error — `r-portal` with an empty/missing value; a portal needs a container expression
+
+  // ---- Phase 77 r-keynav grid focus-model + multi-group — ROZ993..ROZ996 ----
+  // 77-SPEC.md §3.1 (grid legality) and §6/§8 (multi-group/nested-roots).
+  // ROZ992 (command-palette-portal-overlay phase) is the verified current
+  // highest; ROZ993 is the next free code.
+  KEYNAV_GRID_ORIENTATION_CONFLICT: 'ROZ993', // error — `.grid()` combined with `.vertical`/`.horizontal`/`.both` (grid owns both axes)
+  KEYNAV_GRID_LOOP_CONFLICT: 'ROZ994', // error — `.grid()` combined with `.loop` (boundary/@keynav-page events replace wrapping)
+  KEYNAV_GRID_BAD_COLUMNS: 'ROZ995', // error — `.grid` missing its argument, or the argument fails to parse as an expression (non-number literal, ref handle, or unparsable $-path)
+  KEYNAV_NESTED_ROOTS: 'ROZ996', // error — an r-keynav root found inside another r-keynav root's subtree; roots must be siblings/cousins, never ancestors of one another
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

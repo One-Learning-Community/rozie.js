@@ -130,6 +130,12 @@ function renderOptionsSuffix(opts: Set<string>, forRemove = false): string {
 /** Render a ModifierArg as a JS-source string. */
 function renderModifierArg(arg: ModifierArg): string {
   if (arg.kind === 'literal') return JSON.stringify(arg.value);
+  // Phase 77 — `'expr'` (the `.grid($data.cols)`-only `$`-path kind) never
+  // reaches this general modifier-arg renderer in practice: `.grid` is
+  // resolved by the bespoke keynav resolver, never registered on the
+  // `ModifierRegistry` this <listeners>/@event pipeline consumes. Handled
+  // here only for type-exhaustiveness — falls back to the raw source text.
+  if (arg.kind === 'expr') return arg.raw;
   // refExpr — peggy grammar already stripped `$refs.` prefix; arg.ref is the
   // bare identifier (e.g. `panelEl`). Svelte refs use bare names (no `Ref`
   // suffix unlike Vue's Pitfall 4).

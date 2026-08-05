@@ -950,6 +950,29 @@ export interface KeynavRootIR {
   sourceExpression?: Expression;
   sourceDeps?: SignalRef[];
   sourceLoc: SourceLoc;
+  /**
+   * Phase 77 — `.grid(<expr>)` (SPEC.md §3). The column-count expression,
+   * evaluated reactively (may be a numeric literal like `7` or a reactive
+   * read like `$data.cols`). Additive-optional: absent on every root without
+   * `.grid`, so a component that doesn't use the grid focus-model produces
+   * byte-identical IR to pre-Phase-77 (SPEC §7.4 additive invariant).
+   * Populated by `resolveKeynavModifiers` at lowering time; legality
+   * (`.grid()` + orientation/`.loop` conflicts, missing/unparsable argument —
+   * ROZ993/994/995) is validated in the same pass.
+   */
+  grid?: {
+    columnsExpression: Expression;
+    columnsDeps: SignalRef[];
+  };
+  /**
+   * Phase 77 — stamped by `resolveKeynavGroups` (77-02 Task 3) ONLY when the
+   * component has two or more `r-keynav` roots, in document order. Left
+   * undefined for a single-root component so its IR — and therefore every
+   * emitter's output — stays byte-identical to pre-Phase-77 (the mechanism
+   * the SPEC §7.4 additive invariant depends on; see resolveKeynavGroups's
+   * module doc comment for the full association-rule rationale).
+   */
+  groupIndex?: number;
 }
 
 /**
@@ -965,6 +988,27 @@ export interface KeynavItemIR {
   labelDeps?: SignalRef[];
   disabledExpression?: Expression;
   disabledDeps?: SignalRef[];
+  /**
+   * Phase 77 (planner Gap B) — `r-keynav-item="{ index: <expr> }"` (SPEC.md
+   * §10.5 amendment 3). An optional explicit item-index expression, lowered
+   * exactly like `label`/`disabled` above. Resolves the nested-r-for index
+   * gap: emitters otherwise derive an item's index from its NEAREST enclosing
+   * loop, which is wrong for a multiply-nested consumer (e.g. the date-picker
+   * day grid's panels → weeks → days loops) — an explicit `index` lets such a
+   * consumer supply its flat grid index with zero markup restructuring.
+   * Additive-optional: absent when the author doesn't author `index`, so an
+   * item's IR stays byte-identical to pre-Phase-77.
+   */
+  indexExpression?: Expression;
+  indexDeps?: SignalRef[];
+  /**
+   * Phase 77 — stamped by `resolveKeynavGroups` (77-02 Task 3) ONLY when the
+   * component has two or more `r-keynav` roots, in document order, matching
+   * the `groupIndex` of the root this item associates to by nearest-ancestor
+   * containment. Left undefined for a single-root component (see
+   * `KeynavRootIR.groupIndex` for the byte-identical-IR rationale).
+   */
+  groupIndex?: number;
   sourceLoc: SourceLoc;
 }
 

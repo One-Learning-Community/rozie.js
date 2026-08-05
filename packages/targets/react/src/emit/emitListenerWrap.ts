@@ -53,6 +53,12 @@ function capitalize(name: string): string {
 
 function renderModifierArgInline(arg: ModifierArg): string {
   if (arg.kind === 'literal') return JSON.stringify(arg.value);
+  // Phase 77 — `'expr'` (the `.grid($data.cols)`-only `$`-path kind) never
+  // reaches this general modifier-arg renderer in practice: `.grid` is
+  // resolved by the bespoke keynav resolver, never registered on the
+  // `ModifierRegistry` this <listeners>/@event pipeline consumes. Handled
+  // here only for type-exhaustiveness — falls back to the raw source text.
+  if (arg.kind === 'expr') return arg.raw;
   return arg.ref; // refExpr — bare identifier (rare for debounce/throttle)
 }
 

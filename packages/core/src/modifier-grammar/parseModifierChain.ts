@@ -45,7 +45,16 @@ export type ModifierArg =
   // inert until a caller opts in to checking for it (resolveKeynavModifiers
   // is the first).
   | { kind: 'literal'; value: string | number | boolean; loc: SourceLoc }
-  | { kind: 'refExpr'; ref: string; loc: SourceLoc };
+  | { kind: 'refExpr'; ref: string; loc: SourceLoc }
+  // Phase 77 (r-keynav grid focus-model, planner Gap A) — a `$`-prefixed
+  // dotted-path argument (`.grid($data.cols)`) that the peggy grammar's new
+  // `PathExpr` alternative matches but does not itself parse as JS — `raw`
+  // carries the matched source text verbatim for the caller to hand to
+  // `tryParseExpression` (the same path every other author expression goes
+  // through). Additive union member; every existing caller pattern-matches
+  // on `kind`, so this is inert until a caller opts in (resolveKeynavModifiers
+  // is the first).
+  | { kind: 'expr'; raw: string; loc: SourceLoc };
 
 /** peggy's location() return shape. */
 type RawLoc = {
@@ -62,10 +71,11 @@ type PeggyError = {
 };
 
 interface RawArg {
-  kind: 'literal' | 'refExpr';
+  kind: 'literal' | 'refExpr' | 'expr';
   loc: RawLoc;
   value?: string | number | boolean;
   ref?: string;
+  raw?: string;
 }
 
 interface RawModifier {
@@ -86,6 +96,13 @@ function shiftArg(arg: RawArg, baseOffset: number): ModifierArg {
     return {
       kind: 'literal',
       value: arg.value as string | number | boolean,
+      loc: shift(arg.loc, baseOffset),
+    };
+  }
+  if (arg.kind === 'expr') {
+    return {
+      kind: 'expr',
+      raw: arg.raw as string,
       loc: shift(arg.loc, baseOffset),
     };
   }

@@ -788,6 +788,7 @@ const KEYNAV_MODIFIER_NAMES = [
   'loop',
   'typeahead',
   'skipdisabled',
+  'grid',
 ] as const;
 
 interface ResolvedKeynavModifiers {
@@ -795,6 +796,17 @@ interface ResolvedKeynavModifiers {
   loop: boolean;
   typeahead: boolean;
   skipDisabled: boolean;
+  /**
+   * Phase 77 — `.grid(<expr>)` resolution result (SPEC.md §3). Undefined when
+   * `.grid` was not authored on this chain, or when it was authored but
+   * failed legality/parse validation (ROZ993/994/995 already pushed in that
+   * case — the caller still gets a `keynavRoot` with `grid` absent so a bad
+   * `.grid(...)` doesn't otherwise perturb the rest of the resolved chain).
+   */
+  grid?: {
+    columnsExpression: t.Expression;
+    columnsDeps: SignalRef[];
+  };
 }
 
 /**
@@ -823,11 +835,28 @@ interface ResolvedKeynavModifiers {
 function resolveKeynavModifiers(
   chain: readonly ModifierChain[],
   diagnostics: Diagnostic[],
+  bindings: BindingsTable,
 ): ResolvedKeynavModifiers {
   let orientation: ResolvedKeynavModifiers['orientation'] = 'vertical';
+  // Phase 77 — tracks whether the author actually wrote an orientation
+  // modifier, as opposed to `orientation` sitting at its default. Needed
+  // because the default ('vertical') is itself a valid modifier value — a
+  // plain `.grid(7)` (which defaults orientation) must NOT self-report
+  // ROZ993; only an AUTHORED `.vertical`/`.horizontal`/`.both` alongside
+  // `.grid()` is the conflict.
+  let orientationExplicit = false;
+  let orientationLoc: ModifierChain['loc'] | undefined;
   let loop = false;
+  let loopLoc: ModifierChain['loc'] | undefined;
   let typeahead = false;
   let skipDisabled = true;
+  // Phase 77 — same "explicit vs defaulted" tracking as orientation: grid
+  // mode's default flips to inert (skipDisabled = false, SPEC §5), so we
+  // need to know whether `.skipdisabled` was actually authored before
+  // applying that flip after the loop.
+  let skipDisabledExplicit = false;
+  let grid: ResolvedKeynavModifiers['grid'];
+  let gridLoc: ModifierChain['loc'] | undefined;
 
   for (const m of chain) {
     switch (m.name) {
@@ -835,9 +864,12 @@ function resolveKeynavModifiers(
       case 'horizontal':
       case 'both':
         orientation = m.name;
+        orientationExplicit = true;
+        orientationLoc = m.loc;
         break;
       case 'loop':
         loop = true;
+        loopLoc = m.loc;
         break;
       case 'typeahead':
         typeahead = true;
@@ -848,6 +880,52 @@ function resolveKeynavModifiers(
           arg !== undefined && arg.kind === 'literal' && typeof arg.value === 'boolean'
             ? arg.value
             : true;
+        skipDisabledExplicit = true;
+        break;
+      }
+      case 'grid': {
+        // Phase 77 (SPEC.md §3) — `.grid(<expr>)`, the column-count
+        // expression. A numeric-literal argument lowers straight to a
+        // numeric-literal Expression node (no parse round-trip needed); a
+        // `$`-prefixed dotted-path argument (the new peggy `PathExpr`
+        // alternative, planner Gap A) is handed to the same
+        // `tryParseExpression` every other author expression goes through,
+        // then dep-computed exactly like a binding attribute. Any other
+        // argument shape (missing, string, boolean, `$refs.` handle, or an
+        // unparsable `$`-path) is ROZ995 — collected-not-thrown, matching
+        // this resolver's existing discipline; the chain keeps resolving.
+        gridLoc = m.loc;
+        const arg = m.args[0];
+        if (arg === undefined) {
+          diagnostics.push({
+            code: RozieErrorCode.KEYNAV_GRID_BAD_COLUMNS,
+            severity: 'error',
+            message:
+              '.grid requires a columns argument — write .grid(7) or .grid($data.cols).',
+            loc: m.loc,
+            hint: '.grid(<expr>) — a numeric literal or a $-prefixed reactive expression naming the column count.',
+          });
+          break;
+        }
+        if (arg.kind === 'literal' && typeof arg.value === 'number') {
+          grid = { columnsExpression: t.numericLiteral(arg.value), columnsDeps: [] };
+          break;
+        }
+        if (arg.kind === 'expr') {
+          const parsed = tryParseExpression(arg.raw);
+          if (parsed) {
+            grid = { columnsExpression: parsed, columnsDeps: computeExpressionDeps(parsed, bindings) };
+            break;
+          }
+        }
+        diagnostics.push({
+          code: RozieErrorCode.KEYNAV_GRID_BAD_COLUMNS,
+          severity: 'error',
+          message:
+            '.grid argument must be a numeric literal or a reactive expression (e.g. $data.cols) — not a string, boolean, ref handle, or unparsable expression.',
+          loc: arg.loc,
+          hint: '.grid(<expr>) — a numeric literal or a $-prefixed reactive expression naming the column count.',
+        });
         break;
       }
       default: {
@@ -857,15 +935,55 @@ function resolveKeynavModifiers(
           severity: 'error',
           message: suggestion
             ? `Unknown r-keynav modifier '.${m.name}' — did you mean '.${suggestion}'?`
-            : `Unknown r-keynav modifier '.${m.name}' — valid modifiers are .vertical/.horizontal/.both/.loop/.typeahead/.skipdisabled.`,
+            : `Unknown r-keynav modifier '.${m.name}' — valid modifiers are .vertical/.horizontal/.both/.loop/.typeahead/.skipdisabled/.grid.`,
           loc: m.loc,
-          hint: 'r-keynav modifiers: orientation (.vertical/.horizontal/.both, default .vertical), .loop, .typeahead, .skipdisabled (default on — .skipdisabled(false) to include disabled items).',
+          hint: 'r-keynav modifiers: orientation (.vertical/.horizontal/.both, default .vertical), .loop, .typeahead, .skipdisabled (default on — .skipdisabled(false) to include disabled items), .grid(<columns>) (2D grid focus-model).',
         });
       }
     }
   }
 
-  return { orientation, loop, typeahead, skipDisabled };
+  if (grid !== undefined) {
+    // SPEC §3.1 legality matrix — `.grid()` owns both axes (an authored
+    // orientation modifier alongside it is a conflict, not a no-op) and
+    // replaces wrapping with boundary/@keynav-page events (`.loop` alongside
+    // it is incoherent). Both are collected-not-thrown; the chain still
+    // resolves to a usable (if flagged) result.
+    if (orientationExplicit) {
+      diagnostics.push({
+        code: RozieErrorCode.KEYNAV_GRID_ORIENTATION_CONFLICT,
+        severity: 'error',
+        message: `.grid() cannot combine with .${orientation} — grid owns both axes.`,
+        loc: orientationLoc ?? gridLoc!,
+        hint: 'Remove the orientation modifier — .grid() always navigates both axes.',
+      });
+    }
+    if (loop) {
+      diagnostics.push({
+        code: RozieErrorCode.KEYNAV_GRID_LOOP_CONFLICT,
+        severity: 'error',
+        message:
+          '.grid() cannot combine with .loop — boundary/@keynav-page events replace wrapping in grid mode.',
+        loc: loopLoc ?? gridLoc!,
+        hint: 'Remove .loop and handle @keynav-page to advance a data page at the grid boundary instead.',
+      });
+    }
+    // SPEC §5 — grid mode is inert-by-default (disabled cells are focusable
+    // but arrows/Home/End land on them); `.skipdisabled` opts back into the
+    // 1D skip-walk. 1D lists are untouched — `skipDisabled` still defaults
+    // true when `.grid` is absent.
+    if (!skipDisabledExplicit) {
+      skipDisabled = false;
+    }
+  }
+
+  return {
+    orientation,
+    loop,
+    typeahead,
+    skipDisabled,
+    ...(grid !== undefined ? { grid } : {}),
+  };
 }
 
 /**
@@ -1294,7 +1412,7 @@ function lowerBareElement(
           ? attr.name.slice('keynav:'.length)
           : '';
         const expr = attr.value !== null ? tryParseExpression(attr.value) : null;
-        const modifiers = resolveKeynavModifiers(attr.chain, diagnostics);
+        const modifiers = resolveKeynavModifiers(attr.chain, diagnostics, bindings);
         keynavRoot = {
           // Cast: `focusModel` is carried UNVALIDATED here by design (see
           // `KeynavRootIR` doc comment) — `resolveKeynavGroups` validates it.
@@ -1306,23 +1424,36 @@ function lowerBareElement(
           activeExpression: expr ?? t.identifier('undefined'),
           activeDeps: expr ? computeExpressionDeps(expr, bindings) : [],
           sourceLoc: attr.loc,
+          // Phase 77 — `.grid(<expr>)` (SPEC.md §3). Additive: only spread
+          // when resolved, so a root without `.grid` produces the exact same
+          // shape as pre-Phase-77 (no `grid: undefined` key materialized).
+          ...(modifiers.grid !== undefined ? { grid: modifiers.grid } : {}),
         };
         continue;
       }
 
-      // Phase 71 — `r-keynav-item="{ label?, disabled? }"` (each item, SPEC
-      // §5). Both object keys are optional; a non-`ObjectExpression` or
-      // unparsable value still lowers to a `keynavItem` marker with both
-      // fields undefined — the element remains a tagged item (its index
-      // comes from its `r-for` context, not from this attribute), it simply
-      // carries no typeahead label / skip-disabled hint. Mirrors the r-on
-      // ObjectExpression own-property walk above.
+      // Phase 71 — `r-keynav-item="{ label?, disabled?, index? }"` (each
+      // item, SPEC §5; `index` added Phase 77 §10.5 amendment 3, planner Gap
+      // B). Object keys are optional; a non-`ObjectExpression` or unparsable
+      // value still lowers to a `keynavItem` marker with all fields
+      // undefined — the element remains a tagged item, it simply carries no
+      // typeahead label / skip-disabled hint / explicit index. Mirrors the
+      // r-on ObjectExpression own-property walk above.
+      //
+      // `index` is threaded exactly like `label`/`disabled` — same parse +
+      // deps treatment, same in-loop scope. Absent `index`, an item's index
+      // still comes from its NEAREST enclosing `r-for` context (unchanged);
+      // `index` exists for the multiply-nested-loop case (e.g. the
+      // date-picker day grid's panels → weeks → days) where the nearest
+      // loop's index is the WRONG index and an explicit flat one is needed.
       if (attr.name === 'keynav-item') {
         const expr = attr.value !== null ? tryParseExpression(attr.value) : null;
         let labelExpression: t.Expression | undefined;
         let labelDeps: SignalRef[] | undefined;
         let disabledExpression: t.Expression | undefined;
         let disabledDeps: SignalRef[] | undefined;
+        let indexExpression: t.Expression | undefined;
+        let indexDeps: SignalRef[] | undefined;
         if (expr !== null && t.isObjectExpression(expr)) {
           for (const prop of expr.properties) {
             if (!t.isObjectProperty(prop)) continue;
@@ -1340,6 +1471,9 @@ function lowerBareElement(
             } else if (keyName === 'disabled') {
               disabledExpression = prop.value;
               disabledDeps = computeExpressionDeps(prop.value, bindings);
+            } else if (keyName === 'index') {
+              indexExpression = prop.value;
+              indexDeps = computeExpressionDeps(prop.value, bindings);
             }
           }
         }
@@ -1349,6 +1483,9 @@ function lowerBareElement(
             : {}),
           ...(disabledExpression !== undefined
             ? { disabledExpression, disabledDeps: disabledDeps ?? [] }
+            : {}),
+          ...(indexExpression !== undefined
+            ? { indexExpression, indexDeps: indexDeps ?? [] }
             : {}),
           sourceLoc: attr.loc,
         };

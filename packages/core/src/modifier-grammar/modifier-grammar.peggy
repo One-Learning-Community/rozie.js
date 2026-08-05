@@ -43,10 +43,29 @@ Arg
   / BooleanLiteral
   / NumberLiteral
   / StringLiteral
+  / PathExpr
 
 RefExpr
   = "$refs." name:Identifier {
       return { kind: 'refExpr', ref: name, loc: location() };
+    }
+
+// Phase 77 (r-keynav grid focus-model, SPEC.md §3/§3.1, planner Gap A) —
+// `.grid(<expr>)` needs to carry a reactive columns expression like
+// `$data.cols`, which the pre-Phase-77 grammar cannot express (`RefExpr`
+// matches only a literal `$refs.` prefix). Additive alternative tried LAST
+// among the Arg alternatives — after RefExpr, so `$refs.x` keeps matching
+// RefExpr first and this rule never shadows it, and after the literal forms,
+// so no existing modifier-call argument shape changes meaning. Narrowly
+// scoped: a leading `$` followed by a dotted identifier path (no parens,
+// quotes, operators or arbitrary text) — bare identifiers and arbitrary
+// expression text remain parse errors exactly as before. Carries the raw
+// matched text; the runtime wrapper hands it to the same `tryParseExpression`
+// path every other author expression goes through (never string-concatenated
+// raw into emit).
+PathExpr
+  = "$" Identifier ("." Identifier)* {
+      return { kind: 'expr', raw: text(), loc: location() };
     }
 
 // Phase 71 (r-keynav) — `.skipdisabled(false)` is the first modifier-grammar
