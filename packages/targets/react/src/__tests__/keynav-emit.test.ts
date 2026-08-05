@@ -235,3 +235,239 @@ describe('React r-keynav emitter (Plan 71-04 Task 2)', () => {
     expect(code).not.toContain('__rozieKeynav');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 77 Plan 03 — multi-root plans, grid config, @keynav-page, explicit
+// item index. Fixtures are kept SEPARATE from the Phase-71 fixtures above so
+// the byte-identity test can assert the Phase-71 fixtures' emit is
+// unchanged, character-for-character.
+// ---------------------------------------------------------------------------
+
+// Two independent 1D roots (SPEC §6 — no new syntax; multi-group is legal by
+// having 2+ r-keynav roots). Distinct active bindings, distinct item shapes.
+const TWO_ROOT_SRC = `<rozie name="KeynavTwoGroups">
+
+<props>
+{
+  rows: { type: Array, default: () => [] },
+  cells: { type: Array, default: () => [] },
+}
+</props>
+
+<data>
+{
+  rowActive: 0,
+  cellActive: 0,
+}
+</data>
+
+<template>
+<div>
+  <ul role="listbox" r-keynav:tabindex="$data.rowActive">
+    <li role="option" r-for="row in $props.rows" :key="row.id" r-keynav-item="{ label: row.label }">{{ row.label }}</li>
+  </ul>
+  <div role="grid" r-keynav:tabindex="$data.cellActive">
+    <button role="gridcell" r-for="cell in $props.cells" :key="cell.id" r-keynav-item="{ label: cell.label }">{{ cell.label }}</button>
+  </div>
+</div>
+</template>
+
+</rozie>`;
+
+// A grid root (`.grid($data.cols)` — reactive columns expression) carrying
+// `@keynav-page` (SPEC §3, §4.1). Both features composed on one root, as the
+// SPEC's own §3 authoring example does.
+const GRID_PAGE_SRC = `<rozie name="KeynavGridPage">
+
+<props>
+{
+  cells: { type: Array, default: () => [] },
+}
+</props>
+
+<data>
+{
+  active: 0,
+  cols: 7,
+}
+</data>
+
+<script>
+const onBoundary = (detail) => {
+  console.log(detail)
+}
+</script>
+
+<template>
+<div role="grid" r-keynav:tabindex.grid($data.cols)="$data.active" @keynav-page="onBoundary">
+  <button role="gridcell" r-for="cell in $props.cells" :key="cell.id" r-keynav-item="{ label: cell.label }">{{ cell.label }}</button>
+</div>
+</template>
+
+</rozie>`;
+
+// Planner Gap B (77-SPEC.md §10.5 amendment 3) — an explicit `index` on
+// `r-keynav-item` overrides a NESTED inner loop's own index alias. Mirrors
+// the date-picker's panels -> weeks -> days shape: the item's nearest
+// enclosing loop is the INNER (day) loop, whose own index (`d`) would be the
+// wrong (weekday 0-6) value; `index: w * 7 + d` supplies the flat grid
+// index. `:source` is explicit (not r-for-synthesized) — sidesteps the
+// unrelated, pre-existing ":source synthesizes from the FIRST item's
+// enclosing loop" mechanic, which is not what this fixture is testing.
+const EXPLICIT_INDEX_SRC = `<rozie name="KeynavExplicitIndex">
+
+<data>
+{
+  active: 0,
+  weeks: [],
+  flatDays: [],
+}
+</data>
+
+<template>
+<div role="grid" r-keynav:tabindex.grid(7)="$data.active" :source="$data.flatDays">
+  <div r-for="(week, w) in $data.weeks" :key="w">
+    <button role="gridcell" r-for="(day, d) in week" :key="d"
+            r-keynav-item="{ label: day.label, index: w * 7 + d }">
+      {{ day.label }}
+    </button>
+  </div>
+</div>
+</template>
+
+</rozie>`;
+
+describe('React r-keynav emitter — multi-root, grid, page, explicit index (Plan 77-03 Task 2)', () => {
+  it('multi-root: two r-keynav roots emit TWO independent useKeynav(...) controller calls', () => {
+    const ir = compile(TWO_ROOT_SRC, 'KeynavTwoGroups.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavTwoGroups.rozie', source: TWO_ROOT_SRC });
+    const callCount = (code.match(/useKeynav\(/g) ?? []).length;
+    expect(callCount).toBe(2);
+  });
+
+  it('multi-root: each root gets its own suffixed root-ref/group-id identifiers', () => {
+    const ir = compile(TWO_ROOT_SRC, 'KeynavTwoGroups.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavTwoGroups.rozie', source: TWO_ROOT_SRC });
+    expect(code).toContain('useKeynav(__rozieKeynavRootRef, {');
+    expect(code).toContain('useKeynav(__rozieKeynavRootRef1, {');
+    expect(code).toContain('const __rozieKeynavGroupId = useId();');
+    expect(code).toContain('const __rozieKeynavGroupId1 = useId();');
+  });
+
+  it('multi-root: each root carries its OWN active-index get/set binding', () => {
+    const ir = compile(TWO_ROOT_SRC, 'KeynavTwoGroups.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavTwoGroups.rozie', source: TWO_ROOT_SRC });
+    expect(code).toContain('getActive: () => rowActive,');
+    expect(code).toContain('setActive: setRowActive,');
+    expect(code).toContain('getActive: () => cellActive,');
+    expect(code).toContain('setActive: setCellActive,');
+  });
+
+  it("multi-root: each item's four attributes are keyed to ITS OWN root's group id and active binding", () => {
+    const ir = compile(TWO_ROOT_SRC, 'KeynavTwoGroups.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavTwoGroups.rozie', source: TWO_ROOT_SRC });
+    // Group 0 (rows) — bare group-id/active identifiers.
+    expect(code).toMatch(
+      /id=\{`\$\{__rozieKeynavGroupId\}-item-\$\{__rozieKeynavIndex\}`\}/,
+    );
+    expect(code).toMatch(/data-rozie-keynav-active=\{rowActive === __rozieKeynavIndex/);
+    // Group 1 (cells) — suffixed group-id/active identifiers, and a
+    // suffixed loop index alias (the compiler-synthesized index is scoped
+    // per-loop, so the SECOND loop gets its own alias name).
+    expect(code).toMatch(
+      /id=\{`\$\{__rozieKeynavGroupId1\}-item-\$\{__rozieKeynavIndex\d*\}`\}/,
+    );
+    expect(code).toMatch(/data-rozie-keynav-active=\{cellActive === __rozieKeynavIndex\d*/);
+  });
+
+  it('grid: the config literal is UNCHANGED (no grid key) — the columns getter is a SIBLING gridColumns option', () => {
+    const ir = compile(GRID_PAGE_SRC, 'KeynavGridPage.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavGridPage.rozie', source: GRID_PAGE_SRC });
+    expect(code).toContain(
+      "config: { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false },",
+    );
+    expect(code).not.toMatch(/config:\s*\{[^}]*grid/);
+    expect(code).toContain('gridColumns: () => cols,');
+  });
+
+  it('page: @keynav-page routes into the onPage controller option and never appears as a JSX prop', () => {
+    const ir = compile(GRID_PAGE_SRC, 'KeynavGridPage.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavGridPage.rozie', source: GRID_PAGE_SRC });
+    // Bare-identifier handler — passed BY REFERENCE (mirrors onCommit's convention).
+    expect(code).toContain('onPage: onBoundary,');
+    expect(code).not.toContain('onKeynavPage');
+    expect(code).not.toContain('@keynav-page');
+  });
+
+  it('page: an arbitrary @keynav-page expression is wrapped in a (detail) => { ...; } arrow', () => {
+    const src = GRID_PAGE_SRC.replace(
+      '@keynav-page="onBoundary"',
+      '@keynav-page="onBoundary($props.cells)"',
+    );
+    const ir = compile(src, 'KeynavGridPage.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavGridPage.rozie', source: src });
+    expect(code).toContain('onPage: (detail) => { onBoundary(props.cells); },');
+  });
+
+  it('grid: a root with no .grid() modifier omits the gridColumns option entirely', () => {
+    const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
+    expect(code).not.toContain('gridColumns');
+  });
+
+  it("explicit item index: an item's own index expression overrides a NESTED inner loop's index alias in all four attributes", () => {
+    const ir = compile(EXPLICIT_INDEX_SRC, 'KeynavExplicitIndex.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavExplicitIndex.rozie', source: EXPLICIT_INDEX_SRC });
+    expect(code).toMatch(/id=\{`\$\{__rozieKeynavGroupId\}-item-\$\{w \* 7 \+ d\}`\}/);
+    expect(code).toMatch(/data-rozie-keynav-item=\{w \* 7 \+ d\}/);
+    expect(code).toMatch(/data-rozie-keynav-active=\{active === w \* 7 \+ d \? '' : undefined\}/);
+    expect(code).toMatch(/tabIndex=\{active === w \* 7 \+ d \? 0 : -1\}/);
+  });
+
+  it('BYTE-IDENTITY: the Phase-71 menu fixture emits character-for-character the same output as before this plan', () => {
+    const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
+    expect(code).toBe(
+      "import { useCallback, useId, useRef, useState } from 'react';\n" +
+        "import { rozieDisplay, useKeynav } from '@rozie/runtime-react';\n\n" +
+        'interface KeynavMenuProps {\n' +
+        '  items?: any[];\n' +
+        '}\n\n' +
+        'export default function KeynavMenu(_props: KeynavMenuProps): JSX.Element {\n' +
+        '  const __defaultItems = useState(() => (() => [])())[0];\n' +
+        "  const props: Omit<KeynavMenuProps, 'items'> & { items: any[] } = {\n" +
+        '    ..._props,\n' +
+        '    items: _props.items ?? __defaultItems,\n' +
+        '  };\n' +
+        '  const attrs: Record<string, unknown> = (() => {\n' +
+        '    const { items, ...rest } = _props as KeynavMenuProps & Record<string, unknown>;\n' +
+        '    void items;\n' +
+        '    return rest;\n' +
+        '  })();\n' +
+        '  const [active, setActive] = useState(0);\n\n' +
+        '  const run = useCallback((item: any) => {\n' +
+        '    console.log(item);\n' +
+        '  }, []);\n\n' +
+        '  const __rozieKeynavRootRef = useRef<HTMLElement | null>(null);\n' +
+        '  const __rozieKeynavGroupId = useId();\n' +
+        '  useKeynav(__rozieKeynavRootRef, {\n' +
+        "    config: { focusModel: 'tabindex', orientation: 'vertical', loop: true, typeahead: false, skipDisabled: true },\n" +
+        '    getSource: () => (props.items).map((it) => ({ label: it.label, disabled: it.disabled })),\n' +
+        '    getActive: () => active,\n' +
+        '    setActive: setActive,\n' +
+        '    onCommit: (i) => { run(props.items[active]); },\n' +
+        "    activeClass: 'is-active',\n" +
+        '  });\n\n' +
+        '  return (\n' +
+        '    <>\n' +
+        '    <div role="menu" {...attrs} ref={__rozieKeynavRootRef} data-rozie-s-d30ecb02="">\n' +
+        '      {props.items.map((it, __rozieKeynavIndex) => <button key={it.id} role="menuitem" id={`${__rozieKeynavGroupId}-item-${__rozieKeynavIndex}`} data-rozie-keynav-item={__rozieKeynavIndex} data-rozie-keynav-active={active === __rozieKeynavIndex ? \'\' : undefined} tabIndex={active === __rozieKeynavIndex ? 0 : -1} data-rozie-s-d30ecb02="">\n' +
+        '        {rozieDisplay(it.label)}\n' +
+        '      </button>)}\n' +
+        '    </div>\n' +
+        '    </>\n' +
+        '  );\n' +
+        '}\n',
+    );
+  });
+});

@@ -26,7 +26,7 @@ import {
 } from '../rewrite/collectReactImports.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
 import { emitSlotDecl } from './emitSlotDecl.js';
-import { buildKeynavScriptInjections, resolveKeynavPlan } from './emitKeynav.js';
+import { buildKeynavScriptInjections, resolveKeynavPlans } from './emitKeynav.js';
 
 export interface EmitTemplateResult {
   jsx: string;
@@ -76,11 +76,12 @@ export function emitTemplate(
   }
 
   // Phase 71 (r-keynav) — resolved ONCE per component (not per element; see
-  // emitKeynav.ts's module doc comment). `null` for the overwhelming
-  // majority of components (no r-keynav root) — every downstream keynav
-  // call site short-circuits on `null`, so this stays a cheap no-op for
-  // every existing fixture (SPEC §11: "no corpus rebless").
-  const keynav = resolveKeynavPlan(ir);
+  // emitKeynav.ts's module doc comment). Phase 77 — one plan PER root, `[]`
+  // for the overwhelming majority of components (no r-keynav root) — every
+  // downstream keynav call site short-circuits on an empty array, so this
+  // stays a cheap no-op for every existing fixture (SPEC §7.4: "no corpus
+  // rebless").
+  const keynavPlans = resolveKeynavPlans(ir);
 
   // command-palette-portal-overlay phase — mutable out-flag; see
   // EmitNodeCtx.elementPortalFlag doc comment.
@@ -94,18 +95,20 @@ export function emitTemplate(
     scriptInjections,
     injectionCounter: { next: 0 },
     ...(opts.scopeAttr !== undefined ? { scopeAttr: opts.scopeAttr } : {}),
-    keynav,
+    keynav: keynavPlans,
     elementPortalFlag,
   };
 
   const jsx = emitNode(ir.template, ctx);
 
-  // Phase 71 (r-keynav) — the `useKeynav(...)` call + its `useRef`/`useId`
-  // scaffolding. Appended AFTER the template walk (order doesn't matter for
-  // THESE lines — they're independent declarations — but keeps this block
-  // visually adjacent to the `keynav` resolution above).
-  if (keynav !== null) {
-    scriptInjections.push(...buildKeynavScriptInjections(keynav, ir, collectors));
+  // Phase 71 (r-keynav), extended Phase 77 — ONE `useKeynav(...)` call + its
+  // `useRef`/`useId` scaffolding PER resolved plan, so a two-root component
+  // gets two independent controller calls. Appended AFTER the template walk
+  // (order doesn't matter for THESE lines — they're independent
+  // declarations — but keeps this block visually adjacent to the
+  // `keynavPlans` resolution above).
+  for (const plan of keynavPlans) {
+    scriptInjections.push(...buildKeynavScriptInjections(plan, ir, collectors));
   }
 
   return {
