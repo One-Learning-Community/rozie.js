@@ -1448,6 +1448,24 @@ $expose({ focus, goToToday, clear })
   border-top-right-radius: var(--rozie-datepicker-day-radius, 6px);
   border-bottom-right-radius: var(--rozie-datepicker-day-radius, 6px);
 }
+/* Selected/range-endpoint hover (UAT-HOVER, plan 77-11): the plain day-hover
+   rule above (0,3,1) would otherwise swap the white-on-accent selected/
+   range-endpoint background for the translucent grey hover tint, leaving
+   white text on light grey. This rule's selectors are each (0,4,1) — it
+   outranks the plain hover rule regardless of source order, and is placed
+   last among the white-on-accent rules so any equal-specificity comparison
+   resolves deterministically too. Token-derived: an unset
+   --rozie-datepicker-selected-hover-bg falls through to a color-mix darkening
+   of the resolved selected/accent color, so a consumer who only sets
+   --rozie-datepicker-accent (or only --rozie-datepicker-selected-bg) still
+   gets a correctly-contrasting hover for free. */
+.rozie-datepicker-day.is-selected:hover:not([aria-disabled='true']),
+.rozie-datepicker-day.is-range-start:hover:not([aria-disabled='true']),
+.rozie-datepicker-day.is-range-end:hover:not([aria-disabled='true']) {
+  color: var(--rozie-datepicker-selected-fg, #fff);
+  background: var(--rozie-datepicker-selected-hover-bg, color-mix(in srgb, var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc)) 85%, #000));
+  border-color: var(--rozie-datepicker-selected-hover-bg, color-mix(in srgb, var(--rozie-datepicker-selected-bg, var(--rozie-datepicker-accent, #0066cc)) 85%, #000));
+}
 .rozie-datepicker-day[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: var(--rozie-datepicker-disabled-opacity, 0.4);
