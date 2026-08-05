@@ -9,6 +9,10 @@ let __rozieKeynavRootRef1 = $state<HTMLElement | undefined>(undefined);
 
 const __rozieKeynavGroupId1 = `keynav-${Math.random().toString(36).slice(2)}`;
 
+let __rozieKeynavRootRef2 = $state<HTMLElement | undefined>(undefined);
+
+const __rozieKeynavGroupId2 = `keynav-${Math.random().toString(36).slice(2)}`;
+
 import type { Snippet } from 'svelte';
 import { onMount } from 'svelte';
 
@@ -115,12 +119,13 @@ const presets = $derived(__presetsProp ?? snippets?.presets);
 let viewIso = $state('');
 let hoverIso = $state('');
 let viewMode = $state('days');
+let activeDay = $state(0);
 let activeMonth = $state(0);
 let activeYear = $state(0);
 
 let root = $state<HTMLElement | undefined>(undefined);
 
-import { addDays, addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDrillIndex, resolveRovingIso, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, toIso, weekdayLabels } from './internal/buildMonthGrid';
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
 // fresh (a date picker open across midnight should follow the wall clock).
@@ -236,13 +241,14 @@ const daysGrids = () => showsDaysView() ? grids() : [];
 // computes this exactly. Empty while a drill panel is showing, mirroring
 // daysGrids()'s own gate.
 const allDayCells = () => daysGrids().flatMap((g: any) => g.weeks.flatMap((row: any) => row));
-// The single roving tab stop for the day grid: the resolved anchor-in-view →
-// today-in-view → first-enabled-in-month-day fallback (resolveRovingIso,
-// buildMonthGrid.ts), scanning every rendered panel under numberOfMonths > 1.
-// `anchor` mirrors the existing viewAnchor() funnel — the selected value in
-// single mode, else the in-progress range anchor — so a range picker gets a
-// tab stop too.
-const rovingDayIso = (): string => resolveRovingIso({
+// The day grid's roving/active-index resolution input — the SAME shape the
+// pre-retrofit rovingDayIso() built, now feeding resolveRovingDayIndex
+// (buildMonthGrid.ts) instead of resolveRovingIso directly, so the tab stop,
+// entry focus and the focus() expose handle can never disagree (the
+// 260802-hla invariant). `anchor` mirrors the existing viewAnchor() funnel —
+// the selected value in single mode, else the in-progress range anchor — so
+// a range picker gets a tab stop too.
+const rovingDayInput = () => ({
   viewIso: viewMonthGrid(),
   value: selected(),
   today: todayIso(),
@@ -256,16 +262,17 @@ const rovingDayIso = (): string => resolveRovingIso({
   numberOfMonths: numberOfMonths,
   anchor: selected() !== '' ? selected() : selectionMode === 'range' ? readRange().start : ''
 });
-// Roving-tabindex value for a day cell: the resolved single tab stop (0), the
-// rest are -1. `inMonth` is what guarantees a SINGLE tab stop under
-// `numberOfMonths > 1` — a spill cell carrying the same ISO in the
-// neighbouring panel has `inMonth === false`. The return type is annotated
-// `number | undefined` ON PURPOSE — the React emitter wraps every numeric
-// `:attr` binding in `(expr) ?? undefined`, and a PROVABLY non-null value (a
-// bare `0`/`-1` ternary) trips TS2869 "right operand of ?? is unreachable".
-// Routing tabindex through this nullable-typed helper keeps the `?? undefined`
-// reachable (the pagination `tabIndexFor` precedent).
-const dayTabIndex = (day: any): number | undefined => day.inMonth && day.iso === rovingDayIso() ? 0 : -1;
+// Seed $data.activeDay from the SAME anchor-in-view → today-in-view →
+// first-enabled-in-month-day fallback the pre-retrofit tab stop used
+// (resolveRovingDayIndex, buildMonthGrid.ts) — called on mount, after a
+// direct month/today nav, and whenever a drill panel returns to the days
+// view (selectMonth/exitToDaysView). The r-keynav grid controller lands DOM
+// focus itself whenever this value changes — see the day grid's template
+// root. NOT called from onDayPage below, which computes its own precise
+// landing index per SPEC §4.1 instead of this fallback chain.
+const seedActiveDay = () => {
+  activeDay = resolveRovingDayIndex(allDayCells(), rovingDayInput());
+};
 // The localized month-year heading. NAMED `monthHeading`, NOT `label` — a bare
 // `label` helper becomes a class field on the Lit custom element and a `title`
 // would collide with the inherited HTMLElement.title; `monthHeading` is clear.
@@ -365,6 +372,9 @@ const goToMonth = (delta: any) => {
   if (disabled) return;
   const unit = viewMode === 'years' ? 144 : viewMode === 'months' ? 12 : 1;
   viewIso = addMonths(viewMonthGrid(), delta * unit);
+  // The rendered day set changed without going through the r-keynav page
+  // mechanism (a direct header nav click) — reseed the tab stop (77-08).
+  seedActiveDay();
 };
 const goPrevMonth = () => goToMonth(-1);
 const goNextMonth = () => goToMonth(1);
@@ -395,16 +405,16 @@ const enterYearsView = () => {
   viewMode = 'years';
 };
 // Pick a month → move the view anchor to it, drill back UP toward days, and
-// schedule focus onto the resolved day tab stop (the new month's grid commits
-// asynchronously on some targets, same defer reasoning as moveFocus). The day
-// grid keeps the hand-rolled scheduler until plan 77-08.
+// seed $data.activeDay onto the resolved day tab stop — the r-keynav grid
+// controller lands DOM focus itself once the value changes (77-08; no
+// scheduler needed any more).
 const selectMonth = (iso: any) => {
   if (disabled) return;
   if (!isIsoDate(iso)) return;
   if (!monthEnabled(iso)) return;
   viewIso = iso;
   viewMode = 'days';
-  scheduleFocus('day', rovingDayIso());
+  seedActiveDay();
 };
 // Pick a year → move the view anchor's year, drill back UP toward months, and
 // re-seed $data.activeMonth (mirrors enterMonthsView — the primitive lands
@@ -418,100 +428,62 @@ const selectYear = (iso: any) => {
   activeMonth = resolveRovingDrillIndex(monthList().months);
 };
 // Shared Escape-to-days exit for both drill keydown handlers: returns to the
-// days view AND schedules day focus, so Escape returns focus into the grid
-// instead of dropping it to <body>.
+// days view AND seeds $data.activeDay, so Escape returns focus into the grid
+// (the r-keynav controller lands it) instead of dropping it to <body>.
 const exitToDaysView = () => {
   viewMode = 'days';
-  scheduleFocus('day', rovingDayIso());
+  seedActiveDay();
 };
-// ---- focus choreography (container ref, post-mount only) ---------------
-// Read $refs.root only here / in handlers / in $expose verbs (all post-mount →
-// ROZ123-safe). querySelectorAll reaches the day cells inside Lit's shadow root
-// too. Focus a day by its ISO; the [data-day] attribute carries the iso.
-const dayCells = () => {
-  const root$local = root;
-  if (!root$local) return [];
-  return Array.from(root$local.querySelectorAll('[data-day]')) as HTMLElement[];
+// ---- day grid r-keynav wiring (77-08 retrofit) --------------------------
+// @keynav-commit fires with the day grid's own active index already resolved
+// by the primitive — read via the handler's OWN `i` parameter (mirrors
+// onMonthCommit/onYearCommit, 77-07 Task 3's real-DOM finding: re-reading
+// $data.activeDay here would see a stale pre-click value on React's async
+// setState). commitValue/commitRange already gate on dayEnabled(iso), so
+// committing a disabled cell stays a safe no-op even though the primitive
+// itself never commits one to begin with (grid mode's inert-by-default
+// contract, SPEC §5).
+const onDayCommit = (i: any) => {
+  const cell = allDayCells()[i];
+  if (cell) onDaySelect(cell.iso);
 };
-// Returns whether a matching cell was found + focused — scheduleFocus uses
-// this to know whether a deferred pass actually LANDED (see below).
-const focusDayIso = (iso: any) => {
-  const cells = dayCells();
-  for (let i = 0; i < cells.length; i++) {
-    if (cells[i].getAttribute('data-day') === iso) {
-      cells[i].focus();
-      return true;
-    }
-  }
-  return false;
-};
-// ---- deferred focus scheduling (D-5) ------------------------------------
-// NOTE (77-07): the drill-panel focus-by-iso helpers this comment block used
-// to mirror — the month/year cell-query walk and the two focus-by-iso
-// helpers they backed — are DELETED. The r-keynav grid primitive now owns
-// landing DOM focus for the months/years drills (enterMonthsView/
-// enterYearsView/selectYear seed $data.activeMonth/$data.activeYear instead
-// of calling scheduleFocus). This scheduler stays
-// for the DAY grid only, which plan 77-08 retrofits next.
-// A guarded double pass (microtask THEN rAF) behind a stale-request TOKEN —
-// the listbox/src/Listbox.rozie scheduleRemeasure pattern, adapted with a
-// token instead of a boolean guard so a NEWER navigation invalidates an
-// in-flight pass rather than merely re-running the latest one blind
-// (project_datatable_raf_focus_poll_steal — a late pass must not stomp a
-// newer navigation). Top-level `let` lowers to a PER-INSTANCE ref on every
-// target (verified: listbox/packages/react/src/Listbox.tsx:131 useRef), so an
-// instance-scoped guard is safe here. The microtask pass catches Solid's /
-// Svelte's synchronous commit; the rAF pass catches the remaining targets'
-// async commit. Both are idempotent — `.focus()` on the already-focused
-// element is a no-op.
+// @keynav-page — the retrofit's behavioural heart (SPEC §4.1, §10). The
+// primitive NEVER moves $data.activeDay itself on a page/boundary event; it
+// only reports the attempted move so the author (who owns which month is
+// rendered) can advance the dataset and set the landing index, both in the
+// SAME tick — the focus-after-render seam plan 77-06 proved on all six
+// targets before this retrofit depended on it.
 //
-// The rAF pass is a NESTED (double) rAF, not a single one: our rAF callback
-// is registered synchronously inside the same call that triggers the state
-// write, so if the target's OWN commit is also rAF-scheduled, same-frame
-// callback ORDER between two independently-registered rAF callbacks is not
-// guaranteed — a single rAF can race the target's paint and run first,
-// finding no cell yet (observed on Angular's zoneless change-detection
-// commit). Nesting guarantees this pass runs on the frame AFTER the one the
-// new DOM was, at latest, painted in — a standard "wait for paint" browser
-// idiom, applied uniformly to all six targets (not a per-target branch, and
-// not a third independently-scheduled pass — it is the SAME rAF pass made
-// commit-safe).
+// 'boundary' (an arrow ran off either end of the WHOLE flat day source, in
+// EITHER axis — a row-end AND a column-end boundary land identically, SPEC
+// §4): swing the view by exactly one month in the event's direction and land
+// at the OPPOSITE edge of the freshly rendered set — forward lands at the
+// first cell (index 0), backward at the last.
 //
-// CONSUME-ON-LAND: the moment EITHER pass actually finds + focuses its cell,
-// it clears `focusRequest` so the OTHER still-pending pass becomes a no-op.
-// Without this, a request that lands on the FIRST (microtask) pass leaves its
-// token live for the SECOND (rAF) pass, which then fires later in the frame —
-// by which point a fast-follow user/keyboard action may have validly moved
-// focus elsewhere, and the late rAF pass would silently stomp it right back
-// (the exact "late poll steals focus" hazard). A pass that finds NO cell (the
-// target hasn't committed the new DOM yet) leaves the token live so the other
-// pass still gets a chance.
-let focusRequest = '';
-// 'day' is the only kind dispatched now (77-07 retired the 'month'/'year'
-// scheduleFocus call sites); kept kind-routed rather than day-only so plan
-// 77-08's day-grid work has the smallest possible diff against this shape.
-const dispatchFocus = (kind: any, iso: any) => {
-  if (kind === 'day') return focusDayIso(iso);
-  return false;
-};
-const scheduleFocus = (kind: any, iso: any) => {
-  if (!iso) return;
-  const token = kind + ':' + iso;
-  focusRequest = token;
-  const pass = () => {
-    if (focusRequest !== token) return;
-    if (dispatchFocus(kind, iso)) focusRequest = '';
-  };
-  let scheduled = false;
-  if (typeof queueMicrotask !== 'undefined') {
-    scheduled = true;
-    queueMicrotask(pass);
+// 'pageup'/'pagedown': swing the view by one month and keep the SAME COLUMN
+// (SPEC §4.1's sameWeekdayIndex illustration, mirroring KeynavGridDemo's own
+// onPage) — every panel is exactly 42 cells (6 rows x 7 columns), so
+// `activeDay % 7` recovers the weekday column regardless of which panel/row
+// the active cell was in.
+//
+// Reuses addMonths — the family's existing month arithmetic (T-77-08-03: one
+// month per event, no unbounded loop) — no new date math.
+//
+// `allDayCells()` is called AFTER the $data.viewIso write, but ONLY its
+// `.length` is read below — SAFE despite React's async setState (unlike
+// onMonthCommit/onYearCommit's `i`-parameter fix, 77-07 Task 3): every panel
+// is unconditionally 42 cells, so the flat array's length is `numberOfMonths
+// * 42` regardless of WHICH month $data.viewIso currently names — nothing
+// here depends on the just-written value actually having landed yet.
+const onDayPage = (detail: any) => {
+  viewIso = addMonths(viewMonthGrid(), detail.direction);
+  const nextCells = allDayCells();
+  if (detail.reason === 'boundary') {
+    activeDay = detail.direction > 0 ? 0 : nextCells.length - 1;
+  } else {
+    const column = activeDay % 7;
+    activeDay = Math.min(column, nextCells.length - 1);
   }
-  if (typeof requestAnimationFrame === 'function') {
-    scheduled = true;
-    requestAnimationFrame(pass);
-  }
-  if (!scheduled) setTimeout(pass, 0);
 };
 // The native `disabled` attribute is gone from the month/year drill buttons
 // (D-3 — focusable-but-inert, matching the day cells), so selectMonth/
@@ -525,57 +497,15 @@ const yearEnabled = (iso: any) => {
   const cell = yearGrid().years.find((y: any) => y.iso === iso);
   return !cell || !cell.disabled;
 };
-// Move the roving focus by `days`, crossing into an adjacent month when the
-// target leaves the displayed grid. Skips nothing — disabled days are still
-// focusable (standard grid pattern) but not selectable.
-const moveFocus = (fromIso: any, days: any) => {
-  if (disabled) return;
-  const next = addDays(fromIso, days);
-  // Widened to ANY rendered month (multi-month): if `next` is present in any of
-  // the displayed grids, arrow focus can cross month columns without swinging
-  // the view. Only when it leaves every rendered month do we move the anchor.
-  const present = grids().some((g: any) => g.weeks.some((row: any) => row.some((d: any) => d.iso === next)));
-  if (present) {
-    // Already rendered — focus synchronously, exactly as before.
-    focusDayIso(next);
-  } else {
-    // The view must swing to show `next` — today's synchronous focusDayIso
-    // ran BEFORE the new month committed and silently dropped focus. Defer.
-    viewIso = next;
-    scheduleFocus('day', next);
-  }
-};
-// ---- keyboard ----------------------------------------------------------
-// Arrow keys move a day, Home/End to the week bounds, PageUp/PageDown change the
-// month, Enter/Space select. The focused day's iso rides on [data-day].
-const onDayKeydown = (iso: any, e: any) => {
+// ---- keyboard (77-08: author-owned Space/Escape only, F5) --------------
+// Every other key (arrows, Home/End, PageUp/PageDown, Ctrl+Home/End, Enter)
+// falls through untouched to the primitive's own root-level grid delegation
+// (the day grid's r-keynav wrapper, template below) — the hand-rolled day
+// keydown switch and its moveFocus helper are DELETED (77-08's whole point).
+const onDayCellKeydown = (iso: any, e: any) => {
   if (disabled) return;
   const key = e ? e.key : '';
-  if (key === 'ArrowLeft') {
-    e.preventDefault();
-    moveFocus(iso, -1);
-  } else if (key === 'ArrowRight') {
-    e.preventDefault();
-    moveFocus(iso, 1);
-  } else if (key === 'ArrowUp') {
-    e.preventDefault();
-    moveFocus(iso, -7);
-  } else if (key === 'ArrowDown') {
-    e.preventDefault();
-    moveFocus(iso, 7);
-  } else if (key === 'Home') {
-    e.preventDefault();
-    moveFocus(iso, -weekdayOffset(iso));
-  } else if (key === 'End') {
-    e.preventDefault();
-    moveFocus(iso, 6 - weekdayOffset(iso));
-  } else if (key === 'PageUp') {
-    e.preventDefault();
-    moveFocus(iso, 0 - daysInMonthSpan(iso, -1));
-  } else if (key === 'PageDown') {
-    e.preventDefault();
-    moveFocus(iso, daysInMonthSpan(iso, 1));
-  } else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+  if (key === ' ' || key === 'Spacebar') {
     e.preventDefault();
     onDaySelect(iso);
   } else if (key === 'Escape') {
@@ -658,33 +588,6 @@ const onYearCellKeydown = (iso: any, e: any) => {
     exitToDaysView();
   }
 };
-// Column index (0..6) of `iso` within its rendered week, honoring weekStartsOn.
-// Scans EVERY rendered panel (grids(), mirroring the already-widened
-// moveFocus) so Home/End resolve correctly in month 2+ of a multi-month view —
-// column indices agree across panels (all panels share weekStartsOn), so
-// first-match is unambiguous.
-const weekdayOffset = (iso: any) => {
-  for (const g of grids() as any) {
-    for (const row of g.weeks as any) {
-      for (let c = 0; c < row.length; c++) {
-        if (row[c].iso === iso) return c;
-      }
-    }
-  }
-  return 0;
-};
-// The day-delta to the same column one month away (PageUp/PageDown). Computed as
-// the difference between `iso` and `addMonths(iso, dir)` so the focus lands on
-// the clamped same-day-of-month.
-const daysInMonthSpan = (iso: any, dir: any) => {
-  const a = isoToMs(iso);
-  const b = isoToMs(addMonths(iso, dir));
-  return Math.round((b - a) / 86400000);
-};
-const isoToMs = (iso: any) => {
-  const t = isIsoDate(iso) ? Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))) : 0;
-  return t;
-};
 // ---- presets (range mode) ----------------------------------------------
 // Resolve every consumer preset's `range` (literal or () => RangeValue thunk)
 // into an ordered { label, range } for the rail + the #presets slot. A PLAIN
@@ -725,20 +628,23 @@ const isPresetActive = (range: any) => {
 };
 
 // ---- lifecycle + imperative handle -------------------------------------
-// Seed the view month from value / today on mount.
-// focus() — focus the selected day, or today, or the first enabled day of the
-// view (the SAME roving-tabindex resolution as the tab stop, so this handle
-// can never disagree with keyboard Tab — and it is multi-month aware, unlike
-// the old grid()-only walk). DELIBERATELY overrides HTMLElement.focus on Lit
+// Seed the view month from value / today on mount, then seed the day grid's
+// active-index model (77-08) — the SAME resolveRovingDayIndex chain the tab
+// stop uses, so mount, keyboard Tab and this handle can never disagree.
+// focus() — resolve + set $data.activeDay through the SAME roving-tabindex
+// chain the tab stop uses (seedActiveDay/resolveRovingDayIndex), so this
+// handle can never disagree with keyboard Tab — multi-month aware. It does
+// NOT query the DOM itself; the r-keynav grid controller lands DOM focus once
+// the value changes (77-08). DELIBERATELY overrides HTMLElement.focus on Lit
 // (ROZ137 warn, accepted).
 export const focus = () => {
-  const iso = rovingDayIso();
-  if (iso) focusDayIso(iso);
+  seedActiveDay();
 };
 // goToToday() — swing the view to the current month (no selection change).
 export const goToToday = () => {
   if (disabled) return;
   viewIso = todayIso();
+  seedActiveDay();
 };
 // ---- footer moves (Today / Clear row) ----------------------------------
 // selectToday() — the footer "Today" action. In single mode commit today
@@ -785,10 +691,11 @@ export const clear = () => {
 
 onMount(() => {
   viewIso = viewMonthGrid();
+  seedActiveDay();
 });
 </script>
 
-<div bind:this={root} role="group" aria-label="Date picker" aria-disabled={!!disabled} {...__rozieAttrs} class={["rozie-datepicker", { 'rozie-datepicker--disabled': disabled, 'rozie-datepicker--multi': numberOfMonths > 1 }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6800c7a2>{#if header}{@render header({ label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled })}{:else}<div class="rozie-datepicker-header" data-rozie-s-6800c7a2><button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Previous month" onclick={goPrevMonth} data-rozie-s-6800c7a2>‹</button>{#if monthYearNav}<button type="button" class="rozie-datepicker-heading rozie-datepicker-heading-button" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Change month and year" aria-live="polite" onclick={enterMonthsView} data-rozie-s-6800c7a2>{rozieDisplay(monthHeading())}</button>{:else}<span class="rozie-datepicker-heading" aria-live="polite" data-rozie-s-6800c7a2>{rozieDisplay(monthHeading())}</span>{/if}<button type="button" class="rozie-datepicker-nav rozie-datepicker-next" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Next month" onclick={goNextMonth} data-rozie-s-6800c7a2>›</button></div>{/if}<div class="rozie-datepicker-grids" data-rozie-s-6800c7a2>{#each daysGrids() as g, gi (gi)}<div class="rozie-datepicker-grid" role="grid" onmouseleave={($event) => { hoverIso = ''; }} data-rozie-s-6800c7a2><div class="rozie-datepicker-weekdays" role="row" data-rozie-s-6800c7a2>{#each weekdays() as wd, wi (wi)}<span class="rozie-datepicker-weekday" role="columnheader" aria-label={rozieAttr(wd)} data-rozie-s-6800c7a2>{rozieDisplay(wd)}</span>{/each}</div>{#each g.weeks as week, wk (wk)}<div class="rozie-datepicker-week" role="row" data-rozie-s-6800c7a2>{#each week as day (day.iso)}<span class="rozie-datepicker-cell" role="gridcell" aria-selected={!!(day.selected || day.rangeStart || day.rangeEnd)} data-rozie-s-6800c7a2><button type="button" class={["rozie-datepicker-day", { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]} data-day={rozieAttr(day.iso)} tabindex={rozieAttr(dayTabIndex(day))} disabled={!!disabled} aria-disabled={!!day.disabled} aria-label={rozieAttr(day.iso)} aria-current={rozieAttr(day.today ? 'date' : null)} onclick={($event) => { onDaySelect(day.iso); }} onmouseenter={($event) => { onDayHover(day.iso); }} onfocus={($event) => { onDayHover(day.iso); }} onkeydown={($event) => { onDayKeydown(day.iso, $event); }} data-rozie-s-6800c7a2>{rozieDisplay(day.day)}</button></span>{/each}</div>{/each}</div>{/each}</div>{#if showsMonthsView()}<div class="rozie-datepicker-months" data-rozie-s-6800c7a2><div class="rozie-datepicker-drill-header" data-rozie-s-6800c7a2><button type="button" class="rozie-datepicker-drill-label" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Change year" onclick={enterYearsView} data-rozie-s-6800c7a2>{rozieDisplay(monthList().year)}</button></div><div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose month" bind:this={__rozieKeynavRootRef} use:keynav={{ config: { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false }, active: activeMonth, getSource: () => (monthList().months).map((cell) => ({ label: cell.label, disabled: cell.disabled })), getActive: () => activeMonth, setActive: (v) => { activeMonth = v; }, onCommit: (i) => { onMonthCommit(i); }, gridColumns: () => 3, onPage: (detail) => { onDrillPage(); } }} data-rozie-s-6800c7a2>{#each monthList().months as cell, __rozieKeynavIndex (cell.iso)}<button type="button" class={["rozie-datepicker-month", { 'is-selected': cell.selected, 'is-current': cell.current }]} role="gridcell" data-month={rozieAttr(cell.iso)} aria-disabled={!!cell.disabled} aria-selected={!!cell.selected} onclick={($event) => { selectMonth(cell.iso); }} onkeydown={($event) => { onMonthCellKeydown(cell.iso, $event); }} id={`${__rozieKeynavGroupId}-item-${__rozieKeynavIndex}`} data-rozie-keynav-item={__rozieKeynavIndex} data-rozie-keynav-active={activeMonth === __rozieKeynavIndex ? '' : undefined} tabindex={activeMonth === __rozieKeynavIndex ? 0 : -1} data-rozie-s-6800c7a2>{rozieDisplay(cell.label)}</button>{/each}</div></div>{/if}{#if showsYearsView()}<div class="rozie-datepicker-years" data-rozie-s-6800c7a2><div class="rozie-datepicker-drill-header" data-rozie-s-6800c7a2><span class="rozie-datepicker-drill-label" aria-live="polite" data-rozie-s-6800c7a2>{rozieDisplay(yearRangeLabel())}</span></div><div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year" bind:this={__rozieKeynavRootRef1} use:keynav={{ config: { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false }, active: activeYear, getSource: () => (yearGrid().years).map((cell) => ({ label: String(cell.year), disabled: cell.disabled })), getActive: () => activeYear, setActive: (v) => { activeYear = v; }, onCommit: (i) => { onYearCommit(i); }, gridColumns: () => 3, onPage: (detail) => { onDrillPage(); } }} data-rozie-s-6800c7a2>{#each yearGrid().years as cell, __rozieKeynavIndex (cell.iso)}<button type="button" class={["rozie-datepicker-year", { 'is-selected': cell.selected, 'is-current': cell.current }]} role="gridcell" data-year={rozieAttr(cell.iso)} aria-disabled={!!cell.disabled} aria-selected={!!cell.selected} onclick={($event) => { selectYear(cell.iso); }} onkeydown={($event) => { onYearCellKeydown(cell.iso, $event); }} id={`${__rozieKeynavGroupId1}-item-${__rozieKeynavIndex}`} data-rozie-keynav-item={__rozieKeynavIndex} data-rozie-keynav-active={activeYear === __rozieKeynavIndex ? '' : undefined} tabindex={activeYear === __rozieKeynavIndex ? 0 : -1} data-rozie-s-6800c7a2>{rozieDisplay(cell.year)}</button>{/each}</div></div>{/if}{#if footer}{@render footer({ today: selectToday, clear, todayIso: todayIso() })}{:else}{#if showsFooter()}<div class="rozie-datepicker-footer" data-rozie-s-6800c7a2><button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-today" disabled={!!disabled} aria-disabled={!!disabled} onclick={selectToday} data-rozie-s-6800c7a2>Today</button><button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-clear" disabled={!!disabled} aria-disabled={!!disabled} onclick={clear} data-rozie-s-6800c7a2>Clear</button></div>{/if}{/if}{#if presets}{@render presets({ presets: resolvedPresets(), apply: applyPreset })}{:else}{#if hasPresets()}<div class="rozie-datepicker-presets" role="group" aria-label="Date range presets" data-rozie-s-6800c7a2>{#each resolvedPresets() as p (p.label)}<button type="button" class={["rozie-datepicker-preset", { 'is-active': isPresetActive(p.range) }]} aria-pressed={!!isPresetActive(p.range)} disabled={!!disabled} onclick={($event) => { applyPreset(p.range); }} data-rozie-s-6800c7a2>{rozieDisplay(p.label)}</button>{/each}</div>{/if}{/if}</div>
+<div bind:this={root} role="group" aria-label="Date picker" aria-disabled={!!disabled} {...__rozieAttrs} class={["rozie-datepicker", { 'rozie-datepicker--disabled': disabled, 'rozie-datepicker--multi': numberOfMonths > 1 }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6800c7a2>{#if header}{@render header({ label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled })}{:else}<div class="rozie-datepicker-header" data-rozie-s-6800c7a2><button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Previous month" onclick={goPrevMonth} data-rozie-s-6800c7a2>‹</button>{#if monthYearNav}<button type="button" class="rozie-datepicker-heading rozie-datepicker-heading-button" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Change month and year" aria-live="polite" onclick={enterMonthsView} data-rozie-s-6800c7a2>{rozieDisplay(monthHeading())}</button>{:else}<span class="rozie-datepicker-heading" aria-live="polite" data-rozie-s-6800c7a2>{rozieDisplay(monthHeading())}</span>{/if}<button type="button" class="rozie-datepicker-nav rozie-datepicker-next" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Next month" onclick={goNextMonth} data-rozie-s-6800c7a2>›</button></div>{/if}<div class="rozie-datepicker-grids" bind:this={__rozieKeynavRootRef} use:keynav={{ config: { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false }, active: activeDay, getSource: () => (allDayCells()).map((day) => ({ disabled: day.disabled })), getActive: () => activeDay, setActive: (v) => { activeDay = v; }, onCommit: (i) => { onDayCommit(i); }, gridColumns: () => 7, onPage: (detail) => { onDayPage(detail); } }} data-rozie-s-6800c7a2>{#each daysGrids() as g, gi (gi)}<div class="rozie-datepicker-grid" role="grid" onmouseleave={($event) => { hoverIso = ''; }} data-rozie-s-6800c7a2><div class="rozie-datepicker-weekdays" role="row" data-rozie-s-6800c7a2>{#each weekdays() as wd, wi (wi)}<span class="rozie-datepicker-weekday" role="columnheader" aria-label={rozieAttr(wd)} data-rozie-s-6800c7a2>{rozieDisplay(wd)}</span>{/each}</div>{#each g.weeks as week, wk (wk)}<div class="rozie-datepicker-week" role="row" data-rozie-s-6800c7a2>{#each week as day, dc (day.iso)}<span class="rozie-datepicker-cell" role="gridcell" aria-selected={!!(day.selected || day.rangeStart || day.rangeEnd)} data-rozie-s-6800c7a2><button type="button" class={["rozie-datepicker-day", { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]} data-day={rozieAttr(day.iso)} disabled={!!disabled} aria-disabled={!!day.disabled} aria-label={rozieAttr(day.iso)} aria-current={rozieAttr(day.today ? 'date' : null)} onclick={($event) => { onDaySelect(day.iso); }} onmouseenter={($event) => { onDayHover(day.iso); }} onfocus={($event) => { onDayHover(day.iso); }} onkeydown={($event) => { onDayCellKeydown(day.iso, $event); }} id={`${__rozieKeynavGroupId}-item-${gi * 42 + wk * 7 + dc}`} data-rozie-keynav-item={gi * 42 + wk * 7 + dc} data-rozie-keynav-active={activeDay === gi * 42 + wk * 7 + dc ? '' : undefined} tabindex={activeDay === gi * 42 + wk * 7 + dc ? 0 : -1} data-rozie-s-6800c7a2>{rozieDisplay(day.day)}</button></span>{/each}</div>{/each}</div>{/each}</div>{#if showsMonthsView()}<div class="rozie-datepicker-months" data-rozie-s-6800c7a2><div class="rozie-datepicker-drill-header" data-rozie-s-6800c7a2><button type="button" class="rozie-datepicker-drill-label" disabled={!!disabled} aria-disabled={!!disabled} aria-label="Change year" onclick={enterYearsView} data-rozie-s-6800c7a2>{rozieDisplay(monthList().year)}</button></div><div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose month" bind:this={__rozieKeynavRootRef1} use:keynav={{ config: { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false }, active: activeMonth, getSource: () => (monthList().months).map((cell) => ({ label: cell.label, disabled: cell.disabled })), getActive: () => activeMonth, setActive: (v) => { activeMonth = v; }, onCommit: (i) => { onMonthCommit(i); }, gridColumns: () => 3, onPage: (detail) => { onDrillPage(); } }} data-rozie-s-6800c7a2>{#each monthList().months as cell, __rozieKeynavIndex (cell.iso)}<button type="button" class={["rozie-datepicker-month", { 'is-selected': cell.selected, 'is-current': cell.current }]} role="gridcell" data-month={rozieAttr(cell.iso)} aria-disabled={!!cell.disabled} aria-selected={!!cell.selected} onclick={($event) => { selectMonth(cell.iso); }} onkeydown={($event) => { onMonthCellKeydown(cell.iso, $event); }} id={`${__rozieKeynavGroupId1}-item-${__rozieKeynavIndex}`} data-rozie-keynav-item={__rozieKeynavIndex} data-rozie-keynav-active={activeMonth === __rozieKeynavIndex ? '' : undefined} tabindex={activeMonth === __rozieKeynavIndex ? 0 : -1} data-rozie-s-6800c7a2>{rozieDisplay(cell.label)}</button>{/each}</div></div>{/if}{#if showsYearsView()}<div class="rozie-datepicker-years" data-rozie-s-6800c7a2><div class="rozie-datepicker-drill-header" data-rozie-s-6800c7a2><span class="rozie-datepicker-drill-label" aria-live="polite" data-rozie-s-6800c7a2>{rozieDisplay(yearRangeLabel())}</span></div><div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year" bind:this={__rozieKeynavRootRef2} use:keynav={{ config: { focusModel: 'tabindex', orientation: 'vertical', loop: false, typeahead: false, skipDisabled: false }, active: activeYear, getSource: () => (yearGrid().years).map((cell) => ({ label: String(cell.year), disabled: cell.disabled })), getActive: () => activeYear, setActive: (v) => { activeYear = v; }, onCommit: (i) => { onYearCommit(i); }, gridColumns: () => 3, onPage: (detail) => { onDrillPage(); } }} data-rozie-s-6800c7a2>{#each yearGrid().years as cell, __rozieKeynavIndex (cell.iso)}<button type="button" class={["rozie-datepicker-year", { 'is-selected': cell.selected, 'is-current': cell.current }]} role="gridcell" data-year={rozieAttr(cell.iso)} aria-disabled={!!cell.disabled} aria-selected={!!cell.selected} onclick={($event) => { selectYear(cell.iso); }} onkeydown={($event) => { onYearCellKeydown(cell.iso, $event); }} id={`${__rozieKeynavGroupId2}-item-${__rozieKeynavIndex}`} data-rozie-keynav-item={__rozieKeynavIndex} data-rozie-keynav-active={activeYear === __rozieKeynavIndex ? '' : undefined} tabindex={activeYear === __rozieKeynavIndex ? 0 : -1} data-rozie-s-6800c7a2>{rozieDisplay(cell.year)}</button>{/each}</div></div>{/if}{#if footer}{@render footer({ today: selectToday, clear, todayIso: todayIso() })}{:else}{#if showsFooter()}<div class="rozie-datepicker-footer" data-rozie-s-6800c7a2><button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-today" disabled={!!disabled} aria-disabled={!!disabled} onclick={selectToday} data-rozie-s-6800c7a2>Today</button><button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-clear" disabled={!!disabled} aria-disabled={!!disabled} onclick={clear} data-rozie-s-6800c7a2>Clear</button></div>{/if}{/if}{#if presets}{@render presets({ presets: resolvedPresets(), apply: applyPreset })}{:else}{#if hasPresets()}<div class="rozie-datepicker-presets" role="group" aria-label="Date range presets" data-rozie-s-6800c7a2>{#each resolvedPresets() as p (p.label)}<button type="button" class={["rozie-datepicker-preset", { 'is-active': isPresetActive(p.range) }]} aria-pressed={!!isPresetActive(p.range)} disabled={!!disabled} onclick={($event) => { applyPreset(p.range); }} data-rozie-s-6800c7a2>{rozieDisplay(p.label)}</button>{/each}</div>{/if}{/if}</div>
 
 <style>
 :global {

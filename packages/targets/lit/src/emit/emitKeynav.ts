@@ -542,12 +542,26 @@ export function keynavItemAttrs(
  * `KeynavController`'s `onCommit`/`onPage` options, NEVER as
  * `@keynavCommit=${...}` / `@keynavPage=${...}` template bindings (which
  * would be inert — neither is a real DOM event a host element dispatches).
+ *
+ * Also strips an explicit `:source="…"` binding attribute (`resolveKeynavGroups`
+ * deliberately does NOT do this itself — see its module doc comment's "NOTE
+ * for emitter plans" — every per-target emitter that walks `attributes` for
+ * real DOM/component props must skip a `binding` attr named `'source'` on a
+ * `keynavRoot` element). Latent since Phase 71/77-02 — no consumer had ever
+ * authored an EXPLICIT `:source` (every prior root synthesized its source
+ * from a co-located `r-for`) until the date-picker day grid's flat,
+ * triple-nested-loop source (77-08).
  */
 export function stripKeynavSyntheticEvents(node: TemplateElementIR): TemplateElementIR {
   if (node.keynavRoot === undefined) return node;
-  const filtered = node.events.filter(
+  const filteredEvents = node.events.filter(
     (e) => e.event !== 'keynav-commit' && e.event !== 'keynav-page',
   );
-  if (filtered.length === node.events.length) return node;
-  return { ...node, events: filtered };
+  const filteredAttrs = node.attributes.filter(
+    (a) => !(a.kind === 'binding' && a.name === 'source'),
+  );
+  if (filteredEvents.length === node.events.length && filteredAttrs.length === node.attributes.length) {
+    return node;
+  }
+  return { ...node, events: filteredEvents, attributes: filteredAttrs };
 }
