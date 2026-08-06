@@ -194,9 +194,11 @@ describe('Svelte r-keynav emitter (Plan 71-06 Task 2)', () => {
   it('SEAM: root action — a bare-identifier @keynav-commit handler is passed BY REFERENCE, not wrapped', () => {
     const ir = compile(COMBOBOX_SRC, 'KeynavCombobox.rozie');
     const { code } = emitSvelte(ir, { filename: 'KeynavCombobox.rozie', source: COMBOBOX_SRC });
-    // `onCommit` is the LAST opts field here (no `activeClass` on this
-    // fixture) — no trailing comma.
-    expect(code).toContain('onCommit: choose }}');
+    // `onCommit` is immediately followed by `getFocusScope` (Plan
+    // 260806-lz7) — the COMBOBOX_SRC wrapper `<div>` is a top-level element
+    // that isn't itself the keynav root, so it gets a freshly-minted scope
+    // ref.
+    expect(code).toContain('onCommit: choose, getFocusScope: () => [__rozieKeynavScopeRef0] }}');
   });
 
   it('SEAM: source synthesis — the menu getSource maps the synthesized r-for array to { label, disabled }', () => {
@@ -454,7 +456,106 @@ describe('Svelte r-keynav emitter — multi-root, grid, page, explicit index (Pl
         '  console.log(item);\n' +
         '};\n' +
         '</script>\n\n' +
-        '<div role="menu" {...__rozieAttrs} use:applyListeners={__rozieAttrs} bind:this={__rozieKeynavRootRef} use:keynav={{ config: { focusModel: \'tabindex\', orientation: \'vertical\', loop: true, typeahead: false, skipDisabled: true }, active: active, getSource: () => (items).map((it) => ({ label: it.label, disabled: it.disabled })), getActive: () => active, setActive: (v) => { active = v; }, onCommit: (i) => { run(items[active]); }, activeClass: \'is-active\' }} data-rozie-s-d30ecb02>{#each items as it, __rozieKeynavIndex (it.id)}<button role="menuitem" id={`${__rozieKeynavGroupId}-item-${__rozieKeynavIndex}`} data-rozie-keynav-item={__rozieKeynavIndex} data-rozie-keynav-active={active === __rozieKeynavIndex ? \'\' : undefined} tabindex={active === __rozieKeynavIndex ? 0 : -1} data-rozie-s-d30ecb02>{rozieDisplay(it.label)}</button>{/each}</div>\n',
+        '<div role="menu" {...__rozieAttrs} use:applyListeners={__rozieAttrs} bind:this={__rozieKeynavRootRef} use:keynav={{ config: { focusModel: \'tabindex\', orientation: \'vertical\', loop: true, typeahead: false, skipDisabled: true }, active: active, getSource: () => (items).map((it) => ({ label: it.label, disabled: it.disabled })), getActive: () => active, setActive: (v) => { active = v; }, onCommit: (i) => { run(items[active]); }, activeClass: \'is-active\', getFocusScope: () => [__rozieKeynavRootRef] }} data-rozie-s-d30ecb02>{#each items as it, __rozieKeynavIndex (it.id)}<button role="menuitem" id={`${__rozieKeynavGroupId}-item-${__rozieKeynavIndex}`} data-rozie-keynav-item={__rozieKeynavIndex} data-rozie-keynav-active={active === __rozieKeynavIndex ? \'\' : undefined} tabindex={active === __rozieKeynavIndex ? 0 : -1} data-rozie-s-d30ecb02>{rozieDisplay(it.label)}</button>{/each}</div>\n',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 260806-lz7 Task 1 Step 8 — the strict-containment focus scope. Fresh
+// fixtures kept SEPARATE from the fixtures above so the existing byte-exact
+// snapshot test only had to absorb the ONE expected `getFocusScope` field
+// (already reconciled above), not a second unrelated shape change.
+// ---------------------------------------------------------------------------
+
+const SCOPE_ROOT_ONLY_SRC = MENU_SRC;
+
+const SCOPE_WITH_HEADING_SRC = `<rozie name="KeynavWithHeading">
+
+<props>
+{
+  items: { type: Array, default: () => [] },
+}
+</props>
+
+<data>
+{
+  active: 0,
+}
+</data>
+
+<template>
+<button type="button">Heading</button>
+<ul role="menu" r-keynav:tabindex="$data.active">
+  <li role="menuitem" r-for="it in $props.items" :key="it.id"
+      r-keynav-item="{ label: it.label }">{{ it.label }}</li>
+</ul>
+</template>
+
+</rozie>`;
+
+const SCOPE_WITH_AUTHOR_REF_SRC = `<rozie name="KeynavWithAuthorRef">
+
+<props>
+{
+  items: { type: Array, default: () => [] },
+}
+</props>
+
+<data>
+{
+  active: 0,
+}
+</data>
+
+<script>
+</script>
+
+<template>
+<button type="button" ref="heading">Heading</button>
+<ul role="menu" r-keynav:tabindex="$data.active">
+  <li role="menuitem" r-for="it in $props.items" :key="it.id"
+      r-keynav-item="{ label: it.label }">{{ it.label }}</li>
+</ul>
+</template>
+
+</rozie>`;
+
+describe('Svelte r-keynav emitter — strict-containment focus scope (Plan 260806-lz7 Task 1 Step 8)', () => {
+  it('single top-level root: getFocusScope reuses the ROOT ref (bare) — no fresh ref minted', () => {
+    const ir = compile(SCOPE_ROOT_ONLY_SRC, 'KeynavMenu.rozie');
+    const { code } = emitSvelte(ir, { filename: 'KeynavMenu.rozie', source: SCOPE_ROOT_ONLY_SRC });
+    expect(code).toContain('getFocusScope: () => [__rozieKeynavRootRef]');
+    expect(code).not.toContain('__rozieKeynavScopeRef');
+  });
+
+  it('a persistent sibling top-level element gets a FRESH minted ref, stamped on the element and read by getFocusScope', () => {
+    const ir = compile(SCOPE_WITH_HEADING_SRC, 'KeynavWithHeading.rozie');
+    const { code } = emitSvelte(ir, {
+      filename: 'KeynavWithHeading.rozie',
+      source: SCOPE_WITH_HEADING_SRC,
+    });
+    expect(code).toContain(
+      'let __rozieKeynavScopeRef0 = $state<HTMLElement | undefined>(undefined);',
+    );
+    expect(code).toMatch(/<button type="button" bind:this=\{__rozieKeynavScopeRef0\}[^>]*>/);
+    expect(code).toContain('getFocusScope: () => [__rozieKeynavScopeRef0, __rozieKeynavRootRef]');
+  });
+
+  it('an author-declared ref on a top-level sibling is REUSED, not shadowed by a second minted ref', () => {
+    const ir = compile(SCOPE_WITH_AUTHOR_REF_SRC, 'KeynavWithAuthorRef.rozie');
+    const { code } = emitSvelte(ir, {
+      filename: 'KeynavWithAuthorRef.rozie',
+      source: SCOPE_WITH_AUTHOR_REF_SRC,
+    });
+    expect(code).not.toContain('__rozieKeynavScopeRef');
+    expect(code).toContain('getFocusScope: () => [heading, __rozieKeynavRootRef]');
+  });
+
+  it('NO-REGRESS: a component with no r-keynav directive never mints a scope ref', () => {
+    const ir = compile(COUNTER_SRC, 'Counter.rozie');
+    const { code } = emitSvelte(ir, { filename: 'Counter.rozie', source: COUNTER_SRC });
+    expect(code).not.toContain('getFocusScope');
+    expect(code).not.toContain('__rozieKeynavScopeRef');
   });
 });

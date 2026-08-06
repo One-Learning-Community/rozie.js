@@ -26,7 +26,12 @@ import type { SvelteScriptInjection } from './emitScript.js';
 // Phase 71 (r-keynav) — Svelte target-pair (Plan 71-06), extended Phase 77
 // (Plan 04) — modeled on the React/Vue references (see emitKeynav.ts's
 // module doc comment).
-import { resolveKeynavPlans, buildKeynavScriptInjections } from './emitKeynav.js';
+import {
+  buildKeynavFocusScopeInjections,
+  buildKeynavScriptInjections,
+  resolveKeynavFocusScopeRefs,
+  resolveKeynavPlans,
+} from './emitKeynav.js';
 
 export interface EmitTemplateResult {
   template: string;
@@ -69,8 +74,16 @@ export function emitTemplate(
   // component's emit is completely untouched (SPEC §7.4: "no corpus
   // rebless").
   const keynavPlans = resolveKeynavPlans(ir);
+  // Plan 260806-lz7 — the component-WIDE strict-containment focus scope,
+  // resolved once alongside `keynavPlans` (`[]` when there are no plans —
+  // see `resolveKeynavFocusScopeRefs`'s doc comment).
+  const keynavScopeRefs = resolveKeynavFocusScopeRefs(ir, keynavPlans);
   if (keynavPlans.length > 0) {
     runtimeImports.add('keynav');
+    // Plan 260806-lz7 — the fresh scope-ref `$state` declarations, ONCE per
+    // component (not once per plan — see `buildKeynavFocusScopeInjections`'s
+    // doc comment).
+    scriptInjections.push(...buildKeynavFocusScopeInjections(keynavScopeRefs));
     for (const plan of keynavPlans) {
       scriptInjections.push(...buildKeynavScriptInjections(plan));
     }
@@ -85,6 +98,7 @@ export function emitTemplate(
     runtimeImports,
     scopeAttr,
     keynav: keynavPlans,
+    keynavScope: keynavScopeRefs,
   };
 
   const template = emitNode(ir.template, ctx);

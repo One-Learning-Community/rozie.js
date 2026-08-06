@@ -95,6 +95,9 @@ import type { SvelteScriptInjection } from './emitScript.js';
 // that keeps single-root emit unchanged.
 const ROOT_REF_VAR = '__rozieKeynavRootRef';
 const GROUP_ID_VAR = '__rozieKeynavGroupId';
+// Plan 260806-lz7 — the strict-containment focus scope's freshly-minted
+// per-top-level-element refs (see `resolveKeynavFocusScopeRefs` below).
+const SCOPE_REF_VAR = '__rozieKeynavScopeRef';
 
 function suffixFor(groupIndex: number): string {
   return groupIndex === 0 ? '' : String(groupIndex);
@@ -230,6 +233,88 @@ export function resolveKeynavPlans(ir: IRComponent): KeynavEmitPlan[] {
   });
 }
 
+/**
+ * Plan 260806-lz7 — the strict-containment focus scope. One entry per
+ * `html`-kind TOP-LEVEL element of the template (`<template>` does not
+ * enforce a single root — multiple top-level elements are legal); a
+ * `component`-kind or non-element top-level node is skipped (a ref on a
+ * child component does not yield a DOM Element). Each entry either reuses an
+ * EXISTING ref (the keynav root's own minted/reused ref when the element IS
+ * a keynav root — appending it is a no-op in the normal case; or an
+ * author-declared `ref="x"`, read verbatim per this file's no-suffix
+ * convention) or mints a FRESH one — Svelte permits only one `bind:this=`
+ * per element, so a fresh ref is only minted when neither already exists.
+ */
+export interface KeynavFocusScopeRef {
+  element: TemplateElementIR;
+  /** The bare variable name — Svelte reads it verbatim, no suffix/`.value`/`.current`. */
+  refVar: string;
+  /** False when `refVar` names an ALREADY-existing ref — no fresh `$state`
+   * decl / `bind:this=` attribute needs minting/stamping for this entry. */
+  needsFreshRef: boolean;
+}
+
+function topLevelTemplateElements(ir: IRComponent): TemplateElementIR[] {
+  if (ir.template === null) return [];
+  const root = ir.template;
+  const candidates: TemplateNode[] = root.type === 'TemplateFragment' ? root.children : [root];
+  return candidates.filter(
+    (n): n is TemplateElementIR => n.type === 'TemplateElement' && n.tagKind === 'html',
+  );
+}
+
+/**
+ * Resolves the component-wide focus scope — `[]` when there are no keynav
+ * plans (the overwhelming majority case) OR the template has zero
+ * `html`-kind top-level elements, in which case every `use:keynav={{ … }}`
+ * opts object OMITS `getFocusScope` entirely, and the runtime takes its
+ * documented `documentHasRealFocus` fallback (never a hard rejection).
+ */
+export function resolveKeynavFocusScopeRefs(
+  ir: IRComponent,
+  plans: KeynavEmitPlan[],
+): KeynavFocusScopeRef[] {
+  if (plans.length === 0) return [];
+  const elements = topLevelTemplateElements(ir);
+  const refs: KeynavFocusScopeRef[] = [];
+  let freshIndex = 0;
+  for (const el of elements) {
+    const rootPlan =
+      el.keynavRoot !== undefined
+        ? (plans.find((p) => p.groupIndex === (el.keynavRoot!.groupIndex ?? 0)) ?? null)
+        : null;
+    if (rootPlan !== null) {
+      refs.push({ element: el, refVar: rootPlan.rootRefVar, needsFreshRef: false });
+      continue;
+    }
+    const existingRef = findStaticAttrValue(el, 'ref');
+    if (existingRef !== null && ir.refs.some((r) => r.name === existingRef)) {
+      refs.push({ element: el, refVar: existingRef, needsFreshRef: false });
+      continue;
+    }
+    refs.push({ element: el, refVar: `${SCOPE_REF_VAR}${freshIndex}`, needsFreshRef: true });
+    freshIndex += 1;
+  }
+  return refs;
+}
+
+/**
+ * `bind:this={…}` for a FRESHLY-minted scope ref only — an already-covered
+ * scope entry (the keynav root's own ref, or an author-declared one) already
+ * emits its `bind:this=` via its own normal path, and Svelte permits only
+ * one `bind:this=` per element. `node` must be reference-identical to the
+ * element `resolveKeynavFocusScopeRefs` walked (i.e. the ORIGINAL, pre-
+ * `stripKeynavSyntheticEvents` node) — see `emitTemplateNode.ts`'s call site.
+ */
+export function keynavFocusScopeAttrs(
+  scopeRefs: KeynavFocusScopeRef[],
+  node: TemplateElementIR,
+): string[] {
+  const match = scopeRefs.find((r) => r.element === node);
+  if (!match || !match.needsFreshRef) return [];
+  return [`bind:this={${match.refVar}}`];
+}
+
 /** `KeynavConfig` object literal — every field is statically known at compile time. */
 function buildConfigCode(k: KeynavRootIR): string {
   return `{ focusModel: '${k.focusModel}', orientation: '${k.orientation}', loop: ${k.loop}, typeahead: ${k.typeahead}, skipDisabled: ${k.skipDisabled} }`;
@@ -348,7 +433,11 @@ function resolveActiveTarget(
  * field remains available for a future virtualized-list plan / hand-authored
  * consumer.
  */
-function buildKeynavOptsCode(plan: KeynavEmitPlan, ir: IRComponent): string {
+function buildKeynavOptsCode(
+  plan: KeynavEmitPlan,
+  ir: IRComponent,
+  scopeRefs: KeynavFocusScopeRef[],
+): string {
   const active = resolveActiveTarget(plan.keynavRoot.activeExpression, ir);
   const lines = [
     `config: ${buildConfigCode(plan.keynavRoot)}`,
@@ -375,6 +464,14 @@ function buildKeynavOptsCode(plan: KeynavEmitPlan, ir: IRComponent): string {
   if (onPageCode !== null) {
     lines.push(`onPage: ${onPageCode}`);
   }
+  // Plan 260806-lz7 — the strict-containment focus scope. Omitted entirely
+  // when there are zero scope refs, which is what lets the runtime take its
+  // documented `documentHasRealFocus` fallback rather than emitting a
+  // useless empty array.
+  if (scopeRefs.length > 0) {
+    const scopeReads = scopeRefs.map((r) => r.refVar).join(', ');
+    lines.push(`getFocusScope: () => [${scopeReads}]`);
+  }
   return `{ ${lines.join(', ')} }`;
 }
 
@@ -388,6 +485,26 @@ function buildKeynavOptsCode(plan: KeynavEmitPlan, ir: IRComponent): string {
  * invoked directly as a TEMPLATE attribute (`keynavRootAttrs`), not a
  * script-level call.
  */
+/**
+ * Plan 260806-lz7 — emits the FRESH scope-ref `let … = $state<HTMLElement |
+ * undefined>(undefined);` decls (skipping any entry that reuses an existing
+ * ref — see `resolveKeynavFocusScopeRefs`'s doc comment), ONCE per component
+ * (unlike `buildKeynavScriptInjections`, which runs once per PLAN) —
+ * duplicating a `let` declaration per plan would be a compile error the
+ * instant a component has more than one `r-keynav` root.
+ */
+export function buildKeynavFocusScopeInjections(
+  scopeRefs: KeynavFocusScopeRef[],
+): SvelteScriptInjection[] {
+  return scopeRefs
+    .filter((r) => r.needsFreshRef)
+    .map((r) => ({
+      name: r.refVar,
+      decl: `let ${r.refVar} = $state<HTMLElement | undefined>(undefined);`,
+      position: 'top' as const,
+    }));
+}
+
 export function buildKeynavScriptInjections(plan: KeynavEmitPlan): SvelteScriptInjection[] {
   const injections: SvelteScriptInjection[] = [];
 
@@ -425,13 +542,14 @@ export function keynavRootAttrs(
   plan: KeynavEmitPlan | null,
   node: TemplateElementIR,
   ir: IRComponent,
+  scopeRefs: KeynavFocusScopeRef[] = [],
 ): string[] {
   if (plan === null || node.keynavRoot === undefined) return [];
   const attrs: string[] = [];
   if (plan.mintedRootRef) {
     attrs.push(`bind:this={${plan.rootRefVar}}`);
   }
-  attrs.push(`use:keynav={${buildKeynavOptsCode(plan, ir)}}`);
+  attrs.push(`use:keynav={${buildKeynavOptsCode(plan, ir, scopeRefs)}}`);
   if (plan.keynavRoot.focusModel === 'activedescendant') {
     const activeCode = rewriteTemplateExpression(plan.keynavRoot.activeExpression, ir);
     attrs.push(
