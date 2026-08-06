@@ -1,6 +1,9 @@
 // Vitest config for @rozie/runtime-keynav-core.
 // `node` environment (not happy-dom/jsdom) — the state machine is pure logic
 // driven by duck-typed event/host shapes, never a real DOM (SPEC §8, Task 2).
+// `focusGuard.test.ts` opts into `happy-dom` per-file (docblock directive)
+// because the composed-tree shadow-DOM ascent/descent it exercises needs a
+// real Document/ShadowRoot.
 import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';

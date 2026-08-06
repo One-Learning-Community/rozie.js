@@ -26,3 +26,11 @@ export { createKeynavStateMachine } from './stateMachine.js';
 
 export type { ClassValue } from './normalizeClassTokens.js';
 export { normalizeClassTokens } from './normalizeClassTokens.js';
+
+export type { FocusScope } from './focusGuard.js';
+export {
+  composedActiveElement,
+  composedContains,
+  documentHasRealFocus,
+  focusIsWithinScope,
+} from './focusGuard.js';
