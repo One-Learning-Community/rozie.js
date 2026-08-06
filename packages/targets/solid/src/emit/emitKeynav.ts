@@ -96,6 +96,14 @@
  * against `KeynavEmitPlan.groupIndex` — never by using "the" plan, since
  * there may now be several.
  *
+ * Plan 260806-lz7 — additionally emits `getFocusScope`, the wiring for
+ * `createKeynav`'s strict-containment focus guard: `resolveKeynavFocusScopeRefs`
+ * mints one plain-`let` ref per top-level template element (reusing an
+ * existing ref over minting a fresh one), and every `createKeynav(...)` call
+ * reads them so the runtime's shared `focusIsWithinScope` predicate
+ * (`@rozie/runtime-keynav-core`) can tell whether a first/redundant focus
+ * pass is safe.
+ *
  * @experimental — shape may change before v1.0
  */
 import type {

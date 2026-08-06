@@ -74,6 +74,14 @@
  * runtime export + a second call site with no correctness benefit over the
  * action-parameter-reactivity mechanism Svelte already provides.
  *
+ * Plan 260806-lz7 — additionally emits `getFocusScope`, the wiring for
+ * `keynav`'s strict-containment focus guard: `resolveKeynavFocusScopeRefs`
+ * mints one bare `$state`-backed ref per top-level template element (reusing
+ * an existing ref over minting a fresh one), and every `use:keynav={{ … }}`
+ * action reads them so the runtime's shared `focusIsWithinScope` predicate
+ * (`@rozie/runtime-keynav-core`) can tell whether a first/redundant focus
+ * pass is safe.
+ *
  * @experimental — shape may change before v1.0
  */
 import type {
