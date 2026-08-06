@@ -92,11 +92,20 @@
  * Phase-77 responsibility is plumbing `onPage`/`gridColumns` through to the
  * machine.
  *
+ * Plan 260806-lz7 — the tabindex model's first/redundant focus+scroll pass
+ * (mount, or a conditionally-mounted root re-appearing) is gated by
+ * `@rozie/runtime-keynav-core`'s `focusIsWithinScope` strict-containment
+ * predicate: it only runs when DOM focus is already inside the owning
+ * component (via the optional `getFocusScope` opt, or the compiler-emitted
+ * root itself). A genuine navigation pass (the active INDEX changing) is
+ * never gated. See `focusGuard.ts`'s module doc comment for the full rule.
+ *
  * @public — runtime API consumed by emitted Vue SFCs with an `r-keynav` root.
  */
 import { onMounted, watch, type Ref } from 'vue';
 import {
   createKeynavStateMachine,
+  focusIsWithinScope,
   normalizeClassTokens,
   type ClassValue,
   type KeynavConfig,
@@ -143,6 +152,35 @@ export interface UseKeynavOpts {
    * byte-identical.
    */
   gridColumns?: () => number;
+  /**
+   * Plan 260806-lz7 — the strict-containment focus scope. Lazily resolved
+   * component-scope element refs (read fresh every pass, never captured
+   * once). Optional and additive: an older leaf that omits this field takes
+   * the `documentHasRealFocus` compatibility fallback rather than strict
+   * containment — see `useKeynav.ts`'s module doc comment.
+   */
+  getFocusScope?: () => Element | readonly (Element | null)[] | null;
+}
+
+// Plan 260806-lz7 — builds the anchor list `focusIsWithinScope` checks
+// containment against. When `getFocusScope` is ABSENT (an older leaf calling
+// this composable without having been regenerated), NO anchor list is built
+// at all — `focusIsWithinScope` then takes its pinned `documentHasRealFocus`
+// fallback, preserving the pre-fix document-scoped behavior for that leaf.
+// When `getFocusScope` IS present, its resolved value is combined with the
+// keynav root itself — appending the root is a no-op in the normal case
+// (the root is inside the component) and is what keeps a
+// `<slot portal />`-relocated keynav root working, since focus inside a
+// portalled root is still "within the component" for this primitive.
+function resolveFocusScope(
+  opts: UseKeynavOpts,
+  root: HTMLElement,
+): Element | readonly (Element | null)[] | null | undefined {
+  if (opts.getFocusScope === undefined) return undefined;
+  const extra = opts.getFocusScope();
+  const list = extra == null ? [] : Array.isArray(extra) ? [...extra] : [extra];
+  list.push(root);
+  return list;
 }
 
 export function useKeynav(
@@ -255,6 +293,14 @@ export function useKeynav(
         // pass.
         let activeRafId: number | null = null;
 
+        // Plan 260806-lz7 — the last active index a focus/scroll pass
+        // actually resolved for THIS attachment. Distinguishes a
+        // first/redundant pass (guarded by `focusIsWithinScope`) from a
+        // genuine navigation pass (unconditional). Seeded null for every
+        // fresh (re)attachment — this local lives inside the outer watch
+        // callback, so a new root naturally starts a new one.
+        let lastFocusedActive: number | null = null;
+
         // ---- Reactive to `active`: focus / scroll / active-class ----
         // A getter-form `watch` source: Vue tracks whatever reactive state
         // `opts.getActive()` reads INSIDE this call (the author's own
@@ -279,6 +325,17 @@ export function useKeynav(
               cancelAnimationFrame(activeRafId);
               activeRafId = null;
             }
+
+            // Plan 260806-lz7 — computed ONCE per watch-callback invocation
+            // (not per `applyActiveEffects` call) so the deferred rAF retry
+            // below reuses the SAME may-apply decision the synchronous pass
+            // made, rather than re-evaluating against a `lastFocusedActive`
+            // this same invocation already advanced to `active`.
+            const isNavigationPass = lastFocusedActive !== null && lastFocusedActive !== active;
+            const mayApply =
+              isNavigationPass ||
+              focusIsWithinScope(resolveFocusScope(opts, root), root.ownerDocument);
+            lastFocusedActive = active;
 
             // Extracted so it can run a SECOND time from the deferred rAF
             // pass below (Phase 77) without duplicating the
@@ -311,18 +368,24 @@ export function useKeynav(
               // Tabindex model (SPEC §3) — DOM focus follows the active
               // item. The `tabindex` VALUE itself is a declarative template
               // binding (emitter-owned); only the imperative `.focus()`
-              // call belongs here.
-              if (opts.config.focusModel === 'tabindex' && activeEl) {
+              // call belongs here. Plan 260806-lz7: gated behind `mayApply`
+              // — a first/redundant pass only focuses when the composed
+              // active element is already inside the owning component; a
+              // genuine navigation pass always focuses.
+              if (mayApply && opts.config.focusModel === 'tabindex' && activeEl) {
                 activeEl.focus();
               }
 
               // SPEC §10 — windower present: drive its `scrollToIndex`. No
               // windower: fall back to `scrollIntoView` on the rendered
-              // node.
-              if (opts.windower) {
-                opts.windower.scrollToIndex(active, { align: 'nearest' });
-              } else if (activeEl) {
-                activeEl.scrollIntoView({ block: 'nearest' });
+              // node. Plan 260806-lz7: same `mayApply` gate as the focus
+              // call above.
+              if (mayApply) {
+                if (opts.windower) {
+                  opts.windower.scrollToIndex(active, { align: 'nearest' });
+                } else if (activeEl) {
+                  activeEl.scrollIntoView({ block: 'nearest' });
+                }
               }
 
               return activeEl !== null;
