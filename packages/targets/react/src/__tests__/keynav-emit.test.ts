@@ -491,6 +491,7 @@ describe('React r-keynav emitter — multi-root, grid, page, explicit index (Pla
         '    setActive: setActive,\n' +
         '    onCommit: (i) => { run(props.items[active]); },\n' +
         "    activeClass: 'is-active',\n" +
+        '    getFocusScope: () => [__rozieKeynavRootRef.current],\n' +
         '  });\n\n' +
         '  return (\n' +
         '    <>\n' +
@@ -503,5 +504,115 @@ describe('React r-keynav emitter — multi-root, grid, page, explicit index (Pla
         '  );\n' +
         '}\n',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 260806-lz7 Task 1 Step 8 — the strict-containment focus scope. Fresh
+// fixtures kept SEPARATE from the fixtures above so the existing byte-exact
+// snapshot test only had to absorb the ONE expected `getFocusScope` line
+// (already reconciled above), not a second unrelated shape change.
+// ---------------------------------------------------------------------------
+
+// A single-root component where the root IS the only top-level element —
+// the common case: the scope reuses the root's OWN ref, no fresh ref minted.
+const SCOPE_ROOT_ONLY_SRC = MENU_SRC;
+
+// A persistent sibling "heading" alongside the keynav root — both are
+// top-level elements of the template (mirrors the date-picker drill-heading
+// shape: a persistent header the user may be focused on when a panel
+// re-appears). The heading carries NO ref of its own, so the emitter must
+// mint a fresh one.
+const SCOPE_WITH_HEADING_SRC = `<rozie name="KeynavWithHeading">
+
+<props>
+{
+  items: { type: Array, default: () => [] },
+}
+</props>
+
+<data>
+{
+  active: 0,
+}
+</data>
+
+<template>
+<button type="button">Heading</button>
+<ul role="menu" r-keynav:tabindex="$data.active">
+  <li role="menuitem" r-for="it in $props.items" :key="it.id"
+      r-keynav-item="{ label: it.label }">{{ it.label }}</li>
+</ul>
+</template>
+
+</rozie>`;
+
+// An author-declared `ref="x"` on a top-level sibling — the scope must reuse
+// it (JSX permits only one `ref=` per element), never mint a second,
+// colliding one.
+const SCOPE_WITH_AUTHOR_REF_SRC = `<rozie name="KeynavWithAuthorRef">
+
+<props>
+{
+  items: { type: Array, default: () => [] },
+}
+</props>
+
+<data>
+{
+  active: 0,
+}
+</data>
+
+<script>
+</script>
+
+<template>
+<button type="button" ref="heading">Heading</button>
+<ul role="menu" r-keynav:tabindex="$data.active">
+  <li role="menuitem" r-for="it in $props.items" :key="it.id"
+      r-keynav-item="{ label: it.label }">{{ it.label }}</li>
+</ul>
+</template>
+
+</rozie>`;
+
+describe('React r-keynav emitter — strict-containment focus scope (Plan 260806-lz7 Task 1 Step 8)', () => {
+  it('single top-level root: getFocusScope reuses the ROOT ref — no fresh ref minted', () => {
+    const ir = compile(SCOPE_ROOT_ONLY_SRC, 'KeynavMenu.rozie');
+    const { code } = emitReact(ir, { filename: 'KeynavMenu.rozie', source: SCOPE_ROOT_ONLY_SRC });
+    expect(code).toContain('getFocusScope: () => [__rozieKeynavRootRef.current],');
+    // No second scope-ref useRef was minted.
+    expect(code).not.toContain('__rozieKeynavScopeRef');
+  });
+
+  it('a persistent sibling top-level element gets a FRESH minted ref, stamped on the element and read by getFocusScope', () => {
+    const ir = compile(SCOPE_WITH_HEADING_SRC, 'KeynavWithHeading.rozie');
+    const { code } = emitReact(ir, {
+      filename: 'KeynavWithHeading.rozie',
+      source: SCOPE_WITH_HEADING_SRC,
+    });
+    expect(code).toContain('const __rozieKeynavScopeRef0 = useRef<HTMLButtonElement | null>(null);');
+    expect(code).toMatch(/<button type="button" ref=\{__rozieKeynavScopeRef0\}[^>]*>/);
+    expect(code).toContain(
+      'getFocusScope: () => [__rozieKeynavScopeRef0.current, __rozieKeynavRootRef.current],',
+    );
+  });
+
+  it('an author-declared ref on a top-level sibling is REUSED, not shadowed by a second minted ref', () => {
+    const ir = compile(SCOPE_WITH_AUTHOR_REF_SRC, 'KeynavWithAuthorRef.rozie');
+    const { code } = emitReact(ir, {
+      filename: 'KeynavWithAuthorRef.rozie',
+      source: SCOPE_WITH_AUTHOR_REF_SRC,
+    });
+    expect(code).not.toContain('__rozieKeynavScopeRef');
+    expect(code).toContain('getFocusScope: () => [heading.current, __rozieKeynavRootRef.current],');
+  });
+
+  it('NO-REGRESS: a component with no r-keynav directive never mints a scope ref', () => {
+    const ir = compile(COUNTER_SRC, 'Counter.rozie');
+    const { code } = emitReact(ir, { filename: 'Counter.rozie', source: COUNTER_SRC });
+    expect(code).not.toContain('getFocusScope');
+    expect(code).not.toContain('__rozieKeynavScopeRef');
   });
 });

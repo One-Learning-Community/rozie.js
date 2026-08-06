@@ -26,7 +26,12 @@ import {
 } from '../rewrite/collectReactImports.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
 import { emitSlotDecl } from './emitSlotDecl.js';
-import { buildKeynavScriptInjections, resolveKeynavPlans } from './emitKeynav.js';
+import {
+  buildKeynavFocusScopeInjections,
+  buildKeynavScriptInjections,
+  resolveKeynavFocusScopeRefs,
+  resolveKeynavPlans,
+} from './emitKeynav.js';
 
 export interface EmitTemplateResult {
   jsx: string;
@@ -82,6 +87,10 @@ export function emitTemplate(
   // stays a cheap no-op for every existing fixture (SPEC §7.4: "no corpus
   // rebless").
   const keynavPlans = resolveKeynavPlans(ir);
+  // Plan 260806-lz7 — the component-WIDE strict-containment focus scope,
+  // resolved once alongside `keynavPlans` (`[]` when there are no plans —
+  // see `resolveKeynavFocusScopeRefs`'s doc comment).
+  const keynavScopeRefs = resolveKeynavFocusScopeRefs(ir, keynavPlans);
 
   // command-palette-portal-overlay phase — mutable out-flag; see
   // EmitNodeCtx.elementPortalFlag doc comment.
@@ -96,10 +105,16 @@ export function emitTemplate(
     injectionCounter: { next: 0 },
     ...(opts.scopeAttr !== undefined ? { scopeAttr: opts.scopeAttr } : {}),
     keynav: keynavPlans,
+    keynavScope: keynavScopeRefs,
     elementPortalFlag,
   };
 
   const jsx = emitNode(ir.template, ctx);
+
+  // Plan 260806-lz7 — the fresh scope-ref `useRef` declarations, ONCE per
+  // component (not once per plan — see `buildKeynavFocusScopeInjections`'s
+  // doc comment).
+  scriptInjections.push(...buildKeynavFocusScopeInjections(keynavScopeRefs, collectors));
 
   // Phase 71 (r-keynav), extended Phase 77 — ONE `useKeynav(...)` call + its
   // `useRef`/`useId` scaffolding PER resolved plan, so a two-root component
@@ -108,7 +123,7 @@ export function emitTemplate(
   // declarations — but keeps this block visually adjacent to the
   // `keynavPlans` resolution above).
   for (const plan of keynavPlans) {
-    scriptInjections.push(...buildKeynavScriptInjections(plan, ir, collectors));
+    scriptInjections.push(...buildKeynavScriptInjections(plan, ir, collectors, keynavScopeRefs));
   }
 
   return {

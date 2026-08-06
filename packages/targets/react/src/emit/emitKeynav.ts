@@ -78,6 +78,9 @@ import type {
 // `suffixFor` below) — the mechanism that keeps single-root emit unchanged.
 const ROOT_REF_VAR = '__rozieKeynavRootRef';
 const GROUP_ID_VAR = '__rozieKeynavGroupId';
+// Plan 260806-lz7 — the strict-containment focus scope's freshly-minted
+// per-top-level-element refs (see `resolveKeynavFocusScopeRefs` below).
+const SCOPE_REF_VAR = '__rozieKeynavScopeRef';
 
 function suffixFor(groupIndex: number): string {
   return groupIndex === 0 ? '' : String(groupIndex);
@@ -229,6 +232,88 @@ export function resolveKeynavPlans(ir: IRComponent): KeynavEmitPlan[] {
 }
 
 /**
+ * Plan 260806-lz7 — the strict-containment focus scope. One entry per
+ * `html`-kind TOP-LEVEL element of the template (`<template>` does not
+ * enforce a single root — multiple top-level elements are legal); a
+ * `component`-kind or non-element top-level node is skipped (a ref on a
+ * child component does not yield a DOM Element). Each entry either reuses an
+ * EXISTING `ref=` on that element (the keynav root's own minted/reused ref
+ * when the element IS a keynav root — appending it is a no-op in the normal
+ * case; or an author-declared `ref="x"`) or mints a FRESH one — JSX permits
+ * only one `ref=` attribute per element, so a fresh ref is only minted when
+ * neither already exists.
+ */
+export interface KeynavFocusScopeRef {
+  element: TemplateElementIR;
+  refVar: string;
+  /** False when `refVar` names an ALREADY-existing ref (the keynav root's
+   * own, or an author-declared one) — no fresh `useRef`/`ref=` needs
+   * minting/stamping for this entry. */
+  needsFreshRef: boolean;
+}
+
+function topLevelTemplateElements(ir: IRComponent): TemplateElementIR[] {
+  if (ir.template === null) return [];
+  const root = ir.template;
+  const candidates: TemplateNode[] = root.type === 'TemplateFragment' ? root.children : [root];
+  return candidates.filter(
+    (n): n is TemplateElementIR => n.type === 'TemplateElement' && n.tagKind === 'html',
+  );
+}
+
+/**
+ * Resolves the component-wide focus scope — `[]` when there are no keynav
+ * plans (the overwhelming majority case) OR the template has zero
+ * `html`-kind top-level elements, in which case every `useKeynav` opts
+ * object OMITS `getFocusScope` entirely, and the runtime takes its
+ * documented `documentHasRealFocus` fallback (never a hard rejection).
+ */
+export function resolveKeynavFocusScopeRefs(
+  ir: IRComponent,
+  plans: KeynavEmitPlan[],
+): KeynavFocusScopeRef[] {
+  if (plans.length === 0) return [];
+  const elements = topLevelTemplateElements(ir);
+  const refs: KeynavFocusScopeRef[] = [];
+  let freshIndex = 0;
+  for (const el of elements) {
+    const rootPlan =
+      el.keynavRoot !== undefined
+        ? (plans.find((p) => p.groupIndex === (el.keynavRoot!.groupIndex ?? 0)) ?? null)
+        : null;
+    if (rootPlan !== null) {
+      refs.push({ element: el, refVar: rootPlan.rootRefVar, needsFreshRef: false });
+      continue;
+    }
+    const existingRef = findStaticAttrValue(el, 'ref');
+    if (existingRef !== null && ir.refs.some((r) => r.name === existingRef)) {
+      refs.push({ element: el, refVar: existingRef, needsFreshRef: false });
+      continue;
+    }
+    refs.push({ element: el, refVar: `${SCOPE_REF_VAR}${freshIndex}`, needsFreshRef: true });
+    freshIndex += 1;
+  }
+  return refs;
+}
+
+/**
+ * `ref={...}` for a FRESHLY-minted scope ref only — an already-covered scope
+ * entry (the keynav root's own ref, or an author-declared one) already emits
+ * its `ref=` via its own normal path, and JSX permits only one `ref=` per
+ * element. `node` must be reference-identical to the element
+ * `resolveKeynavFocusScopeRefs` walked (i.e. the ORIGINAL, pre-
+ * `stripKeynavSyntheticEvents` node) — see `emitTemplateNode.ts`'s call site.
+ */
+export function keynavFocusScopeAttrs(
+  scopeRefs: KeynavFocusScopeRef[],
+  node: TemplateElementIR,
+): string[] {
+  const match = scopeRefs.find((r) => r.element === node);
+  if (!match || !match.needsFreshRef) return [];
+  return [`ref={${match.refVar}}`];
+}
+
+/**
  * `KeynavConfig` object literal — every field is statically known at compile
  * time. Deliberately NEVER gains a `grid` key here (Phase 77): grid columns
  * are a reactive expression, and `config` is captured exactly ONCE by
@@ -346,16 +431,47 @@ function buildOnPageCode(root: TemplateElementIR, ir: IRComponent): string | nul
 }
 
 /**
+ * Plan 260806-lz7 — emits the FRESH scope-ref `useRef<...>(null)` lines
+ * (skipping any entry that reuses an existing ref — see
+ * `resolveKeynavFocusScopeRefs`'s doc comment). Called ONCE per component
+ * (unlike `buildKeynavScriptInjections`, which runs once per PLAN) —
+ * duplicating a `const` declaration per plan would be a compile error the
+ * instant a component has more than one `r-keynav` root.
+ */
+export function buildKeynavFocusScopeInjections(
+  scopeRefs: KeynavFocusScopeRef[],
+  collectors: { react: ReactImportCollector },
+): string[] {
+  const injections: string[] = [];
+  for (const ref of scopeRefs) {
+    if (!ref.needsFreshRef) continue;
+    collectors.react.add('useRef');
+    const refType = htmlElementTypeForTag(ref.element.tagName);
+    injections.push(`const ${ref.refVar} = useRef<${refType} | null>(null);`);
+  }
+  return injections;
+}
+
+/**
  * Renders ONE `useKeynav(...)` call plus its `useRef`/`useId` scaffolding as
  * scriptInjection lines (placed AFTER the user script body by `shell.ts` —
  * see the module doc comment). `emitTemplate.ts` calls this once PER
  * resolved plan, so a two-root component emits TWO independent controller
  * calls. Registers every import the emitted lines reference.
+ *
+ * `scopeRefs` (Plan 260806-lz7) — the component-WIDE focus scope (shared
+ * identically across every plan's `getFocusScope`, regardless of which root
+ * this call is for — the guard's containment boundary is the whole
+ * component, not a single root). `[]` when the template has zero
+ * `html`-kind top-level elements, in which case `getFocusScope` is omitted
+ * entirely from this plan's opts and the runtime takes its documented
+ * fallback.
  */
 export function buildKeynavScriptInjections(
   plan: KeynavEmitPlan,
   ir: IRComponent,
   collectors: { react: ReactImportCollector; runtime: RuntimeReactImportCollector },
+  scopeRefs: KeynavFocusScopeRef[] = [],
 ): string[] {
   const injections: string[] = [];
 
@@ -401,6 +517,15 @@ export function buildKeynavScriptInjections(
   const onPageCode = buildOnPageCode(plan.rootElement, ir);
   if (onPageCode !== null) {
     optsLines.push(`  onPage: ${onPageCode},`);
+  }
+  // Plan 260806-lz7 — the strict-containment focus scope. Omitted entirely
+  // when there are zero scope refs (a template with no `html`-kind top-level
+  // elements at all — vanishingly rare), which is what lets the runtime take
+  // its documented `documentHasRealFocus` fallback rather than emitting a
+  // useless empty array.
+  if (scopeRefs.length > 0) {
+    const scopeReads = scopeRefs.map((r) => `${r.refVar}.current`).join(', ');
+    optsLines.push(`  getFocusScope: () => [${scopeReads}],`);
   }
   injections.push(`useKeynav(${plan.rootRefVar}, {\n${optsLines.join('\n')}\n});`);
 
