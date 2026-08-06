@@ -231,16 +231,35 @@ export class KeynavController implements ReactiveController {
    * The DOM subtree this controller's item queries (`applyActiveSideEffects`)
    * are scoped to — the specific root element identified by `rootMarker` for
    * a multi-root component, else the whole shadow root (single-root case,
-   * unchanged from before Phase 77). Falls back to the shadow root if the
-   * marked element can't be found (defensive; should not happen once the
-   * component has rendered at least once).
+   * unchanged from before Phase 77). Returns `null` when `rootMarker` is
+   * defined but its marked element isn't currently in the DOM — i.e. this
+   * controller's OWN group isn't the one being shown right now (e.g. a
+   * conditionally-rendered — `r-if` — drill/grid panel, such as
+   * date-picker's months/years panels).
+   *
+   * lit-drill-seed-january (found 2026-08-05): this used to fall back to
+   * `this.host.renderRoot` — the whole shadow root — under the (violated)
+   * assumption that a marked root "should not happen [to be absent] once
+   * the component has rendered at least once". A conditionally-rendered
+   * panel is EXACTLY the case where that assumption doesn't hold, and the
+   * fallback is unsafe: `data-rozie-keynav-item` index values are reused
+   * 0..N-1 across every `r-keynav` group sharing one shadow root, so an
+   * unscoped whole-root query can coincidentally match a DIFFERENT,
+   * currently-visible group's item at the SAME numeric index. Concretely,
+   * this caused an INACTIVE controller (whose own `active` never changed,
+   * but whose `lastAppliedEl` went stale merely because a SIBLING group's
+   * content was swapped by that OTHER group's own r-if) to steal DOM focus
+   * — and then, via `onFocusIn` -> `moveTo()`, even the ACTIVE group's own
+   * index — away from the group actually being entered (date-picker's
+   * months-drill entry landing on January instead of the selected June).
+   * Returning `null` here lets `applyActiveSideEffects` treat "my own group
+   * isn't rendered" as nothing-to-do, never searching outside its own
+   * group's boundary.
    */
-  private queryScope(): ParentNode {
+  private queryScope(): ParentNode | null {
     if (this.opts.rootMarker === undefined) return this.host.renderRoot;
-    return (
-      this.host.renderRoot.querySelector(
-        `[data-rozie-keynav-root="${this.opts.rootMarker}"]`,
-      ) ?? this.host.renderRoot
+    return this.host.renderRoot.querySelector(
+      `[data-rozie-keynav-root="${this.opts.rootMarker}"]`,
     );
   }
 
@@ -384,8 +403,22 @@ export class KeynavController implements ReactiveController {
     this.cancelPendingRetry();
     if (!Number.isFinite(active)) return;
 
-    const found = this.applyActiveSideEffects(active);
-    if (!found) {
+    const result = this.applyActiveSideEffects(active);
+    if (result === 'no-scope') {
+      // lit-drill-seed-january follow-up — this controller's own group
+      // isn't currently rendered (see `queryScope()`'s doc comment). Do NOT
+      // leave `lastActive` recorded as "settled" at this value: if we did,
+      // the NEXT time this exact numeric active value recurs once the
+      // group's root reappears (e.g. date-picker's selectYear() re-resolving
+      // $data.activeMonth back to the SAME already-selected month), the
+      // `active === lastActive` guard above would short-circuit before
+      // `staleEl` is even relevant — `lastAppliedEl` is null, not merely
+      // disconnected, so `staleEl` reads false too — and this method would
+      // return early forever, never re-applying focus to the remounted
+      // group. Resetting to the pre-connect sentinel forces the very next
+      // real update of this group to be treated as a fresh change.
+      this.lastActive = undefined;
+    } else if (result === 'not-found') {
       this.pendingRafId = requestAnimationFrame(() => {
         this.pendingRafId = null;
         if (this.opts.getActive() !== active) return;
@@ -394,9 +427,25 @@ export class KeynavController implements ReactiveController {
     }
   }
 
-  /** Returns whether an element for `active` was found in the DOM. */
-  private applyActiveSideEffects(active: number): boolean {
+  /**
+   * Applies focus/scroll/class-toggle side effects for `active`, scoped to
+   * this controller's own group. Returns `'no-scope'` when this group isn't
+   * currently rendered at all (see `queryScope()`), `'not-found'` when the
+   * group IS rendered but the specific item for `active` isn't (yet) in the
+   * DOM (SPEC §10's one-frame-late case), or `'found'` on success.
+   */
+  private applyActiveSideEffects(active: number): 'no-scope' | 'not-found' | 'found' {
     const root = this.queryScope();
+    if (root === null) {
+      // This controller's own group isn't currently rendered (see
+      // `queryScope()`'s doc comment — lit-drill-seed-january). There is
+      // nothing in the DOM for THIS group to focus/scroll/class-toggle, and
+      // — critically — no other group's item is a safe substitute. Clear
+      // `lastAppliedEl` so a stale reference from before this group was torn
+      // down doesn't linger (mirrors the "not found" bookkeeping below).
+      this.lastAppliedEl = null;
+      return 'no-scope';
+    }
     const activeEl = root.querySelector<HTMLElement>(
       `[data-rozie-keynav-item="${active}"]`,
     );
@@ -439,6 +488,6 @@ export class KeynavController implements ReactiveController {
     // doc comment).
     this.lastAppliedEl = activeEl;
 
-    return activeEl !== null;
+    return activeEl !== null ? 'found' : 'not-found';
   }
 }

@@ -20,7 +20,7 @@
  * this suite.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { LitElement, html } from 'lit';
+import { LitElement, html, nothing } from 'lit';
 import type { KeynavConfig, KeynavPageDetail } from '@rozie/runtime-keynav-core';
 import { KeynavController, type KeynavControllerOpts } from '../KeynavController.js';
 
@@ -745,5 +745,231 @@ describe('KeynavController — multi-root DOM containment scoping (Plan 77-05 Ta
 
     expect(el.activeA).toBe(2);
     expect(el.activeB).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// lit-drill-seed-january — a THIRD, CONDITIONALLY-rendered group (`data-rozie-
+// keynav-root` absent until its own mode is active) sharing the same shadow
+// root as an always-present group whose CONTENT (not just visibility) empties
+// when a sibling mode is active. Mirrors date-picker's day/months/years
+// drill triple exactly (day grid's wrapper root is always in the DOM but its
+// item content is gated separately; the months/years panels are each fully
+// r-if-gated). Reproduces the cross-group DOM-query collision: an INACTIVE
+// group's controller (still holding its own default `active === 0`, and
+// whose `lastAppliedEl` goes stale the instant ANY sibling's content swaps)
+// re-queries the WHOLE shadow root for its own index (because its own scoped
+// root element doesn't exist), coincidentally matches a DIFFERENT,
+// currently-visible group's item at that same index, and steals DOM focus
+// onto it — even though that group's `active` value never actually changed.
+// ---------------------------------------------------------------------------
+
+interface DrillElInstance extends HTMLElement {
+  mode: 'a' | 'b' | 'c';
+  activeA: number;
+  activeB: number;
+  activeC: number;
+  enterB(seedIndex: number): void;
+  updateComplete: Promise<boolean>;
+  shadowRoot: ShadowRoot;
+}
+
+function defineDrillEl(): string {
+  const tag = `keynav-test-drill-${tagCounter++}`;
+  const groupItems = ITEMS.map((it) => ({ ...it, disabled: false }));
+
+  class DrillEl extends LitElement {
+    static override properties = {
+      mode: { type: String },
+      activeA: { type: Number },
+      activeB: { type: Number },
+      activeC: { type: Number },
+    };
+    declare mode: 'a' | 'b' | 'c';
+    declare activeA: number;
+    declare activeB: number;
+    declare activeC: number;
+    controllerA: KeynavController;
+    controllerB: KeynavController;
+    controllerC: KeynavController;
+
+    constructor() {
+      super();
+      this.mode = 'a';
+      this.activeA = 0;
+      this.activeB = 0;
+      this.activeC = 0;
+      // Construction order mirrors DatePicker.ts's field order (day, month,
+      // year) — `hostUpdated()` runs in this SAME order on every update,
+      // which is what lets a LATER-constructed inactive controller steal
+      // focus back from an EARLIER-constructed active one within one batch.
+      this.controllerA = new KeynavController(this, {
+        config: BASE_CONFIG,
+        getSource: () => groupItems,
+        getActive: () => this.activeA,
+        setActive: (i) => {
+          this.activeA = i;
+        },
+        onCommit: () => {},
+        rootMarker: 'a',
+      });
+      this.controllerB = new KeynavController(this, {
+        config: BASE_CONFIG,
+        getSource: () => groupItems,
+        getActive: () => this.activeB,
+        setActive: (i) => {
+          this.activeB = i;
+        },
+        onCommit: () => {},
+        rootMarker: 'b',
+      });
+      this.controllerC = new KeynavController(this, {
+        config: BASE_CONFIG,
+        getSource: () => groupItems,
+        getActive: () => this.activeC,
+        setActive: (i) => {
+          this.activeC = i;
+        },
+        onCommit: () => {},
+        rootMarker: 'c',
+      });
+    }
+
+    /** Mirrors `enterMonthsView()`: seed the target group's active index
+     * FIRST, then flip the view mode — both synchronous, same handler. */
+    enterB(seedIndex: number): void {
+      this.activeB = seedIndex;
+      this.mode = 'b';
+    }
+
+    override render() {
+      // Single top-level wrapper element (rather than several top-level
+      // conditional sibling parts) — the vitest/happy-dom environment used
+      // by this suite does not reliably patch MULTIPLE top-level dynamic
+      // child parts in a shadow-root-rendered template (verified against a
+      // throwaway spike: an array/conditional part growing from empty at
+      // the TOP LEVEL of the template silently fails to commit under
+      // happy-dom@15, while the identical part nested one level down inside
+      // a containing element works correctly). This has no bearing on the
+      // bug under test — `DatePicker.ts`'s real template nests its drill
+      // panels one level inside the component's own root `<div>` the same
+      // way.
+      return html`
+        <div class="root">
+          <div role="menu" data-rozie-keynav-root="a">
+            ${this.mode === 'a'
+              ? groupItems.map(
+                  (item, i) => html`
+                    <li
+                      data-group="a"
+                      data-rozie-keynav-item=${i}
+                      ?data-rozie-keynav-active=${this.activeA === i}
+                      tabindex=${this.activeA === i ? 0 : -1}
+                    >${item.label}</li>
+                  `,
+                )
+              : nothing}
+          </div>
+          ${this.mode === 'b'
+            ? html`<div role="menu" data-rozie-keynav-root="b">
+                ${groupItems.map(
+                  (item, i) => html`
+                    <li
+                      data-group="b"
+                      data-rozie-keynav-item=${i}
+                      ?data-rozie-keynav-active=${this.activeB === i}
+                      tabindex=${this.activeB === i ? 0 : -1}
+                    >${item.label}</li>
+                  `,
+                )}
+              </div>`
+            : nothing}
+          ${this.mode === 'c'
+            ? html`<div role="menu" data-rozie-keynav-root="c">
+                ${groupItems.map(
+                  (item, i) => html`
+                    <li
+                      data-group="c"
+                      data-rozie-keynav-item=${i}
+                      ?data-rozie-keynav-active=${this.activeC === i}
+                      tabindex=${this.activeC === i ? 0 : -1}
+                    >${item.label}</li>
+                  `,
+                )}
+              </div>`
+            : nothing}
+        </div>
+      `;
+    }
+  }
+
+  customElements.define(tag, DrillEl);
+  return tag;
+}
+
+describe('KeynavController — conditionally-rendered multi-root groups (lit-drill-seed-january)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('entering group B seeds a non-zero active index and focus lands on THAT item, not group C\'s stale default stealing focus onto index 0', async () => {
+    const tag = defineDrillEl();
+    const el = await mount<DrillElInstance>(tag);
+
+    // Enter group B seeded at index 2 (the "already-selected" cell — mirrors
+    // enterMonthsView() resolving to June, index 5, not January, index 0).
+    // `activeC` is NEVER touched — it stays at its constructor default (0),
+    // exactly like `activeYear` before the years drill is ever entered.
+    el.enterB(2);
+    await el.updateComplete;
+
+    expect(el.activeB).toBe(2);
+    expect(el.activeC).toBe(0); // untouched — this group was never entered
+
+    const groupBItems = Array.from(el.shadowRoot.querySelectorAll('[data-group="b"]'));
+    // The regression: group C's controller (inactive, root "c" absent,
+    // active still 0) must NOT re-query the whole shadow root and steal
+    // focus onto group B's index-0 item.
+    expect(el.shadowRoot.activeElement).toBe(groupBItems[2]);
+    expect((groupBItems[2] as HTMLElement).getAttribute('data-rozie-keynav-item')).toBe('2');
+  });
+
+  // -------------------------------------------------------------------------
+  // lit-drill-seed-january follow-up (found via synchronous Docker VR against
+  // date-picker-keyboard.spec.ts 'drill enter/exit keeps keyboard focus
+  // continuity', line 260): the fix above (queryScope() returning null
+  // instead of falling back to the whole shadow root) correctly stops the
+  // cross-group steal, but exposed a SECOND, previously-latent gap in the
+  // SAME hostUpdated()/applyActiveSideEffects() interaction — clearing
+  // `lastAppliedEl` to null when a group's own root is absent silently
+  // disables the `staleEl` re-apply trigger for the NEXT time that group's
+  // root reappears with the SAME numeric active value (hostUpdated()'s
+  // `active === lastActive` short-circuit fires first). Mirrors date-picker's
+  // selectYear(): re-entering the months drill after picking a year re-seeds
+  // activeMonth to the SAME already-selected month index.
+  // -------------------------------------------------------------------------
+  it('re-entering group B with an unchanged seed index (after visiting group C) still re-applies focus (lit-drill-seed-january follow-up)', async () => {
+    const tag = defineDrillEl();
+    const el = await mount<DrillElInstance>(tag);
+
+    el.enterB(2);
+    await el.updateComplete;
+    const firstGroupBItems = Array.from(el.shadowRoot.querySelectorAll('[data-group="b"]'));
+    expect(el.shadowRoot.activeElement).toBe(firstGroupBItems[2]);
+
+    // Drill further into group C — group B's root goes absent (torn down).
+    el.mode = 'c';
+    await el.updateComplete;
+    expect(el.shadowRoot.querySelector('[data-rozie-keynav-root="b"]')).toBeNull();
+
+    // Re-enter group B, seeded to the SAME index as before (mirrors
+    // selectYear() re-resolving $data.activeMonth to the already-seeded
+    // month — the selected date never changed, only the view anchor did).
+    el.enterB(2);
+    await el.updateComplete;
+
+    const groupBItems = Array.from(el.shadowRoot.querySelectorAll('[data-group="b"]'));
+    expect(el.activeB).toBe(2);
+    expect(el.shadowRoot.activeElement).toBe(groupBItems[2]);
   });
 });
