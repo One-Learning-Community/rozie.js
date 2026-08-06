@@ -59,11 +59,25 @@
  * This controller owns only what a declarative template cannot: focus,
  * scroll, and the imperative `r-keynav-active-class` toggle.
  *
+ * Plan 260806-lz7 — the tabindex model's first/redundant focus+scroll pass
+ * (a connect, or a group's own root reappearing after a `'no-scope'`
+ * `hostUpdated()` pass) is gated by `@rozie/runtime-keynav-core`'s
+ * `focusIsWithinScope` strict-containment predicate: it only runs when DOM
+ * focus is already inside the owning component. Unlike the four
+ * opts-driven runtimes, Lit derives its anchor NATIVELY from `this.host`
+ * (the custom element) rather than a threaded `getFocusScope` opt — a
+ * focused element nested inside the shadow root still resolves as
+ * contained, because `composedContains` ascends OUT of shadow boundaries
+ * back up to the host. A genuine navigation pass (the active INDEX
+ * changing) is never gated. See `focusGuard.ts`'s module doc comment for
+ * the full rule.
+ *
  * @public — runtime API consumed by emitted Lit `.ts` files.
  */
 import type { LitElement, ReactiveController, ReactiveControllerHost } from 'lit';
 import {
   createKeynavStateMachine,
+  focusIsWithinScope,
   normalizeClassTokens,
   type ClassValue,
   type KeynavConfig,
@@ -168,6 +182,16 @@ export class KeynavController implements ReactiveController {
    * cancelled on a newer active-change and on `hostDisconnected()`.
    */
   private pendingRafId: number | null = null;
+  /**
+   * Plan 260806-lz7 — the last active index a focus/scroll pass actually
+   * resolved for this group's attachment. Distinguishes a first/redundant
+   * pass (guarded by `focusIsWithinScope`) from a genuine navigation pass
+   * (unconditional). Reset in `hostConnected()` (a fresh connect) and on the
+   * `'no-scope'` branch of `hostUpdated()` (this group's own root isn't
+   * currently rendered — the SAME "treat the next real update as fresh"
+   * reasoning `lastActive`'s reset there already documents).
+   */
+  private lastFocusedActive: number | null = null;
 
   constructor(host: KeynavControllerHost, opts: KeynavControllerOpts) {
     this.host = host;
@@ -343,6 +367,9 @@ export class KeynavController implements ReactiveController {
     // mount, since `active` is always a "change" from the undefined baseline).
     this.lastActive = undefined;
     this.lastAppliedEl = null;
+    // Plan 260806-lz7 — a fresh connect starts with no navigation history of
+    // its own; the next applied pass is guarded.
+    this.lastFocusedActive = null;
   }
 
   hostDisconnected(): void {
@@ -403,7 +430,22 @@ export class KeynavController implements ReactiveController {
     this.cancelPendingRetry();
     if (!Number.isFinite(active)) return;
 
-    const result = this.applyActiveSideEffects(active);
+    // Plan 260806-lz7 — computed ONCE per `hostUpdated()` invocation (not
+    // per `applyActiveSideEffects` call) so the deferred rAF retry below
+    // reuses the SAME may-apply decision the synchronous pass made, rather
+    // than re-evaluating against a `lastFocusedActive` this same invocation
+    // already advanced to `active`. Lit derives its anchor natively from
+    // `this.host` (the custom element) rather than an opts field — see the
+    // module doc comment — so `composedContains` walking focus inside the
+    // shadow root back up to the host is what makes strict containment work
+    // here without any threaded scope.
+    const isNavigationPass =
+      this.lastFocusedActive !== null && this.lastFocusedActive !== active;
+    const mayApply =
+      isNavigationPass || focusIsWithinScope([this.host], this.host.ownerDocument);
+    this.lastFocusedActive = active;
+
+    const result = this.applyActiveSideEffects(active, mayApply);
     if (result === 'no-scope') {
       // lit-drill-seed-january follow-up — this controller's own group
       // isn't currently rendered (see `queryScope()`'s doc comment). Do NOT
@@ -418,11 +460,15 @@ export class KeynavController implements ReactiveController {
       // group. Resetting to the pre-connect sentinel forces the very next
       // real update of this group to be treated as a fresh change.
       this.lastActive = undefined;
+      // Plan 260806-lz7 — same reasoning: the next real update of this
+      // group must be treated as a fresh (guarded) pass, not a navigation
+      // continuing from before the group disappeared.
+      this.lastFocusedActive = null;
     } else if (result === 'not-found') {
       this.pendingRafId = requestAnimationFrame(() => {
         this.pendingRafId = null;
         if (this.opts.getActive() !== active) return;
-        this.applyActiveSideEffects(active);
+        this.applyActiveSideEffects(active, mayApply);
       });
     }
   }
@@ -433,8 +479,18 @@ export class KeynavController implements ReactiveController {
    * currently rendered at all (see `queryScope()`), `'not-found'` when the
    * group IS rendered but the specific item for `active` isn't (yet) in the
    * DOM (SPEC §10's one-frame-late case), or `'found'` on success.
+   *
+   * `mayApply` (Plan 260806-lz7) — computed ONCE by `hostUpdated()` (for
+   * both its synchronous call and its deferred rAF retry, which reuses the
+   * SAME value rather than recomputing against `lastFocusedActive` this
+   * same logical pass already advanced) and threaded down as a plain
+   * parameter. Gates the focus + scroll calls only — the SPEC §9
+   * active-class toggle stays unconditional.
    */
-  private applyActiveSideEffects(active: number): 'no-scope' | 'not-found' | 'found' {
+  private applyActiveSideEffects(
+    active: number,
+    mayApply: boolean,
+  ): 'no-scope' | 'not-found' | 'found' {
     const root = this.queryScope();
     if (root === null) {
       // This controller's own group isn't currently rendered (see
@@ -470,16 +526,22 @@ export class KeynavController implements ReactiveController {
     // Tabindex model (SPEC §3) — DOM focus follows the active item. The
     // `tabindex` VALUE itself is a declarative template binding
     // (emitter-owned); only the imperative `.focus()` call belongs here.
-    if (this.opts.config.focusModel === 'tabindex' && activeEl) {
+    // Plan 260806-lz7: gated behind `mayApply` — a first/redundant pass
+    // only focuses when the composed active element is already inside the
+    // owning component; a genuine navigation pass always focuses.
+    if (mayApply && this.opts.config.focusModel === 'tabindex' && activeEl) {
       activeEl.focus();
     }
 
     // SPEC §10 — windower present: drive its `scrollToIndex`. No windower:
-    // fall back to `scrollIntoView` on the rendered node.
-    if (this.opts.windower) {
-      this.opts.windower.scrollToIndex(active, { align: 'nearest' });
-    } else if (activeEl) {
-      activeEl.scrollIntoView({ block: 'nearest' });
+    // fall back to `scrollIntoView` on the rendered node. Plan 260806-lz7:
+    // same `mayApply` gate as the focus call above.
+    if (mayApply) {
+      if (this.opts.windower) {
+        this.opts.windower.scrollToIndex(active, { align: 'nearest' });
+      } else if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest' });
+      }
     }
 
     // 77-07 — remember which element (if any) this pass actually applied

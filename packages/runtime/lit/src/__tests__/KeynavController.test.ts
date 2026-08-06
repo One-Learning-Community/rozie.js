@@ -297,6 +297,157 @@ describe('KeynavController — runtime-lit', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Plan 260806-lz7 Task 1 — strict-containment focus guard. `defineScopedMenuEl`
+// renders a persistent `#heading` button in the SAME shadow root as the
+// keynav root's `<ul>`, so case (b) can focus something "inside the
+// component (this.host's shadow tree) but outside the keynav root" — the
+// Lit shape of the date-picker drill-heading scenario. Unlike the four
+// opts-driven runtimes, Lit has no `getFocusScope` field (it derives its
+// anchor natively from `this.host`), so there is no separate compatibility
+// case here — every Lit consumer gets strict containment unconditionally.
+// ---------------------------------------------------------------------------
+
+interface ScopedMenuElInstance extends HTMLElement {
+  active: number;
+  updateComplete: Promise<boolean>;
+  shadowRoot: ShadowRoot;
+}
+
+function defineScopedMenuEl(opts: { config?: KeynavConfig; onCommit?: (i: number) => void }): string {
+  const tag = `keynav-test-scoped-menu-${tagCounter++}`;
+  const config = opts.config ?? BASE_CONFIG;
+  const onCommit = opts.onCommit ?? (() => {});
+
+  class ScopedMenuEl extends LitElement {
+    static override properties = { active: { type: Number } };
+    declare active: number;
+    controller: KeynavController;
+
+    constructor() {
+      super();
+      this.active = 0;
+      this.controller = new KeynavController(this, {
+        config,
+        getSource: () => ITEMS,
+        getActive: () => this.active,
+        setActive: (i) => {
+          this.active = i;
+        },
+        onCommit,
+      });
+    }
+
+    override render() {
+      return html`
+        <button type="button" id="heading">Heading</button>
+        <ul>
+          ${ITEMS.map(
+            (item, i) => html`
+              <li
+                data-rozie-keynav-item=${i}
+                ?data-rozie-keynav-active=${this.active === i}
+                tabindex=${this.active === i ? 0 : -1}
+              >${item.label}</li>
+            `,
+          )}
+        </ul>
+      `;
+    }
+  }
+
+  customElements.define(tag, ScopedMenuEl);
+  return tag;
+}
+
+function scopedItems(el: ScopedMenuElInstance): HTMLElement[] {
+  return Array.from(el.shadowRoot.querySelectorAll('li'));
+}
+
+function scopedByLabel(el: ScopedMenuElInstance, label: string): HTMLElement {
+  const found = scopedItems(el).find((it) => it.textContent === label);
+  if (!found) throw new Error(`no item with label ${label}`);
+  return found;
+}
+
+describe('KeynavController — strict-containment focus guard (Plan 260806-lz7 Task 1)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('case (c): a cold mount with nothing ever focused does not steal focus or scroll', async () => {
+    const tag = defineMenuEl({});
+    const el = await mount(tag);
+
+    expect(document.activeElement).toBe(document.body);
+    expect(items(el)[0]!.hasAttribute('data-rozie-keynav-active')).toBe(true); // active-class/data marker IS unconditional
+    expect(el.shadowRoot.activeElement).not.toBe(items(el)[0]); // but DOM focus was NOT stolen
+  });
+
+  it('case (a) — THE STRICTNESS CASE: mount while a real element OUTSIDE the component subtree holds focus does not steal focus', async () => {
+    const outside = document.createElement('button');
+    outside.type = 'button';
+    outside.textContent = 'Outside';
+    document.body.appendChild(outside);
+    outside.focus();
+    expect(document.activeElement).toBe(outside);
+
+    const tag = defineMenuEl({});
+    const el = await mount(tag);
+
+    // A document-scoped predicate would let this steal focus (something IS
+    // focused on the page); strict containment must not, because "outside"
+    // is not inside the component's own host/shadow subtree.
+    expect(document.activeElement).toBe(outside);
+    expect(el.shadowRoot.activeElement).not.toBe(items(el)[0]);
+
+    outside.remove();
+  });
+
+  it('case (b): mount/re-appearance while focus is INSIDE the component (this.host\'s shadow tree) but outside the keynav root DOES focus (drill-continuity shape)', async () => {
+    const tag = defineScopedMenuEl({});
+    const el = await mount<ScopedMenuElInstance>(tag);
+    expect(el.shadowRoot.activeElement).not.toBe(scopedByLabel(el, 'Alpha')); // cold mount — case (c), unaffected here
+
+    // Disconnect + reconnect forces a fresh attachment (hostDisconnected then
+    // hostConnected resets lastFocusedActive to null — mirroring an r-if
+    // root's controller-level fresh-attachment reset on the other five
+    // targets). `.focus()` the heading — inside this.host's shadow tree,
+    // outside the <ul> keynav root — SYNCHRONOUSLY right after reconnecting
+    // and BEFORE awaiting `updateComplete`: Lit's reactive update (and thus
+    // `hostUpdated()`) is scheduled on a microtask, so this establishes real
+    // focus before the guarded pass evaluates it, mirroring the date-picker
+    // drill shape where focus already sits on the persistent header when a
+    // panel reappears.
+    el.remove();
+    document.body.appendChild(el);
+    (el.shadowRoot.querySelector('#heading') as HTMLElement).focus();
+    // Forces a genuine update cycle (hostUpdated included) even though no
+    // reactive property changed — in the real component, an r-if panel
+    // reappearing is always accompanied by a property flip that would
+    // trigger this same cycle; `requestUpdate()` is the direct, honest way
+    // to force it here without inventing unrelated property plumbing.
+    (el as unknown as { requestUpdate(): void }).requestUpdate();
+    await el.updateComplete;
+
+    expect(el.shadowRoot.activeElement).toBe(scopedByLabel(el, 'Alpha'));
+  });
+
+  it('case (d): after a guarded cold mount, an index change focuses unconditionally even though document focus is still at body', async () => {
+    const tag = defineMenuEl({});
+    const el = await mount(tag);
+    expect(document.activeElement).toBe(document.body); // guarded mount pass did not steal focus
+
+    dispatchKey(items(el)[0]!, 'ArrowDown'); // a genuine navigation pass
+    await el.updateComplete;
+
+    // Index 1 (Bravo) is disabled — skipDisabled lands on index 2 (Charlie)
+    // — and it IS focused, unconditionally, even though document focus was
+    // still at body.
+    expect(el.shadowRoot.activeElement).toBe(items(el)[2]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Plan 77-05 Task 1 — `onPage` + `gridColumns` + the deferred one-frame-late
 // focus pass. A separate harness (`defineGridMenuEl`/`defineLateGridEl`)
 // keeps the pre-existing `defineMenuEl` cases above completely untouched
@@ -856,6 +1007,7 @@ function defineDrillEl(): string {
       // way.
       return html`
         <div class="root">
+          <button type="button" id="drill-heading">Heading</button>
           <div role="menu" data-rozie-keynav-root="a">
             ${this.mode === 'a'
               ? groupItems.map(
@@ -916,6 +1068,21 @@ describe('KeynavController — conditionally-rendered multi-root groups (lit-dri
     const tag = defineDrillEl();
     const el = await mount<DrillElInstance>(tag);
 
+    // Plan 260806-lz7 — establish real focus inside the component BEFORE
+    // drilling, mirroring the actual date-picker flow (the user has already
+    // interacted with the calendar — e.g. via the persistent month/year
+    // header — before ever opening the months drill). `#drill-heading`
+    // persists across every mode (unlike a group's own items, which are torn
+    // down the instant mode flips — happy-dom, like real browsers, reverts
+    // focus to the document the moment a focused node is removed, so a group
+    // item cannot be used as the pre-drill focus target here). Without this,
+    // group B's entry pass is a COLD first pass with nothing focused
+    // anywhere, which the strict-containment guard correctly refuses to
+    // steal focus for (case (c)) — this test is specifically the drill-
+    // CONTINUITY shape (case (b)), which requires focus already established
+    // inside the component.
+    (el.shadowRoot.querySelector('#drill-heading') as HTMLElement).focus();
+
     // Enter group B seeded at index 2 (the "already-selected" cell — mirrors
     // enterMonthsView() resolving to June, index 5, not January, index 0).
     // `activeC` is NEVER touched — it stays at its constructor default (0),
@@ -952,15 +1119,27 @@ describe('KeynavController — conditionally-rendered multi-root groups (lit-dri
     const tag = defineDrillEl();
     const el = await mount<DrillElInstance>(tag);
 
+    // Plan 260806-lz7 — establish real focus inside the component before the
+    // first drill, mirroring the actual date-picker flow. See the sibling
+    // test above for why this is required under the strict-containment
+    // guard.
+    (el.shadowRoot.querySelector('#drill-heading') as HTMLElement).focus();
+
     el.enterB(2);
     await el.updateComplete;
     const firstGroupBItems = Array.from(el.shadowRoot.querySelectorAll('[data-group="b"]'));
     expect(el.shadowRoot.activeElement).toBe(firstGroupBItems[2]);
 
-    // Drill further into group C — group B's root goes absent (torn down).
+    // Drill further into group C — group B's root goes absent (torn down),
+    // which (like a real browser) reverts DOM focus to the document the
+    // instant the focused node is removed. Re-focus the persistent heading —
+    // mirroring the real date-picker flow, where the user still has SOME
+    // element inside the component focused (e.g. the persistent header) —
+    // before re-entering group B.
     el.mode = 'c';
     await el.updateComplete;
     expect(el.shadowRoot.querySelector('[data-rozie-keynav-root="b"]')).toBeNull();
+    (el.shadowRoot.querySelector('#drill-heading') as HTMLElement).focus();
 
     // Re-enter group B, seeded to the SAME index as before (mirrors
     // selectYear() re-resolving $data.activeMonth to the already-seeded
