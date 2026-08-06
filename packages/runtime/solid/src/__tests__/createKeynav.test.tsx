@@ -248,6 +248,168 @@ describe('createKeynav (Solid, Plan 71-07 Task 1)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Plan 260806-lz7 Task 1 — strict-containment focus guard. `buildScopedMenu`
+// wires `getFocusScope` to a wrapper element that contains the keynav root
+// PLUS a sibling "heading" (standing in for the date-picker drill heading),
+// so cases (a)/(b) can distinguish "inside the component, outside the root"
+// from "outside the component entirely." Mirrors the React reference's
+// `ScopedMenu` harness (Plan 260806-lz7 Task 1) test-by-test.
+// ---------------------------------------------------------------------------
+
+interface ScopedMenuHarness {
+  wrapper: HTMLElement;
+  heading: HTMLElement;
+  items: HTMLElement[];
+  dispose: () => void;
+}
+
+function buildScopedMenu(opts: {
+  config: KeynavConfig;
+  onCommit: (i: number) => void;
+  items?: Item[];
+  /** Focuses the heading BEFORE `createKeynav` ever runs — mirrors a
+   * drill-continuity re-entry where focus already sits inside the
+   * component, outside the root, at (re)attachment time. */
+  focusHeadingBeforeMount?: boolean;
+}): ScopedMenuHarness {
+  const items = opts.items ?? ITEMS;
+  const wrapper = document.createElement('div');
+  document.body.appendChild(wrapper);
+  const heading = document.createElement('button');
+  heading.type = 'button';
+  heading.textContent = 'Heading';
+  wrapper.appendChild(heading);
+
+  if (opts.focusHeadingBeforeMount) {
+    heading.focus();
+  }
+
+  const root = document.createElement('div');
+  root.setAttribute('role', 'menu');
+  root.tabIndex = -1;
+  wrapper.appendChild(root);
+
+  const itemEls: HTMLElement[] = items.map((it) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('role', 'menuitem');
+    btn.textContent = it.label;
+    if (it.disabled) btn.disabled = true;
+    root.appendChild(btn);
+    return btn;
+  });
+
+  let dispose: () => void = () => {};
+
+  createRoot((d) => {
+    dispose = d;
+    const [active, setActive] = createSignal(0);
+
+    itemEls.forEach((el, i) => {
+      createEffect(() => {
+        el.setAttribute('data-rozie-keynav-item', String(i));
+        if (active() === i) el.setAttribute('data-rozie-keynav-active', '');
+        else el.removeAttribute('data-rozie-keynav-active');
+        el.setAttribute('tabindex', active() === i ? '0' : '-1');
+      });
+    });
+
+    createKeynav(() => root, {
+      config: opts.config,
+      getSource: () => items,
+      getActive: () => active(),
+      setActive,
+      onCommit: opts.onCommit,
+      getFocusScope: () => [wrapper],
+    });
+  });
+
+  return { wrapper, heading, items: itemEls, dispose };
+}
+
+describe('createKeynav (Solid) — strict-containment focus guard (Plan 260806-lz7 Task 1)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('case (c): a cold mount with nothing ever focused does not steal focus or scroll', () => {
+    const commit = vi.fn();
+    const { items, dispose } = buildMenu({ config: BASE_CONFIG, onCommit: commit });
+
+    expect(document.activeElement).toBe(document.body);
+    expect(isActive(byLabel(items, 'Alpha'))).toBe(true); // active-class/data marker IS unconditional
+    expect(document.activeElement).not.toBe(byLabel(items, 'Alpha')); // but DOM focus was NOT stolen
+
+    dispose();
+  });
+
+  it('case (a) — THE STRICTNESS CASE: mount while a real element OUTSIDE the component subtree holds focus does not steal focus', () => {
+    const commit = vi.fn();
+    const outside = document.createElement('button');
+    outside.type = 'button';
+    outside.textContent = 'Outside';
+    document.body.appendChild(outside);
+    outside.focus();
+    expect(document.activeElement).toBe(outside);
+
+    const { items, dispose } = buildScopedMenu({ config: BASE_CONFIG, onCommit: commit });
+
+    // A document-scoped predicate would let this steal focus (something IS
+    // focused on the page); strict containment must not, because "outside"
+    // is not inside the ScopedMenu's wrapper.
+    expect(document.activeElement).toBe(outside);
+    expect(document.activeElement).not.toBe(byLabel(items, 'Alpha'));
+
+    dispose();
+  });
+
+  it('case (b): mount while focus is INSIDE the component but outside the keynav root DOES focus (drill-continuity shape)', () => {
+    const commit = vi.fn();
+    const { items, dispose } = buildScopedMenu({
+      config: BASE_CONFIG,
+      onCommit: commit,
+      focusHeadingBeforeMount: true,
+    });
+
+    expect(document.activeElement).toBe(byLabel(items, 'Alpha'));
+
+    dispose();
+  });
+
+  it('case (d): after a guarded cold mount, an index change focuses unconditionally even though document focus is still at body', () => {
+    const commit = vi.fn();
+    const { root, items, dispose } = buildMenu({ config: BASE_CONFIG, onCommit: commit });
+    expect(document.activeElement).toBe(document.body); // guarded mount pass did not steal focus
+
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); // a genuine navigation pass
+
+    // Bravo is disabled — skipDisabled lands on Charlie — and it IS focused,
+    // unconditionally, even though document focus was still at body.
+    expect(document.activeElement).toBe(byLabel(items, 'Charlie'));
+
+    dispose();
+  });
+
+  it('compatibility: without getFocusScope, a real focus anywhere in the document still lets the guarded first pass focus (document-scoped fallback, never unconditional steal)', () => {
+    const commit = vi.fn();
+    const outside = document.createElement('button');
+    outside.type = 'button';
+    outside.textContent = 'Outside';
+    document.body.appendChild(outside);
+    outside.focus();
+
+    // `buildMenu` (unlike `buildScopedMenu`) never passes `getFocusScope` —
+    // this proves the field is additive and an un-regenerated leaf degrades
+    // to the OLD document-scoped predicate, not to a hard rejection.
+    const { items, dispose } = buildMenu({ config: BASE_CONFIG, onCommit: commit });
+
+    expect(document.activeElement).toBe(byLabel(items, 'Alpha'));
+
+    dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Plan 77-04 Task 3 — `onPage` + `gridColumns` + the deferred one-frame-late
 // focus pass. A separate harness (`buildGridMenu`/`buildLateGrid`) keeps the
 // pre-existing `buildMenu` cases above completely untouched (SPEC §7.4
