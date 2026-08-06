@@ -80,11 +80,21 @@
  * Phase-77 responsibility is plumbing `onPage`/`gridColumns` through to the
  * machine.
  *
+ * Plan 260806-lz7 — the tabindex model's first/redundant focus+scroll pass
+ * (mount, or an `{#if}`-gated root re-appearing as a fresh action instance)
+ * is gated by `@rozie/runtime-keynav-core`'s `focusIsWithinScope`
+ * strict-containment predicate: it only runs when DOM focus is already
+ * inside the owning component (via the optional `getFocusScope` opt, or the
+ * compiler-emitted root itself). A genuine navigation pass (the active INDEX
+ * changing) is never gated. See `focusGuard.ts`'s module doc comment for the
+ * full rule.
+ *
  * @public — runtime API consumed by emitted `.svelte` files with an
  * `r-keynav` root.
  */
 import {
   createKeynavStateMachine,
+  focusIsWithinScope,
   normalizeClassTokens,
   type ClassValue,
   type KeynavConfig,
@@ -143,6 +153,35 @@ export interface KeynavActionOpts {
    * behavior and emitted call byte-identical.
    */
   gridColumns?: () => number;
+  /**
+   * Plan 260806-lz7 — the strict-containment focus scope. Lazily resolved
+   * component-scope element refs (read fresh every pass, never captured
+   * once). Optional and additive: an older leaf that omits this field takes
+   * the `documentHasRealFocus` compatibility fallback rather than strict
+   * containment — see `keynav.ts`'s module doc comment.
+   */
+  getFocusScope?: () => Element | readonly (Element | null)[] | null;
+}
+
+// Plan 260806-lz7 — builds the anchor list `focusIsWithinScope` checks
+// containment against. When `getFocusScope` is ABSENT (an older leaf calling
+// this action without having been regenerated), NO anchor list is built at
+// all — `focusIsWithinScope` then takes its pinned `documentHasRealFocus`
+// fallback, preserving the pre-fix document-scoped behavior for that leaf.
+// When `getFocusScope` IS present, its resolved value is combined with the
+// keynav root itself — appending the root is a no-op in the normal case
+// (the root is inside the component) and is what keeps a
+// `<slot portal />`-relocated keynav root working, since focus inside a
+// portalled root is still "within the component" for this primitive.
+function resolveFocusScope(
+  opts: KeynavActionOpts,
+  node: HTMLElement,
+): Element | readonly (Element | null)[] | null | undefined {
+  if (opts.getFocusScope === undefined) return undefined;
+  const extra = opts.getFocusScope();
+  const list = extra == null ? [] : Array.isArray(extra) ? [...extra] : [extra];
+  list.push(node);
+  return list;
 }
 
 /**
@@ -154,11 +193,19 @@ export interface KeynavActionOpts {
  * comment for why `update()` fires reliably). Returns whether an element for
  * `active` was found in the DOM — Phase 77's `runActiveEffects` uses this to
  * decide whether to schedule a deferred retry (T-77-03-03).
+ *
+ * `mayApply` (Plan 260806-lz7) — computed ONCE by the caller
+ * (`runActiveEffects`, for both its synchronous call and its deferred rAF
+ * retry, which reuses the SAME value rather than recomputing) and threaded
+ * down as a plain parameter, since this function is a pure module-level
+ * helper with no closure state of its own to consult. Gates the focus +
+ * scroll calls only — the SPEC §9 active-class toggle stays unconditional.
  */
 function applyActiveEffects(
   node: Element,
   active: number,
   opts: KeynavActionOpts,
+  mayApply: boolean,
 ): boolean {
   if (!Number.isFinite(active)) return true;
   const activeEl = node.querySelector<HTMLElement>(
@@ -190,17 +237,23 @@ function applyActiveEffects(
 
   // Tabindex model (SPEC §3) — DOM focus follows the active item. The
   // `tabindex` VALUE itself is a declarative template binding (emitter-
-  // owned); only the imperative `.focus()` call belongs here.
-  if (opts.config.focusModel === 'tabindex' && activeEl) {
+  // owned); only the imperative `.focus()` call belongs here. Plan
+  // 260806-lz7: gated behind `mayApply` — a first/redundant pass only
+  // focuses when the composed active element is already inside the owning
+  // component; a genuine navigation pass always focuses.
+  if (mayApply && opts.config.focusModel === 'tabindex' && activeEl) {
     activeEl.focus();
   }
 
   // SPEC §10 — windower present: drive its `scrollToIndex`. No windower:
-  // fall back to `scrollIntoView` on the rendered node.
-  if (opts.windower) {
-    opts.windower.scrollToIndex(active, { align: 'nearest' });
-  } else if (activeEl) {
-    activeEl.scrollIntoView({ block: 'nearest' });
+  // fall back to `scrollIntoView` on the rendered node. Plan 260806-lz7:
+  // same `mayApply` gate as the focus call above.
+  if (mayApply) {
+    if (opts.windower) {
+      opts.windower.scrollToIndex(active, { align: 'nearest' });
+    } else if (activeEl) {
+      activeEl.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   return activeEl !== null;
@@ -317,6 +370,16 @@ export function keynav(
   // own, and so `destroy()` can cancel a still-pending pass.
   let activeRafId: number | null = null;
 
+  // Plan 260806-lz7 — the last active index a focus/scroll pass actually
+  // resolved for THIS attachment (one action instance = one keynav root
+  // element). Distinguishes a first/redundant pass (guarded by
+  // `focusIsWithinScope`) from a genuine navigation pass (unconditional).
+  // Seeded null; lives in the action's closure, so a fresh `keynav(node,
+  // opts)` call (a new action instance — Svelte destroys and recreates the
+  // action on root identity change, e.g. an `{#if}`-gated root) naturally
+  // starts a new one.
+  let lastFocusedActive: number | null = null;
+
   // Runs `applyActiveEffects` once synchronously; if no element was found
   // for `active` (e.g. a same-tick grid-paging dataset swap hasn't rendered
   // the landing item yet), schedules exactly ONE `requestAnimationFrame`-
@@ -329,12 +392,25 @@ export function keynav(
       cancelAnimationFrame(activeRafId);
       activeRafId = null;
     }
-    const found = applyActiveEffects(node, active, opts);
+
+    // Plan 260806-lz7 — computed ONCE per `runActiveEffects` invocation (not
+    // per `applyActiveEffects` call) so the deferred rAF retry below reuses
+    // the SAME may-apply decision the synchronous pass made, rather than
+    // re-evaluating against a `lastFocusedActive` this same invocation
+    // already advanced to `active`. This is what keeps Svelte's
+    // unconditional `update()` re-application guarded too, symmetric with
+    // the other five implementations.
+    const isNavigationPass = lastFocusedActive !== null && lastFocusedActive !== active;
+    const mayApply =
+      isNavigationPass || focusIsWithinScope(resolveFocusScope(opts, node), node.ownerDocument);
+    lastFocusedActive = active;
+
+    const found = applyActiveEffects(node, active, opts, mayApply);
     if (!found) {
       activeRafId = requestAnimationFrame(() => {
         activeRafId = null;
         if (currentOpts.getActive() !== active) return;
-        applyActiveEffects(node, active, currentOpts);
+        applyActiveEffects(node, active, currentOpts, mayApply);
       });
     }
   }
