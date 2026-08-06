@@ -259,7 +259,7 @@ describe('Angular r-keynav emitter (Plan 71-09 Task 2)', () => {
     const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
     const { code } = emitAngular(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
     expect(code).toMatch(
-      /import \{ createKeynavStateMachine, type KeynavStateMachine, normalizeClassTokens \} from '@rozie\/runtime-keynav-core';/,
+      /import \{ createKeynavStateMachine, type KeynavStateMachine, focusIsWithinScope, normalizeClassTokens \} from '@rozie\/runtime-keynav-core';/,
     );
     expect(code).toContain("const __rozieKeynavTokens = normalizeClassTokens('is-active');");
     expect(code).toContain('effect(() => {');
@@ -730,5 +730,79 @@ describe('Angular r-keynav emitter — conditional-root re-attach (Plan 77-10)',
       []
     ).length;
     expect(guardOccurrences).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 260806-lz7 Task 1 Step 9 — the strict-containment focus guard's
+// Angular-native wiring (inject(ElementRef) host anchor, no threaded opts
+// field). Fresh assertions kept SEPARATE from the fixtures above.
+// ---------------------------------------------------------------------------
+
+describe('Angular r-keynav emitter — strict-containment focus guard (Plan 260806-lz7 Task 1 Step 9)', () => {
+  it('imports focusIsWithinScope from @rozie/runtime-keynav-core', () => {
+    const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
+    const { code } = emitAngular(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
+    expect(code).toMatch(/import \{[^}]*\bfocusIsWithinScope\b[^}]*\} from '@rozie\/runtime-keynav-core';/);
+  });
+
+  it('emits exactly ONE shared inject(ElementRef) host-anchor field, group index 0 only', () => {
+    const ir = compile(TWO_ROOT_SRC, 'KeynavTwoGroups.rozie');
+    const { code } = emitAngular(ir, { filename: 'KeynavTwoGroups.rozie', source: TWO_ROOT_SRC });
+    const hostFieldMatches = code.match(/private __rozieKeynavHostEl = inject\(ElementRef\);/g) ?? [];
+    expect(hostFieldMatches.length).toBe(1);
+  });
+
+  it('emits a per-group last-focused-active field, suffixed like every other per-group field', () => {
+    const ir = compile(TWO_ROOT_SRC, 'KeynavTwoGroups.rozie');
+    const { code } = emitAngular(ir, { filename: 'KeynavTwoGroups.rozie', source: TWO_ROOT_SRC });
+    expect(code).toContain('private __rozieKeynavLastFocused: number | null = null;');
+    expect(code).toContain('private __rozieKeynavLastFocused1: number | null = null;');
+  });
+
+  it('applyMethod gates .focus() and .scrollIntoView() behind __rozieKeynavMayApply; the active-class toggle stays unguarded', () => {
+    const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
+    const { code } = emitAngular(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
+    expect(code).toContain('if (__rozieKeynavMayApply) __rozieKeynavActiveEl?.focus();');
+    expect(code).toContain(
+      "if (__rozieKeynavMayApply) __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });",
+    );
+    // Unguarded — SPEC §9's active-class toggle is never gated.
+    expect(code).toContain(
+      "__rozieKeynavRootEl.querySelectorAll('[data-rozie-keynav-item]').forEach((__rozieKeynavItemEl) => __rozieKeynavItemEl.classList.remove(...__rozieKeynavTokens));",
+    );
+  });
+
+  it('syncMethod computes may-apply ONCE (scope = host nativeElement + root; document = root.ownerDocument) and reuses it for the deferred rAF retry', () => {
+    const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
+    const { code } = emitAngular(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
+    expect(code).toContain(
+      'const __rozieKeynavIsNav = this.__rozieKeynavLastFocused !== null && this.__rozieKeynavLastFocused !== __rozieKeynavActive;',
+    );
+    expect(code).toContain(
+      'const __rozieKeynavMayApply = __rozieKeynavIsNav || focusIsWithinScope([this.__rozieKeynavHostEl.nativeElement, __rozieKeynavRootEl], __rozieKeynavRootEl.ownerDocument);',
+    );
+    expect(code).toContain('this.__rozieKeynavLastFocused = __rozieKeynavActive;');
+    // Both the synchronous call and the rAF retry pass the SAME
+    // `__rozieKeynavMayApply` — no second computation inside the retry.
+    const applyCalls =
+      code.match(/this\.__rozieKeynavApplyActive\([^)]*__rozieKeynavMayApply\)/g) ?? [];
+    expect(applyCalls.length).toBe(2);
+  });
+
+  it('attachMethod resets the last-focused field to null on a root-identity change, before storing the new root', () => {
+    const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
+    const { code } = emitAngular(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
+    expect(code).toMatch(
+      /this\.__rozieKeynavLastFocused = null;\n\s*this\.__rozieKeynavAttachedRoot = __rozieKeynavRootEl;/,
+    );
+  });
+
+  it('NO-REGRESS: a component with no r-keynav directive never emits the host-anchor field or focusIsWithinScope', () => {
+    const ir = compile(COUNTER_SRC, 'Counter.rozie');
+    const { code } = emitAngular(ir, { filename: 'Counter.rozie', source: COUNTER_SRC });
+    expect(code).not.toContain('focusIsWithinScope');
+    expect(code).not.toContain('__rozieKeynavHostEl');
+    expect(code).not.toContain('__rozieKeynavLastFocused');
   });
 });

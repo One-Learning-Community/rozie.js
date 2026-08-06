@@ -141,6 +141,22 @@
  *     shared, stateless infrastructure — declared once (group index 0 only)
  *     and referenced bare (unsuffixed) by every group's delegation block.
  *
+ * Plan 260806-lz7 — the tabindex model's first/redundant focus+scroll pass
+ * (a fresh attach, or a root-identity change) is gated by
+ * `@rozie/runtime-keynav-core`'s `focusIsWithinScope` strict-containment
+ * predicate: it only runs when DOM focus is already inside the owning
+ * component. Angular derives its anchor NATIVELY from a single shared
+ * `inject(ElementRef)` field (`HOST_ELEMENT_FIELD`, declared once at group
+ * index 0, like `RENDERER_FIELD`) — no threaded opts field, since the whole
+ * component's own root element IS the exact component boundary. The
+ * may-apply decision is computed ONCE per `syncMethod` invocation (not
+ * inside `applyMethod`, which the deferred rAF retry calls a SECOND time
+ * with the SAME active value — recomputing there would misclassify the
+ * retry as a redundant pass instead of the navigation/guarded pass it is a
+ * continuation of) and threaded down as a parameter. A genuine navigation
+ * pass is never gated. See `focusGuard.ts`'s module doc comment for the full
+ * rule.
+ *
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
@@ -182,6 +198,24 @@ const RAF_ID_FIELD = '__rozieKeynavRafId';
 const ATTACHED_ROOT_FIELD = '__rozieKeynavAttachedRoot';
 const DETACH_FIELD = '__rozieKeynavDetach';
 const ATTACH_ROOT_METHOD = '__rozieKeynavAttachRoot';
+/**
+ * Plan 260806-lz7 — the strict-containment focus guard's native anchor.
+ * Genuinely SHARED infrastructure (like `RENDERER_FIELD`) — declared exactly
+ * ONCE (group index 0) via `inject(ElementRef)`, and referenced bare
+ * (unsuffixed) by every group's `applyMethod`. Angular has no
+ * `getFocusScope` opts field the way the four fragment-target hooks/
+ * composables do — the host component's OWN root element is the exact
+ * component boundary, so this single injected ref is sufficient for every
+ * group.
+ */
+const HOST_ELEMENT_FIELD = '__rozieKeynavHostEl';
+/**
+ * Plan 260806-lz7 — per-group last-focused-active bookkeeping, mirroring the
+ * `lastFocusedActive` local every other target's implementation tracks.
+ * Distinguishes a first/redundant pass (guarded by `focusIsWithinScope`)
+ * from a genuine navigation pass (unconditional).
+ */
+const LAST_FOCUSED_FIELD = '__rozieKeynavLastFocused';
 
 function suffixFor(groupIndex: number): string {
   return groupIndex === 0 ? '' : String(groupIndex);
@@ -517,7 +551,12 @@ export function buildKeynavClassEmission(
   const constructorLines: string[] = [];
   const afterViewInitLines: string[] = [];
   const angularImports = new Set<string>();
-  const runtimeImports = new Set<string>(['createKeynavStateMachine', 'type KeynavStateMachine']);
+  const runtimeImports = new Set<string>([
+    'createKeynavStateMachine',
+    'type KeynavStateMachine',
+    // Plan 260806-lz7 — the shared strict-containment predicate.
+    'focusIsWithinScope',
+  ]);
 
   for (const plan of plans) {
     const suffix = suffixFor(plan.groupIndex);
@@ -529,6 +568,7 @@ export function buildKeynavClassEmission(
     const attachedRootField = `${ATTACHED_ROOT_FIELD}${suffix}`;
     const detachField = `${DETACH_FIELD}${suffix}`;
     const attachMethod = `${ATTACH_ROOT_METHOD}${suffix}`;
+    const lastFocusedField = `${LAST_FOCUSED_FIELD}${suffix}`;
     const rootRefExpr = `this.${plan.rootRefVar}()?.nativeElement`;
 
     const active = resolveActiveScriptTarget(plan.keynavRoot.activeExpression);
@@ -554,8 +594,14 @@ export function buildKeynavClassEmission(
       );
     }
 
+    // Plan 260806-lz7: gated behind `__rozieKeynavMayApply` — a
+    // first/redundant pass only focuses when the composed active element is
+    // already inside the owning component; a genuine navigation pass always
+    // focuses.
     const focusLines: string[] =
-      plan.keynavRoot.focusModel === 'tabindex' ? ['  __rozieKeynavActiveEl?.focus();'] : [];
+      plan.keynavRoot.focusModel === 'tabindex'
+        ? ['  if (__rozieKeynavMayApply) __rozieKeynavActiveEl?.focus();']
+        : [];
 
     fieldDecls.push(
       `private ${groupIdVar} = 'rozie-keynav-' + Math.random().toString(36).slice(2);`,
@@ -571,6 +617,10 @@ export function buildKeynavClassEmission(
     // referenced bare (unsuffixed) by every group's delegation block below.
     if (plan.groupIndex === 0) {
       fieldDecls.push(`private ${RENDERER_FIELD} = inject(Renderer2);`);
+      // Plan 260806-lz7 — the strict-containment guard's native anchor,
+      // genuinely SHARED infrastructure like `RENDERER_FIELD` above.
+      fieldDecls.push(`private ${HOST_ELEMENT_FIELD} = inject(ElementRef);`);
+      angularImports.add('ElementRef');
     }
     fieldDecls.push(`private ${controllerVar}: KeynavStateMachine | null = null;`);
     // Phase 77 (T-77-05-03) — the single outstanding rAF retry id for THIS
@@ -580,6 +630,8 @@ export function buildKeynavClassEmission(
     // attached root, and the stored teardown for that attachment.
     fieldDecls.push(`private ${attachedRootField}: HTMLElement | null = null;`);
     fieldDecls.push(`private ${detachField}: (() => void) | null = null;`);
+    // Plan 260806-lz7 — per-group last-focused-active bookkeeping.
+    fieldDecls.push(`private ${lastFocusedField}: number | null = null;`);
 
     // Shared active-item sync (focus/scroll/`r-keynav-active-class` toggle,
     // SPEC §9), extracted into its own arrow-field method — see the 71-11
@@ -598,11 +650,11 @@ export function buildKeynavClassEmission(
     // pattern).
     fieldDecls.push(
       [
-        `private ${applyMethod} = (__rozieKeynavRootEl: HTMLElement, __rozieKeynavActive: number): boolean => {`,
+        `private ${applyMethod} = (__rozieKeynavRootEl: HTMLElement, __rozieKeynavActive: number, __rozieKeynavMayApply: boolean): boolean => {`,
         `  const __rozieKeynavActiveEl = __rozieKeynavRootEl.querySelector<HTMLElement>(\`[data-rozie-keynav-item="\${__rozieKeynavActive}"]\`);`,
         ...activeClassLines,
         ...focusLines,
-        `  __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });`,
+        `  if (__rozieKeynavMayApply) __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });`,
         `  return __rozieKeynavActiveEl !== null;`,
         `};`,
       ].join('\n'),
@@ -614,13 +666,21 @@ export function buildKeynavClassEmission(
         `  const __rozieKeynavRootEl = ${rootRefExpr};`,
         `  if (this.${rafField} !== null) { cancelAnimationFrame(this.${rafField}); this.${rafField} = null; }`,
         `  if (!__rozieKeynavRootEl || !Number.isFinite(__rozieKeynavActive)) return;`,
-        `  const __rozieKeynavFound = this.${applyMethod}(__rozieKeynavRootEl, __rozieKeynavActive);`,
+        // Plan 260806-lz7 — computed ONCE per `${syncMethod}` invocation (not
+        // per `${applyMethod}` call) so the deferred rAF retry below reuses
+        // the SAME may-apply decision the synchronous pass made, rather than
+        // re-evaluating against a `${lastFocusedField}` this same invocation
+        // already advanced to `__rozieKeynavActive`.
+        `  const __rozieKeynavIsNav = this.${lastFocusedField} !== null && this.${lastFocusedField} !== __rozieKeynavActive;`,
+        `  const __rozieKeynavMayApply = __rozieKeynavIsNav || focusIsWithinScope([this.${HOST_ELEMENT_FIELD}.nativeElement, __rozieKeynavRootEl], __rozieKeynavRootEl.ownerDocument);`,
+        `  this.${lastFocusedField} = __rozieKeynavActive;`,
+        `  const __rozieKeynavFound = this.${applyMethod}(__rozieKeynavRootEl, __rozieKeynavActive, __rozieKeynavMayApply);`,
         `  if (!__rozieKeynavFound) {`,
         `    this.${rafField} = requestAnimationFrame(() => {`,
         `      this.${rafField} = null;`,
         `      if (${active.get} !== __rozieKeynavActive) return;`,
         `      const __rozieKeynavRetryRootEl = ${rootRefExpr};`,
-        `      if (__rozieKeynavRetryRootEl) this.${applyMethod}(__rozieKeynavRetryRootEl, __rozieKeynavActive);`,
+        `      if (__rozieKeynavRetryRootEl) this.${applyMethod}(__rozieKeynavRetryRootEl, __rozieKeynavActive, __rozieKeynavMayApply);`,
         `    });`,
         `  }`,
         `};`,
@@ -644,6 +704,9 @@ export function buildKeynavClassEmission(
         `  const __rozieKeynavRootEl = ${rootRefExpr} ?? null;`,
         `  if (__rozieKeynavRootEl === this.${attachedRootField}) return;`,
         `  if (this.${detachField}) { this.${detachField}(); this.${detachField} = null; }`,
+        // Plan 260806-lz7 — a root-identity change starts a fresh
+        // attachment with no navigation history of its own.
+        `  this.${lastFocusedField} = null;`,
         `  this.${attachedRootField} = __rozieKeynavRootEl;`,
         `  if (!__rozieKeynavRootEl) return;`,
         `  const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.${controllerVar}?.onKeydown($event); };`,
