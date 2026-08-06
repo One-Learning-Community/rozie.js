@@ -39,11 +39,13 @@ import { emitTemplateEvent, type ScriptInjection } from './emitTemplateEvent.js'
 // Phase 71 (r-keynav) — REFERENCE emitter wiring modeled on the React target
 // (see emitKeynav.ts's module doc comment).
 import {
+  keynavFocusScopeAttrs,
   keynavItemAttrs,
   keynavRootAttrs,
   loopBodyHasKeynavItem,
   stripKeynavSyntheticEvents,
   type KeynavEmitPlan,
+  type KeynavFocusScopeRef,
 } from './emitKeynav.js';
 
 /**
@@ -87,6 +89,14 @@ export interface EmitNodeCtx {
    * plan, since a multi-root component now has several.
    */
   keynav?: KeynavEmitPlan[];
+  /**
+   * Plan 260806-lz7 — the component-wide strict-containment focus scope
+   * (resolved ONCE by `emitTemplate.ts` via `resolveKeynavFocusScopeRefs`),
+   * one entry per `html`-kind top-level template element. `[]` (or
+   * `undefined` — back-compat) when there are no keynav plans, or the
+   * template has zero top-level html elements.
+   */
+  keynavScope?: KeynavFocusScopeRef[];
   /**
    * Phase 71 (r-keynav) — the CURRENT `r-for` loop's index-alias identifier,
    * threaded down by `emitLoop` for the duration of that loop's body subtree
@@ -476,6 +486,9 @@ function emitElementWithExtraDirectiveInner(
   const keynavAttrs = [
     ...keynavRootAttrs(keynavRootPlan, node, ctx.ir),
     ...keynavItemAttrs(keynavItemPlan, node, ctx.keynavItemIndexAlias ?? null, ctx.ir),
+    // Plan 260806-lz7 — `origNode` (not the post-strip `node`), since
+    // `resolveKeynavFocusScopeRefs` walked the ORIGINAL `ir.template` tree.
+    ...keynavFocusScopeAttrs(ctx.keynavScope ?? [], origNode),
   ];
 
   const partsHead: string[] = [];

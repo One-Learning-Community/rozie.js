@@ -23,7 +23,12 @@ import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { emitNode, type EmitNodeCtx } from './emitTemplateNode.js';
 import type { ScriptInjection } from './emitTemplateEvent.js';
-import { buildKeynavScriptInjections, resolveKeynavPlans } from './emitKeynav.js';
+import {
+  buildKeynavFocusScopeInjections,
+  buildKeynavScriptInjections,
+  resolveKeynavFocusScopeRefs,
+  resolveKeynavPlans,
+} from './emitKeynav.js';
 
 export interface EmitTemplateResult {
   template: string;
@@ -69,6 +74,10 @@ export function emitTemplate(
   // stays a cheap no-op for every existing fixture (SPEC §7.4: "no corpus
   // rebless").
   const keynavPlans = resolveKeynavPlans(ir);
+  // Plan 260806-lz7 — the component-WIDE strict-containment focus scope,
+  // resolved once alongside `keynavPlans` (`[]` when there are no plans —
+  // see `resolveKeynavFocusScopeRefs`'s doc comment).
+  const keynavScopeRefs = resolveKeynavFocusScopeRefs(ir, keynavPlans);
 
   const ctx: EmitNodeCtx = {
     ir,
@@ -78,16 +87,26 @@ export function emitTemplate(
     injectionCounter: { next: 0 },
     indent: '',
     keynav: keynavPlans,
+    keynavScope: keynavScopeRefs,
   };
 
   const template = emitNode(ir.template, ctx);
 
+  const extraVueImportNames: string[] = [];
+
+  // Plan 260806-lz7 — the fresh scope-ref `ref()` declarations, ONCE per
+  // component (not once per plan — see `buildKeynavFocusScopeInjections`'s
+  // doc comment).
+  scriptInjections.push(...buildKeynavFocusScopeInjections(keynavScopeRefs));
+  for (const ref of keynavScopeRefs) {
+    if (ref.mintedRef) extraVueImportNames.push('ref');
+  }
+
   // Phase 71 (r-keynav), extended Phase 77 — ONE `useKeynav(...)` call + its
   // `ref()`/group-id scaffolding PER resolved plan, so a two-root component
   // gets two independent controller calls.
-  const extraVueImportNames: string[] = [];
   for (const plan of keynavPlans) {
-    scriptInjections.push(...buildKeynavScriptInjections(plan, ir));
+    scriptInjections.push(...buildKeynavScriptInjections(plan, ir, keynavScopeRefs));
     if (plan.mintedRootRef) {
       extraVueImportNames.push('ref');
     }

@@ -114,6 +114,9 @@ function flattenInlineCode(code: string): string {
 // emit unchanged.
 const ROOT_REF_VAR = '__rozieKeynavRootRef';
 const GROUP_ID_VAR = '__rozieKeynavGroupId';
+// Plan 260806-lz7 — the strict-containment focus scope's freshly-minted
+// per-top-level-element refs (see `resolveKeynavFocusScopeRefs` below).
+const SCOPE_REF_VAR = '__rozieKeynavScopeRef';
 
 function suffixFor(groupIndex: number): string {
   return groupIndex === 0 ? '' : String(groupIndex);
@@ -358,6 +361,90 @@ export function resolveKeynavPlans(ir: IRComponent): KeynavEmitPlan[] {
   });
 }
 
+/**
+ * Plan 260806-lz7 — the strict-containment focus scope. One entry per
+ * `html`-kind TOP-LEVEL element of the template (`<template>` does not
+ * enforce a single root — multiple top-level elements are legal); a
+ * `component`-kind or non-element top-level node is skipped (a ref on a
+ * child component does not yield a DOM Element). Each entry either reuses an
+ * EXISTING ref (the keynav root's own minted/reused ref when the element IS
+ * a keynav root — appending it is a no-op in the normal case; or an
+ * author-declared `ref="x"`, reading through `xRef.value` per this file's
+ * `Ref` suffix convention) or mints a FRESH one — Vue permits only one
+ * `ref=` attribute per element, so a fresh ref is only minted when neither
+ * already exists.
+ */
+export interface KeynavFocusScopeRef {
+  element: TemplateElementIR;
+  /** The SCRIPT-side variable name (already carries the `Ref` suffix for a
+   * reused author ref, per this file's convention) — read as `<refVar>.value`. */
+  refVar: string;
+  /** False when `refVar` names an ALREADY-existing ref — no fresh `ref()`
+   * decl / template `ref=` attribute needs minting/stamping for this entry. */
+  mintedRef: boolean;
+}
+
+function topLevelTemplateElements(ir: IRComponent): TemplateElementIR[] {
+  if (ir.template === null) return [];
+  const root = ir.template;
+  const candidates: TemplateNode[] = root.type === 'TemplateFragment' ? root.children : [root];
+  return candidates.filter(
+    (n): n is TemplateElementIR => n.type === 'TemplateElement' && n.tagKind === 'html',
+  );
+}
+
+/**
+ * Resolves the component-wide focus scope — `[]` when there are no keynav
+ * plans (the overwhelming majority case) OR the template has zero
+ * `html`-kind top-level elements, in which case every `useKeynav` opts
+ * object OMITS `getFocusScope` entirely, and the runtime takes its
+ * documented `documentHasRealFocus` fallback (never a hard rejection).
+ */
+export function resolveKeynavFocusScopeRefs(
+  ir: IRComponent,
+  plans: KeynavEmitPlan[],
+): KeynavFocusScopeRef[] {
+  if (plans.length === 0) return [];
+  const elements = topLevelTemplateElements(ir);
+  const refs: KeynavFocusScopeRef[] = [];
+  let freshIndex = 0;
+  for (const el of elements) {
+    const rootPlan =
+      el.keynavRoot !== undefined
+        ? (plans.find((p) => p.groupIndex === (el.keynavRoot!.groupIndex ?? 0)) ?? null)
+        : null;
+    if (rootPlan !== null) {
+      refs.push({ element: el, refVar: rootPlan.rootRefVar, mintedRef: false });
+      continue;
+    }
+    const existingRef = findStaticAttrValue(el, 'ref');
+    if (existingRef !== null && ir.refs.some((r) => r.name === existingRef)) {
+      refs.push({ element: el, refVar: `${existingRef}Ref`, mintedRef: false });
+      continue;
+    }
+    refs.push({ element: el, refVar: `${SCOPE_REF_VAR}${freshIndex}`, mintedRef: true });
+    freshIndex += 1;
+  }
+  return refs;
+}
+
+/**
+ * `ref="…"` for a FRESHLY-minted scope ref only — an already-covered scope
+ * entry (the keynav root's own ref, or an author-declared one) already emits
+ * its `ref=` via its own normal path, and Vue permits only one `ref=` per
+ * element. `node` must be reference-identical to the element
+ * `resolveKeynavFocusScopeRefs` walked (i.e. the ORIGINAL, pre-
+ * `stripKeynavSyntheticEvents` node) — see `emitTemplateNode.ts`'s call site.
+ */
+export function keynavFocusScopeAttrs(
+  scopeRefs: KeynavFocusScopeRef[],
+  node: TemplateElementIR,
+): string[] {
+  const match = scopeRefs.find((r) => r.element === node);
+  if (!match || !match.mintedRef) return [];
+  return [`ref="${match.refVar}"`];
+}
+
 /** `KeynavConfig` object literal — every field is statically known at compile time. */
 function buildConfigCode(k: KeynavRootIR): string {
   return `{ focusModel: '${k.focusModel}', orientation: '${k.orientation}', loop: ${k.loop}, typeahead: ${k.typeahead}, skipDisabled: ${k.skipDisabled} }`;
@@ -487,15 +574,54 @@ function resolveActiveScriptTarget(
 }
 
 /**
+ * Plan 260806-lz7 — emits the FRESH scope-ref `ref<...>(null)` decls
+ * (skipping any entry that reuses an existing ref — see
+ * `resolveKeynavFocusScopeRefs`'s doc comment) as a SINGLE `ScriptInjection`,
+ * called ONCE per component (unlike `buildKeynavScriptInjections`, which
+ * runs once per PLAN) — duplicating a `const` declaration per plan would be
+ * a compile error the instant a component has more than one `r-keynav`
+ * root. Returns `[]` (no injection at all) when there is nothing fresh to
+ * declare.
+ */
+export function buildKeynavFocusScopeInjections(scopeRefs: KeynavFocusScopeRef[]): ScriptInjection[] {
+  const fresh = scopeRefs.filter((r) => r.mintedRef);
+  if (fresh.length === 0) return [];
+  const declLines = fresh.map((r) => `const ${r.refVar} = ref<HTMLElement | null>(null);`);
+  return [
+    {
+      wrapName: 'useKeynavFocusScope',
+      // `ScriptInjection['import']`'s discriminated union has no `'vue'` /
+      // `'ref'` member (only `'computed'`, for the r-match hoist path) — the
+      // SAME gap `mintedRootRef`'s own `ref<...>(null)` decl already lives
+      // with, below. `ref` is always already imported whenever a component
+      // has `$data` or `$refs` (`vueGeneratedNames.ts`), which every keynav
+      // consumer necessarily has (an active-index binding is `$data`-backed).
+      // Reusing `useKeynav` here is a harmless, deduped no-op re-request —
+      // this injection only ever exists alongside at least one keynav plan,
+      // which already imports it for real.
+      import: { from: '@rozie/runtime-vue', name: 'useKeynav' },
+      decl: declLines.join('\n'),
+    },
+  ];
+}
+
+/**
  * Renders the `useKeynav(...)` call plus its `ref()`/group-id scaffolding as
  * a SINGLE `ScriptInjection` — `mergeScriptInjections` (emitVue.ts) already
  * places every injection's `decl` at the bottom of the script body (after
  * the user's own handler declarations) and dedupes `@rozie/runtime-vue`
  * imports across every injection.
+ *
+ * `scopeRefs` (Plan 260806-lz7) — the component-WIDE focus scope (shared
+ * identically across every plan's `getFocusScope`, regardless of which root
+ * this call is for). `[]` when the template has zero `html`-kind top-level
+ * elements, in which case `getFocusScope` is omitted entirely from this
+ * plan's opts and the runtime takes its documented fallback.
  */
 export function buildKeynavScriptInjections(
   plan: KeynavEmitPlan,
   ir: IRComponent,
+  scopeRefs: KeynavFocusScopeRef[] = [],
 ): ScriptInjection[] {
   const declLines: string[] = [];
 
@@ -541,6 +667,14 @@ export function buildKeynavScriptInjections(
   const onPageCode = buildOnPageCode(plan.rootElement, ir);
   if (onPageCode !== null) {
     optsLines.push(`  onPage: ${onPageCode},`);
+  }
+  // Plan 260806-lz7 — the strict-containment focus scope. Omitted entirely
+  // when there are zero scope refs, which is what lets the runtime take its
+  // documented `documentHasRealFocus` fallback rather than emitting a
+  // useless empty array.
+  if (scopeRefs.length > 0) {
+    const scopeReads = scopeRefs.map((r) => `${r.refVar}.value`).join(', ');
+    optsLines.push(`  getFocusScope: () => [${scopeReads}],`);
   }
   declLines.push(`useKeynav(${plan.rootRefVar}, {\n${optsLines.join('\n')}\n});`);
 
