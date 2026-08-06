@@ -1028,23 +1028,78 @@ async function settleExample(
   }
   // DatePickerScreenshot (@rozie-ui/date-picker): the calendar renders a 6×7 month
   // grid → 42 `.rozie-datepicker-day` buttons. The `[class*=...]` substring locator
-  // survives React's CSS-Modules class hashing and pierces Lit's shadow. Wait for all
-  // 42 before clipping; the control is never focused (no caret), so once the grid
-  // paints the frame is final. The pinned value='2025-06-15' fixes the month, so the
+  // survives React's CSS-Modules class hashing and pierces Lit's shadow. Wait for
+  // all 42 before clipping. The pinned value='2025-06-15' fixes the month, so the
   // grid is deterministic.
-  if (example === 'DatePickerScreenshot') {
+  //
+  // MOUNT-FOCUS CORRECTION (datepicker-vr-docker-drift debug session,
+  // 2026-08-05): the day grid is NOT "never focused" — the Phase 77 r-keynav
+  // day-grid retrofit (77-08) gives it the SAME tabindex-model mount-focus
+  // contract as KeynavMenu/KeynavGrid above (SPEC §3/§9): `useKeynav`'s
+  // active-change watch calls `.focus()` on the resolved active cell
+  // unconditionally, including its `{ immediate: true }` first fire on
+  // mount. With a pinned `value`, the active cell resolves to the SELECTED
+  // day, which lands real DOM focus and matches `:focus-visible`, painting
+  // the `.rozie-datepicker-day:focus-visible` accent outline ring — a subtle
+  // but real, deterministic, and CORRECT part of the mount frame (confirmed
+  // identical via getComputedStyle/:focus-visible on both the pinned Docker
+  // container AND local macOS Chromium; this is NOT a container-rendering
+  // bug). The prior 42-cell-only wait raced ahead of this focus effect on
+  // some runs and behind it on others depending on host timing, producing a
+  // false "sometimes matches, sometimes doesn't" read. Wait for the pinned
+  // day to actually hold DOM focus before clipping — a no-op wait once focus
+  // has already landed, mirroring the KeynavGrid pattern exactly.
+  if (example === 'DatePickerScreenshot' || example === 'DatePickerFooter') {
     await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(42, {
       timeout: 10_000,
     });
+    await expect(page.locator('[data-day="2025-06-15"]')).toBeFocused({ timeout: 10_000 });
+  }
+  // DatePickerWeekendDisable: same pinned value='2025-06-15' as
+  // DatePickerScreenshot/Footer above, but June 15 2025 is a Sunday and
+  // `disabledDaysOfWeek={[0,6]}` disables it — per SPEC §5 a disabled cell is
+  // focusable-but-inert, so mount focus lands there exactly like any other
+  // cell (mirrors the KeynavGrid demo's own disabled-item-0 precedent
+  // above). Same mount-focus correction as DatePickerScreenshot.
+  if (example === 'DatePickerWeekendDisable') {
+    await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(42, {
+      timeout: 10_000,
+    });
+    await expect(page.locator('[data-day="2025-06-15"]')).toBeFocused({ timeout: 10_000 });
   }
   // DatePickerRangeComplete / DatePickerPresetActive (@rozie-ui/date-picker, range
   // mode): same 6×7 = 42-day grid as DatePickerScreenshot. Wait for all 42 day
   // buttons before clipping; the seeded range pins the view month, so the band /
-  // active-preset frame is final once the grid paints (nothing is focused).
-  if (example === 'DatePickerRangeComplete' || example === 'DatePickerPresetActive') {
+  // active-preset frame is final once the grid paints.
+  //
+  // MOUNT-FOCUS CORRECTION: same contract as DatePickerScreenshot above — in
+  // range mode the active cell resolves to the range's `start` endpoint
+  // (rovingDayInput's `anchor` funnel), which is where mount focus lands.
+  // DatePickerRangeComplete seeds { start: '2025-05-28', end: '2025-06-04' };
+  // DatePickerPresetActive seeds { start: '2025-06-10', end: '2025-06-16' }.
+  if (example === 'DatePickerRangeComplete') {
     await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(42, {
       timeout: 10_000,
     });
+    await expect(page.locator('[data-day="2025-05-28"]')).toBeFocused({ timeout: 10_000 });
+  }
+  if (example === 'DatePickerPresetActive') {
+    await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(42, {
+      timeout: 10_000,
+    });
+    await expect(page.locator('[data-day="2025-06-10"]')).toBeFocused({ timeout: 10_000 });
+  }
+  // DatePickerTwoMonth (@rozie-ui/date-picker, RANGE mode, numberOfMonths=2):
+  // two 6×7 grids → 84 day buttons (this cell previously had NO settle wait
+  // at all beyond the mount-clip's own `toBeVisible()`). Seeded range
+  // { start: '2025-06-10', end: '2025-06-15' } pins the view to June+July
+  // 2025. Same mount-focus contract as the range cells above — active cell
+  // resolves to the range start.
+  if (example === 'DatePickerTwoMonth') {
+    await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(84, {
+      timeout: 10_000,
+    });
+    await expect(page.locator('[data-day="2025-06-10"]')).toBeFocused({ timeout: 10_000 });
   }
   // ResizableScreenshot (@rozie-ui/resizable): the splitter renders one
   // role="separator" handle between the two panels. Its presence proves the wrapper
