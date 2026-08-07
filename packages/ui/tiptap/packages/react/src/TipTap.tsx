@@ -840,11 +840,17 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   _buildDefaultLinkEditorRef.current = buildDefaultLinkEditor;
   const _buildLinkScopeRef = useRef(buildLinkScope);
   _buildLinkScopeRef.current = buildLinkScope;
+  const _handleDropRef = useRef(handleDrop);
+  _handleDropRef.current = handleDrop;
+  const _handlePasteRef = useRef(handlePaste);
+  _handlePasteRef.current = handlePaste;
   const _makeNodeViewExtensionsRef = useRef(makeNodeViewExtensions);
   _makeNodeViewExtensionsRef.current = makeNodeViewExtensions;
   const _refreshLinkRef = useRef(refreshLink);
   _refreshLinkRef.current = refreshLink;
   useEffect(() => {
+    const _handleDropStable: typeof _handleDropRef.current = (...args) => _handleDropRef.current(...args);
+    const _handlePasteStable: typeof _handlePasteRef.current = (...args) => _handlePasteRef.current(...args);
     interface ReactivePortalHandle {
     update(scope: unknown): void;
     dispose(): void;
@@ -1043,8 +1049,8 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // functions declared above (see their doc comment for why they live at the
     // top level rather than as closures nested in this ternary).
     const uploadHandlers = _uploadImageRef.current ? {
-      handlePaste,
-      handleDrop
+      handlePaste: _handlePasteStable,
+      handleDrop: _handleDropStable
     } : {};
     editor.current = new Editor({
       element: editorEl.current!,

@@ -376,7 +376,7 @@ const Bubble = forwardRef<BubbleHandle, BubbleProps>(function Bubble(_props: Bub
         dying?.destroy();
       }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const v = props.data;
     if (!instance.current) return;

@@ -99,10 +99,13 @@ export default function Toolbar(props: ToolbarProps): JSX.Element {
     editor.dispatchCommand(lexicalLink.TOGGLE_LINK_COMMAND, active.link ? null : 'https://example.com');
   }, [active]);
 
+  const _activateRef = useRef(activate);
+  _activateRef.current = activate;
   useEffect(() => {
+    const _activateStable: typeof _activateRef.current = (...args) => _activateRef.current(...args);
     // Defer one microtask so the parent shell's $onMount has created the editor —
     // child mount hooks fire before the parent's on React/Vue/Solid (see header).
-    queueMicrotask(activate);
+    queueMicrotask(_activateStable);
     return () => {
       disposed.current = true;
       if (teardown.current) {
@@ -110,7 +113,7 @@ export default function Toolbar(props: ToolbarProps): JSX.Element {
         teardown.current = null;
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

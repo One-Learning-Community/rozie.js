@@ -379,7 +379,7 @@ const Chart = forwardRef<ChartHandle, ChartProps>(function Chart(_props: ChartPr
         dying?.destroy();
       }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const v = props.data;
     if (!instance.current) return;

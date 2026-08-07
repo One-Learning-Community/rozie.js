@@ -376,7 +376,7 @@ const Radar = forwardRef<RadarHandle, RadarProps>(function Radar(_props: RadarPr
         dying?.destroy();
       }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const v = props.data;
     if (!instance.current) return;

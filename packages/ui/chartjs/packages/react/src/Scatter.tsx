@@ -376,7 +376,7 @@ const Scatter = forwardRef<ScatterHandle, ScatterProps>(function Scatter(_props:
         dying?.destroy();
       }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const v = props.data;
     if (!instance.current) return;

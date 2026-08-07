@@ -319,7 +319,10 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
     instance.current?.unselect();
   }
 
+  const _normalizeEventRef = useRef(normalizeEvent);
+  _normalizeEventRef.current = normalizeEvent;
   useEffect(() => {
+    const _normalizeEventStable: typeof _normalizeEventRef.current = (...args) => _normalizeEventRef.current(...args);
     const portals = {
     event: (container: HTMLElement, scope: { arg: unknown }): (() => void) => {
       const slot = _renderEventRef.current ?? props.slots?.['event'];
@@ -496,7 +499,7 @@ const FullCalendar = forwardRef<FullCalendarHandle, FullCalendarProps>(function 
       firstDay: _firstDayRef.current,
       slotDuration: _slotDurationRef.current,
       nowIndicator: _nowIndicatorRef.current,
-      events: _eventsRef.current.map(normalizeEvent),
+      events: _eventsRef.current.map(_normalizeEventStable),
       // D-02: a consumer-passed headerToolbar fully REPLACES the built-in
       // toolbar; the built-in default lives in the `headerToolbar` prop default.
       headerToolbar: _headerToolbarRef.current,

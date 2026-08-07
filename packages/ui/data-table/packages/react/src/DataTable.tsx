@@ -4343,6 +4343,30 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   _indexOfRowInRef.current = indexOfRowIn;
   const _isGridRef = useRef(isGrid);
   _isGridRef.current = isGrid;
+  const _onColumnFiltersChangeCbRef = useRef(onColumnFiltersChangeCb);
+  _onColumnFiltersChangeCbRef.current = onColumnFiltersChangeCb;
+  const _onColumnOrderChangeCbRef = useRef(onColumnOrderChangeCb);
+  _onColumnOrderChangeCbRef.current = onColumnOrderChangeCb;
+  const _onColumnPinningChangeCbRef = useRef(onColumnPinningChangeCb);
+  _onColumnPinningChangeCbRef.current = onColumnPinningChangeCb;
+  const _onColumnSizingChangeCbRef = useRef(onColumnSizingChangeCb);
+  _onColumnSizingChangeCbRef.current = onColumnSizingChangeCb;
+  const _onColumnSizingInfoChangeCbRef = useRef(onColumnSizingInfoChangeCb);
+  _onColumnSizingInfoChangeCbRef.current = onColumnSizingInfoChangeCb;
+  const _onColumnVisibilityChangeCbRef = useRef(onColumnVisibilityChangeCb);
+  _onColumnVisibilityChangeCbRef.current = onColumnVisibilityChangeCb;
+  const _onExpandedChangeCbRef = useRef(onExpandedChangeCb);
+  _onExpandedChangeCbRef.current = onExpandedChangeCb;
+  const _onGlobalFilterChangeCbRef = useRef(onGlobalFilterChangeCb);
+  _onGlobalFilterChangeCbRef.current = onGlobalFilterChangeCb;
+  const _onGroupingChangeCbRef = useRef(onGroupingChangeCb);
+  _onGroupingChangeCbRef.current = onGroupingChangeCb;
+  const _onPaginationChangeCbRef = useRef(onPaginationChangeCb);
+  _onPaginationChangeCbRef.current = onPaginationChangeCb;
+  const _onRowSelectionChangeCbRef = useRef(onRowSelectionChangeCb);
+  _onRowSelectionChangeCbRef.current = onRowSelectionChangeCb;
+  const _onSortingChangeCbRef = useRef(onSortingChangeCb);
+  _onSortingChangeCbRef.current = onSortingChangeCb;
   const _syncIndeterminateRef = useRef(syncIndeterminate);
   _syncIndeterminateRef.current = syncIndeterminate;
   const _tableColumnsRef = useRef(tableColumns);
@@ -4354,6 +4378,19 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const _writePaginationRef = useRef(writePagination);
   _writePaginationRef.current = writePagination;
   useEffect(() => {
+    const _onColumnFiltersChangeCbStable: typeof _onColumnFiltersChangeCbRef.current = (...args) => _onColumnFiltersChangeCbRef.current(...args);
+    const _onColumnOrderChangeCbStable: typeof _onColumnOrderChangeCbRef.current = (...args) => _onColumnOrderChangeCbRef.current(...args);
+    const _onColumnPinningChangeCbStable: typeof _onColumnPinningChangeCbRef.current = (...args) => _onColumnPinningChangeCbRef.current(...args);
+    const _onColumnSizingChangeCbStable: typeof _onColumnSizingChangeCbRef.current = (...args) => _onColumnSizingChangeCbRef.current(...args);
+    const _onColumnSizingInfoChangeCbStable: typeof _onColumnSizingInfoChangeCbRef.current = (...args) => _onColumnSizingInfoChangeCbRef.current(...args);
+    const _onColumnVisibilityChangeCbStable: typeof _onColumnVisibilityChangeCbRef.current = (...args) => _onColumnVisibilityChangeCbRef.current(...args);
+    const _onExpandedChangeCbStable: typeof _onExpandedChangeCbRef.current = (...args) => _onExpandedChangeCbRef.current(...args);
+    const _onGlobalFilterChangeCbStable: typeof _onGlobalFilterChangeCbRef.current = (...args) => _onGlobalFilterChangeCbRef.current(...args);
+    const _onGroupingChangeCbStable: typeof _onGroupingChangeCbRef.current = (...args) => _onGroupingChangeCbRef.current(...args);
+    const _onPaginationChangeCbStable: typeof _onPaginationChangeCbRef.current = (...args) => _onPaginationChangeCbRef.current(...args);
+    const _onRowSelectionChangeCbStable: typeof _onRowSelectionChangeCbRef.current = (...args) => _onRowSelectionChangeCbRef.current(...args);
+    const _onSortingChangeCbStable: typeof _onSortingChangeCbRef.current = (...args) => _onSortingChangeCbRef.current(...args);
+    const _syncIndeterminateStable: typeof _syncIndeterminateRef.current = (...args) => _syncIndeterminateRef.current(...args);
     // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
     // edit committed BEFORE the consumer ever pushes new rows (or when the consumer passes
     // a one-way `:data`) has a base array to whole-array-replace. currentData() then sources
@@ -4385,7 +4422,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       getExpandedRowModel: getExpandedRowModel(),
       getSubRows: (_getSubRowsRef.current || undefined) as any,
       getRowCanExpand: _expandableRef.current === true && _getSubRowsRef.current == null ? () => true : undefined,
-      onExpandedChange: onExpandedChangeCb,
+      onExpandedChange: _onExpandedChangeCbStable,
       // Grouping auto-expand (phase 50 req-4): table-core's autoResetExpanded defaults TRUE, so a
       // POST-MOUNT setGrouping (the consumer #groupBar / applyGrouping verb) auto-fires
       // onExpandedChange({}) to reset the expanded set. That spurious reset funnels through
@@ -4404,7 +4441,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // nested r-for — Pitfall 1). Group rows are expandable via the EXISTING expanded model
       // (getRowCanExpand default `!!subRows.length`), so collapsing a group hides its subtree.
       getGroupedRowModel: getGroupedRowModel(),
-      onGroupingChange: onGroupingChangeCb,
+      onGroupingChange: _onGroupingChangeCbStable,
       // Faceted filtering (phase 50 reqs 8-9, D-03): the 3 faceted models are supplied
       // UNCONDITIONALLY (mirrors the expand/group models) — INERT until a consumer reads a
       // column facet (the getFaceted* verbs / #filter slot), so byte-identical-off holds (req-10).
@@ -4434,16 +4471,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // PER-SLICE callbacks (Open-Q1: each maps 1:1 to a slice's r-model + change event,
       // no global onStateChange diff) — hoisted top-level consts, re-passed by the re-feed
       // $watch so React reads fresh currentState (the stale-closure fix, F6).
-      onSortingChange: onSortingChangeCb,
-      onGlobalFilterChange: onGlobalFilterChangeCb,
-      onColumnFiltersChange: onColumnFiltersChangeCb,
-      onPaginationChange: onPaginationChangeCb,
-      onRowSelectionChange: onRowSelectionChangeCb,
-      onColumnVisibilityChange: onColumnVisibilityChangeCb,
-      onColumnSizingChange: onColumnSizingChangeCb,
-      onColumnOrderChange: onColumnOrderChangeCb,
-      onColumnPinningChange: onColumnPinningChangeCb,
-      onColumnSizingInfoChange: onColumnSizingInfoChangeCb,
+      onSortingChange: _onSortingChangeCbStable,
+      onGlobalFilterChange: _onGlobalFilterChangeCbStable,
+      onColumnFiltersChange: _onColumnFiltersChangeCbStable,
+      onPaginationChange: _onPaginationChangeCbStable,
+      onRowSelectionChange: _onRowSelectionChangeCbStable,
+      onColumnVisibilityChange: _onColumnVisibilityChangeCbStable,
+      onColumnSizingChange: _onColumnSizingChangeCbStable,
+      onColumnOrderChange: _onColumnOrderChangeCbStable,
+      onColumnPinningChange: _onColumnPinningChangeCbStable,
+      onColumnSizingInfoChange: _onColumnSizingInfoChangeCbStable,
       // Resize mode: 'onChange' so the bound columnSizing model updates live during the
       // drag (the behavioral width-delta assertion observes the in-progress width). Column
       // resizing is enabled at the table level; per-column opt-out is via the ColumnDef.
@@ -4527,7 +4564,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // selection state (bound :indeterminate is inert on 5/6 targets). The box persists
       // across selection changes; a microtask defer covers React's post-render DOM patch.
       _syncIndeterminateRef.current();
-      if (typeof queueMicrotask !== 'undefined') queueMicrotask(syncIndeterminate);else Promise.resolve().then(syncIndeterminate);
+      if (typeof queueMicrotask !== 'undefined') queueMicrotask(_syncIndeterminateStable);else Promise.resolve().then(_syncIndeterminateStable);
     };
 
     // initial pull

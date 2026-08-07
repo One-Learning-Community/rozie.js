@@ -376,7 +376,7 @@ const Bar = forwardRef<BarHandle, BarProps>(function Bar(_props: BarProps, ref):
         dying?.destroy();
       }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const v = props.data;
     if (!instance.current) return;

@@ -376,7 +376,7 @@ const PolarArea = forwardRef<PolarAreaHandle, PolarAreaProps>(function PolarArea
         dying?.destroy();
       }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const v = props.data;
     if (!instance.current) return;

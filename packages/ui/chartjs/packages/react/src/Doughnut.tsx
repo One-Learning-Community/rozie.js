@@ -376,7 +376,7 @@ const Doughnut = forwardRef<DoughnutHandle, DoughnutProps>(function Doughnut(_pr
         dying?.destroy();
       }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const v = props.data;
     if (!instance.current) return;

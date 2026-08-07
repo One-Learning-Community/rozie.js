@@ -603,6 +603,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
   const _applyLayersRef = useRef(applyLayers);
   _applyLayersRef.current = applyLayers;
   useEffect(() => {
+    const _applyLayersStable: typeof _applyLayersRef.current = (...args) => _applyLayersRef.current(...args);
     interface ReactivePortalHandle {
     update(scope: unknown): void;
     dispose(): void;
@@ -898,7 +899,7 @@ const MapLibre = forwardRef<MapLibreHandle, MapLibreProps>(function MapLibre(_pr
     reconcileInteractive.current(_interactiveLayerIdsRef.current);
 
     // sources/layers need the style loaded.
-    if (instance.current.isStyleLoaded()) _applyLayersRef.current();else instance.current.on('load', applyLayers);
+    if (instance.current.isStyleLoaded()) _applyLayersRef.current();else instance.current.on('load', _applyLayersStable);
     return () => {
       for (const root of portalRoots.current) root.unmount();
   portalRoots.current.clear();

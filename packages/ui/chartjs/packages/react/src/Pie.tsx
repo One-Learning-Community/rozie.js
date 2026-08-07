@@ -376,7 +376,7 @@ const Pie = forwardRef<PieHandle, PieProps>(function Pie(_props: PieProps, ref):
         dying?.destroy();
       }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const v = props.data;
     if (!instance.current) return;
