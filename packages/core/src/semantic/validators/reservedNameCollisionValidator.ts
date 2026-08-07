@@ -39,6 +39,12 @@
  *   - The IR validator `validateSlotPropCollision` (ROZ127) owns ALL slot-name
  *     collisions: slot==prop, slot-key-shape (hyphenated/leading-digit), and
  *     slot==DOM-member/expose-verb. Slots are therefore NOT checked here.
+ *   - `propEmitCallbackCollisionValidator.ts` (ROZ148, Quick 260807-2qn) owns
+ *     the prop-vs-emit-synthesized-callback-name axis — a DIFFERENT collision
+ *     class than this file's reserved-name checks: a declared prop colliding
+ *     with a name the COMPILER synthesizes from another declaration (the
+ *     `on<Pascal>` field React/Solid mint per emit), not a per-target reserved
+ *     word. Not re-checked here.
  *
  * provide/inject: the inject-LOCAL binding is INTERNAL (Half A auto-renames it);
  * the KEY is a runtime string literal (never an identifier), so it cannot

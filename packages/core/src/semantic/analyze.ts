@@ -42,6 +42,7 @@ import { runRefsPreMountValidator } from './validators/refsPreMountValidator.js'
 import { runStructuredCloneReactiveValidator } from './validators/structuredCloneReactiveValidator.js';
 import { runExposeReservedMemberValidator } from './validators/exposeReservedMemberValidator.js';
 import { runReservedNameCollisionValidator } from './validators/reservedNameCollisionValidator.js';
+import { runPropEmitCallbackCollisionValidator } from './validators/propEmitCallbackCollisionValidator.js';
 import { runReactStaleReadValidator } from './validators/reactStaleReadValidator.js';
 import { runDataNestedMutationValidator } from './validators/dataNestedMutationValidator.js';
 import { runDataInitSigilValidator } from './validators/dataInitSigilValidator.js';
@@ -99,6 +100,15 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   // slot collisions are owned by validateSlotPropCollision (ROZ127), $expose
   // verbs by the widened ROZ137 — no double-firing.
   runReservedNameCollisionValidator(ast, bindings, diagnostics);
+  // Quick 260807-2qn — ROZ148 (error): a <props> key exactly equal to the
+  // on<Pascal> callback field React/Solid synthesize for a declared emit —
+  // BOTH fields would land on one generated props interface with different
+  // types (TS2300). A DIFFERENT collision class from ROZ142/ROZ981 above (a
+  // declared name colliding with a COMPILER-SYNTHESIZED name, not a reserved
+  // name), so it owns its own file and runs immediately after — see that
+  // file's OWNERSHIP header for why it is not folded into
+  // reservedNameCollisionValidator.ts. Reads bindings.props/emits.
+  runPropEmitCallbackCollisionValidator(ast, bindings, diagnostics);
   // Quick 260717-8zb (Task 2 Item 5) — ROZ147 (suppressible warning): a <props>
   // key colliding with an inherited HTMLElement/Element/Node PROPERTY name not
   // already covered by ROZ142's curated LIT_DOM_PROP_FOOTGUNS tier. Reads

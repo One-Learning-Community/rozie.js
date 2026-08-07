@@ -516,6 +516,21 @@ export const RozieErrorCode = {
   // ship a grandfathered collision. See litInheritedPropertyValidator.ts.
   LIT_INHERITED_PROPERTY_PROP_NAME: 'ROZ147', // warning (suppressible) — a <props> key collides with an inherited HTMLElement/Element/Node PROPERTY name that becomes a Lit class field, shadowing the base-class property.
 
+  // Quick 260807-2qn — ROZ148 is the next free code after ROZ147. Dan decided
+  // this fork 2026-08-07: React/Solid both synthesize an `on<Pascal>(...)`
+  // callback field on the generated props interface for every declared
+  // `$emit`. If the author ALSO declares a `<props>` key exactly equal to
+  // that synthesized name, both fields land on the SAME props interface with
+  // different types — a hard TS2300 duplicate-identifier break on every
+  // strict-TS consumer, on two of six targets, with no typecheck net at
+  // author time. A silent dedup would pick a consumer-visible return type by
+  // accident (neither side is obviously the one that should move), so this
+  // fails loud instead — mirroring the ROZ127 prop/slot collision precedent.
+  // Scope fence (D-05): the emit axis ONLY — the two model-companion sibling
+  // shapes (`default<X>`/`on<X>Change` vs a model prop) are deliberately NOT
+  // covered here; see propEmitCallbackCollisionValidator.ts.
+  PROP_EMIT_CALLBACK_NAME_COLLISION: 'ROZ148', // error — a <props> key equal to the on<Pascal> callback field React/Solid synthesize for a declared emit; both fields land on one props interface with different types (TS2300). Rename the prop or the emit.
+
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
   WRITE_TO_REF: 'ROZ201', // $refs.foo = … (refs are read-only DOM-element wrappers)
