@@ -814,3 +814,150 @@ describe('createKeynav (Solid) — grid config, @keynav-page, deferred focus (Pl
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Quick task 260806-lz7 — drill-exit sibling-group race. Mirrors the React
+// reference's `TwoGroupHarness` (`useKeynav.test.tsx`) test-by-test — see its
+// doc comment for the full rationale. `buildTwoGroupHarness` wires ONE
+// `createKeynav` attachment (group A, mirrors date-picker's persistent days
+// grid) sharing `getFocusScope: () => [wrapper]` with a plain sibling
+// element (`bItem`, mirrors a focused cell inside a SIBLING attachment —
+// e.g. date-picker's months panel — that the SAME transition destroys); the
+// sibling doesn't need its own `createKeynav` wiring, since what's under
+// test is group A's own guarded pass reacting to the shared wrapper's
+// same-tick focus loss, not the sibling's own keynav behavior.
+// ---------------------------------------------------------------------------
+
+interface TwoGroupHarness {
+  wrapper: HTMLElement;
+  itemsA: HTMLElement[];
+  bItem: HTMLElement;
+  setActiveA: (i: number) => void;
+  removeB: () => void;
+  dispose: () => void;
+}
+
+function buildTwoGroupHarness(): TwoGroupHarness {
+  const wrapper = document.createElement('div');
+  document.body.appendChild(wrapper);
+
+  const rootA = document.createElement('div');
+  rootA.setAttribute('role', 'menu');
+  rootA.tabIndex = -1;
+  wrapper.appendChild(rootA);
+
+  const itemsA: HTMLElement[] = ITEMS.map((it) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = it.label;
+    rootA.appendChild(btn);
+    return btn;
+  });
+
+  const rootB = document.createElement('div');
+  rootB.setAttribute('role', 'menu');
+  wrapper.appendChild(rootB);
+  const bItem = document.createElement('button');
+  bItem.type = 'button';
+  bItem.textContent = 'B-item';
+  bItem.tabIndex = 0;
+  rootB.appendChild(bItem);
+
+  let dispose: () => void = () => {};
+  let setActiveAImpl: (i: number) => void = () => {};
+
+  createRoot((d) => {
+    dispose = d;
+    const [activeA, setActiveASignal] = createSignal(0);
+    setActiveAImpl = setActiveASignal;
+
+    itemsA.forEach((el, i) => {
+      createEffect(() => {
+        el.setAttribute('data-rozie-keynav-item', String(i));
+        if (activeA() === i) el.setAttribute('data-rozie-keynav-active', '');
+        else el.removeAttribute('data-rozie-keynav-active');
+        el.setAttribute('tabindex', activeA() === i ? '0' : '-1');
+      });
+    });
+
+    createKeynav(() => rootA, {
+      config: BASE_CONFIG,
+      getSource: () => ITEMS,
+      getActive: () => activeA(),
+      setActive: setActiveASignal,
+      onCommit: () => {},
+      getFocusScope: () => [wrapper],
+    });
+  });
+
+  return {
+    wrapper,
+    itemsA,
+    bItem,
+    setActiveA: (i) => setActiveAImpl(i),
+    removeB: () => rootB.remove(),
+    dispose,
+  };
+}
+
+describe('createKeynav (Solid) — drill-exit sibling-group race (Plan 260806-lz7)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it("a sibling group's focused item destroyed in the same transition, followed by a SEPARATELY rAF-deferred write for THIS group (mirroring date-picker's seedActiveDay), still focuses — even when the tracker's OWN internal expiry rAF is registered BEFORE the sibling's deferred-write rAF (the exact Solid drill-exit race, found via a real-Chromium Docker VR run)", () => {
+    const raf = stubRaf();
+    try {
+      const { itemsA, bItem, setActiveA, removeB, dispose } = buildTwoGroupHarness();
+
+      // Focus lands on the sibling's item (mirrors drilling into months —
+      // established directly here since what's under test is group A's
+      // reaction to the shared scope's focus loss, not how the sibling
+      // itself acquired focus).
+      bItem.focus();
+      expect(document.activeElement).toBe(bItem);
+
+      // The transition: the sibling's focused item is removed as part of a
+      // real-Chromium-style same-tick DOM removal — dispatch the WHATWG
+      // "unfocusing steps" `focusout` (relatedTarget null) BEFORE removal,
+      // exactly like `focusGuard.test.ts`'s own `dispatchRemovalFocusOut`
+      // (happy-dom does not fire this automatically). This registers the
+      // tracker's OWN internal (chained) expiry rAF — callbacks[0].
+      bItem.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+      removeB();
+      expect(document.activeElement).toBe(document.body);
+      expect(raf.callbacks.length).toBeGreaterThanOrEqual(1);
+      const trackerExpiryLink1 = raf.callbacks[0]!;
+
+      // Group A's OWN sibling deferred write — mirrors `seedActiveDay`'s
+      // `requestAnimationFrame(() => { $data.activeDay = next })`,
+      // registered strictly AFTER the tracker's own expiry rAF above
+      // (matching the exact registration order this fix depends on).
+      let deferredWriteRan = false;
+      requestAnimationFrame(() => {
+        deferredWriteRan = true;
+        setActiveA(2);
+      });
+      const siblingDeferredWrite = raf.callbacks[raf.callbacks.length - 1]!;
+
+      // Fire the tracker's own first chained expiry link — mirrors it
+      // running BEFORE the sibling's deferred write in the SAME animation
+      // frame (the race). With the fix, this must NOT clear the tracker
+      // outright — it re-arms for a further frame.
+      trackerExpiryLink1(0);
+
+      // NOW the sibling's deferred write fires — group A's active index
+      // resolves to 2 (Charlie), and its guarded pass must still see the
+      // tracker as valid (the sibling's chain is still "within scope" via
+      // the shared wrapper).
+      siblingDeferredWrite(0);
+      expect(deferredWriteRan).toBe(true);
+
+      expect(document.activeElement).toBe(byLabel(itemsA, 'Charlie'));
+
+      dispose();
+    } finally {
+      raf.restore();
+    }
+  });
+});

@@ -232,7 +232,14 @@ describe('focusIsWithinScope', () => {
     anchor.remove();
   });
 
-  it('the same-tick-removal fallback EXPIRES on the next animation frame — a later unrelated guarded pass does not keep reusing it', () => {
+  it('the same-tick-removal fallback survives a SAME-FRAME sibling requestAnimationFrame regardless of which rAF registers first — the drill-exit race (React/Solid found via real-Chromium Docker VR: this listener\'s own expiry rAF can register BEFORE a sibling\'s deferred write)', () => {
+    // Mirrors the real race: a SIBLING consumer (date-picker's own
+    // `seedActiveDay`) independently registers its OWN `requestAnimationFrame`
+    // to resolve the transition's real value — and on React/Solid, that
+    // registration can land AFTER this listener's own first expiry
+    // `requestAnimationFrame`, in the SAME upcoming frame. A single-frame
+    // expiry would fire before the sibling's write ever gets to consume the
+    // tracker; the chained (triple) expiry must not.
     const rafCallbacks: FrameRequestCallback[] = [];
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       rafCallbacks.push(cb);
@@ -250,9 +257,22 @@ describe('focusIsWithinScope', () => {
       expect(focusIsWithinScope([anchor], document)).toBe(true);
       expect(rafCallbacks).toHaveLength(1);
 
-      // The browser paints — the deferred expiry fires.
+      // Frame N+1: this listener's own first chained rAF fires — registered
+      // BEFORE a same-frame sibling's deferred write (the race case) — and
+      // the tracker must still be usable for that sibling's check.
       rafCallbacks[0]!(0);
+      expect(focusIsWithinScope([anchor], document)).toBe(true);
+      expect(rafCallbacks).toHaveLength(2); // the second chained rAF is now armed.
 
+      // Frame N+2: still not expired — the sibling's own write may itself
+      // have deferred its EFFECT (not just its state write) to run after
+      // this frame's paint (React's `useEffect`).
+      rafCallbacks[1]!(0);
+      expect(focusIsWithinScope([anchor], document)).toBe(true);
+      expect(rafCallbacks).toHaveLength(3); // the third and final chained rAF is now armed.
+
+      // Frame N+3: the deferred expiry finally fires.
+      rafCallbacks[2]!(0);
       expect(focusIsWithinScope([anchor], document)).toBe(false);
       anchor.remove();
     } finally {

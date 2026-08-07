@@ -149,11 +149,14 @@ export type FocusScope = Element | readonly (Element | null)[] | null | undefine
 // transition). Consuming the tracked value on the FIRST read starved every
 // LATER read in that same batch — including the one attachment the
 // transition was actually FOR. The tracked value instead expires on the
-// next animation frame (comfortably past every target's post-render
-// effect/watch flush, which all complete before the next paint) — every
-// attachment checking within the SAME render batch sees the SAME value,
-// while a genuinely later, unrelated interaction still gets a fresh (empty)
-// tracker.
+// THIRD subsequent animation frame (see `ensureFocusLossTracker`'s own doc
+// comment for why one frame is not enough — a same-frame sibling
+// `requestAnimationFrame`-deferred write, and any effect IT triggers, needs
+// a full extra frame to be guaranteed to have run first, regardless of
+// which of the two independently-registered rAF callbacks happens to run
+// first within the shared frame) — every attachment checking within the
+// SAME render batch sees the SAME value, while a genuinely later, unrelated
+// interaction still gets a fresh (empty) tracker.
 const focusLossTrackers = new WeakMap<Document, Set<EventTarget> | null>();
 
 function ensureFocusLossTracker(doc: Document): void {
@@ -166,11 +169,51 @@ function ensureFocusLossTracker(doc: Document): void {
       const chain = new Set(e.composedPath());
       focusLossTrackers.set(doc, chain);
       const win = doc.defaultView;
+      // TRIPLE rAF expiry (drill-exit patch) — NOT a single frame. A
+      // sibling consumer can legitimately defer the transition's OWN
+      // active-index resolution by one `requestAnimationFrame` for reasons
+      // entirely unrelated to this guard (date-picker's `seedActiveDay`
+      // does this for reactive-commit-timing reasons documented on its own
+      // declaration). That deferred write's `requestAnimationFrame` call
+      // and THIS listener's expiry `requestAnimationFrame` call are two
+      // INDEPENDENT registrations that can land in the SAME upcoming
+      // animation frame — and a browser runs same-frame rAF callbacks in
+      // REGISTRATION order, which depends on whether the host framework's
+      // DOM removal (and therefore this `focusout` listener) fires
+      // SYNCHRONOUSLY inside the transition's own event handler (before
+      // the sibling's deferred write even registers its rAF) or
+      // ASYNCHRONOUSLY after it (after the sibling's rAF has already been
+      // registered). This ordering is a framework/DOM-commit-timing
+      // implementation detail, NOT something this module can observe or
+      // should depend on — verified empirically via a real-Chromium Docker
+      // VR run against date-picker's months->days Escape exit: on React
+      // and Solid, THIS listener's rAF happens to register (and therefore
+      // run) BEFORE the sibling's deferred write in the same frame,
+      // clearing the tracker one frame early; on Vue/Svelte/Lit/Angular
+      // the registration order happens to run the other way, which is why
+      // the single-frame expiry never surfaced there. Re-arming the SAME
+      // clear across THREE animation frames (rather than consuming it
+      // after the first) removes the dependency on that exact ordering:
+      // ANY same-frame sibling callback — and any effect IT triggers, even
+      // one a framework defers to run after paint (React's `useEffect` is
+      // the canonical example, itself scheduled via a macrotask that can
+      // slip a frame under real-world scheduler/CPU jitter, observed
+      // directly in a loaded Docker CI container during this fix's own
+      // verification) — is guaranteed to have completed well within three
+      // subsequent frames, regardless of which rAF happened to register
+      // first. This is the standard "chained rAF" technique for "wait
+      // until a browser frame has genuinely rendered and settled, with
+      // margin for a deferred post-paint effect," not a value tuned to any
+      // one framework's scheduler.
       win?.requestAnimationFrame(() => {
-        // Only clear if nothing NEWER has overwritten it in the meantime.
-        if (focusLossTrackers.get(doc) === chain) {
-          focusLossTrackers.set(doc, null);
-        }
+        win.requestAnimationFrame(() => {
+          win.requestAnimationFrame(() => {
+            // Only clear if nothing NEWER has overwritten it in the meantime.
+            if (focusLossTrackers.get(doc) === chain) {
+              focusLossTrackers.set(doc, null);
+            }
+          });
+        });
       });
     },
     true,
@@ -185,8 +228,8 @@ function ensureFocusLossTracker(doc: Document): void {
  *    `doc.documentElement`: normally returns false (cold static mount stops
  *    here) UNLESS the last element to lose focus via a same-tick DOM
  *    removal (see the focus-loss-tracker doc comment above, valid until the
- *    next animation frame) is contained by a non-empty `scope` — the
- *    drill-continuity patch.
+ *    THIRD subsequent animation frame) is contained by a non-empty `scope`
+ *    — the drill-continuity patch.
  * 2. Normalize `scope` to a list of connected Elements, discarding null /
  *    disconnected entries.
  * 3. If that list is EMPTY, return `documentHasRealFocus(doc)` — the
@@ -205,8 +248,9 @@ export function focusIsWithinScope(scope: FocusScope, doc: Document): boolean {
       const lostChain = focusLossTrackers.get(doc);
       // Deliberately NOT consumed on read — see the tracker's own doc
       // comment for why every attachment checking within the SAME render
-      // batch must see the SAME value. Expires on the next animation frame
-      // instead.
+      // batch must see the SAME value. Expires on the SECOND animation
+      // frame instead (see `ensureFocusLossTracker`'s doc comment for why
+      // one frame is not enough).
       if (lostChain && anchors.some((anchor) => lostChain.has(anchor))) {
         return true;
       }

@@ -11,7 +11,7 @@
  * hook itself never touches those two attributes).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent, screen, act, waitFor } from '@testing-library/react';
+import { render, fireEvent, screen, within, act, waitFor } from '@testing-library/react';
 import { useEffect, useRef, useState } from 'react';
 import type { KeynavConfig, KeynavPageDetail } from '@rozie/runtime-keynav-core';
 import { useKeynav } from '../useKeynav.js';
@@ -606,6 +606,169 @@ describe('useKeynav — grid config, @keynav-page, deferred focus (Plan 77-03 Ta
         stalePass(0);
       });
       expect(document.activeElement).toBe(aEl);
+    } finally {
+      raf.restore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Quick task 260806-lz7 — drill-exit sibling-group race. Found via a REAL
+// Chromium Docker VR run against @rozie-ui/date-picker's months->days
+// Escape exit: the months panel's focused cell is destroyed by the SAME
+// transition that resolves the days grid's (a SIBLING attachment sharing
+// the SAME `getFocusScope` wrapper) guarded pass, but that pass's REAL
+// value is itself deferred one `requestAnimationFrame` for reasons entirely
+// unrelated to this guard (date-picker's own `seedActiveDay` — reactive-
+// commit-timing, not focus). `@rozie/runtime-keynav-core`'s
+// `focusIsWithinScope` tracks "the last element to lose focus via a
+// same-tick DOM removal" and expires that tracking after a bounded number
+// of animation frames so a genuinely later, unrelated interaction doesn't
+// keep reusing it — but the tracker's OWN internal expiry
+// `requestAnimationFrame` and the SIBLING's independently-registered
+// deferred-write `requestAnimationFrame` are two UNRELATED registrations
+// that can land in the SAME upcoming frame. On React specifically, the
+// removal's `focusout` (and therefore the tracker's own expiry rAF)
+// registers BEFORE the sibling's deferred write registers its own rAF —
+// browsers run same-frame rAF callbacks in REGISTRATION order, so a
+// single-frame expiry clears the tracker one frame before the sibling's
+// real value ever lands. This harness reproduces that exact registration
+// order with a stubbed, deterministic rAF queue.
+// ---------------------------------------------------------------------------
+
+function TwoGroupHarness({
+  showB,
+  activeA,
+  onCommitA,
+  onCommitB,
+}: {
+  showB: boolean;
+  activeA: number;
+  onCommitA: (i: number) => void;
+  onCommitB: (i: number) => void;
+}) {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const rootARef = useRef<HTMLDivElement | null>(null);
+  const rootBRef = useRef<HTMLDivElement | null>(null);
+  const [activeB] = useState(0);
+  useKeynav(rootARef, {
+    config: BASE_CONFIG,
+    getSource: () => ITEMS,
+    getActive: () => activeA,
+    setActive: () => {},
+    onCommit: onCommitA,
+    getFocusScope: () => [wrapperRef.current],
+  });
+  useKeynav(rootBRef, {
+    config: BASE_CONFIG,
+    getSource: () => ITEMS,
+    getActive: () => activeB,
+    setActive: () => {},
+    onCommit: onCommitB,
+    getFocusScope: () => [wrapperRef.current],
+  });
+  return (
+    <div data-testid="wrapper" ref={wrapperRef}>
+      <div role="menu" ref={rootARef} tabIndex={-1} data-testid="rootA">
+        {ITEMS.map((it, i) => (
+          <button
+            type="button"
+            key={it.id}
+            data-rozie-keynav-item={i}
+            data-rozie-keynav-active={activeA === i ? '' : undefined}
+            tabIndex={activeA === i ? 0 : -1}
+          >
+            {it.label}
+          </button>
+        ))}
+      </div>
+      {showB && (
+        <div role="menu" ref={rootBRef} tabIndex={-1} data-testid="rootB">
+          {ITEMS.map((it, i) => (
+            <button
+              type="button"
+              key={it.id}
+              data-rozie-keynav-item={i}
+              data-rozie-keynav-active={activeB === i ? '' : undefined}
+              tabIndex={activeB === i ? 0 : -1}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+describe('useKeynav — drill-exit sibling-group race (Plan 260806-lz7)', () => {
+  it('a sibling group\'s focused item destroyed in the same transition, followed by a SEPARATELY rAF-deferred write for THIS group (mirroring date-picker\'s seedActiveDay), still focuses — even when the tracker\'s OWN internal expiry rAF is registered BEFORE the sibling\'s deferred-write rAF (the exact React drill-exit race, found via a real-Chromium Docker VR run)', () => {
+    const raf = stubRaf();
+    try {
+      const commitA = vi.fn();
+      const commitB = vi.fn();
+
+      const { rerender } = render(
+        <TwoGroupHarness showB={true} activeA={0} onCommitA={commitA} onCommitB={commitB} />,
+      );
+
+      // Focus lands on group B's active item (mirrors drilling into months —
+      // group B's own first guarded pass focused it, since group B's item
+      // was, at that point, the composed active element and thus "within
+      // scope" via direct containment).
+      const bItem = within(screen.getByTestId('rootB')).getByText('Alpha');
+      act(() => {
+        bItem.focus();
+      });
+      expect(document.activeElement).toBe(bItem);
+
+      // The transition: group B's focused item is removed as part of a
+      // real-Chromium-style same-tick DOM removal — dispatch the WHATWG
+      // "unfocusing steps" `focusout` (relatedTarget null) BEFORE removal,
+      // exactly like `focusGuard.test.ts`'s own `dispatchRemovalFocusOut`
+      // (happy-dom does not fire this automatically). This registers the
+      // tracker's OWN internal (chained) expiry rAF — callbacks[0].
+      act(() => {
+        bItem.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+      });
+      rerender(<TwoGroupHarness showB={false} activeA={0} onCommitA={commitA} onCommitB={commitB} />);
+      expect(document.activeElement).toBe(document.body);
+      expect(raf.callbacks.length).toBeGreaterThanOrEqual(1);
+      const trackerExpiryLink1 = raf.callbacks[0]!;
+
+      // Group A's OWN sibling deferred write — mirrors `seedActiveDay`'s
+      // `requestAnimationFrame(() => { $data.activeDay = next })`,
+      // registered strictly AFTER the tracker's own expiry rAF above
+      // (matching the exact registration order this fix depends on:
+      // real-Chromium fires `focusout` — and therefore arms the tracker's
+      // expiry — synchronously inside the transition's own handler, BEFORE
+      // date-picker's `seedActiveDay` call that follows it even runs).
+      let deferredWriteRan = false;
+      requestAnimationFrame(() => {
+        deferredWriteRan = true;
+        rerender(<TwoGroupHarness showB={false} activeA={2} onCommitA={commitA} onCommitB={commitB} />);
+      });
+      const siblingDeferredWrite = raf.callbacks[raf.callbacks.length - 1]!;
+
+      // Fire the tracker's own first chained expiry link — mirrors it
+      // running BEFORE the sibling's deferred write in the SAME animation
+      // frame (the race). With the fix, this must NOT clear the tracker
+      // outright — it re-arms for a further frame.
+      act(() => {
+        trackerExpiryLink1(0);
+      });
+
+      // NOW the sibling's deferred write fires — group A's active index
+      // resolves to 2 (Charlie), and its guarded pass must still see the
+      // tracker as valid (group B's chain is still "within scope" via the
+      // shared wrapper).
+      act(() => {
+        siblingDeferredWrite(0);
+      });
+      expect(deferredWriteRan).toBe(true);
+
+      const aItem2 = within(screen.getByTestId('rootA')).getByText('Charlie');
+      expect(document.activeElement).toBe(aItem2);
     } finally {
       raf.restore();
     }
