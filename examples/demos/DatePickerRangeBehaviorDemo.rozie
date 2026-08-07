@@ -25,6 +25,15 @@
   the PROPERTY form (:presetRanges) — Lit requires a property, never an attribute
   (same as disabledDates); a literal range (no thunk) keeps it safe on all six.
 
+  BLOCKED DAY (quick task 260807-6p8, D-02): `blocked` seeds a single
+  disabledDates entry, 2025-06-25, bound via :disabledDates. Jun 25 sits
+  OUTSIDE every span the frozen phases above drive (they only touch days 5, 8,
+  10, 12, 14, 16, 20), so no existing assertion in this file shifts. The new
+  range-span-disabled phase (date-picker-range-behavior.spec.ts, appended after
+  the PRESET phase) drives a span that DOES cross it (21..27) to prove the
+  preview band is suppressed and a blocked commit re-anchors instead of
+  completing.
+
   COLLISION NOTE: the readout-helper is `applyRange`, NOT `setRange` — a set<X>
   helper collapses onto the generated $data.range setter on React/Solid (ROZ524).
   apply<X> is the listbox/data-table precedent (DatePickerBehaviorDemo applyDate).
@@ -43,6 +52,7 @@
   presets: [
     { label: 'Mid June', range: { start: '2025-06-05', end: '2025-06-20' } },
   ],
+  blocked: ['2025-06-25'],
   lastComplete: '',
 }
 </data>
@@ -71,6 +81,7 @@ const applyRange = (r) => {
     r-model:value="$data.range"
     selectionMode="range"
     :presetRanges="$data.presets"
+    :disabledDates="$data.blocked"
     :weekStartsOn="0"
     locale="en-US"
     @rangeComplete="onRangeComplete($event)"

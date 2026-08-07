@@ -14,19 +14,25 @@ import {
   buildMonthGrid,
   buildMonthList,
   buildYearGrid,
+  dayLabel,
   isDayDisabled,
   isInRange,
   isIsoDate,
   isoToUtc,
+  LABEL_DEFAULTS,
   monthLabel,
   normalizeRange,
   rangeFromPreset,
+  rangeSpansDisabled,
+  resolveLabel,
   resolveRovingDrillIso,
   resolveRovingIso,
   resolveViewIso,
   toIso,
   weekdayLabels,
 } from './buildMonthGrid';
+
+const sorted = (a: readonly string[]) => [...a].sort();
 
 describe('isIsoDate', () => {
   it('accepts well-formed YYYY-MM-DD', () => {
@@ -572,6 +578,199 @@ describe('resolveRovingIso', () => {
       anchor: '',
     });
     expect(iso.slice(0, 7)).toBe('2025-07');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// rangeSpansDisabled / dayLabel / weekdayLabels(...,'long') / LABEL_DEFAULTS /
+// resolveLabel — quick task 260807-6p8 (D-01, D-02, D-05). Import failure IS
+// the RED signal until Task 2 adds these exports. Expected values below are
+// hand-computed against the real June 2025 calendar (June 15 2025 is a
+// Sunday, confirmed independently by the dayLabel assertions), not copied
+// from any implementation.
+// ---------------------------------------------------------------------------
+describe('rangeSpansDisabled', () => {
+  it('returns false with no disabled config at all', () => {
+    expect(rangeSpansDisabled('2025-06-01', '2025-06-10', {
+      viewIso: '2025-06-01', value: '', today: '',
+    })).toBe(false);
+  });
+
+  it('returns true for a disabledDates entry strictly inside the interior', () => {
+    expect(rangeSpansDisabled('2025-06-01', '2025-06-10', {
+      viewIso: '2025-06-01', value: '', today: '', disabledDates: ['2025-06-05'],
+    })).toBe(true);
+  });
+
+  it('returns false for a disabledDates entry that IS one of the two endpoints', () => {
+    expect(rangeSpansDisabled('2025-06-01', '2025-06-10', {
+      viewIso: '2025-06-01', value: '', today: '', disabledDates: ['2025-06-01'],
+    })).toBe(false);
+  });
+
+  it('returns false for a disabledDates entry outside the span', () => {
+    expect(rangeSpansDisabled('2025-06-01', '2025-06-10', {
+      viewIso: '2025-06-01', value: '', today: '', disabledDates: ['2025-06-15'],
+    })).toBe(false);
+  });
+
+  it('is order-tolerant: reversed argument order gives the same result as forward', () => {
+    const input = { viewIso: '2025-06-01', value: '', today: '', disabledDates: ['2025-06-05'] };
+    expect(rangeSpansDisabled('2025-06-10', '2025-06-01', input)).toBe(
+      rangeSpansDisabled('2025-06-01', '2025-06-10', input),
+    );
+    expect(rangeSpansDisabled('2025-06-10', '2025-06-01', input)).toBe(true);
+  });
+
+  it('returns false for the same day and for adjacent days (zero interior)', () => {
+    const withDisabled = { viewIso: '2025-06-01', value: '', today: '', disabledDates: ['2025-06-05'] };
+    expect(rangeSpansDisabled('2025-06-05', '2025-06-05', withDisabled)).toBe(false);
+    expect(rangeSpansDisabled('2025-06-05', '2025-06-06', withDisabled)).toBe(false);
+  });
+
+  it('disabledDaysOfWeek over a 10-day span (interior >= 7) is true regardless of hit', () => {
+    // a=Jun1, b=Jun11 -> interior Jun2..Jun10 = 9 days, >= 7 -> necessarily
+    // contains every weekday, so true immediately.
+    expect(rangeSpansDisabled('2025-06-01', '2025-06-11', {
+      viewIso: '2025-06-01', value: '', today: '', disabledDaysOfWeek: [0],
+    })).toBe(true);
+  });
+
+  it('disabledDaysOfWeek over a 4-day span whose interior contains no Sunday is false', () => {
+    // a=Jun2 (Mon), b=Jun5 (Thu) -> interior Jun3(Tue), Jun4(Wed) -> no Sunday.
+    expect(rangeSpansDisabled('2025-06-02', '2025-06-05', {
+      viewIso: '2025-06-01', value: '', today: '', disabledDaysOfWeek: [0],
+    })).toBe(false);
+  });
+
+  it('disabledDaysOfWeek over a 4-day span whose interior DOES contain a Sunday is true', () => {
+    // a=Jun6 (Fri), b=Jun9 (Mon) -> interior Jun7(Sat), Jun8(Sun) -> contains Sunday.
+    expect(rangeSpansDisabled('2025-06-06', '2025-06-09', {
+      viewIso: '2025-06-01', value: '', today: '', disabledDaysOfWeek: [0],
+    })).toBe(true);
+  });
+
+  it('isDateDisabled predicate hitting an interior day returns true', () => {
+    const isDateDisabled = (iso: string) => iso === '2025-06-05';
+    expect(rangeSpansDisabled('2025-06-01', '2025-06-10', {
+      viewIso: '2025-06-01', value: '', today: '', isDateDisabled,
+    })).toBe(true);
+  });
+
+  it('isDateDisabled predicate hitting only an endpoint returns false', () => {
+    const isDateDisabled = (iso: string) => iso === '2025-06-01';
+    expect(rangeSpansDisabled('2025-06-01', '2025-06-10', {
+      viewIso: '2025-06-01', value: '', today: '', isDateDisabled,
+    })).toBe(false);
+  });
+
+  it('min/max are NOT consulted: both endpoints inside the window never blocks', () => {
+    expect(rangeSpansDisabled('2025-06-01', '2025-06-10', {
+      viewIso: '2025-06-01', value: '', today: '', min: '2025-05-01', max: '2025-07-01',
+    })).toBe(false);
+  });
+
+  it('an interior longer than RANGE_SCAN_MAX_DAYS with isDateDisabled fails OPEN (false)', () => {
+    const isDateDisabled = () => true; // would be true for every interior day if walked
+    expect(rangeSpansDisabled('2000-01-01', '2020-01-01', {
+      viewIso: '2000-01-01', value: '', today: '', isDateDisabled,
+    })).toBe(false);
+  });
+
+  it('returns false for malformed / empty ISO on either side', () => {
+    const withDisabled = { viewIso: '2025-06-01', value: '', today: '', disabledDates: ['2025-06-05'] };
+    expect(rangeSpansDisabled('', '2025-06-10', withDisabled)).toBe(false);
+    expect(rangeSpansDisabled('2025-06-01', 'not-a-date', withDisabled)).toBe(false);
+  });
+
+  it('returns false when the whole control is disabled', () => {
+    expect(rangeSpansDisabled('2025-06-01', '2025-06-10', {
+      viewIso: '2025-06-01', value: '', today: '', disabled: true, disabledDates: ['2025-06-05'],
+    })).toBe(false);
+  });
+});
+
+describe('dayLabel', () => {
+  it('renders a human-readable localized day label', () => {
+    const label = dayLabel('2025-06-15', 'en-US');
+    expect(label).toContain('Sunday');
+    expect(label).toContain('June');
+    expect(label).toContain('15');
+    expect(label).toContain('2025');
+  });
+
+  it('localizes into another locale', () => {
+    expect(dayLabel('2025-06-15', 'fr-FR')).toContain('juin');
+  });
+
+  it('is UTC-anchored (never slides a day earlier)', () => {
+    const label = dayLabel('2025-06-01', 'en-US');
+    expect(label).toContain('1');
+    expect(label).toContain('June');
+    expect(label).not.toContain('May');
+  });
+
+  it('is a total function: a malformed iso returns the input string unchanged', () => {
+    expect(dayLabel('not-a-date', 'en-US')).toBe('not-a-date');
+  });
+});
+
+describe('weekdayLabels — long form (third arg)', () => {
+  it('returns full weekday names starting from weekStartsOn', () => {
+    expect(weekdayLabels(0, 'en-US', 'long')).toEqual([
+      'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+    ]);
+  });
+
+  it('rotates the first label with a Monday start', () => {
+    expect(weekdayLabels(1, 'en-US', 'long')[0]).toBe('Monday');
+  });
+
+  it('leaves the two-arg (short) form unchanged', () => {
+    const sun = weekdayLabels(0, 'en-US');
+    expect(sun.length).toBe(7);
+    expect(sun[0]).not.toBe('Sunday'); // short form, not the long name
+  });
+});
+
+describe('LABEL_DEFAULTS', () => {
+  it('has exactly the 10 chrome keys, all non-empty strings', () => {
+    const keys = [
+      'root', 'previousMonth', 'nextMonth', 'changeMonthYear', 'changeYear',
+      'chooseMonth', 'chooseYear', 'presets', 'today', 'clear',
+    ];
+    expect(sorted(Object.keys(LABEL_DEFAULTS))).toEqual(sorted(keys));
+    for (const k of keys) {
+      expect(typeof (LABEL_DEFAULTS as Record<string, string>)[k]).toBe('string');
+      expect((LABEL_DEFAULTS as Record<string, string>)[k].length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('resolveLabel', () => {
+  it('an override string wins', () => {
+    expect(resolveLabel({ root: 'Custom root' }, 'root')).toBe('Custom root');
+  });
+
+  it('an empty-string override falls back to the default', () => {
+    expect(resolveLabel({ root: '' }, 'root')).toBe(LABEL_DEFAULTS.root);
+  });
+
+  it('a non-string override (number / object / null) falls back to the default', () => {
+    expect(resolveLabel({ root: 42 as unknown }, 'root')).toBe(LABEL_DEFAULTS.root);
+    expect(resolveLabel({ root: {} as unknown }, 'root')).toBe(LABEL_DEFAULTS.root);
+    expect(resolveLabel({ root: null as unknown }, 'root')).toBe(LABEL_DEFAULTS.root);
+  });
+
+  it('undefined / null / a non-object labels falls back to the default', () => {
+    expect(resolveLabel(undefined, 'root')).toBe(LABEL_DEFAULTS.root);
+    expect(resolveLabel(null, 'root')).toBe(LABEL_DEFAULTS.root);
+    expect(resolveLabel('not-an-object', 'root')).toBe(LABEL_DEFAULTS.root);
+  });
+
+  it('an unknown extra key in labels is ignored, never thrown', () => {
+    expect(() => resolveLabel({ bogusKey: 'x' }, 'root')).not.toThrow();
+    expect(resolveLabel({ bogusKey: 'x' } as never, 'root')).toBe(LABEL_DEFAULTS.root);
   });
 });
 

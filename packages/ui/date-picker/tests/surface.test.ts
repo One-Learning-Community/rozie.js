@@ -28,7 +28,7 @@ const EXPECT = {
   name: 'DatePicker',
   props: [
     'value', 'min', 'max', 'disabledDates', 'weekStartsOn', 'disabled', 'locale', 'selectionMode', 'presetRanges',
-    'monthYearNav', 'numberOfMonths', 'showFooter', 'disabledDaysOfWeek', 'isDateDisabled',
+    'monthYearNav', 'numberOfMonths', 'showFooter', 'disabledDaysOfWeek', 'isDateDisabled', 'labels',
   ],
   models: ['value'],
   emits: ['change', 'rangeComplete'],
@@ -53,7 +53,7 @@ describe('DatePicker.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (14 props)', () => {
+  it('props surface matches (15 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

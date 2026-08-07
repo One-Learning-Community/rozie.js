@@ -181,6 +181,61 @@ for (const target of TARGETS) {
     await expect(cell(5)).toHaveClass(/is-range-start/);
     await expect(cell(20)).toHaveClass(/is-range-end/);
 
+    // ---------------------------------------------------------------------
+    // RANGE-SPAN-DISABLED (quick task 260807-6p8, D-02). The demo now seeds
+    // `blocked: ['2025-06-25']` bound to :disabledDates. A span whose interior
+    // crosses Jun 25 must be suppressed in preview AND re-anchor instead of
+    // completing on commit — through BOTH the pointer path and the keyboard
+    // (@focus -> onDayHover) path.
+    // ---------------------------------------------------------------------
+
+    // Pointer leg. The preset left a completed range (Jun05..Jun20), so a
+    // single click on day 21 re-anchors.
+    await cell(21).click();
+    await expect(cell(21)).toHaveClass(/is-range-start/, { timeout: 10_000 });
+
+    // CONTROL: hover a day whose span does NOT cross the blocked Jun 25 — the
+    // band still works (proves the suppression below is span-specific, not a
+    // global regression).
+    await cell(23).hover();
+    await expect(previewBand).toHaveCount(3, { timeout: 10_000 }); // 21, 22, 23
+
+    // Hover day 27 — the span 21..27 crosses the disabled Jun 25, so the
+    // preview band must be suppressed entirely.
+    await cell(27).hover();
+    await expect(previewBand).toHaveCount(0, { timeout: 10_000 });
+
+    // Click day 27 — the blocked span must RE-ANCHOR instead of completing:
+    // day 27 becomes the new range-start, there is no range-end, and
+    // rangeComplete never fires (the readout still shows the preset's value).
+    await cell(27).click();
+    await expect(cell(27)).toHaveClass(/is-range-start/, { timeout: 10_000 });
+    await expect(rangeEndCells).toHaveCount(0);
+    await expect(page.getByTestId('readout-complete')).toHaveText(
+      `${day(5)}…${day(20)}`,
+    );
+
+    // Keyboard leg (the D-02 "arrowing onto a disabled day" proof, via the
+    // @focus -> onDayHover path). Move the pointer off the grid first so a
+    // stationary cursor cannot confound the focus-driven assertions below.
+    await page.mouse.move(0, 0);
+
+    // Focus day 27 (still the anchor) — proves the focus->hover path is LIVE,
+    // not globally dead: the anchor itself lights a 1-cell preview band.
+    await cell(27).focus();
+    await expect(previewBand).toHaveCount(1, { timeout: 10_000 });
+
+    // ArrowUp lands one row up, on day 20 — the span 20..27 crosses the
+    // disabled Jun 25, so the band is suppressed. A vertical move is used
+    // deliberately: it always lands on an enabled cell regardless of how the
+    // r-keynav grid primitive skips disabled cells horizontally.
+    await page.keyboard.press('ArrowUp');
+    await expect(previewBand).toHaveCount(0, { timeout: 10_000 });
+
+    // ArrowDown returns to day 27 — the anchor-only band is back.
+    await page.keyboard.press('ArrowDown');
+    await expect(previewBand).toHaveCount(1, { timeout: 10_000 });
+
     expect(pageErrors, `uncaught page errors: ${pageErrors.join('; ')}`).toEqual([]);
     expect(consoleErrors, `console errors: ${consoleErrors.join('; ')}`).toEqual([]);
   });
