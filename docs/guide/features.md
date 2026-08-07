@@ -1804,7 +1804,7 @@ The combobox example is the proof that association is **shared reactive state** 
 
 **What the compiler sets for you:**
 
-- tabindex model (`r-keynav:tabindex`): the roving `tabindex` `0`/`-1` toggle across items, plus `.focus()` on the active item whenever it changes.
+- tabindex model (`r-keynav:tabindex`): the roving `tabindex` `0`/`-1` toggle across items, plus `.focus()` on the active item whenever it changes. A genuine navigation (the active index actually moving) always focuses. The very FIRST focus/scroll pass — mount, or a root re-appearing behind `r-if` — is different: it only fires when DOM focus is already somewhere inside the component. A cold page load, or a page where the user is focused on something unrelated elsewhere, is left alone; drilling into a panel while focus already sits on the component's own heading (or any other element inside it) still focuses the panel's active item, preserving keyboard continuity.
 - activedescendant model (`r-keynav:activedescendant`): `aria-activedescendant` on the nav root, plus a stable, unique `id` per item (so the root has something to point at).
 - both models: `data-rozie-keynav-item="<index>"` on each item and `data-rozie-keynav-active` on the active item (the canonical styling/test hook — see [Active-item styling](#active-item-styling) below), a stable group id on the root, and the delegated keydown/pointermove wiring.
 
