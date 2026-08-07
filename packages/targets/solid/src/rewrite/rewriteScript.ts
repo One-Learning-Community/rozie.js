@@ -981,7 +981,27 @@ export function rewriteRozieIdentifiers(
           nonNullRefCallArgs &&
           path.parentPath?.isCallExpression() &&
           path.parentPath.node.arguments.includes(path.node);
-        if (property.name === '__rozieRoot' || isDirectCallArg) {
+        // quick 260807-cor (D4) — an authored, non-optional member/method
+        // access DIRECTLY on the ref (`$refs.viewportEl.querySelectorAll(…)`)
+        // is a bare read+narrow, not a call-argument hand-off — Pattern D's
+        // `nonNullRefCallArgs` opt-in (lifecycle-hook-body-only) doesn't
+        // apply here on purpose: `initialOptions()` is a plain top-level
+        // helper called ONLY from `$onMount`, so this read never reaches
+        // Pattern D's gated rewrite pass at all. This rule is therefore
+        // UNCONDITIONAL, mirroring React/Vue/Svelte/Angular's
+        // `refLowersToNonNull`'s "authored non-optional member/call on the
+        // ref itself" rule (Rule 1 there) — a `$refs.X` read that SURVIVED
+        // compilation is already guaranteed mount-safe by ROZ123 (refs are
+        // rejected in every eager-evaluated context: `$computed`, a `$watch`
+        // getter, a bare template binding), so any member/call access
+        // directly on it is safe everywhere, not just inside a lifecycle
+        // hook's OWN body. `OptionalMemberExpression` parents are excluded —
+        // `$refs.dialogEl?.focus()` is the author opting INTO optionality.
+        const isMemberAccessOnRef =
+          path.parentPath?.isMemberExpression({ object: path.node }) ||
+          (path.parentPath?.isCallExpression() &&
+            path.parentPath.node.callee === path.node);
+        if (property.name === '__rozieRoot' || isDirectCallArg || isMemberAccessOnRef) {
           path.replaceWith(t.tsNonNullExpression(refIdent));
         } else {
           path.replaceWith(refIdent);

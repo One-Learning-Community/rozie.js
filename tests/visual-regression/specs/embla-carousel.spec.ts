@@ -293,37 +293,24 @@ for (const target of TARGETS) {
 /**
  * Declarative (mode b) slide coverage (260802-tmo, Task 2) — mode b is a
  * documented headline capability (embla.md "two slide-source modes",
- * embla-comparison.md's "Config-array AND declarative slides ✅" row) with
- * ZERO test coverage before this task. `CarouselDeclarativeDemo.rozie` passes
- * NO `:slides` prop; four `.rozie-embla__slide` children are dropped directly
- * into the default slot.
+ * embla-comparison.md's "Config-array AND declarative slides ✅" row).
+ * `CarouselDeclarativeDemo.rozie` passes NO `:slides` prop; four
+ * `.rozie-embla__slide` children are dropped directly into the default slot.
  *
- * D4 — VERIFIED (not just predicted): on Lit the four `.rozie-embla__slide`
- * divs DO mount as light-DOM children of the nested `<rozie-carousel>`
- * element (assertion 1 passes — Playwright's CSS locator pierces the shadow
- * boundary and counts 4), and `next-model` does write the bound index
- * (assertion 2 passes). But the container transform never moves (assertion 3
- * is the load-bearing RED): `rozie-carousel`'s shadow root
- * `.rozie-embla__container` renders only `<slot></slot>` — the assigned
- * light-DOM nodes are not DESCENDANTS of that element in the DOM-tree sense,
- * so Embla's internal `container.querySelectorAll('.rozie-embla__slide')`
- * (Carousel.rozie:280) sees zero slides and the engine never lays out.
- * Verified live via direct shadow-root inspection (not source-read).
- *
- * Resolving this needs `assignedElements()`-based slide discovery at the Lit
- * slot lowering — an ARCHITECTURE change, not a Carousel.rozie edit. See
- * .planning/quick/260802-tmo-embla-013-fixes/EMITTER-FINDINGS.md (D4). NOT a
- * silent skip — delete this gate (and the title-scoped `test.fixme` route
- * below) when that lands.
+ * Runs UNGATED on all six targets (quick 260807-cor, D4 — the
+ * `$slotted.<name>` sigil closed the Lit-only gap this title used to route
+ * around via `DECLARATIVE_KNOWN_FAILING` / `test.fixme`). Assertion 4 below
+ * is the D4-specific reactivity proof: appending a light-DOM slide AFTER
+ * mount grows the rendered dot count, which requires Lit's assigned-elements
+ * signal to be BOTH seeded at mount (assertion 1-3 depend on this) AND live
+ * post-mount (this is the part native `querySelectorAll` could never give
+ * Lit — see the reInit-backstop `$watch` in Carousel.rozie).
  */
-const DECLARATIVE_KNOWN_FAILING = new Set<typeof TARGETS[number]>(['lit']);
-
 for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
-  const runner =
-    !built || DECLARATIVE_KNOWN_FAILING.has(target) ? test.fixme : test;
+  const runner = !built ? test.fixme : test;
   runner(`embla-carousel-declarative [${target}]: default-slot slide DOM mounts and drives the engine`, async ({
     page,
   }) => {
@@ -362,5 +349,38 @@ for (const target of TARGETS) {
         intervals: [100, 200, 400, 800],
       })
       .toBeGreaterThan(20);
+
+    // ---- 4. post-mount reactivity (quick 260807-cor D4): appending a
+    //      light-DOM slide AFTER mount grows the rendered dot count. Append
+    //      as a SIBLING of an EXISTING `.rozie-embla__slide`
+    //      (`existingSlide.parentElement`) rather than querying a container
+    //      class directly — `.parentElement` is unambiguous regardless of
+    //      per-target DOM shape (a plain descendant of `.rozie-embla__
+    //      container` on the five hostless targets; the LIGHT-DOM host
+    //      custom element itself on Lit, since a slotted node's `.parentNode`
+    //      is always its original light-DOM parent, never the shadow `<slot>`
+    //      it is rendered through). This is exactly what the
+    //      `$slotted.default` reInit-backstop watch in Carousel.rozie exists
+    //      to observe on Lit — Embla's own native watchSlides
+    //      MutationObserver is shadow-container-scoped and never fires for
+    //      light-DOM mutations.
+    const dotsBefore = await page.locator('.rozie-embla__dot').count();
+    await page.evaluate(() => {
+      const existingSlide = document.querySelector('.rozie-embla__slide');
+      const host = existingSlide?.parentElement;
+      const slide = document.createElement('div');
+      slide.className = 'rozie-embla__slide';
+      const body = document.createElement('div');
+      body.className = 'slide-body';
+      body.textContent = 'Epsilon';
+      slide.appendChild(body);
+      host?.appendChild(slide);
+    });
+    await expect
+      .poll(async () => page.locator('.rozie-embla__dot').count(), {
+        timeout: 10_000,
+        intervals: [100, 200, 400, 800],
+      })
+      .toBeGreaterThan(dotsBefore);
   });
 }

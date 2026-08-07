@@ -62,7 +62,10 @@ const nextModel = () => { $data.idx = Math.min($data.idx + 1, SLIDES.length - 1)
   <!-- NO :slides prop — mode b only. Each child MUST carry
        class="rozie-embla__slide": Carousel.rozie pins Embla's `slides` option
        to that selector (:280), so unclassed children are not measured. -->
-  <Carousel r-model:selectedIndex="$data.idx" :loop="false" :draggable="true">
+  <!-- :dots="true" (quick 260807-cor D4) — the embla-carousel-declarative VR
+       title's post-mount reactivity assertion polls the rendered dot count
+       after appending a fifth light-DOM slide, so dot pagination must be on. -->
+  <Carousel r-model:selectedIndex="$data.idx" :loop="false" :draggable="true" :dots="true">
     <div
       r-for="slide, i in SLIDES"
       :key="slide"

@@ -39,7 +39,7 @@ function roz202(diags: { code: string }[]) {
 }
 
 describe('reservedIdentifierValidator — ROZ202', () => {
-  it('reserved set matches the 15 documented sigils', () => {
+  it('reserved set matches the 16 documented sigils', () => {
     expect([...RESERVED_SIGILS].sort()).toEqual(
       // Phase 14 added `$attrs` — consumer-passed attribute cluster.
       // Phase 15 added `$listeners` — consumer-passed listener cluster.
@@ -48,6 +48,8 @@ describe('reservedIdentifierValidator — ROZ202', () => {
       // Phase 21 added `$expose` — producer-side imperative-handle sigil.
       // Phase 36 added `$provide` / `$inject` — cross-component context sigils.
       // Phase 45 added `$clone` — target-rewritten deep-clone call-form sigil.
+      // quick 260807-cor (D4) added `$slotted` — Lit-only assigned-elements
+      // member sigil, compile-time constant `[]` on the other five targets.
       [
         '$attrs',
         '$clone',
@@ -64,6 +66,7 @@ describe('reservedIdentifierValidator — ROZ202', () => {
         '$refs',
         '$restoreFocus',
         '$slots',
+        '$slotted',
       ].sort(),
     );
   });

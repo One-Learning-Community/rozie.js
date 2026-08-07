@@ -286,6 +286,7 @@ export class Carousel {
   private __rozieWatchInitial_2 = true;
   private __rozieWatchInitial_3 = true;
   private __rozieWatchInitial_4 = true;
+  private __rozieWatchInitial_5 = true;
 
   constructor() {
     effect(() => { const __watchVal = (() => this.selectedIndex())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((i: any) => {
@@ -298,7 +299,11 @@ export class Carousel {
       this.emblaThumbs?.reInit(this.thumbsOptionsFromProps());
       this.syncNav();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.thumbnails())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((on: any) => {
+    effect(() => { const __watchVal = (() => [].length)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
+      this.embla?.reInit(this.reinitOptions());
+      this.syncNav();
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.thumbnails())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((on: any) => {
       if (!on) {
         if (this.emblaThumbs) {
           this.emblaThumbs.destroy();
@@ -434,17 +439,26 @@ export class Carousel {
   initialOptions = () => {
     let opts: any = null;
     opts = {
-      // Pin the slide set explicitly rather than letting Embla infer it from the
-      // container's direct children. In config-array mode the container also holds a
-      // trailing empty default <slot> (the declarative-mode entry point). On Lit that
-      // <slot> is a real, 0-width node in shadow DOM, so Embla would count it as a
-      // phantom 5th slide and collapse scrollSnapList() to a single snap — one dot,
-      // next-arrow disabled — even though the four real slides render correctly (the
-      // hostless targets emit no node for an unused slot, so they were unaffected).
-      // Both modes label slides `.rozie-embla__slide` (see the mode-b docs), so this
-      // selector is correct for config-array AND declarative usage; `...$props.options`
-      // still overrides it if a consumer needs to.
-      slides: '.rozie-embla__slide',
+      // quick 260807-cor (D4) — explicit element list, not a selector string. The
+      // phantom-slot problem this used to work around structurally (a pinned
+      // `.rozie-embla__slide` selector to dodge counting the trailing empty
+      // default `<slot>` as a 5th slide) is now solved by construction: we hand
+      // Embla the ACTUAL matched elements instead of letting it discover them
+      // itself, so there is no container to phantom-count from in the first
+      // place. The first spread resolves config-array slides via the viewport
+      // ref's own querySelectorAll (works identically to the old selector on
+      // all six targets — declarative-mode content isn't inside the viewport
+      // ref path). The second spread — `$slotted.default` — is what makes
+      // declarative mode (mode b) resolve on Lit: it is the Lit-only sigil
+      // that reaches across the shadow boundary to the assigned light-DOM
+      // slide elements a shadow-blind `querySelectorAll` could never see
+      // (RESEARCH.md D4); it's an empty spread on the other five targets,
+      // where slide content is already a real descendant the viewport-ref
+      // query already found. `embla-carousel@8.6.0`'s `storeElements()` treats
+      // a `slides` array as a literal element list (`Options.d.ts`), so no
+      // engine patch is needed for either half. `...$props.options` still
+      // overrides `slides` last if a consumer needs to.
+      slides: [...this.viewportEl()!.nativeElement.querySelectorAll('.rozie-embla__slide'), ...[]],
       loop: this.loop(),
       align: this.align(),
       axis: this.axis(),

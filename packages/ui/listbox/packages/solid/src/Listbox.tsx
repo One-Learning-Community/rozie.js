@@ -887,7 +887,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
       return;
     }
     if (!listElRef) return;
-    const el = listElRef.querySelector('#' + CSS.escape(optionId(activeIndex())));
+    const el = listElRef!.querySelector('#' + CSS.escape(optionId(activeIndex())));
     el?.scrollIntoView({
       block: 'nearest'
     });

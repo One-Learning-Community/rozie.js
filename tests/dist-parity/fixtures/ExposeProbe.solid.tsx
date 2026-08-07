@@ -26,7 +26,7 @@ export default function ExposeProbe(_props: ExposeProbeProps): JSX.Element {
     setValue('');
   }
   function focus(): void {
-    fieldRef.focus();
+    fieldRef!.focus();
   }
 
   return (

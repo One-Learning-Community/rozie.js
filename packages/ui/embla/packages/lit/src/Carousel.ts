@@ -188,6 +188,7 @@ export default class Carousel extends SignalWatcher(LitElement) {
   @query('[data-rozie-ref="thumbsViewportEl"]') private _refThumbsViewportEl!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieWatchPrev_3: unknown;
+private __rozieWatchInitial_4 = true;
 private __rozieFirstUpdateDone = false;
 
   @state() private _hasSlotSlide = false;
@@ -195,6 +196,7 @@ private __rozieFirstUpdateDone = false;
   @property({ attribute: false }) slide?: (scope: { slide: any; index: any }) => unknown;
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
+  private _slotDefaultAssigned = signal<Element[]>([]);
   @state() private _hasSlotThumb = false;
   @queryAssignedElements({ slot: 'thumb', flatten: true }) private _slotThumbElements!: Element[];
   @property({ attribute: false }) thumb?: (scope: { slide: any; index: any }) => unknown;
@@ -219,7 +221,14 @@ private __rozieFirstUpdateDone = false;
     {
       const slotEl = this.shadowRoot?.querySelector('slot:not([name])');
       if (slotEl !== null && slotEl !== undefined) {
-        const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
+        const update = () => {
+          this._hasSlotDefault = this._slotDefaultElements.length > 0;
+          const assigned = this._slotDefaultElements;
+          const prev = this._slotDefaultAssigned.value;
+          if (assigned.length !== prev.length || assigned.some((el, i) => el !== prev[i])) {
+            this._slotDefaultAssigned.value = assigned;
+          }
+        };
         slotEl.addEventListener('slotchange', update);
         // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
         this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
@@ -243,6 +252,7 @@ private __rozieFirstUpdateDone = false;
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
     this._hasSlotSlide = Array.from(this.children).some((el) => el.getAttribute('slot') === 'slide');
     this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
+    this._slotDefaultAssigned.value = Array.from(this.children).filter((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     this._hasSlotThumb = Array.from(this.children).some((el) => el.getAttribute('slot') === 'thumb');
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
@@ -271,6 +281,10 @@ private __rozieFirstUpdateDone = false;
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.selectedIndex)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((i: any) => {
       if (this.embla && typeof i === 'number' && i !== this.embla.selectedScrollSnap()) this.embla.scrollTo(i);
     })(__watchVal); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._slotDefaultAssigned.value.length)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
+      this.embla?.reInit(this.reinitOptions());
+      this.syncNav();
+    })(); }); }));
 
     this.embla = EmblaCarousel(this._refViewportEl, this.initialOptions(), this.emblaPluginsFromProps());
 
@@ -469,17 +483,26 @@ private __rozieFirstUpdateDone = false;
   initialOptions = () => {
   let opts: any = null;
   opts = {
-    // Pin the slide set explicitly rather than letting Embla infer it from the
-    // container's direct children. In config-array mode the container also holds a
-    // trailing empty default <slot> (the declarative-mode entry point). On Lit that
-    // <slot> is a real, 0-width node in shadow DOM, so Embla would count it as a
-    // phantom 5th slide and collapse scrollSnapList() to a single snap — one dot,
-    // next-arrow disabled — even though the four real slides render correctly (the
-    // hostless targets emit no node for an unused slot, so they were unaffected).
-    // Both modes label slides `.rozie-embla__slide` (see the mode-b docs), so this
-    // selector is correct for config-array AND declarative usage; `...$props.options`
-    // still overrides it if a consumer needs to.
-    slides: '.rozie-embla__slide',
+    // quick 260807-cor (D4) — explicit element list, not a selector string. The
+    // phantom-slot problem this used to work around structurally (a pinned
+    // `.rozie-embla__slide` selector to dodge counting the trailing empty
+    // default `<slot>` as a 5th slide) is now solved by construction: we hand
+    // Embla the ACTUAL matched elements instead of letting it discover them
+    // itself, so there is no container to phantom-count from in the first
+    // place. The first spread resolves config-array slides via the viewport
+    // ref's own querySelectorAll (works identically to the old selector on
+    // all six targets — declarative-mode content isn't inside the viewport
+    // ref path). The second spread — `$slotted.default` — is what makes
+    // declarative mode (mode b) resolve on Lit: it is the Lit-only sigil
+    // that reaches across the shadow boundary to the assigned light-DOM
+    // slide elements a shadow-blind `querySelectorAll` could never see
+    // (RESEARCH.md D4); it's an empty spread on the other five targets,
+    // where slide content is already a real descendant the viewport-ref
+    // query already found. `embla-carousel@8.6.0`'s `storeElements()` treats
+    // a `slides` array as a literal element list (`Options.d.ts`), so no
+    // engine patch is needed for either half. `...$props.options` still
+    // overrides `slides` last if a consumer needs to.
+    slides: [...this._refViewportEl.querySelectorAll('.rozie-embla__slide'), ...this._slotDefaultAssigned.value],
     loop: this.loop,
     align: this.align,
     axis: this.axis,
