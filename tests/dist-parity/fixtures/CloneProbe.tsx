@@ -16,7 +16,7 @@ export default function CloneProbe(props: CloneProbeProps): JSX.Element {
 
   useEffect(() => {
     setCloned(structuredClone(_stateRef.current));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

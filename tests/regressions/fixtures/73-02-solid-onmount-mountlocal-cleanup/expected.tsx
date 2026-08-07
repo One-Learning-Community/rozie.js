@@ -23,7 +23,7 @@ export default function OnMountMountLocalCleanup(_props: OnMountMountLocalCleanu
       setTicks(prev => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

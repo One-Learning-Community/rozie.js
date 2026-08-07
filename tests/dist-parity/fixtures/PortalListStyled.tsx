@@ -100,7 +100,7 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
   portalRoots.current.clear();
       instance.current?.destroy();
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>

@@ -13,7 +13,7 @@ export default function RefShadowsDataKey(props: RefShadowsDataKeyProps): JSX.El
 
   useEffect(() => {
     setN((boxRef.current as HTMLElement).childElementCount + _boxRef.current);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
