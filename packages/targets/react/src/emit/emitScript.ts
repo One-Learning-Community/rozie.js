@@ -994,17 +994,90 @@ function rewriteWatchedPropReads(
  * helper has zero residual references, otherwise the emitted
  * `eslint-disable-line` would flip from unused-directive to missing-dep.
  */
+/**
+ * Quick 260806-w00 seam 4, D-03/D-04 — shared "is this Identifier reference a
+ * VALUE position" predicate. A value position is any reference that is NOT a
+ * declaration/binding site (variable declarator id, function-decl id, param,
+ * import/export specifier, labeled-statement label), NOT a non-computed
+ * member-property / shorthand-object-key slot, and NOT the callee of a call
+ * we've already rewritten. This is the exact skip ladder
+ * `rewriteMountHelperCalls`'s `Identifier` visitor used to inline for
+ * "residual" classification; it is now factored out so the value-position
+ * REWRITE (this function) and the D-04 pairing-safety CENSUS
+ * (`collectHelperValuePositions`) share ONE definition and cannot diverge.
+ */
+function isHelperIdentifierValuePosition(path: NodePath<t.Identifier>): boolean {
+  const parent = path.parent;
+  if (t.isCallExpression(parent) && parent.callee === path.node) return false;
+  if (
+    (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+    parent.property === path.node &&
+    !parent.computed
+  ) {
+    return false;
+  }
+  if (t.isObjectProperty(parent) && parent.key === path.node && !parent.shorthand) return false;
+  if (t.isVariableDeclarator(parent) && parent.id === path.node) return false;
+  if (t.isFunctionDeclaration(parent) && parent.id === path.node) return false;
+  if (t.isFunction(parent) && parent.params.includes(path.node)) return false;
+  if (t.isImportSpecifier(parent) || t.isImportDefaultSpecifier(parent)) return false;
+  if (t.isExportSpecifier(parent)) return false;
+  if (t.isLabeledStatement(parent) && parent.label === path.node) return false;
+  return true;
+}
+
+/**
+ * Quick 260806-w00 seam 4, D-04 — non-mutating census of which eligible
+ * helpers appear in a VALUE position (per `isHelperIdentifierValuePosition`)
+ * inside a given lifecycle/watcher body. Used to build the pairing-safety
+ * map BEFORE any rewrite runs, so eligibility for one hook can be decided by
+ * looking at every OTHER hook/watcher without perturbing them.
+ */
+function collectHelperValuePositions(
+  bodyNode: t.Expression | t.BlockStatement,
+  eligibleHelpers: ReadonlySet<string>,
+): Set<string> {
+  const found = new Set<string>();
+  if (eligibleHelpers.size === 0) return found;
+  const programStmts: t.Statement[] = t.isBlockStatement(bodyNode)
+    ? bodyNode.body
+    : [t.expressionStatement(bodyNode as t.Expression)];
+  const file = t.file(t.program(programStmts));
+  traverse(file, {
+    Identifier(path: NodePath<t.Identifier>) {
+      const name = path.node.name;
+      if (!eligibleHelpers.has(name)) return;
+      // D-11 shadow guard parity — a locally-shadowed name is a different
+      // binding, not a reference to the top-level helper.
+      if (path.scope.getBinding(name)) return;
+      if (!isHelperIdentifierValuePosition(path)) return;
+      found.add(name);
+    },
+  });
+  return found;
+}
+
 function rewriteMountHelperCalls(
   bodyClone: t.Expression | t.BlockStatement,
   eligibleHelpers: ReadonlySet<string>,
+  wrappableHelpers: ReadonlySet<string> = new Set(),
 ): {
   node: t.Expression | t.BlockStatement;
   rewritten: Set<string>;
   residual: Set<string>;
+  /**
+   * Quick 260806-w00 seam 4 (D-01/D-03) — helper names whose VALUE-position
+   * reference(s) in THIS body were replaced with the stable wrapper ident
+   * (`_<H>Stable`). Disjoint in effect from `residual`: a wrapped reference
+   * no longer needs the bare identifier to survive, so it does NOT count
+   * toward the D-07 "keep the dep" test.
+   */
+  wrapped: Set<string>;
 } {
   const rewritten = new Set<string>();
   const residual = new Set<string>();
-  if (eligibleHelpers.size === 0) return { node: bodyClone, rewritten, residual };
+  const wrapped = new Set<string>();
+  if (eligibleHelpers.size === 0) return { node: bodyClone, rewritten, residual, wrapped };
 
   // Wrap into a Program-rooted file so we can traverse WITH SCOPE — the shadow
   // test depends on it.
@@ -1014,9 +1087,10 @@ function rewriteMountHelperCalls(
   const file = t.file(t.program(programStmts));
 
   // Identifiers we MANUFACTURED as the `object` of a freshly-built
-  // `_<H>Ref.current` MemberExpression — visiting them would mis-classify them
-  // as residual references. Tracked via WeakSet keyed on node identity (same
-  // pattern as `rewriteWatchedPropReads` / `hoistModuleLet`).
+  // `_<H>Ref.current` MemberExpression, or as a freshly-built `_<H>Stable`
+  // wrapper reference — visiting them would mis-classify them as residual
+  // references. Tracked via WeakSet keyed on node identity (same pattern as
+  // `rewriteWatchedPropReads` / `hoistModuleLet`).
   const synthesizedIdentifiers = new WeakSet<t.Node>();
 
   traverse(file, {
@@ -1037,26 +1111,21 @@ function rewriteMountHelperCalls(
       if (synthesizedIdentifiers.has(path.node)) return;
       const name = path.node.name;
       if (!eligibleHelpers.has(name)) return;
+      // D-11 shadow guard — a binding resolvable from this scope means the name
+      // refers to a LOCAL declaration, not the top-level helper.
       if (path.scope.getBinding(name)) return;
-      const parent = path.parent;
-      // The callee slot of a call we just rewrote is gone; any callee slot we
-      // did NOT rewrite is a shadowed name, already excluded above.
-      if (t.isCallExpression(parent) && parent.callee === path.node) return;
-      // Same skip ladder as `rewriteWatchedPropReads`'s Identifier visitor.
-      if (
-        (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
-        parent.property === path.node &&
-        !parent.computed
-      ) {
+      if (!isHelperIdentifierValuePosition(path)) return;
+      // Quick 260806-w00 seam 4 (D-01/D-03) — a genuine value-position
+      // reference. Pairing-safe + collision-clean helpers route through the
+      // ONE stable wrapper minted for this hook (D-02); everything else
+      // stays residual exactly as before this seam.
+      if (wrappableHelpers.has(name)) {
+        const wrapperIdent = t.identifier(`_${name}Stable`);
+        synthesizedIdentifiers.add(wrapperIdent);
+        path.replaceWith(wrapperIdent);
+        wrapped.add(name);
         return;
       }
-      if (t.isObjectProperty(parent) && parent.key === path.node && !parent.shorthand) return;
-      if (t.isVariableDeclarator(parent) && parent.id === path.node) return;
-      if (t.isFunctionDeclaration(parent) && parent.id === path.node) return;
-      if (t.isFunction(parent) && parent.params.includes(path.node)) return;
-      if (t.isImportSpecifier(parent) || t.isImportDefaultSpecifier(parent)) return;
-      if (t.isExportSpecifier(parent)) return;
-      if (t.isLabeledStatement(parent) && parent.label === path.node) return;
       residual.add(name);
     },
   });
@@ -1069,7 +1138,7 @@ function rewriteMountHelperCalls(
     const stmt = file.program.body[0];
     if (stmt && t.isExpressionStatement(stmt)) node = stmt.expression;
   }
-  return { node, rewritten, residual };
+  return { node, rewritten, residual, wrapped };
 }
 
 function tryHoistArrowToFunction(stmt: t.Statement): t.Statement | null {
@@ -2018,6 +2087,14 @@ export function emitScript(
   //        a NEW lexical predicate, which seam 2's D-04 rejected for the same
   //        trade. The cost is byte churn with identical behaviour.
   const eligibleMountHelpers = new Set<string>();
+  // Quick 260806-w00 seam 4 (D-05) — helper names whose WRAPPER identifier
+  // (`_<H>Stable`, minted by the value-position pass) would collide with a
+  // prop / state / template-ref name, a portal renderer ident, or another
+  // top-level helper's literal name. Populated inside the D-10 block below
+  // (which already computes `reservedNames` / `reservedRefIdents`); ships
+  // regardless of measured collision count, mirroring D-10's own insurance
+  // rationale — a duplicate `const _<H>Stable` is a TS2451.
+  const wrapperCollisionUnsafe = new Set<string>();
   // The helpers `exhaustive-deps` actually flags when they are referenced from
   // an effect: exactly the ones emitted as `useCallback(...)`. A helper emitted
   // as a plain `function` DECLARATION (pdf's `cdnBase`) is treated as static by
@@ -2082,6 +2159,108 @@ export function emitScript(
       if (reservedRefIdents.has(`_${name}Ref`)) continue;
       eligibleMountHelpers.add(name);
     }
+
+    // Quick 260806-w00 seam 4 (D-05) — the wrapper-collision guard. Checked
+    // against the SAME `reservedNames` / `reservedRefIdents` sets, plus
+    // `allHelperNames` itself (a wrapper ident could theoretically collide
+    // with an unrelated top-level helper's literal name).
+    for (const name of eligibleMountHelpers) {
+      const wrapperIdent = `_${name}Stable`;
+      if (
+        reservedNames.has(wrapperIdent) ||
+        reservedRefIdents.has(wrapperIdent) ||
+        allHelperNames.has(wrapperIdent)
+      ) {
+        wrapperCollisionUnsafe.add(name);
+      }
+    }
+  }
+
+  // Quick 260806-w00 seam 4 (D-04) — the pairing-safety census. Non-mutating:
+  // walks every `ir.lifecycle` entry's setup + cleanup bodies (ALL phases,
+  // including standalone `unmount` hooks) and every `ir.watchers` callback,
+  // recording which eligible helpers appear in a VALUE position and WHERE.
+  // The registration/de-registration pairing this seam relies on is scoped to
+  // ONE hook's setup+cleanup (the same `useEffect` closure, D-02); a value
+  // position that also appears in a DIFFERENT lifecycle hook or in a watcher
+  // is a different scope entirely and must NOT be wrapped (its sibling
+  // occurrence would keep passing the bare identifier, breaking the pairing
+  // that made the wrapper safe in the first place). Template/JSX value
+  // positions are deliberately excluded — React re-attaches JSX handlers per
+  // render, so there is no identity-paired de-registration to protect there.
+  const helperValuePositionHookIdx = new Map<string, Set<number>>();
+  const helperValuePositionInWatcher = new Set<string>();
+  if (eligibleMountHelpers.size > 0) {
+    ir.lifecycle.forEach((lh, idx) => {
+      const paired = lifecyclePairing.perHook[idx];
+      const bodies: Array<t.Expression | t.BlockStatement> = [];
+      const setupNode = paired?.setupCloned ?? lh.setup;
+      if (t.isArrowFunctionExpression(setupNode) || t.isFunctionExpression(setupNode)) {
+        bodies.push(setupNode.body);
+      } else if (t.isIdentifier(setupNode)) {
+        // The IDENTIFIER lifecycle form (`$onMount(H)` / `$onUnmount(H)`,
+        // e.g. Modal's `lockScroll`/`unlockScroll`) — the whole argument IS
+        // the identifier, a "call H at this phase" instruction, NOT a body
+        // that could contain a value-position REFERENCE to H. Scanning it
+        // here would misclassify the identifier as referencing itself.
+        // LC-01 (Quick 260806-w00 seam 4, Task 2) owns this shape via a
+        // separate ref-indirection path; the value-position wrapper never
+        // applies to it.
+      } else if (t.isBlockStatement(setupNode) || t.isExpression(setupNode)) {
+        bodies.push(setupNode as t.Expression | t.BlockStatement);
+      }
+      const cleanupNode = paired?.cleanupCloned ?? null;
+      if (cleanupNode) {
+        if (t.isArrowFunctionExpression(cleanupNode) || t.isFunctionExpression(cleanupNode)) {
+          bodies.push(cleanupNode.body);
+        } else if (t.isIdentifier(cleanupNode)) {
+          // Same exclusion as `setupNode` above, for the paired-cleanup
+          // Identifier form (`$onMount(setup, H)`).
+        } else if (t.isExpression(cleanupNode)) {
+          bodies.push(cleanupNode);
+        }
+      }
+      for (const body of bodies) {
+        for (const name of collectHelperValuePositions(body, eligibleMountHelpers)) {
+          let set = helperValuePositionHookIdx.get(name);
+          if (!set) {
+            set = new Set<number>();
+            helperValuePositionHookIdx.set(name, set);
+          }
+          set.add(idx);
+        }
+      }
+    });
+    ir.watchers.forEach((wh, wIdx) => {
+      const paired = watcherPairing.perWatcher[wIdx];
+      const cbNode = paired?.callbackCloned ?? wh.callback;
+      for (const name of collectHelperValuePositions(
+        cbNode as t.Expression | t.BlockStatement,
+        eligibleMountHelpers,
+      )) {
+        helperValuePositionInWatcher.add(name);
+      }
+    });
+  }
+
+  /**
+   * Quick 260806-w00 seam 4 (D-04/D-05) — is helper `name`'s value position
+   * inside lifecycle hook `idx` safe to route through the stable wrapper?
+   * Safe iff: (a) its wrapper ident does not collide with anything (D-05),
+   * (b) it never appears in a value position inside ANY watcher callback, and
+   * (c) every lifecycle hook where it appears in a value position IS `idx`
+   * itself — i.e. its registration and de-registration live in the SAME
+   * `useEffect` closure.
+   */
+  function isHelperWrappableForHook(name: string, idx: number): boolean {
+    if (wrapperCollisionUnsafe.has(name)) return false;
+    if (helperValuePositionInWatcher.has(name)) return false;
+    const hooksSet = helperValuePositionHookIdx.get(name);
+    if (!hooksSet || hooksSet.size === 0) return false;
+    for (const otherIdx of hooksSet) {
+      if (otherIdx !== idx) return false;
+    }
+    return true;
   }
 
   // 4b. Plan 07.7 follow-up — pre-compute the watched-prop ref-rewrite plan.
@@ -2270,6 +2449,11 @@ export function emitScript(
   // references across both). Only those may be dropped from the hook's dep
   // array — see the D-07 filter in the lifecycle loop.
   const fullyIndirectedHelpersByIdx = new Map<number, Set<string>>();
+  // Quick 260806-w00 seam 4 (D-01/D-02) — keyed by hook index, the helper
+  // names whose value position was wrapped in THAT hook. Drives the wrapper
+  // DECLARATION emission (prepended into that hook's `setupInvocation`, D-02)
+  // — a helper is wrapped in at most one hook (D-04 guarantees this).
+  const wrappedByIdx = new Map<number, Set<string>>();
 
   if (
     (watchedModelPropNames.size > 0 ||
@@ -2412,6 +2596,14 @@ export function emitScript(
       // and must stay byte-identical.
       const helperRewriteActive = lh.phase === 'mount' && eligibleMountHelpers.size > 0;
 
+      // Quick 260806-w00 seam 4 (D-01..D-05) — the subset of eligible helpers
+      // whose VALUE positions may be routed through the stable wrapper for
+      // THIS hook. Computed per-hook (not once) because the D-04
+      // pairing-safety test is relative to `idx`.
+      const wrappableForThisHook: Set<string> = helperRewriteActive
+        ? new Set([...eligibleMountHelpers].filter((n) => isHelperWrappableForHook(n, idx)))
+        : new Set<string>();
+
       // The old early return lived here. It is now conditional on the HELPER
       // pass also having nothing to do — otherwise a hook whose body reads no
       // prop / state but DOES call a stale-capable helper would be skipped.
@@ -2450,12 +2642,21 @@ export function emitScript(
       // rewrite, one rebuild. A second `t.arrowFunctionExpression(...)`
       // reconstruction is exactly the comment-destroying shape swj's S2 caught.
       const helperSetup = helperRewriteActive
-        ? rewriteMountHelperCalls(setupBodyForRewrite, eligibleMountHelpers)
+        ? rewriteMountHelperCalls(setupBodyForRewrite, eligibleMountHelpers, wrappableForThisHook)
         : null;
       if (helperSetup) {
         for (const n of helperSetup.rewritten) actuallyRewrittenMountHelpers.add(n);
+        // Quick 260806-w00 seam 4 (D-01) — a wrapped value position reads
+        // `_<H>Ref.current` from inside the wrapper, so it needs the SAME
+        // synced-ref decl as a call rewrite.
+        for (const n of helperSetup.wrapped) actuallyRewrittenMountHelpers.add(n);
       }
-      if (setupModel.size > 0 || setupNonModel.size > 0 || (helperSetup?.rewritten.size ?? 0) > 0) {
+      if (
+        setupModel.size > 0 ||
+        setupNonModel.size > 0 ||
+        (helperSetup?.rewritten.size ?? 0) > 0 ||
+        (helperSetup?.wrapped.size ?? 0) > 0
+      ) {
       // The helper pass mutated the SAME body node in place (its callee slots),
       // so the prop rewrite below runs over the already-indirected body and
       // both changes land in ONE rebuilt arrow.
@@ -2499,16 +2700,30 @@ export function emitScript(
       // Quick 260803-swj seam 2 (follow-up) — same per-body gate for cleanup.
       const helperCleanup =
         helperRewriteActive && cleanupBodyForRewrite
-          ? rewriteMountHelperCalls(cleanupBodyForRewrite, eligibleMountHelpers)
+          ? rewriteMountHelperCalls(cleanupBodyForRewrite, eligibleMountHelpers, wrappableForThisHook)
           : null;
       if (helperCleanup) {
         for (const n of helperCleanup.rewritten) actuallyRewrittenMountHelpers.add(n);
+        for (const n of helperCleanup.wrapped) actuallyRewrittenMountHelpers.add(n);
       }
 
+      // Quick 260806-w00 seam 4 (D-01/D-02) — the union of value positions
+      // wrapped in EITHER body of this hook. D-04's pairing-safety gate
+      // guarantees a wrappable helper's value positions are ALL inside this
+      // one hook, so there is no cross-hook union concern — a helper is
+      // wrapped in at most one hook.
+      const wrappedForHook = new Set<string>([
+        ...(helperSetup?.wrapped ?? []),
+        ...(helperCleanup?.wrapped ?? []),
+      ]);
+      if (wrappedForHook.size > 0) wrappedByIdx.set(idx, wrappedForHook);
+
       // Quick 260803-w7b seam 3 (D-07) — a helper may be dropped from THIS
-      // hook's dep array only when it was rewritten in at least one body AND
-      // has zero residual references across BOTH. A helper that is both called
-      // and passed (D-03) keeps its dep, so the emitted directive survives.
+      // hook's dep array only when it was rewritten (call OR value-position
+      // wrap) in at least one body AND has zero residual references across
+      // BOTH. A helper that is both called/wrapped and left with a bare
+      // (unsafe-to-wrap) value position keeps its dep, so the emitted
+      // directive survives.
       if (helperRewriteActive) {
         const residual = new Set<string>([
           ...(helperSetup?.residual ?? []),
@@ -2518,6 +2733,8 @@ export function emitScript(
         for (const n of [
           ...(helperSetup?.rewritten ?? []),
           ...(helperCleanup?.rewritten ?? []),
+          ...(helperSetup?.wrapped ?? []),
+          ...(helperCleanup?.wrapped ?? []),
         ]) {
           if (!residual.has(n)) fully.add(n);
         }
@@ -2529,7 +2746,8 @@ export function emitScript(
           cleanupBodyForRewrite &&
           (cleanupModel.size > 0 ||
             cleanupNonModel.size > 0 ||
-            (helperCleanup?.rewritten.size ?? 0) > 0)
+            (helperCleanup?.rewritten.size ?? 0) > 0 ||
+            (helperCleanup?.wrapped.size ?? 0) > 0)
         ) {
           const rewrittenCleanupInner =
             cleanupModel.size > 0 || cleanupNonModel.size > 0
@@ -3312,6 +3530,24 @@ export function emitScript(
       // Prepend the `const portals = { ... };` closure to the setup body so
       // user code's rewritten `portals.<name>(...)` references resolve.
       setupInvocation = portalsEmit.closureBlock + '\n  ' + setupInvocation;
+    }
+
+    // Quick 260806-w00 seam 4 (D-01/D-02) — prepend the stable-wrapper
+    // declaration(s) for every helper wrapped in THIS hook. Applied AFTER the
+    // portal-closure prepend above so the wrappers land FIRST-most (D-02):
+    // both `setupInvocation` and `cleanupInvocation` are inlined into the SAME
+    // effect callback, so a `const` at the head of setup is in scope for the
+    // returned cleanup, and `[]` deps mean it is constructed exactly once.
+    // Sorted for snapshot determinism (D-08).
+    const wrapperNamesForHook = wrappedByIdx.get(idx);
+    if (wrapperNamesForHook && wrapperNamesForHook.size > 0) {
+      const wrapperDeclLines = [...wrapperNamesForHook]
+        .sort()
+        .map(
+          (name) =>
+            `const _${name}Stable: typeof _${name}Ref.current = (...args) => _${name}Ref.current(...args);`,
+        );
+      setupInvocation = wrapperDeclLines.join('\n  ') + '\n  ' + setupInvocation;
     }
 
     let cleanupInvocation = '';

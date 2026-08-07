@@ -242,16 +242,55 @@ $onMount(() => {
 <template><div>hi</div></template>
 </rozie>`;
 
-  it('GREEN GUARD-5 (D-03) — a VALUE-position helper reference is untouched', () => {
+  // GREEN GUARD-5 (D-03) originally pinned VALUE-position helper references
+  // as byte-identical — the only fix available at seam-3 time (an inline
+  // `(...a) => _HRef.current(...a)` at EACH call site) would mint a NEW
+  // function identity per call site and break the paired
+  // `removeEventListener(onTick)`, so seam 3 deliberately left this shape
+  // untouched and filed it (`react-value-position-helper-stale-mount-refs`).
+  //
+  // Quick 260806-w00 seam 4 closes that backlog item: ONE stable wrapper is
+  // hoisted per (helper, hook) and BOTH the registration and the
+  // de-registration are rewritten to reference it, which is what keeps the
+  // pairing intact. This guard's premise (byte-identical) is dead; inverted
+  // here to its post-fix assertion, with a companion assertion for what the
+  // OLD guard was actually protecting — identity pairing between the
+  // registration and the de-registration.
+  it('INVERTED (was GREEN GUARD-5, D-03) — a VALUE-position helper reference now routes through a stable wrapper (Quick 260806-w00 seam 4)', () => {
     const code = compile(SRC_VALUE_POS);
     const mount = mountEffect(code);
-    // Eligible by D-02 (`useCallback(fn, [props.gain])`) but never CALLED here.
+    // Eligible by D-02 (`useCallback(fn, [props.gain])`); previously never
+    // CALLED, and previously never wrapped either. Now wrapped.
     expect(code).toContain('const onTick = useCallback(');
-    expect(code).not.toContain('_onTickRef');
-    expect(mount.body).toContain("document.addEventListener('pointerdown', onTick)");
-    expect(mount.body).toContain("document.removeEventListener('pointerdown', onTick)");
+    expect(code).toContain('const _onTickRef = useRef(onTick);');
+    expect(code).toContain(
+      'const _onTickStable: typeof _onTickRef.current = (...args) => _onTickRef.current(...args);',
+    );
+    expect(mount.body).not.toContain("document.addEventListener('pointerdown', onTick)");
+    expect(mount.body).toContain("document.addEventListener('pointerdown', _onTickStable)");
+    expect(mount.body).toContain("document.removeEventListener('pointerdown', _onTickStable)");
   });
 
+  it('companion (D-04 pairing) — the registration and de-registration resolve to the SAME wrapper identifier', () => {
+    // This is the actual correctness property the old GUARD-5 was protecting
+    // against regressing: whatever identity `addEventListener` registers,
+    // `removeEventListener` must de-register the SAME identity, or the
+    // listener leaks for the app's lifetime (T-w00-01).
+    const code = compile(SRC_VALUE_POS);
+    const mount = mountEffect(code);
+    const registerMatch = /document\.addEventListener\('pointerdown', (\w+)\)/.exec(mount.body);
+    const unregisterMatch = /document\.removeEventListener\('pointerdown', (\w+)\)/.exec(mount.body);
+    expect(registerMatch?.[1]).toBeDefined();
+    expect(registerMatch?.[1]).toBe(unregisterMatch?.[1]);
+    // And exactly ONE wrapper declaration exists — not one per call site.
+    const declCount = (code.match(/const _onTickStable:/g) ?? []).length;
+    expect(declCount).toBe(1);
+  });
+
+  // Re-blessed by Quick 260806-w00 (seam 4) — the snapshot now captures the
+  // stable-wrapper shape (`_onTickRef` + `_onTickStable`) instead of the
+  // byte-identical bare-`onTick` shape seam 3 froze. See the INVERTED test
+  // above for the assertion-level explanation.
   it('snapshot — SRC_VALUE_POS', () => {
     expect(compile(SRC_VALUE_POS)).toMatchSnapshot();
   });

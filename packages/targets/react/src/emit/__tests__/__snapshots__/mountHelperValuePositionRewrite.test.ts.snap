@@ -1,0 +1,267 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitScript (React) — value-position helper references route through a stable wrapper (Quick 260806-w00 seam 4) > snapshot — SRC_CALL_AND_PASS 1`] = `
+"import { useCallback, useEffect, useRef } from 'react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  const combo = useCallback(() => {
+    use(props.gain);
+  }, [props.gain]);
+
+  const _comboRef = useRef(combo);
+  _comboRef.current = combo;
+  useEffect(() => {
+    const _comboStable: typeof _comboRef.current = (...args) => _comboRef.current(...args);
+    use(_comboRef.current());
+    document.addEventListener('pointerdown', _comboStable);
+    return () => document.removeEventListener('pointerdown', _comboStable);
+  }, []);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — value-position helper references route through a stable wrapper (Quick 260806-w00 seam 4) > snapshot — SRC_NON_MOUNT 1`] = `
+"import { useCallback, useEffect, useRef } from 'react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+  const _watch0First = useRef(true);
+
+  const onTick2 = useCallback(() => {
+    use(props.gain);
+  }, [props.gain]);
+
+  useEffect(() => {
+    document.addEventListener('pointerdown', onTick2);
+  }, [document, onTick2]);
+  useEffect(() => {
+    if (_watch0First.current) { _watch0First.current = false; return; }
+    document.addEventListener('pointerdown', onTick2);
+  }, [props.gain]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — value-position helper references route through a stable wrapper (Quick 260806-w00 seam 4) > snapshot — SRC_PAIRED 1`] = `
+"import { useCallback, useEffect, useRef } from 'react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  const onTick = useCallback(() => {
+    use(props.gain);
+  }, [props.gain]);
+  const staticHandler = useCallback(() => {
+    seed(42);
+  }, []);
+
+  const _onTickRef = useRef(onTick);
+  _onTickRef.current = onTick;
+  useEffect(() => {
+    const _onTickStable: typeof _onTickRef.current = (...args) => _onTickRef.current(...args);
+    document.addEventListener('pointerdown', _onTickStable);
+    document.addEventListener('resize', staticHandler);
+    return () => {
+      document.removeEventListener('pointerdown', _onTickStable);
+      document.removeEventListener('resize', staticHandler);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — value-position helper references route through a stable wrapper (Quick 260806-w00 seam 4) > snapshot — SRC_SHADOW 1`] = `
+"import { useEffect } from 'react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  function onTick4() {
+    use(props.gain);
+  }
+
+  useEffect(() => {
+    const onTick4 = () => 7;
+    document.addEventListener('x', onTick4);
+  }, []);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — value-position helper references route through a stable wrapper (Quick 260806-w00 seam 4) > snapshot — SRC_SIBLING_UNMOUNT 1`] = `
+"import { useCallback, useEffect } from 'react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  const onTick3 = useCallback(() => {
+    use(props.gain);
+  }, [props.gain]);
+
+  useEffect(() => {
+    document.addEventListener('pointerdown', onTick3);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('pointerdown', onTick3);
+    };
+  }, []);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — value-position helper references route through a stable wrapper (Quick 260806-w00 seam 4) > snapshot — SRC_TEMPLATE_VALUE_POS 1`] = `
+"import { useCallback, useEffect, useRef } from 'react';
+import { mergeListeners } from '@rozie/runtime-react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  const onTick5 = useCallback(() => {
+    use(props.gain);
+  }, [props.gain]);
+
+  const _onTick5Ref = useRef(onTick5);
+  _onTick5Ref.current = onTick5;
+  useEffect(() => {
+    const _onTick5Stable: typeof _onTick5Ref.current = (...args) => _onTick5Ref.current(...args);
+    document.addEventListener('pointerdown', _onTick5Stable);
+    return () => document.removeEventListener('pointerdown', _onTick5Stable);
+  }, []);
+
+  return (
+    <button {...mergeListeners({ onClick: onTick5 }, attrs)} data-rozie-s-8fd6d49e="">Go</button>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — value-position helper references route through a stable wrapper (Quick 260806-w00 seam 4) > snapshot — SRC_WRAPPER_COLLIDE 1`] = `
+"import { useCallback, useEffect } from 'react';
+
+interface TestProps {
+  gain?: number;
+  _onTickStable?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain' | '_onTickStable'> & { gain: number; _onTickStable: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+    _onTickStable: _props._onTickStable ?? 0,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, _onTickStable, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain; void _onTickStable;
+    return rest;
+  })();
+
+  const onTick = useCallback(() => {
+    use(props.gain);
+  }, [props.gain]);
+
+  useEffect(() => {
+    document.addEventListener('pointerdown', onTick);
+    return () => document.removeEventListener('pointerdown', onTick);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;

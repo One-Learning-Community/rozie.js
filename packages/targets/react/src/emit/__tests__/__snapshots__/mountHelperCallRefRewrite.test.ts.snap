@@ -206,7 +206,7 @@ export default function Test(_props: TestProps): JSX.Element {
 `;
 
 exports[`emitScript (React) — $onMount-scoped helper CALLS must go through synced refs (Quick 260803-w7b seam 3) > snapshot — SRC_VALUE_POS 1`] = `
-"import { useCallback, useEffect } from 'react';
+"import { useCallback, useEffect, useRef } from 'react';
 
 interface TestProps {
   gain?: number;
@@ -227,10 +227,13 @@ export default function Test(_props: TestProps): JSX.Element {
     use(props.gain);
   }, [props.gain]);
 
+  const _onTickRef = useRef(onTick);
+  _onTickRef.current = onTick;
   useEffect(() => {
-    document.addEventListener('pointerdown', onTick);
-    return () => document.removeEventListener('pointerdown', onTick);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const _onTickStable: typeof _onTickRef.current = (...args) => _onTickRef.current(...args);
+    document.addEventListener('pointerdown', _onTickStable);
+    return () => document.removeEventListener('pointerdown', _onTickStable);
+  }, []);
 
   return (
     <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
