@@ -63,9 +63,11 @@ export default function Modal(_props: ModalProps): JSX.Element {
     document.body.style.overflow = savedBodyOverflow.current;
   }, [props.lockBodyScroll]);
 
+  const _unlockScrollRef = useRef(unlockScroll);
+  _unlockScrollRef.current = unlockScroll;
   useEffect(() => {
     lockScroll();
-    return () => unlockScroll();
+    return () => _unlockScrollRef.current();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     dialogEl.current?.focus();

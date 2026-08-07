@@ -3340,6 +3340,41 @@ export function emitScript(
   // watcher loops, in Round 4 of 260519 linechart-watch-recreate.) See the
   // pre-scan block above the pass-4b comment.
 
+  // Quick 260806-w00 seam 4 (LC-01, D-11/D-12) — byte-neutral discovery
+  // PRESCAN for the Identifier lifecycle form. `$onUnmount(H)` (standalone)
+  // and the paired-cleanup `$onMount(setup, H)` shape never reach pass 4b's
+  // `rewriteMountHelperCalls` (there is no AST body to walk — the lifecycle
+  // loop below synthesizes the invocation as a STRING from `<node>.name`),
+  // so the `_<H>Ref` seeding block right after this comment (keyed off
+  // `actuallyRewrittenMountHelpers`, which pass 4b populates) would never
+  // learn about these names on its own. Discover them HERE, before that
+  // seeding block runs, exactly mirroring seam 3's own hoisted prescan (same
+  // failure mode: a name discovered too late never gets its declaration —
+  // a render-time ReferenceError for every consumer). `$onMount(H)` is
+  // deliberately EXCLUDED (D-11) — it is provably identity-safe (runs DURING
+  // mount, when the first-render instance IS current); only the identifier
+  // forms that execute at TEARDOWN are eligible.
+  const identifierFormCleanupHelpers = new Set<string>();
+  ir.lifecycle.forEach((lh, idx) => {
+    const paired = lifecyclePairing.perHook[idx];
+    if (lh.phase === 'unmount') {
+      const unmountCloned = paired?.setupCloned ?? lh.setup;
+      if (t.isIdentifier(unmountCloned) && eligibleMountHelpers.has(unmountCloned.name)) {
+        identifierFormCleanupHelpers.add(unmountCloned.name);
+      }
+      return;
+    }
+    const cleanupCloned = paired?.cleanupCloned ?? null;
+    if (
+      cleanupCloned &&
+      t.isIdentifier(cleanupCloned) &&
+      eligibleMountHelpers.has(cleanupCloned.name)
+    ) {
+      identifierFormCleanupHelpers.add(cleanupCloned.name);
+    }
+  });
+  for (const n of identifierFormCleanupHelpers) actuallyRewrittenMountHelpers.add(n);
+
   const lifecycleEffectLines: string[] = [];
   // Quick 260803-w7b seam 3 (D-08) — the `_<H>Ref` decls SEED
   // `lifecycleEffectLines`; they must NOT go in `hookSection`.
@@ -3386,7 +3421,15 @@ export function emitScript(
       const unmountCloned = paired?.setupCloned ?? lh.setup;
       let unmountBody: string;
       if (t.isIdentifier(unmountCloned)) {
-        unmountBody = `${unmountCloned.name}();`;
+        // Quick 260806-w00 seam 4 (LC-01) — a standalone `$onUnmount(H)`
+        // executes AT TEARDOWN, inside a `[]`-dep effect's returned cleanup
+        // closure, which freezes `H` at its render-#1 instance. When `H` is
+        // eligible (its rendered dep array is non-empty — D-06/D-02 parity),
+        // route through the synced ref the D-12 prescan seeded so teardown
+        // invokes the CURRENT instance instead.
+        unmountBody = identifierFormCleanupHelpers.has(unmountCloned.name)
+          ? `_${unmountCloned.name}Ref.current();`
+          : `${unmountCloned.name}();`;
       } else if (
         t.isArrowFunctionExpression(unmountCloned) ||
         t.isFunctionExpression(unmountCloned)
@@ -3553,7 +3596,13 @@ export function emitScript(
     let cleanupInvocation = '';
     if (cleanupCloned) {
       if (t.isIdentifier(cleanupCloned)) {
-        cleanupInvocation = `\n  return () => ${cleanupCloned.name}();`;
+        // Quick 260806-w00 seam 4 (LC-01) — same treatment as the standalone
+        // unmount builder above, for the PAIRED `$onMount(setup, H)` shape
+        // (`H` as the cleanup identifier). `$onMount`'s OWN identifier form
+        // (`setupInvocation`, below) is deliberately left untouched — D-11.
+        cleanupInvocation = identifierFormCleanupHelpers.has(cleanupCloned.name)
+          ? `\n  return () => _${cleanupCloned.name}Ref.current();`
+          : `\n  return () => ${cleanupCloned.name}();`;
       } else if (
         t.isArrowFunctionExpression(cleanupCloned) ||
         t.isFunctionExpression(cleanupCloned)
@@ -3643,13 +3692,20 @@ export function emitScript(
     //     warning. Measured on listbox/Listbox and pdf/PdfViewer.
     //
     // Neither edge is new — both are pre-existing approximations of a heuristic
-    // that happened to be exactly calibrated for the pre-seam emit. Rather than
-    // redesign `mountHasFlaggableDep` corpus-wide (a separate seam, and a far
-    // wider blast radius than this one), re-derive the predicate from the
-    // ACTUAL EMITTED BODY — but ONLY for the hooks this seam indirected. That
-    // bound is what keeps the change surgical: a hook whose helper deps were
-    // not touched here takes the identical pre-fix path, byte for byte.
-    if (lh.phase === 'mount' && (fullyIndirectedHelpersByIdx.get(idx)?.size ?? 0) > 0) {
+    // that happened to be exactly calibrated for the pre-seam emit.
+    //
+    // Quick 260806-w00 seam 4 (DIR-01) — seam 3 contained this (rather than
+    // closing it) by re-deriving the predicate from the ACTUAL EMITTED BODY
+    // ONLY for the hooks it indirected (`fullyIndirectedHelpersByIdx.get(idx)`
+    // bound below), which kept that change surgical but left the imprecise
+    // IR-derived model as the default for every OTHER mount hook — still
+    // wrong in both directions, just not currently observable because
+    // nothing else perturbed its inputs. This seam is exactly that
+    // perturbation (the value-position wrapper pass, D-01..D-08), so the
+    // bound is dropped: body-derivation is now the default for EVERY mount
+    // hook, closing the todo. Corpus-wide acceptance (0-new ESLint messages,
+    // or the D-10 fork) is measured and recorded in Task 3's SUMMARY.
+    if (lh.phase === 'mount') {
       const emittedBody = `${setupInvocation}\n${cleanupInvocation}`
         // Comments are not code — a helper name mentioned in a `//` note (e.g.
         // combobox's "Routes through the SAME buildVirtualizer() …") must not

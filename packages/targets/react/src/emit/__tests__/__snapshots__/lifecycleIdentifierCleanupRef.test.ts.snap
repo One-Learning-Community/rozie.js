@@ -1,0 +1,188 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emitScript (React) — Identifier-form lifecycle cleanup routes through a synced ref (LC-01) + directive derivation is the default (DIR-01) — Quick 260806-w00 seam 4 Task 2 > snapshot — SRC_EMPTY_DEPS_UNMOUNT 1`] = `
+"import { useCallback, useEffect } from 'react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  const cleanup4 = useCallback(() => {
+    seed(2);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cleanup4();
+    };
+  }, []);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — Identifier-form lifecycle cleanup routes through a synced ref (LC-01) + directive derivation is the default (DIR-01) — Quick 260806-w00 seam 4 Task 2 > snapshot — SRC_FUNCDECL_HELPER_ONLY 1`] = `
+"import { useEffect } from 'react';
+
+interface TestProps {}
+
+export default function Test(props: TestProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
+
+  function cdnBase() {
+    return 'https://cdn.example.com';
+  }
+
+  useEffect(() => {
+    seed(cdnBase());
+  }, []);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — Identifier-form lifecycle cleanup routes through a synced ref (LC-01) + directive derivation is the default (DIR-01) — Quick 260806-w00 seam 4 Task 2 > snapshot — SRC_GLOBALS_ONLY 1`] = `
+"import { useEffect } from 'react';
+
+interface TestProps {}
+
+export default function Test(props: TestProps): JSX.Element {
+  const attrs = props as Record<string, unknown>;
+
+  useEffect(() => {
+    console.log('hi');
+    window.scrollTo(0, 0);
+  }, []);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — Identifier-form lifecycle cleanup routes through a synced ref (LC-01) + directive derivation is the default (DIR-01) — Quick 260806-w00 seam 4 Task 2 > snapshot — SRC_MOUNT_IDENTIFIER 1`] = `
+"import { useCallback, useEffect } from 'react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  const setup1 = useCallback(() => {
+    use(props.gain);
+  }, [props.gain]);
+
+  useEffect(() => {
+    setup1();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — Identifier-form lifecycle cleanup routes through a synced ref (LC-01) + directive derivation is the default (DIR-01) — Quick 260806-w00 seam 4 Task 2 > snapshot — SRC_PAIRED_CLEANUP_IDENTIFIER 1`] = `
+"import { useCallback, useEffect, useRef } from 'react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  const setup3 = useCallback(() => {
+    seed(1);
+  }, []);
+  const cleanup3 = useCallback(() => {
+    use(props.gain);
+  }, [props.gain]);
+
+  const _cleanup3Ref = useRef(cleanup3);
+  _cleanup3Ref.current = cleanup3;
+  useEffect(() => {
+    setup3();
+    return () => _cleanup3Ref.current();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;
+
+exports[`emitScript (React) — Identifier-form lifecycle cleanup routes through a synced ref (LC-01) + directive derivation is the default (DIR-01) — Quick 260806-w00 seam 4 Task 2 > snapshot — SRC_STANDALONE_UNMOUNT 1`] = `
+"import { useCallback, useEffect, useRef } from 'react';
+
+interface TestProps {
+  gain?: number;
+}
+
+export default function Test(_props: TestProps): JSX.Element {
+  const props: Omit<TestProps, 'gain'> & { gain: number } = {
+    ..._props,
+    gain: _props.gain ?? 1,
+  };
+  const attrs: Record<string, unknown> = (() => {
+    const { gain, ...rest } = _props as TestProps & Record<string, unknown>;
+    void gain;
+    return rest;
+  })();
+
+  const cleanup1 = useCallback(() => {
+    use(props.gain);
+  }, [props.gain]);
+
+  const _cleanup1Ref = useRef(cleanup1);
+  _cleanup1Ref.current = cleanup1;
+  useEffect(() => {
+    return () => {
+      _cleanup1Ref.current();
+    };
+  }, []);
+
+  return (
+    <div {...attrs} data-rozie-s-8fd6d49e="">hi</div>
+  );
+}
+"
+`;

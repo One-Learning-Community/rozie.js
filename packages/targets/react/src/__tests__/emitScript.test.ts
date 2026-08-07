@@ -90,8 +90,16 @@ describe('emitScript — behavior', () => {
     // lock/unlock on every `open` toggle (the cross-target scroll-lock primitive).
     expect(useEffectMatches.length).toBe(3);
 
-    // Cleanup is wired via `return () => unlockScroll();` inside the paired useEffect
-    expect(lifecycleEffectsSection).toMatch(/return\s*\(\s*\)\s*=>\s*unlockScroll\(\)/);
+    // Quick 260806-w00 seam 4 (LC-01, D-14) — the paired-cleanup Identifier
+    // form now routes through a synced ref so teardown invokes the CURRENT
+    // `unlockScroll` instance rather than the render-#1 one. `lockScroll`
+    // (the SETUP identifier) is deliberately untouched — D-11: `$onMount(H)`
+    // executes DURING mount, when the first-render instance IS current.
+    expect(lifecycleEffectsSection).toMatch(
+      /return\s*\(\s*\)\s*=>\s*_unlockScrollRef\.current\(\)/,
+    );
+    expect(lifecycleEffectsSection).not.toMatch(/return\s*\(\s*\)\s*=>\s*unlockScroll\(\)/);
+    expect(lifecycleEffectsSection).toContain('lockScroll();');
 
     expect(collectors.react.has('useRef')).toBe(true);
     expect(collectors.react.has('useEffect')).toBe(true);
