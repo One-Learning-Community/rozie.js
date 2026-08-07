@@ -259,8 +259,16 @@ export function useKeynav(
           return idx;
         };
 
-        const onKeyDown = (e: KeyboardEvent): void => machine.onKeydown(e);
+        // Plan 260806-lz7 — each delegated handler marks the attachment as
+        // "really interacted with" BEFORE dispatching into the state
+        // machine, so the active-change watch this same event triggers sees
+        // the flag already set when it runs.
+        const onKeyDown = (e: KeyboardEvent): void => {
+          hasInteracted = true;
+          machine.onKeydown(e);
+        };
         const onPointerDown = (e: PointerEvent): void => {
+          hasInteracted = true;
           const idx = resolveItemIndex(e.target);
           if (idx !== null) machine.onPointerActivate(idx);
         };
@@ -279,6 +287,7 @@ export function useKeynav(
         // used to move relative to whatever `active` happened to be BEFORE
         // that focus call).
         const onFocusIn = (e: FocusEvent): void => {
+          hasInteracted = true;
           const idx = resolveItemIndex(e.target);
           if (idx !== null) machine.moveTo(idx);
         };
@@ -300,6 +309,15 @@ export function useKeynav(
         // fresh (re)attachment — this local lives inside the outer watch
         // callback, so a new root naturally starts a new one.
         let lastFocusedActive: number | null = null;
+        // Plan 260806-lz7 — true once a REAL DOM interaction (keydown,
+        // pointerdown, or focusin) has reached this attachment's delegated
+        // listeners. A value change alone is NOT sufficient evidence of a
+        // navigation — see the React reference's `hasInteracted` doc
+        // comment (`useKeynav.ts`) for why: a consumer may resolve its true
+        // mount-time active index through an app-level effect deferred
+        // after the initial render (date-picker's `seedActiveDay`), which
+        // looks identical to a real navigation on a plain value diff.
+        let hasInteracted = false;
 
         // ---- Reactive to `active`: focus / scroll / active-class ----
         // A getter-form `watch` source: Vue tracks whatever reactive state
@@ -330,8 +348,10 @@ export function useKeynav(
             // (not per `applyActiveEffects` call) so the deferred rAF retry
             // below reuses the SAME may-apply decision the synchronous pass
             // made, rather than re-evaluating against a `lastFocusedActive`
-            // this same invocation already advanced to `active`.
-            const isNavigationPass = lastFocusedActive !== null && lastFocusedActive !== active;
+            // this same invocation already advanced to `active`. Also
+            // requires `hasInteracted` — see its declaration's doc comment.
+            const isNavigationPass =
+              hasInteracted && lastFocusedActive !== null && lastFocusedActive !== active;
             const mayApply =
               isNavigationPass ||
               focusIsWithinScope(resolveFocusScope(opts, root), root.ownerDocument);

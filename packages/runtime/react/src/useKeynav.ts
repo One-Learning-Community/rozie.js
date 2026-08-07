@@ -224,7 +224,32 @@ export function useKeynav(
     onKeyDown: ((e: KeyboardEvent) => void) | null;
     onPointerDown: ((e: PointerEvent) => void) | null;
     onFocusIn: ((e: FocusEvent) => void) | null;
-  }>({ root: null, machine: null, onKeyDown: null, onPointerDown: null, onFocusIn: null });
+    /**
+     * Plan 260806-lz7 — true once a REAL DOM interaction (keydown,
+     * pointerdown, or focusin) has reached this attachment's delegated
+     * listeners. Distinguishes a genuine user-driven navigation from an
+     * app-internal active-index write that never went through user input —
+     * e.g. a mount-time active-index resolution some consumers (date-picker)
+     * deliberately defer one `requestAnimationFrame` for OTHER reasons
+     * (reliable reactive-commit timing), which would otherwise look
+     * INDISTINGUISHABLE from a real navigation to a plain "did the value
+     * change since last applied" diff — found via this plan's own Docker VR
+     * run: date-picker's cold mount resolved its selected day through
+     * exactly two passes (the `<data>` default, then the deferred real
+     * value), and treating the second as a navigation stole focus on a page
+     * where nothing was ever focused. Reset to `false` alongside every other
+     * per-attachment field on a root-identity change (a fresh attachment has
+     * no interaction history of its own).
+     */
+    hasInteracted: boolean;
+  }>({
+    root: null,
+    machine: null,
+    onKeyDown: null,
+    onPointerDown: null,
+    onFocusIn: null,
+    hasInteracted: false,
+  });
 
   // ---- Effect 1 (root-identity-tracked): state machine + root keydown/pointer delegation ----
   useEffect(() => {
@@ -245,6 +270,8 @@ export function useKeynav(
     attach.onKeyDown = null;
     attach.onPointerDown = null;
     attach.onFocusIn = null;
+    // Plan 260806-lz7 — a fresh attachment starts with no interaction history.
+    attach.hasInteracted = false;
 
     if (!root) return;
 
@@ -311,8 +338,16 @@ export function useKeynav(
       return idx;
     };
 
-    const onKeyDown = (e: KeyboardEvent): void => machine.onKeydown(e);
+    // Plan 260806-lz7 — each delegated handler marks the attachment as
+    // "really interacted with" BEFORE dispatching into the state machine, so
+    // the active-change effect this same event triggers sees the flag
+    // already set when it runs.
+    const onKeyDown = (e: KeyboardEvent): void => {
+      attach.hasInteracted = true;
+      machine.onKeydown(e);
+    };
     const onPointerDown = (e: PointerEvent): void => {
+      attach.hasInteracted = true;
       const idx = resolveItemIndex(e.target);
       if (idx !== null) machine.onPointerActivate(idx);
     };
@@ -330,6 +365,7 @@ export function useKeynav(
     // ArrowRight, which used to move relative to whatever `active` happened
     // to be BEFORE that focus call).
     const onFocusIn = (e: FocusEvent): void => {
+      attach.hasInteracted = true;
       const idx = resolveItemIndex(e.target);
       if (idx !== null) machine.moveTo(idx);
     };
@@ -417,8 +453,14 @@ export function useKeynav(
     // re-evaluating against a `focusedActive` this same invocation already
     // advanced to `active` (which would make the retry look like a
     // "redundant" pass instead of the navigation/guarded pass it actually
-    // is a continuation of).
-    const isNavigationPass = applied.focusedActive !== null && applied.focusedActive !== active;
+    // is a continuation of). Additionally requires `attach.hasInteracted` —
+    // a value change alone is NOT sufficient evidence of a real navigation;
+    // see `attachRef`'s `hasInteracted` doc comment for why (date-picker's
+    // deferred mount-time active-index resolution looks identical to a
+    // navigation on a plain value diff).
+    const attach = attachRef.current;
+    const isNavigationPass =
+      attach.hasInteracted && applied.focusedActive !== null && applied.focusedActive !== active;
     const mayApply =
       isNavigationPass || focusIsWithinScope(resolveFocusScope(optsRef.current, root), root.ownerDocument);
     applied.focusedActive = active;

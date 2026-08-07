@@ -192,6 +192,19 @@ export class KeynavController implements ReactiveController {
    * reasoning `lastActive`'s reset there already documents).
    */
   private lastFocusedActive: number | null = null;
+  /**
+   * Plan 260806-lz7 — true once a REAL DOM interaction (keydown,
+   * pointerdown, or focusin) has reached this controller's delegated
+   * listeners. A value change alone is NOT sufficient evidence of a
+   * navigation — a consumer may resolve its true mount-time active index
+   * through an app-level effect deferred after the initial render
+   * (date-picker's `seedActiveDay`, one `requestAnimationFrame` after
+   * mount), which looks identical to a real navigation on a plain value
+   * diff — found via this plan's own Docker VR run against
+   * @rozie-ui/date-picker. Reset alongside `lastFocusedActive` (see its doc
+   * comment for the reset sites).
+   */
+  private hasInteracted = false;
 
   constructor(host: KeynavControllerHost, opts: KeynavControllerOpts) {
     this.host = host;
@@ -201,11 +214,13 @@ export class KeynavController implements ReactiveController {
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     if (!this.matchesRootScope(e.target)) return;
+    this.hasInteracted = true;
     this.machine?.onKeydown(e);
   };
 
   private readonly onPointerDown = (e: PointerEvent): void => {
     if (!this.matchesRootScope(e.target)) return;
+    this.hasInteracted = true;
     const idx = this.resolveItemIndex(e.target);
     if (idx !== null) this.machine?.onPointerActivate(idx);
   };
@@ -225,6 +240,7 @@ export class KeynavController implements ReactiveController {
   // whatever `active` happened to be BEFORE that focus call).
   private readonly onFocusIn = (e: FocusEvent): void => {
     if (!this.matchesRootScope(e.target)) return;
+    this.hasInteracted = true;
     const idx = this.resolveItemIndex(e.target);
     if (idx !== null) this.machine?.moveTo(idx);
   };
@@ -370,6 +386,7 @@ export class KeynavController implements ReactiveController {
     // Plan 260806-lz7 — a fresh connect starts with no navigation history of
     // its own; the next applied pass is guarded.
     this.lastFocusedActive = null;
+    this.hasInteracted = false;
   }
 
   hostDisconnected(): void {
@@ -439,8 +456,11 @@ export class KeynavController implements ReactiveController {
     // module doc comment — so `composedContains` walking focus inside the
     // shadow root back up to the host is what makes strict containment work
     // here without any threaded scope.
+    // Also requires `this.hasInteracted` — see its declaration's doc
+    // comment for why a value change alone is not sufficient evidence of a
+    // real navigation.
     const isNavigationPass =
-      this.lastFocusedActive !== null && this.lastFocusedActive !== active;
+      this.hasInteracted && this.lastFocusedActive !== null && this.lastFocusedActive !== active;
     const mayApply =
       isNavigationPass || focusIsWithinScope([this.host], this.host.ownerDocument);
     this.lastFocusedActive = active;
@@ -464,6 +484,7 @@ export class KeynavController implements ReactiveController {
       // group must be treated as a fresh (guarded) pass, not a navigation
       // continuing from before the group disappeared.
       this.lastFocusedActive = null;
+      this.hasInteracted = false;
     } else if (result === 'not-found') {
       this.pendingRafId = requestAnimationFrame(() => {
         this.pendingRafId = null;

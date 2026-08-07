@@ -216,6 +216,17 @@ const HOST_ELEMENT_FIELD = '__rozieKeynavHostEl';
  * from a genuine navigation pass (unconditional).
  */
 const LAST_FOCUSED_FIELD = '__rozieKeynavLastFocused';
+/**
+ * Plan 260806-lz7 — per-group "has this attachment seen a REAL DOM
+ * interaction (keydown/pointerdown/focusin) yet" flag. A value change alone
+ * is NOT sufficient evidence of a navigation — a consumer may resolve its
+ * true mount-time active index through an app-level effect deferred after
+ * the initial render (date-picker's own `seedActiveDay`, one
+ * `requestAnimationFrame` after mount), which looks identical to a real
+ * navigation on a plain value diff — found via this plan's own Docker VR run
+ * against @rozie-ui/date-picker.
+ */
+const HAS_INTERACTED_FIELD = '__rozieKeynavHasInteracted';
 
 function suffixFor(groupIndex: number): string {
   return groupIndex === 0 ? '' : String(groupIndex);
@@ -569,6 +580,7 @@ export function buildKeynavClassEmission(
     const detachField = `${DETACH_FIELD}${suffix}`;
     const attachMethod = `${ATTACH_ROOT_METHOD}${suffix}`;
     const lastFocusedField = `${LAST_FOCUSED_FIELD}${suffix}`;
+    const hasInteractedField = `${HAS_INTERACTED_FIELD}${suffix}`;
     const rootRefExpr = `this.${plan.rootRefVar}()?.nativeElement`;
 
     const active = resolveActiveScriptTarget(plan.keynavRoot.activeExpression);
@@ -632,6 +644,7 @@ export function buildKeynavClassEmission(
     fieldDecls.push(`private ${detachField}: (() => void) | null = null;`);
     // Plan 260806-lz7 — per-group last-focused-active bookkeeping.
     fieldDecls.push(`private ${lastFocusedField}: number | null = null;`);
+    fieldDecls.push(`private ${hasInteractedField} = false;`);
 
     // Shared active-item sync (focus/scroll/`r-keynav-active-class` toggle,
     // SPEC §9), extracted into its own arrow-field method — see the 71-11
@@ -671,7 +684,10 @@ export function buildKeynavClassEmission(
         // the SAME may-apply decision the synchronous pass made, rather than
         // re-evaluating against a `${lastFocusedField}` this same invocation
         // already advanced to `__rozieKeynavActive`.
-        `  const __rozieKeynavIsNav = this.${lastFocusedField} !== null && this.${lastFocusedField} !== __rozieKeynavActive;`,
+        // Also requires `this.${hasInteractedField}` — a value change alone
+        // is not sufficient evidence of a real navigation (see
+        // `HAS_INTERACTED_FIELD`'s doc comment).
+        `  const __rozieKeynavIsNav = this.${hasInteractedField} && this.${lastFocusedField} !== null && this.${lastFocusedField} !== __rozieKeynavActive;`,
         `  const __rozieKeynavMayApply = __rozieKeynavIsNav || focusIsWithinScope([this.${HOST_ELEMENT_FIELD}.nativeElement, __rozieKeynavRootEl], __rozieKeynavRootEl.ownerDocument);`,
         `  this.${lastFocusedField} = __rozieKeynavActive;`,
         `  const __rozieKeynavFound = this.${applyMethod}(__rozieKeynavRootEl, __rozieKeynavActive, __rozieKeynavMayApply);`,
@@ -707,10 +723,12 @@ export function buildKeynavClassEmission(
         // Plan 260806-lz7 — a root-identity change starts a fresh
         // attachment with no navigation history of its own.
         `  this.${lastFocusedField} = null;`,
+        `  this.${hasInteractedField} = false;`,
         `  this.${attachedRootField} = __rozieKeynavRootEl;`,
         `  if (!__rozieKeynavRootEl) return;`,
-        `  const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.${controllerVar}?.onKeydown($event); };`,
+        `  const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.${hasInteractedField} = true; this.${controllerVar}?.onKeydown($event); };`,
         `  const __rozieKeynavHandlePointer = ($event: PointerEvent) => {`,
+        `    this.${hasInteractedField} = true;`,
         `    const __rozieKeynavTarget = $event.target;`,
         `    if (!(__rozieKeynavTarget instanceof Element)) return;`,
         `    const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');`,
@@ -741,6 +759,7 @@ export function buildKeynavClassEmission(
         // then presses ArrowRight, which used to move relative to whatever
         // `active` happened to be BEFORE that focus call).
         `  const __rozieKeynavHandleFocusIn = ($event: FocusEvent) => {`,
+        `    this.${hasInteractedField} = true;`,
         `    const __rozieKeynavTarget = $event.target;`,
         `    if (!(__rozieKeynavTarget instanceof Element)) return;`,
         `    const __rozieKeynavMarker = __rozieKeynavTarget.closest('[data-rozie-keynav-item]');`,

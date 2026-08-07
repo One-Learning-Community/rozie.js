@@ -205,6 +205,18 @@ describe('KeynavController — runtime-lit', () => {
     const rendered = items(el);
     const focusSpy = vi.spyOn(rendered[2]!, 'focus');
 
+    // Plan 260806-lz7 — a bare `el.active = 2` property write (never a real
+    // keydown/pointerdown/focusin) is now correctly guarded on a cold mount
+    // (case (c) of the strict-containment matrix) — a value change alone is
+    // not evidence of a real navigation. Establish real interaction first
+    // (focusing the CURRENTLY active item, mirroring how a roving-tabindex
+    // consumer would already have arrived at item 0 before triggering this
+    // change) so the SUBSEQUENT active-index write is a genuine navigation,
+    // matching this test's actual intent — "does an active-CHANGE call
+    // .focus()", not "does a cold value write steal focus".
+    rendered[0]!.focus();
+    await el.updateComplete;
+
     el.active = 2;
     await el.updateComplete;
 
@@ -444,6 +456,29 @@ describe('KeynavController — strict-containment focus guard (Plan 260806-lz7 T
     // — and it IS focused, unconditionally, even though document focus was
     // still at body.
     expect(el.shadowRoot.activeElement).toBe(items(el)[2]);
+  });
+
+  // Found via this plan's own Docker VR run against @rozie-ui/date-picker —
+  // see the React reference's identical test (`useKeynav.test.tsx`) for the
+  // full rationale: a consumer may resolve its true mount-time active index
+  // through an app-level property write AFTER the initial render
+  // (date-picker's `seedActiveDay`, deferred one `requestAnimationFrame`),
+  // which looks IDENTICAL to a real navigation on a plain value diff — a
+  // bare `el.active = N` write is never routed through the delegated
+  // keydown/pointerdown/focusin listeners.
+  it('an app-level (non-interaction) active-index write AFTER mount is still guarded — a value change alone is not evidence of a real navigation', async () => {
+    const tag = defineMenuEl({});
+    const el = await mount(tag);
+    expect(document.activeElement).toBe(document.body); // cold mount — case (c)
+
+    el.active = 2; // 'Charlie' — a bare property write, never a real interaction.
+    await el.updateComplete;
+
+    expect(items(el)[2]!.getAttribute('data-rozie-keynav-active')).toBe(''); // active-class/data marker IS unconditional
+    // DOM focus must NOT have followed it — nothing on the page was ever
+    // interacted with.
+    expect(document.activeElement).toBe(document.body);
+    expect(el.shadowRoot.activeElement).not.toBe(items(el)[2]);
   });
 });
 

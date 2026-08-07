@@ -417,6 +417,74 @@ describe('keynav (Svelte) — strict-containment focus guard (Plan 260806-lz7 Ta
     menu.unmount();
     outside.remove();
   });
+
+  // Found via this plan's own Docker VR run against @rozie-ui/date-picker —
+  // see the React reference's identical test (`useKeynav.test.tsx`) for the
+  // full rationale: a consumer may resolve its true mount-time active index
+  // through an app-level write AFTER the initial render (date-picker's
+  // `seedActiveDay`, deferred one `requestAnimationFrame`), which looks
+  // IDENTICAL to a real navigation on a plain value diff. `update()` here
+  // simulates the reactive flush Svelte performs once `opts.active` changes
+  // — the SAME mechanism `menu.sync()` uses elsewhere in this file — but the
+  // value change itself is driven by an external write, never a
+  // keydown/pointerdown/focusin.
+  it('an app-level (non-interaction) active-index write AFTER mount is still guarded — a value change alone is not evidence of a real navigation', () => {
+    const commit = vi.fn();
+    const root = document.createElement('div');
+    root.setAttribute('role', 'menu');
+    root.setAttribute('tabindex', '-1');
+    document.body.appendChild(root);
+
+    let active = 0;
+    function render(): void {
+      root.innerHTML = '';
+      ITEMS.forEach((it, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('role', 'menuitem');
+        btn.setAttribute('data-rozie-keynav-item', String(i));
+        if (active === i) btn.setAttribute('data-rozie-keynav-active', '');
+        btn.setAttribute('tabindex', active === i ? '0' : '-1');
+        if (it.disabled) btn.disabled = true;
+        btn.textContent = it.label;
+        root.appendChild(btn);
+      });
+    }
+    render();
+
+    function buildOpts(): KeynavActionOpts {
+      return {
+        config: BASE_CONFIG,
+        active,
+        getSource: () => ITEMS,
+        getActive: () => active,
+        setActive: (i) => {
+          active = i;
+          render();
+        },
+        onCommit: commit,
+      };
+    }
+    const action = keynav(root, buildOpts());
+
+    // Mirrors date-picker's `seedActiveDay`: an APP-LEVEL write (never a
+    // keydown/pointerdown/focusin) resolves the true active index after the
+    // initial render; `update()` mirrors the reactive flush that write
+    // would trigger.
+    active = 2; // 'Charlie' — a DIFFERENT index than the initial 0.
+    render();
+    action.update(buildOpts());
+
+    expect(byText(root, 'Charlie').getAttribute('data-rozie-keynav-active')).toBe('');
+    // The active-class/data marker DID move to Charlie — that's the app's
+    // own state, unconditional per SPEC §9 — but DOM focus must NOT have
+    // followed it, since nothing on the page was ever interacted with.
+    expect(document.activeElement).toBe(document.body);
+    expect(document.activeElement).not.toBe(byText(root, 'Charlie'));
+
+    action.destroy();
+    root.remove();
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -17,7 +17,7 @@
  * package already uses.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createEffect, createRoot, createSignal } from 'solid-js';
+import { createEffect, createRoot, createSignal, onMount } from 'solid-js';
 import type { KeynavConfig, KeynavPageDetail } from '@rozie/runtime-keynav-core';
 import { createKeynav } from '../createKeynav.js';
 
@@ -404,6 +404,70 @@ describe('createKeynav (Solid) — strict-containment focus guard (Plan 260806-l
     const { items, dispose } = buildMenu({ config: BASE_CONFIG, onCommit: commit });
 
     expect(document.activeElement).toBe(byLabel(items, 'Alpha'));
+
+    dispose();
+  });
+
+  // Found via this plan's own Docker VR run against @rozie-ui/date-picker —
+  // see the React reference's identical test (`useKeynav.test.tsx`) for the
+  // full rationale: a consumer may resolve its true mount-time active index
+  // through an app-level effect that writes the active signal AFTER the
+  // initial render (date-picker's `seedActiveDay`, deferred one
+  // `requestAnimationFrame`), which looks IDENTICAL to a real navigation on
+  // a plain value diff.
+  it('an app-level (non-interaction) active-index write AFTER mount is still guarded — a value change alone is not evidence of a real navigation', () => {
+    const commit = vi.fn();
+    const root = document.createElement('div');
+    root.setAttribute('role', 'menu');
+    root.tabIndex = -1;
+    document.body.appendChild(root);
+
+    const itemEls: HTMLElement[] = ITEMS.map((it) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.setAttribute('role', 'menuitem');
+      btn.textContent = it.label;
+      if (it.disabled) btn.disabled = true;
+      root.appendChild(btn);
+      return btn;
+    });
+
+    let dispose: () => void = () => {};
+    createRoot((d) => {
+      dispose = d;
+      const [active, setActive] = createSignal(0);
+
+      itemEls.forEach((el, i) => {
+        createEffect(() => {
+          el.setAttribute('data-rozie-keynav-item', String(i));
+          if (active() === i) el.setAttribute('data-rozie-keynav-active', '');
+          else el.removeAttribute('data-rozie-keynav-active');
+          el.setAttribute('tabindex', active() === i ? '0' : '-1');
+        });
+      });
+
+      createKeynav(() => root, {
+        config: BASE_CONFIG,
+        getSource: () => ITEMS,
+        getActive: () => active(),
+        setActive,
+        onCommit: commit,
+      });
+
+      // Mirrors date-picker's `seedActiveDay`: an APP-LEVEL onMount (never a
+      // keydown/pointerdown/focusin) resolves the true active index after
+      // the initial render.
+      onMount(() => {
+        setActive(2); // 'Charlie' — a DIFFERENT index than the initial 0.
+      });
+    });
+
+    expect(byLabel(itemEls, 'Charlie').getAttribute('data-rozie-keynav-active')).toBe('');
+    // The active-class/data marker DID move to Charlie — that's the app's
+    // own state, unconditional per SPEC §9 — but DOM focus must NOT have
+    // followed it, since nothing on the page was ever interacted with.
+    expect(document.activeElement).toBe(document.body);
+    expect(document.activeElement).not.toBe(byLabel(itemEls, 'Charlie'));
 
     dispose();
   });

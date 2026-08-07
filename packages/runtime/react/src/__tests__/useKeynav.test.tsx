@@ -11,8 +11,8 @@
  * hook itself never touches those two attributes).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent, screen, act } from '@testing-library/react';
-import { useRef, useState } from 'react';
+import { render, fireEvent, screen, act, waitFor } from '@testing-library/react';
+import { useEffect, useRef, useState } from 'react';
 import type { KeynavConfig, KeynavPageDetail } from '@rozie/runtime-keynav-core';
 import { useKeynav } from '../useKeynav.js';
 
@@ -302,6 +302,77 @@ describe('useKeynav — strict-containment focus guard (Plan 260806-lz7 Task 1)'
     render(<Menu config={BASE_CONFIG} onCommit={commit} />);
 
     expect(document.activeElement).toBe(screen.getByText('Alpha'));
+  });
+
+  // -------------------------------------------------------------------------
+  // Found via this plan's own Docker VR run against @rozie-ui/date-picker:
+  // a consumer may resolve its TRUE mount-time active index through an
+  // app-level effect that writes `setActive` AFTER the initial render (e.g.
+  // date-picker's `seedActiveDay`, deliberately deferred one
+  // `requestAnimationFrame` for unrelated reactive-commit-timing reasons —
+  // see `DatePicker.rozie`'s own doc comment on `seedActiveDay`). From
+  // `useKeynav`'s point of view this looks EXACTLY like two passes with
+  // different `active` values — indistinguishable from a real keyboard/
+  // pointer navigation on a plain value diff. Without gating `isNavigationPass`
+  // on a REAL delegated DOM interaction (keydown/pointerdown/focusin) having
+  // occurred, the second (deferred) pass would incorrectly qualify as
+  // "navigation" and focus unconditionally — stealing focus on a page where
+  // NOTHING was ever interacted with, exactly the case (c)/(a) cold-mount
+  // guarantee this whole plan exists to establish. `DeferredSeedMenu` below
+  // reproduces the two-pass shape directly (no fake timers — a real
+  // `useEffect` write after mount, mirroring the app-level `$onMount` write
+  // date-picker performs, still not routed through any DOM event).
+  // -------------------------------------------------------------------------
+  it('an app-level (non-interaction) active-index write AFTER mount is still guarded — a value change alone is not evidence of a real navigation', async () => {
+    const commit = vi.fn();
+
+    function DeferredSeedMenu() {
+      const rootRef = useRef<HTMLDivElement | null>(null);
+      const [active, setActive] = useState(0);
+      useKeynav(rootRef, {
+        config: BASE_CONFIG,
+        getSource: () => ITEMS,
+        getActive: () => active,
+        setActive,
+        onCommit: commit,
+      });
+      // Mirrors date-picker's `seedActiveDay`: an APP-LEVEL effect (never a
+      // keydown/pointerdown/focusin) resolves the true active index after
+      // the initial render — here synchronously post-mount rather than via
+      // requestAnimationFrame, since the exact deferral mechanism is not
+      // what's under test; only "a setActive call that never went through a
+      // delegated DOM event" is.
+      useEffect(() => {
+        setActive(2); // 'Charlie' — a DIFFERENT index than the initial 0.
+      }, []);
+      return (
+        <div role="menu" ref={rootRef} tabIndex={-1} data-testid="root">
+          {ITEMS.map((it, i) => (
+            <button
+              type="button"
+              key={it.id}
+              role="menuitem"
+              data-rozie-keynav-item={i}
+              data-rozie-keynav-active={active === i ? '' : undefined}
+              tabIndex={active === i ? 0 : -1}
+              disabled={it.disabled}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    render(<DeferredSeedMenu />);
+    await waitFor(() => expect(screen.getByText('Charlie').getAttribute('data-rozie-keynav-active')).toBe(''));
+
+    // The active-class/data marker DID move to Charlie (index 2) — that's
+    // the app's own state, unconditional per SPEC §9 — but DOM focus must
+    // NOT have followed it, since nothing on the page was ever interacted
+    // with.
+    expect(document.activeElement).toBe(document.body);
+    expect(document.activeElement).not.toBe(screen.getByText('Charlie'));
   });
 });
 

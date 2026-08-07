@@ -338,8 +338,16 @@ export function keynav(
     return idx;
   };
 
-  const onKeyDown = (e: KeyboardEvent): void => machine.onKeydown(e);
+  // Plan 260806-lz7 — each delegated handler marks the attachment as
+  // "really interacted with" BEFORE dispatching into the state machine, so
+  // the active-change pass this same event triggers (via `update()`) sees
+  // the flag already set when it runs.
+  const onKeyDown = (e: KeyboardEvent): void => {
+    hasInteracted = true;
+    machine.onKeydown(e);
+  };
   const onPointerDown = (e: PointerEvent): void => {
+    hasInteracted = true;
     const idx = resolveItemIndex(e.target);
     if (idx !== null) machine.onPointerActivate(idx);
   };
@@ -357,6 +365,7 @@ export function keynav(
   // ArrowRight, which used to move relative to whatever `active` happened
   // to be BEFORE that focus call).
   const onFocusIn = (e: FocusEvent): void => {
+    hasInteracted = true;
     const idx = resolveItemIndex(e.target);
     if (idx !== null) machine.moveTo(idx);
   };
@@ -379,6 +388,15 @@ export function keynav(
   // action on root identity change, e.g. an `{#if}`-gated root) naturally
   // starts a new one.
   let lastFocusedActive: number | null = null;
+  // Plan 260806-lz7 — true once a REAL DOM interaction (keydown, pointerdown,
+  // or focusin) has reached this attachment's delegated listeners. A value
+  // change alone is NOT sufficient evidence of a navigation — a consumer may
+  // resolve its true mount-time active index through an app-level effect
+  // deferred after the initial render (date-picker's `seedActiveDay`, one
+  // `requestAnimationFrame` after mount), which looks identical to a real
+  // navigation on a plain value diff — found via this plan's own Docker VR
+  // run against @rozie-ui/date-picker.
+  let hasInteracted = false;
 
   // Runs `applyActiveEffects` once synchronously; if no element was found
   // for `active` (e.g. a same-tick grid-paging dataset swap hasn't rendered
@@ -399,8 +417,10 @@ export function keynav(
     // re-evaluating against a `lastFocusedActive` this same invocation
     // already advanced to `active`. This is what keeps Svelte's
     // unconditional `update()` re-application guarded too, symmetric with
-    // the other five implementations.
-    const isNavigationPass = lastFocusedActive !== null && lastFocusedActive !== active;
+    // the other five implementations. Also requires `hasInteracted` — see
+    // its declaration's doc comment.
+    const isNavigationPass =
+      hasInteracted && lastFocusedActive !== null && lastFocusedActive !== active;
     const mayApply =
       isNavigationPass || focusIsWithinScope(resolveFocusScope(opts, node), node.ownerDocument);
     lastFocusedActive = active;

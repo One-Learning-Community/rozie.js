@@ -777,7 +777,7 @@ describe('Angular r-keynav emitter — strict-containment focus guard (Plan 2608
     const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
     const { code } = emitAngular(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
     expect(code).toContain(
-      'const __rozieKeynavIsNav = this.__rozieKeynavLastFocused !== null && this.__rozieKeynavLastFocused !== __rozieKeynavActive;',
+      'const __rozieKeynavIsNav = this.__rozieKeynavHasInteracted && this.__rozieKeynavLastFocused !== null && this.__rozieKeynavLastFocused !== __rozieKeynavActive;',
     );
     expect(code).toContain(
       'const __rozieKeynavMayApply = __rozieKeynavIsNav || focusIsWithinScope([this.__rozieKeynavHostEl.nativeElement, __rozieKeynavRootEl], __rozieKeynavRootEl.ownerDocument);',
@@ -790,11 +790,25 @@ describe('Angular r-keynav emitter — strict-containment focus guard (Plan 2608
     expect(applyCalls.length).toBe(2);
   });
 
-  it('attachMethod resets the last-focused field to null on a root-identity change, before storing the new root', () => {
+  it('attachMethod resets the last-focused AND has-interacted fields on a root-identity change, before storing the new root', () => {
     const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
     const { code } = emitAngular(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
     expect(code).toMatch(
-      /this\.__rozieKeynavLastFocused = null;\n\s*this\.__rozieKeynavAttachedRoot = __rozieKeynavRootEl;/,
+      /this\.__rozieKeynavLastFocused = null;\n\s*this\.__rozieKeynavHasInteracted = false;\n\s*this\.__rozieKeynavAttachedRoot = __rozieKeynavRootEl;/,
+    );
+  });
+
+  it('each delegated handler (keydown/pointerdown/focusin) marks the attachment as interacted', () => {
+    const ir = compile(MENU_SRC, 'KeynavMenu.rozie');
+    const { code } = emitAngular(ir, { filename: 'KeynavMenu.rozie', source: MENU_SRC });
+    expect(code).toContain(
+      'const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.__rozieKeynavHasInteracted = true; this.__rozieKeynavController?.onKeydown($event); };',
+    );
+    expect(code).toMatch(
+      /const __rozieKeynavHandlePointer = \(\$event: PointerEvent\) => \{\n\s*this\.__rozieKeynavHasInteracted = true;/,
+    );
+    expect(code).toMatch(
+      /const __rozieKeynavHandleFocusIn = \(\$event: FocusEvent\) => \{\n\s*this\.__rozieKeynavHasInteracted = true;/,
     );
   });
 

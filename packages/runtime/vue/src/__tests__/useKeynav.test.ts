@@ -11,7 +11,7 @@
 // never touches those two attributes). Mirrors the React reference's
 // `useKeynav.test.tsx` (Plan 71-04) test-by-test.
 import { describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, nextTick, ref } from 'vue';
+import { defineComponent, h, nextTick, onMounted, ref } from 'vue';
 import { mount } from '@vue/test-utils';
 import type { KeynavConfig, KeynavPageDetail } from '@rozie/runtime-keynav-core';
 import { useKeynav } from '../useKeynav.js';
@@ -352,6 +352,70 @@ describe('useKeynav (Vue) — strict-containment focus guard (Plan 260806-lz7 Ta
 
     wrapper.unmount();
     outside.remove();
+  });
+
+  // Found via this plan's own Docker VR run against @rozie-ui/date-picker —
+  // see the React reference's identical test (`useKeynav.test.tsx`) for the
+  // full rationale: a consumer may resolve its true mount-time active index
+  // through an app-level effect that writes the active ref AFTER the
+  // initial render (date-picker's `seedActiveDay`, deferred one
+  // `requestAnimationFrame`), which looks IDENTICAL to a real navigation on
+  // a plain value diff.
+  it('an app-level (non-interaction) active-index write AFTER mount is still guarded — a value change alone is not evidence of a real navigation', async () => {
+    const commit = vi.fn();
+    const DeferredSeedMenu = defineComponent({
+      setup() {
+        const rootRef = ref<HTMLElement | null>(null);
+        const active = ref(0);
+        useKeynav(rootRef, {
+          config: BASE_CONFIG,
+          getSource: () => ITEMS,
+          getActive: () => active.value,
+          setActive: (i) => {
+            active.value = i;
+          },
+          onCommit: commit,
+        });
+        // Mirrors date-picker's `seedActiveDay`: an APP-LEVEL mounted hook
+        // (never a keydown/pointerdown/focusin) resolves the true active
+        // index after the initial render.
+        onMounted(() => {
+          active.value = 2; // 'Charlie' — a DIFFERENT index than the initial 0.
+        });
+        return () =>
+          h(
+            'div',
+            { role: 'menu', ref: rootRef, tabindex: -1, 'data-testid': 'root' },
+            ITEMS.map((it, i) =>
+              h(
+                'button',
+                {
+                  type: 'button',
+                  key: it.id,
+                  role: 'menuitem',
+                  'data-rozie-keynav-item': i,
+                  'data-rozie-keynav-active': active.value === i ? '' : undefined,
+                  tabindex: active.value === i ? 0 : -1,
+                  disabled: it.disabled,
+                },
+                it.label,
+              ),
+            ),
+          );
+      },
+    });
+
+    const wrapper = mount(DeferredSeedMenu, { attachTo: document.body });
+    await nextTick();
+
+    expect(byText(wrapper, 'Charlie').getAttribute('data-rozie-keynav-active')).toBe('');
+    // The active-class/data marker DID move to Charlie — that's the app's
+    // own state, unconditional per SPEC §9 — but DOM focus must NOT have
+    // followed it, since nothing on the page was ever interacted with.
+    expect(document.activeElement).toBe(document.body);
+    expect(document.activeElement).not.toBe(byText(wrapper, 'Charlie'));
+
+    wrapper.unmount();
   });
 });
 
