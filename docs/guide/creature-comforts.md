@@ -51,7 +51,7 @@ escape without leaving the framework. Rozie absorbs them.
 | **Solid** | Inline `<style>` JSX renders after consumer styles, wiping same-specificity cascade. | Head-injection via `__rozieInjectStyle()` runtime helper. |
 | **Lit** | lit-html's `repeat()` caches by sentinel-comment node identity → engine DOM mutation garbles the part tree. | `$reconcileAfterDomMutation()` escape hatch. |
 | **Lit** | Web Components have no scoped-CSS bridge to consumer styles. | `adoptConsumerStyles` runtime helper + `data-rozie-s-<hash>` stamping reaches into shadow roots correctly. |
-| **Lit** | No native slot parameter API — consumer-side scoped-slot fill needs a transport. | `@property({attribute:false}) X?: (scope) => unknown` + template invocation; consumer-side `.X=${(scope) => html\`…\`}` splice. |
+| **Lit** | No native slot parameter API — consumer-side scoped-slot fill needs a transport. | `@property({attribute:false}) X?: (scope) => unknown` + template invocation; consumer-side ``.X=${(scope) => html`…`}`` splice. |
 
 ## What's not on the list
 

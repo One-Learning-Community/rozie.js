@@ -43,7 +43,7 @@ Frontmatter `title:`, then a `<script setup>` importing the **default** export o
 ## Auto behaviors worth knowing
 
 - `gen-usage-pages.mjs` `relatedLinks()` auto-links the comparison and demo pages **iff those files exist** — so create them before relying on the cross-links.
-- `displayNameFor()` reads `<Name>` from the generated `packages/react/README.md` line `Idiomatic **react** \`<Name>\``; falls back to the slug. So run codegen (which renders that README) before generating usage pages.
+- `displayNameFor()` reads `<Name>` from the generated `packages/react/README.md` line ``Idiomatic **react** `<Name>` ``; falls back to the slug. So run codegen (which renders that README) before generating usage pages.
 - The usage page carries a `GENERATED … do not edit by hand` banner — respect it; edit `readme.mjs` and re-run.
 
 ## Updating an existing family

@@ -129,7 +129,7 @@ The toolbar is a **separate component** (never inlined into the shell) so you ca
 
 ## The `@mention` decorator node
 
-The family ships **one reference `DecoratorNode`** — an inline `@mention` chip — proving the neutral-descriptor **decorator bridge** end-to-end across all six targets. A `DecoratorNode.decorate()` returns a framework-neutral `{ component, props }` descriptor, and a small per-target **mount bridge** renders it with the framework's native render primitive (React `createPortal`, Vue `Teleport`, Solid `render`, Angular `createComponent`, Lit `render(html\`…\`)`). This is the extensibility story for rendering framework components as custom editor nodes; the full walkthrough — including how to author your own decorator node — is the [decorator authoring recipe](/components/lexical-recipe-decorator).
+The family ships **one reference `DecoratorNode`** — an inline `@mention` chip — proving the neutral-descriptor **decorator bridge** end-to-end across all six targets. A `DecoratorNode.decorate()` returns a framework-neutral `{ component, props }` descriptor, and a small per-target **mount bridge** renders it with the framework's native render primitive (React `createPortal`, Vue `Teleport`, Solid `render`, Angular `createComponent`, Lit ``render(html`…`)``). This is the extensibility story for rendering framework components as custom editor nodes; the full walkthrough — including how to author your own decorator node — is the [decorator authoring recipe](/components/lexical-recipe-decorator).
 
 ## API
 
