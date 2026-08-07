@@ -1,5 +1,12 @@
 # @rozie-ui/date-picker-angular
 
+## 0.1.3
+
+### Patch Changes
+
+- Regenerated against the `r-keynav` strict-containment focus guard (`@rozie/runtime-keynav-core@0.4.0`). The day/months/years grids no longer steal DOM focus on a cold page load or while focus sits on an unrelated element elsewhere on the page; drilling into the months/years panels and exiting back out with Escape now reliably restores keyboard focus to the previously-selected day. Arrow-key navigation and click selection are unaffected. No API surface change.
+- @rozie/runtime-keynav-core@0.4.0
+
 ## 0.1.2
 
 ### Patch Changes

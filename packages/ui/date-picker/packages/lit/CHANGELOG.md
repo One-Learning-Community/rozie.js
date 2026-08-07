@@ -1,5 +1,16 @@
 # @rozie-ui/date-picker-lit
 
+## 0.1.4
+
+### Patch Changes
+
+- Regenerated against `@rozie/runtime-lit@0.4.0`, which folds in two fixes:
+  - The `r-keynav` strict-containment focus guard — the day/months/years grids no longer steal DOM focus on a cold page load or while focus sits on an unrelated element elsewhere on the page; drilling into the months/years panels and exiting back out with Escape now reliably restores keyboard focus to the previously-selected day.
+  - A previously-unreleased multi-root `KeynavController` fix: an inactive drill panel's controller no longer steals focus onto a different, currently-visible panel's item at the same index (the months panel was landing on January instead of the actually-selected month), and a panel re-appearing with an unchanged active index is now correctly re-focused instead of silently dropped.
+
+  Arrow-key navigation and click selection are unaffected. No API surface change.
+- @rozie/runtime-lit@0.4.0
+
 ## 0.1.3
 
 ### Patch Changes
