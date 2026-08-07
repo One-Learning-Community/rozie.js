@@ -24,9 +24,16 @@ export function Demo() {
     { label: 'Cherry', value: 'cherry' },
   ];
   return (
-    <Listbox value={value()} onValueChange={setValue} options={options} placeholder="Pick a fruit…">
-      {({ option, selected }) => <span classList={{ selected: selected() }}>{option().label}</span>}
-    </Listbox>
+    <Listbox
+      value={value()}
+      onValueChange={setValue}
+      options={options}
+      placeholder="Pick a fruit…"
+      // Custom option render via the optionSlot prop (Solid's scoped slots
+      // are props, not children); the ctx fields are plain values, not
+      // signal accessors.
+      optionSlot={({ option, selected }) => <span classList={{ selected }}>{option.label}</span>}
+    />
   );
 }
 ```

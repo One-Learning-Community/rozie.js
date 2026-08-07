@@ -1,6 +1,6 @@
 ---
 title: DatePicker — comparison
-surface_hash: afd83814da6a
+surface_hash: 8d91af7afd25
 ---
 
 # DatePicker vs the per-framework date pickers
@@ -148,9 +148,12 @@ Rozie's scope is narrow on purpose; framing it as deliberate is the honest move.
   when you want a dropdown date field. Staying headless is what lets it drop into
   any field pattern.
 - **Not the deepest localization story.** It uses `Intl.DateTimeFormat` for the
-  month-year heading and weekday labels in any BCP-47 `locale`, but it does *not*
-  ship the non-Gregorian calendar systems that react-day-picker, react-aria,
-  bits-ui, and Melt inherit from Adobe's `@internationalized/date`.
+  month-year heading, weekday labels, day-cell accessible names, and each
+  multi-month panel's own grid caption in any BCP-47 `locale` — plus an
+  optional `labels` prop to translate the 10 static English chrome phrases
+  (`Intl` can localize a *date*, not the phrase "Previous month") — but it
+  does *not* ship the non-Gregorian calendar systems that react-day-picker,
+  react-aria, bits-ui, and Melt inherit from Adobe's `@internationalized/date`.
 - **Not a date library.** It carries a tiny UTC-safe internal grid helper, not a
   general date toolkit — bring `date-fns` / `dayjs` / `Temporal` for arithmetic
   elsewhere in your app. The upside: **no date-library dependency** in the bundle,
@@ -165,9 +168,9 @@ is the point:
 | --- | --- | --- |
 | Cross-framework parity | ✓ one source → 6 idiomatic packages | ✗ a different library per framework |
 | Headless / restyleable | ✓ token-themed + `#header` / `#footer` / `#presets` slots | ~ varies; usually opinionated CSS |
-| `min` / `max` / disabled dates | ✓ built in | ✓ usually |
+| `min` / `max` / disabled dates | ✓ built in; a range can neither preview nor commit **across** a disabled day (pointer + keyboard) | ✓ usually |
 | Roving-grid keyboard a11y | ✓ [WAI-ARIA grid](https://www.w3.org/WAI/ARIA/apg/patterns/grid/) (arrows / Home / End / PageUp / PageDown / Enter / Space) | ~ ranges from best-in-class to a known weak spot |
-| Localized labels | ✓ `Intl.DateTimeFormat` | ✓ usually (often via a date lib) |
+| Localized labels | ✓ `Intl.DateTimeFormat` (day cells, per-panel captions, weekday header, month-year heading) + optional `labels` prop for the 10 static chrome strings | ✓ usually (often via a date lib) |
 | Two-way value + form binding | ✓ ISO `value` model + Angular `ControlValueAccessor` on all six | ~ per-framework idiom |
 | Imperative handle | ✓ uniform `focus()` / `goToToday()` / `clear()` | ~ varies per library |
 | Date-library dependency | ✓ none (UTC-safe internal helper) | ~ frequently `date-fns` / `dayjs` / `luxon` |

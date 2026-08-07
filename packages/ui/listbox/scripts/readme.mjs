@@ -82,9 +82,18 @@ export function Demo() {
   const [value, setValue] = useState<string | null>(null);
   const options = ${FRUITS};
   return (
-    <Listbox value={value} onValueChange={setValue} options={options} placeholder="Pick a fruit…">
-      {{ /* optional custom option render via the \`option\` slot */ }}
-    </Listbox>
+    <Listbox
+      value={value}
+      onValueChange={setValue}
+      options={options}
+      placeholder="Pick a fruit…"
+      // Custom option render via the renderOption render-prop (React's scoped
+      // slots are props, not children); the equivalent form is
+      // slots={{ option: ... }}.
+      renderOption={({ option, active, selected }) => (
+        <span className={selected ? 'selected' : active ? 'active' : undefined}>{option.label}</span>
+      )}
+    />
   );
 }`,
   },
@@ -152,9 +161,16 @@ export function Demo() {
   const [value, setValue] = createSignal<string | null>(null);
   const options = ${FRUITS};
   return (
-    <Listbox value={value()} onValueChange={setValue} options={options} placeholder="Pick a fruit…">
-      {({ option, selected }) => <span classList={{ selected: selected() }}>{option().label}</span>}
-    </Listbox>
+    <Listbox
+      value={value()}
+      onValueChange={setValue}
+      options={options}
+      placeholder="Pick a fruit…"
+      // Custom option render via the optionSlot prop (Solid's scoped slots
+      // are props, not children); the ctx fields are plain values, not
+      // signal accessors.
+      optionSlot={({ option, selected }) => <span classList={{ selected }}>{option.label}</span>}
+    />
   );
 }`,
   },

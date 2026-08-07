@@ -29,7 +29,9 @@ export function Demo() {
   );
 }
 
-// Headless: render your own page buttons via the scoped #item slot.
+// Headless: render your own page buttons via the renderItem render-prop (a
+// self-closing element — React's scoped slots are props, not children; the
+// equivalent form is slots={{ item: ... }}).
 export function CustomDemo() {
   const [page, setPage] = useState(1);
   return (
@@ -38,15 +40,12 @@ export function CustomDemo() {
       onModelValueChange={setPage}
       totalPages={20}
       siblingCount={2}
-    >
-      {{
-        item: ({ page, selected, goto }) => (
-          <button aria-current={selected ? 'page' : undefined} onClick={goto}>
-            {page}
-          </button>
-        ),
-      }}
-    </Pagination>
+      renderItem={({ page, selected, goto }) => (
+        <button aria-current={selected ? 'page' : undefined} onClick={goto}>
+          {page}
+        </button>
+      )}
+    />
   );
 }
 ```

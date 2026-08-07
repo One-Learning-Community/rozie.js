@@ -109,6 +109,28 @@ Five props round out the day-to-day configuration surface beyond `min`/`max`/`di
 <DatePicker v-model:value="date" show-footer />
 ```
 
+## Accessibility &amp; localization
+
+Every day cell, panel caption, weekday header, and the month-year heading announce a fully-localized string **automatically**, driven by the `locale` prop through `Intl.DateTimeFormat` — zero config required: the day cell's accessible name (e.g. "Sunday, June 15, 2025" in `en-US`, or the `fr-FR` equivalent), each multi-month panel's own `aria-label` caption ("June 2025" / "July 2025" when `numberOfMonths="2"`), the weekday column-header long names, and the month-year heading text.
+
+`Intl` is a date/number formatter, not a message catalog, though — it can localize a *date*, but it cannot translate the English phrase "Previous month". Ten static chrome strings are **not** Intl-derived and stay English by default; pass the optional `labels` prop to override any of them:
+
+```vue
+<DatePicker
+  v-model:value="date"
+  locale="fr-FR"
+  :labels="{
+    previousMonth: 'Mois précédent',
+    nextMonth: 'Mois suivant',
+    changeMonthYear: 'Changer le mois et l\'année',
+    today: 'Aujourd\'hui',
+    clear: 'Effacer',
+  }"
+/>
+```
+
+The full key list (`root`, `previousMonth`, `nextMonth`, `changeMonthYear`, `changeYear`, `chooseMonth`, `chooseYear`, `presets`, `today`, `clear`) and their English defaults are on the [API reference](/components/date-picker-api). An empty `labels` (the default) yields the English defaults — most consumers need zero configuration. **Lit caveat:** `labels` is an object prop, so pass it via a *property* binding (`.labels=${…}`), never a string attribute — the same rule already in force for `disabledDates`/`presetRanges`.
+
 ## Range selection
 
 Set `selectionMode="range"` to turn the same calendar into a date-range picker. In range mode the `value` is no longer an ISO string but a `{ start, end }` object (both ISO `YYYY-MM-DD` strings, `''` when empty) — the prop is polymorphic, `value: string | { start, end }`, so `selectionMode="single"` (the default) is byte-identical to the single-date picker above and stays fully backward-compatible.
@@ -131,6 +153,8 @@ const range = ref({ start: '', end: '' });
 ```
 
 Selection is **direction-agnostic**: the first click drops an anchor, not a forced start. The second click completes the range, and the component applies min/max ordering at both the hover preview and the commit, so selecting backwards (later day first, then an earlier one) yields the same ordered `{ start, end }` as selecting forwards. As you move the pointer (or roving keyboard focus) between the two clicks, the days between the anchor and the hovered day render a live **preview band**; a third click restarts the selection from a new anchor.
+
+A range can be neither previewed nor committed **across** a disabled day (`min`/`max`/`disabledDates`/`disabledDaysOfWeek`/`isDateDisabled`): hovering or arrowing to a day whose span back to the anchor crosses a disabled day suppresses the preview band entirely, and clicking that day **re-anchors** the selection there instead of completing it — the same behavior through both the pointer and the keyboard. `presetRanges`, by contrast, are applied exactly as supplied: the consumer already owns the preset's date math (see [Presets](#presets) below), so a preset is never span-validated.
 
 A `rangeComplete` event fires once when the second endpoint lands (or a preset applies) — see the [API reference](/components/date-picker-api) for its payload and the per-target consumer-prop casing.
 

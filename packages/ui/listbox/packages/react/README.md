@@ -24,9 +24,18 @@ export function Demo() {
     { label: 'Cherry', value: 'cherry' },
   ];
   return (
-    <Listbox value={value} onValueChange={setValue} options={options} placeholder="Pick a fruit…">
-      {{ /* optional custom option render via the `option` slot */ }}
-    </Listbox>
+    <Listbox
+      value={value}
+      onValueChange={setValue}
+      options={options}
+      placeholder="Pick a fruit…"
+      // Custom option render via the renderOption render-prop (React's scoped
+      // slots are props, not children); the equivalent form is
+      // slots={{ option: ... }}.
+      renderOption={({ option, active, selected }) => (
+        <span className={selected ? 'selected' : active ? 'active' : undefined}>{option.label}</span>
+      )}
+    />
   );
 }
 ```
