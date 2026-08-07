@@ -10,6 +10,9 @@
  *   - `$refs.X`           → `this._refX`        (the @query-decorated field)
  *   - `$slots.X`          → `this._hasSlotX`    (presence boolean)
  *   - `$slots[''] / $slots.default` (default) → `this._hasSlotDefault`
+ *   - `$slotted.X`        → `this._slotXAssigned.value` (quick 260807-cor D4
+ *                            — LIVE only when the component reads the sigil;
+ *                            gated by emitSlotDecl.ts's collectSlottedReads)
  *   - `$emit('name', x)`  → `this.dispatchEvent(new CustomEvent('name', { detail: x, bubbles: true, composed: true }))`
  *   - `$el`               → `this`
  *
@@ -81,6 +84,20 @@ function thisDot(name: string): t.MemberExpression {
 function thisSignalRead(name: string): t.MemberExpression {
   return t.memberExpression(
     t.memberExpression(t.thisExpression(), t.identifier(`_${name}`)),
+    t.identifier('value'),
+  );
+}
+
+/**
+ * quick 260807-cor (D4) — build a `this._slot<Suffix>Assigned.value`
+ * expression (the assigned-elements preact-signal field). `suffix` is the
+ * PascalCase slot-field suffix from `slotFieldSuffix` (e.g. 'Default',
+ * 'Header'), matching the field name `emitSlotDecl.ts`'s `emitOneSlot` emits
+ * when the slot is gated ON.
+ */
+function thisSlotAssignedRead(suffix: string): t.MemberExpression {
+  return t.memberExpression(
+    t.memberExpression(t.thisExpression(), t.identifier(`_slot${suffix}Assigned`)),
     t.identifier('value'),
   );
 }
@@ -640,6 +657,17 @@ export function rewriteScript(
         path.node.object = t.identifier('portals');
         return;
       }
+
+      if (obj.name === '$slotted') {
+        // quick 260807-cor (D4) — `$slotted.<name>` → `this._slot<X>Assigned.value`
+        // (the preact-signal assigned-elements field, live only when the
+        // component actually reads the sigil — emitSlotDecl.ts's gate).
+        // `slotFieldSuffix` treats both '' and the authored 'default' as
+        // 'Default', matching the field name emitSlotDecl.ts emits.
+        path.replaceWith(thisSlotAssignedRead(slotFieldSuffix(prop.name)));
+        path.skip();
+        return;
+      }
     },
 
     OptionalMemberExpression(path) {
@@ -652,6 +680,14 @@ export function rewriteScript(
       if (obj.name === '$refs' && refNames.has(prop.name)) {
         // $refs.foo?.bar  →  this._refFoo?.bar — re-wire the object.
         path.node.object = thisDot(refFieldName(prop.name));
+        return;
+      }
+
+      if (obj.name === '$slotted') {
+        // quick 260807-cor (D4) — mirror of MemberExpression branch above
+        // for optional-chained `$slotted.X?.foo` patterns.
+        path.replaceWith(thisSlotAssignedRead(slotFieldSuffix(prop.name)));
+        path.skip();
         return;
       }
 

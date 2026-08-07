@@ -49,6 +49,7 @@ import { emitScript } from './emit/emitScript.js';
 import { emitTemplate } from './emit/emitTemplate.js';
 import { emitListeners } from './emit/emitListeners.js';
 import { emitSlotDecl } from './emit/emitSlotDecl.js';
+import { collectSlottedReads } from './emit/collectSlottedReads.js';
 import { emitStyle } from './emit/emitStyle.js';
 import { buildShell } from './emit/shell.js';
 import { emitTagName, toKebabCase } from './emit/emitDecorator.js';
@@ -172,7 +173,19 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   );
 
   // 1. Slot declarations — must come early because emitTemplate may reference slot fields.
-  const slotResult = emitSlotDecl(ir, { decorators: decoratorImports });
+  //
+  // quick 260807-cor (D4) — collect `$slotted.<name>` reads from the
+  // PRE-rewrite script program BEFORE calling emitSlotDecl, so it can gate
+  // the assigned-elements field/write/pre-seed per slot (the blast-radius
+  // guard keeping the other 30 slot-bearing Lit leaves byte-identical). Safe
+  // regardless of rewriteScript ordering — IR-04 guarantees no target ever
+  // mutates `ir.setupBody.scriptProgram` in place.
+  const slottedReads = collectSlottedReads(ir);
+  const slotResult = emitSlotDecl(ir, {
+    decorators: decoratorImports,
+    signals: signalsImports,
+    slottedReads,
+  });
   diagnostics.push(...slotResult.diagnostics);
 
   // command-palette-portal-through-portal cluster (BUG A follow-up) — computed

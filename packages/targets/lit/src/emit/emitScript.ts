@@ -875,16 +875,21 @@ function isStableMemberChainGetterBody(body: t.BlockStatement | t.Expression): b
  *     re-fires for prop changes. Per memory project_fullcalendar_react_lit_gaps,
  *     this is option #3 (hybrid IR classification).
  *   - 'effect' — at least one dep reads from `$data` (preact-signal),
- *     `$computed` (computed signal), or `$slots` (signal-watched), OR is an
+ *     `$computed` (computed signal), `$slots` (signal-watched), or `$slotted`
+ *     (quick 260807-cor D4 — assigned-elements preact-signal), OR is an
  *     opaque closure dep we cannot reason about. Keep the `effect()` route so
  *     signal subscriptions are established normally. Lit-`updated()` route
  *     would not fire on $data-only changes (those don't flow through @property
  *     setters) so `effect()` is necessary.
  *
- * `'computed'` and `'slots'` deps go through `effect()` because they ARE
- * preact-signals under the hood in target-lit (computed → `computed()`,
- * slots-presence → `signal()`); the existing `effect()` plumbing observes them
- * correctly.
+ * `'computed'`, `'slots'`, and `'slotted'` deps go through `effect()` because
+ * they ARE preact-signals under the hood in target-lit (computed →
+ * `computed()`, slots-presence → `signal()`, assigned-elements →
+ * `signal<Element[]>()`); the existing `effect()` plumbing observes them
+ * correctly. This is THE load-bearing reason D4 needed a distinct `slotted`
+ * scope rather than reusing `slots`: a Lit `@state()` field is NOT a preact
+ * signal and `effect()` would never observe it (see RESEARCH.md's
+ * seam-correction #2/#3).
  */
 function classifyWatcherRoute(
   watcher: WatchHook,
@@ -916,7 +921,7 @@ function classifyWatcherRoute(
       if (name !== undefined) propNames.add(name);
       continue;
     }
-    // 'data' | 'computed' | 'slots' | 'closure' — route through effect()
+    // 'data' | 'computed' | 'slots' | 'slotted' | 'closure' — route through effect()
     nonPropsSeen = true;
   }
   // Edge case: getterDeps is empty (constant getter — `() => 42`). Treat as

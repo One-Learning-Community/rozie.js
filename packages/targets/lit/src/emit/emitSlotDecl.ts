@@ -27,13 +27,35 @@
 import * as bt from '@babel/types';
 import type { IRComponent, SlotDecl, ParamDecl } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
-import type { LitDecoratorImportCollector } from '../rewrite/collectLitImports.js';
+import type {
+  LitDecoratorImportCollector,
+  PreactSignalsImportCollector,
+} from '../rewrite/collectLitImports.js';
 import { collectMethodNamesFromIR } from './methodNames.js';
 import { portalSlotMemberName } from './portalSlotMemberName.js';
 import { slotScopeParamType, slotScopeTypeObject } from './slotScopeParamType.js';
 
 export interface EmitSlotDeclOpts {
   decorators: LitDecoratorImportCollector;
+  /**
+   * quick 260807-cor (D4) — preact-signals import collector, threaded so
+   * `emitOneSlot` can register `signal` (and ONLY `signal`; the effect route
+   * is already registered by emitScript.ts's watcher pass) when it emits an
+   * assigned-elements field. Optional so every pre-existing call site
+   * (emitSlotDecl.test.ts's direct-construction tests) stays source-compatible
+   * — omitting it is safe as long as `slottedReads` is also omitted/empty,
+   * since no field is emitted without a hit in that set.
+   */
+  signals?: PreactSignalsImportCollector;
+  /**
+   * quick 260807-cor (D4) — the set of slot keys ('default' for the unnamed
+   * slot, else the authored name) read through `$slotted.<name>` anywhere in
+   * the component's `<script>`, from `collectSlottedReads.ts`. A slot whose
+   * key is NOT in this set gets no assigned-elements field, no signal write,
+   * no pre-seed line — byte-identical to pre-D4 output. Defaults to an empty
+   * set (no slot ever qualifies) when omitted.
+   */
+  slottedReads?: ReadonlySet<string>;
 }
 
 // WR-01 (Phase 07.4 review): a slot param resolves through dispatchEvent
@@ -96,6 +118,8 @@ function emitOneSlot(
   slotChangeWiringLines: string[],
   preSeedLines: string[],
   methodNameSet: Set<string>,
+  slottedReads: ReadonlySet<string>,
+  signals: PreactSignalsImportCollector | undefined,
 ): string {
   const suffix = slotFieldSuffix(slot.name);
   const stateField = `  @state() private _hasSlot${suffix} = false;`;
@@ -107,16 +131,49 @@ function emitOneSlot(
       : `{ slot: '${slot.name}', flatten: true }`;
   const queryField = `  @queryAssignedElements(${opts}) private _slot${suffix}Elements!: Element[];`;
 
+  // quick 260807-cor (D4) — gate: this slot's assigned-elements field/write/
+  // pre-seed are emitted ONLY when the component actually reads
+  // `$slotted.<this-slot's-authored-key>` somewhere in <script>. Un-gated
+  // components (the other 30 slot-bearing Lit leaves) stay byte-identical.
+  const authoredKey = slot.name === '' ? 'default' : slot.name;
+  const readsSlotted = slottedReads.has(authoredKey);
+  let assignedField = '';
+  if (readsSlotted) {
+    signals?.add('signal');
+    assignedField = `  private _slot${suffix}Assigned = signal<Element[]>([]);`;
+  }
+
   // slotchange wiring: register on every <slot> element in the shadow tree
   // and update the corresponding _hasSlot<X> field. We register per-slot to
   // keep the logic readable; performance impact is negligible for ≤4 slots.
   const selector = slot.name === '' ? 'slot:not([name])' : `slot[name="${slot.name}"]`;
+  // quick 260807-cor (D4) — when gated ON, the update closure ALSO resolves
+  // the current assigned elements and writes the signal, but ONLY when the
+  // resolved list differs from the previous one by length or per-index
+  // identity (T-260807-01 mitigation, mandatory). An unconditional write
+  // allocates a new array identity on every slotchange, permanently
+  // dirtying the signal — the same re-entrancy class as the MapLibre
+  // SignalWatcher incident. `this._slot<X>Elements` (the existing
+  // @queryAssignedElements getter) is the resolved-elements source of
+  // truth; no new query mechanism is introduced.
+  const updateBody = readsSlotted
+    ? [
+        `    const update = () => {`,
+        `      this._hasSlot${suffix} = this._slot${suffix}Elements.length > 0;`,
+        `      const assigned = this._slot${suffix}Elements;`,
+        `      const prev = this._slot${suffix}Assigned.value;`,
+        `      if (assigned.length !== prev.length || assigned.some((el, i) => el !== prev[i])) {`,
+        `        this._slot${suffix}Assigned.value = assigned;`,
+        `      }`,
+        `    };`,
+      ].join('\n')
+    : `    const update = () => { this._hasSlot${suffix} = this._slot${suffix}Elements.length > 0; };`;
   slotChangeWiringLines.push(
     [
       `{`,
       `  const slotEl = this.shadowRoot?.querySelector('${selector}');`,
       `  if (slotEl !== null && slotEl !== undefined) {`,
-      `    const update = () => { this._hasSlot${suffix} = this._slot${suffix}Elements.length > 0; };`,
+      updateBody,
       `    slotEl.addEventListener('slotchange', update);`,
       `    // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.`,
       `    this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));`,
@@ -136,10 +193,26 @@ function emitOneSlot(
     preSeedLines.push(
       `this._hasSlot${suffix} = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));`,
     );
+    // quick 260807-cor (D4) — assigned-elements pre-seed, gated identically
+    // to the field/write above. The @queryAssignedElements-backed getter is
+    // empty until the <slot> element exists in the shadow root (not before
+    // firstUpdated), so THIS pre-seed is what makes a mount-phase
+    // `$slotted.<X>` read (inside $onMount) resolve non-zero — mirrors why
+    // the presence pre-seed above exists (D-LIT-15).
+    if (readsSlotted) {
+      preSeedLines.push(
+        `this._slot${suffix}Assigned.value = Array.from(this.children).filter((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));`,
+      );
+    }
   } else {
     preSeedLines.push(
       `this._hasSlot${suffix} = Array.from(this.children).some((el) => el.getAttribute('slot') === '${slot.name}');`,
     );
+    if (readsSlotted) {
+      preSeedLines.push(
+        `this._slot${suffix}Assigned.value = Array.from(this.children).filter((el) => el.getAttribute('slot') === '${slot.name}');`,
+      );
+    }
   }
 
   // ctxInterfaces — emit only when at least one slot param is data-typed.
@@ -195,7 +268,9 @@ function emitOneSlot(
     propertyField = `  @property({ attribute: false }) ${propertyFieldName}?: (scope: ${scopeType}) => unknown;`;
   }
 
-  return [stateField, queryField, propertyField].filter((s) => s.length > 0).join('\n');
+  return [stateField, queryField, assignedField, propertyField]
+    .filter((s) => s.length > 0)
+    .join('\n');
 }
 
 export function emitSlotDecl(
@@ -203,6 +278,7 @@ export function emitSlotDecl(
   opts: EmitSlotDeclOpts,
 ): EmitSlotDeclResult {
   const diagnostics: Diagnostic[] = [];
+  const slottedReads = opts.slottedReads ?? new Set<string>();
   const slots = ir.slots ?? [];
   if (slots.length === 0) {
     return {
@@ -261,6 +337,8 @@ export function emitSlotDecl(
         slotChangeWiringLines,
         preSeedLinesArr,
         methodNameSet,
+        slottedReads,
+        opts.signals,
       ),
     )
     .join('\n');
