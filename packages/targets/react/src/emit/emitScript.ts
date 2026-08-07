@@ -1016,7 +1016,14 @@ function isHelperIdentifierValuePosition(path: NodePath<t.Identifier>): boolean 
   ) {
     return false;
   }
-  if (t.isObjectProperty(parent) && parent.key === path.node && !parent.shorthand) return false;
+  // The KEY slot of an ObjectProperty is NEVER a value position — not even
+  // when shorthand (`{ helperName }`). For a shorthand property, `key` and
+  // `value` are DISTINCT node objects with the same name, so this check
+  // (identity comparison) correctly excludes only the key-side occurrence;
+  // the value-side occurrence still passes through and may be rewritten
+  // (see `rewriteMountHelperCalls`'s Identifier visitor for the
+  // shorthand-to-explicit conversion that keeps the PROPERTY NAME intact).
+  if (t.isObjectProperty(parent) && parent.key === path.node) return false;
   if (t.isVariableDeclarator(parent) && parent.id === path.node) return false;
   if (t.isFunctionDeclaration(parent) && parent.id === path.node) return false;
   if (t.isFunction(parent) && parent.params.includes(path.node)) return false;
@@ -1122,6 +1129,20 @@ function rewriteMountHelperCalls(
       if (wrappableHelpers.has(name)) {
         const wrapperIdent = t.identifier(`_${name}Stable`);
         synthesizedIdentifiers.add(wrapperIdent);
+        // Shorthand-object-property safety: `{ handlePaste }` has a VALUE
+        // slot (this node) whose identifier name doubles as the PROPERTY
+        // NAME. Naively replacing the value would leave `shorthand: true`
+        // pointing at a value whose name no longer matches the key, which
+        // @babel/generator resolves unpredictably across versions — and
+        // downstream consumers that spread this object (e.g. ProseMirror's
+        // `editorProps` reading `handlePaste`/`handleDrop` by exact name)
+        // would silently stop receiving the callback. Force the property to
+        // its EXPLICIT `key: value` form first so the property NAME survives
+        // untouched and only the VALUE reference is indirected.
+        const parent = path.parent;
+        if (t.isObjectProperty(parent) && parent.value === path.node && parent.shorthand) {
+          parent.shorthand = false;
+        }
         path.replaceWith(wrapperIdent);
         wrapped.add(name);
         return;

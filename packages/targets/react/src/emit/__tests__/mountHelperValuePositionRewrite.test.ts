@@ -371,4 +371,39 @@ $onMount(() => {
   it('snapshot — SRC_TEMPLATE_VALUE_POS', () => {
     expect(compile(SRC_TEMPLATE_VALUE_POS)).toMatchSnapshot();
   });
+
+  // --- V10 (regression, found during Task 3 leaf regen: tiptap TipTap.tsx) -
+  // A SHORTHAND object property (`{ handlePaste }`) has a VALUE slot whose
+  // identifier doubles as the PROPERTY NAME. Naively `path.replaceWith`-ing
+  // the value node left `shorthand: true` with a mismatched key/value name,
+  // which the generator resolved by also silently renaming the KEY —
+  // `{ handlePaste }` became `{ _handlePasteStable }`. Any downstream
+  // consumer that spreads the object and expects an EXACT property name
+  // (ProseMirror's `editorProps.handlePaste`/`.handleDrop`) would silently
+  // stop receiving the callback — a real regression, not just byte churn.
+  const SRC_SHORTHAND_PROPERTY = `<rozie name="Test" inherit-attrs="false">
+<props>{ gain: { type: Number, default: 1 } }</props>
+<script>
+const handlePaste = () => { use($props.gain); };
+$onMount(() => {
+  const uploadHandlers = { handlePaste };
+  seed(uploadHandlers);
+  return () => document.removeEventListener('paste', handlePaste);
+});
+</script>
+<template><div>hi</div></template>
+</rozie>`;
+
+  it('V10 (regression) — a shorthand object property value is wrapped WITHOUT renaming the property key', () => {
+    const code = compile(SRC_SHORTHAND_PROPERTY);
+    const mount = mountEffect(code);
+    // The property NAME must survive untouched — only its value is indirected.
+    expect(mount.body).toContain('handlePaste: _handlePasteStable');
+    expect(code).not.toContain('{ _handlePasteStable }');
+    expect(code).not.toContain('_handlePasteStable,');
+  });
+
+  it('snapshot — SRC_SHORTHAND_PROPERTY', () => {
+    expect(compile(SRC_SHORTHAND_PROPERTY)).toMatchSnapshot();
+  });
 });
