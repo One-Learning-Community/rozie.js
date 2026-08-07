@@ -75,6 +75,13 @@ const MAGIC_ACCESSOR_NAMES = new Set([
   // free closure dep. NOT in STABLE_IDENTIFIERS (D-03) — `$model` only ever
   // appears as a member-expression object, never a bare identifier.
   '$model',
+  // quick 260807-cor (D4) — `$slotted.<name>` member reads resolve to the
+  // Lit-only assigned-elements signal (empty-array constant on the other five
+  // targets). Handled by an EXPLICIT branch in the MemberExpression visitor
+  // BELOW (not via detectMagicAccess — see that branch's comment for why),
+  // but the bare `$slotted` identifier must still never surface as a free
+  // closure dep, so it's listed here like every other magic accessor object.
+  '$slotted',
 ]);
 
 /**
@@ -225,6 +232,28 @@ export function computeExpressionDeps(
           cur = cur.object;
         }
         if (!t.isMemberExpression(cur)) return;
+
+        // quick 260807-cor (D4) — `$slotted.<name>` is handled by an EXPLICIT
+        // branch here, BEFORE `detectMagicAccess`, rather than by widening
+        // `detectMagicAccess` itself. `detectMagicAccess` is shared with five
+        // validators (unknownRef / propWrite / updateExpression /
+        // reactStaleRead / refsPreMount) — widening it there would ripple
+        // validation semantics into all five that this task does not intend
+        // (e.g. an unknown-slot-name diagnostic). `$slotted.<undeclaredName>`
+        // is consequently unvalidated here — accepted scope for D4; a bogus
+        // slot name silently lowers to an empty array on five targets and to
+        // no assigned-elements field on Lit (see collectSlottedReads.ts),
+        // rather than raising a compile error.
+        if (
+          t.isIdentifier(cur.object) &&
+          cur.object.name === '$slotted' &&
+          !cur.computed &&
+          t.isIdentifier(cur.property)
+        ) {
+          path.skip();
+          push({ scope: 'slotted', path: [cur.property.name] });
+          return;
+        }
 
         const access = detectMagicAccess(cur);
         if (!access) {

@@ -15,6 +15,7 @@
  *   - `$data.foo.bar = X` nested write    → emit ROZ521, leave AST unchanged (Pitfall 7)
  *   - `$refs.foo` read                    → `foo.current`
  *   - `$slots.foo` (boolean check)        → `(props.renderFoo ?? props.slots?.['foo'])`  (Phase 07.3.2 Plan 08 — merge guard with dynamic-name fallback; mirrors rewriteTemplateExpression)
+ *   - `$slotted.foo`                       → `[]`  (quick 260807-cor D4 — compile-time constant; live only on Lit)
  *   - `$emit('search', q)`                → `props.onSearch?.(q)`  (camelCase + on-prefix + optional-chain)
  *
  * `$onMount`/`$onUnmount`/`$onUpdate` calls are NOT mutated by this pass —
@@ -1205,6 +1206,19 @@ export function rewriteRozieIdentifiers(
         // top of the mount-phase useEffect body. Just rename the object —
         // member traversal continues into the call args.
         path.node.object = t.identifier('portals');
+        return;
+      }
+      if (obj.name === '$slotted') {
+        // quick 260807-cor (D4) — `$slotted.<name>` is a compile-time
+        // constant on React: there's no shadow boundary here, slot content
+        // is already a real light-DOM descendant of the component, so the
+        // sigil always resolves to an empty array. Any property name is
+        // accepted (unvalidated against declared slots — see
+        // computeDeps.ts's sibling branch doc comment); this mirrors the
+        // 5-no-ops/1-real shape of `$reconcileAfterDomMutation`, whose one
+        // "real" target is Lit instead of React.
+        path.replaceWith(t.arrayExpression([]));
+        path.skip();
         return;
       }
     },

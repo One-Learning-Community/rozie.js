@@ -13,6 +13,7 @@
  *   - `$data.foo += 1`            → `this.foo.set(this.foo() + 1)`
  *   - `$refs.foo`                 → `this.foo()?.nativeElement` (viewChild signal)
  *   - `$slots.foo` (boolean)      → `this.fooTpl` (TemplateRef-typed @ContentChild)
+ *   - `$slotted.foo`              → `[]`  (quick 260807-cor D4 — compile-time constant; live only on Lit)
  *   - `$emit('foo', x)`           → `this.foo.emit(x)`          (output() signal)
  *
  * Bare identifier references to top-level user-introduced names ALSO get
@@ -1359,6 +1360,15 @@ export function rewriteRozieIdentifiers(
         path.node.object = t.identifier('portals');
         return;
       }
+      if (obj.name === '$slotted') {
+        // quick 260807-cor (D4) — compile-time constant `[]` on Angular; no
+        // shadow boundary, slot content is already a real light-DOM
+        // descendant. See react/src/rewrite/rewriteScript.ts's sibling
+        // branch for the full rationale.
+        path.replaceWith(t.arrayExpression([]));
+        path.skip();
+        return;
+      }
     },
 
     OptionalMemberExpression(path) {
@@ -1407,6 +1417,13 @@ export function rewriteRozieIdentifiers(
                 true,
               ),
         );
+        return;
+      }
+      if (obj.name === '$slotted') {
+        // quick 260807-cor (D4) — mirror of MemberExpression branch above
+        // for optional-chained `$slotted.X?.foo` patterns.
+        path.replaceWith(t.arrayExpression([]));
+        path.skip();
         return;
       }
     },

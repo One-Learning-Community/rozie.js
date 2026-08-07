@@ -10,6 +10,7 @@
  *   - `$refs.dialogEl`            → `dialogElRef.value` (Pitfall 4 — Ref suffix avoids name collisions)
  *   - `$emit('change', x)`        → `emit('change', x)` (defineEmits emits via local emit handle)
  *   - bare reads of computed-name → `name.value`      (computed() returns Ref<T>)
+ *   - `$slotted.foo`               → `[]`  (quick 260807-cor D4 — compile-time constant; live only on Lit)
  *
  * `$onMount`/`$onUnmount`/`$onUpdate` calls are NOT mutated by this pass —
  * they're consumed STRUCTURALLY from `ir.lifecycle` by emitScript (Task 2).
@@ -401,6 +402,15 @@ export function rewriteRozieIdentifiers(
         }
         return;
       }
+      if (obj.name === '$slotted') {
+        // quick 260807-cor (D4) — compile-time constant `[]` on Vue; no
+        // shadow boundary, slot content is already a real light-DOM
+        // descendant. See react/src/rewrite/rewriteScript.ts's sibling
+        // branch for the full rationale.
+        path.replaceWith(t.arrayExpression([]));
+        path.skip();
+        return;
+      }
     },
 
     OptionalMemberExpression(path) {
@@ -449,6 +459,13 @@ export function rewriteRozieIdentifiers(
         // optional-chained `$slots.X?.foo` patterns.
         path.node.object = t.identifier('slots');
         slotsUsed = true;
+        return;
+      }
+      if (obj.name === '$slotted') {
+        // quick 260807-cor (D4) — mirror of MemberExpression branch above
+        // for optional-chained `$slotted.X?.foo` patterns.
+        path.replaceWith(t.arrayExpression([]));
+        path.skip();
         return;
       }
     },

@@ -12,6 +12,7 @@
  *   - `$data.x += n`               → `setX(prev => prev + n)` (compound updater)
  *   - `$refs.foo` read             → `fooRef`     (plain variable set via ref callback)
  *   - `$emit('event', args)`       → `_props.onEvent?.(args)` (optional-chain call)
+ *   - `$slotted.foo`                → `[]`         (quick 260807-cor D4 — compile-time constant; live only on Lit)
  *   - `$onMount`, `$onUnmount`, `$onUpdate` — NOT mutated; consumed structurally from ir.lifecycle
  *
  * Per CONTEXT D-08 collected-not-thrown: never throws on user input.
@@ -1020,6 +1021,16 @@ export function rewriteRozieIdentifiers(
         );
         const merged = t.logicalExpression('??', lhs, rhs);
         path.replaceWith(t.parenthesizedExpression(merged));
+        path.skip();
+        return;
+      }
+
+      if (object.name === '$slotted') {
+        // quick 260807-cor (D4) — compile-time constant `[]` on Solid; no
+        // shadow boundary, slot content is already a real light-DOM
+        // descendant. See react/src/rewrite/rewriteScript.ts's sibling
+        // branch for the full rationale.
+        path.replaceWith(t.arrayExpression([]));
         path.skip();
         return;
       }

@@ -1414,6 +1414,12 @@ function renderSignalRef(ref: SignalRef, modelProps: ReadonlySet<string>): strin
     const head = ref.path[0] ?? '';
     return `props.render${capitalize(head)}`;
   }
+  if (ref.scope === 'slotted') {
+    // quick 260807-cor (D4) — defensive branch; `renderDepArray` below skips
+    // 'slotted' deps before this is ever called on one. See
+    // emit/renderDepArray.ts's identical comment for the full rationale.
+    return '';
+  }
   // closure
   return ref.identifier;
 }
@@ -1425,6 +1431,9 @@ function renderSignalRef(ref: SignalRef, modelProps: ReadonlySet<string>): strin
 function renderDepArray(deps: SignalRef[], modelProps: ReadonlySet<string>): string {
   const rendered = new Set<string>();
   for (const d of deps) {
+    // quick 260807-cor (D4) — drop `slotted`-scoped deps; compile-time
+    // constant `[]` on React, never a legitimate dependency.
+    if (d.scope === 'slotted') continue;
     rendered.add(renderSignalRef(d, modelProps));
   }
   const sorted = [...rendered].sort();

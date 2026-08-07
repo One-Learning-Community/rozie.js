@@ -12,6 +12,12 @@
  *   - computed                 → `name`          (bare local from useMemo)
  *   - slots (named)            → `props.renderHeader`
  *   - slots (default '')       → `props.children`
+ *   - slotted                  → DROPPED (quick 260807-cor D4 — compile-time
+ *                                 constant `[]` on React; never a legitimate
+ *                                 dep, and `[].length` is stable across
+ *                                 renders anyway, but dropping it here keeps
+ *                                 the dep array minimal and matches the
+ *                                 documented "React drops it" contract)
  *   - closure                  → `helperFn`     (literal identifier)
  *
  * Refs are EXCLUDED at the SignalRef level — Phase 2 D-21b lock — so this
@@ -61,6 +67,13 @@ export function renderSignalRef(dep: SignalRef, ir: IRComponent): string {
       if (slotName === '') return 'props.children';
       return `props.render${capitalize(slotName)}`;
     }
+    case 'slotted':
+      // quick 260807-cor (D4) — defensive branch. `renderDepArray` below
+      // filters this scope out before calling this function; this return is
+      // reached only if some future caller invokes `renderSignalRef`
+      // directly on a `slotted` ref. An empty string keeps that call site
+      // from throwing rather than silently mapping to a bogus identifier.
+      return '';
     case 'closure':
       return dep.identifier;
   }
@@ -74,7 +87,13 @@ export function renderSignalRef(dep: SignalRef, ir: IRComponent): string {
  * both narrow to root `props.foo`) appear once.
  */
 export function renderDepArray(deps: SignalRef[], ir: IRComponent): string {
-  const expressions = deps.map((d) => renderSignalRef(d, ir));
+  // quick 260807-cor (D4) — drop `slotted`-scoped deps BEFORE rendering. The
+  // sigil is a compile-time constant `[]` on React; a dep entry for it would
+  // never be `undefined` (renderSignalRef has a defensive `''` branch) but
+  // filtering here keeps the array from carrying a load-bearing-looking but
+  // meaningless empty-string element.
+  const filteredDeps = deps.filter((d) => d.scope !== 'slotted');
+  const expressions = filteredDeps.map((d) => renderSignalRef(d, ir));
   // Spike-012 R3-1 — the `$event` sigil is the synthesized event-handler param,
   // not a reactive value. A debounce/throttle wrap whose handler reads `$event`
   // (`@input.debounce(300)="$data.q = $event.target.value"`) collected it as a

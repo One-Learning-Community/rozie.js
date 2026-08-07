@@ -18,6 +18,8 @@
  *   $expose — producer-side imperative-handle sigil (Phase 21)
  *   $provide — cross-component context provide sigil (Phase 36)
  *   $inject  — cross-component context inject sigil (Phase 36)
+ *   $slotted — Lit-only assigned-elements member sigil, `[]` constant on the
+ *              other five targets (quick 260807-cor, D4)
  *
  * A user-authored identifier that shadows one of these — a `<data>` field
  * name or an `r-for` loop variable — would be silently captured by the
@@ -65,10 +67,11 @@ export const RESERVED_SIGILS: ReadonlySet<string> = new Set([
   '$provide', // Phase 36 — cross-component context provide sigil
   '$inject', // Phase 36 — cross-component context inject sigil
   '$clone', // Phase 45 — target-rewritten deep-clone call-form sigil
+  '$slotted', // quick 260807-cor (D4) — Lit-only assigned-elements member sigil
 ]);
 
 const RESERVED_SIGIL_LIST =
-  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs, $listeners, $restoreFocus, $model, $expose, $provide, $inject, $clone';
+  '$el, $props, $data, $refs, $slots, $emit, $event, $attrs, $listeners, $restoreFocus, $model, $expose, $provide, $inject, $clone, $slotted';
 
 function emitCollision(
   name: string,
