@@ -36,13 +36,13 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Autoplay plugin toggle | ⚠️ wire the plugin yourself | ⚠️ | ⚠️ | ⚠️ | ⚠️ | — | ✅ `autoplay` prop |
 | Imperative handle | ✅ via the api object | ✅ via the api object | ✅ via the api object | ✅ via the api accessor | ⚠️ | hand-roll | ✅ uniform 14-verb `$expose` |
 | Plugin / options escape hatch | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ `:plugins` + `:options` |
-| Config-array **and** declarative slides | ❌ (slot only) | ❌ | ❌ | ❌ | ❌ | — | ✅ `:slides` array OR default slot (⚠️ declarative slides don't resolve on Lit¹) |
+| Config-array **and** declarative slides | ❌ (slot only) | ❌ | ❌ | ❌ | ❌ | — | ✅ `:slides` array OR default slot, on all six targets¹ |
 | TypeScript | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
 | Accessibility (carousel ARIA role, keyboard nav, labels) | ❓ not verified | ❓ not verified | ❓ not verified | ❓ not verified | ❓ not verified | — | ⚠️ arrow/dot `aria-label`s only — no carousel role, no keyboard nav on the viewport; planned for 0.2.0 (D9) |
 | Zero-config styling, re-skinnable | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | — | ✅ CSS-var tokens + shadcn/Material/Bootstrap bridges |
 | One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
-¹ On the Lit target, declarative (default-slot) slides don't resolve today: Embla measures slides via `container.querySelectorAll('.rozie-embla__slide')` against the shadow-root container, and light-DOM children arriving through a native `<slot>` are invisible to that query. Config-array mode (`:slides`) is unaffected and is the recommended mode on Lit. See the [showcase's Slots section](/components/embla#slots) for the verified detail.
+¹ Declarative (default-slot) mode resolves on Lit via the [`$slotted.<name>` sigil](/guide/features#slotted-name-—-resolve-slotted-elements-across-the-lit-shadow-boundary), which reaches across the shadow boundary that a bare `container.querySelectorAll('.rozie-embla__slide')` cannot see through.
 
 ## Where Rozie wins today
 

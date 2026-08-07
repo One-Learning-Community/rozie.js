@@ -1176,6 +1176,47 @@ Authors targeting only one framework can leave the marker and sigil in place at 
 The marker and sigil are escape hatches, not a default. Use them only when a third-party engine actually mutates DOM your component owns. Calling the sigil on every state change on Lit forces a child-tree rebuild and defeats lit-html's keyed diffing; the marker by itself is cheap, but the pairing has a real per-call cost. If you're not integrating with an engine that touches the DOM, you don't need either.
 :::
 
+## `$slotted.<name>` — resolve slotted elements across the Lit shadow boundary
+
+A wrapped vanilla engine that queries the DOM for its own content (`container.querySelectorAll(selector)`, `container.children`, …) can't see slot-projected elements on Lit: native `<slot>` "flattening" is a rendering-composition concept, not a DOM-tree one, so slotted light-DOM nodes are never *descendants* of the shadow-root container the engine was handed. `$slotted.<name>` is the escape hatch — a member-shape sigil that returns the `Element[]` currently assigned to a named slot (`$slotted.default` for the unnamed slot).
+
+```rozie
+<template>
+  <div ref="containerEl">
+    <slot />
+  </div>
+</template>
+
+<script>
+import Engine from 'some-vanilla-engine'
+
+let instance = null
+
+$onMount(() => {
+  // Hand the engine an explicit element list instead of a selector string —
+  // works uniformly whether the elements are real descendants (five targets)
+  // or projected across a shadow boundary (Lit).
+  instance = new Engine({ items: $slotted.default })
+  return () => instance?.destroy()
+})
+
+// Re-init when slotted content changes after mount — the ONLY target where
+// this getter is anything but a constant is Lit (see the table below).
+$watch(() => $slotted.default.length, () => instance?.reInit({ items: $slotted.default }))
+</script>
+```
+
+**On React / Vue / Svelte / Solid / Angular, `$slotted.<name>` is a compile-time constant `[]`.** There's no shadow boundary on those targets — slot content is already a real descendant of the container an engine would query directly — so the sigil has nothing to resolve. This mirrors the 5-no-op / 1-real shape of [`$reconcileAfterDomMutation()`](#r-external-and-reconcileafterdommutation-—-dom-the-framework-doesn-t-own) above, whose one live target is also Lit.
+
+**On Lit, the sigil is live and reactive**, backed by a `queryAssignedElements`-derived signal maintained by the existing slotchange machinery, pre-seeded in `connectedCallback()` so a mount-phase read resolves non-zero. Reading it is meaningful only after mount — the same discipline as [`$refs`](#refs-derived-from-ref): the underlying `<slot>` element doesn't exist in the shadow root until first render.
+
+| Target | `$slotted.<name>` |
+| --- | --- |
+| React / Vue / Svelte / Solid / Angular | `[]` (compile-time constant) |
+| Lit | the live, reactive `Element[]` assigned to that slot, resolved across the shadow boundary |
+
+Use it exactly where you'd otherwise hand a vanilla engine a DOM-query-based option (`slides`, `items`, `children`) and want that option to resolve identically whether the consumer's content is config-driven or dropped in declaratively via the default slot — see [`Carousel`](/components/embla)'s `slides` option for the shipped example.
+
 ## `r-portal="<container-expr>"` — teleport an element's own subtree
 
 Sometimes a modal overlay, a dropdown menu, or a tooltip needs to escape an ancestor's `overflow: hidden` / `transform` / `filter` / `contain` — any of which creates a clipping context or a new containing block that traps a `position: fixed` element. The fix on every framework is the same idea: render the subtree somewhere else in the DOM (usually `document.body`), while keeping it logically part of the same component.

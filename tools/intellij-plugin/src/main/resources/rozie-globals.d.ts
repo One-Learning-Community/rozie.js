@@ -18,7 +18,8 @@
 // as the 20th (shipped 2026-05-24 in the pre-Phase-16 cleanup but never
 // surfaced to the editor), and updated `$watch` to the lazy-by-default
 // contract of quick 260602-9lw (optional `{ immediate: true }` third arg;
-// no `oldValue` callback param).
+// no `oldValue` callback param). quick 260807-cor (2026-08-07) added
+// `$slotted` as the 21st — the Lit-only assigned-elements member sigil (D4).
 //
 // *** INVARIANT — NO BRACE-DELIMITED TYPES IN THIS FILE ***
 // This file is injected VERBATIM as the prefix of every Rozie JS injection,
@@ -201,3 +202,13 @@ declare function $expose(methods: Record<string, (...args: any[]) => unknown>): 
  * the other 5 targets. Shipped 2026-05-24 (pre-Phase-16 cleanup).
  */
 declare function $reconcileAfterDomMutation(): void;
+/**
+ * quick 260807-cor (D4) — resolve the Elements currently assigned to a named
+ * (or `default` for the unnamed) slot, across a Lit shadow boundary.
+ * `$slotted.default` / `$slotted.<name>`. Compile-time constant `[]` on
+ * React/Vue/Svelte/Solid/Angular (no shadow boundary there — slot content is
+ * already a real descendant of the container). Live and reactive on Lit,
+ * backed by a `queryAssignedElements`-derived signal. Meaningful only after
+ * mount, like `$refs`.
+ */
+declare const $slotted: Record<string, Element[]>;
