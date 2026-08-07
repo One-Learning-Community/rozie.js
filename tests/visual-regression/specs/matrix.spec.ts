@@ -1032,74 +1032,75 @@ async function settleExample(
   // all 42 before clipping. The pinned value='2025-06-15' fixes the month, so the
   // grid is deterministic.
   //
-  // MOUNT-FOCUS CORRECTION (datepicker-vr-docker-drift debug session,
-  // 2026-08-05): the day grid is NOT "never focused" — the Phase 77 r-keynav
-  // day-grid retrofit (77-08) gives it the SAME tabindex-model mount-focus
-  // contract as KeynavMenu/KeynavGrid above (SPEC §3/§9): `useKeynav`'s
-  // active-change watch calls `.focus()` on the resolved active cell
-  // unconditionally, including its `{ immediate: true }` first fire on
-  // mount. With a pinned `value`, the active cell resolves to the SELECTED
-  // day, which lands real DOM focus and matches `:focus-visible`, painting
-  // the `.rozie-datepicker-day:focus-visible` accent outline ring — a subtle
-  // but real, deterministic, and CORRECT part of the mount frame (confirmed
-  // identical via getComputedStyle/:focus-visible on both the pinned Docker
-  // container AND local macOS Chromium; this is NOT a container-rendering
-  // bug). The prior 42-cell-only wait raced ahead of this focus effect on
-  // some runs and behind it on others depending on host timing, producing a
-  // false "sometimes matches, sometimes doesn't" read. Wait for the pinned
-  // day to actually hold DOM focus before clipping — a no-op wait once focus
-  // has already landed, mirroring the KeynavGrid pattern exactly.
+  // FOCUS-WITHIN GUARD (Plan 260806-lz7, superseding the prior MOUNT-FOCUS
+  // CORRECTION): the day grid's r-keynav root now gates its first/redundant
+  // focus+scroll pass behind `@rozie/runtime-keynav-core`'s strict
+  // containment predicate — a cold mount with nothing focused anywhere on
+  // the page no longer steals DOM focus onto the selected day (case (c) of
+  // the guard's test matrix). The `.rozie-datepicker-day:focus-visible`
+  // accent ring from the prior mount-focus contract is gone from this
+  // baseline; assert the new steady state directly (no day cell holds
+  // focus) rather than waiting for a focus arrival that no longer happens.
   if (example === 'DatePickerScreenshot' || example === 'DatePickerFooter') {
     await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(42, {
       timeout: 10_000,
     });
-    await expect(page.locator('[data-day="2025-06-15"]')).toBeFocused({ timeout: 10_000 });
+    await expect(page.locator('[class*="rozie-datepicker-day"]:focus')).toHaveCount(0, {
+      timeout: 10_000,
+    });
   }
   // DatePickerWeekendDisable: same pinned value='2025-06-15' as
-  // DatePickerScreenshot/Footer above, but June 15 2025 is a Sunday and
-  // `disabledDaysOfWeek={[0,6]}` disables it — per SPEC §5 a disabled cell is
-  // focusable-but-inert, so mount focus lands there exactly like any other
-  // cell (mirrors the KeynavGrid demo's own disabled-item-0 precedent
-  // above). Same mount-focus correction as DatePickerScreenshot.
+  // DatePickerScreenshot/Footer above. FOCUS-WITHIN GUARD (Plan 260806-lz7):
+  // same steady-state assertion as DatePickerScreenshot — a cold mount no
+  // longer focuses the selected (here, disabled) day.
   if (example === 'DatePickerWeekendDisable') {
     await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(42, {
       timeout: 10_000,
     });
-    await expect(page.locator('[data-day="2025-06-15"]')).toBeFocused({ timeout: 10_000 });
+    await expect(page.locator('[class*="rozie-datepicker-day"]:focus')).toHaveCount(0, {
+      timeout: 10_000,
+    });
   }
   // DatePickerRangeComplete / DatePickerPresetActive (@rozie-ui/date-picker, range
   // mode): same 6×7 = 42-day grid as DatePickerScreenshot. Wait for all 42 day
   // buttons before clipping; the seeded range pins the view month, so the band /
   // active-preset frame is final once the grid paints.
   //
-  // MOUNT-FOCUS CORRECTION: same contract as DatePickerScreenshot above — in
-  // range mode the active cell resolves to the range's `start` endpoint
-  // (rovingDayInput's `anchor` funnel), which is where mount focus lands.
-  // DatePickerRangeComplete seeds { start: '2025-05-28', end: '2025-06-04' };
-  // DatePickerPresetActive seeds { start: '2025-06-10', end: '2025-06-16' }.
+  // FOCUS-WITHIN GUARD (Plan 260806-lz7): same steady-state assertion as
+  // DatePickerScreenshot above — a cold mount no longer focuses the range's
+  // `start` endpoint. DatePickerRangeComplete seeds { start: '2025-05-28',
+  // end: '2025-06-04' }; DatePickerPresetActive seeds { start: '2025-06-10',
+  // end: '2025-06-16' } — the seeds are still load-bearing for which
+  // band/preset paints, just no longer for focus.
   if (example === 'DatePickerRangeComplete') {
     await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(42, {
       timeout: 10_000,
     });
-    await expect(page.locator('[data-day="2025-05-28"]')).toBeFocused({ timeout: 10_000 });
+    await expect(page.locator('[class*="rozie-datepicker-day"]:focus')).toHaveCount(0, {
+      timeout: 10_000,
+    });
   }
   if (example === 'DatePickerPresetActive') {
     await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(42, {
       timeout: 10_000,
     });
-    await expect(page.locator('[data-day="2025-06-10"]')).toBeFocused({ timeout: 10_000 });
+    await expect(page.locator('[class*="rozie-datepicker-day"]:focus')).toHaveCount(0, {
+      timeout: 10_000,
+    });
   }
   // DatePickerTwoMonth (@rozie-ui/date-picker, RANGE mode, numberOfMonths=2):
-  // two 6×7 grids → 84 day buttons (this cell previously had NO settle wait
-  // at all beyond the mount-clip's own `toBeVisible()`). Seeded range
-  // { start: '2025-06-10', end: '2025-06-15' } pins the view to June+July
-  // 2025. Same mount-focus contract as the range cells above — active cell
-  // resolves to the range start.
+  // two 6×7 grids → 84 day buttons. Seeded range { start: '2025-06-10', end:
+  // '2025-06-15' } pins the view to June+July 2025.
+  //
+  // FOCUS-WITHIN GUARD (Plan 260806-lz7): same steady-state assertion as the
+  // range cells above.
   if (example === 'DatePickerTwoMonth') {
     await expect(page.locator('[class*="rozie-datepicker-day"]')).toHaveCount(84, {
       timeout: 10_000,
     });
-    await expect(page.locator('[data-day="2025-06-10"]')).toBeFocused({ timeout: 10_000 });
+    await expect(page.locator('[class*="rozie-datepicker-day"]:focus')).toHaveCount(0, {
+      timeout: 10_000,
+    });
   }
   // ResizableScreenshot (@rozie-ui/resizable): the splitter renders one
   // role="separator" handle between the two panels. Its presence proves the wrapper
@@ -1109,45 +1110,53 @@ async function settleExample(
   if (example === 'ResizableScreenshot') {
     await expect(page.getByRole('separator')).toBeVisible({ timeout: 10_000 });
   }
-  // KeynavMenu (Phase 71, r-keynav tabindex model): the compiler's own
-  // active-change effect calls `.focus()` on item 0 as part of MOUNT itself
-  // (active initializes to 0, and the tabindex-model effect fires on that
-  // first value too — SPEC §3/§9), so the browser's native focus-ring
-  // outline is part of the deterministic frame. On Angular specifically that
-  // effect is a constructor-body `effect()` gated on a `viewChild()` signal
-  // that only resolves AFTER `ngAfterViewInit` — one extra change-detection
-  // tick beyond the other 5 targets' synchronous-setup equivalent — so an
-  // unguarded screenshot can race ahead of the focus-ring paint on Angular
-  // only. Wait for real DOM focus to land on item 0 before clipping (a
-  // no-op wait on the 5 targets where it's already true by the time the
-  // mount locator settles).
+  // KeynavMenu (Phase 71, r-keynav tabindex model): a role="menu" with 5
+  // `data-rozie-keynav-item` buttons (KeynavMenuDemo.rozie's ITEMS array).
+  //
+  // FOCUS-WITHIN GUARD (Plan 260806-lz7, superseding the prior MOUNT-FOCUS
+  // contract): the tabindex-model root's first/redundant focus+scroll pass
+  // is now gated behind the strict-containment predicate — a cold mount
+  // with nothing focused anywhere on the page no longer steals DOM focus
+  // onto item 0 (case (c) of the guard's test matrix). Wait for all 5 items
+  // to render, then assert the new steady state directly: no item holds
+  // focus.
   if (example === 'KeynavMenu') {
-    await expect(page.locator('[data-rozie-keynav-item="0"]')).toBeFocused({
+    await expect(page.locator('[data-rozie-keynav-item]')).toHaveCount(5, {
+      timeout: 10_000,
+    });
+    await expect(page.locator('[data-rozie-keynav-item]:focus')).toHaveCount(0, {
       timeout: 10_000,
     });
   }
-  // KeynavGrid (Phase 77, r-keynav grid focus-model): SAME MOUNT-focus
-  // contract as KeynavMenu above — the tabindex-model active-change effect
-  // calls `.focus()` on the active cell (index 0, page 0) as part of mount
-  // itself. Item 0 is DISABLED in this demo (the calendar "weekend" column
-  // pattern) — disabled cells are focusable-but-inert (SPEC §5), so mount
-  // focus lands there exactly like any other cell. Wait for real DOM focus
-  // before clipping (a no-op wait on targets where it's already true).
+  // KeynavGrid (Phase 77, r-keynav grid focus-model): page 0 of
+  // KeynavGridDemo.rozie is a FULL 5×7 grid — 35 `data-rozie-keynav-item`
+  // cells.
+  //
+  // FOCUS-WITHIN GUARD (Plan 260806-lz7): SAME steady-state assertion as
+  // KeynavMenu above — a cold mount no longer focuses the active (here,
+  // disabled) cell.
   if (example === 'KeynavGrid') {
-    await expect(page.locator('[data-rozie-keynav-item="0"]')).toBeFocused({
+    await expect(page.locator('[data-rozie-keynav-item]')).toHaveCount(35, {
+      timeout: 10_000,
+    });
+    await expect(page.locator('[data-rozie-keynav-item]:focus')).toHaveCount(0, {
       timeout: 10_000,
     });
   }
-  // KeynavMultiGroup (Phase 77, r-keynav multi-group): TWO roots, both
-  // tabindex-model, both mount-focus their own active item — only ONE can
-  // hold real browser focus. Root declaration order (Root A's controller
-  // mounts before Root B's) makes the LAST-declared root's mount effect win
-  // deterministically per target, but WHICH root wins is an emitter-internal
-  // detail this pixel gate does not hard-code — it only waits for focus to
-  // land on ANY keynav item before clipping, so the baseline is
-  // deterministic without depending on that internal ordering.
+  // KeynavMultiGroup (Phase 77, r-keynav multi-group): TWO independent
+  // roots — LIST_A (4 items) + GRID_B (6 cells), KeynavMultiGroupDemo.rozie
+  // — 10 `data-rozie-keynav-item` elements total across both groups.
+  //
+  // FOCUS-WITHIN GUARD (Plan 260806-lz7, superseding the prior "exactly one
+  // of the two roots wins mount focus" contract): a cold mount no longer
+  // focuses EITHER root's active item — both first/redundant passes are
+  // gated behind the strict-containment predicate. Assert the new steady
+  // state directly: no item in either group holds focus.
   if (example === 'KeynavMultiGroup') {
-    await expect(page.locator('[data-rozie-keynav-item]:focus')).toHaveCount(1, {
+    await expect(page.locator('[data-rozie-keynav-item]')).toHaveCount(10, {
+      timeout: 10_000,
+    });
+    await expect(page.locator('[data-rozie-keynav-item]:focus')).toHaveCount(0, {
       timeout: 10_000,
     });
   }
