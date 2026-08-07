@@ -220,6 +220,13 @@ for (const target of TARGETS) {
     // stationary cursor cannot confound the focus-driven assertions below.
     await page.mouse.move(0, 0);
 
+    // The native click above already left day 27 focused — blur it first so
+    // the re-focus below is a genuine focus TRANSITION (browsers do not
+    // re-fire the `focus` event on an already-focused element), matching how
+    // a real keyboard user re-entering the grid (e.g. Tab away and back)
+    // would trigger the @focus -> onDayHover path.
+    await cell(27).evaluate((el) => (el as HTMLElement).blur());
+
     // Focus day 27 (still the anchor) — proves the focus->hover path is LIVE,
     // not globally dead: the anchor itself lights a 1-cell preview band.
     await cell(27).focus();

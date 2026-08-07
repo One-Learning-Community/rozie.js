@@ -594,19 +594,31 @@ export function resolveRovingDayIndex(cells: CalendarDay[], input: RovingDayInpu
   return cells.findIndex((c) => c.inMonth && c.iso === iso);
 }
 
+const WEEKDAY_NAMES_FALLBACK_LONG = [
+  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+];
+
 /**
  * The seven weekday header labels, ordered from `weekStartsOn`. Localized via
- * `Intl` (short names) with an English fallback.
+ * `Intl` with an English fallback. `width` defaults to `'short'` (the
+ * existing two-arg call shape and output are byte-unchanged); pass `'long'`
+ * for the full weekday name (quick task 260807-6p8, D-01 — the visible header
+ * text stays the short label; the long form feeds `aria-label` only).
  */
-export function weekdayLabels(weekStartsOn: number, locale: string): string[] {
+export function weekdayLabels(
+  weekStartsOn: number,
+  locale: string,
+  width: 'short' | 'long' = 'short',
+): string[] {
   const start = ((Math.floor(weekStartsOn ?? 0) % 7) + 7) % 7;
   const out: string[] = [];
   let fmt: Intl.DateTimeFormat | null = null;
   try {
-    fmt = new Intl.DateTimeFormat(locale || 'en-US', { weekday: 'short', timeZone: 'UTC' });
+    fmt = new Intl.DateTimeFormat(locale || 'en-US', { weekday: width, timeZone: 'UTC' });
   } catch {
     fmt = null;
   }
+  const fallback = width === 'long' ? WEEKDAY_NAMES_FALLBACK_LONG : WEEKDAY_NAMES_FALLBACK;
   for (let i = 0; i < 7; i++) {
     const dow = (start + i) % 7;
     if (fmt) {
@@ -614,8 +626,152 @@ export function weekdayLabels(weekStartsOn: number, locale: string): string[] {
       const ms = Date.UTC(2023, 0, 1) + dow * 86400000;
       out.push(fmt.format(new Date(ms)));
     } else {
-      out.push(WEEKDAY_NAMES_FALLBACK[dow]);
+      out.push(fallback[dow]);
     }
   }
   return out;
+}
+
+/**
+ * Localized, human-readable full-date label for a day cell's `aria-label`
+ * (quick task 260807-6p8, D-01 item 4) — e.g. `"Sunday, June 15, 2025"`
+ * instead of the raw ISO string. `timeZone: 'UTC'` is load-bearing: the whole
+ * file is UTC-anchored (see the module doc comment), and a local-zone format
+ * would slide the announced date by a day near a DST/zone boundary. Mirrors
+ * {@link monthLabel}'s total-function discipline — a throw or a malformed iso
+ * returns the raw `iso` string unchanged rather than throwing.
+ */
+export function dayLabel(iso: string, locale: string): string {
+  const t = isoToUtc(iso);
+  if (t == null) return iso;
+  try {
+    return new Intl.DateTimeFormat(locale || 'en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(t));
+  } catch {
+    return iso;
+  }
+}
+
+/**
+ * The 10 static English "chrome" phrases the DatePicker's `labels` prop can
+ * override (quick task 260807-6p8, D-05 discretion resolution). These are
+ * NOT Intl-derived — `Intl` localizes DATES, not the English phrase
+ * "Previous month" — so a consumer must supply their own translations via
+ * `labels` for a fully-localized control. Every key is documented on the
+ * `labels` prop in `DatePicker.rozie`.
+ */
+export type DatePickerLabelKey =
+  | 'root'
+  | 'previousMonth'
+  | 'nextMonth'
+  | 'changeMonthYear'
+  | 'changeYear'
+  | 'chooseMonth'
+  | 'chooseYear'
+  | 'presets'
+  | 'today'
+  | 'clear';
+
+export const LABEL_DEFAULTS: Record<DatePickerLabelKey, string> = {
+  root: 'Date picker',
+  previousMonth: 'Previous month',
+  nextMonth: 'Next month',
+  changeMonthYear: 'Change month and year',
+  changeYear: 'Change year',
+  chooseMonth: 'Choose month',
+  chooseYear: 'Choose year',
+  presets: 'Date range presets',
+  today: 'Today',
+  clear: 'Clear',
+};
+
+/**
+ * Resolve a single chrome label: the consumer's `labels[key]` override when
+ * it is a non-empty string, else {@link LABEL_DEFAULTS}`[key]`. `labels` is
+ * an untrusted, consumer-supplied prop value (T-6p8-01) — guarded with a
+ * truthy + `typeof === 'object'` test so a string/number/null/array `labels`
+ * value can never throw; an unknown extra key is silently ignored.
+ */
+export function resolveLabel(labels: unknown, key: DatePickerLabelKey): string {
+  if (labels && typeof labels === 'object') {
+    const v = (labels as Record<string, unknown>)[key];
+    if (typeof v === 'string' && v !== '') return v;
+  }
+  return LABEL_DEFAULTS[key];
+}
+
+/**
+ * Hard cap on the interior-day walk `rangeSpansDisabled` performs for the
+ * `isDateDisabled` branch (T-6p8-02, Denial of Service — mitigate). A
+ * deliberate fail-OPEN: an interior exceeding this returns `false` rather
+ * than walking further — a fail-closed cap would silently forbid a
+ * legitimate multi-decade range that has no actually-disabled day in it.
+ */
+export const RANGE_SCAN_MAX_DAYS = 4000;
+
+/**
+ * `true` when the (order-tolerant) span between `a` and `b` crosses a
+ * disabled day in its INTERIOR — strictly between the two endpoints,
+ * excluding them (quick task 260807-6p8, D-02). Consumed by BOTH the range
+ * hover-preview path and the range-commit path in `DatePicker.rozie`, so a
+ * preview band and a commit can never disagree about the same span.
+ *
+ * Checked in this order:
+ * 1. The whole control disabled, either ISO unparsable, or a non-positive
+ *    interior (same day / adjacent days) → `false`.
+ * 2. `disabledDates` — an O(list) scan (not a day walk): any entry whose UTC
+ *    ms lies strictly between the two endpoints → `true`.
+ * 3. `disabledDaysOfWeek` (non-empty) — an interior of 7 or more days
+ *    necessarily contains every weekday, so this returns `true` immediately
+ *    without walking; otherwise it walks the (at most 6) interior days and
+ *    compares `getUTCDay()`.
+ * 4. `isDateDisabled` — the only branch that walks days one at a time,
+ *    capped at {@link RANGE_SCAN_MAX_DAYS} (see its own doc comment for the
+ *    fail-open rationale).
+ *
+ * `min`/`max` are deliberately NOT consulted: they define a single
+ * CONTIGUOUS window, so if both endpoints already pass the bound test, every
+ * interior day between them does too — there is nothing a bounds check could
+ * find that isn't already implied by the endpoints themselves.
+ */
+export function rangeSpansDisabled(a: string, b: string, input: MonthGridInput): boolean {
+  if (input.disabled) return false;
+  const at = isoToUtc(a);
+  const bt = isoToUtc(b);
+  if (at == null || bt == null) return false;
+  const lo = at <= bt ? at : bt;
+  const hi = at <= bt ? bt : at;
+  const interiorDays = Math.round((hi - lo) / 86400000) - 1;
+  if (interiorDays <= 0) return false;
+
+  const disabledDates = input.disabledDates || [];
+  for (let i = 0; i < disabledDates.length; i++) {
+    const dt = isoToUtc(disabledDates[i]);
+    if (dt != null && dt > lo && dt < hi) return true;
+  }
+
+  const blockedDows = input.disabledDaysOfWeek || [];
+  if (blockedDows.length > 0) {
+    if (interiorDays >= 7) return true;
+    for (let ms = lo + 86400000; ms < hi; ms += 86400000) {
+      const dow = new Date(ms).getUTCDay();
+      for (let i = 0; i < blockedDows.length; i++) if (blockedDows[i] === dow) return true;
+    }
+  }
+
+  if (input.isDateDisabled) {
+    if (interiorDays > RANGE_SCAN_MAX_DAYS) return false;
+    for (let ms = lo + 86400000; ms < hi; ms += 86400000) {
+      const cd = new Date(ms);
+      const iso = toIso(cd.getUTCFullYear(), cd.getUTCMonth(), cd.getUTCDate());
+      if (input.isDateDisabled(iso)) return true;
+    }
+  }
+
+  return false;
 }

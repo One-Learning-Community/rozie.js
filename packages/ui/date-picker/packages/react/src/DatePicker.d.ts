@@ -40,6 +40,12 @@ export interface DatePickerProps {
    */
   locale?: string;
   /**
+   * Optional overrides for the 10 static English "chrome" strings, keyed by `root`, `previousMonth`, `nextMonth`, `changeMonthYear`, `changeYear`, `chooseMonth`, `chooseYear`, `presets`, `today`, `clear` (defaults: `"Date picker"`, `"Previous month"`, `"Next month"`, `"Change month and year"`, `"Change year"`, `"Choose month"`, `"Choose year"`, `"Date range presets"`, `"Today"`, `"Clear"`). **Honest split:** `Intl` is a date/number formatter, not a message catalog — it can localize a DATE but cannot translate the phrase "Previous month". The day-cell accessible name, each multi-month panel's own grid caption, the weekday header long names, and the month-year heading text are already Intl-derived from the `locale` prop and are NOT `labels` keys; the 10 chrome phrases above are English-static and only `labels` can translate them. An empty object (the default) yields the English defaults with zero config. **Lit caveat:** pass via a *property* binding (`.labels=${…}`), never a string attribute — the same rule already in force for `disabledDates`/`presetRanges`.
+   * @example
+   * <DatePicker :labels="{ previousMonth: 'Mois précédent' }" locale="fr-FR" />
+   */
+  labels?: Record<string, unknown>;
+  /**
    * Quick-pick presets for `range` mode — an array of `{ label, range }` where `range` is a literal `{ start, end }` value **or** a `() => { start, end }` thunk (the consumer owns the date math and i18n labels). Renders a default preset rail beneath the grid; the `#presets` slot overrides it. **Lit caveat:** pass via a *property* binding (`.presetRanges=${[…]}`) — thunks inside the array cannot survive a string attribute, same as `disabledDates`.
    */
   presetRanges?: unknown[];
@@ -65,7 +71,7 @@ export interface DatePickerProps {
   isDateDisabled?: ((...args: any[]) => any) | null;
   onChange?: (...args: unknown[]) => void;
   onRangeComplete?: (...args: unknown[]) => void;
-  renderHeader?: (params: { label: unknown; prev: (...args: any[]) => any; next: (...args: any[]) => any; disabled: unknown }) => ReactNode;
+  renderHeader?: (params: { label: unknown; prev: (...args: any[]) => any; next: (...args: any[]) => any; disabled: unknown; openMonths: (...args: any[]) => any; openYears: (...args: any[]) => any; closeDrill: (...args: any[]) => any; viewMode: unknown }) => ReactNode;
   renderFooter?: (params: { today: (...args: any[]) => any; clear: (...args: any[]) => any; todayIso: unknown }) => ReactNode;
   renderPresets?: (params: { presets: unknown; apply: (...args: any[]) => any }) => ReactNode;
   slots?: Record<string, () => ReactNode>;

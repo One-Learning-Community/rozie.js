@@ -3,18 +3,22 @@ import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { createKeynavStateMachine, type KeynavStateMachine, focusIsWithinScope } from '@rozie/runtime-keynav-core';
 
-import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, dayLabel, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, rangeSpansDisabled, resolveLabel, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
 // fresh (a date picker open across midnight should follow the wall clock).
 
 interface HeaderCtx {
-  $implicit: { label: any; prev: any; next: any; disabled: any };
+  $implicit: { label: any; prev: any; next: any; disabled: any; openMonths: any; openYears: any; closeDrill: any; viewMode: any };
   label: any;
   prev: any;
   next: any;
   disabled: any;
+  openMonths: any;
+  openYears: any;
+  closeDrill: any;
+  viewMode: any;
 }
 
 interface FooterCtx {
@@ -56,19 +60,19 @@ function __rozieAttr(v: unknown): string | null {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <div class="rozie-datepicker" [ngClass]="{ 'rozie-datepicker--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-datepicker--multi': numberOfMonths() > 1 }" #root role="group" aria-label="Date picker" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="rozie-datepicker" [ngClass]="{ 'rozie-datepicker--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-datepicker--multi': numberOfMonths() > 1 }" #root role="group" [attr.aria-label]="rozieAttr(labelFor('root'))" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" #rozieSpread_0 #rozieListenersTarget_1>
       
       @if ((headerTpl ?? templates()?.['header'])) {
-    <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled() }, label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled() }" />
+    <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled(), openMonths: enterMonthsView, openYears: enterYearsView, closeDrill: exitToDaysView, viewMode: viewMode() }, label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled(), openMonths: enterMonthsView, openYears: enterYearsView, closeDrill: exitToDaysView, viewMode: viewMode() }" />
     } @else {
 
         <div class="rozie-datepicker-header">
-          <button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" aria-label="Previous month" (click)="goPrevMonth()">‹</button>
+          <button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(labelFor('previousMonth'))" (click)="goPrevMonth()">‹</button>
           @if (monthYearNav()) {
-    <button type="button" class="rozie-datepicker-heading rozie-datepicker-heading-button" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" aria-label="Change month and year" aria-live="polite" (click)="enterMonthsView()">{{ rozieDisplay(monthHeading()) }}</button>
+    <button type="button" class="rozie-datepicker-heading rozie-datepicker-heading-button" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(labelFor('changeMonthYear'))" aria-live="polite" (click)="enterMonthsView()">{{ rozieDisplay(monthHeading()) }}</button>
     } @else {
     <span class="rozie-datepicker-heading" aria-live="polite">{{ rozieDisplay(monthHeading()) }}</span>
-    }<button type="button" class="rozie-datepicker-nav rozie-datepicker-next" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" aria-label="Next month" (click)="goNextMonth()">›</button>
+    }<button type="button" class="rozie-datepicker-nav rozie-datepicker-next" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(labelFor('nextMonth'))" (click)="goNextMonth()">›</button>
         </div>
       
     }
@@ -76,10 +80,10 @@ function __rozieAttr(v: unknown): string | null {
       
       <div class="rozie-datepicker-grids" #__rozieKeynavRootRef>
         @for (g of daysGrids(); track g.year + '-' + g.month; let gi = $index) {
-    <div class="rozie-datepicker-grid" role="grid" (mouseleave)="hoverIso.set('')">
+    <div class="rozie-datepicker-grid" role="grid" [attr.aria-label]="rozieAttr(panelHeading(gi))" (mouseleave)="hoverIso.set('')">
           <div class="rozie-datepicker-weekdays" role="row">
             @for (wd of weekdays(); track wi; let wi = $index) {
-    <span class="rozie-datepicker-weekday" role="columnheader" [attr.aria-label]="rozieAttr(wd)">{{ rozieDisplay(wd) }}</span>
+    <span class="rozie-datepicker-weekday" role="columnheader" [attr.aria-label]="rozieAttr(weekdaysLong()[wi])">{{ rozieDisplay(wd) }}</span>
     }
           </div>
 
@@ -88,7 +92,7 @@ function __rozieAttr(v: unknown): string | null {
             
             @for (day of week; track day.iso; let dc = $index) {
     <span class="rozie-datepicker-cell" role="gridcell" [attr.aria-selected]="!!(day.selected || day.rangeStart || day.rangeEnd)">
-              <button type="button" class="rozie-datepicker-day" [ngClass]="{ 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }" [attr.data-day]="rozieAttr(day.iso)" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!day.disabled" [attr.aria-label]="rozieAttr(day.iso)" [attr.aria-current]="rozieAttr(day.today ? 'date' : null)" (mouseenter)="onDayHover(day.iso)" (focus)="onDayHover(day.iso)" (keydown)="onDayCellKeydown(day.iso, $event)" [id]="\`\${__rozieKeynavGroupId}-item-\${gi * 42 + wk * 7 + dc}\`" [attr.data-rozie-keynav-item]="gi * 42 + wk * 7 + dc" [attr.data-rozie-keynav-active]="activeDay() === gi * 42 + wk * 7 + dc ? '' : undefined" [tabIndex]="activeDay() === gi * 42 + wk * 7 + dc ? 0 : -1">{{ rozieDisplay(day.day) }}</button>
+              <button type="button" class="rozie-datepicker-day" [ngClass]="{ 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }" [attr.data-day]="rozieAttr(day.iso)" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!day.disabled" [attr.aria-label]="rozieAttr(dayAria(day.iso))" [attr.aria-current]="rozieAttr(day.today ? 'date' : null)" (mouseenter)="onDayHover(day.iso)" (focus)="onDayHover(day.iso)" (keydown)="onDayCellKeydown(day.iso, $event)" [id]="\`\${__rozieKeynavGroupId}-item-\${gi * 42 + wk * 7 + dc}\`" [attr.data-rozie-keynav-item]="gi * 42 + wk * 7 + dc" [attr.data-rozie-keynav-active]="activeDay() === gi * 42 + wk * 7 + dc ? '' : undefined" [tabIndex]="activeDay() === gi * 42 + wk * 7 + dc ? 0 : -1">{{ rozieDisplay(day.day) }}</button>
             </span>
     }
           </div>
@@ -101,9 +105,9 @@ function __rozieAttr(v: unknown): string | null {
       @if (showsMonthsView()) {
     <div class="rozie-datepicker-months">
         <div class="rozie-datepicker-drill-header">
-          <button type="button" class="rozie-datepicker-drill-label" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" aria-label="Change year" (click)="enterYearsView()">{{ rozieDisplay(monthList().year) }}</button>
+          <button type="button" class="rozie-datepicker-drill-label" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(labelFor('changeYear'))" (click)="enterYearsView()">{{ rozieDisplay(monthList().year) }}</button>
         </div>
-        <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose month" #__rozieKeynavRootRef1>
+        <div class="rozie-datepicker-drill-grid" role="grid" [attr.aria-label]="rozieAttr(labelFor('chooseMonth'))" #__rozieKeynavRootRef1>
           @for (cell of monthList().months; track cell.iso) {
     <button type="button" class="rozie-datepicker-month" [ngClass]="{ 'is-selected': cell.selected, 'is-current': cell.current }" role="gridcell" [attr.data-month]="rozieAttr(cell.iso)" [attr.aria-disabled]="!!cell.disabled" [attr.aria-selected]="!!cell.selected" (click)="selectMonth(cell.iso)" (keydown)="onMonthCellKeydown(cell.iso, $event)" [id]="\`\${__rozieKeynavGroupId1}-item-\${$index}\`" [attr.data-rozie-keynav-item]="$index" [attr.data-rozie-keynav-active]="activeMonth() === $index ? '' : undefined" [tabIndex]="activeMonth() === $index ? 0 : -1">{{ rozieDisplay(cell.label) }}</button>
     }
@@ -114,7 +118,7 @@ function __rozieAttr(v: unknown): string | null {
         <div class="rozie-datepicker-drill-header">
           <span class="rozie-datepicker-drill-label" aria-live="polite">{{ rozieDisplay(yearRangeLabel()) }}</span>
         </div>
-        <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year" #__rozieKeynavRootRef2>
+        <div class="rozie-datepicker-drill-grid" role="grid" [attr.aria-label]="rozieAttr(labelFor('chooseYear'))" #__rozieKeynavRootRef2>
           @for (cell of yearGrid().years; track cell.iso) {
     <button type="button" class="rozie-datepicker-year" [ngClass]="{ 'is-selected': cell.selected, 'is-current': cell.current }" role="gridcell" [attr.data-year]="rozieAttr(cell.iso)" [attr.aria-disabled]="!!cell.disabled" [attr.aria-selected]="!!cell.selected" (click)="selectYear(cell.iso)" (keydown)="onYearCellKeydown(cell.iso, $event)" [id]="\`\${__rozieKeynavGroupId2}-item-\${$index}\`" [attr.data-rozie-keynav-item]="$index" [attr.data-rozie-keynav-active]="activeYear() === $index ? '' : undefined" [tabIndex]="activeYear() === $index ? 0 : -1">{{ rozieDisplay(cell.year) }}</button>
     }
@@ -126,8 +130,8 @@ function __rozieAttr(v: unknown): string | null {
 
         @if (showsFooter()) {
     <div class="rozie-datepicker-footer">
-          <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-today" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (click)="selectToday()">Today</button>
-          <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-clear" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (click)="clear()">Clear</button>
+          <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-today" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (click)="selectToday()">{{ rozieDisplay(labelFor('today')) }}</button>
+          <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-clear" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (click)="clear()">{{ rozieDisplay(labelFor('clear')) }}</button>
         </div>
     }
     }
@@ -138,7 +142,7 @@ function __rozieAttr(v: unknown): string | null {
     } @else {
 
         @if (hasPresets()) {
-    <div class="rozie-datepicker-presets" role="group" aria-label="Date range presets">
+    <div class="rozie-datepicker-presets" role="group" [attr.aria-label]="rozieAttr(labelFor('presets'))">
           @for (p of resolvedPresets(); track p.label) {
     <button type="button" class="rozie-datepicker-preset" [ngClass]="{ 'is-active': isPresetActive(p.range) }" [attr.aria-pressed]="!!isPresetActive(p.range)" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" (click)="applyPreset(p.range)">{{ rozieDisplay(p.label) }}</button>
     }
@@ -500,6 +504,12 @@ export class DatePicker {
    * BCP-47 locale tag used by `Intl.DateTimeFormat` to render the month-year heading and the short weekday header labels (e.g. `"fr-FR"`, `"ja-JP"`). Falls back to English names in a runtime without `Intl`.
    */
   locale = input<string>('en-US');
+  /**
+   * Optional overrides for the 10 static English "chrome" strings, keyed by `root`, `previousMonth`, `nextMonth`, `changeMonthYear`, `changeYear`, `chooseMonth`, `chooseYear`, `presets`, `today`, `clear` (defaults: `"Date picker"`, `"Previous month"`, `"Next month"`, `"Change month and year"`, `"Change year"`, `"Choose month"`, `"Choose year"`, `"Date range presets"`, `"Today"`, `"Clear"`). **Honest split:** `Intl` is a date/number formatter, not a message catalog — it can localize a DATE but cannot translate the phrase "Previous month". The day-cell accessible name, each multi-month panel's own grid caption, the weekday header long names, and the month-year heading text are already Intl-derived from the `locale` prop and are NOT `labels` keys; the 10 chrome phrases above are English-static and only `labels` can translate them. An empty object (the default) yields the English defaults with zero config. **Lit caveat:** pass via a *property* binding (`.labels=${…}`), never a string attribute — the same rule already in force for `disabledDates`/`presetRanges`.
+   * @example
+   * <DatePicker :labels="{ previousMonth: 'Mois précédent' }" locale="fr-FR" />
+   */
+  labels = input<Record<string, any>>((() => ({}))());
   /**
    * Quick-pick presets for `range` mode — an array of `{ label, range }` where `range` is a literal `{ start, end }` value **or** a `() => { start, end }` thunk (the consumer owns the date math and i18n labels). Renders a default preset rail beneath the grid; the `#presets` slot overrides it. **Lit caveat:** pass via a *property* binding (`.presetRanges=${[…]}`) — thunks inside the array cannot survive a string attribute, same as `disabledDates`.
    */
@@ -929,7 +939,11 @@ export class DatePicker {
   };
   monthHeading = () => monthLabel(this.viewMonthGrid(), this.locale());
   weekdays = () => weekdayLabels(this.weekStartsOn(), this.locale());
-  dayEnabled = (iso: any) => !isDayDisabled(iso, {
+  labelFor = (key: any) => resolveLabel(this.labels(), key);
+  dayAria = (iso: any) => dayLabel(iso, this.locale());
+  weekdaysLong = () => weekdayLabels(this.weekStartsOn(), this.locale(), 'long');
+  panelHeading = (i: any) => monthLabel(addMonths(this.viewMonthGrid(), i), this.locale());
+  gateInput = () => ({
     viewIso: this.viewMonthGrid(),
     value: this.selected(),
     today: this.todayIso(),
@@ -941,6 +955,8 @@ export class DatePicker {
     weekStartsOn: this.weekStartsOn(),
     disabled: (this.disabled() || this.__rozieCvaDisabled())
   });
+  dayEnabled = (iso: any) => !isDayDisabled(iso, this.gateInput());
+  rangeSpanBlocked = (a: any, b: any) => rangeSpansDisabled(a, b, this.gateInput());
   commitValue = (iso: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     if (!isIsoDate(iso)) return;
@@ -957,8 +973,8 @@ export class DatePicker {
     if (!isIsoDate(iso)) return;
     if (!this.dayEnabled(iso)) return;
     const r = this.readRange();
-    if (r.start === '' || r.end !== '') {
-      // No in-progress selection, or a completed one → (re)start the anchor.
+    if (r.start === '' || r.end !== '' || this.rangeSpanBlocked(r.start, iso)) {
+      // No in-progress selection, a completed one, or a blocked span → (re)start the anchor.
       this.value.set({
         start: iso,
         end: ''
@@ -974,7 +990,7 @@ export class DatePicker {
         }
       });
     } else {
-      // Anchor set, end empty → complete the range (ordered by normalizeRange).
+      // Anchor set, end empty, span not blocked → complete the range (ordered by normalizeRange).
       const next = normalizeRange({
         start: r.start,
         end: iso
@@ -993,7 +1009,12 @@ export class DatePicker {
   onDayHover = (iso: any) => {
     if (this.selectionMode() !== 'range') return;
     const r = this.readRange();
-    if (r.start !== '' && r.end === '') this.hoverIso.set(iso);
+    if (r.start === '' || r.end !== '') return;
+    if (!this.dayEnabled(iso) || this.rangeSpanBlocked(r.start, iso)) {
+      this.hoverIso.set('');
+      return;
+    }
+    this.hoverIso.set(iso);
   };
   onDaySelect = (iso: any) => {
     if (this.selectionMode() === 'range') this.commitRange(iso);else this.commitValue(iso);
@@ -1046,6 +1067,7 @@ export class DatePicker {
     this.activeMonth.set(resolveRovingDrillIndex(this.monthList().months));
   };
   exitToDaysView = () => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
     this.viewMode.set('days');
     // $data.viewIso is unchanged here (no fresher value to pass), but the
     // days-view transition IS fresh in THIS call — say so explicitly

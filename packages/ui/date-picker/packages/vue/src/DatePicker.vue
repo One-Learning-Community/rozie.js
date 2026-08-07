@@ -1,25 +1,25 @@
 <template>
 
-<div :class="['rozie-datepicker', { 'rozie-datepicker--disabled': props.disabled, 'rozie-datepicker--multi': props.numberOfMonths > 1 }]" ref="rootRef" role="group" aria-label="Date picker" :aria-disabled="!!props.disabled" v-bind="$attrs">
+<div :class="['rozie-datepicker', { 'rozie-datepicker--disabled': props.disabled, 'rozie-datepicker--multi': props.numberOfMonths > 1 }]" ref="rootRef" role="group" :aria-label="labelFor('root')" :aria-disabled="!!props.disabled" v-bind="$attrs">
   
-  <slot name="header" :label="monthHeading()" :prev="goPrevMonth" :next="goNextMonth" :disabled="!!props.disabled">
+  <slot name="header" :label="monthHeading()" :prev="goPrevMonth" :next="goNextMonth" :disabled="!!props.disabled" :openMonths="enterMonthsView" :openYears="enterYearsView" :closeDrill="exitToDaysView" :viewMode="viewMode">
     <div class="rozie-datepicker-header">
-      <button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" aria-label="Previous month" @click="goPrevMonth">‹</button>
-      <button v-if="props.monthYearNav" type="button" class="rozie-datepicker-heading rozie-datepicker-heading-button" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" aria-label="Change month and year" aria-live="polite" @click="enterMonthsView">{{ monthHeading() }}</button><span v-else class="rozie-datepicker-heading" aria-live="polite">{{ monthHeading() }}</span><button type="button" class="rozie-datepicker-nav rozie-datepicker-next" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" aria-label="Next month" @click="goNextMonth">›</button>
+      <button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="labelFor('previousMonth')" @click="goPrevMonth">‹</button>
+      <button v-if="props.monthYearNav" type="button" class="rozie-datepicker-heading rozie-datepicker-heading-button" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="labelFor('changeMonthYear')" aria-live="polite" @click="enterMonthsView">{{ monthHeading() }}</button><span v-else class="rozie-datepicker-heading" aria-live="polite">{{ monthHeading() }}</span><button type="button" class="rozie-datepicker-nav rozie-datepicker-next" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="labelFor('nextMonth')" @click="goNextMonth">›</button>
     </div>
   </slot>
 
   
   <div class="rozie-datepicker-grids" ref="__rozieKeynavRootRef">
-    <div v-for="(g, gi) in daysGrids()" :key="g.year + '-' + g.month" class="rozie-datepicker-grid" role="grid" @mouseleave="hoverIso = ''">
+    <div v-for="(g, gi) in daysGrids()" :key="g.year + '-' + g.month" class="rozie-datepicker-grid" role="grid" :aria-label="panelHeading(gi)" @mouseleave="hoverIso = ''">
       <div class="rozie-datepicker-weekdays" role="row">
-        <span v-for="(wd, wi) in weekdays()" :key="wi" class="rozie-datepicker-weekday" role="columnheader" :aria-label="wd">{{ wd }}</span>
+        <span v-for="(wd, wi) in weekdays()" :key="wi" class="rozie-datepicker-weekday" role="columnheader" :aria-label="weekdaysLong()[wi]">{{ wd }}</span>
       </div>
 
       <div v-for="(week, wk) in g.weeks" :key="week[0].iso" class="rozie-datepicker-week" role="row">
         
         <span v-for="(day, dc) in week" :key="day.iso" class="rozie-datepicker-cell" role="gridcell" :aria-selected="!!(day.selected || day.rangeStart || day.rangeEnd)">
-          <button type="button" :class="['rozie-datepicker-day', { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]" :data-day="day.iso" :disabled="!!props.disabled" :aria-disabled="!!day.disabled" :aria-label="day.iso" :aria-current="day.today ? 'date' : undefined" @mouseenter="onDayHover(day.iso)" @focus="onDayHover(day.iso)" @keydown="onDayCellKeydown(day.iso, $event)" :id="`${__rozieKeynavGroupId}-item-${gi * 42 + wk * 7 + dc}`" :data-rozie-keynav-item="gi * 42 + wk * 7 + dc" :data-rozie-keynav-active="activeDay === gi * 42 + wk * 7 + dc ? '' : undefined" :tabindex="activeDay === gi * 42 + wk * 7 + dc ? 0 : -1">{{ day.day }}</button>
+          <button type="button" :class="['rozie-datepicker-day', { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]" :data-day="day.iso" :disabled="!!props.disabled" :aria-disabled="!!day.disabled" :aria-label="dayAria(day.iso)" :aria-current="day.today ? 'date' : undefined" @mouseenter="onDayHover(day.iso)" @focus="onDayHover(day.iso)" @keydown="onDayCellKeydown(day.iso, $event)" :id="`${__rozieKeynavGroupId}-item-${gi * 42 + wk * 7 + dc}`" :data-rozie-keynav-item="gi * 42 + wk * 7 + dc" :data-rozie-keynav-active="activeDay === gi * 42 + wk * 7 + dc ? '' : undefined" :tabindex="activeDay === gi * 42 + wk * 7 + dc ? 0 : -1">{{ day.day }}</button>
         </span>
       </div>
     </div>
@@ -28,27 +28,27 @@
   
   <div v-if="showsMonthsView()" class="rozie-datepicker-months">
     <div class="rozie-datepicker-drill-header">
-      <button type="button" class="rozie-datepicker-drill-label" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" aria-label="Change year" @click="enterYearsView">{{ monthList().year }}</button>
+      <button type="button" class="rozie-datepicker-drill-label" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="labelFor('changeYear')" @click="enterYearsView">{{ monthList().year }}</button>
     </div>
-    <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose month" ref="__rozieKeynavRootRef1">
+    <div class="rozie-datepicker-drill-grid" role="grid" :aria-label="labelFor('chooseMonth')" ref="__rozieKeynavRootRef1">
       <button v-for="(cell, __rozieKeynavIndex) in monthList().months" :key="cell.iso" type="button" :class="['rozie-datepicker-month', { 'is-selected': cell.selected, 'is-current': cell.current }]" role="gridcell" :data-month="cell.iso" :aria-disabled="!!cell.disabled" :aria-selected="!!cell.selected" @click="selectMonth(cell.iso)" @keydown="onMonthCellKeydown(cell.iso, $event)" :id="`${__rozieKeynavGroupId1}-item-${__rozieKeynavIndex}`" :data-rozie-keynav-item="__rozieKeynavIndex" :data-rozie-keynav-active="activeMonth === __rozieKeynavIndex ? '' : undefined" :tabindex="activeMonth === __rozieKeynavIndex ? 0 : -1">{{ cell.label }}</button>
     </div>
   </div><div v-if="showsYearsView()" class="rozie-datepicker-years">
     <div class="rozie-datepicker-drill-header">
       <span class="rozie-datepicker-drill-label" aria-live="polite">{{ yearRangeLabel() }}</span>
     </div>
-    <div class="rozie-datepicker-drill-grid" role="grid" aria-label="Choose year" ref="__rozieKeynavRootRef2">
+    <div class="rozie-datepicker-drill-grid" role="grid" :aria-label="labelFor('chooseYear')" ref="__rozieKeynavRootRef2">
       <button v-for="(cell, __rozieKeynavIndex) in yearGrid().years" :key="cell.iso" type="button" :class="['rozie-datepicker-year', { 'is-selected': cell.selected, 'is-current': cell.current }]" role="gridcell" :data-year="cell.iso" :aria-disabled="!!cell.disabled" :aria-selected="!!cell.selected" @click="selectYear(cell.iso)" @keydown="onYearCellKeydown(cell.iso, $event)" :id="`${__rozieKeynavGroupId2}-item-${__rozieKeynavIndex}`" :data-rozie-keynav-item="__rozieKeynavIndex" :data-rozie-keynav-active="activeYear === __rozieKeynavIndex ? '' : undefined" :tabindex="activeYear === __rozieKeynavIndex ? 0 : -1">{{ cell.year }}</button>
     </div>
   </div><slot name="footer" :today="selectToday" :clear="clear" :todayIso="todayIso()">
     <div v-if="showsFooter()" class="rozie-datepicker-footer">
-      <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-today" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" @click="selectToday">Today</button>
-      <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-clear" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" @click="clear">Clear</button>
+      <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-today" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" @click="selectToday">{{ labelFor('today') }}</button>
+      <button type="button" class="rozie-datepicker-footer-btn rozie-datepicker-clear" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" @click="clear">{{ labelFor('clear') }}</button>
     </div></slot>
 
   
   <slot name="presets" :presets="resolvedPresets()" :apply="applyPreset">
-    <div v-if="hasPresets()" class="rozie-datepicker-presets" role="group" aria-label="Date range presets">
+    <div v-if="hasPresets()" class="rozie-datepicker-presets" role="group" :aria-label="labelFor('presets')">
       <button v-for="p in resolvedPresets()" :key="p.label" type="button" :class="['rozie-datepicker-preset', { 'is-active': isPresetActive(p.range) }]" :aria-pressed="!!isPresetActive(p.range)" :disabled="!!props.disabled" @click="applyPreset(p.range)">{{ p.label }}</button>
     </div></slot>
 </div>
@@ -90,6 +90,12 @@ const props = withDefaults(
      */
     locale?: string;
     /**
+     * Optional overrides for the 10 static English "chrome" strings, keyed by `root`, `previousMonth`, `nextMonth`, `changeMonthYear`, `changeYear`, `chooseMonth`, `chooseYear`, `presets`, `today`, `clear` (defaults: `"Date picker"`, `"Previous month"`, `"Next month"`, `"Change month and year"`, `"Change year"`, `"Choose month"`, `"Choose year"`, `"Date range presets"`, `"Today"`, `"Clear"`). **Honest split:** `Intl` is a date/number formatter, not a message catalog — it can localize a DATE but cannot translate the phrase "Previous month". The day-cell accessible name, each multi-month panel's own grid caption, the weekday header long names, and the month-year heading text are already Intl-derived from the `locale` prop and are NOT `labels` keys; the 10 chrome phrases above are English-static and only `labels` can translate them. An empty object (the default) yields the English defaults with zero config. **Lit caveat:** pass via a *property* binding (`.labels=${…}`), never a string attribute — the same rule already in force for `disabledDates`/`presetRanges`.
+     * @example
+     * <DatePicker :labels="{ previousMonth: 'Mois précédent' }" locale="fr-FR" />
+     */
+    labels?: Record<string, any>;
+    /**
      * Quick-pick presets for `range` mode — an array of `{ label, range }` where `range` is a literal `{ start, end }` value **or** a `() => { start, end }` thunk (the consumer owns the date math and i18n labels). Renders a default preset rail beneath the grid; the `#presets` slot overrides it. **Lit caveat:** pass via a *property* binding (`.presetRanges=${[…]}`) — thunks inside the array cannot survive a string attribute, same as `disabledDates`.
      */
     presetRanges?: any[];
@@ -114,7 +120,7 @@ const props = withDefaults(
      */
     isDateDisabled?: ((...args: any[]) => any) | null;
   }>(),
-  { selectionMode: 'single', min: null, max: null, disabledDates: () => [], weekStartsOn: 0, disabled: false, locale: 'en-US', presetRanges: () => [], monthYearNav: true, numberOfMonths: 1, showFooter: false, disabledDaysOfWeek: () => [], isDateDisabled: null }
+  { selectionMode: 'single', min: null, max: null, disabledDates: () => [], weekStartsOn: 0, disabled: false, locale: 'en-US', labels: () => ({}), presetRanges: () => [], monthYearNav: true, numberOfMonths: 1, showFooter: false, disabledDaysOfWeek: () => [], isDateDisabled: null }
 );
 
 /**
@@ -130,7 +136,7 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
-  header(props: { label: any; prev: any; next: any; disabled: any }): any;
+  header(props: { label: any; prev: any; next: any; disabled: any; openMonths: any; openYears: any; closeDrill: any; viewMode: any }): any;
   footer(props: { today: any; clear: any; todayIso: any }): any;
   presets(props: { presets: any; apply: any }): any;
 }>();
@@ -145,7 +151,7 @@ const activeYear = ref(0);
 
 const rootRef = ref<HTMLElement>();
 
-import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
+import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, dayLabel, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, rangeSpansDisabled, resolveLabel, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
 // ---- today (deterministic per-render read) -----------------------------
 // Today's ISO, computed from the local clock. A plain function so each call is
 // fresh (a date picker open across midnight should follow the wall clock).
@@ -391,10 +397,28 @@ const seedActiveDay = (viewIsoOverride?: string, assumeDaysView?: boolean) => {
 // `label` helper becomes a class field on the Lit custom element and a `title`
 // would collide with the inherited HTMLElement.title; `monthHeading` is clear.
 const monthHeading = () => monthLabel(viewMonthGrid(), props.locale);
-// The seven weekday header labels, rotated by weekStartsOn.
+// The seven weekday header labels, rotated by weekStartsOn. Visible text —
+// stays the SHORT Intl label (weekdaysLong() below feeds aria-label only).
 const weekdays = () => weekdayLabels(props.weekStartsOn, props.locale);
-// Whether a given ISO can be selected (the template gates clicks on it too).
-const dayEnabled = (iso: any) => !isDayDisabled(iso, {
+// ---- labels / a11y (quick task 260807-6p8, D-01, D-05) -----------------
+// labelFor(key) is the ONE resolution site for every chrome aria/visible
+// string — no default is ever duplicated at a call site (resolveLabel funnels
+// $props.labels through the shared LABEL_DEFAULTS table).
+const labelFor = (key: any) => resolveLabel(props.labels, key);
+// The day cell's full, localized, human-readable aria-label (e.g. "Sunday,
+// June 15, 2025") — Intl-derived from $props.locale, NOT a `labels` key.
+const dayAria = (iso: any) => dayLabel(iso, props.locale);
+// The seven FULL weekday names (Intl 'long'), used only for the column-header
+// aria-label — the visible text stays weekdays()'s short form.
+const weekdaysLong = () => weekdayLabels(props.weekStartsOn, props.locale, 'long');
+// Each rendered month panel's OWN localized "Month YYYY" caption (per-panel
+// aria-label on its role="grid") — panel `i` is the view month advanced `i`
+// months, matching how grids() builds the panels.
+const panelHeading = (i: any) => monthLabel(addMonths(viewMonthGrid(), i), props.locale);
+// The ten-field gating input shared by isDayDisabled AND rangeSpansDisabled,
+// so day-cell enablement and range-span validation can never disagree about
+// the same gates. ONE definition (was inlined per-call before this task).
+const gateInput = () => ({
   viewIso: viewMonthGrid(),
   value: selected(),
   today: todayIso(),
@@ -406,6 +430,12 @@ const dayEnabled = (iso: any) => !isDayDisabled(iso, {
   weekStartsOn: props.weekStartsOn,
   disabled: props.disabled
 });
+// Whether a given ISO can be selected (the template gates clicks on it too).
+const dayEnabled = (iso: any) => !isDayDisabled(iso, gateInput());
+// Whether the (order-tolerant) span between two ISOs crosses a disabled day
+// in its interior (D-02) — consumed by BOTH onDayHover (preview suppression)
+// and commitRange (re-anchor instead of complete) below, one predicate.
+const rangeSpanBlocked = (a: any, b: any) => rangeSpansDisabled(a, b, gateInput());
 // ---- write funnel (single $emit site) ----------------------------------
 // Select an ISO date: write the model + emit change. NOT named `setValue`
 // (collides with React's generated `value` model setter → ROZ524). A no-op
@@ -428,13 +458,19 @@ const commitValue = (iso: any) => {
 // (anchor set, end empty → completing): write the ORDERED { start, end } +
 // clear the preview + emit change AND rangeComplete. Endpoints are compared by
 // VALUE (never object ===, Pitfall-4).
+// [D-02] The restart branch now ALSO fires when the in-progress span crosses
+// a disabled day (rangeSpanBlocked(r.start, iso)) — a blocked second click
+// RE-ANCHORS at the clicked day instead of completing, reusing this SAME
+// restart branch verbatim (one write path; no second $model.value write site
+// is introduced). Deliberately does NOT clear $data.hoverIso here — the
+// frozen VR phases depend on the restart branch's existing behavior.
 const commitRange = (iso: any) => {
   if (props.disabled) return;
   if (!isIsoDate(iso)) return;
   if (!dayEnabled(iso)) return;
   const r = readRange();
-  if (r.start === '' || r.end !== '') {
-    // No in-progress selection, or a completed one → (re)start the anchor.
+  if (r.start === '' || r.end !== '' || rangeSpanBlocked(r.start, iso)) {
+    // No in-progress selection, a completed one, or a blocked span → (re)start the anchor.
     value.value = {
       start: iso,
       end: ''
@@ -447,7 +483,7 @@ const commitRange = (iso: any) => {
       }
     });
   } else {
-    // Anchor set, end empty → complete the range (ordered by normalizeRange).
+    // Anchor set, end empty, span not blocked → complete the range (ordered by normalizeRange).
     const next = normalizeRange({
       start: r.start,
       end: iso
@@ -465,11 +501,21 @@ const commitRange = (iso: any) => {
 };
 // Hover preview: only meaningful in range mode while a range is in progress
 // (anchor set, end empty). Records the hovered ISO so the grid lights the
-// direction-agnostic preview band. Otherwise a no-op.
+// direction-agnostic preview band. Otherwise a no-op — the early return below
+// is byte-preserved from the pre-260807-6p8 behavior. [D-02] Inside the
+// previewing state, when the hovered day is itself disabled OR the anchor→
+// hovered span crosses a disabled day (rangeSpanBlocked), the band is
+// SUPPRESSED entirely by clearing $data.hoverIso (not merely returning) —
+// clamping would put the visible band somewhere the cursor is not.
 const onDayHover = (iso: any) => {
   if (props.selectionMode !== 'range') return;
   const r = readRange();
-  if (r.start !== '' && r.end === '') hoverIso.value = iso;
+  if (r.start === '' || r.end !== '') return;
+  if (!dayEnabled(iso) || rangeSpanBlocked(r.start, iso)) {
+    hoverIso.value = '';
+    return;
+  }
+  hoverIso.value = iso;
 };
 // Day-select dispatch: route a click / Enter / Space through the mode-appropriate
 // funnel (range → commitRange, single → commitValue).
@@ -550,8 +596,14 @@ const selectYear = (iso: any) => {
 };
 // Shared Escape-to-days exit for both drill keydown handlers: returns to the
 // days view AND seeds $data.activeDay, so Escape returns focus into the grid
-// (the r-keynav controller lands it) instead of dropping it to <body>.
+// (the r-keynav controller lands it) instead of dropping it to <body>. [D-03]
+// Now also reachable via the additive `header` slot `:closeDrill` param —
+// unlike its two existing callers (which already guard on $props.disabled
+// before calling), a consumer-invoked slot callback has no such guard, so a
+// whole-control disabled check is added here (a no-op for both existing call
+// sites, which never call this while disabled).
 const exitToDaysView = () => {
+  if (props.disabled) return;
   viewMode.value = 'days';
   // $data.viewIso is unchanged here (no fresher value to pass), but the
   // days-view transition IS fresh in THIS call — say so explicitly
@@ -772,7 +824,13 @@ const resolvedPresets = () => props.presetRanges.map((p: any) => ({
 // boolean through minification (the React falsy-number-in-r-if discipline).
 const hasPresets = (): boolean => resolvedPresets().length > 0;
 // Apply a preset = a complete range: write the (ordered) value + clear any
-// in-progress preview + emit change AND rangeComplete.
+// in-progress preview + emit change AND rangeComplete. [D-02 discretion,
+// DELIBERATELY NOT range-span-validated] Unlike commitRange, this does NOT
+// consult rangeSpanBlocked: a preset's `range` is a consumer-supplied
+// literal/thunk whose date math the consumer already owns (see the
+// `presetRanges` prop docs), and silently refusing to honor a preset the
+// consumer explicitly configured would be worse than applying it as
+// supplied. Filed as a new explicit re-defer (quick task 260807-6p8 SUMMARY).
 const applyPreset = (range: any) => {
   if (props.disabled) return;
   const next = normalizeRange(range);
