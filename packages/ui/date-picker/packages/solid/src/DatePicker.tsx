@@ -1228,6 +1228,7 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
     onCommit: (i) => { onDayCommit(i); },
     gridColumns: () => 7,
     onPage: (detail) => { onDayPage(detail); },
+    getFocusScope: () => [rootRef],
   });
 
   const [__rozieKeynavRootRef1, __setRozieKeynavRootRef1] = createSignal<HTMLElement | null>(null);
@@ -1242,6 +1243,7 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
     onCommit: (i) => { onMonthCommit(i); },
     gridColumns: () => 3,
     onPage: (detail) => { onDrillPage(); },
+    getFocusScope: () => [rootRef],
   });
 
   const [__rozieKeynavRootRef2, __setRozieKeynavRootRef2] = createSignal<HTMLElement | null>(null);
@@ -1256,6 +1258,7 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
     onCommit: (i) => { onYearCommit(i); },
     gridColumns: () => 3,
     onPage: (detail) => { onDrillPage(); },
+    getFocusScope: () => [rootRef],
   });
 
   return (

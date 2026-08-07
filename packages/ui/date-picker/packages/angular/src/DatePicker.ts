@@ -1,7 +1,7 @@
 import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createKeynavStateMachine, type KeynavStateMachine } from '@rozie/runtime-keynav-core';
+import { createKeynavStateMachine, type KeynavStateMachine, focusIsWithinScope } from '@rozie/runtime-keynav-core';
 
 import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
 
@@ -541,14 +541,16 @@ export class DatePicker {
   private __rozieKeynavGroupId = 'rozie-keynav-' + Math.random().toString(36).slice(2);
   private __rozieKeynavRootRef = viewChild<ElementRef<HTMLElement>>('__rozieKeynavRootRef');
   private __rozieKeynavRenderer = inject(Renderer2);
+  private __rozieKeynavHostEl = inject(ElementRef);
   private __rozieKeynavController: KeynavStateMachine | null = null;
   private __rozieKeynavRafId: number | null = null;
   private __rozieKeynavAttachedRoot: HTMLElement | null = null;
   private __rozieKeynavDetach: (() => void) | null = null;
-  private __rozieKeynavApplyActive = (__rozieKeynavRootEl: HTMLElement, __rozieKeynavActive: number): boolean => {
+  private __rozieKeynavLastFocused: number | null = null;
+  private __rozieKeynavApplyActive = (__rozieKeynavRootEl: HTMLElement, __rozieKeynavActive: number, __rozieKeynavMayApply: boolean): boolean => {
     const __rozieKeynavActiveEl = __rozieKeynavRootEl.querySelector<HTMLElement>(`[data-rozie-keynav-item="${__rozieKeynavActive}"]`);
-    __rozieKeynavActiveEl?.focus();
-    __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });
+    if (__rozieKeynavMayApply) __rozieKeynavActiveEl?.focus();
+    if (__rozieKeynavMayApply) __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });
     return __rozieKeynavActiveEl !== null;
   };
   private __rozieKeynavSyncActive = () => {
@@ -556,13 +558,16 @@ export class DatePicker {
     const __rozieKeynavRootEl = this.__rozieKeynavRootRef()?.nativeElement;
     if (this.__rozieKeynavRafId !== null) { cancelAnimationFrame(this.__rozieKeynavRafId); this.__rozieKeynavRafId = null; }
     if (!__rozieKeynavRootEl || !Number.isFinite(__rozieKeynavActive)) return;
-    const __rozieKeynavFound = this.__rozieKeynavApplyActive(__rozieKeynavRootEl, __rozieKeynavActive);
+    const __rozieKeynavIsNav = this.__rozieKeynavLastFocused !== null && this.__rozieKeynavLastFocused !== __rozieKeynavActive;
+    const __rozieKeynavMayApply = __rozieKeynavIsNav || focusIsWithinScope([this.__rozieKeynavHostEl.nativeElement, __rozieKeynavRootEl], __rozieKeynavRootEl.ownerDocument);
+    this.__rozieKeynavLastFocused = __rozieKeynavActive;
+    const __rozieKeynavFound = this.__rozieKeynavApplyActive(__rozieKeynavRootEl, __rozieKeynavActive, __rozieKeynavMayApply);
     if (!__rozieKeynavFound) {
       this.__rozieKeynavRafId = requestAnimationFrame(() => {
         this.__rozieKeynavRafId = null;
         if (this.activeDay() !== __rozieKeynavActive) return;
         const __rozieKeynavRetryRootEl = this.__rozieKeynavRootRef()?.nativeElement;
-        if (__rozieKeynavRetryRootEl) this.__rozieKeynavApplyActive(__rozieKeynavRetryRootEl, __rozieKeynavActive);
+        if (__rozieKeynavRetryRootEl) this.__rozieKeynavApplyActive(__rozieKeynavRetryRootEl, __rozieKeynavActive, __rozieKeynavMayApply);
       });
     }
   };
@@ -570,6 +575,7 @@ export class DatePicker {
     const __rozieKeynavRootEl = this.__rozieKeynavRootRef()?.nativeElement ?? null;
     if (__rozieKeynavRootEl === this.__rozieKeynavAttachedRoot) return;
     if (this.__rozieKeynavDetach) { this.__rozieKeynavDetach(); this.__rozieKeynavDetach = null; }
+    this.__rozieKeynavLastFocused = null;
     this.__rozieKeynavAttachedRoot = __rozieKeynavRootEl;
     if (!__rozieKeynavRootEl) return;
     const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.__rozieKeynavController?.onKeydown($event); };
@@ -610,10 +616,11 @@ export class DatePicker {
   private __rozieKeynavRafId1: number | null = null;
   private __rozieKeynavAttachedRoot1: HTMLElement | null = null;
   private __rozieKeynavDetach1: (() => void) | null = null;
-  private __rozieKeynavApplyActive1 = (__rozieKeynavRootEl: HTMLElement, __rozieKeynavActive: number): boolean => {
+  private __rozieKeynavLastFocused1: number | null = null;
+  private __rozieKeynavApplyActive1 = (__rozieKeynavRootEl: HTMLElement, __rozieKeynavActive: number, __rozieKeynavMayApply: boolean): boolean => {
     const __rozieKeynavActiveEl = __rozieKeynavRootEl.querySelector<HTMLElement>(`[data-rozie-keynav-item="${__rozieKeynavActive}"]`);
-    __rozieKeynavActiveEl?.focus();
-    __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });
+    if (__rozieKeynavMayApply) __rozieKeynavActiveEl?.focus();
+    if (__rozieKeynavMayApply) __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });
     return __rozieKeynavActiveEl !== null;
   };
   private __rozieKeynavSyncActive1 = () => {
@@ -621,13 +628,16 @@ export class DatePicker {
     const __rozieKeynavRootEl = this.__rozieKeynavRootRef1()?.nativeElement;
     if (this.__rozieKeynavRafId1 !== null) { cancelAnimationFrame(this.__rozieKeynavRafId1); this.__rozieKeynavRafId1 = null; }
     if (!__rozieKeynavRootEl || !Number.isFinite(__rozieKeynavActive)) return;
-    const __rozieKeynavFound = this.__rozieKeynavApplyActive1(__rozieKeynavRootEl, __rozieKeynavActive);
+    const __rozieKeynavIsNav = this.__rozieKeynavLastFocused1 !== null && this.__rozieKeynavLastFocused1 !== __rozieKeynavActive;
+    const __rozieKeynavMayApply = __rozieKeynavIsNav || focusIsWithinScope([this.__rozieKeynavHostEl.nativeElement, __rozieKeynavRootEl], __rozieKeynavRootEl.ownerDocument);
+    this.__rozieKeynavLastFocused1 = __rozieKeynavActive;
+    const __rozieKeynavFound = this.__rozieKeynavApplyActive1(__rozieKeynavRootEl, __rozieKeynavActive, __rozieKeynavMayApply);
     if (!__rozieKeynavFound) {
       this.__rozieKeynavRafId1 = requestAnimationFrame(() => {
         this.__rozieKeynavRafId1 = null;
         if (this.activeMonth() !== __rozieKeynavActive) return;
         const __rozieKeynavRetryRootEl = this.__rozieKeynavRootRef1()?.nativeElement;
-        if (__rozieKeynavRetryRootEl) this.__rozieKeynavApplyActive1(__rozieKeynavRetryRootEl, __rozieKeynavActive);
+        if (__rozieKeynavRetryRootEl) this.__rozieKeynavApplyActive1(__rozieKeynavRetryRootEl, __rozieKeynavActive, __rozieKeynavMayApply);
       });
     }
   };
@@ -635,6 +645,7 @@ export class DatePicker {
     const __rozieKeynavRootEl = this.__rozieKeynavRootRef1()?.nativeElement ?? null;
     if (__rozieKeynavRootEl === this.__rozieKeynavAttachedRoot1) return;
     if (this.__rozieKeynavDetach1) { this.__rozieKeynavDetach1(); this.__rozieKeynavDetach1 = null; }
+    this.__rozieKeynavLastFocused1 = null;
     this.__rozieKeynavAttachedRoot1 = __rozieKeynavRootEl;
     if (!__rozieKeynavRootEl) return;
     const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.__rozieKeynavController1?.onKeydown($event); };
@@ -675,10 +686,11 @@ export class DatePicker {
   private __rozieKeynavRafId2: number | null = null;
   private __rozieKeynavAttachedRoot2: HTMLElement | null = null;
   private __rozieKeynavDetach2: (() => void) | null = null;
-  private __rozieKeynavApplyActive2 = (__rozieKeynavRootEl: HTMLElement, __rozieKeynavActive: number): boolean => {
+  private __rozieKeynavLastFocused2: number | null = null;
+  private __rozieKeynavApplyActive2 = (__rozieKeynavRootEl: HTMLElement, __rozieKeynavActive: number, __rozieKeynavMayApply: boolean): boolean => {
     const __rozieKeynavActiveEl = __rozieKeynavRootEl.querySelector<HTMLElement>(`[data-rozie-keynav-item="${__rozieKeynavActive}"]`);
-    __rozieKeynavActiveEl?.focus();
-    __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });
+    if (__rozieKeynavMayApply) __rozieKeynavActiveEl?.focus();
+    if (__rozieKeynavMayApply) __rozieKeynavActiveEl?.scrollIntoView({ block: 'nearest' });
     return __rozieKeynavActiveEl !== null;
   };
   private __rozieKeynavSyncActive2 = () => {
@@ -686,13 +698,16 @@ export class DatePicker {
     const __rozieKeynavRootEl = this.__rozieKeynavRootRef2()?.nativeElement;
     if (this.__rozieKeynavRafId2 !== null) { cancelAnimationFrame(this.__rozieKeynavRafId2); this.__rozieKeynavRafId2 = null; }
     if (!__rozieKeynavRootEl || !Number.isFinite(__rozieKeynavActive)) return;
-    const __rozieKeynavFound = this.__rozieKeynavApplyActive2(__rozieKeynavRootEl, __rozieKeynavActive);
+    const __rozieKeynavIsNav = this.__rozieKeynavLastFocused2 !== null && this.__rozieKeynavLastFocused2 !== __rozieKeynavActive;
+    const __rozieKeynavMayApply = __rozieKeynavIsNav || focusIsWithinScope([this.__rozieKeynavHostEl.nativeElement, __rozieKeynavRootEl], __rozieKeynavRootEl.ownerDocument);
+    this.__rozieKeynavLastFocused2 = __rozieKeynavActive;
+    const __rozieKeynavFound = this.__rozieKeynavApplyActive2(__rozieKeynavRootEl, __rozieKeynavActive, __rozieKeynavMayApply);
     if (!__rozieKeynavFound) {
       this.__rozieKeynavRafId2 = requestAnimationFrame(() => {
         this.__rozieKeynavRafId2 = null;
         if (this.activeYear() !== __rozieKeynavActive) return;
         const __rozieKeynavRetryRootEl = this.__rozieKeynavRootRef2()?.nativeElement;
-        if (__rozieKeynavRetryRootEl) this.__rozieKeynavApplyActive2(__rozieKeynavRetryRootEl, __rozieKeynavActive);
+        if (__rozieKeynavRetryRootEl) this.__rozieKeynavApplyActive2(__rozieKeynavRetryRootEl, __rozieKeynavActive, __rozieKeynavMayApply);
       });
     }
   };
@@ -700,6 +715,7 @@ export class DatePicker {
     const __rozieKeynavRootEl = this.__rozieKeynavRootRef2()?.nativeElement ?? null;
     if (__rozieKeynavRootEl === this.__rozieKeynavAttachedRoot2) return;
     if (this.__rozieKeynavDetach2) { this.__rozieKeynavDetach2(); this.__rozieKeynavDetach2 = null; }
+    this.__rozieKeynavLastFocused2 = null;
     this.__rozieKeynavAttachedRoot2 = __rozieKeynavRootEl;
     if (!__rozieKeynavRootEl) return;
     const __rozieKeynavHandleKeydown = ($event: KeyboardEvent) => { this.__rozieKeynavController2?.onKeydown($event); };

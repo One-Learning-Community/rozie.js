@@ -881,6 +881,7 @@ useKeynav(__rozieKeynavRootRef, {
   onCommit: (i) => { onDayCommit(i); },
   gridColumns: () => 7,
   onPage: (detail) => { onDayPage(detail); },
+  getFocusScope: () => [rootRef.value],
 });
 const __rozieKeynavRootRef1 = ref<HTMLElement | null>(null);
 const __rozieKeynavGroupId1 = `keynav-${Math.random().toString(36).slice(2)}`;
@@ -892,6 +893,7 @@ useKeynav(__rozieKeynavRootRef1, {
   onCommit: (i) => { onMonthCommit(i); },
   gridColumns: () => 3,
   onPage: (detail) => { onDrillPage(); },
+  getFocusScope: () => [rootRef.value],
 });
 const __rozieKeynavRootRef2 = ref<HTMLElement | null>(null);
 const __rozieKeynavGroupId2 = `keynav-${Math.random().toString(36).slice(2)}`;
@@ -903,6 +905,7 @@ useKeynav(__rozieKeynavRootRef2, {
   onCommit: (i) => { onYearCommit(i); },
   gridColumns: () => 3,
   onPage: (detail) => { onDrillPage(); },
+  getFocusScope: () => [rootRef.value],
 });
 </script>
 

@@ -553,6 +553,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     onCommit: (i) => { onDayCommit(i); },
     gridColumns: () => 7,
     onPage: (detail) => { onDayPage(detail); },
+    getFocusScope: () => [root.current],
   });
   const __rozieKeynavRootRef1 = useRef<HTMLDivElement | null>(null);
   const __rozieKeynavGroupId1 = useId();
@@ -564,6 +565,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     onCommit: (i) => { onMonthCommit(i); },
     gridColumns: () => 3,
     onPage: (detail) => { onDrillPage(); },
+    getFocusScope: () => [root.current],
   });
   const __rozieKeynavRootRef2 = useRef<HTMLDivElement | null>(null);
   const __rozieKeynavGroupId2 = useId();
@@ -575,6 +577,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     onCommit: (i) => { onYearCommit(i); },
     gridColumns: () => 3,
     onPage: (detail) => { onDrillPage(); },
+    getFocusScope: () => [root.current],
   });
 
   const _rozieExposeRef = useRef({ focus, goToToday, clear });
