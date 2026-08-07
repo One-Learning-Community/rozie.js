@@ -364,14 +364,49 @@ for (const target of TARGETS) {
     //      to observe on Lit — Embla's own native watchSlides
     //      MutationObserver is shadow-container-scoped and never fires for
     //      light-DOM mutations.
+    //
+    //      `deepQuerySelector` is load-bearing on Lit specifically:
+    //      `CarouselDeclarativeDemo` is ITSELF a Lit custom element (its own
+    //      shadow root), so `.rozie-embla__slide` sits TWO shadow boundaries
+    //      below `document` there (`rozie-carousel-declarative-demo`'s shadow
+    //      root → `<rozie-carousel>` → its light-DOM children) — a plain
+    //      `document.querySelector` never finds it and the append silently
+    //      no-ops (confirmed live: `document.querySelector` returns null,
+    //      `host?.appendChild` short-circuits on the null). Playwright's OWN
+    //      locator engine pierces shadow roots automatically (used for every
+    //      other assertion in this title); raw `page.evaluate` browser JS
+    //      does not, so this test needs its own shadow-piercing walk.
     const dotsBefore = await page.locator('.rozie-embla__dot').count();
     await page.evaluate(() => {
-      const existingSlide = document.querySelector('.rozie-embla__slide');
+      function deepQuerySelector(root: Document | ShadowRoot, selector: string): Element | null {
+        const found = root.querySelector(selector);
+        if (found) return found;
+        for (const el of root.querySelectorAll('*')) {
+          if (el.shadowRoot) {
+            const inner = deepQuerySelector(el.shadowRoot, selector);
+            if (inner) return inner;
+          }
+        }
+        return null;
+      }
+      const existingSlide = deepQuerySelector(document, '.rozie-embla__slide');
       const host = existingSlide?.parentElement;
       const slide = document.createElement('div');
       slide.className = 'rozie-embla__slide';
+      // Inline sizing — a dynamically `createElement`d node carries NO
+      // `data-rozie-s-<hash>` scope attribute, so the demo's own SCOPED
+      // `.rozie-embla__slide { flex: 0 0 100%; … }` / `.slide-body { … }`
+      // rules (both scoped to the demo's own template) never reach it.
+      // Inline styles sidestep that entirely and keep this assertion's pass
+      // condition about Embla's slide COUNT, not an incidental CSS-scoping
+      // interaction.
+      slide.style.flex = '0 0 100%';
+      slide.style.minWidth = '0';
       const body = document.createElement('div');
       body.className = 'slide-body';
+      body.style.flex = '0 0 100%';
+      body.style.minWidth = '0';
+      body.style.height = '120px';
       body.textContent = 'Epsilon';
       slide.appendChild(body);
       host?.appendChild(slide);

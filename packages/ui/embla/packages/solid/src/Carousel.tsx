@@ -366,26 +366,34 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   function initialOptions() {
     let opts: any = null;
     opts = {
-      // quick 260807-cor (D4) — explicit element list, not a selector string. The
-      // phantom-slot problem this used to work around structurally (a pinned
-      // `.rozie-embla__slide` selector to dodge counting the trailing empty
-      // default `<slot>` as a 5th slide) is now solved by construction: we hand
-      // Embla the ACTUAL matched elements instead of letting it discover them
-      // itself, so there is no container to phantom-count from in the first
-      // place. The first spread resolves config-array slides via the viewport
-      // ref's own querySelectorAll (works identically to the old selector on
-      // all six targets — declarative-mode content isn't inside the viewport
-      // ref path). The second spread — `$slotted.default` — is what makes
-      // declarative mode (mode b) resolve on Lit: it is the Lit-only sigil
-      // that reaches across the shadow boundary to the assigned light-DOM
-      // slide elements a shadow-blind `querySelectorAll` could never see
-      // (RESEARCH.md D4); it's an empty spread on the other five targets,
-      // where slide content is already a real descendant the viewport-ref
-      // query already found. `embla-carousel@8.6.0`'s `storeElements()` treats
-      // a `slides` array as a literal element list (`Options.d.ts`), so no
-      // engine patch is needed for either half. `...$props.options` still
+      // quick 260807-cor (D4) — CONDITIONAL: the selector string on the FALSE
+      // branch, an explicit element list only on the TRUE branch. This is
+      // deliberately NOT an unconditional array — Embla's own `storeElements()`
+      // re-resolves a STRING selector fresh via `container.querySelectorAll()`
+      // on EVERY `reInit()` call, including its OWN internally-triggered ones
+      // (the native `watchSlides: true` MutationObserver calls `reInit()` with
+      // NO arguments, which reuses whatever `slides` value was last explicitly
+      // set — a materialized ARRAY would freeze at that point, silently
+      // breaking watchSlides' self-healing for ANY post-mount slide-count
+      // change on ALL SIX targets, not just Lit; verified live via the VR
+      // union matrix, not just reasoned about). Keeping the selector string as
+      // the DEFAULT branch preserves 100% of the pre-D4 native-self-healing
+      // behavior — for config-array mode on every target, AND for declarative
+      // mode on the five hostless targets, AND for Lit's config-array mode
+      // (all of those cases have real shadow/light-DOM descendants the
+      // selector correctly re-finds every time, exactly as before this task).
+      // `$slotted.default.length` is a compile-time-constant `0` on the five
+      // hostless targets (Task 1 lowers `$slotted.default` to `[]`), so this
+      // ternary is UNCONDITIONALLY the selector-string branch there — a cheap,
+      // always-false runtime check, byte-behavior-identical to the pre-D4
+      // `slides: '.rozie-embla__slide'` line. Only on Lit, and only when
+      // there IS declarative (light-DOM) content assigned to the default slot,
+      // does it switch to the explicit list — the phantom-slot problem
+      // (`container.children` fallback catching the trailing empty <slot>) is
+      // avoided the same way it always was: the selector filters to
+      // `.rozie-embla__slide` elements only. `...$props.options` still
       // overrides `slides` last if a consumer needs to.
-      slides: [...viewportElRef!.querySelectorAll('.rozie-embla__slide'), ...[]],
+      slides: [].length > 0 ? [...viewportElRef!.querySelectorAll('.rozie-embla__slide'), ...[]] : '.rozie-embla__slide',
       loop: local.loop,
       align: local.align,
       axis: local.axis,
