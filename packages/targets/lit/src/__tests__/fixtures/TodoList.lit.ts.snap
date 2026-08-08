@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { RozieSlotDistributor, createLitControllableProperty, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieHeaderSlotCtx {
@@ -17,6 +17,8 @@ interface RozieDefaultSlotCtx {
 
 @customElement('rozie-todo-list')
 export default class TodoList extends SignalWatcher(LitElement) {
+  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };
+
   static styles = css`
 :host{display:contents}
 .todo-list[data-rozie-s-52bec3de] { font-family: system-ui, sans-serif; }
@@ -31,6 +33,8 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   private _itemsControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'items-change', defaultValue: [], initialControlledValue: undefined });
   @property({ type: String, reflect: true }) title: string = 'Todo';
   private _draft = signal('');
+
+  private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
   @state() private _hasSlotHeader = false;
   @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];

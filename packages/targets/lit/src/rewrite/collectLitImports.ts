@@ -211,6 +211,15 @@ export type RuntimeLitImport =
    */
   | 'RoziePortalController'
   /**
+   * Quick 260808-iyh (D5) — the `RozieSlotDistributor` ReactiveController,
+   * shipped from `@rozie/runtime-lit`. Added by `emitLit.ts` ONLY when
+   * `shouldDistributeSlots(ir)` trips (a duplicated slot name, or a slot
+   * nested under `r-for`), so a non-gated component's `@rozie/runtime-lit`
+   * import line stays byte-identical (mirrors `KeynavController`'s /
+   * `RoziePortalController`'s identical gate shape).
+   */
+  | 'RozieSlotDistributor'
+  /**
    * command-palette-portal-through-portal cluster (BUG A) —
    * `rozieResolvePortalledRef`, shipped from `@rozie/runtime-lit`. Added by
    * `emitScript.ts`'s `emitRefField` ONLY when the component has at least

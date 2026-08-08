@@ -54,6 +54,7 @@ import { emitStyle } from './emit/emitStyle.js';
 import { buildShell } from './emit/shell.js';
 import { emitTagName, toKebabCase } from './emit/emitDecorator.js';
 import { computeScopeHash } from './emit/scopeHash.js';
+import { shouldDistributeSlots } from './emit/shouldDistributeSlots.js';
 
 export interface EmitLitOptions {
   filename?: string;
@@ -280,6 +281,17 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     runtimeImports.add('adoptDocumentStyles');
   }
 
+  // Quick 260808-iyh (D5) — compile-time IR-shape gate: a duplicated slot
+  // name, or a slot nested under r-for, has no per-iteration identity under
+  // native named slot assignment. See shouldDistributeSlots.ts's module doc
+  // comment for why this stays a gate rather than a universal default.
+  // false for every component without the collision shape — byte-identical
+  // to pre-D5 output (no new field, no new import, no firstUpdated change).
+  const distributeSlots = shouldDistributeSlots(ir);
+  if (distributeSlots) {
+    runtimeImports.add('RozieSlotDistributor');
+  }
+
   // Plan 14-05 — `$attrs` getter for Lit. Lit has no native template-side
   // `$attrs` proxy (cf. Vue's magic accessor); the consumer's attributes land
   // on the host custom element (`<rozie-foo id="x">`) and we re-project them
@@ -445,6 +457,12 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   ].filter((s) => s.trim().length > 0).join('\n\n');
 
   const classBody = composeClassBody({
+    // Quick 260808-iyh (D5) — pushed FIRST (ahead of staticStylesField).
+    // Empty string when the gate is closed, which is what keeps every
+    // non-gated component byte-identical.
+    shadowRootOptionsField: distributeSlots
+      ? '  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: \'manual\' };'
+      : '',
     staticStylesField: styleResult.staticStylesField,
     fieldDecls: scriptResult.fieldDecls,
     debouncedFieldDecls: templateResult.debouncedFieldDecls.join('\n'),
@@ -456,6 +474,16 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     // @query(..., true) ref field + RoziePortalController field
     // initializer (empty for every non-portal component).
     portalFieldDecls: templateResult.portalFieldDecls.join('\n'),
+    // Quick 260808-iyh (D5) — the RozieSlotDistributor field initializer.
+    // Empty for every component the gate doesn't trip. Lit runs every
+    // registered controller's hostUpdated() (reactive-element.js:941)
+    // BEFORE the host's own firstUpdated() (L944), and adoptDocumentStyles
+    // is the first statement INSIDE firstUpdated() — so the controller's
+    // initial distribution pass already precedes style adoption with zero
+    // firstUpdated() changes needed here.
+    slotDistributorFieldDecls: distributeSlots
+      ? '  private _rozieSlotDistributor = new RozieSlotDistributor(this);'
+      : '',
     slotFillerClassFields: templateResult.slotFillerClassFields
       .map((f) => '  ' + f)
       .join('\n'),
@@ -606,6 +634,13 @@ function combineListenerWiring(
 }
 
 interface ComposeClassBodyParts {
+  /**
+   * Quick 260808-iyh (D5) — `static shadowRootOptions: ShadowRootInit = {
+   * ...LitElement.shadowRootOptions, slotAssignment: 'manual' };`. Empty
+   * string for every component `shouldDistributeSlots` doesn't trip
+   * (byte-identical to pre-D5 output).
+   */
+  shadowRootOptionsField: string;
   staticStylesField: string;
   fieldDecls: string;
   /**
@@ -635,6 +670,12 @@ interface ComposeClassBodyParts {
    * identical to pre-phase output).
    */
   portalFieldDecls: string;
+  /**
+   * Quick 260808-iyh (D5) — `private _rozieSlotDistributor = new
+   * RozieSlotDistributor(this);`. Empty string for every component
+   * `shouldDistributeSlots` doesn't trip (byte-identical to pre-D5 output).
+   */
+  slotDistributorFieldDecls: string;
   /**
    * Phase 07.2 Plan 03 — class-field declarations storing captured scoped-
    * slot fill ctx (e.g. `private _headerCtx?: { close: unknown };`). Spliced
@@ -691,6 +732,10 @@ interface ComposeClassBodyParts {
 function composeClassBody(parts: ComposeClassBodyParts): string {
   const sections: string[] = [];
 
+  // Quick 260808-iyh (D5) — pushed FIRST, ahead of staticStylesField.
+  if (parts.shadowRootOptionsField.trim().length > 0) {
+    sections.push(parts.shadowRootOptionsField);
+  }
   if (parts.staticStylesField.trim().length > 0) {
     sections.push(parts.staticStylesField);
   }
@@ -708,6 +753,10 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   }
   if (parts.portalFieldDecls.trim().length > 0) {
     sections.push(parts.portalFieldDecls);
+  }
+  // Quick 260808-iyh (D5) — immediately after portalFieldDecls.
+  if (parts.slotDistributorFieldDecls.trim().length > 0) {
+    sections.push(parts.slotDistributorFieldDecls);
   }
   if (parts.slotFillerClassFields.trim().length > 0) {
     sections.push(parts.slotFillerClassFields);

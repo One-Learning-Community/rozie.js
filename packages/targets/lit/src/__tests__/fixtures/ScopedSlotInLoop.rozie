@@ -1,0 +1,12 @@
+<rozie name="ScopedSlotInLoop">
+<props>
+{ items: { type: Array, default: () => [] } }
+</props>
+<template>
+<ul>
+  <li r-for="item, i in $props.items" :key="i">
+    <slot name="row" :item="item" :index="i">{{ item }}</slot>
+  </li>
+</ul>
+</template>
+</rozie>
