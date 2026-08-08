@@ -23,6 +23,10 @@ export {
   RoziePortalController,
   type RoziePortalControllerHost,
 } from './RoziePortalController.js';
+export {
+  RozieSlotDistributor,
+  type RozieSlotDistributorHost,
+} from './RozieSlotDistributor.js';
 export { rozieResolvePortalledRef } from './rozieResolvePortalledRef.js';
 export { injectGlobalStyles } from './injectGlobalStyles.js';
 export { adoptConsumerStyles } from './adoptConsumerStyles.js';
