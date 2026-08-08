@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { RozieSlotDistributor, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieDefaultSlotCtx {
@@ -10,11 +10,15 @@ interface RozieDefaultSlotCtx {
 
 @customElement('rozie-loop-mustache-nested-conditional-slot-rfor')
 export default class LoopMustacheNestedConditionalSlotRfor extends SignalWatcher(LitElement) {
+  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };
+
   static styles = css`
 :host{display:contents}
 `;
 
   @property({ type: Array }) items: any[] = [];
+
+  private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];

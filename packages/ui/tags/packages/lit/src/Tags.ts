@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { RozieSlotDistributor, createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieTagSlotCtx {
@@ -12,6 +12,8 @@ interface RozieTagSlotCtx {
 
 @customElement('rozie-tags')
 export default class Tags extends SignalWatcher(LitElement) {
+  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };
+
   static styles = css`
 :host{display:contents}
 .rozie-tags[data-rozie-s-64848f8e] {
@@ -149,6 +151,8 @@ export default class Tags extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true }) ariaLabel: string | null = null;
   private _draft = signal('');
   @query('[data-rozie-ref="root"]') private _refRoot!: HTMLElement;
+
+  private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
   @state() private _hasSlotTag = false;
   @queryAssignedElements({ slot: 'tag', flatten: true }) private _slotTagElements!: Element[];

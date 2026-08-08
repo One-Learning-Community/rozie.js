@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { RoziePortalController, adoptConsumerStyles, createLitControllableProperty, injectGlobalStyles, rozieAttr, rozieDisplay, rozieResolvePortalledRef, rozieStyle } from '@rozie/runtime-lit';
+import { RoziePortalController, RozieSlotDistributor, adoptConsumerStyles, createLitControllableProperty, injectGlobalStyles, rozieAttr, rozieDisplay, rozieResolvePortalledRef, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { ref } from 'lit/directives/ref.js';
 import '@rozie-ui/combobox-lit';
@@ -87,6 +87,8 @@ interface RozieTrailingSlotCtx {
 
 @customElement('rozie-command-palette')
 export default class CommandPalette extends SignalWatcher(LitElement) {
+  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };
+
   static styles = css`
 :host{display:contents}
 .rozie-command-palette[data-rozie-s-768cad96] {
@@ -509,6 +511,8 @@ private __rozieWatchInitial_0 = true;
   @query('[data-rozie-portal-ref="__roziePortal0"]') private __roziePortal0!: HTMLElement;
   @query('[data-rozie-portal-anchor="__roziePortal0"]') private __roziePortal0Anchor!: HTMLElement;
   private __roziePortal0Controller = new RoziePortalController(this, () => this.__roziePortal0, () => this.__roziePortal0Anchor, () => (this.resolveAppendTo(this.appendTo)));
+
+  private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
   @state() private _hasSlotBreadcrumb = false;
   @queryAssignedElements({ slot: 'breadcrumb', flatten: true }) private _slotBreadcrumbElements!: Element[];

@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { attachOutsideClickListener, createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
+import { RozieSlotDistributor, attachOutsideClickListener, createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally
@@ -34,6 +34,8 @@ interface RozieEmptySlotCtx {
 
 @customElement('rozie-listbox')
 export default class Listbox extends SignalWatcher(LitElement) {
+  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };
+
   static styles = css`
 :host{display:contents}
 .rozie-listbox[data-rozie-s-b576227a] {
@@ -206,6 +208,8 @@ export default class Listbox extends SignalWatcher(LitElement) {
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
+
+  private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
   @state() private _hasSlotSelected = false;
   @queryAssignedElements({ slot: 'selected', flatten: true }) private _slotSelectedElements!: Element[];

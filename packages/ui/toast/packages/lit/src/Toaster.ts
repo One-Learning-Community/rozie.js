@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { rozieAttr, rozieClass, rozieDisplay, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
+import { RozieSlotDistributor, rozieAttr, rozieClass, rozieDisplay, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 interface RozieToastSlotCtx {
@@ -11,6 +11,8 @@ interface RozieToastSlotCtx {
 
 @customElement('rozie-toaster')
 export default class Toaster extends SignalWatcher(LitElement) {
+  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };
+
   static styles = css`
 :host{display:contents}
 @media (prefers-reduced-motion: reduce) {
@@ -195,6 +197,8 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   private _toasts = signal<any[]>([]);
   private _seq = signal(0);
   private _swipe = signal<any>(null);
+
+  private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
   @state() private _hasSlotToast = false;
   @queryAssignedElements({ slot: 'toast', flatten: true }) private _slotToastElements!: Element[];

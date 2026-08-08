@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, signal } from '@lit-labs/preact-signals';
-import { __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieAttr, rozieClass, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
+import { RozieSlotDistributor, __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieAttr, rozieClass, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { useSortableJS } from './internal/useSortableJS';
@@ -13,6 +13,8 @@ interface RozieDefaultSlotCtx {
 
 @customElement('rozie-sortable-list')
 export default class SortableList extends SignalWatcher(LitElement) {
+  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };
+
   static styles = css`
 :host{display:contents}
 .rozie-sortable-wrap[data-rozie-s-0af24eae] { display: block; }
@@ -124,6 +126,8 @@ export default class SortableList extends SignalWatcher(LitElement) {
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieFirstUpdateDone = false;
+
+  private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
   @state() private _hasSlotHeader = false;
   @queryAssignedElements({ slot: 'header', flatten: true }) private _slotHeaderElements!: Element[];

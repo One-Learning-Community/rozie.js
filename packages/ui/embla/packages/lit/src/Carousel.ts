@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { RozieSlotDistributor, createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import EmblaCarousel from 'embla-carousel';
 import Autoplay from 'embla-carousel-autoplay';
@@ -21,6 +21,8 @@ interface RozieThumbSlotCtx {
 
 @customElement('rozie-carousel')
 export default class Carousel extends SignalWatcher(LitElement) {
+  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };
+
   static styles = css`
 :host{display:contents}
 .rozie-embla[data-rozie-s-4143c216] { position: relative; }
@@ -190,6 +192,8 @@ private __rozieWatchInitial_0 = true;
 private __rozieWatchPrev_3: unknown;
 private __rozieWatchInitial_4 = true;
 private __rozieFirstUpdateDone = false;
+
+  private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
   @state() private _hasSlotSlide = false;
   @queryAssignedElements({ slot: 'slide', flatten: true }) private _slotSlideElements!: Element[];

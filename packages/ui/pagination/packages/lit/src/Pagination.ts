@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
+import { RozieSlotDistributor, createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { paginationItems } from './internal/paginationItems';
 
@@ -36,6 +36,8 @@ interface RozieNextControlSlotCtx {
 
 @customElement('rozie-pagination')
 export default class Pagination extends SignalWatcher(LitElement) {
+  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };
+
   static styles = css`
 :host{display:contents}
 .rozie-pagination[data-rozie-s-de247ae2] {
@@ -133,6 +135,8 @@ export default class Pagination extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) ariaLabel: string = 'Pagination';
   @query('[data-rozie-ref="nav"]') private _refNav!: HTMLElement;
+
+  private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
   @state() private _hasSlotPrevControl = false;
   @queryAssignedElements({ slot: 'prevControl', flatten: true }) private _slotPrevControlElements!: Element[];

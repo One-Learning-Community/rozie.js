@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
-import { createLitControllableProperty, rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runtime-lit';
+import { RozieSlotDistributor, createLitControllableProperty, rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runtime-lit';
 import { ContextProvider, createContext } from '@lit/context';
 import { repeat } from 'lit/directives/repeat.js';
 import '@rozie-ui/popover-lit';
@@ -91,6 +91,8 @@ interface RozieDetailSlotCtx {
 
 @customElement('rozie-data-table')
 export default class DataTable extends SignalWatcher(LitElement) {
+  static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };
+
   static styles = css`
 :host{display:contents}
 .rozie-data-table[data-rozie-s-d5dcab4c] {
@@ -630,6 +632,8 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     __rozieCtxHost._colReg.value = r;
   }
 }))(this) });
+
+  private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
   @state() private _hasSlotDefault = false;
   @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
