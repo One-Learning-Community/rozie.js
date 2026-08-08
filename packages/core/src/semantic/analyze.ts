@@ -49,6 +49,7 @@ import { runDataInitSigilValidator } from './validators/dataInitSigilValidator.j
 import { runBareSigilValidator } from './validators/bareSigilValidator.js';
 import { runMemoValidator } from './validators/memoValidator.js';
 import { runLitInheritedPropertyValidator } from './validators/litInheritedPropertyValidator.js';
+import { runReservedSlotNameValidator } from './validators/reservedSlotNameValidator.js';
 
 export interface AnalyzeResult {
   bindings: BindingsTable;
@@ -145,5 +146,8 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   // Phase 19 (D-08) — final pass: a <listener> placed inside <template> is a
   // misplaced element (ROZ206). No binding dependency.
   runListenerElementValidator(ast, diagnostics);
+  // Quick 260808-iyh (D5) — ROZ210: a <slot> whose name is the reserved
+  // unnamed-slot key "default". Plain AST walk; no binding dependency.
+  runReservedSlotNameValidator(ast, diagnostics);
   return { bindings, diagnostics };
 }

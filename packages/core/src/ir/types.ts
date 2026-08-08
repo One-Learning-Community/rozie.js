@@ -376,6 +376,28 @@ export interface SlotDecl {
    * @experimental — added in Phase 33
    */
   isReactive?: boolean;
+  /**
+   * Quick 260808-iyh (D5) — set by `lowerSlots` when the `<slot>` element
+   * itself, or any ancestor element in the template tree, carries an
+   * `r-for` directive. `true` means the slot renders N times at runtime
+   * with no per-iteration identity under native named slot assignment
+   * (every runtime `<slot name="x">` produced by a `repeat()`-style loop
+   * projects the SAME light-DOM children). Consumed by the Lit target's
+   * `shouldDistributeSlots` gate to decide whether to emit
+   * `slotAssignment: 'manual'` + a `RozieSlotDistributor` controller.
+   *
+   * Inherited down the whole subtree exactly like `presence`'s r-if
+   * tracking — a slot nested arbitrarily deep below an `r-for` element
+   * still carries `inLoop === true`, and `flattenNestedSlots` lifts the
+   * SAME SlotDecl object reference onto the flat `ir.slots` surface, so
+   * the flag rides along for free.
+   *
+   * Undefined === false (back-compat with pre-D5 IRs) — assigned only when
+   * true, so no existing IR snapshot gains a new key.
+   *
+   * @experimental — added in Quick 260808-iyh (D5)
+   */
+  inLoop?: boolean;
 }
 
 /**

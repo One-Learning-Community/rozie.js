@@ -76,6 +76,12 @@ function isTemplateElement(node: TemplateNode): node is TemplateElement {
 interface SlotVisitContext {
   /** Conditional ancestors guarded by r-if expressions (text + ref count). */
   rIfStack: string[];
+  /**
+   * Quick 260808-iyh (D5) — true once the walk has passed through (or is
+   * currently on) an element carrying `r-for`. Threaded down the tree the
+   * same way `rIfStack` is; consumed to set `SlotDecl.inLoop`.
+   */
+  inLoop: boolean;
 }
 
 function collectParamsFromSlotElement(slot: TemplateElement, isPortal: boolean): ParamDecl[] {
@@ -184,6 +190,19 @@ function getRIfAttr(el: TemplateElement): string | null {
   return null;
 }
 
+/**
+ * Quick 260808-iyh (D5) — mirrors `getRIfAttr`, detecting `r-for` instead of
+ * `r-if`. `r-for` is the same directive attribute shape with `name === 'for'`.
+ */
+function hasRForAttr(el: TemplateElement): boolean {
+  for (const a of el.attributes) {
+    if (a.kind === 'directive' && a.name === 'for' && a.value !== null) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function visit(
   nodes: readonly TemplateNode[],
   ctx: SlotVisitContext,
@@ -193,9 +212,11 @@ function visit(
     if (!isTemplateElement(node)) continue;
 
     const rIf = getRIfAttr(node);
-    const childCtx: SlotVisitContext = rIf
-      ? { rIfStack: [...ctx.rIfStack, rIf] }
-      : ctx;
+    const childInLoop = ctx.inLoop || hasRForAttr(node);
+    const childCtx: SlotVisitContext =
+      rIf || childInLoop !== ctx.inLoop
+        ? { rIfStack: rIf ? [...ctx.rIfStack, rIf] : ctx.rIfStack, inLoop: childInLoop }
+        : ctx;
 
     if (node.tagName === 'slot') {
       // Determine slot name
@@ -259,6 +280,11 @@ function visit(
           decl.isReactive = true;
         }
       }
+      // Quick 260808-iyh (D5) — set ONLY when true so non-loop slots carry no
+      // key at all (undefined === false back-compat, no IR snapshot churn).
+      if (childInLoop) {
+        decl.inLoop = true;
+      }
       out.push(decl);
       continue;
     }
@@ -291,7 +317,7 @@ function flattenNestedSlots(slot: SlotDecl, out: SlotDecl[]): void {
 
 export function lowerSlots(template: TemplateAST): SlotDecl[] {
   const out: SlotDecl[] = [];
-  visit(template.children, { rIfStack: [] }, out);
+  visit(template.children, { rIfStack: [], inLoop: false }, out);
 
   // D-SM-01: lift nested slots onto the flat declared slot surface. Iterate a
   // snapshot of the top-level slots (the loop appends to `out`). De-dupe by

@@ -614,6 +614,17 @@ export const RozieErrorCode = {
   // topically partitioned beyond the 100/200/300 severity bands).
   EMIT_NAME_INVALID_IDENTIFIER: 'ROZ209', // error — an `$emit` event name that is not `/^[a-zA-Z][a-zA-Z0-9_-]*$/` (e.g. `update:foo`, `a.b`). Cannot lower to a safe destructure/void-statement target on every emit-consuming code path. Use a `model: true` prop for two-way binding instead of Vue's `update:x` convention.
 
+  // ROZ210 confirmed free repo-wide before use (next free code after ROZ209).
+  // Quick 260808-iyh (D5) — a `<slot>` whose `name` is the reserved
+  // unnamed-slot key. `portalKey()` (ir/types.ts) and every per-target
+  // emitter's unnamed-slot member sentinel (`emitSlotDecl.ts`'s
+  // `authoredKey`, `collectSlottedReads.ts`) use the literal string
+  // `'default'` to address the UNNAMED slot — the same key the D4 `$slotted`
+  // member sigil uses. A `<slot name="default">` collides with that
+  // sentinel at the emitter layer. Rename the slot, or drop the `name`
+  // attribute entirely to author an unnamed slot.
+  RESERVED_SLOT_NAME: 'ROZ210',
+
   // ---- Warnings (Phase 2 Plan 02) — ROZ300..ROZ399 ----
   RFOR_MISSING_KEY: 'ROZ300', // SEM-03: r-for without :key
   RFOR_KEY_IS_LOOP_VARIABLE: 'ROZ301', // SEM-03: :key="index" / :key="item" (loop var)

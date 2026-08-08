@@ -734,7 +734,8 @@
       "sourceLoc": {
         "start": 2408,
         "end": 2709
-      }
+      },
+      "inLoop": true
     },
     {
       "type": "SlotDecl",
