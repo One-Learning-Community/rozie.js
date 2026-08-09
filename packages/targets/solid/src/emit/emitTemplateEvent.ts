@@ -72,6 +72,25 @@ export interface EmitEventCtx {
    * a listener on a component tag (no meaningful DOM element type).
    */
   elementTag?: string | undefined;
+  /**
+   * Phase 33 / REQ-26 — reactive-portal scope-param accessor rewrite (bug fix,
+   * quick 260809-6zp). Mirrors `EmitNodeCtx.scopeAccessorParams` /
+   * `RewriteTemplateOpts.scopeAccessorParams`: inside a REACTIVE portal-slot
+   * filler body, a bare reference to a destructured scope param (e.g. `setLink`
+   * from `#linkEditor="{ setLink, unsetLink, close }"`) must lower to
+   * `_rozieScope().<prop>`, not a bare identifier — the scope is a Solid
+   * Accessor, not a value in this lexical scope. `renderExpr` (used for every
+   * OTHER attribute kind) already threads this; `emitTemplateEvent` did not,
+   * so `@click="applyNext(setLink)"` / `@click="unsetLink()"` emitted a bare
+   * `setLink` / `unsetLink` reference — a ReferenceError at runtime (or, for a
+   * name that coincides with a global like `close`, a silent no-op calling
+   * `window.close()` instead of the scope's `close`). Threaded through
+   * `renderHandler` into `rewriteTemplateExpression`'s rewrite, matching every
+   * other expression-attribute path.
+   */
+  scopeAccessorParams?:
+    | { accessorIdent: string; params: ReadonlyMap<string, string> }
+    | undefined;
 }
 
 export interface EmitTemplateEventResult {
@@ -298,6 +317,9 @@ function renderHandler(
   ir: IRComponent,
   invokeAccessors?: ReadonlySet<string> | undefined,
   loopValueBindings?: ReadonlySet<string> | undefined,
+  scopeAccessorParams?:
+    | { accessorIdent: string; params: ReadonlyMap<string, string> }
+    | undefined,
 ): string {
   // Phase 16 R2 / D-03 — thread the loop-accessor unwrap set into the
   // template-expression rewriter. The set is sourced from `EmitEventCtx`
@@ -309,7 +331,13 @@ function renderHandler(
   // Spike-012 NEW-4 — also thread the raw keyless-item-alias set so a loop var
   // used in a handler (`@click="pick(item)"`) stays bare when it shadows a
   // `$computed`, instead of being called (`pick(item())` on a scalar).
-  return rewriteTemplateExpression(handler, ir, { invokeAccessors, loopValueBindings });
+  //
+  // Bug fix (quick 260809-6zp) — also thread `scopeAccessorParams` so a
+  // destructured reactive-portal scope param referenced inside an event
+  // handler (`@click="applyNext(setLink)"`, `@click="unsetLink()"`) lowers to
+  // `_rozieScope().<prop>` like every other attribute-expression path, instead
+  // of emitting a bare (undefined, or accidentally-global) identifier.
+  return rewriteTemplateExpression(handler, ir, { invokeAccessors, loopValueBindings, scopeAccessorParams });
 }
 
 /**
@@ -431,7 +459,7 @@ export function emitTemplateEvent(
     if (desc.helperName === 'createDebouncedHandler' || desc.helperName === 'createThrottledHandler') {
       const solidHelper = desc.helperName;
       ctx.collectors.runtime.add(solidHelper);
-      const originalHandlerCode = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
+      const originalHandlerCode = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams);
       // Spike-012 NEW-2 — a statement-kind handler (`@input.debounce(300)="bump()"`)
       // must be wrapped in a thunk so the FUNCTION is debounced, not its invoked
       // `void` result (TS2345).
@@ -471,7 +499,7 @@ export function emitTemplateEvent(
     // Pure helper-wrap: reference the wrapper name directly.
     handlerExpr = handlerRef;
   } else if (inlineGuards.length === 0) {
-    const code = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
+    const code = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams);
     if (handlerKind === 'identifier') {
       handlerExpr = code;
     } else if (handlerKind === 'callable') {
@@ -499,12 +527,12 @@ export function emitTemplateEvent(
     } else if (handlerKind === 'identifier') {
       // Bare identifier (e.g. `onSearch`) — call without args so handlers typed
       // `() => void` don't complain about the synthetic event parameter.
-      handlerInvocation = `${renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings)}()`;
+      handlerInvocation = `${renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams)}()`;
     } else if (handlerKind === 'callable') {
       // Optional-call so optional callback props don't TS2722.
-      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings)})?.($event)`;
+      handlerInvocation = `(${renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams)})?.($event)`;
     } else {
-      handlerInvocation = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
+      handlerInvocation = renderHandler(listener.handler, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams);
     }
     handlerExpr = `(${eventParam}) => { ${guardLines} ${handlerInvocation}; }`;
   }

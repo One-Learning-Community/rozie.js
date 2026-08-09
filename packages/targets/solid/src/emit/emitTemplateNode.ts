@@ -633,6 +633,7 @@ function emitElementListeners(
       // event-handler lowering so call-arg index references emit as `index()`.
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
+      scopeAccessorParams: ctx.scopeAccessorParams,
       elementTag: node.tagKind === 'html' ? node.tagName : undefined,    });
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
     const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{(.*)\}$/s);
@@ -713,6 +714,7 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       // event-handler lowering so call-arg index references emit as `index()`.
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
+      scopeAccessorParams: ctx.scopeAccessorParams,
       elementTag: node.tagKind === 'html' ? node.tagName : undefined,    });
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
 
