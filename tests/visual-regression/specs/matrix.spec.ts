@@ -250,6 +250,19 @@ const EXAMPLES = [
   // contentDOM composition) lives in tiptap-nodeview.spec.ts and is NOT baseline-
   // gated.
   'TipTapNodeViewScreenshot',
+  // Quick 260809-6zp (link-editor residuals) — TipTapLinkEditorScreenshot is the
+  // content-STABLE pixel cell for the OPEN built-in link-editor surface (residual
+  // 2, D-02). `TipTapLinkEditorScreenshotDemo.rozie` renders a FIXED rich doc
+  // whose FIRST textblock STARTS with a link, so the surface opens with ZERO
+  // interaction (D-05 — ProseMirror's initial collapsed selection resolves marks
+  // from the following node), with the caret neutralized + never focused — so a
+  // stable `TipTapLinkEditorScreenshot.png` baseline CAN exist. Per D-10 all 6
+  // targets diff against the SAME shared baseline. Baseline-gates to `test.fixme`
+  // via `baselineExists()` until the Linux-Docker regen lands the PNG. The
+  // BEHAVIORAL coverage (the #linkEditor consumer-override path, all 6 targets)
+  // lives in tiptap-link-editor.spec.ts and is NOT baseline-gated; the
+  // behavioral `TipTapLinkEditor` cell is deliberately NOT in this EXAMPLES list.
+  'TipTapLinkEditorScreenshot',
   //
   // RESOLVED 2026-06-08: the line + bar cells previously captured with AXES but no
   // DATA SERIES (doughnut fine) was NOT a first-paint/ResizeObserver timing issue —
@@ -615,6 +628,33 @@ async function settleExample(
     });
     // Brief settle for layout; the editor is never focused and the caret is
     // neutralized, so there is no blink/selection source to wait out.
+    await page.waitForTimeout(200);
+  }
+  // TipTapLinkEditorScreenshot (quick 260809-6zp): the content-STABLE OPEN
+  // link-editor-surface pixel cell. ProseMirror boots with a seed doc whose
+  // first textblock starts with a link, so the dedicated link-editor bubble
+  // menu opens with ZERO interaction (D-05). Wait for the editor, then for the
+  // seed prose to be present, then for the link-editor surface itself and its
+  // input's prefilled value (the D-04 mount-time prefill fix this cell guards)
+  // before a short settle for the Floating-UI position computation.
+  if (example === 'TipTapLinkEditorScreenshot') {
+    await expect(page.locator('.ProseMirror')).toBeVisible();
+    await expect
+      .poll(async () => (await page.locator('.ProseMirror').textContent()) ?? '', {
+        timeout: 10_000,
+        intervals: [100, 200, 400],
+      })
+      .toContain('Rozie docs');
+    await expect(page.locator('.rozie-tiptap-link-editor')).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.locator('.rozie-tiptap-link-input')).toHaveValue(
+      'https://rozie.dev/docs',
+      { timeout: 10_000 },
+    );
+    // Brief settle for the Floating-UI position computation; the editor is
+    // never focused and the caret is neutralized, so there is no blink/
+    // selection source to wait out.
     await page.waitForTimeout(200);
   }
   // Table: TableDemo renders `<table class="rozie-table">`. The React target

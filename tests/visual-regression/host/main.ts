@@ -255,6 +255,21 @@ export const EXAMPLES = [
   // custom nodes); registered in matrix.spec.ts (auto-fixme until the Linux PNG).
   'TipTapNodeView',
   'TipTapNodeViewScreenshot',
+  // Quick 260809-6zp (link-editor residuals) — the `#linkEditor` consumer-
+  // override + open-surface proving cells. TipTapLinkEditor is the BEHAVIORAL
+  // cell (loader → examples/demos/TipTapLinkEditorDemo.rozie, which fills the
+  // `#linkEditor` REACTIVE portal slot with a consumer fragment). It proves
+  // in-place re-render as the caret moves on/off a link, and that setLink /
+  // unsetLink / close called FROM the fragment mutate the document / dismiss
+  // the surface, on all 6 targets — Svelte 5 and Solid were never runtime-
+  // proven before this. Built for all 6 targets but deliberately NOT a
+  // matrix.spec.ts pixel cell — covered by tiptap-link-editor.spec.ts.
+  // TipTapLinkEditorScreenshot is the content-STABLE pixel cell for the OPEN
+  // built-in link-editor surface (a seed doc whose first textblock starts with
+  // a link, so the surface opens with zero interaction); registered in
+  // matrix.spec.ts (auto-fixme until the Linux PNG lands).
+  'TipTapLinkEditor',
+  'TipTapLinkEditorScreenshot',
   // Phase 35 (maplibre) — the WebGL-map two-way-camera + portal-slot proving
   // cells. MapLibre is the BEHAVIORAL cell (loader →
   // examples/demos/MapLibreDemo.rozie, which imports
@@ -1302,6 +1317,11 @@ export const LIT_TAGS: Record<Example, string> = {
   // kebab of TipTapNodeViewDemo / TipTapNodeViewScreenshotDemo.
   TipTapNodeView: 'rozie-tip-tap-node-view',
   TipTapNodeViewScreenshot: 'rozie-tip-tap-node-view-screenshot',
+  // Quick 260809-6zp — the lit entry appends '-demo' → tags
+  // 'rozie-tip-tap-link-editor-demo' / 'rozie-tip-tap-link-editor-screenshot-demo'
+  // = kebab of TipTapLinkEditorDemo / TipTapLinkEditorScreenshotDemo.
+  TipTapLinkEditor: 'rozie-tip-tap-link-editor',
+  TipTapLinkEditorScreenshot: 'rozie-tip-tap-link-editor-screenshot',
   // Phase 35 (maplibre) — the lit entry appends '-demo' → tags
   // 'rozie-map-libre-demo' / 'rozie-map-libre-screenshot-demo' = kebab of
   // MapLibreDemo / MapLibreScreenshotDemo.
@@ -1738,6 +1758,11 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // nodeView slot. No parent props needed.
   TipTapNodeView: {},
   TipTapNodeViewScreenshot: {},
+  // Quick 260809-6zp — both link-editor demos are self-contained: each seeds
+  // its own fixed/seed doc in <data>/<script> and (for TipTapLinkEditor) fills
+  // the #linkEditor slot. No parent props needed.
+  TipTapLinkEditor: {},
+  TipTapLinkEditorScreenshot: {},
   // Phase 35 — both MapLibre demos are self-contained: MapLibreDemo seeds its
   // center/zoom/markers in <data> and the OFFLINE_STYLE in <script>;
   // MapLibreScreenshotDemo hardcodes the OFFLINE_STYLE + fixed center/zoom in

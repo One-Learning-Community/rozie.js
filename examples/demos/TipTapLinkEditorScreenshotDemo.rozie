@@ -1,0 +1,65 @@
+<!--
+  TipTapLinkEditorScreenshotDemo.rozie — content-STABLE screenshot consumer for
+  the OPEN built-in link-editor surface (residual 2, D-02, quick 260809-6zp). The
+  SEPARATE deterministic pixel cell — never extend it for behavior, never bolt
+  pixels onto TipTapLinkEditorDemo.
+
+  Same caret-neutralization recipe as TipTapScreenshotDemo (Phase 32 precedent):
+    1. A FIXED rich doc bound one-way as `html` — never a live timestamp.
+    2. NEVER focus the editor (no interactive controls, spec never clicks in).
+    3. A belt-and-suspenders `editorProps` override (caret-color: transparent).
+
+  Opens with ZERO interaction (D-05): the FIRST textblock STARTS with an anchor,
+  so ProseMirror's initial collapsed selection (start of the first textblock)
+  resolves its marks from the node that FOLLOWS — the link text — making
+  `editor.isActive('link')` true at mount. The dedicated link-editor BubbleMenu
+  instance evaluates its `shouldShow` in its constructor and shows immediately.
+  No `#linkEditor` fill, so the BUILT-IN form renders — and per the D-04 mount-
+  time prefill fix, its input is seeded from the seed link's href rather than
+  rendering empty. This cell is the permanent regression guard for that fix.
+-->
+
+<rozie name="TipTapLinkEditorScreenshotDemo">
+
+<components>
+{
+  TipTap: '../../packages/ui/tiptap/src/TipTap.rozie',
+}
+</components>
+
+<script>
+// FIXED rich document — the FIRST textblock STARTS with an anchor (D-05: zero-
+// interaction open) followed by ordinary prose, then a second plain paragraph.
+// Never a live timestamp or random content.
+const FIXED_HTML = '<p><a href="https://rozie.dev/docs">Rozie docs</a> — start here for the full guide to the six-target compiler.</p><p>A second paragraph with no links, for visual contrast.</p>'
+
+// Belt-and-suspenders caret neutralization — even an accidental focus cannot
+// paint a blinking caret into the capture. autofocus stays false; the cell is
+// never clicked.
+const stableEditorProps = { attributes: { style: 'caret-color: transparent' } }
+</script>
+
+<template>
+<div class="tiptap-linkeditor-screenshot-demo">
+  <TipTap
+    :html="FIXED_HTML"
+    :autofocus="false"
+    :editorProps="stableEditorProps"
+  />
+</div>
+</template>
+
+<style>
+.tiptap-linkeditor-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  /* Extra TOP padding (D-02/D-05): the link sits at the very start of the first
+     textblock, and Floating UI positions the link-editor bubble ABOVE the
+     selection by default — the top padding gives it room to render inside the
+     clipped screenshot mount instead of overflowing above it. */
+  padding: 4rem 1rem 1rem;
+  max-width: 720px;
+}
+</style>
+
+</rozie>

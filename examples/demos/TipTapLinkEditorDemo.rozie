@@ -1,0 +1,260 @@
+<!--
+  TipTapLinkEditorDemo.rozie — BEHAVIORAL cell for the TipTap `#linkEditor`
+  REACTIVE portal-slot consumer-override path (residual 1, D-01, quick
+  260809-6zp). The companion of the content-stable TipTapLinkEditorScreenshotDemo
+  (pixel cell) — never bolt pixels onto this one.
+
+  This demo proves, across ALL SIX targets, that a consumer fragment filling
+  `#linkEditor` REPLACES the built-in link form in the engine-managed bubble-menu
+  host, re-renders in place as the caret moves on/off a link (Spike 016's
+  survive-detach-reattach proof, never runtime-checked on Svelte 5 or Solid until
+  now), and that `setLink` / `unsetLink` / `close` called FROM the fragment
+  actually mutate the document and dismiss the surface — the same verbs the new
+  `$expose setLink`/`unsetLink` handle methods delegate to (residual 3), so this
+  demo doubles as end-to-end proof those two implementations cannot disagree.
+
+  Modeled on TipTapNodeViewDemo.rozie (driver-button shape, cross-target-uniform
+  editor capture) and TipTapBubbleMenuDemo.rozie (engine-host `:root` styling for
+  a fragment portalled into an imperatively-created bubble-menu host).
+
+  Seed doc: the FIRST textblock STARTS with a known link (the same D-05 zero-
+  interaction-open trick as the pixel cell — ProseMirror's initial collapsed
+  selection resolves marks from the node that FOLLOWS, so `editor.isActive
+  ('link')` is already true at mount and the fragment is showing before any
+  driver click, matching step 1's immediate mount assertion) and a second plain
+  paragraph (an off-link anchor position for the caret-off / select-plain
+  drivers).
+-->
+
+<rozie name="TipTapLinkEditorDemo">
+
+<components>
+{
+  TipTap: '../../packages/ui/tiptap/src/TipTap.rozie',
+}
+</components>
+
+<data>
+{
+  content: '<p><a href="https://rozie.dev/docs">Rozie docs</a> — read before you start.</p><p>A second, link-free paragraph for off-link selections.</p>',
+  out: '(no output yet)',
+}
+</data>
+
+<script>
+// The second href `setLink` (via `applyNext`) writes — distinct from the seed
+// href, so the readout can prove the mutation actually happened, plus a `target`
+// attr (a STOCK Link-allowed attribute, D-06) so multi-attr passthrough is
+// proven without a `Link.extend` dependency in examples/.
+const NEXT_HREF = 'https://rozie.dev/blog'
+
+// Stash the live editor (the #linkEditor scope's `editor` param, carried
+// uniformly across all 6 targets) the moment the fragment renders. Returns the
+// empty string so it can sit in a `:data-cap` binding without painting anything
+// — the cross-target-uniform editor path INCLUDING Angular, whose component ref
+// resolves to the host element rather than the $expose handle.
+const captureEditor = (ed) => {
+  if (ed && typeof window !== 'undefined') window.__leEditor = ed
+  return ''
+}
+
+const liveEditor = () => {
+  const h = $refs.ed
+  if (h && typeof h.getEditor === 'function') return h.getEditor()
+  if (typeof window !== 'undefined' && window.__leEditor) return window.__leEditor
+  return null
+}
+
+// Walk the doc for a text node carrying a `link` mark; return a position INSIDE
+// the mark (node position + 1) so the caret lands within it, not on its boundary.
+const linkPos = (ed) => {
+  let found = null
+  ed.state.doc.descendants((node, pos) => {
+    if (found == null && node.isText && node.marks.some((m) => m.type.name === 'link')) {
+      found = pos + 1
+      return false
+    }
+    return found == null
+  })
+  return found
+}
+
+// Position inside the SECOND paragraph (the link-free one) — an off-link anchor
+// for driveCaretOffLink / driveSelectPlain.
+const plainParagraphPos = (ed) => {
+  let count = 0
+  let found = null
+  ed.state.doc.descendants((node, pos) => {
+    if (found != null) return false
+    if (node.type.name === 'paragraph') {
+      count += 1
+      if (count === 2) { found = pos + 1; return false }
+    }
+    return true
+  })
+  return found
+}
+
+const driveCaretIntoLink = () => {
+  const ed = liveEditor()
+  if (!ed) { $data.out = '(no handle)'; return }
+  const pos = linkPos(ed)
+  if (pos == null) { $data.out = '(no link)'; return }
+  ed.chain().focus().setTextSelection(pos).run()
+  $data.out = 'caret-in@' + pos
+}
+
+const driveCaretOffLink = () => {
+  const ed = liveEditor()
+  if (!ed) { $data.out = '(no handle)'; return }
+  const pos = plainParagraphPos(ed)
+  if (pos == null) { $data.out = '(no plain paragraph)'; return }
+  ed.chain().focus().setTextSelection(pos).run()
+  $data.out = 'caret-off@' + pos
+}
+
+const driveSelectPlain = () => {
+  const ed = liveEditor()
+  if (!ed) { $data.out = '(no handle)'; return }
+  const pos = plainParagraphPos(ed)
+  if (pos == null) { $data.out = '(no plain paragraph)'; return }
+  // A non-empty range within the second (link-free) paragraph.
+  ed.chain().focus().setTextSelection({ from: pos, to: pos + 4 }).run()
+  $data.out = 'select-plain@' + pos
+}
+
+// Routes the slot-scope `setLink` through a named helper so the template
+// expression stays a plain call (Angular AOT rejects an inline arrow in a
+// template expression, and this keeps the attrs object literal out of the
+// projected <ng-template>). `target` is a STOCK Link-allowed attribute (D-06),
+// so it genuinely persists and proves multi-attr passthrough without needing a
+// `Link.extend` dependency.
+const applyNext = (fn) => {
+  fn({ href: NEXT_HREF, target: '_blank' })
+}
+
+// Bindable readout of the reactive `attrs` scope param.
+const describeAttrs = (attrs) => (attrs && attrs.href) ? attrs.href : '(no attrs)'
+
+// Mirrors the built-in form's own mousedown discipline — pressing a fragment
+// control must not blur the editor and collapse the selection before the
+// setLink/unsetLink/close command runs.
+const keepFocus = () => {}
+</script>
+
+<template>
+<div class="tiptap-linkeditor-demo">
+  <h3>TipTap — link editor consumer override</h3>
+
+  <TipTap ref="ed" r-model:html="$data.content" :editable="true">
+    <!--
+      #linkEditor REACTIVE portal-slot fill (residual 1, D-01). Replaces the
+      built-in link form entirely — the engine-managed bubble-menu host renders
+      ONLY this fragment. Re-rendered in place on every selection/link change via
+      refreshLink()'s handle.update(). No `r-if` anywhere in this fragment (AOT-
+      safe inside a projected <ng-template>); the fragment root is always present.
+    -->
+    <template #linkEditor="{ editor, href, attrs, setLink, unsetLink, close }">
+      <span
+        class="le-frag"
+        data-testid="le-form"
+        :data-cap="captureEditor(editor)"
+        :data-href="href"
+        :data-attr-href="describeAttrs(attrs)"
+      >
+        <span class="le-href-readout">{{ href }}</span>
+        <button type="button" data-testid="le-apply" @mousedown.prevent="keepFocus" @click="applyNext(setLink)">Apply</button>
+        <button type="button" data-testid="le-unset" @mousedown.prevent="keepFocus" @click="unsetLink()">Remove</button>
+        <button type="button" data-testid="le-close" @mousedown.prevent="keepFocus" @click="close()">Close</button>
+      </span>
+    </template>
+  </TipTap>
+
+  <div class="le-drivers">
+    <button type="button" data-testid="le-caret-in" @click="driveCaretIntoLink">Caret into link</button>
+    <button type="button" data-testid="le-caret-off" @click="driveCaretOffLink">Caret off link</button>
+    <button type="button" data-testid="le-select-plain" @click="driveSelectPlain">Select plain</button>
+  </div>
+
+  <pre class="le-html" data-testid="le-html">{{ $data.content }}</pre>
+  <pre class="le-out" data-testid="le-out">{{ $data.out }}</pre>
+</div>
+</template>
+
+<style>
+.tiptap-linkeditor-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 720px;
+}
+.tiptap-linkeditor-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+
+.le-drivers {
+  display: flex;
+  gap: 0.375rem;
+  margin-top: 0.75rem;
+}
+.le-drivers button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.le-html,
+.le-out {
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  background: #fafafa;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+:root {
+  /* Engine-DOM escape hatch — the #linkEditor fragment teleports into the
+     engine-owned link-editor bubble-menu host inside <rozie-tiptap>'s shadow
+     root (the imperatively-created linkEditorEl handed to the dedicated
+     BubbleMenu extension), so on Lit a plain scoped rule cannot reach it. :root
+     emits document-level CSS adopted into the shadow root (adopt-document-styles
+     on the wrapper). NOT :global() (ROZ128) — see TipTapBubbleMenuDemo. */
+  .le-frag {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.3125rem 0.5rem;
+    min-width: 12rem;
+    min-height: 1.5rem;
+    background: #1a1a1a;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  }
+  .le-href-readout {
+    color: #fff;
+    font-size: 0.75rem;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .le-frag button {
+    padding: 0.1875rem 0.5rem;
+    border: none;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.75rem;
+  }
+  .le-frag button:hover { background: rgba(255, 255, 255, 0.22); }
+}
+</style>
+
+</rozie>
