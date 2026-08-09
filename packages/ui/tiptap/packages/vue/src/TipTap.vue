@@ -144,7 +144,7 @@ const count = ref({
   characters: 0,
   words: 0
 });
-const link = ref({
+const linkState = ref({
   href: '',
   attrs: {}
 });
@@ -284,7 +284,7 @@ const closeLink = () => {
   // current link href. The surface itself is link-anchored (like Google Docs) — it
   // stays while the caret is on a link and hides once openFlag is clear and the
   // caret is off any link (or the doc is not editable).
-  if (linkInputEl) linkInputEl.value = link.value.href;
+  if (linkInputEl) linkInputEl.value = linkState.value.href;
   editor?.commands.focus();
 };
 // The reactive `#linkEditor` slot scope — keys EXACTLY { editor, href, attrs,
@@ -294,8 +294,8 @@ const closeLink = () => {
 // custom attr is the consumer's Link.extend concern, not this wrapper's).
 const buildLinkScope = () => ({
   editor,
-  href: link.value.href,
-  attrs: link.value.attrs,
+  href: linkState.value.href,
+  attrs: linkState.value.attrs,
   setLink: applyLink,
   unsetLink: removeLink,
   close: closeLink
@@ -315,7 +315,7 @@ const refreshLink = () => {
   const key = href + ' ' + JSON.stringify(a);
   if (key === lastLinkKey) return;
   lastLinkKey = key;
-  link.value = {
+  linkState.value = {
     href,
     attrs: a
   };
@@ -741,7 +741,7 @@ function handleDrop(view: any, event: any, slice: any, moved: any) {
   return true;
 }
 // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
-// the marquee surface: 16 verbs over the live Editor, uniform across all 6
+// the marquee surface: 25 verbs over the live Editor, uniform across all 6
 // targets. Each guards the pre-mount / destroyed `editor = null`.
 //
 // Collision discipline:
@@ -749,7 +749,7 @@ function handleDrop(view: any, event: any, slice: any, moved: any) {
 //     prop makes React auto-generate a `setHtml` state setter, so a `setHtml`
 //     $expose verb would collide on the React target (ROZ524). (CodeMirror's
 //     setValue→replaceValue lesson, html edition.)
-//   - None of the 14 names collide with LitElement reserved lifecycle methods
+//   - None of the 25 names collide with LitElement reserved lifecycle methods
 //     (update/render/firstUpdated/updated/willUpdate/requestUpdate).
 //   - The focus/blur COMMANDS are named `focusEditor`/`blurEditor`, NOT
 //     `focus`/`blur` — the component emits `focus`/`blur` EVENTS, and on
@@ -872,6 +872,31 @@ function getCharacterCount() {
 function getWordCount() {
   if (!editor) return 0;
   return editor.storage.characterCount ? editor.storage.characterCount.words() : editor.getText().split(/\s+/).filter(Boolean).length;
+}
+// setLink(attrs) / unsetLink() (D-03, residual 3) — thin delegates to the SAME
+// applyLink/removeLink the #linkEditor slot scope hands a consumer fragment
+// (buildLinkScope above), so the imperative handle and the slot-scope verb
+// implementation cannot disagree. Four-way collision check:
+//   - not a prop name — the 14 props are html / editable / placeholder /
+//     autofocus / editorClass / ariaLabel / editorProps / extensions /
+//     starterKit / nodeSpecs / uploadImage / maxLength / enforceMaxLength /
+//     bubbleMenuShouldShow;
+//   - not an emitted event name — the 4 events are update / selectionUpdate /
+//     focus / blur (the ROZ121 Angular output-field-vs-method rule);
+//   - not an existing $expose verb — the 23 names already in the object below;
+//   - not a React auto-generated model setter — the only model prop is
+//     `html`, whose setter is `setHtml` (the ROZ524 rule that forced
+//     `setContent`), and not a LitElement lifecycle method (update / render /
+//     firstUpdated / updated / willUpdate / requestUpdate).
+// applyLink already ignores an attrs object without a non-empty string href
+// (no degenerate empty-href anchor is ever written), and both verbs no-op
+// before mount / after destroy through the `editor?.` guards already inside
+// applyLink/removeLink — no second validation path is introduced.
+function setLink(attrs: any) {
+  applyLink(attrs);
+}
+function unsetLink() {
+  removeLink();
 }
 
 interface ReactivePortalHandle {
@@ -1190,6 +1215,14 @@ onMounted(() => {
       linkEditorHandle = portals.linkEditor(linkEditorEl, buildLinkScope());
     } else {
       buildDefaultLinkEditor(linkEditorEl);
+      // Prefill correction (D-04): the refreshLink() call above (right after
+      // `new Editor(...)`) already computed $data.linkState.href from the
+      // initial document — but linkInputEl didn't exist yet at that point, so
+      // it latched lastLinkKey and every LATER refreshLink() for the same link
+      // early-returns, leaving the just-created input empty even when the
+      // caret starts inside a link. Seed it directly from the already-computed
+      // state; a no-link mount leaves this the empty string (unchanged).
+      if (linkInputEl) linkInputEl.value = linkState.value.href;
     }
   }
   _cleanup_0 = () => {
@@ -1221,7 +1254,7 @@ watch(() => html.value, (v: any) => {
 });
 watch(() => props.editable, (v: any) => editor?.setEditable(v, false));
 
-defineExpose({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor });
+defineExpose({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor, setLink, unsetLink });
 </script>
 
 <style scoped>

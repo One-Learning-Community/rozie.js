@@ -20,24 +20,28 @@
     - A uniform imperative command handle across all six targets ($expose).
 
   Surface (Phase 32, feature-rich expansion from the original 4 props;
-  character/word count added quick 260720-tzw):
-    - props (13): html[model] / editable / placeholder / autofocus /
+  character/word count added quick 260720-tzw; link editor added quick
+  260721-liz; setLink/unsetLink added quick 260809-6zp):
+    - props (14): html[model] / editable / placeholder / autofocus /
                   editorClass / ariaLabel / editorProps / extensions /
                   starterKit / nodeSpecs / uploadImage / maxLength /
-                  enforceMaxLength
+                  enforceMaxLength / bubbleMenuShouldShow
     - events (4): update / selectionUpdate / focus / blur
-    - $expose (22): getEditor, focusEditor, blurEditor, getHTML, getJSON,
+    - $expose (25): getEditor, focusEditor, blurEditor, getHTML, getJSON,
                   getText, setContent, clearContent, toggleBold, toggleItalic,
                   toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList,
                   undo, redo, chain, isActive, can, isEmpty, getCharacterCount,
-                  getWordCount
-    - slots (4):  3 mount-once portal slots — `toolbar` (consumer toolbar bound
+                  getWordCount, openLinkEditor, setLink, unsetLink
+    - slots (6):  3 mount-once portal slots — `toolbar` (consumer toolbar bound
                   to the editor), `bubbleMenu` + `floatingMenu` (selection-anchored
                   menus over @tiptap/extension-bubble-menu / -floating-menu, each
-                  handed the live editor) — plus `nodeView`, a REACTIVE portal slot
+                  handed the live editor) — plus 2 REACTIVE portal slots,
+                  `linkEditor` (consumer override for the built-in link-editing
+                  surface; scope includes setLink/unsetLink/close) and `nodeView`
                   (consumer fragment rendered as a custom ProseMirror node, driven
                   by the `nodeSpecs` prop — a general custom-node registration
-                  facility, not a hardcoded pair)
+                  facility, not a hardcoded pair) — plus `count`, a plain reactive
+                  scoped slot for the character/word counter
 
   The `editorProps` (ProseMirror) and `extensions` (extra TipTap extensions
   merged onto StarterKit) props are the consumer-extensibility passthroughs —
@@ -204,7 +208,12 @@
     characters: 0,
     words: 0,
   },
-  link: {
+  // Named `linkState` (not `link`) — a `$data.link` key would make React
+  // auto-generate a `setLink` state setter that collides with the new
+  // `setLink` $expose verb (ROZ524, the $data-key==$expose-verb collision
+  // class; the setContent/setHtml precedent, this time on a nested $data key
+  // rather than the model prop).
+  linkState: {
     href: '',
     attrs: {},
   },
@@ -347,7 +356,7 @@ const closeLink = () => {
   // current link href. The surface itself is link-anchored (like Google Docs) — it
   // stays while the caret is on a link and hides once openFlag is clear and the
   // caret is off any link (or the doc is not editable).
-  if (linkInputEl) linkInputEl.value = $data.link.href
+  if (linkInputEl) linkInputEl.value = $data.linkState.href
   editor?.commands.focus()
 }
 // The reactive `#linkEditor` slot scope — keys EXACTLY { editor, href, attrs,
@@ -357,8 +366,8 @@ const closeLink = () => {
 // custom attr is the consumer's Link.extend concern, not this wrapper's).
 const buildLinkScope = () => ({
   editor,
-  href: $data.link.href,
-  attrs: $data.link.attrs,
+  href: $data.linkState.href,
+  attrs: $data.linkState.attrs,
   setLink: applyLink,
   unsetLink: removeLink,
   close: closeLink,
@@ -378,7 +387,7 @@ const refreshLink = () => {
   const key = href + ' ' + JSON.stringify(a)
   if (key === lastLinkKey) return
   lastLinkKey = key
-  $data.link = { href, attrs: a }
+  $data.linkState = { href, attrs: a }
   if (linkEditorHandle) {
     linkEditorHandle.update(buildLinkScope())
   } else if (linkInputEl && !linkInputEl.matches(':focus')) {
@@ -964,6 +973,14 @@ $onMount(() => {
       linkEditorHandle = $portals.linkEditor(linkEditorEl, buildLinkScope())
     } else {
       buildDefaultLinkEditor(linkEditorEl)
+      // Prefill correction (D-04): the refreshLink() call above (right after
+      // `new Editor(...)`) already computed $data.linkState.href from the
+      // initial document — but linkInputEl didn't exist yet at that point, so
+      // it latched lastLinkKey and every LATER refreshLink() for the same link
+      // early-returns, leaving the just-created input empty even when the
+      // caret starts inside a link. Seed it directly from the already-computed
+      // state; a no-link mount leaves this the empty string (unchanged).
+      if (linkInputEl) linkInputEl.value = $data.linkState.href
     }
   }
 
@@ -1006,7 +1023,7 @@ $watch(() => $props.html, (v) => {
 $watch(() => $props.editable, (v) => editor?.setEditable(v, false))
 
 // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
-// the marquee surface: 16 verbs over the live Editor, uniform across all 6
+// the marquee surface: 25 verbs over the live Editor, uniform across all 6
 // targets. Each guards the pre-mount / destroyed `editor = null`.
 //
 // Collision discipline:
@@ -1014,7 +1031,7 @@ $watch(() => $props.editable, (v) => editor?.setEditable(v, false))
 //     prop makes React auto-generate a `setHtml` state setter, so a `setHtml`
 //     $expose verb would collide on the React target (ROZ524). (CodeMirror's
 //     setValue→replaceValue lesson, html edition.)
-//   - None of the 14 names collide with LitElement reserved lifecycle methods
+//   - None of the 25 names collide with LitElement reserved lifecycle methods
 //     (update/render/firstUpdated/updated/willUpdate/requestUpdate).
 //   - The focus/blur COMMANDS are named `focusEditor`/`blurEditor`, NOT
 //     `focus`/`blur` — the component emits `focus`/`blur` EVENTS, and on
@@ -1087,11 +1104,32 @@ function isEmpty()             { return editor ? editor.isEmpty : true }
 // correct count even on a stock <TipTap> that never registered CharacterCount.
 function getCharacterCount() { if (!editor) return 0; return editor.storage.characterCount ? editor.storage.characterCount.characters() : editor.getText().length }
 function getWordCount()      { if (!editor) return 0; return editor.storage.characterCount ? editor.storage.characterCount.words() : editor.getText().split(/\s+/).filter(Boolean).length }
+// setLink(attrs) / unsetLink() (D-03, residual 3) — thin delegates to the SAME
+// applyLink/removeLink the #linkEditor slot scope hands a consumer fragment
+// (buildLinkScope above), so the imperative handle and the slot-scope verb
+// implementation cannot disagree. Four-way collision check:
+//   - not a prop name — the 14 props are html / editable / placeholder /
+//     autofocus / editorClass / ariaLabel / editorProps / extensions /
+//     starterKit / nodeSpecs / uploadImage / maxLength / enforceMaxLength /
+//     bubbleMenuShouldShow;
+//   - not an emitted event name — the 4 events are update / selectionUpdate /
+//     focus / blur (the ROZ121 Angular output-field-vs-method rule);
+//   - not an existing $expose verb — the 23 names already in the object below;
+//   - not a React auto-generated model setter — the only model prop is
+//     `html`, whose setter is `setHtml` (the ROZ524 rule that forced
+//     `setContent`), and not a LitElement lifecycle method (update / render /
+//     firstUpdated / updated / willUpdate / requestUpdate).
+// applyLink already ignores an attrs object without a non-empty string href
+// (no degenerate empty-href anchor is ever written), and both verbs no-op
+// before mount / after destroy through the `editor?.` guards already inside
+// applyLink/removeLink — no second validation path is introduced.
+function setLink(attrs)      { applyLink(attrs) }
+function unsetLink()         { removeLink() }
 
 $expose({
   getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent,
   toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain,
-  isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor,
+  isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor, setLink, unsetLink,
 })
 </script>
 

@@ -258,12 +258,14 @@ export interface TipTapHandle {
   getCharacterCount: (...args: any[]) => any;
   getWordCount: (...args: any[]) => any;
   openLinkEditor: (...args: any[]) => any;
+  setLink: (...args: any[]) => any;
+  unsetLink: (...args: any[]) => any;
 }
 
 export default function TipTap(_props: TipTapProps): JSX.Element {
   const _merged = mergeProps({ editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: (() => ({}))() as Record<string, any>, extensions: (() => [])() as any[], starterKit: (() => ({}))() as Record<string, any>, nodeSpecs: (() => [])() as any[], uploadImage: null, maxLength: null, enforceMaxLength: false, bubbleMenuShouldShow: null }, _props);
   const [local, attrs] = splitProps(_merged, ['html', 'editable', 'placeholder', 'autofocus', 'editorClass', 'ariaLabel', 'editorProps', 'extensions', 'starterKit', 'nodeSpecs', 'uploadImage', 'maxLength', 'enforceMaxLength', 'bubbleMenuShouldShow', 'ref', 'onUpdate', 'onSelectionUpdate', 'onFocus', 'onBlur']);
-  onMount(() => { local.ref?.({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor }); });
+  onMount(() => { local.ref?.({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor, setLink, unsetLink }); });
 
   const [html, setHtml] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'html', '<p>Start writing…</p>');
   const [active, setActive] = createSignal({
@@ -280,7 +282,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     characters: 0,
     words: 0
   });
-  const [link, setLink] = createSignal({
+  const [linkState, setLinkState] = createSignal({
     href: '',
     attrs: {}
   });
@@ -586,6 +588,14 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
         linkEditorHandle = portals.linkEditor(linkEditorEl, buildLinkScope());
       } else {
         buildDefaultLinkEditor(linkEditorEl);
+        // Prefill correction (D-04): the refreshLink() call above (right after
+        // `new Editor(...)`) already computed $data.linkState.href from the
+        // initial document — but linkInputEl didn't exist yet at that point, so
+        // it latched lastLinkKey and every LATER refreshLink() for the same link
+        // early-returns, leaving the just-created input empty even when the
+        // caret starts inside a link. Seed it directly from the already-computed
+        // state; a no-link mount leaves this the empty string (unchanged).
+        if (linkInputEl) linkInputEl.value = linkState().href;
       }
     }
   })() as unknown;
@@ -733,7 +743,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     // current link href. The surface itself is link-anchored (like Google Docs) — it
     // stays while the caret is on a link and hides once openFlag is clear and the
     // caret is off any link (or the doc is not editable).
-    if (linkInputEl) linkInputEl.value = link().href;
+    if (linkInputEl) linkInputEl.value = linkState().href;
     editor?.commands.focus();
   }
   // The reactive `#linkEditor` slot scope — keys EXACTLY { editor, href, attrs,
@@ -744,8 +754,8 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
   function buildLinkScope() {
     return {
       editor,
-      href: link().href,
-      attrs: link().attrs,
+      href: linkState().href,
+      attrs: linkState().attrs,
       setLink: applyLink,
       unsetLink: removeLink,
       close: closeLink
@@ -766,7 +776,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     const key = href + ' ' + JSON.stringify(a);
     if (key === lastLinkKey) return;
     lastLinkKey = key;
-    setLink({
+    setLinkState({
       href,
       attrs: a
     });
@@ -1205,7 +1215,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     return true;
   }
   // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
-  // the marquee surface: 16 verbs over the live Editor, uniform across all 6
+  // the marquee surface: 25 verbs over the live Editor, uniform across all 6
   // targets. Each guards the pre-mount / destroyed `editor = null`.
   //
   // Collision discipline:
@@ -1213,7 +1223,7 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
   //     prop makes React auto-generate a `setHtml` state setter, so a `setHtml`
   //     $expose verb would collide on the React target (ROZ524). (CodeMirror's
   //     setValue→replaceValue lesson, html edition.)
-  //   - None of the 14 names collide with LitElement reserved lifecycle methods
+  //   - None of the 25 names collide with LitElement reserved lifecycle methods
   //     (update/render/firstUpdated/updated/willUpdate/requestUpdate).
   //   - The focus/blur COMMANDS are named `focusEditor`/`blurEditor`, NOT
   //     `focus`/`blur` — the component emits `focus`/`blur` EVENTS, and on
@@ -1336,6 +1346,31 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
   function getWordCount() {
     if (!editor) return 0;
     return editor.storage.characterCount ? editor.storage.characterCount.words() : editor.getText().split(/\s+/).filter(Boolean).length;
+  }
+  // setLink(attrs) / unsetLink() (D-03, residual 3) — thin delegates to the SAME
+  // applyLink/removeLink the #linkEditor slot scope hands a consumer fragment
+  // (buildLinkScope above), so the imperative handle and the slot-scope verb
+  // implementation cannot disagree. Four-way collision check:
+  //   - not a prop name — the 14 props are html / editable / placeholder /
+  //     autofocus / editorClass / ariaLabel / editorProps / extensions /
+  //     starterKit / nodeSpecs / uploadImage / maxLength / enforceMaxLength /
+  //     bubbleMenuShouldShow;
+  //   - not an emitted event name — the 4 events are update / selectionUpdate /
+  //     focus / blur (the ROZ121 Angular output-field-vs-method rule);
+  //   - not an existing $expose verb — the 23 names already in the object below;
+  //   - not a React auto-generated model setter — the only model prop is
+  //     `html`, whose setter is `setHtml` (the ROZ524 rule that forced
+  //     `setContent`), and not a LitElement lifecycle method (update / render /
+  //     firstUpdated / updated / willUpdate / requestUpdate).
+  // applyLink already ignores an attrs object without a non-empty string href
+  // (no degenerate empty-href anchor is ever written), and both verbs no-op
+  // before mount / after destroy through the `editor?.` guards already inside
+  // applyLink/removeLink — no second validation path is introduced.
+  function setLink(attrs: any) {
+    applyLink(attrs);
+  }
+  function unsetLink() {
+    removeLink();
   }
 
   return (

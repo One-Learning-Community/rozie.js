@@ -276,7 +276,7 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
       `component compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) ` +
       `source wrapping [TipTap](https://tiptap.dev/) (the ProseMirror-based headless ` +
       `editor). Two-way \`html\` content binding, a batteries-included toolbar (or bring ` +
-      `your own via the \`toolbar\` slot), a 14-verb imperative command handle, and ` +
+      `your own via the \`toolbar\` slot), a 25-verb imperative command handle, and ` +
       `\`editorProps\`/\`extensions\` passthroughs. This package is generated; do not edit ` +
       `\`src/\` by hand.`,
   );

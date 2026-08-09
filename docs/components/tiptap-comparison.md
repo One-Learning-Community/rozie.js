@@ -1,5 +1,5 @@
 ---
-surface_hash: 9809b8b6195d
+surface_hash: 3858339832a2
 ---
 
 # TipTap libraries comparison
@@ -28,7 +28,7 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Mount editor | ✅ | ✅ | ✅ | ✅ | ✅ | hand-roll | ✅ |
 | **Controlled two-way content** | ❌¹ | ❌¹ | ✅ (CVA / `ngModel`) | ❌¹ | ❌¹ | hand-roll | ✅ `r-model:html` (+ Angular CVA) |
-| Imperative command handle | ✅ (the `Editor`) | ✅ (the `Editor`) | ✅ (you own `Editor`) | ✅ (store) | ✅ (read hooks) | hand-roll | ✅ 22-verb `$expose` |
+| Imperative command handle | ✅ (the `Editor`) | ✅ (the `Editor`) | ✅ (you own `Editor`) | ✅ (store) | ✅ (read hooks) | hand-roll | ✅ 25-verb `$expose` |
 | Batteries-included toolbar | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ internal toolbar |
 | Consumer toolbar slot (bound to editor) | build it yourself | build it yourself | build it yourself | build it yourself | build it yourself | hand-roll | ✅ `toolbar` portal slot |
 | `extensions` passthrough | ✅ | ✅ | ✅ | ✅ | ✅ | hand-roll | ✅ |
@@ -49,7 +49,7 @@ The wedge is real and strongest for **Lit (no wrapper at all)** and **Solid (thi
 - **Controlled two-way `html`** out of the box on all six, with a shared echo-guard — the thing every React/Vue/Svelte consumer reimplements by hand.
 - **A batteries-included toolbar** (Bold/Italic/H1/H2/Bullet/Underline/Ordered-List with live active-state, plus Undo/Redo) *and* a **`toolbar` portal slot** that hands the consumer the live editor — neither official wrapper ships any toolbar.
 - **Selection-anchored `bubbleMenu` / `floatingMenu` portal slots** over the Floating-UI menu extensions — bring-your-own menu fragment, handed the live editor, uniform across all six targets (including Solid and Lit, where a consumer would otherwise hand-roll all menu UI).
-- **A uniform 22-verb imperative command handle** (`$expose`) with the same shape on every target — versus "hold the `Editor` you happened to construct" (which differs per framework: hook return, ref, store, or a directive input).
+- **A uniform 25-verb imperative command handle** (`$expose`) with the same shape on every target — versus "hold the `Editor` you happened to construct" (which differs per framework: hook return, ref, store, or a directive input).
 - **A batteries-included character/word counter** — set `:max-length` for a live `characters / maxLength` counter (soft by default, `:enforce-max-length` opts into a hard ProseMirror-level cap) with an overridable `#count` scoped slot and `getCharacterCount()` / `getWordCount()` handle reads, uniform across all six targets with zero setup when unused.
 - **Node views on all six** — a single `nodeView` **reactive** portal slot renders a framework fragment as a custom ProseMirror node (mention chips, embeds, editable callouts) and re-renders it **in place** on each transaction. This is the marquee TipTap feature, and Rozie ships it where the ecosystem has gaps: **Solid (`solid-tiptap` has no node-view renderer)** and **Lit (no wrapper at all)** get it for free from the same source.
 
@@ -127,7 +127,7 @@ JSON output is **available today** through `getJSON()` on the `$expose` handle �
 ## Honest caveats
 
 - **Feature-complete vs the official wrappers, on six targets** — node views (G1), bubble / floating menus (G2), bundled Placeholder (G3), and reactive-forms / CVA (G5) all ship. The only intentionally-unmatched item is the JSON two-way model payload (G4), covered by `getJSON()` on the handle (above). Rozie's wedge is the **uniform cross-framework editor + toolbar + node views + selection menus + command handle + two-way binding**, and especially **reach into Solid and Lit** where the ecosystem is thin-to-absent.
-- **`@rozie-ui/tiptap` is `0.1.0`** — the surface (13 props / 4 events / 22-verb handle / `toolbar` + `bubbleMenu` + `floatingMenu` mount-once slots + `nodeView` reactive slot + `count` scoped slot) is stable and gate-verified, but it is younger than the multi-year official wrappers.
+- **`@rozie-ui/tiptap` is `0.1.0`** — the surface (13 props / 4 events / 25-verb handle / `toolbar` + `bubbleMenu` + `floatingMenu` mount-once slots + `nodeView` reactive slot + `count` scoped slot) is stable and gate-verified, but it is younger than the multi-year official wrappers.
 - **Single StarterKit baseline, now honestly config-aware** — the bundled extension set is StarterKit; everything else comes through `:extensions`. A `starterKit` config passthrough (`StarterKit.configure(...)`) plus a collision-aware auto-disable scan mean a consumer swapping in a custom same-named extension (e.g. a custom `Link`) genuinely wins with no duplicate-extension warning, without needing to know the `StarterKit.configure({ link:false })` incantation. Richer setups still carry more consumer wiring than a batteries-everything wrapper would — that remains by design.
 
 ## Cross-references

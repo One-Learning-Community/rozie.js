@@ -108,6 +108,8 @@ export interface TipTapHandle {
   getCharacterCount: (...args: any[]) => any;
   getWordCount: (...args: any[]) => any;
   openLinkEditor: (...args: any[]) => any;
+  setLink: (...args: any[]) => any;
+  unsetLink: (...args: any[]) => any;
 }
 
 declare const TipTap: React.ForwardRefExoticComponent<TipTapProps & React.RefAttributes<TipTapHandle>>;

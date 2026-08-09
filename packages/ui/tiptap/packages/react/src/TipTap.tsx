@@ -152,6 +152,8 @@ export interface TipTapHandle {
   getCharacterCount: (...args: any[]) => any;
   getWordCount: (...args: any[]) => any;
   openLinkEditor: (...args: any[]) => any;
+  setLink: (...args: any[]) => any;
+  unsetLink: (...args: any[]) => any;
 }
 
 const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: TipTapProps, ref): JSX.Element {
@@ -196,8 +198,8 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   const bubbleMenuDispose = useRef<any>(null);
   const floatingMenuDispose = useRef<any>(null);
   const linkEditorHandle = useRef<any>(null);
-  const lastLinkKey = useRef<any>(null);
   const linkInputEl = useRef<any>(null);
+  const lastLinkKey = useRef<any>(null);
   const [html, setHtml] = useControllableState({
     value: props.html,
     defaultValue: props.defaultHtml ?? '<p>Start writing…</p>',
@@ -253,10 +255,12 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     characters: 0,
     words: 0
   });
-  const [link, setLink] = useState({
+  const [linkState, setLinkState] = useState({
     href: '',
     attrs: {}
   });
+  const _linkStateRef = useRef(linkState);
+  _linkStateRef.current = linkState;
   const toolbarEl = useRef<HTMLDivElement | null>(null);
   const editorEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
@@ -296,17 +300,17 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // current link href. The surface itself is link-anchored (like Google Docs) — it
     // stays while the caret is on a link and hides once openFlag is clear and the
     // caret is off any link (or the doc is not editable).
-    if (linkInputEl.current) linkInputEl.current.value = link.href;
+    if (linkInputEl.current) linkInputEl.current.value = linkState.href;
     editor.current?.commands.focus();
   }
   const buildLinkScope = useCallback(() => ({
     editor: editor.current,
-    href: link.href,
-    attrs: link.attrs,
+    href: linkState.href,
+    attrs: linkState.attrs,
     setLink: applyLink,
     unsetLink: removeLink,
     close: closeLink
-  }), [applyLink, closeLink, link, removeLink]);
+  }), [applyLink, closeLink, linkState, removeLink]);
   const refreshLink = useCallback(() => {
     if (!editor.current) return;
     const a = editor.current.getAttributes('link');
@@ -318,7 +322,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     const key = href + ' ' + JSON.stringify(a);
     if (key === lastLinkKey.current) return;
     lastLinkKey.current = key;
-    setLink({
+    setLinkState({
       href,
       attrs: a
     });
@@ -682,7 +686,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     return true;
   }
   // ── Imperative handle (Phase 21 $expose) — TipTap is command-rich, so this is
-  // the marquee surface: 16 verbs over the live Editor, uniform across all 6
+  // the marquee surface: 25 verbs over the live Editor, uniform across all 6
   // targets. Each guards the pre-mount / destroyed `editor = null`.
   //
   // Collision discipline:
@@ -690,7 +694,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   //     prop makes React auto-generate a `setHtml` state setter, so a `setHtml`
   //     $expose verb would collide on the React target (ROZ524). (CodeMirror's
   //     setValue→replaceValue lesson, html edition.)
-  //   - None of the 14 names collide with LitElement reserved lifecycle methods
+  //   - None of the 25 names collide with LitElement reserved lifecycle methods
   //     (update/render/firstUpdated/updated/willUpdate/requestUpdate).
   //   - The focus/blur COMMANDS are named `focusEditor`/`blurEditor`, NOT
   //     `focus`/`blur` — the component emits `focus`/`blur` EVENTS, and on
@@ -834,6 +838,50 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
   function getWordCount() {
     if (!editor.current) return 0;
     return editor.current.storage.characterCount ? editor.current.storage.characterCount.words() : editor.current.getText().split(/\s+/).filter(Boolean).length;
+  }
+  // setLink(attrs) / unsetLink() (D-03, residual 3) — thin delegates to the SAME
+  // applyLink/removeLink the #linkEditor slot scope hands a consumer fragment
+  // (buildLinkScope above), so the imperative handle and the slot-scope verb
+  // implementation cannot disagree. Four-way collision check:
+  //   - not a prop name — the 14 props are html / editable / placeholder /
+  //     autofocus / editorClass / ariaLabel / editorProps / extensions /
+  //     starterKit / nodeSpecs / uploadImage / maxLength / enforceMaxLength /
+  //     bubbleMenuShouldShow;
+  //   - not an emitted event name — the 4 events are update / selectionUpdate /
+  //     focus / blur (the ROZ121 Angular output-field-vs-method rule);
+  //   - not an existing $expose verb — the 23 names already in the object below;
+  //   - not a React auto-generated model setter — the only model prop is
+  //     `html`, whose setter is `setHtml` (the ROZ524 rule that forced
+  //     `setContent`), and not a LitElement lifecycle method (update / render /
+  //     firstUpdated / updated / willUpdate / requestUpdate).
+  // applyLink already ignores an attrs object without a non-empty string href
+  // (no degenerate empty-href anchor is ever written), and both verbs no-op
+  // before mount / after destroy through the `editor?.` guards already inside
+  // applyLink/removeLink — no second validation path is introduced.
+  // setLink(attrs) / unsetLink() (D-03, residual 3) — thin delegates to the SAME
+  // applyLink/removeLink the #linkEditor slot scope hands a consumer fragment
+  // (buildLinkScope above), so the imperative handle and the slot-scope verb
+  // implementation cannot disagree. Four-way collision check:
+  //   - not a prop name — the 14 props are html / editable / placeholder /
+  //     autofocus / editorClass / ariaLabel / editorProps / extensions /
+  //     starterKit / nodeSpecs / uploadImage / maxLength / enforceMaxLength /
+  //     bubbleMenuShouldShow;
+  //   - not an emitted event name — the 4 events are update / selectionUpdate /
+  //     focus / blur (the ROZ121 Angular output-field-vs-method rule);
+  //   - not an existing $expose verb — the 23 names already in the object below;
+  //   - not a React auto-generated model setter — the only model prop is
+  //     `html`, whose setter is `setHtml` (the ROZ524 rule that forced
+  //     `setContent`), and not a LitElement lifecycle method (update / render /
+  //     firstUpdated / updated / willUpdate / requestUpdate).
+  // applyLink already ignores an attrs object without a non-empty string href
+  // (no degenerate empty-href anchor is ever written), and both verbs no-op
+  // before mount / after destroy through the `editor?.` guards already inside
+  // applyLink/removeLink — no second validation path is introduced.
+  function setLink(attrs: any) {
+    applyLink(attrs);
+  }
+  function unsetLink() {
+    removeLink();
   }
 
   const _buildDefaultLinkEditorRef = useRef(buildDefaultLinkEditor);
@@ -1161,6 +1209,14 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
         linkEditorHandle.current = portals.linkEditor(linkEditorEl.current, _buildLinkScopeRef.current());
       } else {
         _buildDefaultLinkEditorRef.current(linkEditorEl.current);
+        // Prefill correction (D-04): the refreshLink() call above (right after
+        // `new Editor(...)`) already computed $data.linkState.href from the
+        // initial document — but linkInputEl didn't exist yet at that point, so
+        // it latched lastLinkKey and every LATER refreshLink() for the same link
+        // early-returns, leaving the just-created input empty even when the
+        // caret starts inside a link. Seed it directly from the already-computed
+        // state; a no-link mount leaves this the empty string (unchanged).
+        if (linkInputEl.current) linkInputEl.current.value = _linkStateRef.current.href;
       }
     }
     return () => {
@@ -1198,9 +1254,9 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     editor.current?.setEditable(v, false);
   }, [props.editable]);
 
-  const _rozieExposeRef = useRef({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor });
-  _rozieExposeRef.current = { getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor };
-  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => _rozieExposeRef.current.getEditor(...args), focusEditor: (...args: Parameters<typeof focusEditor>): ReturnType<typeof focusEditor> => _rozieExposeRef.current.focusEditor(...args), blurEditor: (...args: Parameters<typeof blurEditor>): ReturnType<typeof blurEditor> => _rozieExposeRef.current.blurEditor(...args), getHTML: (...args: Parameters<typeof getHTML>): ReturnType<typeof getHTML> => _rozieExposeRef.current.getHTML(...args), getJSON: (...args: Parameters<typeof getJSON>): ReturnType<typeof getJSON> => _rozieExposeRef.current.getJSON(...args), getText: (...args: Parameters<typeof getText>): ReturnType<typeof getText> => _rozieExposeRef.current.getText(...args), setContent: (...args: Parameters<typeof setContent>): ReturnType<typeof setContent> => _rozieExposeRef.current.setContent(...args), clearContent: (...args: Parameters<typeof clearContent>): ReturnType<typeof clearContent> => _rozieExposeRef.current.clearContent(...args), toggleBold: (...args: Parameters<typeof toggleBold>): ReturnType<typeof toggleBold> => _rozieExposeRef.current.toggleBold(...args), toggleItalic: (...args: Parameters<typeof toggleItalic>): ReturnType<typeof toggleItalic> => _rozieExposeRef.current.toggleItalic(...args), toggleHeading: (...args: Parameters<typeof toggleHeading>): ReturnType<typeof toggleHeading> => _rozieExposeRef.current.toggleHeading(...args), toggleBulletList: (...args: Parameters<typeof toggleBulletList>): ReturnType<typeof toggleBulletList> => _rozieExposeRef.current.toggleBulletList(...args), toggleUnderline: (...args: Parameters<typeof toggleUnderline>): ReturnType<typeof toggleUnderline> => _rozieExposeRef.current.toggleUnderline(...args), toggleOrderedList: (...args: Parameters<typeof toggleOrderedList>): ReturnType<typeof toggleOrderedList> => _rozieExposeRef.current.toggleOrderedList(...args), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => _rozieExposeRef.current.undo(...args), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => _rozieExposeRef.current.redo(...args), chain: (...args: Parameters<typeof chain>): ReturnType<typeof chain> => _rozieExposeRef.current.chain(...args), isActive: (...args: Parameters<typeof isActive>): ReturnType<typeof isActive> => _rozieExposeRef.current.isActive(...args), can: (...args: Parameters<typeof can>): ReturnType<typeof can> => _rozieExposeRef.current.can(...args), isEmpty: (...args: Parameters<typeof isEmpty>): ReturnType<typeof isEmpty> => _rozieExposeRef.current.isEmpty(...args), getCharacterCount: (...args: Parameters<typeof getCharacterCount>): ReturnType<typeof getCharacterCount> => _rozieExposeRef.current.getCharacterCount(...args), getWordCount: (...args: Parameters<typeof getWordCount>): ReturnType<typeof getWordCount> => _rozieExposeRef.current.getWordCount(...args), openLinkEditor: (...args: Parameters<typeof openLinkEditor>): ReturnType<typeof openLinkEditor> => _rozieExposeRef.current.openLinkEditor(...args) }), []);
+  const _rozieExposeRef = useRef({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor, setLink, unsetLink });
+  _rozieExposeRef.current = { getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor, setLink, unsetLink };
+  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => _rozieExposeRef.current.getEditor(...args), focusEditor: (...args: Parameters<typeof focusEditor>): ReturnType<typeof focusEditor> => _rozieExposeRef.current.focusEditor(...args), blurEditor: (...args: Parameters<typeof blurEditor>): ReturnType<typeof blurEditor> => _rozieExposeRef.current.blurEditor(...args), getHTML: (...args: Parameters<typeof getHTML>): ReturnType<typeof getHTML> => _rozieExposeRef.current.getHTML(...args), getJSON: (...args: Parameters<typeof getJSON>): ReturnType<typeof getJSON> => _rozieExposeRef.current.getJSON(...args), getText: (...args: Parameters<typeof getText>): ReturnType<typeof getText> => _rozieExposeRef.current.getText(...args), setContent: (...args: Parameters<typeof setContent>): ReturnType<typeof setContent> => _rozieExposeRef.current.setContent(...args), clearContent: (...args: Parameters<typeof clearContent>): ReturnType<typeof clearContent> => _rozieExposeRef.current.clearContent(...args), toggleBold: (...args: Parameters<typeof toggleBold>): ReturnType<typeof toggleBold> => _rozieExposeRef.current.toggleBold(...args), toggleItalic: (...args: Parameters<typeof toggleItalic>): ReturnType<typeof toggleItalic> => _rozieExposeRef.current.toggleItalic(...args), toggleHeading: (...args: Parameters<typeof toggleHeading>): ReturnType<typeof toggleHeading> => _rozieExposeRef.current.toggleHeading(...args), toggleBulletList: (...args: Parameters<typeof toggleBulletList>): ReturnType<typeof toggleBulletList> => _rozieExposeRef.current.toggleBulletList(...args), toggleUnderline: (...args: Parameters<typeof toggleUnderline>): ReturnType<typeof toggleUnderline> => _rozieExposeRef.current.toggleUnderline(...args), toggleOrderedList: (...args: Parameters<typeof toggleOrderedList>): ReturnType<typeof toggleOrderedList> => _rozieExposeRef.current.toggleOrderedList(...args), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => _rozieExposeRef.current.undo(...args), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => _rozieExposeRef.current.redo(...args), chain: (...args: Parameters<typeof chain>): ReturnType<typeof chain> => _rozieExposeRef.current.chain(...args), isActive: (...args: Parameters<typeof isActive>): ReturnType<typeof isActive> => _rozieExposeRef.current.isActive(...args), can: (...args: Parameters<typeof can>): ReturnType<typeof can> => _rozieExposeRef.current.can(...args), isEmpty: (...args: Parameters<typeof isEmpty>): ReturnType<typeof isEmpty> => _rozieExposeRef.current.isEmpty(...args), getCharacterCount: (...args: Parameters<typeof getCharacterCount>): ReturnType<typeof getCharacterCount> => _rozieExposeRef.current.getCharacterCount(...args), getWordCount: (...args: Parameters<typeof getWordCount>): ReturnType<typeof getWordCount> => _rozieExposeRef.current.getWordCount(...args), openLinkEditor: (...args: Parameters<typeof openLinkEditor>): ReturnType<typeof openLinkEditor> => _rozieExposeRef.current.openLinkEditor(...args), setLink: (...args: Parameters<typeof setLink>): ReturnType<typeof setLink> => _rozieExposeRef.current.setLink(...args), unsetLink: (...args: Parameters<typeof unsetLink>): ReturnType<typeof unsetLink> => _rozieExposeRef.current.unsetLink(...args) }), []);
 
   return (
     <>

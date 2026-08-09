@@ -1,6 +1,6 @@
 # @rozie-ui/tiptap-solid
 
-Idiomatic **solid** `TipTap` — a cross-framework rich-text editor component compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source wrapping [TipTap](https://tiptap.dev/) (the ProseMirror-based headless editor). Two-way `html` content binding, a batteries-included toolbar (or bring your own via the `toolbar` slot), a 14-verb imperative command handle, and `editorProps`/`extensions` passthroughs. This package is generated; do not edit `src/` by hand.
+Idiomatic **solid** `TipTap` — a cross-framework rich-text editor component compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source wrapping [TipTap](https://tiptap.dev/) (the ProseMirror-based headless editor). Two-way `html` content binding, a batteries-included toolbar (or bring your own via the `toolbar` slot), a 25-verb imperative command handle, and `editorProps`/`extensions` passthroughs. This package is generated; do not edit `src/` by hand.
 
 ## Install
 
@@ -89,6 +89,8 @@ const html = handle?.getHTML();
 | `getCharacterCount` | Return the current character count. Reads the CharacterCount extension's live storage when registered (`maxLength` set or the `#count` slot filled), else falls back to `getText().length`. Always a number — 0 before mount. |
 | `getWordCount` | Return the current word count. Reads the CharacterCount extension's live storage when registered, else falls back to a whitespace-split count of `getText()`. Always a number — 0 before mount. |
 | `openLinkEditor` | Open the link editor on the current selection (create mode) — the imperative equivalent of clicking the toolbar Link button. Surfaces the editor prefilled with any existing link href; no-op before mount. |
+| `setLink` | Apply or replace a link on the current selection, widening to the whole link mark first — `setLink({ href })`, with any additional stock attrs (`target`, `rel`, `class`, `title`) forwarded verbatim. An attrs object without a non-empty `href` is ignored. Attrs the registered `Link` extension does not declare are dropped by the extension itself — persisting a custom attribute requires `Link.extend({ addAttributes })` via the `extensions` prop. No-op before mount. |
+| `unsetLink` | Remove the link mark from the current selection, widening to the whole link first. No-op before mount. |
 
 ## Slots
 

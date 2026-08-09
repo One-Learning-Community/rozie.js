@@ -346,7 +346,7 @@ export class TipTap {
     characters: 0,
     words: 0
   });
-  link = signal({
+  linkState = signal({
     href: '',
     attrs: {}
   });
@@ -787,6 +787,14 @@ export class TipTap {
         this.linkEditorHandle = portals.linkEditor(this.linkEditorEl, this.buildLinkScope());
       } else {
         this.buildDefaultLinkEditor(this.linkEditorEl);
+        // Prefill correction (D-04): the refreshLink() call above (right after
+        // `new Editor(...)`) already computed $data.linkState.href from the
+        // initial document — but linkInputEl didn't exist yet at that point, so
+        // it latched lastLinkKey and every LATER refreshLink() for the same link
+        // early-returns, leaving the just-created input empty even when the
+        // caret starts inside a link. Seed it directly from the already-computed
+        // state; a no-link mount leaves this the empty string (unchanged).
+        if (this.linkInputEl) this.linkInputEl.value = this.linkState().href;
       }
     }
     this.__rozieDestroyRef.onDestroy(() => {
@@ -854,13 +862,13 @@ export class TipTap {
     // current link href. The surface itself is link-anchored (like Google Docs) — it
     // stays while the caret is on a link and hides once openFlag is clear and the
     // caret is off any link (or the doc is not editable).
-    if (this.linkInputEl) this.linkInputEl.value = this.link().href;
+    if (this.linkInputEl) this.linkInputEl.value = this.linkState().href;
     this.editor?.commands.focus();
   };
   buildLinkScope = () => ({
     editor: this.editor,
-    href: this.link().href,
-    attrs: this.link().attrs,
+    href: this.linkState().href,
+    attrs: this.linkState().attrs,
     setLink: this.applyLink,
     unsetLink: this.removeLink,
     close: this.closeLink
@@ -876,7 +884,7 @@ export class TipTap {
     const key = href + ' ' + JSON.stringify(a);
     if (key === this.lastLinkKey) return;
     this.lastLinkKey = key;
-    this.link.set({
+    this.linkState.set({
       href,
       attrs: a
     });
@@ -1288,6 +1296,12 @@ export class TipTap {
   getWordCount = () => {
     if (!this.editor) return 0;
     return this.editor.storage.characterCount ? this.editor.storage.characterCount.words() : this.editor.getText().split(/\s+/).filter(Boolean).length;
+  };
+  setLink = (attrs: any) => {
+    this.applyLink(attrs);
+  };
+  unsetLink = () => {
+    this.removeLink();
   };
 
   private __rozieCvaOnChange: (v: string) => void = () => {};

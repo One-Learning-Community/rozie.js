@@ -13,7 +13,7 @@
  *   - The focus/blur COMMANDS are `focusEditor`/`blurEditor`, NOT `focus`/`blur`
  *     — the component emits `focus`/`blur` EVENTS, and on class-based targets
  *     (Angular) an output field and a method cannot share a name (ROZ121).
- *   - None of the 22 names collides with the 11 props or LitElement lifecycle.
+ *   - None of the 25 names collides with the 11 props or LitElement lifecycle.
  */
 export const handleManifest = {
   getEditor:
@@ -50,6 +50,10 @@ export const handleManifest = {
     'Return the current word count. Reads the CharacterCount extension\'s live storage when registered, else falls back to a whitespace-split count of `getText()`. Always a number — 0 before mount.',
   openLinkEditor:
     'Open the link editor on the current selection (create mode) — the imperative equivalent of clicking the toolbar Link button. Surfaces the editor prefilled with any existing link href; no-op before mount.',
+  setLink:
+    'Apply or replace a link on the current selection, widening to the whole link mark first — `setLink({ href })`, with any additional stock attrs (`target`, `rel`, `class`, `title`) forwarded verbatim. An attrs object without a non-empty `href` is ignored. Attrs the registered `Link` extension does not declare are dropped by the extension itself — persisting a custom attribute requires `Link.extend({ addAttributes })` via the `extensions` prop. No-op before mount.',
+  unsetLink:
+    'Remove the link mark from the current selection, widening to the whole link first. No-op before mount.',
 };
 
 export default handleManifest;
