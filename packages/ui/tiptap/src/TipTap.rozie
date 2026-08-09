@@ -350,6 +350,30 @@ const removeLink = () => {
   editor?.chain().focus().extendMarkRange('link').unsetLink().run()
   openFlag = false
 }
+// Force the link-editor BubbleMenu to open/close right now, matching openFlag
+// (bug fix — quick 260809-6zp). `editor?.commands.focus()` alone is NOT
+// sufficient: TipTap's `focus` command early-returns with NO dispatch whenever
+// `view.hasFocus() && position === null` (the whole document is already
+// focused — the COMMON case once the create/close affordance is invoked from
+// a `@mousedown.prevent`-guarded control, which deliberately never blurs the
+// editor). And even a dispatched but otherwise-INERT transaction (no doc/
+// selection change) is not enough either: @tiptap/extension-bubble-menu's own
+// `update()` short-circuits with `isSame = !selectionChanged && !docChanged`
+// BEFORE it ever re-runs `shouldShow` — so a no-op dispatch is silently
+// swallowed by the extension's OWN guard, not just TipTap's `focus` command.
+// The extension's `transactionHandler` (its own doc comment: "This allows
+// external code to trigger ... via `editor.view.dispatch(editor.state.tr
+// .setMeta(pluginKey, 'updatePosition'))`") is the official escape hatch: a
+// transaction tagged with THIS surface's own `pluginKey` ('rozieLinkEditor')
+// calls `show()`/`hide()` directly, bypassing both guards. This bit both
+// `openLinkEditor` (create-mode toolbar button) and `closeLink` (built-in
+// Cancel AND any consumer `close()`), on every target, whenever the editor
+// was already focused. `editor` is the raw TipTap `Editor` instance on all 6.
+const forceMenuRecheck = () => {
+  if (!editor) return
+  const visible = editor.isEditable && (editor.isActive('link') || openFlag)
+  editor.view.dispatch(editor.state.tr.setMeta('rozieLinkEditor', visible ? 'show' : 'hide'))
+}
 const closeLink = () => {
   openFlag = false
   // "Cancel" = discard the unsaved edit: revert the built-in form's input to the
@@ -358,16 +382,26 @@ const closeLink = () => {
   // caret is off any link (or the doc is not editable).
   if (linkInputEl) linkInputEl.value = $data.linkState.href
   editor?.commands.focus()
+  forceMenuRecheck()
 }
 // The reactive `#linkEditor` slot scope — keys EXACTLY { editor, href, attrs,
 // setLink, unsetLink, close } (spec §5.3). `attrs` is the raw link mark attrs
 // object so a consumer can read custom attrs (e.g. data-course-link); setLink
 // forwards whatever attrs object it is handed VERBATIM (REQ-42 — persistence of a
 // custom attr is the consumer's Link.extend concern, not this wrapper's).
-const buildLinkScope = () => ({
+//
+// Takes `href`/`attrs` as PARAMETERS rather than reading `$data.linkState` —
+// every caller has just computed (or is about to compute) these values
+// directly from the live editor, and reading them back off `$data`
+// immediately after a same-tick write hits the React setState-is-async
+// stale-read trap (the D-04 prefill fix's own class of bug, here on the
+// ONGOING reactive-refresh path rather than the one-time mount path). Passing
+// them straight through keeps every target reading the value that was ACTUALLY
+// just computed, not a framework-buffered echo of it.
+const buildLinkScope = (href, attrs) => ({
   editor,
-  href: $data.linkState.href,
-  attrs: $data.linkState.attrs,
+  href,
+  attrs,
   setLink: applyLink,
   unsetLink: removeLink,
   close: closeLink,
@@ -389,7 +423,7 @@ const refreshLink = () => {
   lastLinkKey = key
   $data.linkState = { href, attrs: a }
   if (linkEditorHandle) {
-    linkEditorHandle.update(buildLinkScope())
+    linkEditorHandle.update(buildLinkScope(href, a))
   } else if (linkInputEl && !linkInputEl.matches(':focus')) {
     // `matches(':focus')` (NOT `document.activeElement === linkInputEl`) so the "is
     // the user typing in this input?" guard holds inside a shadow root — on the Lit
@@ -407,6 +441,7 @@ const openLinkEditor = () => {
   openFlag = true
   editor?.commands.focus()
   refreshLink()
+  forceMenuRecheck()
 }
 // Build the batteries-included default link-editor form imperatively into the
 // engine-managed host (the bubble-menu extension owns positioning). Vanilla DOM
@@ -970,17 +1005,28 @@ $onMount(() => {
   // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
   if (linkEditorEl) {
     if ($slots.linkEditor) {
-      linkEditorHandle = $portals.linkEditor(linkEditorEl, buildLinkScope())
+      // Read the initial link attrs straight off the live editor (NOT
+      // `$data.linkState`, written by the refreshLink() call above in this
+      // same tick) — the same React stale-read avoidance as buildLinkScope's
+      // other call site.
+      const initialLinkAttrs = editor.getAttributes('link')
+      linkEditorHandle = $portals.linkEditor(linkEditorEl, buildLinkScope(initialLinkAttrs.href || '', initialLinkAttrs))
     } else {
       buildDefaultLinkEditor(linkEditorEl)
       // Prefill correction (D-04): the refreshLink() call above (right after
-      // `new Editor(...)`) already computed $data.linkState.href from the
-      // initial document — but linkInputEl didn't exist yet at that point, so
-      // it latched lastLinkKey and every LATER refreshLink() for the same link
-      // early-returns, leaving the just-created input empty even when the
-      // caret starts inside a link. Seed it directly from the already-computed
-      // state; a no-link mount leaves this the empty string (unchanged).
-      if (linkInputEl) linkInputEl.value = $data.linkState.href
+      // `new Editor(...)`) already latched lastLinkKey — linkInputEl didn't
+      // exist yet at that point, so every LATER refreshLink() for the same
+      // link early-returns, leaving the just-created input empty even when the
+      // caret starts inside a link. Seed it directly from the LIVE editor
+      // (`editor.getAttributes('link')`), NOT `$data.linkState` — reading a
+      // $data key immediately after refreshLink() just wrote it hits the
+      // React setState-is-async stale-read trap (the same write-then-read-in-
+      // one-handler class ROZ138 warns about elsewhere in this file), since
+      // $data.linkState was written by the refreshLink() call directly above.
+      // `editor` is a plain instance handle, not reactive state, so reading it
+      // straight off the engine is synchronous and target-uniform. A no-link
+      // mount leaves this the empty string (unchanged).
+      if (linkInputEl) linkInputEl.value = editor.getAttributes('link').href || ''
     }
   }
 

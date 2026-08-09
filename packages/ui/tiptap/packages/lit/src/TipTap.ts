@@ -796,17 +796,28 @@ private _portalContainers = new Set<HTMLElement>();
     // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
     if (this.linkEditorEl) {
       if (this.linkEditor !== undefined) {
-        this.linkEditorHandle = portals.linkEditor(this.linkEditorEl, this.buildLinkScope());
+        // Read the initial link attrs straight off the live editor (NOT
+        // `$data.linkState`, written by the refreshLink() call above in this
+        // same tick) — the same React stale-read avoidance as buildLinkScope's
+        // other call site.
+        const initialLinkAttrs = this.editor.getAttributes('link');
+        this.linkEditorHandle = portals.linkEditor(this.linkEditorEl, this.buildLinkScope(initialLinkAttrs.href || '', initialLinkAttrs));
       } else {
         this.buildDefaultLinkEditor(this.linkEditorEl);
         // Prefill correction (D-04): the refreshLink() call above (right after
-        // `new Editor(...)`) already computed $data.linkState.href from the
-        // initial document — but linkInputEl didn't exist yet at that point, so
-        // it latched lastLinkKey and every LATER refreshLink() for the same link
-        // early-returns, leaving the just-created input empty even when the
-        // caret starts inside a link. Seed it directly from the already-computed
-        // state; a no-link mount leaves this the empty string (unchanged).
-        if (this.linkInputEl) this.linkInputEl.value = this._linkState.value.href;
+        // `new Editor(...)`) already latched lastLinkKey — linkInputEl didn't
+        // exist yet at that point, so every LATER refreshLink() for the same
+        // link early-returns, leaving the just-created input empty even when the
+        // caret starts inside a link. Seed it directly from the LIVE editor
+        // (`editor.getAttributes('link')`), NOT `$data.linkState` — reading a
+        // $data key immediately after refreshLink() just wrote it hits the
+        // React setState-is-async stale-read trap (the same write-then-read-in-
+        // one-handler class ROZ138 warns about elsewhere in this file), since
+        // $data.linkState was written by the refreshLink() call directly above.
+        // `editor` is a plain instance handle, not reactive state, so reading it
+        // straight off the engine is synchronous and target-uniform. A no-link
+        // mount leaves this the empty string (unchanged).
+        if (this.linkInputEl) this.linkInputEl.value = this.editor.getAttributes('link').href || '';
       }
     }
   }
@@ -926,6 +937,12 @@ private _portalContainers = new Set<HTMLElement>();
   this.openFlag = false;
 };
 
+  forceMenuRecheck = () => {
+  if (!this.editor) return;
+  const visible = this.editor.isEditable && (this.editor.isActive('link') || this.openFlag);
+  this.editor.view.dispatch(this.editor.state.tr.setMeta('rozieLinkEditor', visible ? 'show' : 'hide'));
+};
+
   closeLink = () => {
   this.openFlag = false;
   // "Cancel" = discard the unsaved edit: revert the built-in form's input to the
@@ -934,12 +951,13 @@ private _portalContainers = new Set<HTMLElement>();
   // caret is off any link (or the doc is not editable).
   if (this.linkInputEl) this.linkInputEl.value = this._linkState.value.href;
   this.editor?.commands.focus();
+  this.forceMenuRecheck();
 };
 
-  buildLinkScope = () => ({
+  buildLinkScope = (href: any, attrs: any) => ({
   editor: this.editor,
-  href: this._linkState.value.href,
-  attrs: this._linkState.value.attrs,
+  href,
+  attrs,
   setLink: this.applyLink,
   unsetLink: this.removeLink,
   close: this.closeLink
@@ -961,7 +979,7 @@ private _portalContainers = new Set<HTMLElement>();
     attrs: a
   };
   if (this.linkEditorHandle) {
-    this.linkEditorHandle.update(this.buildLinkScope());
+    this.linkEditorHandle.update(this.buildLinkScope(href, a));
   } else if (this.linkInputEl && !this.linkInputEl.matches(':focus')) {
     // `matches(':focus')` (NOT `document.activeElement === linkInputEl`) so the "is
     // the user typing in this input?" guard holds inside a shadow root — on the Lit
@@ -976,6 +994,7 @@ private _portalContainers = new Set<HTMLElement>();
   this.openFlag = true;
   this.editor?.commands.focus();
   this.refreshLink();
+  this.forceMenuRecheck();
 };
 
   buildDefaultLinkEditor = (el: any) => {

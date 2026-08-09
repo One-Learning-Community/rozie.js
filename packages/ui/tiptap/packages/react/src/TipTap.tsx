@@ -259,8 +259,6 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     href: '',
     attrs: {}
   });
-  const _linkStateRef = useRef(linkState);
-  _linkStateRef.current = linkState;
   const toolbarEl = useRef<HTMLDivElement | null>(null);
   const editorEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
@@ -294,6 +292,11 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     editor.current?.chain().focus().extendMarkRange('link').unsetLink().run();
     openFlag.current = false;
   }
+  function forceMenuRecheck() {
+    if (!editor.current) return;
+    const visible = editor.current.isEditable && (editor.current.isActive('link') || openFlag.current);
+    editor.current.view.dispatch(editor.current.state.tr.setMeta('rozieLinkEditor', visible ? 'show' : 'hide'));
+  }
   function closeLink() {
     openFlag.current = false;
     // "Cancel" = discard the unsaved edit: revert the built-in form's input to the
@@ -302,15 +305,16 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // caret is off any link (or the doc is not editable).
     if (linkInputEl.current) linkInputEl.current.value = linkState.href;
     editor.current?.commands.focus();
+    forceMenuRecheck();
   }
-  const buildLinkScope = useCallback(() => ({
+  const buildLinkScope = useCallback((href: any, attrs: any) => ({
     editor: editor.current,
-    href: linkState.href,
-    attrs: linkState.attrs,
+    href,
+    attrs,
     setLink: applyLink,
     unsetLink: removeLink,
     close: closeLink
-  }), [applyLink, closeLink, linkState, removeLink]);
+  }), [applyLink, closeLink, removeLink]);
   const refreshLink = useCallback(() => {
     if (!editor.current) return;
     const a = editor.current.getAttributes('link');
@@ -327,7 +331,7 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
       attrs: a
     });
     if (linkEditorHandle.current) {
-      linkEditorHandle.current.update(buildLinkScope());
+      linkEditorHandle.current.update(buildLinkScope(href, a));
     } else if (linkInputEl.current && !linkInputEl.current.matches(':focus')) {
       // `matches(':focus')` (NOT `document.activeElement === linkInputEl`) so the "is
       // the user typing in this input?" guard holds inside a shadow root — on the Lit
@@ -341,7 +345,8 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     openFlag.current = true;
     editor.current?.commands.focus();
     refreshLink();
-  }, [refreshLink]);
+    forceMenuRecheck();
+  }, [forceMenuRecheck, refreshLink]);
   const buildDefaultLinkEditor = useCallback((el: any) => {
     const input = document.createElement('input');
     input.type = 'text';
@@ -1206,17 +1211,28 @@ const TipTap = forwardRef<TipTapHandle, TipTapProps>(function TipTap(_props: Tip
     // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
     if (linkEditorEl.current) {
       if ((props.renderLinkEditor ?? props.slots?.["linkEditor"])) {
-        linkEditorHandle.current = portals.linkEditor(linkEditorEl.current, _buildLinkScopeRef.current());
+        // Read the initial link attrs straight off the live editor (NOT
+        // `$data.linkState`, written by the refreshLink() call above in this
+        // same tick) — the same React stale-read avoidance as buildLinkScope's
+        // other call site.
+        const initialLinkAttrs = editor.current.getAttributes('link');
+        linkEditorHandle.current = portals.linkEditor(linkEditorEl.current, _buildLinkScopeRef.current(initialLinkAttrs.href || '', initialLinkAttrs));
       } else {
         _buildDefaultLinkEditorRef.current(linkEditorEl.current);
         // Prefill correction (D-04): the refreshLink() call above (right after
-        // `new Editor(...)`) already computed $data.linkState.href from the
-        // initial document — but linkInputEl didn't exist yet at that point, so
-        // it latched lastLinkKey and every LATER refreshLink() for the same link
-        // early-returns, leaving the just-created input empty even when the
-        // caret starts inside a link. Seed it directly from the already-computed
-        // state; a no-link mount leaves this the empty string (unchanged).
-        if (linkInputEl.current) linkInputEl.current.value = _linkStateRef.current.href;
+        // `new Editor(...)`) already latched lastLinkKey — linkInputEl didn't
+        // exist yet at that point, so every LATER refreshLink() for the same
+        // link early-returns, leaving the just-created input empty even when the
+        // caret starts inside a link. Seed it directly from the LIVE editor
+        // (`editor.getAttributes('link')`), NOT `$data.linkState` — reading a
+        // $data key immediately after refreshLink() just wrote it hits the
+        // React setState-is-async stale-read trap (the same write-then-read-in-
+        // one-handler class ROZ138 warns about elsewhere in this file), since
+        // $data.linkState was written by the refreshLink() call directly above.
+        // `editor` is a plain instance handle, not reactive state, so reading it
+        // straight off the engine is synchronous and target-uniform. A no-link
+        // mount leaves this the empty string (unchanged).
+        if (linkInputEl.current) linkInputEl.current.value = editor.current.getAttributes('link').href || '';
       }
     }
     return () => {
