@@ -56,6 +56,19 @@ for (const target of TARGETS) {
   runner(`code-mirror [${target}]: r-model:value round-trips between two editor instances`, async ({
     page,
   }) => {
+    // ERROR TRAP — same contract as the expanded-surface leg below: a clean
+    // round-trip emits zero uncaught page errors and zero console.error.
+    const pageErrors: string[] = [];
+    const consoleErrors: string[] = [];
+    page.on('pageerror', (err) => {
+      pageErrors.push(err.message);
+    });
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+
     await page.goto(`/?example=CodeMirror&target=${target}`);
     const mount = page.getByTestId('rozie-mount');
     await expect(mount).toBeVisible();
@@ -175,6 +188,11 @@ for (const target of TARGETS) {
         intervals: [100, 200, 400],
       })
       .toBe(themeClassBefore);
+
+    // ---- ERROR TRAP (listeners at the top of this test) ----
+    await page.waitForTimeout(250);
+    expect(pageErrors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
   });
 }
 
@@ -401,6 +419,27 @@ for (const target of TARGETS) {
       await expect(mount.getByTestId('state-handle-out')).toHaveText('scrolled', {
         timeout: 10_000,
       });
+
+      // ---- focus + setSelection — the last 2 of the 12 verbs, each with its
+      // own observable assertion (previously exercised only as side-effects
+      // inside insertText/getSelection). `focus` is proven structurally: CM
+      // stamps `.cm-focused` on the focused `.cm-editor` — clicking the button
+      // moves focus to the button, then the handler programmatically refocuses
+      // the editor, so the class appearing IS the verb landing.
+      await mount.getByTestId('handle-focus').click();
+      await expect(mount.getByTestId('state-handle-out')).toHaveText('focused', {
+        timeout: 10_000,
+      });
+      await expect(
+        surfaceCell.locator('.cm-editor.cm-focused'),
+      ).toHaveCount(1, { timeout: 10_000 });
+      // setSelection round-trips a fixed {anchor:2, head:5} range back out
+      // through getSelection — the marker proves the range LANDED.
+      await mount.getByTestId('handle-set-selection').click();
+      await expect(mount.getByTestId('state-handle-out')).toHaveText(
+        'setsel 2-5',
+        { timeout: 10_000 },
+      );
     }
 
     // ---- D-05 panel portal slot mount + dispose ----
@@ -444,6 +483,43 @@ for (const target of TARGETS) {
     // Editor F and move the caret with arrow keys; mounts must stay at 1 while
     // updates climbs — i.e. the fragment is NOT remounted per caret move.
     //
+    // ---- HARD reconciliation proof via the deterministic caret stepper ----
+    // The keyboard soft-try below can silently skip on targets where key
+    // synthesis fails (Lit's shadow root), leaving the reconciliation proof
+    // quietly absent there. The `tip-step` button steps Editor F's caret
+    // through the tipEd ref's setSelection verb — a plain button click works
+    // on ALL six targets, so this is a hard assertion, not a soft try. Three
+    // steps must advance the update counter while the mount counter holds at
+    // 1 (in-place re-render, no remount).
+    await expect(mount.getByTestId('state-tip-mounts')).toContainText(
+      'mounts:1',
+      { timeout: 10_000 },
+    );
+    const stepUpdatesBefore = Number(
+      (
+        (await mount.getByTestId('state-tip-updates').textContent()) ?? ''
+      ).replace(/\D/g, ''),
+    );
+    for (let i = 0; i < 3; i++) {
+      await mount.getByTestId('tip-step').click();
+      await page.waitForTimeout(80);
+    }
+    await expect
+      .poll(
+        async () =>
+          Number(
+            (
+              (await mount.getByTestId('state-tip-updates').textContent()) ?? ''
+            ).replace(/\D/g, ''),
+          ),
+        { timeout: 10_000, intervals: [100, 200, 400] },
+      )
+      .toBeGreaterThanOrEqual(stepUpdatesBefore + 3);
+    await expect(mount.getByTestId('state-tip-mounts')).toContainText(
+      'mounts:1',
+      { timeout: 5_000 },
+    );
+
     // Soft-try: contenteditable focus + key synthesis varies across the 6
     // targets (Lit hosts inside a ShadowRoot); the topPanel structural gate
     // above is the primary G5-wave-1 smoke, this is the reconciliation bonus.
@@ -514,6 +590,31 @@ for (const target of TARGETS) {
     await expect(basicSetupCell.locator('.cm-foldGutter')).toHaveCount(0, {
       timeout: 10_000,
     });
+
+    // ---- `/languages` preset subpath — runtime proof (Editor I) ----
+    // The demo feeds the `web` preset (lang-html + embedded CSS/JS) through
+    // `:extensions` with basicSetup:true (supplies the defaultHighlightStyle
+    // fallback). The HTML doc parses into styled token <span>s inside
+    // `.cm-line` — a signal a plaintext/unhighlighted doc never produces
+    // (thin-baseline editors render bare text nodes). This is the ONLY
+    // runtime exercise of the leaf `/languages` module anywhere in the suite;
+    // the family's languages.test.ts covers preset instantiation + six-leaf
+    // byte-identity statically.
+    const langCell = mount.getByTestId('lang-cell');
+    await expect(langCell).toBeVisible({ timeout: 10_000 });
+    await expect
+      .poll(
+        async () =>
+          (await langCell.locator('.cm-content').first().textContent()) ?? '',
+        { timeout: 10_000, intervals: [200, 400, 800] },
+      )
+      .toContain('hello');
+    await expect
+      .poll(
+        async () => langCell.locator('.cm-line span').count(),
+        { timeout: 10_000, intervals: [200, 400, 800] },
+      )
+      .toBeGreaterThan(0);
 
     // ---- D7S-06 gutter + decoration REACTIVE MULTI-INSTANCE portal slots ----
     // Editor G. The demo rig already mounts 2 gutter markers (lines 1 + 3) and

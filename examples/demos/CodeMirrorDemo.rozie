@@ -57,6 +57,10 @@
   // baselineCompartment reconfigure.
   basicSetupCode: "function greet(name) {\n  return name\n}",
   basicSetupOn: false,
+  // Languages-preset rig (Editor I) — an HTML doc the `web` preset parses;
+  // basicSetup:true supplies CM6's defaultHighlightStyle fallback so parsed
+  // tokens get styled <span>s (the thin baseline ships no highlighter).
+  langCode: '<div class="box">hello</div>',
   // G5 wave 1 — topPanel (mount-once) + tooltip (REACTIVE) portal slots.
   // tipCode drives a dedicated editor whose tooltip shows the live caret line/col.
   tipCode: "alpha\nbeta\ngamma",
@@ -89,6 +93,24 @@
 
 <script>
 import { EditorView } from '@codemirror/view'
+// Languages rig (Editor I) — the same construction the leaf `/languages`
+// module's `web` preset performs (`[html()]`, lang-html WITH its embedded
+// CSS + JS sub-languages). Deliberately a BARE import, NOT the leaf module
+// path: a relative import into a leaf's src resolves `@codemirror/*` through
+// the LEAF's own node_modules symlink context, and the Angular sub-build gives
+// those a second module identity — two `@codemirror/state` copies on one page,
+// and CM6 rejects the preset with "Unrecognized extension value … multiple
+// instances of @codemirror/state" (caught live by the spec's error trap). The
+// bare specifier shares the demo's proven '@codemirror/view' resolution path.
+// The `/languages` MODULE itself (all 16 presets instantiated +
+// EditorState.create acceptance + six-leaf byte-identity) is covered by the
+// family's tests/languages.test.ts.
+import { html as langHtml } from '@codemirror/lang-html'
+
+// Module-level (identity-stable) — a fresh array per render would spuriously
+// retrigger the component's extensions $watch (the driving-prop identity
+// lesson, playbook §8).
+const webPreset = [langHtml()]
 
 const SEED = "function greet(name) {\n  return `Hello, ${name}!`\n}\n\ngreet('world')"
 
@@ -185,6 +207,34 @@ const handleDispatch = () => {
 const handleScrollToPos = () => {
   $refs.cm?.scrollToPos?.(0)
   $data.handleOut = 'scrolled'
+}
+// The last 2 of the 12 verbs, each with its OWN observable assertion (they were
+// previously exercised only as side-effects inside other handlers): `focus` is
+// asserted structurally by the spec via CM's `.cm-focused` class on the surface
+// editor; `setSelection` round-trips a fixed range back out through
+// getSelection so the marker proves the range LANDED, not just that the call
+// didn't throw.
+const handleFocus = () => {
+  $refs.cm?.focus?.()
+  $data.handleOut = $refs.cm?.focus ? 'focused' : '(no handle)'
+}
+const handleSetSelection = () => {
+  $refs.cm?.setSelection?.({ anchor: 2, head: 5 })
+  const sel = $refs.cm?.getSelection?.()
+  $data.handleOut = sel ? `setsel ${sel.from}-${sel.to}` : '(no handle)'
+}
+
+// Deterministic tooltip caret stepper (Editor F). The spec's keyboard-synthesis
+// caret leg is a SOFT try (focus + key events vary across targets — Lit's
+// shadow root is the usual silent skipper), which meant the tooltip
+// reconciliation proof could quietly not run on some targets. This button steps
+// the caret via the tipEd ref's setSelection verb — a plain click works on all
+// six targets, so the spec can HARD-assert updates climb while mounts holds 1.
+// (Also exercises setSelection on a SECOND editor instance.)
+let tipStepPos = 0
+const tipStep = () => {
+  tipStepPos = (tipStepPos + 1) % 15
+  $refs.tipEd?.setSelection?.(tipStepPos)
 }
 
 // G5 wave 1 — REACTIVE tooltip slot empirical proof. The reactive portal slot
@@ -346,6 +396,8 @@ const markDecoMount = (from) => {
       <button type="button" data-testid="handle-select-all" @click="handleSelectAll">selectAll</button>
       <button type="button" data-testid="handle-dispatch" @click="handleDispatch">dispatch</button>
       <button type="button" data-testid="handle-scroll-to-pos" @click="handleScrollToPos">scrollToPos</button>
+      <button type="button" data-testid="handle-focus" @click="handleFocus">focus</button>
+      <button type="button" data-testid="handle-set-selection" @click="handleSetSelection">setSelection</button>
     </div>
 
     <!-- data-testid lives on the wrapping <div> (a plain element reliably
@@ -405,9 +457,13 @@ const markDecoMount = (from) => {
          tooltip that reads the live editor state (line/col). The tooltip fill
          is the empirical reconciliation proof — capTip bumps update/mount
          counters surfaced in the state pane. -->
+    <div class="control-row">
+      <span class="row-label">Tooltip</span>
+      <button type="button" data-testid="tip-step" @click="tipStep">step caret</button>
+    </div>
     <div class="editor-cell" data-testid="tip-cell">
       <span class="label">Editor F (topPanel + reactive tooltip)</span>
-      <CodeMirror r-model:value="$data.tipCode" :height="120" theme="light">
+      <CodeMirror ref="tipEd" r-model:value="$data.tipCode" :height="120" theme="light">
         <template #topPanel="{ view }">
           <span class="cm-toppanel-fill" data-testid="toppanel-fill">status · top-docked panel</span>
         </template>
@@ -463,6 +519,23 @@ const markDecoMount = (from) => {
         :height="120"
         theme="light"
         :basicSetup="$data.basicSetupOn"
+      />
+    </div>
+
+    <!-- Languages-preset rig (Editor I) — runtime-proves the `/languages`
+         subpath export. The `web` preset (lang-html + embedded CSS/JS) is fed
+         through `:extensions`; basicSetup:true supplies the
+         defaultHighlightStyle fallback, so the parsed HTML doc renders styled
+         token <span>s inside `.cm-line` — a structural signal a plaintext doc
+         never produces (the spec asserts span count > 0, no pixels). -->
+    <div class="editor-cell" data-testid="lang-cell">
+      <span class="label">Editor I (languages preset — web)</span>
+      <CodeMirror
+        r-model:value="$data.langCode"
+        :height="120"
+        theme="light"
+        :basicSetup="true"
+        :extensions="webPreset"
       />
     </div>
 
