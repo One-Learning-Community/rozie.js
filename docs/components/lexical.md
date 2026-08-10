@@ -1,14 +1,14 @@
 # Lexical — the cross-framework rich-text editor
 
-`LexicalEditor` is Rozie's port of [Lexical](https://lexical.dev/) — Meta's extensible, framework-agnostic rich-text editor. One `.rozie` source ships idiomatic **React, Vue, Svelte, Angular, Solid, and Lit** consumers from a single wrapper. Lexical's own binding ecosystem is the thinnest of any major editor: **Angular and Lit have no maintained wrapper at all**, Vue and Solid are stale (pinned many minors behind core), and Svelte's is bus-factor-1. Rozie collapses all six targets into one source. See the [Lexical libraries comparison](/components/lexical-comparison) for the full matrix, and the [roadmap](#roadmap-staging) for what still lands in v1.1 (Markdown-shortcuts + Tables).
+`LexicalEditor` is a port of [Lexical](https://lexical.dev/), Meta's extensible, framework-agnostic rich-text editor. It ships as idiomatic React, Vue, Svelte, Angular, Solid, and Lit packages with the same API. Lexical's own binding ecosystem is the thinnest of any major editor: Angular and Lit have no maintained wrapper at all, Vue and Solid are stale (pinned many minors behind core), and Svelte's is bus-factor-1. See the [Lexical libraries comparison](/components/lexical-comparison) for the full matrix, and the [roadmap](#roadmap-staging) for what still lands in v1.1 (Markdown-shortcuts + Tables).
 
-This page is the **show-and-tell**: the compositional API (the `<LexicalEditor>` shell + plugin children + the selection-reading `<Toolbar>`), the four core plugins, the `$inject` contract for custom children, the props, and the deliberately-unstyled posture. For a custom node, see the [decorator authoring recipe](/components/lexical-recipe-decorator); for the dense prop table see the [API reference](/components/lexical-api).
+This page covers the compositional API (the `<LexicalEditor>` shell + plugin children + the selection-reading `<Toolbar>`), the four core plugins, the `$inject` contract for custom children, the props, and the deliberately-unstyled posture. For a custom node, see the [decorator authoring recipe](/components/lexical-recipe-decorator); for the dense prop table see the [API reference](/components/lexical-api).
 
 The full source for `LexicalEditor.rozie` lives in the [`@rozie-ui/lexical` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/src/LexicalEditor.rozie).
 
 ## The `@rozie-ui/lexical` packages
 
-`LexicalEditor` ships as six pre-compiled, per-framework packages generated from a single set of `.rozie` sources via the package's `codegen.mjs`. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`LexicalEditor` ships as six pre-compiled, per-framework packages. Install the one for your framework; no build step is required:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ The full source for `LexicalEditor.rozie` lives in the [`@rozie-ui/lexical` pack
 | `@rozie-ui/lexical-solid` | `npm i @rozie-ui/lexical-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/solid/README.md) |
 | `@rozie-ui/lexical-lit` | `npm i @rozie-ui/lexical-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/lexical/packages/lit/README.md) |
 
-**Lit ships today** as the 6th target — a Lit web component that hosts the editor in an **open shadow root**. It carries the one parity caveat the other five don't: a **browser-version floor of Chrome 137+ / Firefox 142+ / Safari 17+** (Lexical resolves selection across the shadow boundary via `getComposedRanges`, which those versions gate). See the [decorator recipe's Lit section](/components/lexical-recipe-decorator#lit-the-open-shadow-root-target) for the shadow-DOM obligations, and the [roadmap](#roadmap-staging) for what remains in v1.1.
+The Lit package is a web component that hosts the editor in an **open shadow root**. It carries the one parity caveat the other five don't: a **browser-version floor of Chrome 137+ / Firefox 142+ / Safari 17+** (Lexical resolves selection across the shadow boundary via `getComposedRanges`, which those versions gate). See the [decorator recipe's Lit section](/components/lexical-recipe-decorator#lit-the-open-shadow-root-target) for the shadow-DOM obligations, and the [roadmap](#roadmap-staging) for what remains in v1.1.
 
 Each package carries the Lexical engine peers — `lexical` plus `@lexical/rich-text`, `@lexical/history`, `@lexical/list`, `@lexical/link`, and `@lexical/utils` (all pinned in `^0.48.0` lockstep) — alongside its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or — for the Lit target — `lit` plus `@lit/context` and `@lit-labs/preact-signals`). Install the engine peers alongside the framework package:
 
@@ -135,7 +135,7 @@ The family ships **one reference `DecoratorNode`** — an inline `@mention` chip
 
 ### Props
 
-The full prop surface of `<LexicalEditor>` (also rendered — auto-generated and drift-checked from the `.rozie` IR — on the [API reference page](/components/lexical-api)):
+The full prop surface of `<LexicalEditor>` (also on the [API reference page](/components/lexical-api)):
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -179,12 +179,12 @@ Consumers of the pre-compiled packages never see this — it only matters if you
 
 ## Roadmap / staging {#roadmap-staging}
 
-`@rozie-ui/lexical` now ships **all six targets**. The editor above plus the Lit web component are shipping today; a focused, smaller set of items remains explicitly deferred to **v1.1** so nothing here is a surprise gap:
+`@rozie-ui/lexical` ships **all six targets**. A focused, smaller set of items is explicitly deferred to **v1.1** so nothing here is a surprise gap:
 
 | Item | Stage | Notes |
 | --- | --- | --- |
 | React / Vue / Svelte / Angular / Solid targets | **Shipping** | Today. |
-| **Lit target + Lit decorator bridge** | **Shipping** | Graduated from v1.1 staging. Hosts the editor in an **open shadow root**; carries the one parity caveat — a **browser-version floor: Chrome 137+ / Firefox 142+ / Safari 17+** (Lexical resolves cross-shadow selection via `getComposedRanges`). See the [decorator recipe's Lit section](/components/lexical-recipe-decorator#lit-the-open-shadow-root-target). |
+| **Lit target + Lit decorator bridge** | **Shipping** | Hosts the editor in an **open shadow root**; carries the one parity caveat — a **browser-version floor: Chrome 137+ / Firefox 142+ / Safari 17+** (Lexical resolves cross-shadow selection via `getComposedRanges`). See the [decorator recipe's Lit section](/components/lexical-recipe-decorator#lit-the-open-shadow-root-target). |
 | Editor shell + RichText / History / List / Link plugins | **Shipping** | Today. |
 | Selection-reading toolbar | **Shipping** | Today. |
 | `@mention` decorator node + 6 per-target bridges | **Shipping** | Today (incl. the Lit bridge). |

@@ -29,7 +29,7 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 
 | Method | Description |
 | --- | --- |
-| `focus` | Move DOM focus to the switch control. Deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element (accepted, warn-only ROZ137). |
+| `focus` | Move DOM focus to the switch control. Deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. |
 | `toggle` | Flip the on/off state (same funnel as a click / Space / Enter) and emit `change`. A no-op while `disabled` or `readonly`. |
 
 ## Slots

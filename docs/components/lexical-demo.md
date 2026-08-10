@@ -13,7 +13,7 @@ import LexicalEditor, {
 
 # Lexical — live demo
 
-This is the **real `@rozie-ui/lexical-vue` package** running on this page (VitePress is itself a Vue app). Type in the editor, select some text and hit the toolbar buttons — **Bold**, *Italic*, • List, and Link — and watch each button light up as the caret moves through matching formatting. Everything below is driven by the same `.rozie` sources that compile to all five frameworks.
+This is the **real `@rozie-ui/lexical-vue` package** running on this page (VitePress is itself a Vue app). Type in the editor, select some text and hit the toolbar buttons — **Bold**, *Italic*, • List, and Link — and watch each button light up as the caret moves through matching formatting. The same Lexical components, with the same API, ship for React, Vue, Svelte, Angular, Solid, and Lit.
 
 <ClientOnly>
 <div class="lexical-live">
@@ -30,13 +30,13 @@ This is the **real `@rozie-ui/lexical-vue` package** running on this page (ViteP
 
 The editor is composed the way you'd compose it in your own app: a `<LexicalEditor>` shell wrapping a `<Toolbar />` plus the `HistoryPlugin` / `ListPlugin` / `LinkPlugin` children. Each child `$inject`s the **same** shared editor instance the shell provides — no editor handle is prop-drilled. The shell registers the RichText baseline itself, so formatting and undo/redo work out of the box; the list and link buttons take effect because their plugins are nested. See the [full API](/components/lexical) for the composition model, the plugin list, and the `$inject` contract for custom children.
 
-## One source, five outputs
+## What ships for each framework
 
-You author the editor shell **once** as a `.rozie` file:
+The editor shell is one `.rozie` file:
 
 <<< ../../packages/ui/lexical/src/LexicalEditor.rozie{html}[LexicalEditor.rozie — the single source]
 
-…and Rozie compiles it to five idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/lexical-{react,vue,svelte,angular,solid}`):
+…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the actual generated output for each target (this is exactly what ships in `@rozie-ui/lexical-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -45,10 +45,11 @@ You author the editor shell **once** as a `.rozie` file:
 <<< ../../packages/ui/lexical/packages/svelte/src/LexicalEditor.svelte[Svelte]
 <<< ../../packages/ui/lexical/packages/angular/src/LexicalEditor.ts[Angular]
 <<< ../../packages/ui/lexical/packages/solid/src/LexicalEditor.tsx[Solid]
+<<< ../../packages/ui/lexical/packages/lit/src/LexicalEditor.ts[Lit]
 
 :::
 
-Each is a real, idiomatic component for its framework — React hooks, Vue `<script setup>`, Svelte 5 runes, an Angular standalone component, and a Solid component. Same props, same `$provide`/`$inject` editor-sharing contract, same plugins, all from the one source above. (Lit is v1.1 — see the [roadmap](/components/lexical#roadmap-staging).)
+Each is a real, idiomatic component for its framework — React hooks, Vue `<script setup>`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same `$provide`/`$inject` editor-sharing contract, same plugins, identical on every target.
 
 ## See also
 

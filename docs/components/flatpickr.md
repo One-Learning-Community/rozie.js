@@ -1,6 +1,6 @@
 # Flatpickr — the cross-framework date picker
 
-`Flatpickr` is Rozie's data-bound port of [flatpickr](https://flatpickr.js.org/) — the dependency-free vanilla-JS date/time picker. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers, replacing the five hand-maintained per-framework wrappers that exist today — [react-flatpickr](https://github.com/haoxins/react-flatpickr), [vue-flatpickr-component](https://github.com/ankurk91/vue-flatpickr-component), [angularx-flatpickr](https://github.com/mattlewis92/angularx-flatpickr), [svelte-flatpickr](https://github.com/jacobmischka/svelte-flatpickr), [lit-flatpickr](https://github.com/Matsuuu/lit-flatpickr) — plus the Solid wrapper that **does not exist upstream at all**.
+`Flatpickr` is Rozie's data-bound port of [flatpickr](https://flatpickr.js.org/) — the dependency-free vanilla-JS date/time picker. Five hand-maintained per-framework wrappers exist today ([react-flatpickr](https://github.com/haoxins/react-flatpickr), [vue-flatpickr-component](https://github.com/ankurk91/vue-flatpickr-component), [angularx-flatpickr](https://github.com/mattlewis92/angularx-flatpickr), [svelte-flatpickr](https://github.com/jacobmischka/svelte-flatpickr), [lit-flatpickr](https://github.com/Matsuuu/lit-flatpickr)), and Solid has none. Rozie ships the same `<Flatpickr>` (same props, events, two-way `date` binding, and imperative handle) in React, Vue, Svelte, Angular, Solid, and Lit.
 
 This page is the **show-and-tell**: the API surface, per-framework quick starts, and the recipes (forms drop-in, range commit, inline calendars, theming) that cover the long tail of what you'd want from a date picker.
 
@@ -8,7 +8,7 @@ The full source for `Flatpickr.rozie` plus the per-target compiled output lives 
 
 ## The `@rozie-ui/flatpickr` packages
 
-`Flatpickr` ships as six pre-compiled, per-framework packages generated from a single `Flatpickr.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step, no `@rozie/*` runtime dependency:
+`Flatpickr` ships as six pre-compiled, per-framework packages; install only the one for your framework. There is no build step and no Rozie toolchain to add:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ The full source for `Flatpickr.rozie` plus the per-target compiled output lives 
 | `@rozie-ui/flatpickr-solid` | `npm i @rozie-ui/flatpickr-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/flatpickr/packages/solid/README.md) |
 | `@rozie-ui/flatpickr-lit` | `npm i @rozie-ui/flatpickr-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/flatpickr/packages/lit/README.md) |
 
-Each package carries `flatpickr ^4.6` plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). Import flatpickr's stylesheet once in your app: `import 'flatpickr/dist/flatpickr.css'`. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `Flatpickr.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
+Each package carries `flatpickr ^4.6` plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). Import flatpickr's stylesheet once in your app: `import 'flatpickr/dist/flatpickr.css'`.
 
 ## Quick start
 
@@ -169,7 +169,7 @@ el.addEventListener('change', (e) => {
 | `formatDate` | `Function` | `null` | | Custom formatter `(date: Date, format: string, locale) => string`. **Construction-time**. |
 | `plugins` | `Array` | `[]` | | Array of flatpickr plugin instances (import from `flatpickr/dist/plugins/…`). Headline: `rangePlugin` for two-input ranges. **Construction-time**. See [Two-input range via rangePlugin](#two-input-range-via-rangeplugin). |
 
-### Emits
+### Events
 
 | Event | Description |
 | --- | --- |
@@ -193,6 +193,10 @@ Beyond props/events, the component exposes imperative methods declared once in t
 | `closePicker` | Close the calendar. Named `closePicker` (not `close`) for the same reason. |
 | `selectDate` | Programmatically set the selection. Named `selectDate` (not `setDate`) to dodge React's auto-generated model setter — see [Gotchas](#gotchas). |
 | `jumpToDate` | Jump the calendar view to a date without selecting it. |
+| `getSelectedDates` | Return the currently selected `Date` objects: `getSelectedDates()` returns `Date[]` (`[]` before mount). The two-way `date` model carries the formatted string; this reads the parsed dates on demand (range bounds, multi-select, validation). |
+| `togglePicker` | Open the calendar if closed, close it if open (one call for a single trigger button). Suffixed for symmetry with `openPicker`/`closePicker`. |
+| `changeMonth` | Navigate the displayed month: `changeMonth(value, isOffset?)`. `isOffset` defaults to `true` (a relative jump); pass `false` for an absolute month. Named `changeMonth` because `monthChange` is the emitted event. |
+| `changeYear` | Jump the calendar to an absolute year: `changeYear(year)`. Named `changeYear` because `yearChange` is the emitted event. |
 
 ## Recipes
 
@@ -443,11 +447,11 @@ The #1 cross-framework bug class (React "input can't be controlled", Vue "infini
 
 ### `selectDate`, not `setDate`
 
-The handle method is `selectDate`, not flatpickr's own `setDate`. The `date` prop is `model: true`, so the React emitter auto-generates a `setDate` setter for it; a user method named `setDate` collides (ROZ524). `selectDate` wraps `instance.setDate`.
+The handle method is `selectDate`, not flatpickr's own `setDate`. The `date` prop is `model: true`, so the React emitter auto-generates a `setDate` setter for it; a user method named `setDate` collides with it. `selectDate` wraps `instance.setDate`.
 
 ### `openPicker` / `closePicker`, not `open` / `close`
 
-The handle methods are `openPicker` / `closePicker`, not `open` / `close`. This component emits `open` and `close` **events**; on targets that materialize events as named members (Angular `output()`), a method named `open`/`close` would collide with the event member (a ROZ121 follow-up class). Prefixing sidesteps it.
+The handle methods are `openPicker` / `closePicker`, not `open` / `close`. This component emits `open` and `close` **events**; on targets that materialize events as named members (Angular `output()`), a method named `open`/`close` would collide with the event member. Prefixing sidesteps it, and `togglePicker` follows the same convention.
 
 ### Selector-style options
 

@@ -30,7 +30,7 @@ function onSelect(e: { item: { id: string; label: string; group?: string }; path
 
 # Command Palette — live demo
 
-This is the **real `@rozie-ui/command-palette-vue` package** running on this page (VitePress is itself a Vue app). The same `CommandPalette.rozie` source compiles to all six frameworks. Open the palette, type to filter over labels **and** keywords (e.g. `grep` finds "Find in Files"), navigate with ArrowUp / ArrowDown, press Enter to run, and Escape or a backdrop click to dismiss.
+This is the **real `@rozie-ui/command-palette-vue` package** running on this page (VitePress is itself a Vue app). The same `CommandPalette` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. Open the palette, type to filter over labels **and** keywords (e.g. `grep` finds "Find in Files"), navigate with ArrowUp / ArrowDown, press Enter to run, and Escape or a backdrop click to dismiss.
 
 <ClientOnly>
 <div class="cmdk-live">

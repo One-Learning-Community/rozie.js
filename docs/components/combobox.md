@@ -1,14 +1,14 @@
 # Combobox — the cross-framework headless combobox / autocomplete
 
-`Combobox` is Rozie's **headless, fully-accessible** combobox / autocomplete — a `@rozie-ui` family with **no third-party engine** behind it. Every behaviour (the text input + popup listbox, `aria-activedescendant` keyboard navigation, client-side filtering, async/server-side mode, the selection model, and dismissal) is authored once in `Combobox.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`Combobox` is a headless, fully-accessible combobox / autocomplete with no third-party engine behind it. It covers the whole behaviour surface: the text input + popup listbox, `aria-activedescendant` keyboard navigation, client-side filtering, async/server-side mode, the selection model, and dismissal. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 The WAI-ARIA combobox pattern — a `role="combobox"` input paired with a `role="listbox"` popup, navigated by `ArrowUp` / `ArrowDown` / `Home` / `End` with the active option tracked via `aria-activedescendant` and committed on `Enter` — is re-implemented (and frequently re-implemented *inaccessibly*) in every framework. Rozie owns the author-side API: the two-way `r-model:value` (the sole `model: true` prop, so a combobox **is** a form control), the internal query + open + active-descendant state, built-in client filtering with an async escape hatch (`disableFilter` + the `search` event), the keyboard model, and the token-themed skin.
 
-And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+Every visual value is a CSS custom property, so the control re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/combobox` packages
 
-`Combobox` ships as six pre-compiled, per-framework packages generated from a single `Combobox.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`Combobox` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ And because **every visual value is a CSS custom property**, it re-skins to any 
 | `@rozie-ui/combobox-solid` | `npm i @rozie-ui/combobox-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/combobox/packages/solid/README.md) |
 | `@rozie-ui/combobox-lit` | `npm i @rozie-ui/combobox-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/combobox/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `Combobox.rozie`, so they cannot drift from the compiled output (`codegen.mjs` asserts the structural columns of this page against `ir.props` on every run).
+Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
 ## Quick start
 
@@ -58,7 +58,7 @@ const frameworks = [
 </template>
 ```
 
-`r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Combobox` the selected value, `Combobox` writes the newly-picked value back, and the framework reconciler picks it up — no `onChange → setState` wiring. The input *text* is internal state, not a second model (two models would forfeit the form-control story); a `search` event exposes the typed query for async / server-side filtering. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Combobox` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Combobox` the selected value, `Combobox` writes the newly-picked value back, and the framework reconciler picks it up with no `onChange → setState` wiring. The input *text* is internal state, not a second model (two models would forfeit the form-control story); a `search` event exposes the typed query for async / server-side filtering. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor`, so a `Combobox` is a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## API
 
@@ -97,10 +97,10 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 
 | Method | Description |
 | --- | --- |
-| `focus` | Move DOM focus to the text input. **Deliberately named `focus`**, which overrides the inherited `HTMLElement.focus` on the Lit custom element — the public `focus()` handle is intended (an accepted, warn-only ROZ137). This mirrors the slider / otp precedent; listbox took the other branch (`focusControl`). |
+| `focus` | Move DOM focus to the text input. Deliberately named `focus`, overriding the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. This mirrors the slider / otp precedent; listbox took the other branch (`focusControl`). |
 | `clear` | Reset the selection: clear `value` (emits `change` with `{ value: null }`) and empty the input text. Collision-safe — not a host-element member. |
 | `seedQuery(text)` | **Imperative only** — sets the input text (and therefore the filtered option list) without touching the `value` model or selection state. Does not open the popup, select an option, or emit `change`/`search`. Not a second model (a combobox has a single `model: true` prop, `value` — a second model would forfeit the Angular `ControlValueAccessor`). Intended for repopulating the input on programmatic restore (e.g. a consumer's back-navigation). |
-| `pinOpen(boolean)` | **Imperative only** — pin the popup open so blurring the input into a host sub-surface (e.g. an action flyout) does not collapse the list. `pinOpen(true)` pins; `pinOpen(false)` unpins. Unpinning alone does not itself close the popup or restore focus — that is the host's responsibility. Render-neutral: never calling it leaves behavior byte-identical to today. |
+| `pinOpen(boolean)` | **Imperative only** — pin the popup open so blurring the input into a host sub-surface (e.g. an action flyout) does not collapse the list. `pinOpen(true)` pins; `pinOpen(false)` unpins. Unpinning alone does not itself close the popup or restore focus — that is the host's responsibility. Render-neutral: never calling it leaves behavior unchanged. |
 
 ### Slots
 
@@ -131,7 +131,7 @@ Pass an ordered `groups` prop and tag each option with a matching `group` id to 
 </template>
 ```
 
-`groups` sets both the section order and the heading text; a group id present on an option but absent from `groups` falls back to a section titled with the id itself, appended after the listed ones (first-appearance order). Options with no `group` render in a single leading, unheaded section. Within every section, options keep their filtered/scored order — grouping is a stable re-partition, never a re-sort. The keyboard model (`ArrowUp`/`ArrowDown`/`Home`/`End`/`Enter`, `aria-activedescendant`) is unchanged: it walks the same group-ordered flat sequence, so on-screen order always matches keyboard order, and headings are never a keyboard stop. **Leaving `groups` empty (and no option carrying `group`) is byte-identical to the ungrouped combobox** — grouping is strictly additive and opt-in. Grouping is supported only in the standard (non-`virtual`) render; `groups` × `virtual` windowing is not yet supported.
+`groups` sets both the section order and the heading text; a group id present on an option but absent from `groups` falls back to a section titled with the id itself, appended after the listed ones (first-appearance order). Options with no `group` render in a single leading, unheaded section. Within every section, options keep their filtered/scored order — grouping is a stable re-partition, never a re-sort. The keyboard model (`ArrowUp`/`ArrowDown`/`Home`/`End`/`Enter`, `aria-activedescendant`) is unchanged: it walks the same group-ordered flat sequence, so on-screen order always matches keyboard order, and headings are never a keyboard stop. Leaving `groups` empty (and no option carrying `group`) renders the ungrouped combobox unchanged — grouping is strictly additive and opt-in. Grouping is supported only in the standard (non-`virtual`) render; `groups` × `virtual` windowing is not yet supported.
 
 ### Capping groups
 
@@ -148,7 +148,7 @@ Pass `groupCap` alongside `groups` to cap each section to its first `groupCap` o
 </template>
 ```
 
-Activating the "+N more" row — `Enter` while it is the active-descendant, or a click/tap — expands **that section only**, in place: the rest of its options render inline and the more-row disappears. Expanding never writes the `value` model or fires `change`; it is purely a reveal. `ArrowDown`/`ArrowUp` rove onto the more-row like any other option and, once expanded, continue into the newly-revealed options — `aria-activedescendant` always resolves to a rendered option or more-row id. A section with `groupCap` or fewer options renders in full with no more-row. Expansion state resets whenever the option set or the typed query changes (a new result set invalidates any prior expansion). Customize the row's markup with the `groupMore` slot; the default reads `+{hidden} more`. `0`/absent (default) is uncapped — byte-identical to plain grouping. `groupCap` only applies to the standard (non-`virtual`) grouped render, same as `groups` itself.
+Activating the "+N more" row — `Enter` while it is the active-descendant, or a click/tap — expands **that section only**, in place: the rest of its options render inline and the more-row disappears. Expanding never writes the `value` model or fires `change`; it is purely a reveal. `ArrowDown`/`ArrowUp` rove onto the more-row like any other option and, once expanded, continue into the newly-revealed options — `aria-activedescendant` always resolves to a rendered option or more-row id. A section with `groupCap` or fewer options renders in full with no more-row. Expansion state resets whenever the option set or the typed query changes (a new result set invalidates any prior expansion). Customize the row's markup with the `groupMore` slot; the default reads `+{hidden} more`. `0`/absent (the default) is uncapped, identical to plain grouping. `groupCap` only applies to the standard (non-`virtual`) grouped render, same as `groups` itself.
 
 ## Filtering: client vs. async
 
@@ -186,7 +186,7 @@ Every value the component renders is a `--rozie-combobox-*` CSS custom property 
 
 The full token vocabulary — the wrapper width and font, the input box model (`input-padding`, `bg`, `color`, `border-width`, `border-color`, `radius`), the accent, the focus ring (`focus-ring-width`, `focus-ring-color`), the disabled state (`disabled-opacity`, `disabled-bg`), the popup listbox (`list-z`, `list-gap`, `list-padding`, `list-max-height`, `list-bg`, `list-border-color`, `list-shadow`), and the option (`option-padding`, `option-radius`, `option-active-bg`, `option-selected-weight`, `option-selected-color`, `option-disabled-opacity`) — has documented defaults in `themes/base.css`. Only cosmetic values flow through tokens; the structural rules (the relative wrapper, the absolutely-positioned popup, the input box model, the focus ring) compile per-leaf and are not consumer-overridable.
 
-New, render-neutral (260715-50l — additive; every fallback replicates today's rendered value, so a consumer who never sets these sees no change):
+Three further tokens are render-neutral: every fallback replicates the default rendered value, so a consumer who never sets them sees no change.
 
 | Token | Fallback | Description |
 | --- | --- | --- |

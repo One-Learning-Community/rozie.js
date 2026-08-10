@@ -1,10 +1,10 @@
 # Waveform — the cross-framework audio waveform player
 
-[wavesurfer.js](https://wavesurfer.xyz) is the de-facto vanilla-JS audio-waveform engine (2D canvas + Web Audio). But its framework wrappers are **lopsided**: React has the official [`@wavesurfer/react`](https://www.npmjs.com/package/@wavesurfer/react); Angular, Svelte, Solid and Lit have thin, stale, or absent wrappers. That gap (React served, the rest stranded) is exactly what Rozie's write-once-ship-six thesis exists to close.
-
-One `Waveform.rozie` source compiles to six idiomatic packages — so Angular, Svelte, Solid and Lit consumers get a category-leading waveform player for free, with the same props, events, two-way playback position, two-way interactive regions, and imperative handle as the React one.
+`Waveform` is an audio waveform player built on [wavesurfer.js](https://wavesurfer.xyz), the de-facto vanilla-JS audio-waveform engine (2D canvas + Web Audio). It ships as idiomatic React, Vue, Svelte, Angular, Solid, and Lit packages with the same props, events, two-way playback position, two-way interactive regions, and imperative handle in each.
 
 ## The `@rozie-ui/wavesurfer` packages
+
+Install the pre-compiled package for your framework; no build step is required:
 
 | Package | Framework | Ships |
 | --- | --- | --- |
@@ -210,7 +210,7 @@ const onOut = (r: { id: string; start: number }) => {
 </template>
 ```
 
-## Reference
+## API
 
 ### Props
 

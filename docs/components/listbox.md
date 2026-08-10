@@ -1,12 +1,12 @@
 # Listbox — the cross-framework headless select
 
-`Listbox` is Rozie's **headless, fully-accessible** select-only listbox — and the first `@rozie-ui` component with **no third-party engine** behind it. Every behaviour (roving virtual focus, full keyboard navigation, type-ahead, single + multi select) is authored once in `Listbox.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit. (For a type-to-filter editable input, reach for the sibling [`@rozie-ui/combobox`](/components/combobox) — it shares the same `@rozie-ui/headless-core` list spine.)
+`Listbox` is a headless, fully-accessible select-only listbox with no third-party engine behind it. It covers the whole behaviour surface: roving virtual focus, full keyboard navigation, type-ahead, and single + multi select. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit. (For a type-to-filter editable input, reach for the sibling [`@rozie-ui/combobox`](/components/combobox) — it shares the same `@rozie-ui/headless-core` list spine.)
 
-Because there is no vanilla-JS dependency, it is the purest demonstration of Rozie's native author-side primitives: `$computed`-derived state, parameterized `@keydown` modifiers, `$refs`-driven focus management, two-way `r-model:value`, scoped slots, and an `$expose` imperative handle. And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+There is no vanilla-JS dependency: selection state, keyboard navigation, type-ahead, and focus management are implemented directly against the platform. Every visual value is a CSS custom property, so the listbox re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/listbox` packages
 
-`Listbox` ships as six pre-compiled, per-framework packages generated from a single `Listbox.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`Listbox` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -17,7 +17,7 @@ Because there is no vanilla-JS dependency, it is the purest demonstration of Roz
 | `@rozie-ui/listbox-solid` | `npm i @rozie-ui/listbox-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/solid/README.md) |
 | `@rozie-ui/listbox-lit` | `npm i @rozie-ui/listbox-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `Listbox.rozie`, so they cannot drift from the compiled output (`codegen.mjs` asserts the structural columns of this page against `ir.props` on every run).
+Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
 ## Quick start
 
@@ -50,7 +50,7 @@ Pass an `options` array and two-way bind `value`:
 </template>
 ```
 
-`r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Listbox` a value, `Listbox` writes the new selection back, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Listbox` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Listbox` a value, `Listbox` writes the new selection back, and the framework reconciler picks it up with no `onChange → setState` wiring. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor`, so a `Listbox` is a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## API
 

@@ -25,7 +25,7 @@ const FRUITS = [
 
 # Listbox — live demo
 
-This is the **real `@rozie-ui/listbox-vue` package** running on this page (VitePress is itself a Vue app). Open the select with the keyboard or mouse, type to filter the combobox, toggle options in the multi-select — then watch the two-way bound value update. Everything below is driven by the same `Listbox.rozie` source that compiles to all six frameworks, with **no engine and no required CSS** — the ARIA behaviour and a tokenised skin ship inside the component.
+This is the **real `@rozie-ui/listbox-vue` package** running on this page (VitePress is itself a Vue app). Open the select with the keyboard or mouse, type to filter the combobox, toggle options in the multi-select — then watch the two-way bound value update. The same `Listbox` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It needs **no engine and no required CSS** — the ARIA behaviour and a tokenised skin ship inside the component.
 
 <ClientOnly>
 <div class="lb-live">
@@ -80,7 +80,7 @@ This is the **real `@rozie-ui/listbox-vue` package** running on this page (ViteP
 
 `value` is two-way bound with `v-model:value` — the readout updates the instant you commit a selection, and a consumer write flows back in. The **Select** instance's buttons drive the imperative handle (`open()`, `clear()`) grabbed through Vue's `ref`. Flip `combobox` for a filterable text input, add `multiple` for array values — the same component, the same surface. See the [full API](/components/listbox) for every prop, event, slot, and handle verb, plus theming and keyboard reference.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -99,7 +99,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same events, same two-way `value`, same scoped slots, same imperative handle — all from the one source above, with no third-party engine behind it.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same events, same two-way `value`, same scoped slots, same imperative handle — identical on every target, with no third-party engine behind it.
 
 ## See also
 

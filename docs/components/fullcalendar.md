@@ -1,6 +1,6 @@
 # FullCalendar — the cross-framework calendar & scheduler
 
-`FullCalendar` is Rozie's data-bound port of [FullCalendar](https://fullcalendar.io/) — the vanilla-JS calendar/scheduler engine. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. FullCalendar already publishes four official wrappers ([@fullcalendar/react](https://www.npmjs.com/package/@fullcalendar/react), [@fullcalendar/vue3](https://www.npmjs.com/package/@fullcalendar/vue3), [@fullcalendar/angular](https://www.npmjs.com/package/@fullcalendar/angular), [@fullcalendar/svelte](https://www.npmjs.com/package/@fullcalendar/svelte)) — each one wraps the same `Calendar` engine. Rozie collapses all of them (plus the Solid and Lit wrappers that **do not exist upstream**) into one source.
+`FullCalendar` is Rozie's data-bound port of [FullCalendar](https://fullcalendar.io/) — the vanilla-JS calendar/scheduler engine. FullCalendar already publishes four official wrappers ([@fullcalendar/react](https://www.npmjs.com/package/@fullcalendar/react), [@fullcalendar/vue3](https://www.npmjs.com/package/@fullcalendar/vue3), [@fullcalendar/angular](https://www.npmjs.com/package/@fullcalendar/angular), [@fullcalendar/svelte](https://www.npmjs.com/package/@fullcalendar/svelte)) — each one wraps the same `Calendar` engine, and Solid and Lit have none. Rozie ships the same `<FullCalendar>` (same props, events, two-way `view` binding, and imperative handle) in React, Vue, Svelte, Angular, Solid, and Lit.
 
 This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the `:options` long-tail passthrough, the opt-in plugin-extension model, and the per-target recipe for the ten custom-content portal slots.
 
@@ -8,7 +8,7 @@ The full source for `FullCalendar.rozie` lives in the [`@rozie-ui/fullcalendar` 
 
 ## The `@rozie-ui/fullcalendar` packages
 
-`FullCalendar` ships as six pre-compiled, per-framework packages generated from a single `FullCalendar.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step, no `@rozie/*` runtime dependency:
+`FullCalendar` ships as six pre-compiled, per-framework packages; install only the one for your framework. There is no build step and no Rozie toolchain to add:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -26,7 +26,7 @@ npm i @rozie-ui/fullcalendar-react \
   @fullcalendar/core @fullcalendar/daygrid @fullcalendar/timegrid @fullcalendar/interaction
 ```
 
-**No manual stylesheet import is needed.** FullCalendar v6 auto-injects its own CSS at runtime — there is no `import 'fullcalendar/...css'` line to add (unlike the date-picker port, which requires a vendor stylesheet import). The wrapper's own `<style>` block carries only its layout box; the global `.fc-*` calendar styling comes from the engine itself. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `FullCalendar.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
+**No manual stylesheet import is needed.** FullCalendar v6 auto-injects its own CSS at runtime — there is no `import 'fullcalendar/...css'` line to add (unlike the date-picker port, which requires a vendor stylesheet import). The wrapper's own `<style>` block carries only its layout box; the global `.fc-*` calendar styling comes from the engine itself.
 
 ## Quick start
 
@@ -158,7 +158,7 @@ el.addEventListener('event-click', (e) => {
 | `headerToolbar` | `Object` | `{…}` | | The toolbar layout (`{ left, center, right }`). A consumer-passed object **fully replaces** the built-in default. Runtime-updatable. |
 | `options` | `Object` | `{}` | | Long-tail passthrough — an arbitrary bag of FullCalendar options/callbacks the curated surface doesn't special-case (`businessHours`, `dayMaxEvents`, `*DidMount` hooks, locale objects, …). Spread **first** into the engine config so the curated props/events/slots **win on key collision** — the curated surface stays primary; `:options` only fills gaps. Runtime-updatable per key via `setOption` (no key-removal reset — a removed key keeps its last applied value until remount; use `getApi()` for full imperative control). |
 
-### Emits
+### Events
 
 | Event | Description |
 | --- | --- |
@@ -188,6 +188,14 @@ Beyond props/events, the component exposes imperative methods declared once in t
 | `prev` | Navigate to the previous date range. |
 | `next` | Navigate to the next date range. |
 | `gotoDate` | Navigate to a specific date — `gotoDate(date)`. |
+| `getDate` | Return the calendar's current anchor date (`null` before mount). The `view` model carries only the view type and `datesSet` only the visible range; this reads the current navigation date on demand. |
+| `getEvents` | Return the current event objects synchronously (`[]` before mount). The pull-based twin of the push-only `eventsSet` event. |
+| `scrollToTime` | Scroll a time-grid view to a given time: `scrollToTime(duration)`. |
+| `updateSize` | Recompute the calendar layout after its container resizes. |
+| `prevYear` | Navigate to the previous year (mirrors `prev`). |
+| `nextYear` | Navigate to the next year (mirrors `next`). |
+| `selectRange` | Select a date/time range: `selectRange(start, end?)` (the `Calendar` API's `select`). Named `selectRange` because `select` is an emitted event. |
+| `clearSelection` | Clear the current date/time selection (the `Calendar` API's `unselect`). Named `clearSelection` because `unselect` is an emitted event. |
 
 **React example:**
 
@@ -201,7 +209,7 @@ cal.current?.next();
 const api = cal.current?.getApi();
 ```
 
-The handle method names are clear of all eleven event names and thirteen prop names (the `$expose` collision discipline — ROZ121), so no `openPicker`-style renames are needed here.
+The selection verbs are named `selectRange` / `clearSelection` rather than bare `select` / `unselect`: this component emits `select` and `unselect` **events**, and an exposed method may not share a name with an emitted event (the same collision rule behind Flatpickr's `openPicker` / `closePicker`). Every other verb name is clear of the event and prop names as-is.
 
 ## Slots
 
@@ -460,7 +468,7 @@ Changing the `:events` array reconciles the live calendar without remounting —
 
 ### Driving navigation from the handle
 
-The eight imperative verbs cover the navigation/mutation surface that props alone can't express. Grab the handle and call `next()`/`prev()`/`today()`/`gotoDate()`/`changeView()`, or reach the raw engine via `getApi()`:
+The imperative verbs cover the navigation/mutation surface that props alone can't express. Grab the handle and call `next()`/`prev()`/`today()`/`prevYear()`/`nextYear()`/`gotoDate()`/`changeView()`, or reach the raw engine via `getApi()`:
 
 ```tsx
 const cal = useRef<FullCalendarHandle>(null);

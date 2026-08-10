@@ -1,38 +1,34 @@
 # Embla — the cross-framework carousel
 
-[Embla Carousel](https://www.embla-carousel.com) is a dependency-free, library-agnostic carousel engine: its core is pure vanilla JS that attaches to a viewport element, reads the consumer's slide DOM, and drives `transform: translate3d(...)` for buttery drag/scroll. But its framework wrappers are **uneven**: React, Vue, Svelte and Solid have official wrappers — but they are **four divergent APIs** (a hook vs a composable vs an action vs a Solid primitive); Angular has only a **single-maintainer community** package version-pinned to Angular majors; and **Lit / web components have nothing at all**.
-
-One `Carousel.rozie` source compiles to six idiomatic packages — so all six frameworks get the *same* props, events, two-way `selectedIndex`, and imperative handle. Lit consumers get a category-leading Embla wrapper for free; Angular gets a first-party-quality signals wrapper from the same source as the other five.
+`Carousel` wraps [Embla Carousel](https://www.embla-carousel.com), the dependency-free, library-agnostic carousel engine: its core is pure vanilla JS that attaches to a viewport element, reads the consumer's slide DOM, and drives `transform: translate3d(...)` for buttery drag/scroll. It ships as idiomatic React, Vue, Svelte, Angular, Solid, and Lit packages with the same props, events, two-way `selectedIndex`, and imperative handle in each.
 
 The full source for `Carousel.rozie` lives in the [`@rozie-ui/embla` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/src/Carousel.rozie). See it running in the [live demo](/components/embla-demo), and how it stacks up against the per-framework wrappers in the [libraries comparison](/components/embla-comparison).
 
 ## The `@rozie-ui/embla` packages
 
-| Package | Framework | Ships |
+Install the pre-compiled package for your framework; no build step is required:
+
+| Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/embla-react` | React 18+ | compiled `.tsx` + types |
-| `@rozie-ui/embla-vue` | Vue 3.4+ | `.vue` SFC source |
-| `@rozie-ui/embla-svelte` | Svelte 5+ | `.svelte` source |
-| `@rozie-ui/embla-angular` | Angular 19+ | standalone component source |
-| `@rozie-ui/embla-solid` | Solid 1.8+ | compiled `.tsx` + types |
-| `@rozie-ui/embla-lit` | Lit 3+ | compiled custom element + types |
+| `@rozie-ui/embla-react` | `npm i @rozie-ui/embla-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/packages/react/README.md) |
+| `@rozie-ui/embla-vue` | `npm i @rozie-ui/embla-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/packages/vue/README.md) |
+| `@rozie-ui/embla-svelte` | `npm i @rozie-ui/embla-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/packages/svelte/README.md) |
+| `@rozie-ui/embla-angular` | `npm i @rozie-ui/embla-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/packages/angular/README.md) |
+| `@rozie-ui/embla-solid` | `npm i @rozie-ui/embla-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/packages/solid/README.md) |
+| `@rozie-ui/embla-lit` | `npm i @rozie-ui/embla-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/packages/lit/README.md) |
 
-All six wrap **Embla Carousel v8** (`embla-carousel@^8.6`) plus the **Autoplay plugin** (`embla-carousel-autoplay@^8.6`), both declared as peer dependencies. (Embla v9 is RC-only and renames the whole API surface — it is deliberately not targeted yet.)
-
-## Install
-
-Install the one package for your framework plus the two Embla peer dependencies — no Rozie toolchain, no build-time compile step:
+All six wrap **Embla Carousel v8** (`embla-carousel@^8.6`) plus the **Autoplay plugin** (`embla-carousel-autoplay@^8.6`), both declared as peer dependencies, alongside each package's framework peer (React 18+, Vue 3.4+, Svelte 5+, Angular 19+, Solid 1.8+, Lit 3+; React also needs `react-dom`). Install the two engine peers alongside the framework package:
 
 ```bash
-# React (also: react-dom)
+# React
 npm i @rozie-ui/embla-react embla-carousel embla-carousel-autoplay
-# Vue
+# Vue / Svelte / Angular / Solid / Lit — swap the framework package
 npm i @rozie-ui/embla-vue embla-carousel embla-carousel-autoplay
-# Svelte / Angular / Solid / Lit — swap the framework package
-npm i @rozie-ui/embla-svelte embla-carousel embla-carousel-autoplay
 ```
 
-There is **no engine CSS to import** — Embla's carousel skeleton ships scoped inside the component (see the tip above).
+(Embla v9 is RC-only and renames the whole API surface; it is deliberately not targeted yet.)
+
+Each package ships its framework's native shape: compiled `.tsx` + types for React and Solid, `.vue` SFC source for Vue, `.svelte` source for Svelte, standalone component source for Angular, and a compiled custom element + types for Lit.
 
 ::: tip No engine CSS to import
 Unlike most engine wrappers, Embla ships **no** stylesheet you must import. The carousel skeleton styles — an `overflow: hidden` viewport, a `display: flex` container, and slide sizing — ship **scoped inside the component**. Slides are plain light-DOM framework children, so the scoped styles reach them on all six targets (including through Lit's shadow root).
@@ -129,23 +125,6 @@ export function Demo() {
 | `reInit` | — | Fires when the engine re-initialises (option/slide change). |
 | `pointer-down` | — | Fires when a pointer drag begins. |
 
-### Slots
-
-Three slots: a scoped `slide` slot (config-array mode custom markup), a scoped `thumb` slot (custom thumbnail content), and the default slot (declarative mode — see [Quick start](#quick-start)). Both scoped slots receive `{ slide, index }`. Per-framework consumer syntax, read off the emitted leaves rather than assumed:
-
-| Framework | `slide` (scoped) | default |
-| --- | --- | --- |
-| React | `renderSlide={({ slide, index }) => …}` (also `renderThumb` for the `thumb` slot) | `children` |
-| Vue | `<template #slide="{ slide, index }">…</template>` | default slot |
-| Svelte | `{#snippet slide({ slide, index })}…{/snippet}` passed as the `slide` prop | children snippet |
-| Angular | `<ng-template #slide let-slide="slide" let-index="index">…</ng-template>` | content projection |
-| Solid | `slideSlot={({ slide, index }) => …}` (also `thumbSlot` for the `thumb` slot) | `children` |
-| Lit | set the `.slide` property to a render function: ``el.slide = ({ slide, index }) => html`…`;`` | default slot (native `<slot>`) |
-
-::: tip Lit: how raw `slot="slide"` children distribute
-`Carousel.rozie` renders `<slot name="slide">` **inside an `r-for`**, so Lit's shadow root ends up with N same-named `<slot name="slide">` elements (one per config-array slide). Native web-components slot assignment has no per-iteration identity — the browser would send **all** matching `slot="slide"` children to the **first** slot in tree order. The Lit leaf therefore ships with manual slot distribution (`slotAssignment: 'manual'` + a `RozieSlotDistributor` controller): light-DOM children carrying `slot="slide"` are assigned **one per iteration in document order** (the i-th child to the i-th slide, extras to the last), and redistribution tracks child adds/removes and `slot`-attribute changes automatically. Note that statically slotted children still cannot receive the scoped `{ slide, index }` params — that is inherent to web-components slots — so for content derived from per-slide data, use the **property function** (``el.slide = (ctx) => html`…`;``) shown above, which is what the live demo does.
-:::
-
 ### Imperative handle
 
 Build prev/next/dots controls off the `$expose` handle (there is no `#controls` slot — the imperative surface exposes everything). Grab the handle with your framework's native ref mechanism:
@@ -179,6 +158,23 @@ const carousel = ref();
   <button @click="carousel.scrollNext()">Next</button>
 </template>
 ```
+
+## Slots
+
+Three slots: a scoped `slide` slot (config-array mode custom markup), a scoped `thumb` slot (custom thumbnail content), and the default slot (declarative mode — see [Quick start](#quick-start)). Both scoped slots receive `{ slide, index }`. Per-framework consumer syntax, read off the emitted leaves rather than assumed:
+
+| Framework | `slide` (scoped) | default |
+| --- | --- | --- |
+| React | `renderSlide={({ slide, index }) => …}` (also `renderThumb` for the `thumb` slot) | `children` |
+| Vue | `<template #slide="{ slide, index }">…</template>` | default slot |
+| Svelte | `{#snippet slide({ slide, index })}…{/snippet}` passed as the `slide` prop | children snippet |
+| Angular | `<ng-template #slide let-slide="slide" let-index="index">…</ng-template>` | content projection |
+| Solid | `slideSlot={({ slide, index }) => …}` (also `thumbSlot` for the `thumb` slot) | `children` |
+| Lit | set the `.slide` property to a render function: ``el.slide = ({ slide, index }) => html`…`;`` | default slot (native `<slot>`) |
+
+::: tip Lit: how raw `slot="slide"` children distribute
+`Carousel.rozie` renders `<slot name="slide">` **inside an `r-for`**, so Lit's shadow root ends up with N same-named `<slot name="slide">` elements (one per config-array slide). Native web-components slot assignment has no per-iteration identity — the browser would send **all** matching `slot="slide"` children to the **first** slot in tree order. The Lit leaf therefore ships with manual slot distribution (`slotAssignment: 'manual'` + a `RozieSlotDistributor` controller): light-DOM children carrying `slot="slide"` are assigned **one per iteration in document order** (the i-th child to the i-th slide, extras to the last), and redistribution tracks child adds/removes and `slot`-attribute changes automatically. Note that statically slotted children still cannot receive the scoped `{ slide, index }` params — that is inherent to web-components slots — so for content derived from per-slide data, use the **property function** (``el.slide = (ctx) => html`…`;``) shown above, which is what the live demo does.
+:::
 
 ## Autoplay
 

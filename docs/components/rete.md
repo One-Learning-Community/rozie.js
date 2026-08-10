@@ -1,21 +1,21 @@
 # FlowCanvas — the cross-framework node-flow editor
 
-`FlowCanvas` is Rozie's data-bound port of [Rete.js v2](https://retejs.org/) — the framework-agnostic visual-programming engine whose core owns the graph model and **all** pointer interaction (pan, zoom, node drag, drag-to-connect). One `.rozie` source ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper.
+`FlowCanvas` is a data-bound port of [Rete.js v2](https://retejs.org/), the framework-agnostic visual-programming engine whose core owns the graph model and all pointer interaction (pan, zoom, node drag, drag-to-connect). It ships as idiomatic React, Vue, Svelte, Angular, Solid, and Lit components with the same API.
 
-This fills a **genuine cross-framework gap**. No other node-flow editor ships all six idiomatically:
+This fills a genuine cross-framework gap. No other node-flow editor ships all six idiomatically:
 
 - [@xyflow/react](https://reactflow.dev/) (React Flow) + [@xyflow/svelte](https://svelteflow.dev/) (Svelte Flow) — React & Svelte only
 - [@vue-flow/core](https://vueflow.dev/) — a **separate** Vue reimplementation, not a shared core
 - [@foblex/flow](https://flow.foblex.com/) / ngx-graph — Angular only
 - Solid has only a single-author experiment; **Lit has nothing**
 
-Rete.js ships render plugins for React/Vue/Angular/Svelte/Lit (five divergent codebases, no Solid). Rozie replaces all of them with **one source and one vanilla render layer** — and Solid (plus a far thinner Lit) gets a category-leading node editor for free.
+Rete.js ships render plugins for React/Vue/Angular/Svelte/Lit (five divergent codebases, no Solid). `FlowCanvas` replaces all of them with a single vanilla render layer, and Solid (plus a far thinner Lit) gets a category-leading node editor.
 
 The full source for `FlowCanvas.rozie` lives in the [`@rozie-ui/rete` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/rete/src/FlowCanvas.rozie).
 
 ## The `@rozie-ui/rete` packages
 
-`FlowCanvas` ships as six pre-compiled, per-framework packages generated from a single `FlowCanvas.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`FlowCanvas` ships as six pre-compiled, per-framework packages. Install the one for your framework; no build step is required:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -145,6 +145,8 @@ Each `<NodeType>`'s `#body` is a **reactive portal template**: one portal handle
 ```
 
 The sockets (connection anchors) come from each type's `<Port>` schema and are rendered by the engine layer — drag from an output socket to an input socket to connect.
+
+## API
 
 ### Props
 

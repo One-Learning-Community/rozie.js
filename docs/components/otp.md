@@ -1,14 +1,14 @@
 # Otp — the cross-framework headless one-time-code input
 
-`Otp` is Rozie's **headless, fully-accessible** one-time-code / PIN input — a `@rozie-ui` family with **no third-party engine** behind it. Every behaviour (per-cell typing, paste-to-distribute, backspace/arrow/Home/End navigation, focus choreography, `role="group"`, ordinal `aria-label`s, masking, and `autocomplete="one-time-code"` SMS autofill) is authored once in `Otp.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`Otp` is a headless, fully-accessible one-time-code / PIN input with no third-party engine behind it. It covers the whole behaviour surface: per-cell typing, paste-to-distribute, backspace/arrow/Home/End navigation, focus choreography, `role="group"`, ordinal `aria-label`s, masking, and `autocomplete="one-time-code"` SMS autofill. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
-Under the hood the "engine" is the **platform itself**: N native `<input>` cells. Browser focus, the keyboard, the clipboard, and one-time-code SMS autofill all come from the platform for free. The component is **fully controlled with no local state** — the assembled code string *is* `value` (the sole `model: true` prop), and each cell's displayed character is derived from it (`value[i]`). There is no draft buffer and no value↔cells echo guard to maintain; entry is sequential (left → right), so `value` is always a contiguous string. Rozie owns the author-side API: the two-way `r-model:value`, the sanitize/distribute logic, the focus choreography (via one container ref, never per-cell refs), and the token-themed skin.
+The foundation is the platform itself: N native `<input>` cells. Browser focus, the keyboard, the clipboard, and one-time-code SMS autofill all come from the platform. The component is fully controlled with no local state: the assembled code string *is* `value` (the sole `model: true` prop), and each cell's displayed character is derived from it (`value[i]`). There is no draft buffer and no value↔cells echo guard to maintain; entry is sequential (left → right), so `value` is always a contiguous string. Rozie owns the author-side API: the two-way `r-model:value`, the sanitize/distribute logic, the focus choreography (via one container ref, never per-cell refs), and the token-themed skin.
 
-And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+Every visual value is a CSS custom property, so the input re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/otp` packages
 
-`Otp` ships as six pre-compiled, per-framework packages generated from a single `Otp.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`Otp` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ And because **every visual value is a CSS custom property**, it re-skins to any 
 | `@rozie-ui/otp-solid` | `npm i @rozie-ui/otp-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/otp/packages/solid/README.md) |
 | `@rozie-ui/otp-lit` | `npm i @rozie-ui/otp-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/otp/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `Otp.rozie`, so they cannot drift from the compiled output (`codegen.mjs` asserts the structural columns of this page against `ir.props` on every run).
+Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
 ## Quick start
 
@@ -47,7 +47,7 @@ Two-way bind `value` and set `length` / `type` to get a segmented code input. Th
 </template>
 ```
 
-`r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Otp` a string, `Otp` writes the new contiguous code back on every edit (type, paste, backspace), and the framework reconciler picks it up — no `onChange → setState` wiring. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — an `Otp` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Otp` a string, `Otp` writes the new contiguous code back on every edit (type, paste, backspace), and the framework reconciler picks it up with no `onChange → setState` wiring. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor`, so an `Otp` is a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## API
 
@@ -77,7 +77,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 
 | Method | Description |
 | --- | --- |
-| `focus` | Move DOM focus to the first empty cell (clamped to the last cell when the code is full). **Deliberately named `focus`**, which overrides the inherited `HTMLElement.focus` on the Lit custom element — the public `focus()` handle is intended (an accepted, warn-only ROZ137). This mirrors the slider precedent; listbox took the other branch (`focusControl`). |
+| `focus` | Move DOM focus to the first empty cell (clamped to the last cell when the code is full). Deliberately named `focus`, overriding the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. This mirrors the slider precedent; listbox took the other branch (`focusControl`). |
 | `clear` | Reset the code to the empty string (emits `change` with `{ value: "" }`) and move focus to the first cell. Collision-safe — not a host-element member. |
 
 ### Slots

@@ -28,7 +28,7 @@ const page2 = ref(5);
 
 # Pagination — live demo
 
-This is the **real `@rozie-ui/pagination-vue` package** running on this page (VitePress is itself a Vue app). Click the page numbers, the prev/next arrows, or use the arrow keys to rove between controls — the two-way bound page updates and the `@change` readout fires. Everything below is driven by the same `Pagination.rozie` source that compiles to all six frameworks, with **no engine and no required CSS** — the windowing logic and a tokenised skin ship inside the component.
+This is the **real `@rozie-ui/pagination-vue` package** running on this page (VitePress is itself a Vue app). Click the page numbers, the prev/next arrows, or use the arrow keys to rove between controls — the two-way bound page updates and the `@change` readout fires. The same `Pagination` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It needs **no engine and no required CSS** — the windowing logic and a tokenised skin ship inside the component.
 
 <ClientOnly>
 <div class="pg-live">

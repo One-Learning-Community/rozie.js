@@ -19,7 +19,7 @@ function onResize(e: { size: number }) {
 
 # Resizable — live demo
 
-This is the **real `@rozie-ui/resizable-vue` package** running on this page (VitePress is itself a Vue app). Drag the handle between the panels, or focus it (`Tab`) and use the Arrow keys / `Home` / `End` — then watch the two-way bound `size` percent update and the `@resize` readout fire. Everything below is driven by the same `Resizable.rozie` source that compiles to all six frameworks, built on native Pointer Events with **no engine and no required CSS** — the drag behaviour and a tokenised skin all ship inside the component.
+This is the **real `@rozie-ui/resizable-vue` package** running on this page (VitePress is itself a Vue app). Drag the handle between the panels, or focus it (`Tab`) and use the Arrow keys / `Home` / `End` — then watch the two-way bound `size` percent update and the `@resize` readout fire. The same `Resizable` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on native Pointer Events with **no engine and no required CSS** — the drag behaviour and a tokenised skin all ship inside the component.
 
 <ClientOnly>
 <div class="rz-live">
@@ -56,7 +56,7 @@ This is the **real `@rozie-ui/resizable-vue` package** running on this page (Vit
 
 `size` is two-way bound with `v-model:size` — the readout updates the instant you drag, and a consumer write (the `reset()` / `applySize()` buttons, grabbed through Vue's `ref`) flows back in. Set `direction` to `'horizontal'` / `'vertical'`, clamp the range with `:min` / `:max`, and listen to `@resize` for every committed change. See the [full API](/components/resizable-api) for every prop, event, handle verb, and slot, plus theming and keyboard reference.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -75,7 +75,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `resize` event, same two-way `size`, same imperative handle, same slots — all from the one source above, built on native Pointer Events with no third-party engine behind it.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `resize` event, same two-way `size`, same imperative handle, same slots — identical on every target, built on native Pointer Events with no third-party engine behind it.
 
 ## See also
 

@@ -42,7 +42,7 @@ const charCount = computed(() => code.value.length);
 
 # CodeMirror — live demo
 
-This is the **real `@rozie-ui/codemirror-vue` package** running on this page (VitePress is itself a Vue app). Type in the editor below, toggle the language and theme, then **Get value** to read the live document straight off the imperative handle. Everything here is driven by the same `CodeMirror.rozie` source that compiles to all six frameworks.
+This is the **real `@rozie-ui/codemirror-vue` package** running on this page (VitePress is itself a Vue app). Type in the editor below, toggle the language and theme, then **Get value** to read the live document straight off the imperative handle. The same `CodeMirror` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 <ClientOnly>
 <div class="cm-live">
@@ -84,7 +84,7 @@ This is the **real `@rozie-ui/codemirror-vue` package** running on this page (Vi
 
 The document is two-way bound with `v-model:value` — the readout above updates live as you type, the language/theme toggles reconfigure the live editor **without a remount** (cursor, history, and scroll position are preserved), and the buttons drive the imperative handle (`focus`, `insertText`, `getValue`). The JSON/Python toggles feed the curated `@rozie-ui/codemirror-vue/languages` presets through `:extensions`, since the bundled `language` prop ships JavaScript only. See the [full API](/components/codemirror) for the complete prop/handle/slot surface.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -103,7 +103,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same two-way `value`, same eight-verb imperative handle, same five portal slots, all from the one source above.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same two-way `value`, same eight-verb imperative handle, same five portal slots, identical on every target.
 
 ## See also
 

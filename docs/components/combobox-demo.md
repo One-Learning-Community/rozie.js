@@ -44,7 +44,7 @@ function onSearch(e: { query: string }) {
 
 # Combobox — live demo
 
-This is the **real `@rozie-ui/combobox-vue` package** running on this page (VitePress is itself a Vue app). Type to filter, use the arrow keys to move the highlight, press `Enter` to pick, or click an option — then watch the two-way bound `value` update. Everything below is driven by the same `Combobox.rozie` source that compiles to all six frameworks, built on native DOM with **no engine and no required CSS** — the WAI-ARIA behaviour and a tokenised skin all ship inside the component.
+This is the **real `@rozie-ui/combobox-vue` package** running on this page (VitePress is itself a Vue app). Type to filter, use the arrow keys to move the highlight, press `Enter` to pick, or click an option — then watch the two-way bound `value` update. The same `Combobox` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on native DOM with **no engine and no required CSS** — the WAI-ARIA behaviour and a tokenised skin all ship inside the component.
 
 <ClientOnly>
 <div class="cb-live">
@@ -91,7 +91,7 @@ This is the **real `@rozie-ui/combobox-vue` package** running on this page (Vite
 
 `value` is two-way bound with `v-model:value` — the readout updates the instant you commit a selection, and a consumer write flows back in. The **Framework picker**'s buttons drive the imperative handle (`clear()`, `focus()`) grabbed through Vue's `ref`. The **Country picker** supplies a custom `#option` template (the scoped slot exposes `{ option, active, selected }`) and listens to `@search` to surface the typed query — the same hook you would use for async / server-side filtering (set `disableFilter` and refetch `options` from the query). See the [full API](/components/combobox) for every prop, event, slot, and handle verb, plus filtering, theming, keyboard, and accessibility reference.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -110,7 +110,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `change` / `search` events, same two-way `value`, same `#option` scoped slot, same imperative handle — all from the one source above, built on native DOM with no third-party engine behind it.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `change` / `search` events, same two-way `value`, same `#option` scoped slot, same imperative handle — identical on every target, built on native DOM with no third-party engine behind it.
 
 ## See also
 

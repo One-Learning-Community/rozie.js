@@ -54,7 +54,7 @@ function reset() {
 
 # FlowCanvas — live demo
 
-This is the **real `@rozie-ui/rete-vue` package** running on this page (VitePress is itself a Vue app) — driving an actual [Rete.js v2](https://retejs.org/) node editor. **Drag a node**, **drag from one socket to another to connect them**, scroll to zoom, or use the controls below. Everything is driven by the same `FlowCanvas.rozie` source that compiles to all six frameworks, through a **vanilla render layer** (no framework-specific Rete render plugin). Rete ships no stylesheet — every node, socket, and connection you see is styled by the component itself.
+This is the **real `@rozie-ui/rete-vue` package** running on this page (VitePress is itself a Vue app) — driving an actual [Rete.js v2](https://retejs.org/) node editor. **Drag a node**, **drag from one socket to another to connect them**, scroll to zoom, or use the controls below. The same `FlowCanvas` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It renders through a **vanilla render layer** (no framework-specific Rete render plugin). Rete ships no stylesheet — every node, socket, and connection you see is styled by the component itself.
 
 <ClientOnly>
 <div class="flow-live">
@@ -105,7 +105,7 @@ This is the **real `@rozie-ui/rete-vue` package** running on this page (VitePres
 
 The graph is **one controlled object** (`v-model:graph`) — the single source of truth, shaped `{ nodes: [{ id, type, x, y, data }], connections: [...] }`. Each node's `type` selects a `<NodeType>` template; the canvas renders every node from its type (render-by-type) and **writes back** into the bound object: dragging a node rewrites its `x`/`y`, and drawing or removing an edge rewrites `connections` — you never hand-reconcile. **Add node** writes a fresh `graph` object and the wrapper reconciles it into the live editor with no remount. `zoom` is **two-way bound** with `v-model:zoom` — the readout tracks it as you scroll, and **Fit** drives the imperative handle (`zoomToFit()`), which echoes the new zoom back into the binding. Each node body is your own `<NodeType>`'s `#body` template, rendered per node through the reactive body portal. The two **built-in overlays** are both visible above: the **Controls** cluster (bottom-left, zoom / fit — `:controls`, on by default) and the opt-in **MiniMap** (bottom-right, `:minimap="true"`) — a scaled map of every node (at its measured size) plus the current viewport window, **pannable** to recenter. See the [full API](/components/rete) for the complete prop / event / handle surface.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -124,7 +124,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with `model()` signals, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, same render-by-type body portal, all from the one source above — and the engine (graph model, pan/zoom/drag, drag-to-connect) is Rete.js on every target.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with `model()` signals, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, same render-by-type body portal, identical on every target — and the engine (graph model, pan/zoom/drag, drag-to-connect) is Rete.js on every target.
 
 The companion `<NodeType>` and `<Port>` type-template tags compile the same way:
 

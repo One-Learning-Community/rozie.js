@@ -1,21 +1,27 @@
 # Cropper — the cross-framework image cropper
 
-[Cropper.js](https://github.com/fengyuanchen/cropperjs) is the de-facto vanilla-JS image-cropping engine. But its framework wrappers are **lopsided**: React has the deep, maintained [`react-cropper`](https://github.com/react-cropper/react-cropper); Vue has the older `vue-cropperjs`; and Angular, Svelte, Solid and Lit have nothing comparable — thin, stale, or absent. That gap (React served, the rest stranded) is exactly what Rozie's write-once-ship-six thesis exists to close.
-
-One `Cropper.rozie` source compiles to six idiomatic packages — so Angular, Svelte, Solid and Lit consumers get a category-leading cropper for free, with the same props, events, two-way crop box, and imperative handle as the React one.
+`Cropper` is an image cropper built on [Cropper.js](https://github.com/fengyuanchen/cropperjs) v1, the de-facto vanilla-JS image-cropping engine. It ships as idiomatic React, Vue, Svelte, Angular, Solid, and Lit packages with the same props, events, two-way crop box, and imperative handle in each.
 
 ## The `@rozie-ui/cropper` packages
 
-| Package | Framework | Ships |
-| --- | --- | --- |
-| `@rozie-ui/cropper-react` | React 18+ | compiled `.tsx` + types |
-| `@rozie-ui/cropper-vue` | Vue 3.4+ | `.vue` SFC source |
-| `@rozie-ui/cropper-svelte` | Svelte 5+ | `.svelte` source |
-| `@rozie-ui/cropper-angular` | Angular 19+ | standalone component source |
-| `@rozie-ui/cropper-solid` | Solid 1.8+ | compiled `.tsx` + types |
-| `@rozie-ui/cropper-lit` | Lit 3+ | compiled custom element + types |
+Install the pre-compiled package for your framework; no build step is required:
 
-All six wrap **Cropper.js v1** (`cropperjs@^1`), declared as a peer dependency. (Cropper.js v2 was rewritten as Web Components with a different API — see [Gotchas](#why-v1-not-v2).)
+| Package | Install | README |
+| --- | --- | --- |
+| `@rozie-ui/cropper-react` | `npm i @rozie-ui/cropper-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/cropper/packages/react/README.md) |
+| `@rozie-ui/cropper-vue` | `npm i @rozie-ui/cropper-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/cropper/packages/vue/README.md) |
+| `@rozie-ui/cropper-svelte` | `npm i @rozie-ui/cropper-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/cropper/packages/svelte/README.md) |
+| `@rozie-ui/cropper-angular` | `npm i @rozie-ui/cropper-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/cropper/packages/angular/README.md) |
+| `@rozie-ui/cropper-solid` | `npm i @rozie-ui/cropper-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/cropper/packages/solid/README.md) |
+| `@rozie-ui/cropper-lit` | `npm i @rozie-ui/cropper-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/cropper/packages/lit/README.md) |
+
+All six wrap **Cropper.js v1** (`cropperjs@^1`), declared as a peer dependency, alongside each package's framework peer (React 18+, Vue 3.4+, Svelte 5+, Angular 19+, Solid 1.8+, Lit 3+). Install the engine peer alongside the framework package:
+
+```bash
+npm i @rozie-ui/cropper-react cropperjs
+```
+
+Each package ships its framework's native shape: compiled `.tsx` + types for React and Solid, `.vue` SFC source for Vue, `.svelte` source for Svelte, standalone component source for Angular, and a compiled custom element + types for Lit. (Cropper.js v2 was rewritten as Web Components with a different API — see [Gotchas](#why-v1-not-v2).)
 
 ::: warning Import the engine CSS yourself
 The scoped component `<style>` cannot reach the engine-rendered `.cropper-*` crop UI, so each app must import Cropper's stylesheet once at its entry:
@@ -236,7 +242,7 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `setDragMode` | Set the drag mode — `setDragMode('crop' \| 'move' \| 'none')`. |
 
 ::: tip Why `crop`/`zoom` are not `$expose` verbs
-Cropper.js names `crop` and `zoom` as **both** events and methods, and `data` is a model prop (so React auto-generates an internal `setData` setter). A bare `crop`/`zoom` verb would collide with the same-named emit (ROZ121) and a `setData` verb with the model setter (ROZ524). So the imperative crop/zoom are exposed under collision-free names — `showCropBox`, `zoomTo`/`zoomBy` — and the crop box is set through the two-way `data` binding (`getData` reads it). The geometry setters `setCanvasData`/`setCropBoxData` are **distinct names** from the model auto-setter (`setData`), so they don't collide either. None of the 27 verbs shadows a Lit lifecycle method.
+Cropper.js names `crop` and `zoom` as **both** events and methods, and `data` is a model prop (so React auto-generates an internal `setData` setter). A bare `crop`/`zoom` verb would collide with the same-named emit, and a `setData` verb with the model setter (Rozie rejects both collisions at compile time). So the imperative crop/zoom are exposed under collision-free names — `showCropBox`, `zoomTo`/`zoomBy` — and the crop box is set through the two-way `data` binding (`getData` reads it). The geometry setters `setCanvasData`/`setCropBoxData` are **distinct names** from the model auto-setter (`setData`), so they don't collide either. None of the 27 verbs shadows a Lit lifecycle method.
 :::
 
 **React example:**

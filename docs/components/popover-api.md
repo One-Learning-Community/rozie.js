@@ -21,7 +21,7 @@ The full prop surface. The single `model: true` slice (`open`, the **Two-way** c
 
 | Event | Description |
 | --- | --- |
-| `change` | Fired whenever the open state changes. Payload is the new `open` boolean. Named `change` — **not** `open` — so the two-way model and its change notification do not collapse onto one name (the MapLibre model-prop==emit-name lesson). |
+| `change` | Fired whenever the open state changes. Payload is the new `open` boolean. Named `change`, not `open`, so the two-way model and its change notification do not collapse onto one name. |
 
 ## Imperative handle
 

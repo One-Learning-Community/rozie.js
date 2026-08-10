@@ -1,14 +1,14 @@
 # SortableList — the cross-framework drag-and-drop component
 
-`SortableList` is Rozie's data-bound port of [SortableJS](https://sortablejs.github.io/Sortable/) — the headline demo for Rozie's competitive wedge. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers, with a feature set that every standalone library on the [Sortable libraries comparison](/components/sortable-comparison) matrix either skips or implements partially.
+`SortableList` is a data-bound port of [SortableJS](https://sortablejs.github.io/Sortable/). It ships as idiomatic React, Vue, Svelte, Angular, Solid, and Lit components, with a feature set that every standalone library on the [Sortable libraries comparison](/components/sortable-comparison) matrix either skips or implements partially.
 
-This page is the **show-and-tell**: API reference, live demos, and the recipes that cover the long tail of what you'd want a drag-and-drop list to do. The [comparison page](/components/sortable-comparison) is the **sell**.
+This page covers the API reference, live demos, and the recipes for the long tail of what you'd want a drag-and-drop list to do. The [comparison page](/components/sortable-comparison) sets it against the per-framework alternatives.
 
 The full source for `SortableList.rozie` lives in [the canonical example page](/examples/sortable-list).
 
 ## The `@rozie-ui/sortable-list` packages
 
-`SortableList` ships as the first `@rozie-ui` product: six pre-compiled, per-framework packages generated from a single `SortableList.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step, no `@rozie/*` runtime dependency:
+`SortableList` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no `@rozie/*` runtime dependency:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ The full source for `SortableList.rozie` lives in [the canonical example page](/
 | `@rozie-ui/sortable-list-solid` | `npm i @rozie-ui/sortable-list-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/packages/solid/README.md) |
 | `@rozie-ui/sortable-list-lit` | `npm i @rozie-ui/sortable-list-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/sortable-list/packages/lit/README.md) |
 
-Each package carries `sortablejs ^1.15` plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). The per-leaf READMEs above and the **Props** table below are generated from the same IR parse of `SortableList.rozie`, so they cannot drift from the compiled output (the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run). This page documents the API surface shared by all six packages; the [comparison page](/components/sortable-comparison) frames the cross-framework wedge, and the [example page](/examples/sortable-list) shows the per-target compiled output side by side.
+Each package carries `sortablejs ^1.15` plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). This page documents the API surface shared by all six packages; the [comparison page](/components/sortable-comparison) covers how it stacks up against the per-framework libraries, and the [example page](/examples/sortable-list) shows the per-target compiled output side by side.
 
 ## Quick start
 
@@ -89,7 +89,7 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `itemClass` | `String \| Array \| Object \| Function` | `""` | yes | Extra class(es) merged onto every item row. Accepts a string, an array, an object (Vue-style class binding), or a `(item, index) => class` function for per-row classes, normalized via the cross-target class normalizer. Bridges `.list-group-item` and per-row layout/styling. |
 | `itemStyle` | `String \| Object \| Function` | `null` | yes | Per-row inline style on the item wrapper. Accepts a CSS string, a flat style object (`Record<string, string \| number>`), or a `(item, index) => string \| object` function. Lands on the `.rozie-sortable-item` wrapper — the direct child of the list container — so it can drive CSS-grid placement (`grid-column` / `align-self`) when `listClass` sets `display: grid`. Normalized per target (React/Solid `parseInlineStyle`, Lit/Svelte `rozieStyle`, Vue/Angular native); `null` / empty drops the attribute. |
 
-### Emits
+### Events
 
 | Event | Payload | Fires when |
 | --- | --- | --- |
@@ -157,7 +157,7 @@ sl.current?.option('disabled', true);     // disable at runtime
 const instance = sl.current?.getInstance(); // raw SortableJS instance
 ```
 
-The four verb names are clear of all sixteen prop names and the five events (`option` is a distinct identifier from the `options` prop), so the `$expose` collision discipline (ROZ121) passes with no renames.
+The four verb names don't collide with any prop or event name (`option` is a distinct identifier from the `options` prop), so Rozie's rule that an `$expose` verb may not share a name with a prop or emit passes with no renames.
 
 ::: tip `toArray` / `sort` rely on `data-id`
 Each rendered row carries `data-id="<key>"`, derived from [`itemKey`](#api) (falling back to the item value, then the index). Set `itemKey` for object lists so `toArray()` / `sort()` operate on stable keys rather than `"[object Object]"`.

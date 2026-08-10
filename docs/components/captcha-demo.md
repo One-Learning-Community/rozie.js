@@ -28,7 +28,7 @@ const reset = () => captcha.value?.reset();
 
 # Captcha — live demo
 
-This is the **real `@rozie-ui/captcha-vue` package** running on this page (VitePress is itself a Vue app). Pick a provider, solve the widget, and watch the two-way `token` model populate — then **Reset**. It's the same `Captcha.rozie` source that compiles to all six frameworks.
+This is the **real `@rozie-ui/captcha-vue` package** running on this page (VitePress is itself a Vue app). Pick a provider, solve the widget, and watch the two-way `token` model populate — then **Reset**. The same `Captcha` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 ::: warning Loads a third-party widget
 This page injects the selected provider's `api.js` from its CDN and renders a live (test-key) challenge. It needs network access and will not render offline.

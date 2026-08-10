@@ -1,14 +1,14 @@
 # Slider — the cross-framework headless slider / range
 
-`Slider` is Rozie's **headless, fully-accessible** slider and dual-thumb range — the second `@rozie-ui` component with **no third-party engine** behind it. Every behaviour (drag, keyboard, focus, `role="slider"`, `aria-value*`, step/min/max, disabled, and RTL) is authored once in `Slider.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`Slider` is a headless, fully-accessible slider and dual-thumb range with no third-party engine behind it. It covers the whole behaviour surface: drag, keyboard, focus, `role="slider"`, `aria-value*`, step/min/max, disabled, and RTL. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
-Under the hood the "engine" is the browser's own **native `<input type="range">`** (Approach B): drag — mouse *and* touch — keyboard, focus management, the slider ARIA role, and step/min/max bounds all come from the platform for free. Dual-thumb **range** mode is two overlapping transparent native inputs; **vertical** is a `transform: rotate(-90deg)` wrapper (so up = increase, with an explicit `aria-orientation="vertical"`); the colored fill is a positioned `<div>` underlay driven purely by `value / min / max` arithmetic — no measured geometry. Rozie owns the author-side API: the two-way `r-model:value`, the range sort/clamp, the fill-var math, the marks + value-bubble overlays, and a thin PageUp/PageDown step augment.
+The foundation is the browser's own native `<input type="range">`: drag (mouse and touch), keyboard, focus management, the slider ARIA role, and step/min/max bounds all come from the platform. Dual-thumb range mode is two overlapping transparent native inputs; vertical is a `transform: rotate(-90deg)` wrapper (so up = increase, with an explicit `aria-orientation="vertical"`); the colored fill is a positioned `<div>` underlay driven purely by `value / min / max` arithmetic, with no measured geometry. Rozie owns the author-side API: the two-way `r-model:value`, the range sort/clamp, the fill-var math, the marks + value-bubble overlays, and a thin PageUp/PageDown step augment.
 
-And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5, plus the cross-browser thumb/track pseudo-element styling that native range inputs require.
+Every visual value is a CSS custom property, so the slider re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5, plus the cross-browser thumb/track pseudo-element styling that native range inputs require.
 
 ## The `@rozie-ui/slider` packages
 
-`Slider` ships as six pre-compiled, per-framework packages generated from a single `Slider.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`Slider` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ And because **every visual value is a CSS custom property**, it re-skins to any 
 | `@rozie-ui/slider-solid` | `npm i @rozie-ui/slider-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/solid/README.md) |
 | `@rozie-ui/slider-lit` | `npm i @rozie-ui/slider-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `Slider.rozie`, so they cannot drift from the compiled output (`codegen.mjs` asserts the structural columns of this page against `ir.props` on every run).
+Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
 ## Quick start
 
@@ -48,7 +48,7 @@ Two-way bind `value` and set the `min` / `max` / `step` scale to get a single-th
 </template>
 ```
 
-`r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Slider` a value, `Slider` writes the new value back on every commit (drag end, keyboard, or programmatic step), and the framework reconciler picks it up — no `onChange → setState` wiring. In single mode `value` is a scalar number; in `range` mode it is a **sorted `[lo, hi]` array** (each thumb is neighbour-clamped, and a fresh array is written on every commit). Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Slider` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Slider` a value, `Slider` writes the new value back on every commit (drag end, keyboard, or programmatic step), and the framework reconciler picks it up with no `onChange → setState` wiring. In single mode `value` is a scalar number; in `range` mode it is a sorted `[lo, hi]` array (each thumb is neighbour-clamped, and a fresh array is written on every commit). Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor`, so a `Slider` is a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## API
 
@@ -90,7 +90,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | Slot | Params | Description |
 | --- | --- | --- |
 | `mark` | `value, label, position` | Custom per-mark rendering. `position` is the mark's percent along the track. |
-| `bubble` | `value` | Custom value-bubble rendering (one instance per thumb in range mode). Gated by `showValue`. Named `bubble`, **not** `value`, because a slot sharing the declared `value` prop name is a hard ROZ127 error (Svelte 5 unifies snippets + props into one `$props` namespace). |
+| `bubble` | `value` | Custom value-bubble rendering (one instance per thumb in range mode). Gated by `showValue`. Named `bubble`, not `value`, because a slot may not share a declared prop name (a hard compile error: Svelte 5 unifies snippets and props into one `$props` namespace). |
 
 ## Theming
 
@@ -107,7 +107,7 @@ Every value the component renders is a `--rozie-slider-*` CSS custom property wi
 
 Two of the tokens are special. `--rozie-slider-fill-start` and `--rozie-slider-fill-end` are **runtime-inline** custom properties the component writes from `value / min / max` (via the `fillStyle` `$computed`) — they drive the colored fill `<div>` and the bubble positions, so they are *not* theme tokens you set yourself. Everything else (accent, track height/radius/bg, thumb size/bg/border/shadow/offset, disabled opacity, the vertical thickness/length, and the mark/bubble cosmetics) is a token with a documented default in `themes/base.css`.
 
-The structural rules — the Approach B overlap, the filled-`<div>` underlay, the rotate-90 vertical wrapper, and the per-vendor pseudo-elements — are behavior-critical and compile per-leaf; they are not consumer-overridable. Only the cosmetic values flow through tokens.
+The structural rules (the overlapping native inputs, the filled-`<div>` underlay, the rotate-90 vertical wrapper, and the per-vendor pseudo-elements) are behavior-critical and compile per-leaf; they are not consumer-overridable. Only the cosmetic values flow through tokens.
 
 ### Design-system bridges
 

@@ -4,11 +4,7 @@ title: Pagination — API reference
 
 # Pagination — API reference
 
-The complete prop / event / slot / imperative-handle surface of `@rozie-ui/pagination`,
-generated from the single `Pagination.rozie` source. The **Props** table below is a
-build-time `rozie-props` fence — it is regenerated from the compiler IR on every docs
-build, so it cannot drift from the shipped component. Each prop's prose lives in exactly
-one place: the `<props>` `docs.description` in the source.
+The complete prop / event / slot / imperative-handle surface of `@rozie-ui/pagination`.
 
 ## Props
 

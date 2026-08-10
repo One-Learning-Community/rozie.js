@@ -1,14 +1,14 @@
 # NumberField — the cross-framework headless numeric stepper
 
-`NumberField` is Rozie's **headless, fully-accessible** numeric input / spinbutton — a `@rozie-ui` family with **no third-party engine** behind it. Every behaviour (typing with locale-aware parse/format, clamp to `[min, max]`, step snapping, the +/- steppers with press-and-hold acceleration, keyboard control — ArrowUp/Down, PageUp/Down, Home/End — optional scrub-on-drag, and `role="spinbutton"` with the full `aria-value*` set) is authored once in `NumberField.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`NumberField` is a headless, fully-accessible numeric input / spinbutton with no third-party engine behind it. It covers the whole behaviour surface: typing with locale-aware parse/format, clamping to `[min, max]`, step snapping, +/- steppers with press-and-hold acceleration, keyboard control (ArrowUp/Down, PageUp/Down, Home/End), optional scrub-on-drag, and `role="spinbutton"` with the full `aria-value*` set. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
-Under the hood the "engine" is the **platform itself**: a native `<input>` for text entry, browser focus, the keyboard, and `Intl.NumberFormat` for locale-aware display. The numeric value *is* `modelValue` (the sole `model: true` prop), typed `number | null` — `null` is the empty field. The one piece of local state is the **edit buffer** (`text`): a half-typed entry like `"1."` or `"-"` is not yet a valid number, so it is held as text while the field is focused and parsed back to a number on blur / Enter. Rozie owns the author-side API: the two-way `r-model:modelValue`, the clamp/snap math, the keyboard choreography, the press-hold ramp, and the token-themed skin.
+The foundation is the platform itself: a native `<input>` for text entry, browser focus, the keyboard, and `Intl.NumberFormat` for locale-aware display. The numeric value *is* `modelValue` (the sole `model: true` prop), typed `number | null`; `null` is the empty field. The one piece of local state is the edit buffer (`text`): a half-typed entry like `"1."` or `"-"` is not yet a valid number, so it is held as text while the field is focused and parsed back to a number on blur / Enter. Rozie owns the author-side API: the two-way `r-model:modelValue`, the clamp/snap math, the keyboard choreography, the press-hold ramp, and the token-themed skin.
 
-And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+Every visual value is a CSS custom property, so the field re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/number-field` packages
 
-`NumberField` ships as six pre-compiled, per-framework packages generated from a single `NumberField.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`NumberField` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ And because **every visual value is a CSS custom property**, it re-skins to any 
 | `@rozie-ui/number-field-solid` | `npm i @rozie-ui/number-field-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/solid/README.md) |
 | `@rozie-ui/number-field-lit` | `npm i @rozie-ui/number-field-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `NumberField.rozie`, so they cannot drift from the compiled output (`codegen.mjs` asserts the structural columns of this page against `ir.props` on every run).
+Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
 ## Quick start
 
@@ -47,7 +47,7 @@ Two-way bind `modelValue` and set `min` / `max` / `step` to get a clamped, step-
 </template>
 ```
 
-`r-model:modelValue` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `NumberField` a `number | null`, `NumberField` writes the new clamped + snapped value back on every commit, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `modelValue` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `NumberField` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:modelValue` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `NumberField` a `number | null`, `NumberField` writes the new clamped + snapped value back on every commit, and the framework reconciler picks it up with no `onChange → setState` wiring. Because `modelValue` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor`, so a `NumberField` is a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## API
 
@@ -78,10 +78,38 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 
 | Method | Description |
 | --- | --- |
-| `focus` | Move DOM focus to the input and select its text. **Deliberately named `focus`**, which overrides the inherited `HTMLElement.focus` on the Lit custom element — the public `focus()` handle is intended (an accepted, warn-only ROZ137). This mirrors the slider/otp precedent. |
+| `focus` | Move DOM focus to the input and select its text. Deliberately named `focus`, overriding the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. This mirrors the slider/otp precedent. |
 | `increment` | Step the value up by one `step` (clamped + snapped). Emits `change`. |
 | `decrement` | Step the value down by one `step` (clamped + snapped). Emits `change`. |
 | `clear` | Set the value to `null` (empty) and clear the edit buffer. Emits `change`. |
+
+## Theming
+
+Every cosmetic value the component renders is a `--rozie-number-field-*` CSS custom property with a built-in fallback, so it works with zero configuration and remains fully re-skinnable. Override tokens at any ancestor scope:
+
+```css
+.rozie-number-field {
+  --rozie-number-field-radius: 0.5rem;
+  --rozie-number-field-width: 4.5rem;
+  --rozie-number-field-border-color: rgba(0, 0, 0, 0.25);
+  --rozie-number-field-btn-bg: rgba(0, 0, 0, 0.04);
+}
+```
+
+The full token vocabulary has documented defaults in `themes/base.css`: layout and typography (`gap`, `font`, `radius`), the frame (`bg`, `border-width`, `border-color`), the text input (`width`, `padding`, `text-align`, `font-size`, `color`), the focus ring (`focus-ring-width`, `focus-ring-color`), the +/- stepper buttons (`btn-size`, `btn-font-size`, `btn-color`, `btn-bg`, `btn-hover-bg`), and the disabled state (`disabled-opacity`). Only cosmetic values flow through tokens; the structural rules (the inline-flex stepper row, the input box model, the +/- buttons) compile per-leaf and are not consumer-overridable.
+
+### Design-system bridges
+
+Each package ships token presets that map the number-field tokens onto a known design system's published CSS variables, so the field automatically follows that system's light/dark theme and accent:
+
+```ts
+import '@rozie-ui/number-field-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --background/--foreground/--border/--ring/--muted
+import '@rozie-ui/number-field-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
+import '@rozie-ui/number-field-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
+import '@rozie-ui/number-field-react/themes/base.css';      // the documented default token set
+```
+
+The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/src/themes/base.css).
 
 ## Accessibility
 

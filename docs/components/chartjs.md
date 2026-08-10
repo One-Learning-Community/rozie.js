@@ -1,6 +1,6 @@
 # Chart.js — the cross-framework chart component
 
-`Chart` is Rozie's data-bound port of [Chart.js](https://www.chartjs.org/) — the most-used canvas charting library on the web. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. Every framework today carries its own hand-maintained Chart.js binding ([react-chartjs-2](https://react-chartjs-2.js.org/), [vue-chartjs](https://vue-chartjs.org/), [ng2-charts](https://valor-software.com/ng2-charts/), [svelte-chartjs](https://www.npmjs.com/package/svelte-chartjs)) — each shuttles a `data` prop into a `new Chart()` call and forwards events back out. Rozie collapses all of them (plus the Solid and Lit wrappers that are thinner upstream) into one source.
+`Chart` is Rozie's data-bound port of [Chart.js](https://www.chartjs.org/) — the most-used canvas charting library on the web. Every framework today carries its own hand-maintained Chart.js binding ([react-chartjs-2](https://react-chartjs-2.js.org/), [vue-chartjs](https://vue-chartjs.org/), [ng2-charts](https://valor-software.com/ng2-charts/), [svelte-chartjs](https://www.npmjs.com/package/svelte-chartjs)) — each shuttles a `data` prop into a `new Chart()` call and forwards events back out. Rozie ships the same `<Chart>` (same props, events, and imperative handle) in React, Vue, Svelte, Angular, Solid, and Lit.
 
 `Chart` is **generic**: the `type` prop switches the chart kind across the whole Chart.js controller set — `line`, `bar`, `pie`, `doughnut`, `radar`, `polarArea`, `scatter`, `bubble`, and any registerable controller. The wrapper calls `Chart.register(...registerables)` once, so every controller is available; you do not ship a per-type component.
 
@@ -10,7 +10,7 @@ The full source for `Chart.rozie` lives in the [`@rozie-ui/chartjs` package](htt
 
 ## The `@rozie-ui/chartjs` packages
 
-`Chart` ships as six pre-compiled, per-framework packages generated from a single `Chart.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`Chart` ships as six pre-compiled, per-framework packages; install only the one for your framework. There is no build step and no Rozie toolchain to add:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -27,7 +27,7 @@ Each package carries the **`chart.js` engine peer** (`^4`) plus its framework pe
 npm i @rozie-ui/chartjs-react chart.js
 ```
 
-Anything the curated prop surface doesn't special-case (scales, legends, custom plugins, per-dataset styling) comes through the `data`/`options` props — Chart.js's own config shapes — and the first-class `:plugins` passthrough for per-instance plugins. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `Chart.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
+Anything the curated prop surface doesn't special-case (scales, legends, custom plugins, per-dataset styling) comes through the `data`/`options` props — Chart.js's own config shapes — and the first-class `:plugins` passthrough for per-instance plugins.
 
 ## Registration & per-type components
 
@@ -46,7 +46,7 @@ import { Chart } from '@rozie-ui/chartjs-react/auto';   // registers ...register
 
 ### Per-type components
 
-Each package also exports **eight per-type components** — `Line`, `Bar`, `Pie`, `Doughnut`, `PolarArea`, `Radar`, `Scatter`, `Bubble` — so you can write `<Bar :data="…" />` instead of `<Chart type="bar" :data="…" />`. Each one pins its `type` and **registers only its own controller set**, so importing it needs no manual registration and is tree-shakable by construction (on the source-shipped Vue/Svelte/Angular packages, importing `Bar` pulls only the bar code). A per-type component carries the *same* surface as the generic `Chart` minus the `type` prop — the full props / 3 events / 8-verb handle / `tooltip` + `fallback` slots:
+Each package also exports **eight per-type components** — `Line`, `Bar`, `Pie`, `Doughnut`, `PolarArea`, `Radar`, `Scatter`, `Bubble` — so you can write `<Bar :data="…" />` instead of `<Chart type="bar" :data="…" />`. Each one pins its `type` and **registers only its own controller set**, so importing it needs no manual registration and is tree-shakable by construction (on the source-shipped Vue/Svelte/Angular packages, importing `Bar` pulls only the bar code). A per-type component carries the *same* surface as the generic `Chart` minus the `type` prop — the full props, events, imperative handle, and `tooltip` + `fallback` slots:
 
 ```tsx
 import { Bar } from '@rozie-ui/chartjs-react';   // no manual register() needed
@@ -213,6 +213,13 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `stopChart` | Stop the current animation loop. |
 | `clearChart` | Clear the chart canvas. |
 | `toBase64Image` | Export the current canvas as a base64-encoded PNG data URL — `toBase64Image(type?, quality?)`. |
+| `setDatasetVisibility` | Show or hide a dataset instantly (no animation): `setDatasetVisibility(datasetIndex, visible)`. The verb behind a custom legend's series toggles. |
+| `isDatasetVisible` | Return whether a dataset is currently visible: `isDatasetVisible(datasetIndex)`. `false` before mount. |
+| `hideDataset` | Hide a dataset (or a single data element) with Chart.js's hide animation: `hideDataset(datasetIndex, dataIndex?)`. The animated sibling of `setDatasetVisibility(i, false)`. |
+| `showDataset` | Show a hidden dataset (or a single data element) with the show animation: `showDataset(datasetIndex, dataIndex?)`. |
+| `setActiveElements` | Programmatically set the active (hovered) elements: `setActiveElements(elements)`; pass `[]` to clear. Events only report hover; this verb sets it (sync hover from a table row, a map pin, or a sibling chart). |
+| `getActiveElements` | Return the current active (hovered) element set. `[]` before mount. |
+| `getDatasetMeta` | Return a dataset's computed metadata (pixel geometry, controller): `getDatasetMeta(datasetIndex)`. For positioning custom overlays and annotations over the canvas. `null` before mount. |
 
 ::: tip The verbs are suffixed (`updateChart`, not `update`)
 The verb-style passthroughs are named `updateChart`/`renderChart`/… rather than bare `update`/`render`. Bare `update()` and `render()` are LitElement reactive-lifecycle methods — a `$expose({ update, render })` would **shadow** them on the Lit leaf and break it. Suffixing keeps the handle collision-free across all six targets (the Chart.js analog of CodeMirror's `setValue`→`replaceValue` lesson).

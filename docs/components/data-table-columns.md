@@ -41,7 +41,7 @@ See the [config-array usage snippet](/components/data-table-usage#columns-as-a-c
 
 A `<Column>` is **renderless** and carries **metadata only** — it never renders a cell itself. Custom cell and header rendering is a **single scoped slot on the parent `<DataTable>`**, `#cell` (scope `{ columnId, column, row, value }`) and `#colHeader` (scope `{ columnId, column, label }`), **dispatched by `columnId`**: you write one slot and switch on `columnId` to vary the render per column. A column the slot does not render (or any column when no slot is supplied) shows the plain accessor value — the fast path. This holds whether columns are declared as `<Column>` children or via the `:columns` array.
 
-> **Why parent-level, not per-`<Column>`?** The `<td>` / `<th>` hosts are framework-owned by the parent's keyed `r-for`, and a renderless child cannot plain-render into a sibling's host. So the one `#cell` / `#colHeader` scoped slot lives on `<DataTable>` and dispatches by `columnId` (design decision **D-A**). The header slot is named `#colHeader` (not `#header`) because a `#header` slot lowers to a Svelte snippet prop named `header`, which collides with a common local.
+> **Why parent-level, not per-`<Column>`?** The `<td>` / `<th>` hosts are framework-owned by the parent's keyed `r-for`, and a renderless child cannot plain-render into a sibling's host. So the one `#cell` / `#colHeader` scoped slot lives on `<DataTable>` and dispatches by `columnId`. The header slot is named `#colHeader` (not `#header`) because a `#header` slot lowers to a Svelte snippet prop named `header`, which collides with a common local.
 
 ```rozie
 <DataTable :data="$data.rows">

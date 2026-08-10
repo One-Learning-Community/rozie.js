@@ -20,7 +20,7 @@ function onChange(next: boolean) {
 
 # Popover — live demo
 
-This is the **real `@rozie-ui/popover-vue` package** running on this page (VitePress is itself a Vue app). Every cell below is driven by the same `Popover.rozie` source that compiles to all six frameworks, positioned by [`@floating-ui/dom`](https://floating-ui.com) with live `autoUpdate` tracking. Click triggers toggle a `role="dialog"` popover; hover triggers open a `role="tooltip"`; Escape and click-outside dismiss.
+This is the **real `@rozie-ui/popover-vue` package** running on this page (VitePress is itself a Vue app). The same `Popover` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. Every cell below is positioned by [`@floating-ui/dom`](https://floating-ui.com) with live `autoUpdate` tracking. Click triggers toggle a `role="dialog"` popover; hover triggers open a `role="tooltip"`; Escape and click-outside dismiss.
 
 <ClientOnly>
 <div class="pop-live">

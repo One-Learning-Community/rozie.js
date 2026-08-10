@@ -24,7 +24,7 @@ function emailValidator(candidate: string) {
 
 # Tags — live demo
 
-This is the **real `@rozie-ui/tags-vue` package** running on this page (VitePress is itself a Vue app). Type a tag and press Enter or comma, paste a comma-separated list (it bulk-adds), backspace through an empty input to delete the last tag, or click a chip's × to remove it — then watch the two-way bound array update. Everything below is driven by the same `Tags.rozie` source that compiles to all six frameworks, built on one native `<input>` plus framework-rendered chips with **no engine and no required CSS**.
+This is the **real `@rozie-ui/tags-vue` package** running on this page (VitePress is itself a Vue app). Type a tag and press Enter or comma, paste a comma-separated list (it bulk-adds), backspace through an empty input to delete the last tag, or click a chip's × to remove it — then watch the two-way bound array update. The same `Tags` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on one native `<input>` plus framework-rendered chips with **no engine and no required CSS**.
 
 <ClientOnly>
 <div class="tags-live">
@@ -69,7 +69,7 @@ This is the **real `@rozie-ui/tags-vue` package** running on this page (VitePres
 
 `modelValue` is two-way bound with `v-model:modelValue` — the readout updates the instant you add or remove, and a consumer write flows back in. The **Skills** instance caps at `:max="8"` (the input disables once full) and its buttons drive the imperative handle (`clear()`, `focus()`) grabbed through Vue's `ref`. The **Emails** instance passes a `:validate` function that rejects non-emails and lower-cases accepted ones — a rejected candidate is silently dropped. See the [full API](/components/tags-api) for every prop, event, handle verb, the scoped `#tag` slot, plus theming and accessibility reference.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -88,7 +88,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `add` / `remove` / `change` events, same two-way `modelValue`, same scoped `#tag` slot, same imperative handle — all from the one source above, with no third-party engine behind it.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `add` / `remove` / `change` events, same two-way `modelValue`, same scoped `#tag` slot, same imperative handle — identical on every target, with no third-party engine behind it.
 
 ## See also
 

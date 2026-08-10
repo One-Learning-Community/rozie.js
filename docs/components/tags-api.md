@@ -26,7 +26,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | Method | Description |
 | --- | --- |
 | `clear` | Remove every token (emits `change` with `{ value: [] }`) and move DOM focus to the text input. Collision-safe — not a host-element member. |
-| `focus` | Move DOM focus to the inline text input. **Deliberately named `focus`**, which overrides the inherited `HTMLElement.focus` on the Lit custom element — the public `focus()` handle is the intended semantics (an accepted, warn-only ROZ137 on the Lit leaf). This mirrors the otp/slider precedent and is consistent with `NumberField`. |
+| `focus` | Move DOM focus to the inline text input. Deliberately named `focus`, overriding the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. This mirrors the otp/slider precedent and is consistent with `NumberField`. |
 
 ## Slots
 
@@ -34,4 +34,4 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | --- | --- | --- |
 | `tag` | `tag, index, remove` | Scoped — fully replaces the rendering of each chip. `tag` is the token string, `index` its position, and `remove()` a zero-arg function that removes this token. The default fallback renders the built-in chip (label + remove button). On React the slot is a render-prop `children` callback (the documented cross-framework slot divergence). |
 
-The slot name `tag` deliberately does **not** equal any prop key (ROZ127 — a slot/prop name collision is a hard error because Svelte 5 collapses snippets and props into one `$props()` bag).
+The slot name `tag` deliberately does not equal any prop key: a slot/prop name collision is a hard compile error, because Svelte 5 collapses snippets and props into one `$props()` bag.

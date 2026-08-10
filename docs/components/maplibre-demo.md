@@ -40,7 +40,7 @@ const zoom = ref(4);
 
 # MapLibre — live demo
 
-This is the **real `@rozie-ui/maplibre-vue` package** running on this page (VitePress is itself a Vue app) — driving an actual WebGL [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/) map. Pan it, scroll to zoom, or use the controls below — the `[lng, lat]` / zoom readout updates live because the camera is **two-way bound**. Everything below is driven by the same `MapLibre.rozie` source that compiles to all six frameworks. The map uses a network-free offline style (a solid background + a colored GeoJSON polygon), so it needs **no tiles and no network**.
+This is the **real `@rozie-ui/maplibre-vue` package** running on this page (VitePress is itself a Vue app) — driving an actual WebGL [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/) map. Pan it, scroll to zoom, or use the controls below — the `[lng, lat]` / zoom readout updates live because the camera is **two-way bound**. The same `MapLibre` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. The map uses a network-free offline style (a solid background + a colored GeoJSON polygon), so it needs **no tiles and no network**.
 
 <ClientOnly>
 <div class="map-live">
@@ -73,7 +73,7 @@ This is the **real `@rozie-ui/maplibre-vue` package** running on this page (Vite
 
 The camera is two-way bound with `v-model:center` and `v-model:zoom` — the readout above updates live as you pan and zoom, and the **Fly to** buttons drive the imperative handle (`flyTo`), while **Zoom in / out** and **Reset** mutate the bound state directly. Because the binding is two-way, a `flyTo()` echoes back into `center`/`zoom` and the readout tracks it — the round-trip is the whole point. `center` is `[lng, lat]` — **longitude first** (MapLibre's convention). See the [full API](/components/maplibre) for the complete prop/event/handle surface.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -92,7 +92,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with `model()` signals, a Solid component, and a Lit custom element. Same props, same 20 events, same eight-verb imperative handle, same reactive `marker` / `popup` / `control` portal slots, all from the one source above.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with `model()` signals, a Solid component, and a Lit custom element. Same props, same 20 events, same eight-verb imperative handle, same reactive `marker` / `popup` / `control` portal slots, identical on every target.
 
 ## See also
 

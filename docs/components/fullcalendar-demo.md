@@ -30,7 +30,7 @@ const setView = (v: string) => { view.value = v; cal.value?.changeView(v); syncT
 
 # FullCalendar — live demo
 
-This is the **real `@rozie-ui/fullcalendar-vue` package** running on this page (VitePress is itself a Vue app). Click the events, drag the toolbar, switch views — then use the controls below to drive the imperative handle. Everything here is driven by the same `FullCalendar.rozie` source that compiles to all six frameworks.
+This is the **real `@rozie-ui/fullcalendar-vue` package** running on this page (VitePress is itself a Vue app). Click the events, drag the toolbar, switch views — then use the controls below to drive the imperative handle. The same `FullCalendar` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 <ClientOnly>
 <div class="fc-live">
@@ -62,7 +62,7 @@ This is the **real `@rozie-ui/fullcalendar-vue` package** running on this page (
 
 The active `view` is two-way bound with `v-model:view` — the readout updates whether you click the calendar's own toolbar or the **Month / Week** buttons above, which drive the imperative handle (`changeView`). The **Prev / Today / Next** buttons call the `prev`, `today`, and `next` handle verbs, and the current month/week label is read back off the raw `Calendar` instance via `getApi()`. See the [full API](/components/fullcalendar) for the complete prop/event/handle surface.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -81,7 +81,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, all from the one source above.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, identical on every target.
 
 ## See also
 

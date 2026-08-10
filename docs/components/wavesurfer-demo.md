@@ -61,7 +61,7 @@ const onZoom = (e: Event) => { const v = Number((e.target as HTMLInputElement).v
 
 # Waveform — live demo
 
-This is the **real `@rozie-ui/wavesurfer-vue` package** running on this page (VitePress is itself a Vue app). The audio is a tone synthesized in-browser — no network needed. Press play, drag to seek, zoom, change speed. Everything below is driven by the same `Waveform.rozie` source that compiles to all six frameworks.
+This is the **real `@rozie-ui/wavesurfer-vue` package** running on this page (VitePress is itself a Vue app). The audio is a tone synthesized in-browser — no network needed. Press play, drag to seek, zoom, change speed. The same `Waveform` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 <ClientOnly>
 <div class="wave-live">
@@ -107,7 +107,7 @@ This is the **real `@rozie-ui/wavesurfer-vue` package** running on this page (Vi
 
 The playback position is two-way bound with `v-model:currentTime` — the readout updates live as it plays, and the buttons drive the imperative handle (`playPause`, `stop`, `setPlaybackRate`, `setZoom`). See the [full API](/components/wavesurfer) for the complete prop/event/handle surface.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -126,7 +126,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, all from the one source above.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, identical on every target.
 
 ## See also
 

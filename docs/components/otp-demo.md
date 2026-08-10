@@ -19,7 +19,7 @@ function onComplete(e: { value: string }) {
 
 # Otp — live demo
 
-This is the **real `@rozie-ui/otp-vue` package** running on this page (VitePress is itself a Vue app). Type a code, paste one in (it distributes across the cells), backspace through it, or arrow between cells — then watch the two-way bound value update and the `@complete` readout fire when the last cell fills. Everything below is driven by the same `Otp.rozie` source that compiles to all six frameworks, built on native `<input>` cells with **no engine and no required CSS** — the platform input behaviour and a tokenised skin all ship inside the component.
+This is the **real `@rozie-ui/otp-vue` package** running on this page (VitePress is itself a Vue app). Type a code, paste one in (it distributes across the cells), backspace through it, or arrow between cells — then watch the two-way bound value update and the `@complete` readout fire when the last cell fills. The same `Otp` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on native `<input>` cells with **no engine and no required CSS** — the platform input behaviour and a tokenised skin all ship inside the component.
 
 <ClientOnly>
 <div class="otp-live">
@@ -63,7 +63,7 @@ This is the **real `@rozie-ui/otp-vue` package** running on this page (VitePress
 
 `value` is two-way bound with `v-model:value` — the readout updates the instant you edit, and a consumer write flows back in. The assembled code is always a contiguous string; flip `:mask="true"` to render the cells as password dots, set `type` to `'numeric'` / `'alphanumeric'` / `'text'` to change the allowed characters and the mobile keyboard, and listen to `@complete` to auto-submit. The **Numeric** instance's buttons drive the imperative handle (`clear()`, `focus()`) grabbed through Vue's `ref`. See the [full API](/components/otp) for every prop, event, and handle verb, plus theming and keyboard reference.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -82,7 +82,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `change` / `complete` events, same two-way `value`, same imperative handle — all from the one source above, built on native `<input>` cells with no third-party engine behind it.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `change` / `complete` events, same two-way `value`, same imperative handle — identical on every target, built on native `<input>` cells with no third-party engine behind it.
 
 ## See also
 

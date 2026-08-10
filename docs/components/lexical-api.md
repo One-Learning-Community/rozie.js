@@ -1,6 +1,6 @@
 # API reference
 
-The `<LexicalEditor>` shell surface. The table below is generated **live from the `LexicalEditor.rozie` IR** on every docs build, so it can never drift from the compiled output. For the compositional model (plugin children, the `$inject` contract), the toolbar, and the decorator node see the [showcase](/components/lexical); for the per-framework consumption code see the [usage page](/components/lexical-usage).
+The `<LexicalEditor>` shell surface. The table below is generated from the component source on every docs build, so it cannot drift from the shipped packages. For the compositional model (plugin children, the `$inject` contract), the toolbar, and the decorator node see the [showcase](/components/lexical); for the per-framework consumption code see the [usage page](/components/lexical-usage).
 
 ## Props
 

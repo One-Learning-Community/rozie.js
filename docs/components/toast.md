@@ -1,14 +1,14 @@
 # Toaster — the cross-framework headless toast / notification host
 
-`Toaster` is Rozie's **headless, accessible** toast / notification host — a `@rozie-ui` family with **no third-party engine** behind it. Every behaviour (the toast queue, precise remaining-time hover-to-pause, promise/loading toasts, pointer swipe-to-dismiss, an opt-in animated collapsed stack, the six corner positions, the live-region ARIA wiring, and the per-toast close button) is authored once in `Toaster.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`Toaster` is a headless, accessible toast / notification host with no third-party engine behind it. It covers the whole behaviour surface: the toast queue, precise remaining-time hover-to-pause, promise/loading toasts, pointer swipe-to-dismiss, an opt-in animated collapsed stack, the six corner positions, the live-region ARIA wiring, and the per-toast close button. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
-It is **deliberately not** the heavyweight shape — a global singleton plus a context/provider system. Instead the `<Toaster>` owns the queue and the auto-dismiss timers as internal state and exposes an imperative **`show` / `dismiss` / `clear` / `patch` / `promise`** handle that you drive through your framework's native `ref` mechanism. "Call from anywhere" then becomes your app's wiring concern (stash the ref where your code can reach it) — Rozie owns the *component*, not your app's global plumbing. This keeps it captcha-simple and side-steps the "context doesn't cross a portal" limitation entirely.
+It ships no global singleton and no context/provider system. The `<Toaster>` owns the queue and the auto-dismiss timers as internal state and exposes an imperative **`show` / `dismiss` / `clear` / `patch` / `promise`** handle that you drive through your framework's native `ref` mechanism. "Call from anywhere" then becomes your app's wiring concern (stash the ref where your code can reach it); Rozie owns the *component*, not your app's global plumbing. This keeps it simple and side-steps the "context doesn't cross a portal" limitation entirely.
 
-The imperative handle is still the primary write surface, but the family now has its **first event**: `@dismissed { toast, reason }`, fired once per toast at dismissal initiation (`clear()` stays bulk and fires nothing). And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+The imperative handle is the primary write surface, complemented by one event: `@dismissed { toast, reason }`, fired once per toast at dismissal initiation (`clear()` stays bulk and fires nothing). Every visual value is a CSS custom property, so the host re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/toast` packages
 
-`Toaster` ships as six pre-compiled, per-framework packages generated from a single `Toaster.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`Toaster` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ The imperative handle is still the primary write surface, but the family now has
 | `@rozie-ui/toast-solid` | `npm i @rozie-ui/toast-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/toast/packages/solid/README.md) |
 | `@rozie-ui/toast-lit` | `npm i @rozie-ui/toast-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/toast/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `Toaster.rozie`, so they cannot drift from the compiled output (`codegen.mjs` asserts the structural columns of this page against `ir.props` on every run).
+Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
 ## Quick start
 
@@ -75,9 +75,19 @@ It shows a `{ type: 'loading', duration: 0 }` toast (a decorative spinner) and r
 | `disableSwipe` | `Boolean` | `false` | yes | Opt **out** of pointer swipe-to-dismiss. By default, dragging a toast past 45% of its own width/height (direction auto-derived from `position`) or a fast flick dismisses it with reason `'swipe'`; a short drag springs back. A drag starting on the close button (or any button/link) never swipes. |
 | `stacked` | `Boolean` | `false` | yes | Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times. |
 
+### Events
+
+`Toaster` has a single event: `dismissed`.
+
+| Event | Payload | Description |
+| --- | --- | --- |
+| `dismissed` | `{ toast, reason }` | Fired exactly once per toast, at dismissal *initiation* (before the exit animation runs). `toast` is the full queue entry; `reason` is `'timeout'` (auto-dismiss), `'swipe'` (pointer swipe past threshold), `'close'` (the built-in close button), or `'api'` (the `dismiss(id)` verb). `clear()` removes every toast immediately and does **not** fire `dismissed`. |
+
+There is no `model: true` prop and no Angular `ControlValueAccessor` — correct for a host that is not a form control; the imperative handle plus this one event are the entire write/notify surface.
+
 ### Imperative handle
 
-The imperative handle is the primary write API. Declared once in the source via `$expose`; obtained through each framework's native ref mechanism. None of the verbs overrides an inherited host-element member (`patch`, not `update`, sidesteps the LitElement `update()` lifecycle method), and none collides with the `dismissed` event, so the Lit custom element emits no ROZ137/ROZ121 warning.
+The imperative handle is the primary write API. Declared once in the source via `$expose`; obtained through each framework's native ref mechanism. None of the verbs overrides an inherited host-element member (`patch`, not `update`, sidesteps the LitElement `update()` lifecycle method), and none collides with the `dismissed` event, so the Lit custom element compiles without override or collision warnings.
 
 | Method | Description |
 | --- | --- |
@@ -92,16 +102,6 @@ The imperative handle is the primary write API. Declared once in the source via 
 | Slot | Params | Description |
 | --- | --- | --- |
 | `toast` | `toast, dismiss` | Custom per-toast rendering. The scope gives you the `toast` record (`{ id, message, type, duration }`) and the `dismiss` function so your chrome can close itself. Without it, each toast renders the (optional loading spinner +) message text plus a close button. |
-
-### Events
-
-`Toaster` has ONE event — its first: `dismissed`.
-
-| Event | Payload | Description |
-| --- | --- | --- |
-| `dismissed` | `{ toast, reason }` | Fired exactly once per toast, at dismissal *initiation* (before the exit animation runs). `toast` is the full queue entry; `reason` is `'timeout'` (auto-dismiss), `'swipe'` (pointer swipe past threshold), `'close'` (the built-in close button), or `'api'` (the `dismiss(id)` verb). `clear()` removes every toast immediately and does **not** fire `dismissed`. |
-
-There is still no `model: true` prop and no Angular `ControlValueAccessor` — correct for a host that is not a form control; the imperative handle + this one event are the entire write/notify surface.
 
 ## Swipe-to-dismiss
 

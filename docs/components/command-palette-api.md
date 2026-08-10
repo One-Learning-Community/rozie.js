@@ -20,13 +20,13 @@ The full prop surface. The two `model: true` slices (`open` and `query`, the **T
 
 ## Escaping a clipped ancestor (`appendTo`)
 
-By default the overlay renders **in place** — inline, wherever `<CommandPalette>` is mounted in your component tree (`appendTo: false`/absent, today's behavior, byte-identical for every existing consumer). If an ancestor has `overflow: hidden`, `transform`, `filter`, or `contain` set, it creates a clipping context or a new containing block that traps a `position: fixed` overlay — a real embedding bug (an app-shell iframe or a designer-chrome wrapper with its own layout is the common case).
+By default the overlay renders **in place** — inline, wherever `<CommandPalette>` is mounted in your component tree (`appendTo: false`/absent). If an ancestor has `overflow: hidden`, `transform`, `filter`, or `contain` set, it creates a clipping context or a new containing block that traps a `position: fixed` overlay — a real embedding bug (an app-shell iframe or a designer-chrome wrapper with its own layout is the common case).
 
 Set `appendTo` to escape it:
 
 | `appendTo` value | Behavior |
 | --- | --- |
-| `false` / absent (default) | Render in place — zero change from today. |
+| `false` / absent (default) | Render in place. |
 | `true` or `'body'` | Portal to `document.body`. |
 | a CSS selector string | Portal to the first element that selector matches. |
 | an `Element` reference | Portal to that element directly. |
@@ -55,11 +55,11 @@ Whichever `defaultItems` is active renders as soon as the query is empty (on ope
 
 This is the first-class replacement for branching on `query === ''` inside a `source` function to return a "default" view — and the natural home for a recents/frecency list (it composes with the `score` prop's own recency-boost hook). Pushing a level whose item carries `defaultItems` shows that home view immediately, with no loading flash and without ever invoking `source('')`.
 
-A palette (or level) with no `defaultItems` set behaves exactly as before this feature — the full, unfiltered `items`/`children` list in source order.
+A palette (or level) with no `defaultItems` set renders the full, unfiltered `items`/`children` list in source order.
 
 ## Per-level virtual windowing
 
-`virtual` / `virtualMaxHeight` / `virtualEstimateRowHeight` opt a long list into vertical windowing (only the visible slice of rows renders inside a bounded scrolling container), threaded straight onto the vendored combobox's own [`virtual`](/components/combobox) support — now that the combobox `virtual` prop is **live-flippable at runtime** (see the combobox changelog), a level pushed with `virtual: true` windows immediately, no remount required.
+`virtual` / `virtualMaxHeight` / `virtualEstimateRowHeight` opt a long list into vertical windowing (only the visible slice of rows renders inside a bounded scrolling container), threaded straight onto the vendored combobox's own [`virtual`](/components/combobox) support. The combobox `virtual` prop is live-flippable at runtime, so a level pushed with `virtual: true` windows immediately, no remount required.
 
 Resolved **per level**, exactly like `defaultItems`/`title`/`placeholder`: the top-level `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` props window the ROOT list; a navigating item's own `virtual`/`virtualMaxHeight`/`virtualEstimateRowHeight` fields (alongside its `children`/`source`) window THAT pushed child level instead — captured onto its frame at push time. Popping back to a level whose `virtual` resolves `false` restores the non-windowed (and, if it carries `group` fields, grouped) render for that level.
 
@@ -101,13 +101,13 @@ const items = [
 
 ## Grouped commands
 
-Commands sharing the same `items[].group` string render as labeled sections — auto-derived from the existing `group` field, no separate opt-in prop. Commands with no `group` render first in a headingless block; groups then follow in first-appearance order (the order their first member appears in `items`), each labeled with its `group` string. A consumer whose items carry no `group` at all sees today's flat, unsectioned list — byte-identical to before this feature.
+Commands sharing the same `items[].group` string render as labeled sections — auto-derived from the existing `group` field, no separate opt-in prop. Commands with no `group` render first in a headingless block; groups then follow in first-appearance order (the order their first member appears in `items`), each labeled with its `group` string. A consumer whose items carry no `group` at all sees a flat, unsectioned list.
 
 Override the section heading's markup with the `groupHeading` slot (see below); the default fill renders the group string as-is.
 
 ## Capping groups
 
-`groupCap` is a straight pass-through to the vendored combobox's `groupCap` (see [Capping groups](/components/combobox#capping-groups) on the Combobox API page): set it to cap each command section to its first `groupCap` results, adding a keyboard-reachable "+N more" row that expands that section in place when activated (Enter or click). `0`/absent = uncapped (default), byte-identical to today. The palette adds no new prop/slot/emit/expose of its own — the default "+N more" fill renders exactly as the vendored combobox renders it; override it via the combobox's `groupMore` slot semantics if you compose the palette directly.
+`groupCap` is a straight pass-through to the vendored combobox's `groupCap` (see [Capping groups](/components/combobox#capping-groups) on the Combobox API page): set it to cap each command section to its first `groupCap` results, adding a keyboard-reachable "+N more" row that expands that section in place when activated (Enter or click). `0`/absent = uncapped (the default). The palette adds no new prop/slot/emit/expose of its own — the default "+N more" fill renders exactly as the vendored combobox renders it; override it via the combobox's `groupMore` slot semantics if you compose the palette directly.
 
 `groupCap` composes with per-row `actions` (see [Interactive sub-actions](#interactive-sub-actions) below): the ⌘K/Right-arrow row action menu always anchors to the exact highlighted VISIBLE row, cap-aware regardless of section order; firing it on a "+N more" row is a no-op.
 
@@ -165,7 +165,7 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 | `show` | Open the palette (writes `open` → `true`). Clears the query, resets the highlight, and focuses the search input. The open verb is `show` — **not** `open` — because an `open()` verb collides with the `open` model (both collapse onto React's generated open/setOpen state). |
 | `close` | Close the palette (writes `open` → `false`), resetting the query and the level stack to root. |
 | `toggle` | Flip the open state. |
-| `focus` | Move DOM focus to the search input. Deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element (accepted warn-only ROZ137). |
+| `focus` | Move DOM focus to the search input. Deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. |
 | `goBack` | Pop one nested level (restoring the parent query + input text). A no-op at the root. Named `goBack` — **not** `back` — because a `back()` verb would collide with the `back` event. |
 | `openTo` | `openTo(path)` — deep-link into a nested level. `path` is an array of item ids from the root; opens the palette, resets to root, then drills through each id in turn, async-aware (awaiting a `Promise` `source` before the next hop). Stops silently at the first id that doesn't resolve. |
 
@@ -173,7 +173,7 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 
 | Slot | Params | Description |
 | --- | --- | --- |
-| `option` | `{ option, index, active, selected, disabled }` | Custom render for a single result row. **Breaking change:** renamed from `item` and realigned to the `@rozie-ui/listbox` `option` vocabulary (the palette now composes the listbox primitive). `option` is the command (`{ id, label, group, keywords, disabled, _i }`); `index` is its position; `active` is whether it is currently highlighted; `selected` whether it is the committed value; `disabled` whether it is non-selectable. Falls back to the label plus an optional group badge. |
+| `option` | `{ option, index, active, selected, disabled }` | Custom render for a single result row, using the `@rozie-ui/listbox` `option` vocabulary (the palette composes the listbox primitive). `option` is the command (`{ id, label, group, keywords, disabled, _i }`); `index` is its position; `active` is whether it is currently highlighted; `selected` whether it is the committed value; `disabled` whether it is non-selectable. Falls back to the label plus an optional group badge. |
 | `empty` | `{ query }` | The settled-but-empty state; `query` is the current search string. Falls back to the `emptyText` prop. Not shown while `loading`/`error` (see below). |
 | `loading` | `{ query }` | Shown while the active level's async `source` is in flight. Falls back to "Loading…". |
 | `error` | `{ query, error, retry }` | Shown when the active level's async `source` rejected. `error` is the rejection value; `retry` re-invokes the source at the current query. |
@@ -200,7 +200,7 @@ The palette also drives several of the vendored `@rozie-ui/combobox` primitive's
 }
 ```
 
-New in `0.3.0` (style polish for nested levels + sub-actions):
+Breadcrumb and composed-input tokens (nested levels + sub-actions):
 
 | Token | Fallback | Description |
 | --- | --- | --- |
@@ -217,7 +217,7 @@ New in `0.3.0` (style polish for nested levels + sub-actions):
 | `--rozie-command-palette-input-underline` | `var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1))` | Forwarded to `--rozie-combobox-input-underline` — the input's bottom-border longhand, which survives the combobox's own `:focus` border-color override so the divider stays put whether the input is focused or not. |
 | `--rozie-command-palette-section-gap` | `0.375rem` | Forwarded to `--rozie-combobox-group-heading-margin-top` — top spacing above each group heading, separating the leading ungrouped block from the first labeled section. |
 
-New in a later release (per-item [hotKey badge](#per-item-hotkey-badge)) — each token falls back to the matching `--rozie-command-palette-actions-hint-*` value, so a consumer who already themed the `#actions` hint gets a matching badge for free:
+Per-item [hotKey badge](#per-item-hotkey-badge) tokens. Each falls back to the matching `--rozie-command-palette-actions-hint-*` value, so a consumer who already themed the `#actions` hint gets a matching badge for free:
 
 | Token | Fallback | Description |
 | --- | --- | --- |
@@ -227,7 +227,7 @@ New in a later release (per-item [hotKey badge](#per-item-hotkey-badge)) — eac
 | `--rozie-command-palette-hotkey-bg` | `--rozie-command-palette-actions-hint-bg` (`rgba(0, 0, 0, 0.06)`) | The badge's background. |
 | `--rozie-command-palette-hotkey-radius` | `--rozie-command-palette-actions-hint-radius` (`0.25rem`) | The badge's corner radius. |
 
-New in a later release ([breadcrumb ancestor click-to-jump](#nested-levels)) — the ancestor jump button inherits the base `--rozie-command-palette-breadcrumb-*` color/weight tokens above; these three additionally style its native-button reset and hover affordance, with the hover color aliasing the existing current-segment color:
+Breadcrumb ancestor jump-button tokens ([click-to-jump](#nested-levels)). The jump button inherits the base `--rozie-command-palette-breadcrumb-*` color/weight tokens above; these three additionally style its native-button reset and hover affordance, with the hover color aliasing the existing current-segment color:
 
 | Token | Fallback | Description |
 | --- | --- | --- |
@@ -235,7 +235,7 @@ New in a later release ([breadcrumb ancestor click-to-jump](#nested-levels)) —
 | `--rozie-command-palette-breadcrumb-jump-hover-color` | `--rozie-command-palette-breadcrumb-current-color` (`inherit`) | The ancestor jump button's text color on hover. |
 | `--rozie-command-palette-breadcrumb-jump-hover-decoration` | `underline` | The ancestor jump button's `text-decoration` on hover. |
 
-New in a later release ([inline command arguments](#inline-command-arguments)) — the chip additionally reuses the `--rozie-command-palette-breadcrumb-current-*` color/weight tokens above; the fields alias the existing panel/input tokens:
+Inline [command-arguments](#inline-command-arguments) surface tokens. The chip additionally reuses the `--rozie-command-palette-breadcrumb-current-*` color/weight tokens above; the fields alias the existing panel/input tokens:
 
 | Token | Fallback | Description |
 | --- | --- | --- |

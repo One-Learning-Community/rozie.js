@@ -25,7 +25,7 @@ What flips on:
 
 **Cell range selection.** In grid mode a rectangular cell-range selection extends via `Shift+Arrow` / `Shift+Click`, surfaced through the one-way `range-change` event (payload `{ anchor, focus }`, each corner a `{ rowIndex, colIndex }` pair, or `{ anchor: null, focus: null }`) and the `getSelectedRange()` verb. It is never a `model:true` slice.
 
-Drive and observe it imperatively via the [`focusCell`](/components/data-table-api#imperative-handle) / `getActiveCell` / `clearActiveCell` handle verbs and the [`activecell-change`](/components/data-table-api#events) event. The exact behavioral contract is locked by a cross-framework VR matrix (`tests/visual-regression/specs/data-table-grid.spec.ts`) proving REQ-1..7 identically on all six targets.
+Drive and observe it imperatively via the [`focusCell`](/components/data-table-api#imperative-handle) / `getActiveCell` / `clearActiveCell` handle verbs and the [`activecell-change`](/components/data-table-api#events) event. The exact behavioral contract is locked by a cross-framework visual-regression matrix proving the same behavior on all six targets.
 
 ## Accessibility
 

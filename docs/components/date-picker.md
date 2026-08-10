@@ -1,14 +1,14 @@
 # DatePicker — the cross-framework headless calendar
 
-`DatePicker` is Rozie's **headless, fully-accessible** single-date calendar — a `@rozie-ui` family with **no third-party engine** behind it. The whole month-grid model (6×7 weeks with leading/trailing spill), the prev/next month navigation, the `weekStartsOn` rotation, the `min` / `max` / `disabledDates` gating, the roving keyboard focus (`role="grid"` with arrow / Home / End / PageUp / PageDown / Enter / Space), the localized `Intl` month and weekday labels, and the two-way ISO-date binding are authored once in `DatePicker.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`DatePicker` is a headless, fully-accessible calendar with no third-party engine behind it. It covers the whole month-grid model: 6×7 weeks with leading/trailing spill, prev/next month navigation, the `weekStartsOn` rotation, `min` / `max` / `disabledDates` gating, roving keyboard focus (`role="grid"` with arrow / Home / End / PageUp / PageDown / Enter / Space), localized `Intl` month and weekday labels, and the two-way ISO-date binding. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
-It is **HEADLESS** in the sense that matters: the component owns the calendar logic and the ARIA wiring, and lets you override the month-nav header via a scoped slot — or accept the default, fully token-themed calendar. The selected date *is* `value` (the sole `model: true` prop → an Angular `ControlValueAccessor`), an ISO `YYYY-MM-DD` string, so the picker binds to forms like any control.
+It is headless in the sense that matters: the component owns the calendar logic and the ARIA wiring, and lets you override the month-nav header via a scoped slot, or accept the default, fully token-themed calendar. The selected date *is* `value` (the sole `model: true` prop, which drives an Angular `ControlValueAccessor`), an ISO `YYYY-MM-DD` string, so the picker binds to forms like any control.
 
-And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+Every visual value is a CSS custom property, so the calendar re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/date-picker` packages
 
-`DatePicker` ships as six pre-compiled, per-framework packages generated from a single `DatePicker.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`DatePicker` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ And because **every visual value is a CSS custom property**, it re-skins to any 
 | `@rozie-ui/date-picker-solid` | `npm i @rozie-ui/date-picker-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/date-picker/packages/solid/README.md) |
 | `@rozie-ui/date-picker-lit` | `npm i @rozie-ui/date-picker-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/date-picker/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The per-leaf READMEs and the docs-site [API reference](/components/date-picker-api) are generated from the same IR parse of `DatePicker.rozie`, so they cannot drift from the compiled output.
+Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
 ## Quick start
 

@@ -1,14 +1,14 @@
 # TipTap — the cross-framework rich-text editor
 
-`TipTap` is Rozie's data-bound port of [TipTap](https://tiptap.dev/) — the headless, ProseMirror-based rich-text editor. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The official ecosystem is uneven: [`@tiptap/react`](https://www.npmjs.com/package/@tiptap/react) and [`@tiptap/vue-3`](https://www.npmjs.com/package/@tiptap/vue-3) are first-party, [`svelte-tiptap`](https://www.npmjs.com/package/svelte-tiptap) and [`ngx-tiptap`](https://www.npmjs.com/package/ngx-tiptap) are healthy community packages, [`solid-tiptap`](https://www.npmjs.com/package/solid-tiptap) is thin and stalling, and **Lit has no wrapper at all**. Rozie collapses all six into one source — and notably, **neither official wrapper ships a controlled two-way content contract or a toolbar**; Rozie does. See the [TipTap libraries comparison](/components/tiptap-comparison) for the full matrix.
+`TipTap` is Rozie's data-bound port of [TipTap](https://tiptap.dev/) — the headless, ProseMirror-based rich-text editor. The official ecosystem is uneven: [`@tiptap/react`](https://www.npmjs.com/package/@tiptap/react) and [`@tiptap/vue-3`](https://www.npmjs.com/package/@tiptap/vue-3) are first-party, [`svelte-tiptap`](https://www.npmjs.com/package/svelte-tiptap) and [`ngx-tiptap`](https://www.npmjs.com/package/ngx-tiptap) are healthy community packages, [`solid-tiptap`](https://www.npmjs.com/package/solid-tiptap) is thin and stalling, and **Lit has no wrapper at all**. Rozie ships the same `<TipTap>` (same props, events, two-way `html` binding, and imperative handle) in React, Vue, Svelte, Angular, Solid, and Lit. Notably, **neither official wrapper ships a controlled two-way content contract or a toolbar**; Rozie does. See the [TipTap libraries comparison](/components/tiptap-comparison) for the full matrix.
 
-This page is the **show-and-tell**: the API surface, per-framework quick starts, the events, the 25-verb imperative command handle, the `editorProps`/`extensions` passthroughs, the per-target recipe for the `toolbar` / `bubbleMenu` / `floatingMenu` portal slots, and the **`nodeView` reactive portal slot** that renders a framework fragment as a custom ProseMirror node (mention chips, embeds, editable callouts) on all six targets.
+This page is the **show-and-tell**: the API surface, per-framework quick starts, the events, the imperative command handle, the `editorProps`/`extensions` passthroughs, the per-target recipe for the `toolbar` / `bubbleMenu` / `floatingMenu` portal slots, and the **`nodeView` reactive portal slot** that renders a framework fragment as a custom ProseMirror node (mention chips, embeds, editable callouts) on all six targets.
 
 The full source for `TipTap.rozie` lives in the [`@rozie-ui/tiptap` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/src/TipTap.rozie).
 
 ## The `@rozie-ui/tiptap` packages
 
-`TipTap` ships as six pre-compiled, per-framework packages generated from a single `TipTap.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`TipTap` ships as six pre-compiled, per-framework packages; install only the one for your framework. There is no build step and no Rozie toolchain to add:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,13 +19,13 @@ The full source for `TipTap.rozie` lives in the [`@rozie-ui/tiptap` package](htt
 | `@rozie-ui/tiptap-solid` | `npm i @rozie-ui/tiptap-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/packages/solid/README.md) |
 | `@rozie-ui/tiptap-lit` | `npm i @rozie-ui/tiptap-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/packages/lit/README.md) |
 
-Each package carries the **two `@tiptap/*` engine peers** — `@tiptap/core` and `@tiptap/starter-kit` (both `^3`) — plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). Install the engine peers alongside the framework package:
+Each package carries the **three `@tiptap/*` engine peers** — `@tiptap/core`, `@tiptap/starter-kit`, and `@tiptap/extensions` (it supplies the bundled `Placeholder`; all `^3`) — plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). Install the engine peers alongside the framework package:
 
 ```bash
-npm i @rozie-ui/tiptap-react @tiptap/core @tiptap/starter-kit
+npm i @rozie-ui/tiptap-react @tiptap/core @tiptap/starter-kit @tiptap/extensions
 ```
 
-TipTap is built from ProseMirror, which is framework-agnostic — the official wrappers exist only to glue `onUpdate` to component state and forward extensions. Rozie's wrapper does that plus a **controlled two-way `html` binding** (with an echo-guard), a **batteries-included toolbar** (or bring your own via the `toolbar` slot), a **25-verb imperative command handle**, and two consumer-extensibility passthroughs (`editorProps` for ProseMirror, `extensions` for extra TipTap extensions composed onto StarterKit). The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `TipTap.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
+TipTap is built from ProseMirror, which is framework-agnostic — the official wrappers exist only to glue `onUpdate` to component state and forward extensions. Rozie's wrapper does that plus a **controlled two-way `html` binding** (with an echo-guard), a **batteries-included toolbar** (or bring your own via the `toolbar` slot), a full **imperative command handle**, and two consumer-extensibility passthroughs (`editorProps` for ProseMirror, `extensions` for extra TipTap extensions composed onto StarterKit).
 
 ## Quick start
 
@@ -132,7 +132,7 @@ el.addEventListener('html-change', (e) => {
 | --- | --- | --- | :---: | --- |
 | `html` | `String` | `"<p>Start writing…</p>"` | ✓ | The two-way document content as an HTML string. Typing writes back through the model path; a consumer write reflects into the live document (echo-guarded so a programmatic set doesn't reset the selection or re-emit `update`). |
 | `editable` | `Boolean` | `true` | | Whether the document is editable. Toggling it calls TipTap's `setEditable` with `emitUpdate: false` (no spurious `update`). When `false`, the internal toolbar is hidden and the wrapper gets an `is-readonly` class. |
-| `placeholder` | `String` | `""` | | Placeholder text, forwarded to the editor host as `data-placeholder` + `aria-placeholder`. For full empty-state placeholder rendering (show/hide on the empty doc), add TipTap's `Placeholder` extension through `:extensions`. |
+| `placeholder` | `String` | `""` | | Placeholder text, forwarded to the editor host as `data-placeholder` + `aria-placeholder` and painted as ghost text on the first empty node via the bundled `Placeholder` extension; no `:extensions` wiring is needed (see [Placeholder rendering is bundled](#placeholder-rendering-is-bundled)). An empty string adds no placeholder. |
 | `autofocus` | `Boolean` | `false` | | Whether to place the caret in the document on mount (TipTap's `autofocus` option). |
 | `editorClass` | `String` | `""` | | A CSS class applied to the contenteditable element (`editorProps.attributes.class`). |
 | `ariaLabel` | `String` | `"Rich text editor"` | | The `aria-label` applied to the contenteditable element. |
@@ -165,6 +165,7 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `blurEditor` | Blur the editor — remove focus. |
 | `getHTML` | Return the current document serialized as an HTML string. |
 | `getJSON` | Return the current document as a ProseMirror JSON object. |
+| `getText` | Return the current document as plain text (TipTap's `getText()`; marks and structure stripped). `''` before mount. |
 | `setContent` | Replace the document — `setContent(html)`. Echo-guarded: reflects into the bound `html` model without bouncing an extra `update`. |
 | `clearContent` | Clear the document to an empty paragraph (reflects the empty value into the `html` model). |
 | `toggleBold` | Toggle bold on the current selection. |
@@ -186,7 +187,7 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `unsetLink` | Remove the link mark from the current selection. No-op before mount. |
 
 ::: tip The focus/blur verbs are `focusEditor` / `blurEditor`, not `focus` / `blur`
-The component emits `focus` and `blur` **events**, and on class-based targets (Angular) an output field and a method cannot share a name (ROZ121). The imperative verbs are therefore named `focusEditor` / `blurEditor`, keeping the event names idiomatic for consumers. Likewise the content setter is `setContent`, not `setHtml` — an `html` model prop makes the React target auto-generate a `setHtml` state setter (ROZ524).
+The component emits `focus` and `blur` **events**, and on class-based targets (Angular) an output field and a method cannot share a name. The imperative verbs are therefore named `focusEditor` / `blurEditor`, keeping the event names idiomatic for consumers. Likewise the content setter is `setContent`, not `setHtml` — an `html` model prop makes the React target auto-generate a `setHtml` state setter.
 :::
 
 **React example:**
@@ -468,7 +469,7 @@ The same `TipTap.rozie` source ships this into **Solid** (where `solid-tiptap` h
 
 ### Driving the editor from the toolbar handle
 
-The 14 `$expose` verbs cover the imperative surface props alone can't express. Grab the handle and wire your own external toolbar — without the `toolbar` slot — by calling the command verbs directly:
+The `$expose` verbs cover the imperative surface props alone can't express. Grab the handle and wire your own external toolbar — without the `toolbar` slot — by calling the command verbs directly:
 
 ```tsx
 const editor = useRef<TipTapHandle>(null);
@@ -552,7 +553,7 @@ A model two-way binding can ping-pong: the consumer's state signals back into th
 
 ### Why `focus` / `blur` are events but the verbs are renamed
 
-`focus` and `blur` are emitted as events (so consumers can wire save-on-blur or toolbar show/hide). Because an Angular output field and a method cannot share a name (ROZ121), the imperative commands are `focusEditor` / `blurEditor`. This keeps **both** capabilities — the focus/blur notifications *and* the imperative focus/blur control — alive across all six targets.
+`focus` and `blur` are emitted as events (so consumers can wire save-on-blur or toolbar show/hide). Because an Angular output field and a method cannot share a name, the imperative commands are `focusEditor` / `blurEditor`. This keeps **both** capabilities — the focus/blur notifications *and* the imperative focus/blur control — alive across all six targets.
 
 ### Placeholder rendering is bundled
 

@@ -1,14 +1,14 @@
 # Switch — the cross-framework headless toggle
 
-`Switch` is Rozie's **headless, fully-accessible** on/off toggle — a `@rozie-ui` family with **no third-party engine** behind it. Every behaviour (a boolean two-way value, toggling on click *and* Space/Enter, `role="switch"` with `aria-checked` / `aria-disabled` / `aria-readonly`, focus management, and the `disabled` / `readonly` states) is authored once in `Switch.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`Switch` is a headless, fully-accessible on/off toggle with no third-party engine behind it. It covers the whole behaviour surface: a boolean two-way value, toggling on click and on Space/Enter, `role="switch"` with `aria-checked` / `aria-disabled` / `aria-readonly`, focus management, and the `disabled` / `readonly` states. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
-Under the hood the "engine" is the **platform itself**: a focusable native element, a native click, and a Space/Enter keydown. The on/off state *is* `modelValue` (the sole `model: true` prop), typed `boolean` — there is no draft local state, so the thumb position and `aria-checked` derive straight from the bound value. Rozie owns the author-side API: the two-way `r-model:modelValue`, the toggle choreography, the ARIA wiring, and the token-themed skin.
+The foundation is the platform itself: a focusable native element, a native click, and a Space/Enter keydown. The on/off state *is* `modelValue` (the sole `model: true` prop), typed `boolean`; there is no draft local state, so the thumb position and `aria-checked` derive straight from the bound value. Rozie owns the author-side API: the two-way `r-model:modelValue`, the toggle choreography, the ARIA wiring, and the token-themed skin.
 
-And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+Every visual value is a CSS custom property, so the switch re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/switch` packages
 
-`Switch` ships as six pre-compiled, per-framework packages generated from a single `Switch.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`Switch` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ And because **every visual value is a CSS custom property**, it re-skins to any 
 | `@rozie-ui/switch-solid` | `npm i @rozie-ui/switch-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/solid/README.md) |
 | `@rozie-ui/switch-lit` | `npm i @rozie-ui/switch-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `Switch.rozie`, so they cannot drift from the compiled output (`codegen.mjs` asserts the structural columns of this page against `ir.props` on every run).
+Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
 ## Quick start
 
@@ -43,7 +43,7 @@ Two-way bind `modelValue` and (optionally) set an `ariaLabel`. The switch toggle
 </template>
 ```
 
-`r-model:modelValue` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Switch` a `boolean`, `Switch` writes the new state back on every toggle, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `modelValue` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Switch` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:modelValue` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Switch` a `boolean`, `Switch` writes the new state back on every toggle, and the framework reconciler picks it up with no `onChange → setState` wiring. Because `modelValue` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor`, so a `Switch` is a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## API
 
@@ -68,7 +68,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 
 | Method | Description |
 | --- | --- |
-| `focus` | Move DOM focus to the switch control. **Deliberately named `focus`**, which overrides the inherited `HTMLElement.focus` on the Lit custom element — the public `focus()` handle is intended (an accepted, warn-only ROZ137). This mirrors the otp / number-field precedent. |
+| `focus` | Move DOM focus to the switch control. Deliberately named `focus`, overriding the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. This mirrors the otp / number-field precedent. |
 | `toggle` | Flip the on/off state (same funnel as a click / Space / Enter) and emit `change`. A no-op while `disabled` or `readonly`. |
 
 ### Slots
@@ -78,6 +78,34 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `(default)` | `checked`, `toggle` |
 
 The default slot is **scoped** — it receives `{ checked, toggle }` so you can render a fully custom thumb/track (or a label + icon) while keeping the accessible button, keyboard, and two-way binding. Omit it and the component renders its built-in tokenised track + thumb.
+
+## Theming
+
+Every cosmetic value the component renders is a `--rozie-switch-*` CSS custom property with a built-in fallback, so it works with zero configuration and remains fully re-skinnable. Override tokens at any ancestor scope:
+
+```css
+.rozie-switch {
+  --rozie-switch-on-bg: #16a34a;
+  --rozie-switch-width: 2.75rem;
+  --rozie-switch-height: 1.5rem;
+  --rozie-switch-thumb-bg: #fff;
+}
+```
+
+The full token vocabulary has documented defaults in `themes/base.css`: the track box model (`width`, `height`, `track-padding`, `radius`), the off/on track colors (`off-bg`, `on-bg`), the thumb (`thumb-size`, `thumb-bg`, `thumb-shadow`, `thumb-travel`), the focus ring (`focus-ring-width`, `focus-ring-color`, `focus-ring-offset`), and the disabled state (`disabled-opacity`). Only cosmetic values flow through tokens; the structural rules (the focusable button, the track/thumb box model, the checked-state transform) compile per-leaf and are not consumer-overridable.
+
+### Design-system bridges
+
+Each package ships token presets that map the switch tokens onto a known design system's published CSS variables, so the control automatically follows that system's light/dark theme and accent:
+
+```ts
+import '@rozie-ui/switch-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --primary/--input/--background/--ring/--radius
+import '@rozie-ui/switch-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
+import '@rozie-ui/switch-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
+import '@rozie-ui/switch-react/themes/base.css';      // the documented default token set
+```
+
+The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/src/themes/base.css).
 
 ## Accessibility
 

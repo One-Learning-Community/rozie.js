@@ -1,14 +1,14 @@
 # Resizable — the cross-framework headless split pane
 
-`Resizable` is Rozie's **headless, accessible** two-panel splitter / resizable pane — a `@rozie-ui` family with **no third-party engine** behind it. Everything (pointer-drag resizing with pointer capture, `role="separator"` keyboard control, a `[min, max]` clamp, the two-way `size` percent, and the `start` / `end` / `handle` slots) is authored once in `Resizable.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`Resizable` is a headless, accessible two-panel splitter / resizable pane with no third-party engine behind it. It covers the whole behaviour surface: pointer-drag resizing with pointer capture, `role="separator"` keyboard control, a `[min, max]` clamp, the two-way `size` percent, and the `start` / `end` / `handle` slots. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
-Under the hood the "engine" is the **platform itself**: native Pointer Events (with pointer capture so the drag keeps tracking even when the cursor leaves the handle) plus the keyboard. The component is **fully controlled with no draft state** — the first panel's percent *is* `size` (the sole `model: true` prop), and the second panel takes the remainder via CSS. There is no measured-geometry state to reconcile: the drag converts the pointer position within the container rect into a percent, clamps it to `[min, max]`, and writes it straight back. Rozie owns the author-side API: the two-way `r-model:size`, the clamp / percent-from-pointer math (unit-tested once and shared by every leaf), and the token-themed skin.
+The foundation is the platform itself: native Pointer Events (with pointer capture so the drag keeps tracking even when the cursor leaves the handle) plus the keyboard. The component is fully controlled with no draft state: the first panel's percent *is* `size` (the sole `model: true` prop), and the second panel takes the remainder via CSS. There is no measured-geometry state to reconcile: the drag converts the pointer position within the container rect into a percent, clamps it to `[min, max]`, and writes it straight back. Rozie owns the author-side API: the two-way `r-model:size`, the clamp / percent-from-pointer math (unit-tested once and shared by every leaf), and the token-themed skin.
 
-And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+Every visual value is a CSS custom property, so the splitter re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/resizable` packages
 
-`Resizable` ships as six pre-compiled, per-framework packages generated from a single `Resizable.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`Resizable` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ And because **every visual value is a CSS custom property**, it re-skins to any 
 | `@rozie-ui/resizable-solid` | `npm i @rozie-ui/resizable-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/solid/README.md) |
 | `@rozie-ui/resizable-lit` | `npm i @rozie-ui/resizable-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The per-leaf READMEs and the [API reference](/components/resizable-api) **Props** table are generated from the same IR parse of `Resizable.rozie`, so they cannot drift from the compiled output.
+Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
 ## Quick start
 
@@ -48,7 +48,7 @@ Two-way bind `size` and project the two panes into the `start` / `end` slots. Dr
 </template>
 ```
 
-`r-model:size` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Resizable` a percent, `Resizable` writes the clamped new percent back on every drag / keyboard nudge, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `size` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — the splitter position **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:size` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Resizable` a percent, `Resizable` writes the clamped new percent back on every drag / keyboard nudge, and the framework reconciler picks it up with no `onChange → setState` wiring. Because `size` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor`, so the splitter position is a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 For the full prop / event / handle / slot reference, see the [API page](/components/resizable-api). For the per-framework consumption code, see the [usage page](/components/resizable-usage).
 

@@ -50,6 +50,7 @@ Every change event fires **regardless** of whether the matching `r-model` slice 
 | `cell-edit-commit` | Fired when an editable cell commits a new, **validated** value (Enter, a blur-commit, or a `commitEditing` call). Payload: `{ rowId, columnId, oldValue, newValue }`. **Not** fired on cancel (`Escape`) or a validation failure. See [Editing](/components/data-table-editing). |
 | `row-edit-commit` | Fired when a full-row edit commits all its changes at once (Enter in row-edit mode or an `editRow` save). Payload: `{ rowId, changes }` where `changes` is `[{ columnId, oldValue, newValue }]` for the columns whose value actually changed. **Not** fired on `Escape` or a validation failure. |
 | `range-change` | **Grid mode only.** Fired when the rectangular cell-range selection changes (extended via `Shift+Arrow` / `Shift+Click`). Payload: `{ anchor, focus }` — each corner a `{ rowIndex, colIndex }` index pair over the visible model, or `{ anchor: null, focus: null }` when no range is set. One-way (this event + the `getSelectedRange` verb), never a `model:true` slice. |
+| `history-change` | **Requires `undoable`.** Fired when undo/redo availability changes: always after an `undo()`/`redo()` call, and when a recorded edit flips `canUndo`/`canRedo` (edge-gated, so a streak of edits that leaves availability unchanged fires nothing). Payload: `{ canUndo: boolean, canRedo: boolean }`. Drive undo/redo toolbar-button enablement from it. |
 
 ## Imperative handle
 
@@ -67,12 +68,12 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `expandAll` | Open every expandable row — `expandAll()`. Fires `expand-change` (payload may be the `true` literal). |
 | `collapseAll` | Collapse every row — `collapseAll()`. Resets the expanded set to `{}`. Fires `expand-change`. |
 | `getExpandedRows` | Return the original row data for the currently-expanded rows — `getExpandedRows()` → `unknown[]` (empty when nothing is expanded). |
-| `applyGrouping` | Set the full grouping — `applyGrouping(cols)` where `cols` is an ordered `string[]` of column ids (multi-column → nested groups). Fires `group-change`. (Named `applyGrouping`, not `setGrouping`, to avoid colliding with React's auto-generated `grouping` model setter — ROZ524.) |
+| `applyGrouping` | Set the full grouping — `applyGrouping(cols)` where `cols` is an ordered `string[]` of column ids (multi-column → nested groups). Fires `group-change`. (Named `applyGrouping`, not `setGrouping`, to avoid colliding with React's auto-generated `grouping` model setter.) |
 | `clearGrouping` | Clear all grouping — `clearGrouping()`. Resets to the ungrouped (flat) row model. Fires `group-change` with `[]`. |
 | `setPage` | Go to a 0-based page index — `setPage(idx)`. Fires `page-change`. |
 | `setRowsPerPage` | Set the page size — `setRowsPerPage(size)`. Fires `page-change`. |
 | `toggleColumnVisibility` | Show/hide a column — `toggleColumnVisibility(colId)`. Fires `visibility-change`. |
-| `applyColumnOrder` | Set the full column order — `applyColumnOrder(order)`. Fires `reorder-change`. (Named `applyColumnOrder`, not `setColumnOrder`, to avoid colliding with React's auto-generated `columnOrder` model setter — ROZ524.) |
+| `applyColumnOrder` | Set the full column order — `applyColumnOrder(order)`. Fires `reorder-change`. (Named `applyColumnOrder`, not `setColumnOrder`, to avoid colliding with React's auto-generated `columnOrder` model setter.) |
 | `resetColumnSizing` | Reset all column widths to their defaults — `resetColumnSizing()`. Fires `resize-change`. |
 | `pinColumn` | Pin a column to a side or unpin it — `pinColumn(colId, side)` where `side` is `'left'` \| `'right'` \| `false`. Fires `pin-change`. |
 | `getFacetedUniqueValues` | Return a column's **cross-filtered** distinct values — `getFacetedUniqueValues(colId)` → `unknown[]` (keys only; occurrence counts are not exposed). Reflects rows passing all *other* active column filters. Empty array when unavailable. Inert (the faceted models stay off-path) until this verb or the `#filter` slot reads a facet. See [Faceted filtering](/components/data-table-faceted-filtering). |
@@ -84,6 +85,13 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `focusCell` | **Grid mode.** Move + DOM-focus the active cell by index — `focusCell(rowIndex, colIndex)` (coerced to integers and clamped to the visible model). Fires `activecell-change`. |
 | `getActiveCell` | **Grid mode.** Return the current active-cell position — `getActiveCell()` → `{ rowIndex, colIndex }` (integers only; never a row object or DOM node). |
 | `clearActiveCell` | **Grid mode.** Reset the roving position to the entry cell (`0,0`) and exit interaction mode — `clearActiveCell()`. Does not emit (a reset, not a navigation). |
+| `getRowIndexRelativeToPage` | Convert an absolute display-order row index (the `focusCell` / `getActiveCell` / `activecell-change` space) to its page-relative index: `getRowIndexRelativeToPage(absRow?)`; with no argument it converts the current active cell's row. In virtual mode (windowing replaces pagination) the absolute index is returned unchanged. Mirrors MUI's `getRowIndexRelativeToVisibleRows`. |
+| `cut` | **Grid mode.** Copy the current cell-range selection to the clipboard as TSV, then clear the source cells through the standard write funnel: `cut()` (the API twin of `Ctrl+X`). Read-only and validation-protected cells are left intact; each cleared cell fires `cell-edit-commit`; no-op while a header cell is active. |
+| `undo` | **Requires `undoable`.** Restore the `data` snapshot from before the most recent mutation (cell/row edit, paste, fill, cut): `undo()`. Replays through the standard write path, so it writes `r-model:data`, fires `data-change`, and fires `history-change`. The stack keeps up to `undoLimit` snapshots (oldest evicted). No-op when there is nothing to undo. |
+| `redo` | **Requires `undoable`.** Restore the most recently undone mutation: `redo()`. Same write path and events as `undo`. No-op when there is nothing to redo. A new recorded edit invalidates the redo stack (standard undo semantics). |
+| `canUndo` | Return whether an undo snapshot is available: `canUndo()` returns a boolean (always `false` when `undoable` is off). |
+| `canRedo` | Return whether a redo snapshot is available: `canRedo()` returns a boolean. |
+| `clearHistory` | Empty both the undo and redo stacks: `clearHistory()`. The table also clears its history automatically when the bound `data` is swapped externally (a new dataset should not inherit the old one's undo stack). |
 
 ## Slots
 

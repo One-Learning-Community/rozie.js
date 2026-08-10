@@ -20,7 +20,7 @@ const SLIDES = [
 
 # Embla — live demo
 
-This is the **real `@rozie-ui/embla-vue` package** running on this page (VitePress is itself a Vue app). Drag the carousel, use the prev/next buttons, jump to a dot — then watch the bound index update. Everything below is driven by the same `Carousel.rozie` source that compiles to all six frameworks.
+This is the **real `@rozie-ui/embla-vue` package** running on this page (VitePress is itself a Vue app). Drag the carousel, use the prev/next buttons, jump to a dot — then watch the bound index update. The same `Carousel` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 <ClientOnly>
 <div class="embla-live">
@@ -50,7 +50,7 @@ This is the **real `@rozie-ui/embla-vue` package** running on this page (VitePre
 
 The snap index is two-way bound with `v-model:selectedIndex` — the readout updates live as you drag or scroll, and the buttons drive the imperative handle (`scrollPrev`, `scrollNext`, `scrollToIndex`). Dragging the carousel writes the new index back through the model; clicking a dot writes the index in and scrolls the carousel — round-trip, echo-guarded. See the [full API](/components/embla) for the complete prop/event/handle surface.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -69,7 +69,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same two-way `selectedIndex`, same imperative handle, all from the one source above.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same two-way `selectedIndex`, same imperative handle, identical on every target.
 
 ## See also
 

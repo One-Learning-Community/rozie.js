@@ -23,7 +23,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 
 | Method | Description |
 | --- | --- |
-| `applySize` | Set the split position programmatically to `percent` (the first-panel size); clamped to `[min, max]` and emits `resize`. **Deliberately named `applySize`, not `setSize`** — the model prop is `size`, so the React emitter auto-generates a `setSize` state setter; an `$expose` verb named `setSize` collapses onto it and trips ROZ524 (the deconfliction pass does not reach inside an `$expose`-verb closure). `apply<X>` is the listbox / data-table precedent. |
+| `applySize` | Set the split position programmatically to `percent` (the first-panel size); clamped to `[min, max]` and emits `resize`. Deliberately named `applySize`, not `setSize`: the model prop is `size`, so the React output auto-generates a `setSize` state setter, and a handle verb named `setSize` would collide with it (a compile error). `apply<X>` is the listbox / data-table precedent. |
 | `reset` | Recentre the split to the midpoint of `[min, max]` (emits `resize`). Collision-safe — not a host-element member. |
 
 ## Slots
@@ -34,4 +34,4 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `end` | — | The second panel — takes the remaining space. |
 | `handle` | — | Optional. Replaces the default grip (a short centered bar) while keeping the drag and keyboard behavior on the wrapping `role="separator"` element. |
 
-On React / Solid the slots are `render*` props (`renderStart` / `renderEnd` / `renderHandle`) — the documented cross-framework slot divergence. None of the slot names equals a prop key (ROZ127 — a slot/prop name collision is a hard error because Svelte 5 collapses snippets and props into one `$props()` bag).
+On React / Solid the slots are `render*` props (`renderStart` / `renderEnd` / `renderHandle`) — the documented cross-framework slot divergence. None of the slot names equals a prop key: a slot/prop name collision is a hard compile error, because Svelte 5 collapses snippets and props into one `$props()` bag.

@@ -15,7 +15,7 @@ const volBox = ref();
 
 # Slider — live demo
 
-This is the **real `@rozie-ui/slider-vue` package** running on this page (VitePress is itself a Vue app). Drag a thumb with the mouse or touch, focus it and press the arrow / `Home` / `End` / `PageUp` keys, drag the two range thumbs past each other (they clamp and stay sorted), or tip the vertical one — then watch the two-way bound value update. Everything below is driven by the same `Slider.rozie` source that compiles to all six frameworks, built on the browser's native `<input type="range">` with **no engine and no required CSS** — the platform input behaviour, the cross-browser thumb styling, and a tokenised skin all ship inside the component.
+This is the **real `@rozie-ui/slider-vue` package** running on this page (VitePress is itself a Vue app). Drag a thumb with the mouse or touch, focus it and press the arrow / `Home` / `End` / `PageUp` keys, drag the two range thumbs past each other (they clamp and stay sorted), or tip the vertical one — then watch the two-way bound value update. The same `Slider` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on the browser's native `<input type="range">` with **no engine and no required CSS** — the platform input behaviour, the cross-browser thumb styling, and a tokenised skin all ship inside the component.
 
 <ClientOnly>
 <div class="sl-live">
@@ -73,7 +73,7 @@ This is the **real `@rozie-ui/slider-vue` package** running on this page (VitePr
 
 `value` is two-way bound with `v-model:value` — the readout updates the instant you commit a value, and a consumer write flows back in. In single mode it's a scalar; with `:range="true"` it's a sorted `[lo, hi]` array (each thumb neighbour-clamped). The **Single** instance's buttons drive the imperative handle (`increment()`, `decrement()`, `focus()`) grabbed through Vue's `ref`. Flip `orientation="vertical"` to rotate the track (up = increase), pass `:marks` for tick marks, or `:show-value` for the value bubble — the same component, the same surface. See the [full API](/components/slider) for every prop, event, slot, and handle verb, plus theming and keyboard reference.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -92,7 +92,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `change` event, same two-way `value`, same scoped slots, same imperative handle — all from the one source above, built on the native `<input type="range">` with no third-party engine behind it.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `change` event, same two-way `value`, same scoped slots, same imperative handle — identical on every target, built on the native `<input type="range">` with no third-party engine behind it.
 
 ## See also
 

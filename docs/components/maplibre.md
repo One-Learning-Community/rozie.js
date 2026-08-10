@@ -1,6 +1,6 @@
 # MapLibre — the cross-framework interactive map
 
-`MapLibre` is Rozie's data-bound port of [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/) — the open-source (BSD-3) WebGL map engine, the community fork of Mapbox GL JS v1. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The per-framework ecosystem is **uneven**: [react-map-gl / @vis.gl/react-maplibre](https://visgl.github.io/react-map-gl/) is deep, [@indoorequal/vue-maplibre-gl](https://indoorequal.github.io/vue-maplibre-gl/), [svelte-maplibre-gl](https://svelte-maplibre-gl.mierune.dev/) and [@maplibre/ngx-maplibre-gl](https://maplibre.org/ngx-maplibre-gl/) are solid — but **Solid has only a stale/Mapbox-first option and Lit has no real wrapper at all**. Rozie collapses all six into one source, and Solid + Lit get a category-leading wrapper for free. See the [MapLibre libraries comparison](/components/maplibre-comparison) for the full per-framework matrix.
+`MapLibre` is Rozie's data-bound port of [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/) — the open-source (BSD-3) WebGL map engine, the community fork of Mapbox GL JS v1. The per-framework ecosystem is **uneven**: [react-map-gl / @vis.gl/react-maplibre](https://visgl.github.io/react-map-gl/) is deep, [@indoorequal/vue-maplibre-gl](https://indoorequal.github.io/vue-maplibre-gl/), [svelte-maplibre-gl](https://svelte-maplibre-gl.mierune.dev/) and [@maplibre/ngx-maplibre-gl](https://maplibre.org/ngx-maplibre-gl/) are solid — but **Solid has only a stale/Mapbox-first option and Lit has no real wrapper at all**. Rozie ships the same `<MapLibre>` (same props, events, two-way camera bindings, and imperative handle) in React, Vue, Svelte, Angular, Solid, and Lit. See the [MapLibre libraries comparison](/components/maplibre-comparison) for the full per-framework matrix.
 
 This page is the **show-and-tell**: the API surface, per-framework quick starts, the 20 map events, the four two-way camera bindings, the imperative handle, the consumer-extensible `:sources` / `:layers` / `:options` passthroughs, and the per-target recipe for the reactive `marker` / `popup` portal slots and the mount-once `control` slot.
 
@@ -8,7 +8,7 @@ The full source for `MapLibre.rozie` lives in the [`@rozie-ui/maplibre` package]
 
 ## The `@rozie-ui/maplibre` packages
 
-`MapLibre` ships as six pre-compiled, per-framework packages generated from a single `MapLibre.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`MapLibre` ships as six pre-compiled, per-framework packages; install only the one for your framework. There is no build step and no Rozie toolchain to add:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -31,7 +31,7 @@ You must **import the engine CSS once** at your app entry. The component's scope
 import 'maplibre-gl/dist/maplibre-gl.css';
 ```
 
-…or `<link>` the CDN copy in your `index.html`. Anything the curated prop surface doesn't special-case (custom data sources, styled layers, the full `MapOptions` bag) comes through the first-class `:sources` / `:layers` / `:options` passthroughs — MapLibre's own config shapes. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `MapLibre.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
+…or `<link>` the CDN copy in your `index.html`. Anything the curated prop surface doesn't special-case (custom data sources, styled layers, the full `MapOptions` bag) comes through the first-class `:sources` / `:layers` / `:options` passthroughs — MapLibre's own config shapes.
 
 ## Quick start
 
@@ -252,12 +252,19 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `getCenter` | Return the current center as `[lng, lat]` (longitude first) — normalized from MapLibre's `LngLat`. |
 | `getZoom` | Return the current zoom level as a number. |
 | `resize` | Resize the map to its container (call after the container's size changes). |
+| `queryRenderedFeatures` | Hit-test the rendered features under a pixel point or box: `queryRenderedFeatures(geometry?, options?)` returns the hit features (`[]` before mount). Click-to-inspect and selection beyond the per-layer `mouseenter`/`mouseleave` events. |
+| `project` | Convert a geographic coordinate to a screen pixel point: `project(lngLat)` (`null` before mount). For positioning framework DOM overlays over map coordinates. |
+| `unproject` | Convert a screen pixel point back to a geographic coordinate: `unproject(point)` (`null` before mount). |
+| `getBounds` | Return the live visible viewport bounds (`null` before mount). Distinct from the construction-only `bounds` prop; use it to lazy-fetch data for the current view. |
+| `zoomIn` | Zoom in one level: `zoomIn(options?)`. An ergonomic nudge for building your own controls. |
+| `zoomOut` | Zoom out one level: `zoomOut(options?)`. |
+| `panBy` | Pan the camera by a pixel offset: `panBy(offset, options?)`. |
 
 ::: tip The camera verbs echo back into the two-way model
-The `$expose` camera verbs (`flyTo` / `easeTo` / `jumpTo` / `fitBounds`) deliberately **do not** pass the wrapper's programmatic echo-guard marker, so an imperative `flyTo()` echoes back into the bound `center` / `zoom` / `bearing` / `pitch` model — and the prop `$watch` then no-ops (the camera already matches). This keeps the handle and the two-way binding consistent. The internal prop-driven reconcile *does* mark its moves, so a consumer state write never bounces.
+The `$expose` camera verbs (`flyTo` / `easeTo` / `jumpTo` / `fitBounds` / `zoomIn` / `zoomOut` / `panBy`) deliberately **do not** pass the wrapper's programmatic echo-guard marker, so an imperative `flyTo()` echoes back into the bound `center` / `zoom` / `bearing` / `pitch` model — and the prop `$watch` then no-ops (the camera already matches). This keeps the handle and the two-way binding consistent. The internal prop-driven reconcile *does* mark its moves, so a consumer state write never bounces.
 :::
 
-The eight handle method names are clear of all three collision classes (ROZ121 / ROZ524 / Lit lifecycle): none is a React model-setter (`setCenter` / `setZoom` / `setBearing` / `setPitch` would be the auto-generated ones — none here), none is an emitted event name (`move` / `zoom` / `rotate` / `pitch` / `drag` / `click` / `idle` / `error` all differ from the verbs), and none shadows a LitElement lifecycle method (`update` / `render` / `requestUpdate` / …).
+The handle method names are clear of all three collision classes: none is a React auto-generated model setter (`setCenter` / `setZoom` / `setBearing` / `setPitch` would be the auto-generated ones — none here), none is an emitted event name (`zoomIn` / `zoomOut` differ from the `zoomend` emit; `move` / `rotate` / `pitch` / `drag` / `click` / `idle` / `error` all differ from the verbs), and none shadows a LitElement lifecycle method (`update` / `render` / `requestUpdate` / …).
 
 **React example:**
 
@@ -276,7 +283,7 @@ const raw = map.current?.getMap();   // the raw MapLibre Map instance
 
 The wrapper surfaces **three** portal slots — two **reactive multi-instance** overlay slots (`marker` / `popup`, driven by the `markers` / `popups` props) and one **mount-once** `control` slot for a custom map control. Each is **guarded** — fill it and your fragments render; leave it unfilled and the surface stays absent.
 
-Each slot's **singular** name (`marker` / `popup` / `control`) is distinct from its **plural** driving prop (`markers` / `popups` / `controls`), keeping the surface ROZ127-clean (a slot name equal to a prop key is a hard error).
+Each slot's **singular** name (`marker` / `popup` / `control`) is distinct from its **plural** driving prop (`markers` / `popups` / `controls`), because a slot name equal to a prop key is a hard compile error in Rozie.
 
 | Slot | Mounts via | Renders | Scope params | Kind | Driven by |
 | --- | --- | --- | --- | --- | --- |
@@ -487,7 +494,7 @@ Set `:interactiveLayerIds` to the layer ids you want hover events on; `@mouseent
 
 ### Driving the map from the handle
 
-The eight `$expose` verbs cover the imperative surface props alone can't express. Grab the handle and call the camera verbs (`flyTo` / `easeTo` / `jumpTo` / `fitBounds`) or the readers (`getCenter` / `getZoom`), or reach the raw engine via `getMap()`:
+The `$expose` verbs cover the imperative surface props alone can't express. Grab the handle and call the camera verbs (`flyTo` / `easeTo` / `jumpTo` / `fitBounds` / `zoomIn` / `zoomOut` / `panBy`), the readers (`getCenter` / `getZoom` / `getBounds`), or the hit-test/projection helpers (`queryRenderedFeatures` / `project` / `unproject`), or reach the raw engine via `getMap()`:
 
 ```tsx
 const map = useRef<MapLibreHandle>(null);

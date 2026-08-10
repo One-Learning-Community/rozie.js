@@ -1,21 +1,23 @@
 # Captcha — the cross-framework CAPTCHA widget
 
-Every CAPTCHA provider ships a vanilla-JS widget that does the real work in the browser — but the framework wrappers around them are **fragmented per provider per framework**: `react-google-recaptcha`, `vue-recaptcha`, `svelte-recaptcha-v2`, `ngx-captcha`, `@hcaptcha/react-hcaptcha` plus separate Vue/Svelte hCaptcha wrappers, `react-turnstile`, and so on — *N providers × M frameworks* of independently-maintained, drifting glue. That combinatorial sprawl is exactly what Rozie's write-once-ship-six thesis exists to collapse.
-
-One `Captcha.rozie` source compiles to six idiomatic packages, and a single `provider` prop switches between **Google reCAPTCHA v2**, **hCaptcha**, **Cloudflare Turnstile**, and **Friendly Captcha** — the first three share a near-identical explicit-render API; Friendly Captcha rides an internal `adapt()` bridge onto the same surface, so one component covers all four.
+`Captcha` is one component for four CAPTCHA providers: a single `provider` prop switches between **Google reCAPTCHA v2**, **hCaptcha**, **Cloudflare Turnstile**, and **Friendly Captcha**. The first three share a near-identical explicit-render API; Friendly Captcha rides an internal `adapt()` bridge onto the same surface. It ships as idiomatic React, Vue, Svelte, Angular, Solid, and Lit packages, replacing the per-provider, per-framework wrappers (`react-google-recaptcha`, `vue-recaptcha`, `ngx-captcha`, `@hcaptcha/react-hcaptcha`, `react-turnstile`, and friends) with one API.
 
 > Looking for the **scoreless reCAPTCHA v3**? That is a fundamentally different, widget-less integration — it ships as the separate [`RecaptchaV3`](#recaptchav3) component in this same package.
 
 ## The `@rozie-ui/captcha` packages
 
-| Package | Framework | Ships |
+Install the pre-compiled package for your framework; no build step is required:
+
+| Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/captcha-react` | React 18+ | compiled `dist` + source |
-| `@rozie-ui/captcha-vue` | Vue 3.4+ | compiled `dist` + `.vue` source |
-| `@rozie-ui/captcha-svelte` | Svelte 5+ | compiled `dist` + `.svelte` source |
-| `@rozie-ui/captcha-angular` | Angular 19+ | compiled `dist` (APF) + source |
-| `@rozie-ui/captcha-solid` | Solid 1.8+ | compiled `dist` + source |
-| `@rozie-ui/captcha-lit` | Lit 3+ | compiled custom element + source |
+| `@rozie-ui/captcha-react` | `npm i @rozie-ui/captcha-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/captcha/packages/react/README.md) |
+| `@rozie-ui/captcha-vue` | `npm i @rozie-ui/captcha-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/captcha/packages/vue/README.md) |
+| `@rozie-ui/captcha-svelte` | `npm i @rozie-ui/captcha-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/captcha/packages/svelte/README.md) |
+| `@rozie-ui/captcha-angular` | `npm i @rozie-ui/captcha-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/captcha/packages/angular/README.md) |
+| `@rozie-ui/captcha-solid` | `npm i @rozie-ui/captcha-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/captcha/packages/solid/README.md) |
+| `@rozie-ui/captcha-lit` | `npm i @rozie-ui/captcha-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/captcha/packages/lit/README.md) |
+
+The packages target React 18+, Vue 3.4+, Svelte 5+, Angular 19+, Solid 1.8+, and Lit 3+. Each ships compiled `dist` output plus its source (`.vue` / `.svelte` where applicable); the Angular package uses the Angular Package Format, and the Lit package is a compiled custom element.
 
 ::: tip No engine dependency
 Unlike the other `@rozie-ui` engine wrappers, Captcha has **no npm peer to install**. Each provider's `api.js` is injected at runtime — once per provider, shared across every `<Captcha>` on the page via a `globalThis` singleton — straight from the provider's CDN. You only need a **site key** from your provider dashboard.
@@ -179,7 +181,7 @@ Grab a handle with your framework's native ref mechanism (React `useRef` / Vue t
 | `getResponse` | Read the current response token on demand (e.g. just before submitting a form). Returns `""` before render or after reset. |
 
 ::: tip Why there is no `render` verb
-`render()` is a `LitElement` lifecycle method — exposing it would clobber the Lit element's own renderer. The widget render is kept internal; the three handle verbs (`reset`/`execute`/`getResponse`) are collision-free across all six targets (no emit/​model-setter/​Lit-lifecycle clash).
+`render()` is a `LitElement` lifecycle method — exposing it would clobber the Lit element's own renderer. The widget render is kept internal; the three handle verbs (`reset`/`execute`/`getResponse`) are collision-free across all six targets (no emit/model-setter/Lit-lifecycle clash).
 :::
 
 **React example:**

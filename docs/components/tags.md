@@ -1,14 +1,14 @@
 # Tags — the cross-framework headless token / tags input
 
-`Tags` is Rozie's **headless, fully-accessible** tags / token input — a `@rozie-ui` family with **no third-party engine** behind it. Every behaviour (type-to-add with configurable delimiter keys, paste-to-bulk-add, Backspace-deletes-previous, dedup, per-token validation, a `max` cap, removable chips with labelled remove controls, a live token count, and the focus choreography) is authored once in `Tags.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`Tags` is a headless, fully-accessible tags / token input with no third-party engine behind it. It covers the whole behaviour surface: type-to-add with configurable delimiter keys, paste-to-bulk-add, Backspace-deletes-previous, dedup, per-token validation, a `max` cap, removable chips with labelled remove controls, a live token count, and the focus choreography. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
-Under the hood the "engine" is the **platform itself**: one native `<input>` for typing plus a row of removable chips. The browser keyboard, the clipboard (paste), and focus all come from the platform for free. The committed tokens **are** `modelValue` (the sole `model: true` prop), so the value is fully two-way bound; the only local state is the in-progress `draft` text in the input — a genuine UI buffer distinct from the committed list. Rozie owns the author-side API: the two-way `r-model:modelValue`, the commit / dedup / validate / cap logic, paste distribution, the Backspace behaviour, the focus choreography (via one container ref, never per-chip refs), and the token-themed skin.
+The foundation is the platform itself: one native `<input>` for typing plus a row of removable chips. The browser keyboard, the clipboard (paste), and focus all come from the platform. The committed tokens *are* `modelValue` (the sole `model: true` prop), so the value is fully two-way bound; the only local state is the in-progress `draft` text in the input, a genuine UI buffer distinct from the committed list. Rozie owns the author-side API: the two-way `r-model:modelValue`, the commit / dedup / validate / cap logic, paste distribution, the Backspace behaviour, the focus choreography (via one container ref, never per-chip refs), and the token-themed skin.
 
-And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+Every visual value is a CSS custom property, so the input re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/tags` packages
 
-`Tags` ships as six pre-compiled, per-framework packages generated from a single `Tags.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`Tags` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ And because **every visual value is a CSS custom property**, it re-skins to any 
 | `@rozie-ui/tags-solid` | `npm i @rozie-ui/tags-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tags/packages/solid/README.md) |
 | `@rozie-ui/tags-lit` | `npm i @rozie-ui/tags-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tags/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The per-leaf READMEs and the [API reference](/components/tags-api) props table are generated from the same IR parse of `Tags.rozie`, so they cannot drift from the compiled output.
+Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
 ## Quick start
 
@@ -49,7 +49,7 @@ Two-way bind `modelValue` (a `string[]`) and type — press Enter or comma to co
 </template>
 ```
 
-`r-model:modelValue` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Tags` an array, `Tags` writes a fresh array back on every add/remove, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `modelValue` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Tags` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:modelValue` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Tags` an array, `Tags` writes a fresh array back on every add/remove, and the framework reconciler picks it up with no `onChange → setState` wiring. Because `modelValue` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor`, so a `Tags` is a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## Custom chip rendering
 
@@ -69,12 +69,7 @@ On React the slot surfaces as a render-prop `children` callback — the one docu
 
 ## API
 
-The full prop / event / handle / slot surface lives on the dedicated **[API reference](/components/tags-api)** page. In brief:
-
-- **Props** — `modelValue` (the two-way tokens array), `delimiters` (commit keys, default `[',', 'Enter']`), `allowDuplicates` (default `false`), `max` (cap, default `null`), `disabled` / `readonly` (both default `false`), `validate` (per-token validator/normalizer), `placeholder`, and `ariaLabel`. Boolean props default `false` (negative opt-out).
-- **Events** — `add` (`{ value, tokens }`), `remove` (`{ value, index, tokens }`), `change` (`{ value }` — the full array, on every mutation).
-- **Imperative handle** — `clear()` and `focus()` (`focus()` focuses the inline text input; it deliberately overrides `HTMLElement.focus` on the Lit leaf — an accepted, warn-only ROZ137).
-- **Slot** — the scoped `tag` slot (`{ tag, index, remove }`).
+The full prop / event / handle / slot surface lives on the dedicated **[API reference](/components/tags-api)** page: the props (`modelValue`, `delimiters`, `allowDuplicates`, `max`, `disabled` / `readonly`, `validate`, `placeholder`, `ariaLabel`), the `add` / `remove` / `change` events, the `clear()` / `focus()` imperative handle, and the scoped `tag` slot.
 
 ## Behaviour
 

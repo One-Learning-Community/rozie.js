@@ -24,7 +24,7 @@ const allPages = ref(false);
 
 # PdfViewer — live demo
 
-This is the **real `@rozie-ui/pdf-vue` package** running on this page (VitePress is itself a Vue app), rendering a 3-page PDF via PDF.js. Page through it, zoom, rotate, toggle continuous scroll — and **select the text** (it's a real text layer, not an image). All of it is driven by the one `PdfViewer.rozie` source that compiles to six frameworks.
+This is the **real `@rozie-ui/pdf-vue` package** running on this page (VitePress is itself a Vue app), rendering a 3-page PDF via PDF.js. Page through it, zoom, rotate, toggle continuous scroll — and **select the text** (it's a real text layer, not an image). The same `PdfViewer` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 <ClientOnly>
 <div class="pdf-live">
@@ -60,7 +60,7 @@ This is the **real `@rozie-ui/pdf-vue` package** running on this page (VitePress
 
 The current page is two-way bound with `v-model:page` (the readout tracks it as you scroll in continuous mode), and the buttons drive the imperative handle (`prevPage` / `nextPage` / `zoomIn` / `zoomOut` / `fitWidth` / `rotateCW`). The worker is bundled locally here via `new URL(...)`; left unset it defaults to a CDN copy. See the [full API](/components/pdf) for every prop, event, and handle verb.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -79,7 +79,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element — with the same props, events, and 12-verb imperative handle, all from the one source above.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element — with the same props, events, and 12-verb imperative handle, identical on every target.
 
 ## See also
 

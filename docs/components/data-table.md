@@ -1,6 +1,6 @@
 # DataTable — overview & install
 
-`DataTable` is Rozie's **headless, fully-accessible** data table / data grid — the `@rozie-ui` component that fills a real cross-framework toolchain gap, authored once in `DataTable.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`DataTable` is Rozie's headless, fully-accessible data table / data grid: the same component, with the same props, twelve two-way state slices, events, imperative handle, and slots, in React, Vue, Svelte, Angular, Solid, and Lit.
 
 ## What you get
 
@@ -15,6 +15,7 @@
 - **Grouping & aggregation** — multi-column, collapsible group rows
 - **Inline editing** — single cell or full row, with validation
 - **WAI-ARIA grid mode** — 2-D keyboard nav + cell range selection
+- **Clipboard & undo/redo** — copy/cut/paste over cell ranges, plus an opt-in grid-wide edit history (the `undoable` prop; `undo`/`redo` verbs + `Ctrl+Z`)
 - **Themeable** — CSS-variable tokens; shadcn/ui, Material 3, Bootstrap 5 bridges
 
 Under the hood the "engine" is **`@tanstack/table-core`** — the *same* framework-agnostic state machine that powers TanStack Table — wired to each framework's reactivity **with no per-framework adapter**. `table-core` owns no DOM (it is a pure `createTable → setOptions → getRowModel` pull-based state machine), so `DataTable` is the controlled-state half of an engine wrapper with none of the DOM-mutation half: Rozie owns the author-side API (the twelve two-way `r-model` slices, the `<Column>` declarative children, the per-column `#cell` / `#header` reactive templates, and the accessible chrome), table-core owns the row model, and the consumer just binds state.
@@ -23,7 +24,7 @@ And because **every visual value is a CSS custom property**, it re-skins to any 
 
 ## The `@rozie-ui/data-table` packages
 
-`DataTable` ships as six pre-compiled, per-framework packages generated from a single `DataTable.rozie` source (plus the declarative `Column.rozie` child) via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`DataTable` (plus its declarative `Column` child) ships as six pre-compiled, per-framework packages; install only the one for your framework. There is no build step and no Rozie toolchain to add:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -34,7 +35,14 @@ And because **every visual value is a CSS custom property**, it re-skins to any 
 | `@rozie-ui/data-table-solid` | `npm i @rozie-ui/data-table-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/data-table/packages/solid/README.md) |
 | `@rozie-ui/data-table-lit` | `npm i @rozie-ui/data-table-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/data-table/packages/lit/README.md) |
 
-Each package carries `@tanstack/table-core` as a **peer dependency** (so you control the table-core version — it is never a bundled copy) plus only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The codegen also enforces a hard rule: each leaf imports **only** `@tanstack/table-core`, never a `@tanstack/<framework>-table` adapter — the single-core no-adapter design is the whole point of the family. The per-leaf READMEs and the [**Props** table](/components/data-table-api#props) are generated from the same IR parse of `DataTable.rozie`, so they cannot drift from the compiled output (`codegen.mjs` asserts the structural columns of the API page against `ir.props` on every run).
+Each package carries **three required peers** besides its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`): `@tanstack/table-core` (the row-model engine), `@tanstack/virtual-core` (row windowing), and `@rozie-ui/popover-<target>` (the popover primitive behind the per-column header menus). All three are peers so you control the versions; none is a bundled copy. Install them alongside the framework package:
+
+```bash
+npm i @rozie-ui/data-table-react \
+  @tanstack/table-core @tanstack/virtual-core @rozie-ui/popover-react
+```
+
+Each leaf imports **only** `@tanstack/table-core`, never a `@tanstack/<framework>-table` adapter; the single-core, no-adapter design is the whole point of the family.
 
 ## Explore the docs
 

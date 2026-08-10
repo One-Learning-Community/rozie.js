@@ -19,7 +19,7 @@ function onClose(e: { reason: string }) {
 
 # Dialog — live demo
 
-This is the **real `@rozie-ui/dialog-vue` package** running on this page (VitePress is itself a Vue app). Open the dialog, then dismiss it by clicking the backdrop, pressing Escape, or using a button — and watch the two-way bound `open` value and the `@close` reason readout update. Everything below is driven by the same `Dialog.rozie` source that compiles to all six frameworks, built on the native `<dialog>` element with **no portal, no engine, and no required CSS** — top-layer rendering, the `::backdrop` scrim, the focus trap, and Esc-to-dismiss all ship inside the platform.
+This is the **real `@rozie-ui/dialog-vue` package** running on this page (VitePress is itself a Vue app). Open the dialog, then dismiss it by clicking the backdrop, pressing Escape, or using a button — and watch the two-way bound `open` value and the `@close` reason readout update. The same `Dialog` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on the native `<dialog>` element with **no portal, no engine, and no required CSS** — top-layer rendering, the `::backdrop` scrim, the focus trap, and Esc-to-dismiss all ship inside the platform.
 
 <ClientOnly>
 <div class="dialog-live">
@@ -58,7 +58,7 @@ This is the **real `@rozie-ui/dialog-vue` package** running on this page (VitePr
 
 `open` is two-way bound with `v-model:open` — the readout updates the instant the dialog shows or dismisses, and a consumer write flows back in. The dialog renders in the **top layer** above this content with no portal; click the dimmed backdrop (unless you tick `disableBackdropClose`), press `Escape`, or use Cancel / Delete to close it, and watch `@close` report `'backdrop'`, `'escape'`, or — via the `show()` / `hide()` handle buttons — `'programmatic'`. See the [full API](/components/dialog) for every prop, event, and handle verb, plus theming and accessibility reference.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -77,7 +77,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same `close` event, same two-way `open`, same `show` / `hide` handle — all from the one source above, built on the native `<dialog>` with no third-party engine behind it.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same `close` event, same two-way `open`, same `show` / `hide` handle — identical on every target, built on the native `<dialog>` with no third-party engine behind it.
 
 ## See also
 

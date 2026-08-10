@@ -40,7 +40,7 @@ function onRangeComplete(e: { value: { start: string; end: string } }) {
 
 # DatePicker — live demo
 
-This is the **real `@rozie-ui/date-picker-vue` package** running on this page (VitePress is itself a Vue app). Click a day, use the prev/next arrows, or focus the grid and use the arrow keys / Home / End / PageUp / PageDown / Enter to drive it entirely from the keyboard — the two-way bound ISO date updates and the `@change` readout fires. Everything below is driven by the same `DatePicker.rozie` source that compiles to all six frameworks, with **no engine and no required CSS** — the calendar logic and a tokenised skin ship inside the component.
+This is the **real `@rozie-ui/date-picker-vue` package** running on this page (VitePress is itself a Vue app). Click a day, use the prev/next arrows, or focus the grid and use the arrow keys / Home / End / PageUp / PageDown / Enter to drive it entirely from the keyboard — the two-way bound ISO date updates and the `@change` readout fires. The same `DatePicker` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It needs **no engine and no required CSS** — the calendar logic and a tokenised skin ship inside the component.
 
 <ClientOnly>
 <div class="dp-live">

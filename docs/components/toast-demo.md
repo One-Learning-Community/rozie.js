@@ -28,7 +28,7 @@ function clearAll() {
 
 # Toaster — live demo
 
-This is the **real `@rozie-ui/toast-vue` package** running on this page (VitePress is itself a Vue app). Click a button to enqueue a toast — it appears in the corner, auto-dismisses after its duration (hover the stack to pause), and you can close it with its × button or clear them all. Everything below is driven by the same `Toaster.rozie` source that compiles to all six frameworks, built on native DOM with **no engine and no required CSS** — the queue/timer behaviour and a tokenised skin all ship inside the component.
+This is the **real `@rozie-ui/toast-vue` package** running on this page (VitePress is itself a Vue app). Click a button to enqueue a toast — it appears in the corner, auto-dismisses after its duration (hover the stack to pause), and you can close it with its × button or clear them all. The same `Toaster` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on native DOM with **no engine and no required CSS** — the queue/timer behaviour and a tokenised skin all ship inside the component.
 
 The host is mounted **once** and driven entirely through Vue's `ref` — there is no global `toast()` singleton; "call from anywhere" is your app's wiring concern.
 
@@ -76,7 +76,7 @@ const toaster = ref();
 </template>
 ```
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -95,7 +95,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same `show` / `dismiss` / `clear` handle, same `#toast` scoped slot — all from the one source above, with no third-party engine behind it.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same `show` / `dismiss` / `clear` handle, same `#toast` scoped slot — identical on every target, with no third-party engine behind it.
 
 ## See also
 

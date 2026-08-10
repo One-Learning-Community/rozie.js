@@ -75,7 +75,7 @@ const BIG_ROWS = Array.from({ length: 50_000 }, (_, i) => ({
 
 # DataTable — live demo
 
-This is the **real `@rozie-ui/data-table-vue` package** running on this page (VitePress is itself a Vue app). Click a header to sort (shift-click to add a secondary sort), type in the search box to filter, page through the rows, tick the checkboxes to select, drag a column edge to resize, or open the **Columns** menu to hide one — then watch the two-way bound state below update. Everything is driven by the same `DataTable.rozie` source that compiles to all six frameworks, built on `@tanstack/table-core` with **no per-framework adapter** and a tokenised skin that ships inside the component.
+This is the **real `@rozie-ui/data-table-vue` package** running on this page (VitePress is itself a Vue app). Click a header to sort (shift-click to add a secondary sort), type in the search box to filter, page through the rows, tick the checkboxes to select, drag a column edge to resize, or open the **Columns** menu to hide one — then watch the two-way bound state below update. The same `DataTable` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on `@tanstack/table-core` with **no per-framework adapter** and a tokenised skin that ships inside the component.
 
 ## Batteries included — the drop-in components
 
@@ -247,7 +247,7 @@ The same real `@rozie-ui/data-table-vue` package, now over **50,000 rows** with 
 
 Set `virtual` to opt in; bound `maxHeight` (or the `--rozie-data-table-max-height` CSS custom property — the prop wins, the token is the fallback) sizes the scroll container, and `estimateRowHeight` seeds the row estimate before `measureElement` refines actual heights. Windowing runs over the full filtered + sorted (pre-pagination) model and suppresses the client pagination chrome. See the [comparison page](/components/data-table-comparison#what-rozie-defers) for the published support boundary (and the orthogonal pieces — column virtualization + dynamic auto-measure — that remain deferred).
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file (the parent `DataTable.rozie` plus the declarative `Column.rozie` child):
 
@@ -266,7 +266,7 @@ You author the component **once** as a `.rozie` file (the parent `DataTable.rozi
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same twelve two-way slices, same fourteen change events, same `<Column>` API, same scoped slots, same imperative handle — all from the one source above, built on `@tanstack/table-core` with no per-framework adapter behind it.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same twelve two-way slices, same fourteen change events, same `<Column>` API, same scoped slots, same imperative handle — identical on every target, built on `@tanstack/table-core` with no per-framework adapter behind it.
 
 ## See also
 

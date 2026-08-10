@@ -45,7 +45,7 @@ The case for Rozie is narrower here than in the TipTap or FullCalendar landscape
 
 ² **`solid-codemirror` is a primitives library**, not a turnkey component: `createCodeMirror` + `createEditorControlledValue` give you the building blocks and you wire the value loop yourself. Rozie's Solid leaf is a drop-in `value`/`onValueChange` component.
 
-³ `solid-codemirror` surfaces the `EditorView` via its `onEditorMount` / ref primitive rather than a method handle; `svelte-codemirror-editor` exposes the view less directly. Rozie gives every target the *same* handle (`getView` / `focus` / `getValue` / `replaceValue` / `dispatch` / `insertText` / `getSelection` / `setSelection`).
+³ `solid-codemirror` surfaces the `EditorView` via its `onEditorMount` / ref primitive rather than a method handle; `svelte-codemirror-editor` exposes the view less directly. Rozie gives every target the *same* handle (`getView` / `focus` / `getValue` / `replaceValue` / `dispatch` / `insertText` / `getSelection` / `setSelection` / `undo` / `redo` / `selectAll` / `scrollToPos`).
 
 ⁴ **Runtime reconfigure varies and is mostly the consumer's job.** These wrappers either re-create the editor on prop change or require you to pass a memoized `extensions`/`basicSetup` (the `@uiw/react-codemirror` README calls out memoizing `extensions` to avoid churn). Rozie wires each curated prop (`language` / `theme` / `readOnly` / `placeholder` / `extensions` / `basicSetup` / `gutterLines` / `decorations`) to its own CodeMirror `Compartment`, so a prop change dispatches a `reconfigure` with no remount. Cursor, history, and scroll position are preserved, uniformly on all six.
 

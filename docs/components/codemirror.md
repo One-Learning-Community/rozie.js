@@ -1,6 +1,6 @@
 # CodeMirror — the cross-framework code editor
 
-`CodeMirror` is Rozie's data-bound port of [CodeMirror 6](https://codemirror.net/) — the de-facto modular code editor for the web. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. Every framework today carries its own hand-maintained CodeMirror binding ([react-codemirror](https://www.npmjs.com/package/@uiw/react-codemirror), [vue-codemirror](https://www.npmjs.com/package/vue-codemirror), [svelte-codemirror](https://www.npmjs.com/package/svelte-codemirror-editor), [ngx-codemirror](https://www.npmjs.com/package/@ctrl/ngx-codemirror)) — each shuttles a `value` through the `EditorView`/`EditorState` API and forwards changes back out. Rozie collapses all of them (plus the Solid and Lit wrappers that **do not exist upstream**) into one source. See the [CodeMirror libraries comparison](/components/codemirror-comparison) for the full per-framework matrix — including the Angular wrapper that's still on CodeMirror 5.
+`CodeMirror` is Rozie's data-bound port of [CodeMirror 6](https://codemirror.net/) — the de-facto modular code editor for the web. Every framework today carries its own hand-maintained CodeMirror binding ([react-codemirror](https://www.npmjs.com/package/@uiw/react-codemirror), [vue-codemirror](https://www.npmjs.com/package/vue-codemirror), [svelte-codemirror](https://www.npmjs.com/package/svelte-codemirror-editor), [ngx-codemirror](https://www.npmjs.com/package/@ctrl/ngx-codemirror)) — each shuttles a `value` through the `EditorView`/`EditorState` API and forwards changes back out. Rozie ships the same `<CodeMirror>` (same props, two-way `value` binding, and imperative handle) in React, Vue, Svelte, Angular, Solid, and Lit. See the [CodeMirror libraries comparison](/components/codemirror-comparison) for the full per-framework matrix — including the Angular wrapper that's still on CodeMirror 5.
 
 This page is the **show-and-tell**: the API surface, per-framework quick starts, the imperative handle, the consumer-extensible `:extensions` passthrough, and the per-target recipe for the five `panel` / `topPanel` / `tooltip` / `gutter` / `decoration` portal slots.
 
@@ -8,7 +8,7 @@ The full source for `CodeMirror.rozie` lives in the [`@rozie-ui/codemirror` pack
 
 ## The `@rozie-ui/codemirror` packages
 
-`CodeMirror` ships as six pre-compiled, per-framework packages generated from a single `CodeMirror.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`CodeMirror` ships as six pre-compiled, per-framework packages; install only the one for your framework. There is no build step and no Rozie toolchain to add:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,15 +19,19 @@ The full source for `CodeMirror.rozie` lives in the [`@rozie-ui/codemirror` pack
 | `@rozie-ui/codemirror-solid` | `npm i @rozie-ui/codemirror-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/codemirror/packages/solid/README.md) |
 | `@rozie-ui/codemirror-lit` | `npm i @rozie-ui/codemirror-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/codemirror/packages/lit/README.md) |
 
-Each package carries the **five `@codemirror/*` engine peers** — `@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/lang-javascript`, and `@codemirror/theme-one-dark` — plus the **`codemirror` meta-package** (it supplies the `basicSetup` bundle; all `^6`) — plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). Install the engine peers alongside the framework package:
+Each package carries **sixteen required engine peers** plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). The engine peers are the five core packages (`@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/lang-javascript`, `@codemirror/theme-one-dark`), the `codemirror` meta-package (it supplies the `basicSetup` bundle), and the ten additional `@codemirror/lang-*` packages behind the [language presets](#language-presets). Installing the `lang-*` peers adds no bundle weight for presets you never import (the presets are tree-shakable, side-effect-free exports), but they must all be present for the install to resolve. One command covers the lot:
 
 ```bash
 npm i @rozie-ui/codemirror-react \
   @codemirror/state @codemirror/view @codemirror/commands \
-  @codemirror/lang-javascript @codemirror/theme-one-dark codemirror
+  @codemirror/theme-one-dark codemirror \
+  @codemirror/lang-javascript @codemirror/lang-html @codemirror/lang-css \
+  @codemirror/lang-sass @codemirror/lang-vue @codemirror/lang-json \
+  @codemirror/lang-markdown @codemirror/lang-yaml @codemirror/lang-xml \
+  @codemirror/lang-python @codemirror/lang-sql
 ```
 
-CodeMirror 6 has **no large "options bag"** — everything is an `Extension`. Anything the curated prop surface doesn't special-case (other languages, custom themes, line-wrapping, autocomplete, linting, key-bindings) comes through the first-class `:extensions` passthrough, which the wrapper composes **last** so consumer extensions win CodeMirror's last-registered-wins facets. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `CodeMirror.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
+CodeMirror 6 has **no large "options bag"** — everything is an `Extension`. Anything the curated prop surface doesn't special-case (other languages, custom themes, line-wrapping, autocomplete, linting, key-bindings) comes through the first-class `:extensions` passthrough, which the wrapper composes **last** so consumer extensions win CodeMirror's last-registered-wins facets.
 
 ## Quick start
 
@@ -173,14 +177,14 @@ el.addEventListener('value-change', (e) => {
 | --- | --- | --- | :---: | --- |
 | `value` | `String` | `""` | ✓ | The two-way document text. Typing in the editor writes back through the model path; a consumer write reflects into the live document (echo-guarded so a programmatic set doesn't ping-pong). This is the **only** change channel — there are no events. |
 | `language` | `String` | `"javascript"` | | Convenience language. `"javascript"` loads the bundled `@codemirror/lang-javascript`; any other value falls back to plain text (no syntax highlighting, no throw). Add other languages through `:extensions`. Runtime-updatable via a `langCompartment` reconfigure — switching the prop re-highlights without a remount. |
-| `theme` | `String \| unknown` | `"light"` | | The built-in strings `"light"` (the editor default) or `"dark"` (the bundled `@codemirror/theme-one-dark`) **or** a CodeMirror `Extension` / `Extension[]` passed straight through (G3) — drop in `@uiw/codemirror-themes`, a `EditorView.theme({…})`, or any theme extension. A non-string `theme` is composed via the `themeCompartment`, so it reconfigures live with no remount, same as the strings. Custom themes also still work through `:extensions` (composed last). |
+| `theme` | `String \| unknown` | `"light"` | | The built-in strings `"light"` (the editor default) or `"dark"` (the bundled `@codemirror/theme-one-dark`) **or** a CodeMirror `Extension` / `Extension[]` passed straight through — drop in `@uiw/codemirror-themes`, a `EditorView.theme({…})`, or any theme extension. A non-string `theme` is composed via the `themeCompartment`, so it reconfigures live with no remount, same as the strings. Custom themes also still work through `:extensions` (composed last). |
 | `readOnly` | `Boolean` | `false` | | Make the document read-only. Runtime-updatable via a `readOnlyCompartment` reconfigure. |
 | `height` | `Number` | `240` | | Editor height in pixels (applied to the wrapper's host box). |
 | `placeholder` | `String` | `""` | | Placeholder text shown when the document is empty (the bundled `@codemirror/view` `placeholder` extension). Empty string ⇒ no placeholder. Runtime-updatable via a `placeholderCompartment` reconfigure. |
 | `extensions` | `Array` | `[]` | | Consumer-extensible passthrough — an arbitrary `Extension[]` composed **last** so it wins CodeMirror's last-registered-wins facets (theme/keymap/language overrides). The CodeMirror 6 analog of an options bag: line-wrapping, autocomplete, linting, custom key-bindings, additional languages/themes — anything the curated props don't special-case. Runtime-reconfigurable via an `extensionsCompartment` (no remount when the array changes). |
-| `basicSetup` | `Boolean` | `false` | | When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included [`basicSetup`](https://codemirror.net/docs/ref/#codemirror.basicSetup) bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps (G1). The curated `language` / `theme` / `readOnly` / `placeholder` / `extensions` props and the consumer `:extensions` still compose **after** it, so they continue to win. Runtime-updatable via a `baselineCompartment` reconfigure — toggling it swaps the bundle live, no remount required. |
-| `gutterLines` | `Array` | `[]` | | The 1-based line numbers that each get a custom gutter marker rendered by the `gutter` slot (G5). One portal handle mounts per visible marker (see [Slots](#slots)). Out-of-range lines are ignored. Runtime-updatable via a `gutterCompartment` reconfigure — changing the array re-marks the lines with no remount. Only meaningful when the `gutter` slot is filled. |
-| `decorations` | `Array` | `[]` | | An array of `{ from, to? }` **0-based document offsets** that each get an inline widget rendered by the `decoration` slot (G5). A point widget is placed at `from`; `to` is passed through in scope for the consumer's awareness. Compute an offset from a line via `view.state.doc.line(n).from`. One portal handle mounts per visible widget. Runtime-updatable via a `decorationCompartment` reconfigure. Only meaningful when the `decoration` slot is filled. |
+| `basicSetup` | `Boolean` | `false` | | When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included [`basicSetup`](https://codemirror.net/docs/ref/#codemirror.basicSetup) bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated `language` / `theme` / `readOnly` / `placeholder` / `extensions` props and the consumer `:extensions` still compose **after** it, so they continue to win. Runtime-updatable via a `baselineCompartment` reconfigure — toggling it swaps the bundle live, no remount required. |
+| `gutterLines` | `Array` | `[]` | | The 1-based line numbers that each get a custom gutter marker rendered by the `gutter` slot. One portal handle mounts per visible marker (see [Slots](#slots)). Out-of-range lines are ignored. Runtime-updatable via a `gutterCompartment` reconfigure — changing the array re-marks the lines with no remount. Only meaningful when the `gutter` slot is filled. |
+| `decorations` | `Array` | `[]` | | An array of `{ from, to? }` **0-based document offsets** that each get an inline widget rendered by the `decoration` slot. A point widget is placed at `from`; `to` is passed through in scope for the consumer's awareness. Compute an offset from a line via `view.state.doc.line(n).from`. One portal handle mounts per visible widget. Runtime-updatable via a `decorationCompartment` reconfigure. Only meaningful when the `decoration` slot is filled. |
 
 There is **no Emits section.** CodeMirror's `updateListener` → two-way `value` path is the only change channel (consumers bind `r-model:value`). See [Why there is no `@change` event](#why-there-is-no-change-event).
 
@@ -198,9 +202,13 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `insertText` | Insert text at the current main selection — `insertText(text)`. |
 | `getSelection` | Return the main selection range (`{ anchor, head, from, to }`) or `null` before mount. |
 | `setSelection` | Set the selection — `setSelection(posNumber | { anchor, head })`. |
+| `undo` | Undo the last change (the history keymap's undo, callable from your own toolbar). |
+| `redo` | Redo the last undone change. |
+| `selectAll` | Select the entire document. |
+| `scrollToPos` | Scroll a document position into view: `scrollToPos(pos, options?)`; the default centers the position vertically. `setSelection` moves the caret but does not guarantee scroll; this dispatches the scroll effect (jump-to-line, scroll-to-match/error). |
 
 ::: tip The verb is `replaceValue`, not `setValue`
-The "set the document text" verb is named `replaceValue` rather than `setValue`. A `value` model prop makes the React target auto-generate a `setValue` state setter, so a `setValue` handle verb is a hard collision (ROZ524) on React. `replaceValue` preserves the value-setter semantics collision-free across all six targets.
+The "set the document text" verb is named `replaceValue` rather than `setValue`. A `value` model prop makes the React target auto-generate a `setValue` state setter, so a `setValue` handle verb is a hard collision on React. `replaceValue` preserves the value-setter semantics collision-free across all six targets.
 :::
 
 **React example:**
@@ -216,7 +224,7 @@ const text = cm.current?.getValue();
 cm.current?.insertText('// inserted at the cursor\n');
 ```
 
-The eight handle method names are clear of all ten prop names (and there are no events), so the `$expose` collision discipline (ROZ121) passes with no renames beyond the React-specific `replaceValue` adjustment above.
+The handle method names are clear of every prop name (and there are no events), so no renames are needed beyond the React-specific `replaceValue` adjustment above.
 
 ## Slots
 
@@ -408,7 +416,7 @@ The `extensions` array is wrapped in its own `extensionsCompartment`, so swappin
 
 ### Driving the editor from the handle
 
-The eight `$expose` verbs cover the imperative surface props alone can't express. Grab the handle and call `focus()` / `getValue()` / `replaceValue()` / `insertText()` / `getSelection()` / `setSelection()`, or reach the raw engine via `getView()`:
+The `$expose` verbs cover the imperative surface props alone can't express. Grab the handle and call `focus()` / `getValue()` / `replaceValue()` / `insertText()` / `getSelection()` / `setSelection()` / `undo()` / `redo()` / `selectAll()` / `scrollToPos()`, or reach the raw engine via `getView()`:
 
 ```tsx
 const cm = useRef<CodeMirrorHandle>(null);

@@ -22,7 +22,7 @@ const exportCrop = () => { out.value = cropper.value?.getCroppedDataURL() ?? '';
 
 # Cropper — live demo
 
-This is the **real `@rozie-ui/cropper-vue` package** running on this page (VitePress is itself a Vue app). Drag the crop box, resize it, use the controls — then **Export** to see the cropped result. Everything below is driven by the same `Cropper.rozie` source that compiles to all six frameworks.
+This is the **real `@rozie-ui/cropper-vue` package** running on this page (VitePress is itself a Vue app). Drag the crop box, resize it, use the controls — then **Export** to see the cropped result. The same `Cropper` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 <ClientOnly>
 <div class="cropper-live">
@@ -65,7 +65,7 @@ This is the **real `@rozie-ui/cropper-vue` package** running on this page (ViteP
 
 The crop box is two-way bound with `v-model:data` — the readout above updates live as you drag, and the buttons drive the imperative handle (`setAspectRatio`, `rotateBy`, `scaleX`/`scaleY`, `reset`, `getCroppedDataURL`). See the [full API](/components/cropper) for the complete prop/event/handle surface.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -84,7 +84,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with a `ControlValueAccessor`, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, all from the one source above.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with a `ControlValueAccessor`, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, identical on every target.
 
 ## See also
 

@@ -8,7 +8,7 @@ The pattern has **two halves**, and the split is the whole trick to making it cr
 2. A **per-target mount bridge** — a small, **hand-written** module that subscribes to Lexical's decorator map and renders the descriptor with the target framework's own render primitive.
 
 ::: warning The bridge is hand-written, not compiler-synthesized
-Rozie does **not** synthesize the mount bridge (D-06 / REQ-39). It is a deliberate **per-target escape hatch** — the same principle as portal slots. You author roughly one ~30-line bridge per framework you support; `codegen.mjs` vendors the right one into each leaf verbatim (never routed through the compiler). This is by design: rendering a native component imperatively into an engine-owned DOM node is exactly the seam where each framework's API genuinely differs, and a hand-written bridge is clearer and safer than a synthesized one.
+Rozie does **not** synthesize the mount bridge. It is a deliberate **per-target escape hatch** — the same principle as portal slots. You author roughly one ~30-line bridge per framework you support; `codegen.mjs` vendors the right one into each leaf verbatim (never routed through the compiler). This is by design: rendering a native component imperatively into an engine-owned DOM node is exactly the seam where each framework's API genuinely differs, and a hand-written bridge is clearer and safer than a synthesized one.
 :::
 
 ## Part 1 — the neutral `DecoratorNode`

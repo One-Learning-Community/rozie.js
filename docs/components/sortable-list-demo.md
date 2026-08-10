@@ -39,7 +39,7 @@ const toggleDisabled = () => {
 
 # SortableList — live demo
 
-This is the **real `@rozie-ui/sortable-list-vue` package** running on this page (VitePress is itself a Vue app). Drag the rows by the **⋮⋮** handle to reorder them — or use the keyboard (Tab to a row, Space to lift, ArrowUp/ArrowDown to move, Space to drop). The buttons mutate the bound array directly, and the live readout proves the two-way order updates. Everything below is driven by the same `SortableList.rozie` source that compiles to all six frameworks.
+This is the **real `@rozie-ui/sortable-list-vue` package** running on this page (VitePress is itself a Vue app). Drag the rows by the **⋮⋮** handle to reorder them — or use the keyboard (Tab to a row, Space to lift, ArrowUp/ArrowDown to move, Space to drop). The buttons mutate the bound array directly, and the live readout proves the two-way order updates. The same `SortableList` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 <ClientOnly>
 <div class="sortable-live">
@@ -80,7 +80,7 @@ This is the **real `@rozie-ui/sortable-list-vue` package** running on this page 
 
 The list is two-way bound with `v-model:items` — the readout above updates live as you drag or press the buttons, and "Toggle drag" drives the imperative handle (`option('disabled', …)`). The component renders each row through its **default scoped slot** (`{ item, index }`), and `item-key="id"` keeps the keyed reconciler stable across reorders. See the [full API](/components/sortable-list) for the complete prop/event/handle surface.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -99,7 +99,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, same default scoped slot, all from the one source above.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, same default scoped slot, identical on every target.
 
 ## See also
 

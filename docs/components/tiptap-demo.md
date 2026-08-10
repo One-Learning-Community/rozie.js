@@ -10,7 +10,7 @@ import TipTap from '@rozie-ui/tiptap-vue';
 // CI). The two-way `html` model is the editor's document serialized as an HTML
 // string; typing writes the new HTML back, the readout below mirrors it live.
 const html = ref(
-  '<h2>Rozie ❤️ TipTap</h2><p>This is the <strong>real</strong> <em>@rozie-ui/tiptap-vue</em> editor. Select some text and hit a toolbar button, or just start typing.</p><ul><li>One source.</li><li>Six frameworks.</li></ul>'
+  '<h2>Rozie ❤️ TipTap</h2><p>This is the <strong>real</strong> <em>@rozie-ui/tiptap-vue</em> editor. Select some text and hit a toolbar button, or just start typing.</p><ul><li>Same API.</li><li>Six frameworks.</li></ul>'
 );
 
 const editor = ref();
@@ -25,7 +25,7 @@ const words = () => {
 
 # TipTap — live demo
 
-This is the **real `@rozie-ui/tiptap-vue` package** running on this page (VitePress is itself a Vue app). Type in the editor, select text and drive the formatting buttons, or hit **Clear** — then watch the live HTML readout and word count update. Everything below is driven by the same `TipTap.rozie` source that compiles to all six frameworks.
+This is the **real `@rozie-ui/tiptap-vue` package** running on this page (VitePress is itself a Vue app). Type in the editor, select text and drive the formatting buttons, or hit **Clear** — then watch the live HTML readout and word count update. The same `TipTap` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 <ClientOnly>
 <div class="tiptap-live">
@@ -66,7 +66,7 @@ This is the **real `@rozie-ui/tiptap-vue` package** running on this page (VitePr
 
 The document is two-way bound with `v-model:html` — the readout above updates live as you type, and the buttons drive the imperative handle (`toggleBold`, `toggleItalic`, `toggleHeading`, `toggleBulletList`, `undo`, `redo`, `focusEditor`, `clearContent`). The component bundles its own toolbar (Bold / Italic / H1 / H2 / Bullet list, with live active-state highlighting); the buttons here are a second, *external* toolbar driving the same `$expose` handle. See the [full API](/components/tiptap) for the complete prop/event/handle surface — including the `toolbar` / `bubbleMenu` / `floatingMenu` portal slots and the reactive `nodeView` slot.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -85,7 +85,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same 14-verb imperative handle, same portal slots, all from the one source above.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same 14-verb imperative handle, same portal slots, identical on every target.
 
 ## See also
 

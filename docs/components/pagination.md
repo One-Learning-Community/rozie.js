@@ -1,14 +1,14 @@
 # Pagination — the cross-framework headless pager
 
-`Pagination` is Rozie's **headless, fully-accessible** pagination control — a `@rozie-ui` family with **no third-party engine** behind it. The whole windowed page-item model (numbers interleaved with ellipses, configurable sibling/boundary windowing), the prev/next bounds, the roving keyboard navigation, the `<nav>` landmark with `aria-current="page"` on the active control, and the two-way page binding are authored once in `Pagination.rozie` and compiled to idiomatic React, Vue, Svelte, Angular, Solid, and Lit.
+`Pagination` is a headless, fully-accessible pagination control with no third-party engine behind it. It covers the whole windowed page-item model: numbers interleaved with ellipses, configurable sibling/boundary windowing, the prev/next bounds, roving keyboard navigation, the `<nav>` landmark with `aria-current="page"` on the active control, and the two-way page binding. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
-It is **HEADLESS**: the component computes the page-item model and exposes it through scoped slots, so you render each control however your design system wants — or accept the default, fully token-themed buttons. The current page *is* `modelValue` (the sole `model: true` prop → an Angular `ControlValueAccessor`), so the pager binds to forms like any control.
+It is headless: the component computes the page-item model and exposes it through scoped slots, so you render each control however your design system wants, or accept the default, fully token-themed buttons. The current page *is* `modelValue` (the sole `model: true` prop, which drives an Angular `ControlValueAccessor`), so the pager binds to forms like any control.
 
-And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+Every visual value is a CSS custom property, so the pager re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/pagination` packages
 
-`Pagination` ships as six pre-compiled, per-framework packages generated from a single `Pagination.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`Pagination` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -19,7 +19,7 @@ And because **every visual value is a CSS custom property**, it re-skins to any 
 | `@rozie-ui/pagination-solid` | `npm i @rozie-ui/pagination-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/solid/README.md) |
 | `@rozie-ui/pagination-lit` | `npm i @rozie-ui/pagination-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pagination/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`). The per-leaf READMEs and the docs-site [API reference](/components/pagination-api) are generated from the same IR parse of `Pagination.rozie`, so they cannot drift from the compiled output.
+Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
 ## Quick start
 

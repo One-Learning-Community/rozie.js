@@ -2,11 +2,11 @@
 
 `CommandPalette` is Rozie's **headless, accessible** cmdk-style command menu — a `@rozie-ui` family with **no third-party engine** behind it. The "⌘K" pattern (a centered modal overlay with a search box over a filtered, keyboard-navigable list of commands) is re-implemented — often inaccessibly — in every framework. Rozie owns the author-side API: the two-way `open` + `query` bindings, **fuzzy ranking with match highlighting** over each item's `label` plus its `keywords` (with a pluggable `score` hook), **nested levels** for drill-in navigation backed by optional **async sources**, **auto-derived group sections** (from each item's `group` field, cappable via `groupCap`), **per-row action menus** (⌘K on a highlighted row), a **`defaultItems` home view** while the query is empty, the roving-highlight keyboard model (ArrowUp / ArrowDown / Home / End / Enter / Escape), the close policy (backdrop click + Escape), and the token-themed skin.
 
-It compiles once from `CommandPalette.rozie` to idiomatic React, Vue, Svelte, Angular, Solid, and Lit. And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
+The same `CommandPalette` ships for React, Vue, Svelte, Angular, Solid, and Lit. And because **every visual value is a CSS custom property**, it re-skins to any design system — with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
 ## The `@rozie-ui/command-palette` packages
 
-`CommandPalette` ships as six pre-compiled, per-framework packages generated from a single `CommandPalette.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`CommandPalette` ships as six pre-compiled, per-framework packages; install only the one for your framework. There is no build step and no Rozie toolchain to add:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -17,7 +17,13 @@ It compiles once from `CommandPalette.rozie` to idiomatic React, Vue, Svelte, An
 | `@rozie-ui/command-palette-solid` | `npm i @rozie-ui/command-palette-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/command-palette/packages/solid/README.md) |
 | `@rozie-ui/command-palette-lit` | `npm i @rozie-ui/command-palette-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/command-palette/packages/lit/README.md) |
 
-Each package carries only its framework peer. For the full prop / event / handle / slot surface see the [**API reference**](/components/command-palette-api); for per-framework consumption code see the [**usage page**](/components/command-palette-usage).
+Each package carries its framework peer plus `@rozie-ui/combobox-<target>` as a **required peer** (the palette's search-over-list core composes the combobox family). Install both:
+
+```bash
+npm i @rozie-ui/command-palette-react @rozie-ui/combobox-react
+```
+
+For the full prop / event / handle / slot surface see the [**API reference**](/components/command-palette-api); for per-framework consumption code see the [**usage page**](/components/command-palette-usage).
 
 ## Quick start
 
@@ -65,7 +71,7 @@ const run = (e) => {
 
 - **Two models, not a form control.** `open` and `query` are both `model: true`. Because there are *two* models the component does **not** generate an Angular `ControlValueAccessor` (a palette is not a single form value) — that is the intended shape.
 - **Portal-style overlay.** The overlay is a `position: fixed` full-viewport backdrop + a centered `role="dialog"` panel, rendered only while `open`. It escapes overflow/`z-index` ancestors without a teleport. A click on the backdrop (not the panel) closes; Escape closes; selecting an item closes when `closeOnSelect` (the default).
-- **Fuzzy ranking + highlighting.** The query is matched as a fuzzy subsequence against each item's `label` (weighted above its `keywords`), results are ranked by match strength, and the matched characters are highlighted in every row (themeable via `--rozie-command-palette-match-*`). Pass a `score` prop — <span v-pre>`(item, query) => number | null`</span> — to customize ranking or exclusion (return `null` to drop an item; higher numbers rank first); a recency/frecency boost is simply added inside it. The ranking lives in `src/internal/scoreCommands.ts` and is unit-tested in isolation. **Behavior change from 0.1.0:** the default matching moved from plain substring to fuzzy-subsequence (more permissive).
+- **Fuzzy ranking + highlighting.** The query is matched as a fuzzy subsequence against each item's `label` (weighted above its `keywords`), results are ranked by match strength, and the matched characters are highlighted in every row (themeable via `--rozie-command-palette-match-*`). Pass a `score` prop — <span v-pre>`(item, query) => number | null`</span> — to customize ranking or exclusion (return `null` to drop an item; higher numbers rank first); a recency/frecency boost is simply added inside it. The ranking lives in `src/internal/scoreCommands.ts` and is unit-tested in isolation.
 - **Roving keyboard model.** ArrowUp / ArrowDown move the highlight (skipping `disabled` items), Home / End jump to the ends, Enter selects the highlighted item, Escape closes (or pops a level — see below). The highlight is tracked virtually via `aria-activedescendant` — DOM focus stays on the search `<input role="combobox">`.
 - **Grouped sections & the home view.** Commands sharing a `group` field render as labeled sections automatically (first-appearance order, headings overridable via the `groupHeading` slot, cappable per-section with `groupCap` + a "+N more" row); the `defaultItems` prop (and a level's own `defaultItems` field) is what renders while the query is empty — the natural home for a recents list. See [Grouped commands](/components/command-palette-api#grouped-commands) and [Default items](/components/command-palette-api#default-items-empty-home-view).
 - **Per-row action menus.** A row carrying `actions: [{ id, label, … }]` gets its own secondary action menu — opened with `actionKey` (default ⌘K), caret-at-end →, or a click on the row's actions affordance — firing `@action-select` while Enter stays the primary `@select`. See [Interactive sub-actions](/components/command-palette-api#interactive-sub-actions).

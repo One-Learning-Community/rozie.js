@@ -29,7 +29,7 @@ Declared once via `$expose`; obtained through each framework's native ref mechan
 
 | Method | Description |
 | --- | --- |
-| `focus` | Move DOM focus to the input and select its text. Deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element (accepted, warn-only ROZ137). |
+| `focus` | Move DOM focus to the input and select its text. Deliberately overrides the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. |
 | `increment` | Step the value up by one `step` (clamped + snapped). Emits `change`. |
 | `decrement` | Step the value down by one `step` (clamped + snapped). Emits `change`. |
 | `clear` | Set the value to `null` (empty) and clear the edit buffer. Emits `change`. |

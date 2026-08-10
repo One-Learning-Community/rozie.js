@@ -19,7 +19,7 @@ function onChange(e: { checked: boolean }) {
 
 # Switch — live demo
 
-This is the **real `@rozie-ui/switch-vue` package** running on this page (VitePress is itself a Vue app). Click a switch, or focus one and press **Space** / **Enter**. Everything below is driven by the same `Switch.rozie` source that compiles to all six frameworks, built on a native focusable element with **no engine and no required CSS** — the toggle behaviour, the ARIA wiring, and a tokenised skin all ship inside the component.
+This is the **real `@rozie-ui/switch-vue` package** running on this page (VitePress is itself a Vue app). Click a switch, or focus one and press **Space** / **Enter**. The same `Switch` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. It's built on a native focusable element with **no engine and no required CSS** — the toggle behaviour, the ARIA wiring, and a tokenised skin all ship inside the component.
 
 <ClientOnly>
 <div class="sw-live">
@@ -61,7 +61,7 @@ This is the **real `@rozie-ui/switch-vue` package** running on this page (VitePr
 
 `modelValue` is two-way bound with `v-model:modelValue` — the readout updates the instant you toggle, and a consumer write flows back in. Listen to `@change` for the new boolean. The **Wi-Fi** instance's buttons drive the imperative handle (`toggle()`, `focus()`) grabbed through Vue's `ref`. See the [full API](/components/switch) for every prop, event, slot, and handle verb, plus theming and the keyboard reference.
 
-## One source, six outputs
+## What ships for each framework
 
 You author the component **once** as a `.rozie` file:
 
@@ -80,7 +80,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same prop, same `change` event, same two-way `modelValue`, same scoped slot, same imperative handle — all from the one source above, built on a native focusable element with no third-party engine behind it.
+Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same prop, same `change` event, same two-way `modelValue`, same scoped slot, same imperative handle — identical on every target, built on a native focusable element with no third-party engine behind it.
 
 ## See also
 

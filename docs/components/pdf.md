@@ -1,14 +1,14 @@
 # PdfViewer — the cross-framework PDF viewer
 
-`PdfViewer` is Rozie's data-bound port of [PDF.js](https://github.com/mozilla/pdf.js) (`pdfjs-dist` v6) — Mozilla's de-facto vanilla-JS PDF renderer. One `.rozie` source file ships idiomatic React, Vue, Svelte, Angular, Solid, and Lit consumers from a single wrapper. The per-framework ecosystem is **lopsided**: [react-pdf (wojtekmaj)](https://github.com/wojtekmaj/react-pdf) is deep and maintained for React; Vue ([vue-pdf-embed](https://github.com/hrynko/vue-pdf-embed)), Angular ([ng2-pdf-viewer](https://github.com/VadimDez/ng2-pdf-viewer)) and Svelte have thinner / older options — and **Solid and Lit have effectively nothing**. Rozie collapses all six into one source, so the five underserved frameworks get a real embeddable PDF viewer — with selectable text, page navigation, zoom and rotation — for free. See the [PDF libraries comparison](/components/pdf-comparison) for the full per-framework matrix.
+`PdfViewer` is a data-bound port of [PDF.js](https://github.com/mozilla/pdf.js) (`pdfjs-dist` v6), Mozilla's de-facto vanilla-JS PDF renderer. It ships as idiomatic React, Vue, Svelte, Angular, Solid, and Lit components: an embeddable PDF viewer with selectable text, page navigation, zoom and rotation, with the same API in each framework. The per-framework ecosystem is lopsided: [react-pdf (wojtekmaj)](https://github.com/wojtekmaj/react-pdf) is deep and maintained for React; Vue ([vue-pdf-embed](https://github.com/hrynko/vue-pdf-embed)), Angular ([ng2-pdf-viewer](https://github.com/VadimDez/ng2-pdf-viewer)) and Svelte have thinner / older options; Solid and Lit have effectively nothing. See the [PDF libraries comparison](/components/pdf-comparison) for the full per-framework matrix.
 
-This page is the **show-and-tell**: the API surface, per-framework quick starts, the five lifecycle events, the two-way `page` model, the 12-verb imperative handle, the worker / standard-font / text-layer story, and the recipes for continuous scroll, binary sources, and bundling the worker.
+This page covers the API surface, per-framework quick starts, the lifecycle events, the two-way `page` model, the imperative handle, the worker / standard-font / text-layer story, and the recipes for continuous scroll, binary sources, and bundling the worker.
 
 The full source for `PdfViewer.rozie` lives in the [`@rozie-ui/pdf` package](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pdf/src/PdfViewer.rozie).
 
 ## The `@rozie-ui/pdf` packages
 
-`PdfViewer` ships as six pre-compiled, per-framework packages generated from a single `PdfViewer.rozie` source via the package's `codegen.mjs` doc-automation engine. Consumers install only the one for their framework — no Rozie toolchain, no build-time compile step:
+`PdfViewer` ships as six pre-compiled, per-framework packages. Install the one for your framework; no build step is required:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -25,7 +25,7 @@ Each package carries the **`pdfjs-dist` engine peer** (`^6`) plus its framework 
 npm i @rozie-ui/pdf-react pdfjs-dist
 ```
 
-Unlike [MapLibre](/components/maplibre) or [Cropper](/components/cropper), **there is no separate engine-CSS import** — `PdfViewer` ships PDF.js's selectable-text-layer CSS itself (through the `:root { }` engine-DOM escape hatch). The PDF.js worker is also **auto-configured** from the jsDelivr CDN copy matching your **installed `pdfjs-dist`'s own `.version`** (read at runtime, not a hand-typed string), so the component works with **zero config** and the default can't drift from the engine version your app resolves. Override the `workerSrc` / `standardFontDataUrl` props for offline / a strict CSP / a bundled worker (see [Gotchas](#the-pdf-js-worker)). Anything the curated prop surface doesn't special-case (cMap URLs, HTTP headers, credentials, …) comes through the first-class `:options` passthrough — PDF.js's own `getDocument` `DocumentInitParameters`. The per-leaf READMEs and the **Props** table below are generated from the same IR parse of `PdfViewer.rozie`, so they cannot drift from the compiled output — the package's `codegen.mjs` asserts the structural columns of this page against `ir.props` on every run.
+Unlike [MapLibre](/components/maplibre) or [Cropper](/components/cropper), **there is no separate engine-CSS import** — `PdfViewer` ships PDF.js's selectable-text-layer CSS itself (through the `:root { }` engine-DOM escape hatch). The PDF.js worker is also **auto-configured** from the jsDelivr CDN copy matching your **installed `pdfjs-dist`'s own `.version`** (read at runtime, not a hand-typed string), so the component works with **zero config** and the default can't drift from the engine version your app resolves. Override the `workerSrc` / `standardFontDataUrl` props for offline / a strict CSP / a bundled worker (see [Gotchas](#the-pdf-js-worker)). Anything the curated prop surface doesn't special-case (cMap URLs, HTTP headers, credentials, …) comes through the first-class `:options` passthrough — PDF.js's own `getDocument` `DocumentInitParameters`.
 
 ## Quick start
 
@@ -228,7 +228,7 @@ Beyond props, the component exposes **20** imperative methods declared once in t
 | `clearFind` | Clear the active query + highlights, re-render, and emit `findresult` with `{ query: '', matches: 0, current: 0 }`. |
 
 ::: tip Why navigation is `goToPage`, not `setPage`
-The handle navigates with **`goToPage(n)`** — there is deliberately **no** `setPage` verb. `page` is the two-way model prop, so React auto-generates an internal `setPage` setter; a `setPage` handle verb would collide with it (ROZ524). None of the 20 verbs collides with an emitted event name either (no bare `load` / `error` / `pagechange` / `pagesrendered` / `pagerendered` / `passwordrequest` / `progress` / `findresult` — ROZ121), and none shadows a LitElement lifecycle method. Every verb drives the component's **internal render state** (not the props), so it works whether or not the consumer two-way-binds `page` — only `page` mirrors back through the model; `scale` / `rotation` are one-way props the verbs override imperatively.
+The handle navigates with **`goToPage(n)`** — there is deliberately **no** `setPage` verb. `page` is the two-way model prop, so React auto-generates an internal `setPage` setter; a `setPage` handle verb would collide with it, and Rozie rejects that collision at compile time. None of the 20 verbs collides with an emitted event name either (no bare `load` / `error` / `pagechange` / `pagesrendered` / `pagerendered` / `passwordrequest` / `progress` / `findresult`), and none shadows a LitElement lifecycle method. Every verb drives the component's **internal render state** (not the props), so it works whether or not the consumer two-way-binds `page` — only `page` mirrors back through the model; `scale` / `rotation` are one-way props the verbs override imperatively.
 :::
 
 **React example:**
