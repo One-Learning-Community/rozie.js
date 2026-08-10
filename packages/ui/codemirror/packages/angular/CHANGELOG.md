@@ -1,4 +1,4 @@
-# @rozie-ui/codemirror-lit
+# @rozie-ui/codemirror-angular
 
 ## 0.1.3
 
@@ -39,17 +39,3 @@
   `theme`/`readOnly`/`basicSetup` compartment reconfigures and the `gutter`/
   `decoration` reactive multi-instance slots. No public-surface change — this
   is a patch, not a feature release.
-
-## 0.1.2
-
-### Patch Changes
-
-- Updated dependencies [c279a7e]
-  - @rozie/runtime-lit@0.2.1
-
-## 0.1.1
-
-### Patch Changes
-
-- Updated dependencies [364f4c5]
-  - @rozie/runtime-lit@0.2.0
