@@ -57,7 +57,7 @@ The gap is widest for Lit, which has no wrapper at all, and Solid, whose wrapper
 - **Selection-anchored `bubbleMenu` / `floatingMenu` portal slots** over the Floating-UI menu extensions: bring your own menu fragment, handed the live editor, uniform across all six targets.
 - **Bundled Placeholder and a live character/word counter** with zero setup: set `placeholder` for empty-state ghost text, `:max-length` for a live counter with an overridable `count` scoped slot and `getCharacterCount()` / `getWordCount()` handle reads.
 
-The showcase documents each of these in depth: [node-view slots](/components/tiptap#node-view-slots), [the link editor](/components/tiptap#link-editor), [bubble & floating menus](/components/tiptap#bubble-floating-menu-slots), and the [full API surface](/components/tiptap#api).
+The showcase documents each of these in depth: [node-view slots](/components/tiptap-node-views), [the link editor](/components/tiptap#link-editor), [bubble & floating menus](/components/tiptap#bubble-floating-menu-slots), and the [full API surface](/components/tiptap#api).
 
 ## What Rozie defers
 

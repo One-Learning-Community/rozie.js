@@ -258,7 +258,7 @@ const theme = $inject('theme')
 </template>
 ```
 
-`ThemeButton` can sit any number of unaware components deep — `<ThemeProvider><Panel><Toolbar><ThemeButton/></Toolbar></Panel></ThemeProvider>` — and still resolve `theme`. The middle components carry no `theme` prop. A click on the button cycles the color and the new value reaches the descendant reactively, in place.
+`ThemeButton` can sit any number of unaware components deep — `<ThemeProvider><Panel><Toolbar><ThemeButton/></Toolbar></Panel></ThemeProvider>` — and still resolve `theme`. The middle components carry no `theme` prop. A click on the button cycles the color and the new value reaches the descendant reactively, in place. This exact trio — provider, unaware passthrough, deep consumer — is the [ThemeContext worked example](/examples/theme-context): full sources, all six compiled outputs, and the demo running live on the page.
 
 - **`$provide(key, value)`** — a top-level `<script>` **statement**. `key` must be a **string literal** (no runtime-computed keys — see ROZ129). `value` may be reactive: a `$data` field, a `$computed`, an object carrying accessors, or an engine handle. Multiple `$provide` calls are allowed for distinct keys.
 - **`$inject(key, fallback?)`** — an **expression** that must bind a local `const` (`const theme = $inject('theme')` — see ROZ132). `key` is a string literal (ROZ130). It returns the nearest provided value and is usable in setup, template, and reactive contexts. With a `fallback`, the returned type is inferred from it; without one, v1 types the result as `any` (a typed `<context>` declaration block is a later phase).
@@ -275,6 +275,8 @@ Each target lowers the pair to its native context idiom. Components with no `$pr
 | Lit | `new ContextProvider(this, { context: C, initialValue: v })` + `setValue` on change, where `C = createContext(Symbol.for('rozie:k'))` | `new ContextConsumer(this, { context: C, subscribe: true })` |
 
 The key identity is what lets a *separately-compiled* provider and consumer find each other. Vue and Svelte use the literal string key; Lit uses a process-global `Symbol.for('rozie:' + key)`. React, Solid, and Angular back their token in a `globalThis` registry keyed by your string — `rozieContext(key)` dedupes a single `Context` object, `rozieToken(key)` a single Angular `InjectionToken` — so two independently-built modules resolve the *same* token. `rozieContext` ships from `@rozie/runtime-react` and `@rozie/runtime-solid`; Angular emits a tiny inline `globalThis`-backed `rozieToken` helper (no extra peer dependency); Lit consumers add `@lit/context` as a peer dependency.
+
+One boundary to respect: **context does not cross a portal**. A subtree relocated with [`r-portal`](/guide/engine-wrappers#r-portal-container-expr-—-teleport-an-element-s-own-subtree) (or mounted through a [portal slot](/examples/portal-list)) cannot be assumed to still resolve a provider above its original position — notably on Lit, where context resolution rides the DOM ancestry via `context-request` events and a relocated subtree's ancestors are the portal target's, not the provider's. Keep `$inject` consumers in normal child position and portal only presentation subtrees.
 
 ### Provide a live reference, not a snapshot
 

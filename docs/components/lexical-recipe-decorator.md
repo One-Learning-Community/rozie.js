@@ -180,7 +180,7 @@ All six targets — **React / Vue / Svelte / Angular / Solid / Lit** — plus th
 - **Markdown-shortcuts plugin** — deferred.
 - **Tables plugin** — deferred.
 
-For the consumer-facing view of this staging, see the [roadmap on the showcase page](/components/lexical#roadmap-staging) and the [comparison page's staging table](/components/lexical-comparison#staging-v1-0-vs-v1-1).
+For the consumer-facing view of this staging, see the [roadmap on the showcase page](/components/lexical#roadmap-staging).
 
 ## Cross-references
 

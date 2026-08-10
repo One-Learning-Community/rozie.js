@@ -1,6 +1,6 @@
 # Examples
 
-Fourteen example pages, each kept live against the compiler: every source listing and per-target output (Vue, React, Svelte, Angular, Solid, Lit) is regenerated from the real `.rozie` file through `@rozie/core` on every docs build, so the docs can't drift. Pick whichever lines up with the feature you're trying to evaluate.
+Fifteen example pages, each kept live against the compiler: every source listing and per-target output (Vue, React, Svelte, Angular, Solid, Lit) is regenerated from the real `.rozie` file through `@rozie/core` on every docs build, so the docs can't drift. Pick whichever lines up with the feature you're trying to evaluate.
 
 ## By complexity
 
@@ -13,6 +13,7 @@ Fourteen example pages, each kept live against the compiler: every source listin
 - [TodoList](/examples/todo-list): `r-for` with `:key`, multiple `$emit` channels, named + default slots with per-item scoped params, fallback content, `r-if` / `r-else` empty state. Calls out the documented React render-prop divergence in slot consumer ergonomics.
 - [Table](/examples/table): slot-driven UI-library table (named scoped slots for header/cell/empty), a consumer-side dynamic slot fill (`` <template #[`footer${mode}`]> ``) toggling between two footer renderers, and an `r-match` / `r-case` / `r-default` switch in the consumer's `#cell` template. The dynamic-slot and `r-match` showcase.
 - [PortalList](/examples/portal-list): portal-slot primitive demo. A tiny inline vanilla-JS engine owns row containers but the per-row CONTENT is rendered through `<slot name="item" portal />` + `$portals.item(container, scope)`. The cross-target equivalent of FullCalendar's `eventContent`, AG-Grid's `cellRenderer`, Swiper's slide content.
+- [ThemeContext](/examples/theme-context): the `$provide` / `$inject` cross-component context pair. A provider, an unaware passthrough, and a deep consumer — three separately-compiled files proving inject-at-depth with no prop-drilling, the live-getter reactivity rule, and the guarded read for Lit's async first paint.
 
 ## Engine wrappers
 
@@ -45,6 +46,7 @@ If you're looking for a specific authoring feature:
 | Multiple `$onMount` hooks | [Modal](/examples/modal), [Dropdown](/examples/dropdown) |
 | `$watch(() => getter, cb)` | [Dropdown](/examples/dropdown), [Flatpickr](/examples/flatpickr), [LineChart](/examples/line-chart), [SortableList](/examples/sortable-list) |
 | `$snapshot` (Svelte `$state`-proxy interop) | [LineChart](/examples/line-chart) |
+| `$provide` / `$inject` cross-component context | [ThemeContext](/examples/theme-context) |
 | `<listeners>` block (`<listener>` elements with reactive `r-if` attach) | [Modal](/examples/modal), [Dropdown](/examples/dropdown) |
 | `.debounce(ms)` modifier | [SearchInput](/examples/search-input) |
 | `.throttle(ms).passive` modifier chain | [Dropdown](/examples/dropdown) |

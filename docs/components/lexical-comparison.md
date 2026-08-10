@@ -47,17 +47,7 @@ The case for Rozie is strongest for Angular and Lit (no wrapper at all) and Vue 
 
 ## Staging — what ships today vs v1.1 {#staging-v1-0-vs-v1-1}
 
-`@rozie-ui/lexical` ships all six targets today; the remaining deferrals:
-
-| Item | Stage |
-| --- | --- |
-| React / Vue / Svelte / Angular / Solid / **Lit** | **Shipping today** |
-| Editor shell + RichText / History / List / Link + toolbar + `@mention` decorator (6 bridges) | **Shipping today** |
-| **Lit target + Lit decorator bridge** (open shadow root; browser floor Chrome 137+ / FF 142+ / Safari 17+) | **Shipping today** |
-| **Markdown-shortcuts plugin** | **v1.1** |
-| **Tables plugin** | **v1.1** |
-
-Lit ships with one parity caveat the other five don't: a documented browser-version floor and open-shadow-DOM obligations (theme CSS per shadow root, `getComposedRanges` selection). See the [decorator recipe's Lit section](/components/lexical-recipe-decorator#lit-the-open-shadow-root-target) for the full obligation list.
+All six targets (including Lit) ship today; the staging table — what ships now versus what remains deferred to v1.1 (Markdown-shortcuts + Tables) — lives on the [showcase page's roadmap](/components/lexical#roadmap-staging).
 
 ## Scope limits
 

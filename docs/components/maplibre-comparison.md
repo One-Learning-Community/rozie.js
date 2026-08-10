@@ -51,7 +51,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## Declarative `<Source>` / `<Layer>` children {#declarative-children}
 
-Sources and layers can be authored as declarative `<Source>` / `<Layer>` children on all six targets, alongside the `:sources` / `:layers` config-array props — the authoring shape the big-framework wrappers (`react-map-gl`, `vue-maplibre-gl`, `svelte-maplibre-gl`, `ngx-maplibre-gl`) are known for. Nested `<Source><Layer/></Source>` auto-binds the layer to its parent source, flat `<Layer source="id" />` works for background and cross-source layers, and both shapes feed the same id-keyed, style-load-gated registry as the config arrays. The [showcase documents the full recipe](/components/maplibre#declarative-source-layer-children).
+Sources and layers can be authored as declarative `<Source>` / `<Layer>` children on all six targets, alongside the `:sources` / `:layers` config-array props — the authoring shape the big-framework wrappers (`react-map-gl`, `vue-maplibre-gl`, `svelte-maplibre-gl`, `ngx-maplibre-gl`) are known for. Nested `<Source><Layer/></Source>` auto-binds the layer to its parent source, flat `<Layer source="id" />` works for background and cross-source layers, and both shapes feed the same id-keyed, style-load-gated registry as the config arrays. The [showcase documents the full recipe](/components/maplibre-sources-layers#declarative-source-layer-children).
 
 ## What Rozie defers {#what-rozie-defers}
 

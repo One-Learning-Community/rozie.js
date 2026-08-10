@@ -26,7 +26,7 @@ Rozie's ordinary scoped slots compile to each target's native slot mechanism: Vu
 Portal slots solve the gap by exposing the same `<slot name="X" />` authoring surface to the consumer but routing the producer-side invocation through each target's `imperative render → returned dispose handle` API. Authors write one wrapper; consumers fill it with `<template #X>` the same way they fill any other named slot.
 
 ::: tip V1 reactivity constraint
-Portal slots are NOT reactive after mount in v1. They re-render only when the wrapper's script re-invokes them, which is how real engine callbacks behave anyway (FullCalendar re-calls `eventContent` when the event data changes; AG-Grid re-calls `cellRenderer` when the row updates). A reactive variant whose closure returns an `{ update, dispose }` handle also exists for engine-driven re-render; the [TipTap `nodeView` slot](/components/tiptap#node-view-slots) is the shipped example.
+Portal slots are NOT reactive after mount in v1. They re-render only when the wrapper's script re-invokes them, which is how real engine callbacks behave anyway (FullCalendar re-calls `eventContent` when the event data changes; AG-Grid re-calls `cellRenderer` when the row updates). A reactive variant whose closure returns an `{ update, dispose }` handle also exists for engine-driven re-render; the [TipTap `nodeView` slot](/components/tiptap-node-views) is the shipped example.
 :::
 
 ::: tip Styling engine-owned DOM

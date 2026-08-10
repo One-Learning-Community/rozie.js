@@ -27,7 +27,7 @@ npm i @rozie-ui/codemirror-react \
   @codemirror/theme-one-dark codemirror @codemirror/lang-javascript
 ```
 
-The ten other `@codemirror/lang-*` packages behind the [language presets](#language-presets) are **optional peers**: install only the ones whose presets you import (e.g. `npm i @codemirror/lang-python` to use the `python` preset). Presets are tree-shakable, side-effect-free exports, so uninstalled languages cost nothing and unused installed ones add no bundle weight.
+The ten other `@codemirror/lang-*` packages behind the [language presets](/components/codemirror-languages) are **optional peers**: install only the ones whose presets you import (e.g. `npm i @codemirror/lang-python` to use the `python` preset). Presets are tree-shakable, side-effect-free exports, so uninstalled languages cost nothing and unused installed ones add no bundle weight.
 
 CodeMirror 6 has **no large "options bag"** — everything is an `Extension`. Anything the curated prop surface doesn't special-case (other languages, custom themes, line-wrapping, autocomplete, linting, key-bindings) comes through the first-class `:extensions` passthrough, which the wrapper composes **last** so consumer extensions win CodeMirror's last-registered-wins facets.
 
@@ -328,56 +328,7 @@ const language = ref('javascript');
 
 ### Language presets
 
-The base `CodeMirror` import bundles exactly one language (JavaScript) so the import stays lean. For everything else, each leaf ships **curated language presets** via a `/languages` subpath — ready-to-spread `Extension[]` constants you drop into `:extensions` for a robust syntax-highlighting starting point on a common use case. The base component and the `language` prop are unchanged; presets are a purely additive opt-in.
-
-```ts
-import { CodeMirror } from '@rozie-ui/codemirror-react';
-import { web } from '@rozie-ui/codemirror-react/languages';
-// <CodeMirror :extensions={web} />   // HTML + embedded CSS/JS
-```
-
-```vue
-<script setup lang="ts">
-import { ref } from 'vue';
-import CodeMirror from '@rozie-ui/codemirror-vue';
-import { python } from '@rozie-ui/codemirror-vue/languages';
-
-const value = ref('def greet():\n    return "hello"\n');
-</script>
-
-<template>
-  <CodeMirror v-model:value="value" :extensions="python" />
-</template>
-```
-
-**Catalog** — each preset is an `Extension[]`; the right column lists the `@codemirror/lang-*` package it pulls into your bundle:
-
-| Preset | What it highlights | Pulls |
-| --- | --- | --- |
-| `web` (alias `html`) | HTML with auto-embedded CSS + JavaScript | `@codemirror/lang-html` (+ `lang-css`, `lang-javascript` transitively) |
-| `css` | Plain CSS | `@codemirror/lang-css` |
-| `scss` | SCSS (`sass({ indented: false })`) | `@codemirror/lang-sass` |
-| `sass` | Indented Sass syntax | `@codemirror/lang-sass` |
-| `vue` | Vue SFC + SCSS `<style lang="scss">` | `@codemirror/lang-vue`, `@codemirror/lang-sass` |
-| `javascript` | JavaScript | `@codemirror/lang-javascript` |
-| `typescript` | TypeScript | `@codemirror/lang-javascript` |
-| `jsx` | JavaScript + JSX | `@codemirror/lang-javascript` |
-| `tsx` | TypeScript + JSX | `@codemirror/lang-javascript` |
-| `json` | JSON | `@codemirror/lang-json` |
-| `markdown` | Markdown | `@codemirror/lang-markdown` |
-| `yaml` | YAML | `@codemirror/lang-yaml` |
-| `xml` | XML | `@codemirror/lang-xml` |
-| `python` | Python | `@codemirror/lang-python` |
-| `sql` | SQL | `@codemirror/lang-sql` |
-
-**Tree-shakable by design.** CodeMirror language constructors are pure (no global registration), so the presets are side-effect-free eager exports: a consumer importing only `{ web }` pulls **only** `@codemirror/lang-html` (and the CSS/JS it embeds) — `python`/`sql`/`yaml`/the rest are dropped by your bundler. The base `CodeMirror` import carries none of them.
-
-**Raw constructors for power users.** Compose your own arrays from the raw `@codemirror/lang-*` constructors, re-exported under a `lang` namespace object:
-
-```ts
-import { lang } from '@rozie-ui/codemirror-react/languages';
-const extensions = [...lang.html(), myCustomExtension];
-```
+The base `CodeMirror` import bundles exactly one language (JavaScript). For everything else, each leaf ships curated, tree-shakable language presets via a `/languages` subpath: ready-to-spread `Extension[]` constants for 15 common languages, plus the raw `@codemirror/lang-*` constructors re-exported under a `lang` namespace. The full catalog and the raw-constructor API live on [Language presets](/components/codemirror-languages).
 
 ### Adding other languages and themes via `:extensions`
 

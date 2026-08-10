@@ -178,6 +178,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'CodeMirror — showcase & API', link: '/components/codemirror' },
+            { text: 'Language presets', link: '/components/codemirror-languages' },
             { text: 'Usage examples', link: '/components/codemirror-usage' },
             { text: 'CodeMirror libraries comparison', link: '/components/codemirror-comparison' },
             { text: 'CodeMirror — live demo', link: '/components/codemirror-demo' },
@@ -210,6 +211,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'TipTap — showcase & API', link: '/components/tiptap' },
+            { text: 'Node-view slots', link: '/components/tiptap-node-views' },
             { text: 'Usage examples', link: '/components/tiptap-usage' },
             { text: 'TipTap libraries comparison', link: '/components/tiptap-comparison' },
             { text: 'TipTap — live demo', link: '/components/tiptap-demo' },
@@ -220,6 +222,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'MapLibre — showcase & API', link: '/components/maplibre' },
+            { text: 'Sources & layers', link: '/components/maplibre-sources-layers' },
             { text: 'Usage examples', link: '/components/maplibre-usage' },
             { text: 'MapLibre libraries comparison', link: '/components/maplibre-comparison' },
             { text: 'MapLibre — live demo', link: '/components/maplibre-demo' },
@@ -270,6 +273,7 @@ export default defineConfig({
           collapsed: true,
           items: [
             { text: 'FlowCanvas — showcase & API', link: '/components/rete' },
+            { text: 'Editing the graph', link: '/components/rete-editing' },
             { text: 'Usage examples', link: '/components/rete-usage' },
             { text: 'Node-flow editor comparison', link: '/components/rete-comparison' },
             { text: 'FlowCanvas — live demo', link: '/components/rete-demo' },
@@ -500,6 +504,7 @@ export default defineConfig({
             { text: 'TodoList', link: '/examples/todo-list' },
             { text: 'Table', link: '/examples/table' },
             { text: 'PortalList (portal-slot primitive)', link: '/examples/portal-list' },
+            { text: 'ThemeContext ($provide / $inject)', link: '/examples/theme-context' },
             { text: 'SortableList (drag & drop)', link: '/examples/sortable-list' },
             { text: 'Flatpickr (date picker)', link: '/examples/flatpickr' },
             { text: 'LineChart (Chart.js)', link: '/examples/line-chart' },
