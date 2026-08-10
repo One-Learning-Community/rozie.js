@@ -127,7 +127,7 @@ $watch(() => $props.open, () => { if ($props.open) reposition() })
     // the author opts in via the third arg. Lazy-by-default is uniform across
     // all six targets.
     expect(script).toMatch(
-      /watch\(\(\) => props\.open, \(\) => \{[\s\S]*?\}\);/,
+      /watch\(\(\) => props\.open, \(\) => \{[\s\S]*?\}, \{ flush: 'post' \}\);/,
     );
     expect(script).not.toMatch(/\{ immediate: true \}/);
   });
@@ -166,8 +166,32 @@ $watch(() => $props.open, () => { console.log('w') }, { immediate: true })
     const ir = lowerSource(src, 'WatchImmediate.rozie');
     const { script } = emitScript(ir);
     expect(script).toMatch(
-      /watch\(\(\) => props\.open, \(\) => \{[\s\S]*?\}, \{ immediate: true \}\);/,
+      /watch\(\(\) => props\.open, \(\) => \{[\s\S]*?\}, \{ immediate: true, flush: 'post' \}\);/,
     );
+  });
+
+  it('260810-jne — `$watch(g, cb, { immediate: true })` merges into ONE options object, no second trailing options argument', () => {
+    const src = `<rozie name="WatchImmediateMerged">
+<props>{ open: { type: Boolean, default: false } }</props>
+<script>
+$watch(() => $props.open, () => { console.log('w') }, { immediate: true })
+</script>
+<template><div /></template>
+</rozie>`;
+    const ir = lowerSource(src, 'WatchImmediateMerged.rozie');
+    const { script } = emitScript(ir);
+    // Exactly one options object on the watch(...) call — { immediate: true, flush: 'post' } —
+    // and no second, separate trailing options argument.
+    expect(script).toMatch(
+      /watch\(\(\) => props\.open, \(\) => \{[\s\S]*?\}, \{ immediate: true, flush: 'post' \}\);/,
+    );
+    // A second, separate trailing options argument would show up as its own
+    // `}, { flush: 'post' });` immediately after the merged object's closing
+    // `});` — confirm that shape is absent, and that `flush: 'post'` appears
+    // exactly once (proving it was merged, not appended).
+    expect(script).not.toMatch(/\{ immediate: true \}\), \{ flush: 'post' \}\);/);
+    const flushOccurrences = script.match(/flush: 'post'/g) || [];
+    expect(flushOccurrences.length).toBe(1);
   });
 
   // Phase 21 (REQ-4) — Vue `$expose` emit → `defineExpose({...})` macro.

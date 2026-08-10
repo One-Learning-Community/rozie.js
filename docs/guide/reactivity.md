@@ -191,12 +191,14 @@ Each target compiles the lazy form to its native effect primitive, skipping the 
 
 | Target | Expansion (lazy default) |
 | --- | --- |
-| Vue | `watch(() => open.value, () => { /* cb */ })` — Vue's native lazy `watch` |
+| Vue | `watch(() => open.value, () => { /* cb */ }, { flush: 'post' })` — Vue's native lazy `watch`, post-flush |
 | React | `useEffect(() => { if (_watch0First.current) { _watch0First.current = false; return; } /* cb */ }, [open, /* closure refs */])` — a `useRef(true)` first-run skip; the ref stays **out** of the dep array (refs are exempt from `react-hooks/exhaustive-deps`) |
 | Svelte 5 | `$effect(() => { const __v = (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => { /* cb */ })(__v); }); })` — the first-run flag is read/written inside `untrack` so it does not self-subscribe |
 | Angular | `effect(() => { const __v = (() => this.open())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } /* cb */ }); })` |
 | Solid | `createEffect(on(() => (() => props.open)(), (v) => untrack(() => (/* cb */)(v)), { defer: true }))` — Solid's idiomatic `on(..., { defer: true })` runs the getter to establish tracking but skips the first callback |
 | Lit | props route → `if (this.hasUpdated && changedProperties.has('open')) { /* cb */ }` inside `updated()` (`hasUpdated` is `false` on the first cycle); effect route → `effect(...)` from `@lit-labs/preact-signals` with a class-field first-run flag inside `untracked`, handle pushed onto the disconnect-cleanup drain |
+
+Vue watchers are **post-flush by construction** — every `$watch` lowering carries `{ flush: 'post' }` (merged with `{ immediate: true }` into a single options object when the author opts in). This matches the other five targets, all of which are post-render by nature (`useEffect`, `createEffect`, `effect()`, `$effect`, `updated()`). A `$watch` **callback** may therefore safely read `$refs` — the DOM has already been patched by the time it runs. This is unlike a `$watch` **getter**, which still evaluates eagerly at tracking time and is still a compile error (`ROZ123`, see [below](#refs-derived-from-ref)) if it reads `$refs`.
 
 ### `{ immediate: true }` — opt back into the eager initial fire
 

@@ -1052,10 +1052,30 @@ function emitWatcherHooks(
     // the default emit is the bare lazy form. The author opts into the eager
     // initial fire with `$watch(getter, cb, { immediate: true })`, which we
     // detect from the cloned call's third argument (literal `{ immediate: true }`).
+    //
+    // 260810-jne — every lowering also carries `flush: 'post'`. Vue's default
+    // `watch()` is PRE-flush: its callback runs before the DOM reflects the
+    // triggering state change. That is the one outlier among our six targets —
+    // React `useEffect`, Solid `createEffect`, Angular `effect()`, Svelte
+    // `$effect`, and Lit `updated()` are all post-render. Post-flush timing
+    // parity means a `$watch` callback can safely read `$refs` (the DOM is
+    // already patched), and it structurally removes a nested-render
+    // re-entrancy path: Vue's `render()` entry runs `flushPreFlushCbs`
+    // synchronously, so a portal fill mounted mid-update could previously
+    // flush a still-pending sibling pre-flush watcher and dispatch back into
+    // the in-progress update; post-flush jobs are not run by
+    // `flushPreFlushCbs`, so that path no longer exists. This does NOT change
+    // the `{ immediate: true }` opt-in's own timing — Vue's `doWatch` invokes
+    // the immediate job directly, synchronously, at registration regardless
+    // of `flush`; `flush` only governs the timing of SUBSEQUENT triggers. So
+    // the documented "`immediate` fires before `$onMount` on vue" contract is
+    // unchanged. We deliberately do not widen `watchCallIsImmediate` or start
+    // forwarding other author-supplied options (e.g. `deep`) — those stay
+    // dropped, as today, to avoid rippling scope across all six targets.
     if (watchCallIsImmediate(expr)) {
-      lines.push(`watch(${getterCode}, ${cbCode}, { immediate: true });`);
+      lines.push(`watch(${getterCode}, ${cbCode}, { immediate: true, flush: 'post' });`);
     } else {
-      lines.push(`watch(${getterCode}, ${cbCode});`);
+      lines.push(`watch(${getterCode}, ${cbCode}, { flush: 'post' });`);
     }
   }
   return { lines, consumedIndices: consumed };
