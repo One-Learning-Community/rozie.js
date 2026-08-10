@@ -295,7 +295,7 @@ Each slot's **singular** name (`marker` / `popup` / `control`) is distinct from 
 
 `control` is a **mount-once** portal slot: its fragment mounts once into a custom `IControl` host (added via `addControl` at `top-right`) and is disposed on unmount. Its scope carries the live `map`.
 
-Portal slots unlock the "foreign-engine cell rendering" pattern: MapLibre owns the marker / popup / control DOM, but the consumer's framework-native fragment is mounted inside it and disposed when the engine tears it down. This is the strongest part of the wedge — **Solid and Lit get framework-native marker / popup content they otherwise can't have**. See [the portal-slot primitive](/examples/portal-list) for the underlying mechanism. Each target fills `#marker` through its native imperative-render API:
+Portal slots unlock the "foreign-engine cell rendering" pattern: MapLibre owns the marker / popup / control DOM, but the consumer's framework-native fragment is mounted inside it and disposed when the engine tears it down. Solid and Lit get framework-native marker / popup content they otherwise can't have. See [the portal-slot primitive](/examples/portal-list) for the underlying mechanism. Each target fills `#marker` through its native imperative-render API:
 
 **React** (render prop):
 

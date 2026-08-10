@@ -122,7 +122,7 @@ declare module '*.rozie' {
 
 A broad active wildcard **shadows** the per-module sidecars: every prop resolves to `unknown` and you lose all type safety (this is the exact silent type-lie the typed-import work removes). Migrate by **deleting** the wildcard for any project whose `.rozie` files are all sidecar-generated (i.e. live where the build emits sidecars), then add `allowArbitraryExtensions: true` if your target isn't Vue. The recommendation is **deprecate-don't-delete** only when you genuinely have `.rozie` imports that get no sidecar (e.g. files outside the build's emit roots) — keep a narrow, `@deprecated`-commented fallback for those; with the flag set, a present per-module sidecar always takes precedence over the wildcard.
 
-### The sidecars are gitignored (REQ-7)
+### The sidecars are gitignored
 
 Generated `*.d.rozie.ts` sidecars are **build artefacts** — they are matched by the repo-wide `*.rozie.ts` gitignore rule and should **not** be committed. They are regenerated on every build, so a fresh checkout produces them as soon as you run `vite build` / `vite dev` (or `rozie build` / `rozie watch`). In CI, run your build step **before** your typecheck step so `tsc` never resolves a `.rozie` import before its sidecar exists.
 
@@ -133,6 +133,10 @@ If a `.rozie` file ever lacks a sidecar at typecheck time, run the build first �
 The sidecar walk **does not descend into nested workspace packages**. When it encounters a directory containing its own `package.json`, it stops — it treats that directory as a separate package that owns its own build. A parent-root build will therefore **not** emit sidecars for `.rozie` files living inside a nested package under the build root.
 
 This is intentional: the model is **one plugin instance per package**, so each package generates the sidecars for its own `.rozie` files during its own build. If your project nests packages, make sure each nested package runs the unplugin (or `rozie build`) so its `.rozie` files get sidecars — a single parent build will not cover them. In CI, pass `--require-complete` to the staleness gate (`node scripts/check-sidecar-staleness.mjs --require-complete`) after each package's build to turn a missing sidecar into a hard failure instead of a silent gap.
+
+### The consumer demos are the proof
+
+Each consumer demo in the repo is the byte-tested proof of its framework's setup: `examples/consumers/react-vite` (React, flag set, wildcard deleted), `vue-vite` (Vue, no flag, `@deprecated` cross-root fallback kept), `svelte-vite` / `lit-vanilla-demo` (flag set, wildcard deleted), `solid-vite` (flag set, `@deprecated` cross-root fallback kept), and `angular-analogjs` (no sidecars — disk-cache types + wildcard fresh-checkout fallback). The sidecar demos each ship a `typed-import.probe` that asserts a correct prop usage compiles and a wrong-typed prop is a genuine error.
 
 ### CLI fallback (no bundler)
 

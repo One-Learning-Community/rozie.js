@@ -57,7 +57,7 @@ Rozie ships [`adoptConsumerStyles`](https://github.com/One-Learning-Community/ro
 
 ### lit-html's `repeat` cache vs. engine DOM mutation
 
-Vanilla-JS engines (SortableJS, FullCalendar, TipTap, Uppy) mutate the DOM directly. On React / Vue / Svelte / Solid / Angular, each framework's reconciler diffs against live `parent.children` at patch time, sees the engine-induced shuffle, and reconciles cleanly.
+Vanilla-JS engines (SortableJS, FullCalendar, TipTap, Uppy) mutate the DOM directly. On React / Vue / Svelte / Solid / Angular, each framework's reconciler diffs against live `parent.children` at patch time and recovers, provided the wrapper restores the engine's DOM mutation before writing the new state (the standard pre-mutation restore the wrapper examples show).
 
 On Lit, lit-html's [`repeat()`](https://lit.dev/docs/templates/directives/#repeat) directive caches its `oldParts` array by sentinel-comment node identity. When the engine physically relocates `<li>` elements relative to those sentinel markers, the cache desyncs — and subsequent renders garble the output. This is a real Lit-specific landmine; community-maintained sortable wrappers either accept it as a known issue or hand-roll lifecycle hooks to tear down + rebuild the part tree.
 

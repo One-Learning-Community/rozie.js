@@ -4,7 +4,7 @@ The `@rozie-ui` families are pre-compiled component packages for React, Vue, Sve
 
 Install only the package for your framework. There is no build step and no `@rozie/*` runtime dependency, just the compiled output for the framework you already use.
 
-Every family below ships six packages (`-react`, `-vue`, `-svelte`, `-angular`, `-solid`, `-lit`), a showcase-and-API page, a libraries-comparison page that shows the cross-framework wedge, and a live demo.
+Every family below ships six packages (`-react`, `-vue`, `-svelte`, `-angular`, `-solid`, `-lit`), a showcase-and-API page, a libraries-comparison page against the incumbents on each framework, and a live demo.
 
 ## The families
 
