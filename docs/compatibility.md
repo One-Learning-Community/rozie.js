@@ -109,15 +109,7 @@ The pattern across them is consistent:
 The only `❌` in the matrix is the Lit-specific scoped + dynamic slot name
 combination — a documented v1 limitation.
 
-Everything else — props, `<data>`, `<listeners>`, `$computed`, `$watch`,
-modifier grammar, two-way binding machinery, default + named slots, refs,
-`$emit`, `<style lang="scss">` preprocessing — has **full feature parity**
-across all six targets: it behaves identically everywhere, with only the
-documented ⚠︎ authoring-shape divergences above.
-
-The *emitted code* is deliberately idiomatic per target — React output is not
-byte-identical to Vue output to Solid output, and that's the whole point.
-What **is** byte-locked is per-target determinism: for a given target, all four
-entrypoints (compile / cli / babel-plugin / unplugin) emit identical bytes.
-That guarantee is verified by the dist-parity fixtures in
-`tests/dist-parity/fixtures/`.
+Every feature not flagged above behaves identically across all six targets;
+[Cross-Framework Parity](/parity) carries the complete narrative, including the
+per-target determinism guarantee (for a given target, all four entrypoints emit
+identical bytes).

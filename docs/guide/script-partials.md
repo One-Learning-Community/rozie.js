@@ -50,7 +50,7 @@ import { onSortingChangeCb, onColumnSizingInfoChangeCb } from './stateChangeCall
 </script>
 ```
 
-Notice what the partial is **not**: there are no `<script>` tags, no block wrappers — it is plain
+A partial carries no `<script>` tags and no block wrappers; it is plain
 TS/JS source. All the usual Rozie sigils (`$data`, `$props`, `$computed`, `$expose`, `$onMount`,
 `$inject`, …) and directives work exactly as they do inline; a partial is conceptually a region of
 the host's script that happens to live in another file.

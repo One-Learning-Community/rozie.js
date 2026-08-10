@@ -2,7 +2,7 @@
 
 Preact teams consume Rozie the same way they consume the rest of the React ecosystem: through `preact/compat`. Rozie compiles your `.rozie` source to its **React** target — idiomatic functional components with `useState` / `useMemo` / `useEffect` — and you alias `react` / `react-dom` to `preact/compat` in your own build config. The compiled output never imports Preact directly; the aliasing happens entirely on the consumer side, exactly as it does for any other React library you already use under Preact.
 
-Be clear-eyed about what this is: **the React target's emit, consumed via the compat layer.** Rozie does not ship a native, signals-based Preact target (no compat shim, authored against Preact's own `signal()` / `hooks` surface). A native target is a *possible* future direction, not a promise. Today, "Preact support" means "Rozie's React emit, proven to run under `preact/compat` and kept proven in CI."
+This is the React target's emit, consumed via the compat layer. Rozie does not ship a native, signals-based Preact target (no compat shim, authored against Preact's own `signal()` / `hooks` surface). A native target is a *possible* future direction, not a promise. Today, "Preact support" means "Rozie's React emit, proven to run under `preact/compat` and kept proven in CI."
 
 If you already run a React-flavored stack on Preact, you can drop Rozie components in with one block of alias config and nothing else.
 
@@ -45,17 +45,17 @@ Two things matter here:
 - **Most-specific-first ordering.** Vite string finds match exactly *or* as a prefix followed by `/` — the bare `react` find therefore also matches `react/jsx-runtime` (though never `react-dom`; there is no `/` boundary). The subpath finds (`react/jsx-runtime`, `react/jsx-dev-runtime`, `react-dom/client`) must come *before* the bare `react-dom` and `react` fallbacks so they hit their dedicated replacements instead of falling through. `@vitejs/plugin-react`'s automatic runtime emits `react/jsx-runtime` imports — the first alias redirects those to `preact/jsx-runtime`.
 - **`dedupe`.** Without it, your app and its workspace dependencies (notably `@rozie/runtime-react`) can each resolve their own `react` copy. `dedupe: ['preact', 'preact/compat']` forces every resolution onto one `preact/compat` instance, so hooks state and context live in a single runtime.
 
-That is the whole setup. Keep your existing `@vitejs/plugin-react`; it is the simpler of the two JSX options and its automatic-runtime output is handled by the first alias.
+Keep your existing `@vitejs/plugin-react`; it is the simpler of the two JSX options and its automatic-runtime output is handled by the first alias.
 
 ## This is a continuously-enforced guarantee
 
-Rozie's React-under-Preact support is not a one-time spot check — it is a standing CI job. The `preact-compat` job in `react-matrix.yml`:
+Rozie's React-under-Preact support is a standing CI job, not a one-time spot check. The `preact-compat` job in `react-matrix.yml`:
 
-- Builds the react-vite demo through `build:preact` — the **same React emit** produced by `Rozie({ target: 'react' })`, with `react` / `react-dom` aliased to `preact/compat` via the config above.
-- Runs the **full Playwright e2e suite** over that Preact build via `test:e2e:preact` (`VITE_USE_PREACT=1`). This is the identical suite the plain-React legs run — not a reduced subset.
+- Builds the react-vite demo through `build:preact` — the same React emit produced by `Rozie({ target: 'react' })`, with `react` / `react-dom` aliased to `preact/compat` via the config above.
+- Runs the full Playwright e2e suite over that Preact build via `test:e2e:preact` (`VITE_USE_PREACT=1`). This is the identical suite the plain-React legs run — not a reduced subset.
 - Fires on every pull request that touches React-emit code paths (`packages/targets/react/**`, `packages/runtime/react/**`, `packages/unplugin/**`, `packages/core/**`, `examples/consumers/react-vite/**`) and on every push to `main`.
 
-The suite that runs under Preact covers Counter, controllable Counter, Modal StrictMode lifecycle, Dropdown outside-click / imperative handle / stale-closure, exhaustive-deps, prop-default coercion, console-preservation, the StrictMode matrix, source-maps, Lit-interop, and an HMR-state spec. So the guarantee isn't "it compiled once" — it's "the React emit keeps passing its real interaction tests under `preact/compat` on every relevant change."
+The suite that runs under Preact covers Counter, controllable Counter, Modal StrictMode lifecycle, Dropdown outside-click / imperative handle / stale-closure, exhaustive-deps, prop-default coercion, console-preservation, the StrictMode matrix, source-maps, Lit-interop, and an HMR-state spec. The guarantee: the React emit keeps passing its real interaction tests under `preact/compat` on every relevant change.
 
 ## Measured bundle benefit
 
@@ -66,7 +66,7 @@ On the react-vite demo app, swapping React for `preact/compat` produces a meanin
 | React | 296 kB | ~93.1 kB |
 | `preact/compat` | 121 kB | ~40.7 kB |
 
-That is roughly **2.4× smaller**. These are measured numbers from the demo app, not a guaranteed figure for an arbitrary application — your delta depends on how much of React's surface you use and what else is in your bundle. But the demo is a representative Rozie consumer, and the direction is consistent: the same emit, fewer bytes shipped.
+That is roughly 2.4× smaller. These are measured numbers from the demo app, not a guaranteed figure for an arbitrary application — your delta depends on how much of React's surface you use and what else is in your bundle. But the demo is a representative Rozie consumer, and the direction is consistent: the same emit, fewer bytes shipped.
 
 ## One known semantic difference: effect timing
 
@@ -74,11 +74,11 @@ There is a single behavioral difference worth knowing about, and it is about *wh
 
 Preact defers passive effects to after-paint (scheduled via `requestAnimationFrame`). React flushes them before a discrete-event update yields. In Rozie terms, side-effects driven from `$watch` and `$onMount` land **one frame later** under `preact/compat` than under React.
 
-For users this is imperceptible. It only becomes observable to tests — or to code — that synchronously read a DOM side-effect *immediately* after an interaction, expecting it to already be applied. The fix is the same one the e2e suite uses to stay green under Preact: **use polling assertions** (e.g. Playwright's auto-retrying `expect(locator).toHaveText(…)`, or `waitFor`) instead of reading the DOM exactly once on the line after the click. If your consumer tests already use auto-retrying assertions, you will not notice the difference at all.
+For users this is imperceptible. It only becomes observable to tests — or to code — that synchronously read a DOM side-effect *immediately* after an interaction, expecting it to already be applied. The fix is the same one the e2e suite uses to stay green under Preact: use polling assertions (e.g. Playwright's auto-retrying `expect(locator).toHaveText(…)`, or `waitFor`) instead of reading the DOM exactly once on the line after the click. If your consumer tests already use auto-retrying assertions, you will not notice the difference at all.
 
 ## @rozie-ui works the same way
 
-The pre-compiled `@rozie-ui/<component>-react` packages are plain React components — they are exactly the emit this page describes, published as packages. That means they consume `preact/compat` through the **same aliases**, with no extra configuration. Install the `-react` variant, apply the alias block above once, and the `@rozie-ui` components resolve onto `preact/compat` alongside your own `.rozie` files.
+The pre-compiled `@rozie-ui/<component>-react` packages are plain React components — they are exactly the emit this page describes, published as packages. That means they consume `preact/compat` through the same aliases, with no extra configuration. Install the `-react` variant, apply the alias block above once, and the `@rozie-ui` components resolve onto `preact/compat` alongside your own `.rozie` files.
 
 ## When Rozie + preact/compat is the right answer
 

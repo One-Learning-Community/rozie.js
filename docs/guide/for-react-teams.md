@@ -1,22 +1,18 @@
-# For React teams who want Vue's scoped CSS (without paying the CSS-in-JS tax)
+# For React teams
 
-React's CSS story has been a long argument with itself — CSS Modules `styles.foo` threading, styled-components / Emotion runtime tax, Tailwind class-soup in JSX. Rozie gives React the model the other frameworks have had for years: a `<style>` block scoped by default, with **zero runtime overhead**, extracted to a plain sibling `.css` file. No class-name hashing, no `styles.foo`, no CSS-in-JS runtime — isolation is a `[data-rozie-s-<hash>]` attribute, exactly like Vue's `<style scoped>`.
-
-**→ [Scoped CSS for React, zero runtime](/guide/scoped-css-for-react)** is the full pitch — CSS Modules vs. styled-components vs. Tailwind vs. Rozie, the SearchInput before/after, and what the compiler emits.
+Rozie compiles `.rozie` components to idiomatic React function components (plain `useState` / `useMemo` / `useEffect`) and gives React a `<style>` block that is scoped by default, with zero runtime cost. The full styling pitch lives at [Scoped CSS for React](/guide/scoped-css-for-react): the CSS Modules / styled-components / Tailwind comparison, the SearchInput before/after, and what the compiler emits.
 
 You don't have to leave React, migrate anything, or give up your existing component library: you write one new component in Rozie this week and import the compiled `.tsx` like any other.
 
 ## The creature comforts beyond styling
 
-The `<style>` block is the headline pitch — but the same compiler that gives you scoped CSS also normalizes a handful of other React papercuts:
+The same compiler that scopes your CSS normalizes a handful of other React papercuts. Three of them are one-liners here because the [creature-comforts matrix](/guide/creature-comforts) carries the full treatment:
 
-### Statically-computed `useEffect` dep arrays
+- **Statically-computed `useEffect` dep arrays.** `eslint-plugin-react-hooks/exhaustive-deps` is the lint rule everyone respects and quietly hates. With Rozie you don't write the dep array; the compiler emits the correct one from the lifecycle hook's body, and the output passes `exhaustive-deps` cleanly.
+- **StrictMode double-fire safety.** `$onMount` returning a cleanup function lowers to one `useEffect` with a cleanup return, the canonical React 18 StrictMode-safe pattern.
+- **Auto-fallthrough for attrs + listeners.** Consumer-passed attributes that aren't declared props auto-spread onto the root element. `class` and `className` are merged, not clobbered. Native listeners pass through. Opt out with `<rozie inherit-attrs="false">`.
 
-`eslint-plugin-react-hooks/exhaustive-deps` is the lint rule everyone respects and quietly hates. With Rozie, you don't write the dep array — the compiler emits the correct one from the lifecycle hook's body. Output passes `exhaustive-deps` cleanly.
-
-### StrictMode double-fire safety
-
-`$onMount` returning a cleanup function lowers to one `useEffect` with a cleanup return — the canonical React 18 StrictMode-safe pattern.
+Two deserve their own sections.
 
 ### Static error on prop mutation
 
@@ -39,10 +35,6 @@ The React `useControllableState` pattern lives in every component library that d
 // Uncontrolled (defaultValue takes over)
 <Modal>…</Modal>
 ```
-
-### Auto-fallthrough for attrs + listeners
-
-Every React component eventually needs `{...rest}` plus `onClick`-forwarding plus a `className` merge. Rozie's `<rozie>` block is `inheritAttrs="true"` by default — consumer-passed attributes that aren't declared props auto-spread onto the root element. `class` and `className` are merged, not clobbered. Native listeners pass through. Opt out with `<rozie inherit-attrs="false">` for components that want manual control.
 
 ## Incremental adoption
 
@@ -91,11 +83,11 @@ export default function Page() {
 }
 ```
 
-`.d.ts` is emitted as a sibling automatically. Your editor gets full IntelliSense for props, including the auto-generated `onValueChange` callbacks for `model: true` props.
+Types come from a generated `SearchInput.d.rozie.ts` sidecar the build writes next to the source, resolved through TypeScript's `allowArbitraryExtensions` flag; setup lives in [Install § Typed `.rozie` imports](/guide/install#typed-rozie-imports-per-framework-setup). Your editor gets full IntelliSense for props, including the generated `onValueChange` callbacks for `model: true` props.
 
 ### Step 4: Decide
 
-If the team likes it, expand. If not, the compiled `.tsx` is a normal React component — delete the `.rozie` source and keep using the output. Zero lock-in, zero parallel runtime, zero new dependency at runtime (the compiled output depends only on `react` + a plain sibling `.css` import your bundler already handles).
+If the team likes it, expand. If not, the compiled `.tsx` is a normal React component — delete the `.rozie` source and keep using the output. At runtime it depends only on `react` and a plain sibling `.css` import your bundler already handles; there is no Rozie runtime to keep and nothing locking you in.
 
 ## When Rozie isn't the right answer for a React team
 
@@ -105,13 +97,14 @@ If the team likes it, expand. If not, the compiled `.tsx` is a normal React comp
 
 ## When Rozie absolutely is
 
-- You want the **Vue authoring ergonomics** (SFC blocks, `:prop=`, `@event.modifier`, `r-if`/`r-for`, `r-model`, scoped styles) but can't migrate the codebase.
+- You want the Vue authoring ergonomics (SFC blocks, `:prop=`, `@event.modifier`, `r-if`/`r-for`, `r-model`, scoped styles) but can't migrate the codebase.
 - Your component library glues vanilla-JS engines (Sortable, Flatpickr, Leaflet, TipTap, …) and you want `querySelector('.x')` to behave identically across every target without per-framework class-name surprises.
-- You want **scoped CSS with zero runtime cost** and the existing options (CSS Modules + per-callsite plumbing, or CSS-in-JS + runtime tax) both feel wrong.
+- You want scoped CSS with zero runtime cost and the existing options (CSS Modules + per-callsite plumbing, or CSS-in-JS + runtime tax) both feel wrong.
 - You're prototyping a new section of an app and the "write less, ship the same" pitch resonates.
 
 ## Next steps
 
+- [Scoped CSS for React](/guide/scoped-css-for-react) — the full styling pitch this page builds on.
 - [Quick Start](/guide/quick-start) — write your first `.rozie` file.
 - [Adopt incrementally](/guide/adopt-incrementally) — full per-stack install
   walkthrough including Next.js, Astro, Babel-only.

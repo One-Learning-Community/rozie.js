@@ -16,8 +16,39 @@ Each app's glue is a different shape. Each upgrade of the engine breaks
 the glue in a different way. Each new framework you adopt means writing
 the glue *again*.
 
-**Rozie wraps each engine once. The same wrapper drops into every one of
-your apps.**
+Rozie wraps each engine once; the same wrapper drops into every one of
+your apps. Better still: for fifteen of the most common engines, the
+wrapper is already written, tested, and published.
+
+## Start with the shipped wrappers
+
+The `@rozie-ui` catalog ships 15 engine-backed families, each a
+battle-tested vanilla-JS engine wrapped once and published as six
+per-framework packages:
+[DataTable](/components/data-table) (TanStack table-core) ·
+[SortableList](/components/sortable-list) (SortableJS) ·
+[Flatpickr](/components/flatpickr) ·
+[FullCalendar](/components/fullcalendar) ·
+[CodeMirror](/components/codemirror) ·
+[Chart.js](/components/chartjs) ·
+[TipTap](/components/tiptap) ·
+[Lexical](/components/lexical) ·
+[MapLibre](/components/maplibre) ·
+[Cropper](/components/cropper) ·
+[Waveform](/components/wavesurfer) (wavesurfer.js) ·
+[PdfViewer](/components/pdf) (pdf.js) ·
+[FlowCanvas](/components/rete) (Rete) ·
+[Carousel](/components/embla) (Embla) ·
+[Popover & Tooltip](/components/popover)
+
+Install only your framework's package
+(`@rozie-ui/sortable-list-react`, `-vue`, `-svelte`, `-angular`,
+`-solid`, `-lit`); there is no Rozie toolchain or runtime in your
+dependency tree. If the engine you fight is on that list, you may not
+need to write a wrapper at all. **[Browse all components →](/components/)**
+
+Writing your own wrapper is the second path, for engines Rozie hasn't
+wrapped yet. The rest of this page is that pattern.
 
 ## The engine-wrapper pattern
 
@@ -53,9 +84,9 @@ If the engine has a vanilla-JS public API you'd call from a plain
 ### What you maintain today (one wrapper per framework)
 
 You either install someone else's wrapper (`react-sortablejs`,
-`vuedraggable`, `ngx-sortablejs`, `svelte-sortablejs`) — four different
-APIs, four different bug surfaces, four different maintainers, four
-different upgrade cycles — or you hand-roll glue inside each app.
+`vuedraggable`, `ngx-sortablejs`, `svelte-sortablejs`), each with its own
+API, bug surface, maintainer, and upgrade cycle, or you hand-roll glue
+inside each app.
 
 Either way, you're maintaining the cross-framework workaround for
 SortableJS's DOM-mutation-vs-framework-reconciler fight independently in
@@ -108,7 +139,7 @@ $watch(() => $props.handle, (v) => instance?.option('handle', v))
 </script>
 
 <template>
-<div class="rozie-sortable-list">
+<div class="rozie-sortable-list" r-external>
   <div r-for="item, index in $props.items" :key="item.id ?? index">
     <slot :item="item" :index="index" />
   </div>
@@ -118,7 +149,7 @@ $watch(() => $props.handle, (v) => instance?.option('handle', v))
 </rozie>
 ```
 
-That's the whole wrapper. Now use it from every app you maintain:
+That is the complete wrapper. Use it from every app you maintain:
 
 ```tsx
 // In your React admin panel
@@ -166,24 +197,26 @@ import { SortableList } from '@your-org/components';
 </rz-sortable-list>
 ```
 
-**Five consumer-side authoring shapes. One source of truth.**
+Five consumer-side authoring shapes, one wrapper.
 
 ## The compiler invariants that make this work
 
-A handful of engine-wrapper-specific compiler features have shipped
-specifically because vanilla-JS engines are common Rozie use cases. You
-can rely on them:
+A set of engine-wrapper-specific compiler features exists because
+vanilla-JS engines are a core Rozie use case. The
+[engine-wrapper toolkit](/guide/engine-wrappers) documents each in full;
+the load-bearing ones:
 
-- **`$el` lowers to the right per-target host element** so engine
+- **`$el`** lowers to the right per-target host element, so engine
   constructors that take a DOM node always get the right one.
 - **`$onMount` returning a cleanup function** is the right shape on every
   target. No `useEffect` ceremony, no `DestroyRef` boilerplate.
 - **`$watch(() => $props.x, (v) => …)`** lowers to each target's idiomatic
   reactive primitive. The callback fires when the watched expression
   changes and the new value is bound correctly on all six targets.
-- **`$reconcileAfterDomMutation()`** is the escape hatch when the engine
-  mutates DOM under the framework's feet — no-op on five targets,
-  active on Lit where lit-html's `repeat` cache needs the nudge.
+- **`$reconcileAfterDomMutation()`**, paired with the `r-external`
+  template marker, is the escape hatch when the engine mutates DOM under
+  the framework's feet: a no-op on five targets, active on Lit where
+  lit-html's `repeat` cache needs the rebuild.
 - **`$classSelector('grip')`** is a typo-checked convenience: authored class
   names render literally on every target (React included — no class hashing), so
   engines that take a `handle: '.grip'` option Just Work everywhere; `$classSelector`
@@ -198,38 +231,32 @@ can rely on them:
   initializers — `selected: null as Item | null` keeps the field
   discriminated instead of degrading to `null` / `any`.
 
-## What's in the reference slate
+## Where the shipped wrappers came from
 
-Seven engine wrappers ship as reference examples, each a different stress
-test of the compiler's engine-wrapper substrate:
+Each `@rozie-ui` engine family started life as a stress test of the
+compiler's engine-wrapper substrate: SortableList exercises a two-way
+array prop plus engine DOM mutation and the `$reconcileAfterDomMutation()`
+escape hatch; Flatpickr exercises scalar two-way binding; Chart.js
+exercises deeply-nested object reactivity with interval-driven `$data`
+mutation; TipTap and Lexical exercise contenteditable DOM ownership;
+FullCalendar exercises structured-payload multi-emit and portal-slot
+fills; Uppy exercises a multi-event emit chain with streaming progress.
 
-| Wrapper | Stresses |
-| --- | --- |
-| [**SortableList**](/examples/sortable-list) | Two-way array prop, DOM mutation, keyed reconciler, `$reconcileAfterDomMutation()` escape hatch |
-| [**Flatpickr**](/examples/flatpickr) | Scalar two-way binding `r-model:date` |
-| **LeafletMap** | TWO scalar two-way binds + array prop |
-| [**LineChart (Chart.js)**](/examples/line-chart) | Deeply-nested object reactivity + interval-driven `$data` mutation |
-| **TipTap** | Rich-text engine, internal toolbar tracking active marks, contenteditable DOM ownership |
-| **Uppy** | Multi-event emit chain, streaming progress, engine-state snapshotting |
-| **FullCalendar** | Date-typed array elements, object spread inside engine calls, structured-payload multi-emit, portal-slot fills |
+Those wrappers graduated into the shipped `@rozie-ui` families listed
+above; only `LeafletMap.rozie` and `Uppy.rozie` remain as compact
+reference sources under the repo's `examples/` directory. For learning
+the pattern, the annotated walkthroughs at
+[SortableList](/examples/sortable-list),
+[Flatpickr](/examples/flatpickr), and
+[LineChart (Chart.js)](/examples/line-chart) are the best reading order.
 
-Each wrapper compiles to byte-identical output across all six targets on
-every commit — the engine-wrapper substrate is the most heavily-pinned
-surface in the test suite.
-
-## Cross-framework leverage — the math
-
-If you maintain a single engine glued into N apps across M frameworks,
-your maintenance cost today is roughly N × M — each app glues each engine
-its own way.
-
-With Rozie, the engine glue is M × 1 — one wrapper per engine — and you
-still pay N × 0 to use it from each app (one import per app, same shape
-as importing any native component).
+## Cross-framework leverage
 
 For a team running a React app + a Vue app + an Angular admin + a static
-HTML site (Lit), and four engines (Sortable + Flatpickr + Leaflet +
-Chart.js): you go from sixteen distinct glue surfaces to four wrappers.
+HTML site (Lit), with four engines in play (Sortable + Flatpickr +
+Leaflet + Chart.js): today that is sixteen distinct glue surfaces, one
+per app-engine pair. With Rozie it is four wrappers, each imported into
+each app the same way any native component is.
 
 The first wrapper takes maybe a day. The second takes an hour, because
 you already know the pattern. The reference examples in this repo are the
@@ -237,26 +264,31 @@ template.
 
 ## How to start
 
-### Step 1: Pick the engine that hurts the most
+### Step 1: Check the shipped catalog
 
-The one you've fought across the most apps. The one that breaks on every
-framework upgrade. The one whose existing wrapper library you don't
-trust.
+Scan the [component catalog](/components/) first. If your engine is
+already wrapped, install your framework's package and stop here.
 
-### Step 2: Read the closest reference
+### Step 2: Pick the engine that hurts the most
+
+Of the engines Rozie hasn't wrapped: the one you've fought across the
+most apps. The one that breaks on every framework upgrade. The one whose
+existing wrapper library you don't trust.
+
+### Step 3: Read the closest reference
 
 [SortableList](/examples/sortable-list) is the canonical demo —
 two-way bound array, DOM mutation, scoped slot for per-row rendering.
 [Flatpickr](/examples/flatpickr) is the simpler scalar-two-way pattern.
 
-### Step 3: Wrap your engine
+### Step 4: Wrap your engine
 
 Copy one of the reference files. Replace SortableJS with your engine.
 Wire `$onMount` / `$onUnmount` for instantiation and teardown. Use
 `$watch` to push prop changes into the engine. Use `$emit` for engine
 events. Use `r-model:` props for state the engine wants to own.
 
-### Step 4: Drop it into one app, then another
+### Step 5: Drop it into one app, then another
 
 The [Adopt incrementally guide](/guide/adopt-incrementally) covers the
 per-stack install. Start with whichever framework is least intimidating;
@@ -264,11 +296,14 @@ the others come for free once it works in the first one.
 
 ## Next steps
 
+- [Browse components](/components/) — the 15 shipped engine-backed
+  `@rozie-ui` families, installable per framework today.
 - [SortableList example](/examples/sortable-list) — the canonical engine
   wrapper, full source + per-target output.
 - [Flatpickr example](/examples/flatpickr) — simpler scalar two-way.
-- [LineChart (Chart.js) example](/examples/line-chart) — deeply-nested
-  reactivity + interval-driven updates.
+- [Engine-wrapper toolkit](/guide/engine-wrappers) — `$classSelector`,
+  `r-external` + `$reconcileAfterDomMutation`, `$slotted`, `r-portal`,
+  `$restoreFocus`, `$snapshot`, `$clone`.
 - [Creature comforts](/guide/creature-comforts) — the full matrix of
   cross-framework normalizations.
 - [Adopt incrementally](/guide/adopt-incrementally) — drop a wrapper

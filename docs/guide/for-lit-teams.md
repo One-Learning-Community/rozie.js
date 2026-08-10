@@ -2,13 +2,13 @@
 
 Lit is the right answer to a lot of questions. Native custom elements that work in any framework or no framework. Standards-track shadow DOM scoping. Tiny runtime. The browser handles registration, lifecycle, and the boundary between your component and the consuming page.
 
-It is also the framework whose compose story has the thinnest ergonomics. Slot fills with parameters. Dynamic slot names. Consumer CSS reaching into shadow roots. Reactive properties that drive declarative re-renders. Engine integration where the engine wants to mutate DOM under lit-html's feet. Each of these has a community workaround, none of them is fun to author, and the locked-in Lit user feels every one daily.
+It is also the framework whose compose story has the thinnest ergonomics: slot fills with parameters, dynamic slot names, consumer CSS reaching into shadow roots, and engine integration where the engine mutates DOM under lit-html's feet. Each has a community workaround, none of them is fun to author, and the locked-in Lit user feels every one daily.
 
-Rozie compiles Vue/Alpine-flavored `.rozie` source to **idiomatic Lit 3.2+ Web Components**, with the compose ergonomics absorbed by the compiler:
+Rozie compiles Vue/Alpine-flavored `.rozie` source to idiomatic Lit 3.2+ Web Components, with the compose ergonomics absorbed by the compiler:
 
 - Default and named slots, parameterized scoped slots, dynamic slot names — same authoring shape as Vue / Svelte / Solid.
 - Consumer CSS reaches into shadow roots through an `adoptConsumerStyles` bridge.
-- `$reconcileAfterDomMutation()` is the escape hatch when an engine mutates DOM under lit-html's `repeat` cache.
+- `r-external` + `$reconcileAfterDomMutation()` are the escape hatch when an engine mutates DOM under lit-html's `repeat` cache.
 - `r-bind="$attrs"` auto-fallthrough handles consumer-passed attributes; native `addEventListener` cleanup is the compiler's job, not yours.
 - `model: true` props compile to a property/attribute pair with a `*-change` `CustomEvent` — the canonical Lit two-way pattern, no boilerplate.
 
@@ -18,7 +18,7 @@ You write one `.rozie` component. The compiled `.ts` is a `LitElement` subclass 
 
 ### Scoped slot params have no native API
 
-Lit's `<slot>` element projects light-DOM children into shadow DOM by name. It does **not** project parameters back to the consumer — there's no equivalent of Vue's `<template #default="{ item }">` or React's `renderItem={(ctx) => …}`.
+Lit's `<slot>` element projects light-DOM children into shadow DOM by name. It does not project parameters back to the consumer — there's no equivalent of Vue's `<template #default="{ item }">` or React's `renderItem={(ctx) => …}`.
 
 Community workarounds: serialize params as JSON into `data-*` attributes, hand-roll a "fillSlot" property API, or expose imperative methods the consumer queries. Each is a bespoke surface in every Lit component.
 
@@ -61,25 +61,20 @@ Vanilla-JS engines (SortableJS, FullCalendar, TipTap, Uppy) mutate the DOM direc
 
 On Lit, lit-html's [`repeat()`](https://lit.dev/docs/templates/directives/#repeat) directive caches its `oldParts` array by sentinel-comment node identity. When the engine physically relocates `<li>` elements relative to those sentinel markers, the cache desyncs — and subsequent renders garble the output. This is a real Lit-specific landmine; community-maintained sortable wrappers either accept it as a known issue or hand-roll lifecycle hooks to tear down + rebuild the part tree.
 
-Rozie's `$reconcileAfterDomMutation()` sigil is the escape hatch:
+Rozie's answer is a pair: the `r-external` template marker on the container the engine binds to, and the `$reconcileAfterDomMutation()` sigil, called once after the handler writes the new model state:
 
 ```rozie
-<script>
-$onMount(() => {
-  instance = new SortableJS($el, {
-    onUpdate: (e) => {
-      // Restore pre-drag DOM order, update bound state…
-      $model.items = next
-      $reconcileAfterDomMutation()  // ← here
-      $emit('change', e)
-    },
-  })
-  return () => instance?.destroy()
-})
-</script>
+onUpdate: (e) => {
+  // Restore pre-drag DOM order, update bound state…
+  $model.items = next
+  $reconcileAfterDomMutation()  // ← here
+  $emit('change', e)
+},
 ```
 
-On Lit it lowers to `__rozieReconcileAfterDomMutation(this)`, which calls `render(nothing, host.renderRoot) + host.requestUpdate()` — a clean tear-down and rebuild of the part tree. On every other target it lowers to `void 0` (no-op). Engine wrappers are framework-agnostic again.
+On Lit the sigil lowers to `__rozieReconcileAfterDomMutation(this)`, which bumps an internal `_rozieReconcileSeq` counter and calls `requestUpdate()`. The compiler wraps the children of the `r-external`-marked element in lit-html's `keyed(seq, …)`, so the bump disposes the stale child DOM (orphan nodes, desynced sentinel comments) and renders the children fresh, while the marked element itself, and any engine listeners attached to it, survives the rebuild. On every other target the sigil lowers to `void 0` (no-op). Engine wrappers are framework-agnostic again.
+
+The full mechanism, the per-target lowering table, and the complete SortableJS wrapper source live in the [engine-wrapper toolkit](/guide/engine-wrappers#r-external-and-reconcileafterdommutation-—-dom-the-framework-doesn-t-own) and [for vanilla-JS + plugin shops](/guide/for-vanilla-js-shops).
 
 ### Dynamic slot names
 
@@ -115,7 +110,7 @@ import './SearchInput.rozie';
 // <rozie-search-input .min-length=${2}></rozie-search-input>
 ```
 
-The `lit-vanilla-demo` at [`examples/consumers/lit-vanilla-demo/`](https://github.com/One-Learning-Community/rozie.js/tree/main/examples/consumers/lit-vanilla-demo/) is a real Vite + Lit consumer importing the same example components — proof the emit is production-ready, not illustrative.
+The `lit-vanilla-demo` at [`examples/consumers/lit-vanilla-demo/`](https://github.com/One-Learning-Community/rozie.js/tree/main/examples/consumers/lit-vanilla-demo/) is a real Vite + Lit consumer importing the same example components.
 
 ## Incremental adoption
 
@@ -125,7 +120,7 @@ The `lit-vanilla-demo` at [`examples/consumers/lit-vanilla-demo/`](https://githu
 pnpm add -D @rozie/unplugin @rozie/runtime-lit lit
 ```
 
-The Lit target has **no host Vite plugin** — Lit components are plain ES modules that self-register via `customElements.define()`, so Rozie's unplugin handles the `.rozie` → custom-element transform directly and Vite's standard `.ts` pipeline takes it from there.
+The Lit target has no host Vite plugin — Lit components are plain ES modules that self-register via `customElements.define()`, so Rozie's unplugin handles the `.rozie` → custom-element transform directly and Vite's standard `.ts` pipeline takes it from there.
 
 ### Step 2: Add to your Vite / Webpack / esbuild config
 
@@ -158,7 +153,7 @@ Or import + render from any framework — React, Vue, Svelte, Angular, Solid, pl
 
 ### Step 5: Decide
 
-If the team likes the authoring ergonomics, expand. If not, the compiled `.ts` is a normal Lit element — you can keep using it, delete the `.rozie` source, and the `.ts` runs on its own. Zero lock-in.
+If the team likes the authoring ergonomics, expand. If not, delete the `.rozie` source and keep the compiled `.ts`, a normal Lit element that runs on its own — the same zero-lock-in exit [the React teams page](/guide/for-react-teams) spells out.
 
 ## Where Rozie is the Lit story you've been waiting for
 

@@ -13,6 +13,7 @@ Create `Counter.rozie`:
 {
   value: { type: Number, default: 0, model: true },
   step:  { type: Number, default: 1 },
+  max:   { type: Number, default: Infinity },
 }
 </props>
 
@@ -23,7 +24,7 @@ Create `Counter.rozie`:
 </data>
 
 <script>
-const canIncrement = $computed(() => $props.value + $props.step <= Infinity)
+const canIncrement = $computed(() => $props.value + $props.step <= $props.max)
 const increment = () => { if (canIncrement) $model.value += $props.step }
 </script>
 
@@ -47,6 +48,7 @@ const increment = () => { if (canIncrement) $model.value += $props.step }
 Key things to notice:
 
 - `<props>` and `<data>` accept real JS expressions, not JSON. `default: () => []`, `Number`, `Infinity` — all fine.
+- `canIncrement` is a `$computed`: it re-derives whenever `value`, `step`, or `max` changes, and gates the increment when a consumer passes `:max` (unbounded by default).
 - `model: true` on a prop signals two-way binding. Rozie expands this to each target's native pattern: `defineModel` (Vue), controllable-state pair (React), `$bindable` (Svelte), `model<T>()` (Angular), `createControllableSignal` (Solid), a property/attribute pair with a `*-change` CustomEvent (Lit).
 - `r-*` directives mirror Vue's `v-*` but are deliberately namespaced so `.rozie` files are visually distinct.
 

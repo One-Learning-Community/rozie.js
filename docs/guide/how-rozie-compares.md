@@ -6,10 +6,10 @@ framework." Two established tools solve adjacent problems extremely well —
 [Ionic's **Stencil**](https://stenciljs.com/) — and Rozie owes a clear
 intellectual debt to both. This page explains where Rozie sits relative to each.
 
-It is **not** a leaderboard. Mitosis and Stencil are mature, capable, and in
-several dimensions broader or more battle-tested than Rozie. The three tools
-optimize for different things; the goal here is to help you pick the right one,
-and to be honest about where Rozie's bet is deliberately narrow.
+Mitosis and Stencil are mature, capable, and in several dimensions broader or
+more battle-tested than Rozie. The three tools optimize for different things;
+the goal here is to help you pick the right one, and to mark where Rozie's bet
+is deliberately narrow.
 
 Facts on this page were verified against the npm registry and GitHub on
 **2026-06-05**: Mitosis `@builder.io/mitosis@0.13.1` (published 2026-06-03,
@@ -42,8 +42,8 @@ Where they differ:
   `onMount`) — a React-shaped mental model. Rozie authors a Vue/Alpine-flavored
   single-file component (`<template>` / `<script>` / `<style>` plus first-class
   `<props>`, `<data>`, `<listeners>`, `<components>` blocks, `r-*` directives,
-  and `{{ }}` interpolation). Neither is objectively better — they suit different
-  authors. Rozie's [design rationale](/guide/design-rationale) explains why it
+  and `{{ }}` interpolation). The two suit different authors.
+  Rozie's [design rationale](/guide/design-rationale) explains why it
   deliberately reads like Vue rather than JSX.
 
 - **Breadth vs. depth of targets.** Mitosis compiles to a longer list of targets
@@ -83,7 +83,7 @@ component using `useState`/`useMemo`; the Vue target is a real SFC using
 `defineModel`/`computed`; Angular uses signals; Svelte uses runes. There is no
 web component in the middle — only Rozie's *Lit* target produces a custom element.
 
-The trade-off cuts both ways, honestly:
+The trade-off cuts both ways:
 
 - **Stencil's web-component model** gives you one runtime artifact that works the
   same everywhere, is standards-based, and is largely framework-*version*
@@ -104,13 +104,13 @@ want one framework-version-agnostic artifact, or you're building on the Ionic /
 PWA tooling. **Rozie fits** when you want genuinely idiomatic native components in
 each framework, without a web-component runtime or shadow-DOM model in between.
 
-## Where we're honest
+## Trade-offs
 
 - Both projects are, in important ways, ahead of Rozie. Stencil has years of
   production use behind it and an enormous install base; Mitosis has a broader
   target matrix and a larger community than Rozie has today.
-- This page is positioning, not a benchmark. We respect both offerings and
-  recommend them without reservation for the jobs they're built for.
+- We respect both offerings and recommend them without reservation for the
+  jobs they're built for.
 - Rozie's contribution is a **deliberately narrow bet**: six mainstream targets,
   Vue-flavored authoring, and depth on the cross-framework behavioral parity and
   component-library affordances that make a single source ship as idiomatic

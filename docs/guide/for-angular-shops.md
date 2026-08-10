@@ -5,10 +5,11 @@ the syntax" pain point. `*ngFor`, decorator soup, `[(ngModel)]` ceremony,
 constructor-DI noise, the standalone-components migration tax — they're
 all things Angular users have asked their framework to fix for years.
 
-Rozie isn't a migration tool — it doesn't ask you to leave Angular. It's a
-**Vue-flavored authoring layer that compiles to idiomatic Angular 19+**:
-standalone components, signals, the new `@if` / `@for` block syntax,
-`input.required<T>()`, `model<T>()`, `output<T>()`, `inject(DestroyRef)`.
+Rozie is a Vue-flavored authoring layer that compiles to idiomatic
+Angular 19+: standalone components, signals, the new `@if` / `@for` block
+syntax, `input.required<T>()`, `model<T>()`, `output<T>()`,
+`inject(DestroyRef)`. You stay in Angular; only the authoring syntax
+changes.
 
 You write one `.rozie` component this week. The compiled `.ts` drops into
 your existing Angular app as a standalone component. Nothing else changes.
@@ -146,17 +147,19 @@ Rozie quietly does the Angular ceremony you'd otherwise hand-roll:
 
 | Angular thing | What Rozie handles |
 | --- | --- |
-| `signal()` / `computed()` / `effect()` | `<data>` → `signal()`, `$computed` → `computed()`, `$watch` → `effect()` |
 | `input.required<T>()` vs `input<T>()` | `required: true` on a `<props>` member — single source of truth across all six targets. |
-| `model<T>()` for two-way binding | `model: true` on a `<props>` member; consumer-side `r-model:propName="…"` |
-| `ControlValueAccessor` + `NG_VALUE_ACCESSOR` provider for custom form controls | A component with exactly **one** `model: true` prop auto-implements `ControlValueAccessor` — `[(ngModel)]`, `[formControl]`, and `formControlName` bind to it like a native control. Touched-on-focusout, `writeValue(null)` → prop default, and disabled-merge wiring included. Opt out with `angular: { cva: false }`. |
 | `output<T>()` + emitting | `$emit('eventname', payload)` |
-| `inject(DestroyRef)` + paired cleanup | `$onMount` returning a cleanup fn — Rozie hoists `private __rozieDestroyRef = inject(DestroyRef)` automatically. |
-| `ngAfterViewInit` for `$el`-touching code | `$onMount` lowers to `ngAfterViewInit()` so `viewChild()` signals are populated when your code runs. |
-| `Renderer2.listen` + global event cleanup | `<listeners>` block of `<listener>` elements, each gated by a reactive `r-if`. Auto-cleanup on destroy. |
 | `*ngTemplateOutlet` + context-guard ceremony | `<slot name="x" :value="…" />` — typed scoped slots with one declaration. |
-| Inline arrow functions in `*ngTemplateOutlet context` (Angular template parser rejects them) | Rozie pre-binds slot-context closures. |
 | `:host` + `::ng-deep` for global rules | `:root { … }` inside `<style>`. |
+
+The rest of the ceremony delta is cataloged row by row in the
+[creature-comforts matrix](/guide/creature-comforts#per-target-pain-points-rozie-hides):
+signals lowering (`<data>` to `signal()`, `$computed` to `computed()`,
+`$watch` to `effect()`), `model<T>()` two-way binding, the
+auto-implemented `ControlValueAccessor` for single-`model: true`
+components, hoisted `DestroyRef` cleanup, `$onMount` timing via
+`ngAfterViewInit()`, `<listeners>` wiring via `Renderer2.listen`, and
+pre-bound slot-context closures.
 
 ## Incremental adoption
 
@@ -203,9 +206,10 @@ export class HostComponent {}
 
 ### Step 4: Decide if you like it
 
-If the team likes the authoring ergonomics, expand. If not, the compiled
-`.ts` is a normal Angular standalone component — you can keep using it,
-delete the `.rozie` source, and the `.ts` works on its own. Zero lock-in.
+If the team likes the authoring ergonomics, expand. If not, delete the
+`.rozie` source and keep the compiled `.ts`, a normal Angular standalone
+component that works on its own — the same zero-lock-in exit
+[the React teams page](/guide/for-react-teams) spells out.
 
 ## What's idiomatic — what isn't
 
@@ -240,17 +244,15 @@ Three things make Angular the strongest fit for this pitch:
    than from React (which is already JSX-y) or Svelte (also block-based).
 2. **The compiled output is fully native.** Rozie emits signals,
    standalone components, modern block syntax, and `inject(DestroyRef)` —
-   the *exact* Angular Angular shops are trying to migrate to from older
-   patterns. Rozie isn't a parallel runtime; it's the Angular you'd write
-   if you had perfect taste.
+   the exact Angular that Angular shops are migrating to from older
+   patterns. There is no parallel runtime in the output.
 3. **Strict-templates clean.** The compiler's output passes `ngc
    --strictTemplates` for every reference example. Type-safety doesn't
    degrade.
 
 ## When Rozie isn't the right answer for an Angular team
 
-The honest pre-concession — if any of these is you, Rozie is the wrong tool and
-we'd rather you know now:
+If any of these describes your team, Rozie is the wrong tool:
 
 - **You're happy authoring Angular's native template DSL and decorators.** The
   entire pitch is the ergonomics delta. If `*ngFor` / `@for`, `[(ngModel)]`

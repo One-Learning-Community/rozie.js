@@ -1,6 +1,6 @@
 # Why Rozie looks the way it does
 
-Rozie's syntax makes a few choices that look unusual on first read — blocks instead of one `<script setup>`, a `$model.` write sigil, a `<listeners>` block full of `<listener>` elements. None of them are accidents, and none are decoration. Each one is the price of the actual product: **deterministic, idiomatic emission to six frameworks from one source.** This page explains the reasoning so the choices read as principled rather than surprising.
+Rozie's syntax makes a few choices that look unusual on first read — blocks instead of one `<script setup>`, a `$model.` write sigil, a `<listeners>` block full of `<listener>` elements. Each one is deliberate, and each one is the price of the actual product: deterministic, idiomatic emission to six frameworks from one source. This page explains the reasoning so the choices read as principled rather than surprising.
 
 If you want the *mechanics* of any feature named below, [Features & design choices](/guide/features) has the per-target tables. This page is the *why*.
 
@@ -14,7 +14,7 @@ That gives a single test for "why is it this way?": *what does the compiler need
 
 The most common first reaction from a Vue or React developer is "why is this split into `<props>`, `<data>`, `<script>` blocks — isn't that the Options API the ecosystem moved away from?"
 
-The blocks are not an organizational preference. They are **format boundaries**, and the format of each block is chosen for what the compiler must do with its contents:
+The blocks are format boundaries. The format of each block is chosen for what the compiler must do with its contents:
 
 - **`<props>` and `<data>` are object literals** because the compiler reads them *without running them*. Prop types, defaults, and `model`/`required` flags are extracted statically to synthesize each target's typed prop signature and `.d.ts` — six different ones — at compile time. If props lived in executable `<script setup>` like `defineProps()`, the compiler would have to partially evaluate your setup function to recover the prop contract. Keeping them as literals makes the contract a thing the compiler can simply *look at*.
 - **`<script>` is JavaScript** because that's your actual component logic — preserved and rewritten per target (`$props.x` → React `props.x`, Vue `props.x`, etc.) without re-parsing.
@@ -45,14 +45,10 @@ It shouldn't, and the reason is a clean rule: **the format follows the content, 
 - **Wiring** — events and bindings attached to targets/elements — is markup: `<template>`, and now `<listeners>`. An event handler on a target reads naturally as an attribute (`@keydown.escape="close"`), exactly like template `@event`. This is why the [`<listener>` element form](/guide/templates-and-events#listeners-block-—-declarative-listener-elements) landed: its content was always wiring, so it belongs in the markup family — and it now reads like Svelte's `<svelte:window>` rather than a stringly-keyed object.
 - **Typed data** — prop and state declarations — is an object literal: `<props>`, `<data>`. Their content is *typed JavaScript values*: `type: Number`, `default: () => []`, `as Shape`, `type: Foo<Bar>`. Those are real JS/TS expression nodes the compiler reads and the consumer's type-checker sees ([details](/guide/props-and-two-way#props-and-data-accept-real-js-expressions)).
 
-Element form would actively *break* `<props>`: `<prop type="Foo<Bar>" :default="() => []" />` stuffs typed JavaScript into string attributes that have to be re-parsed and can't be type-checked — destroying the `<script lang="ts">` prop-type story. So the split isn't an inconsistency to fix; it's the correct rule applied to two different kinds of content. The discriminator is **wiring vs. typed-data**, not *markup-ish vs. not*.
+Element form would actively *break* `<props>`: `<prop type="Foo<Bar>" :default="() => []" />` stuffs typed JavaScript into string attributes that have to be re-parsed and can't be type-checked — destroying the `<script lang="ts">` prop-type story. The split is one rule applied to two different kinds of content, and the discriminator is **wiring vs. typed-data**.
 
 ## The advanced tier: engine-wrapper sigils
 
 A handful of Rozie's surface — `$classSelector()`, `r-external`, `$reconcileAfterDomMutation()`, `$restoreFocus()`, portal slots — exists only for one job: wrapping a vanilla-JS engine (SortableJS, flatpickr, TipTap, a charting lib) that owns DOM the framework doesn't control. These are deliberately an **advanced tier**. You will not meet them writing a Counter, a Modal, or a form — only when you hand a third-party engine some DOM and have to reconcile its mutations against six different keyed-reconcilers.
 
 If your first encounter with Rozie is the [SortableList showcase](/components/sortable-list), that's the deep end on purpose — it's the proof that the hard cross-framework cases are *possible*, not the shape of everyday authoring. Start with [Counter](/examples/counter) or [SearchInput](/examples/search-input) for what normal Rozie code looks like; reach for these sigils only when you're integrating an engine. Each is documented where it's needed: [`$classSelector()`](/guide/engine-wrappers#classselector-—-handing-a-class-name-to-a-vanilla-js-engine), [`r-external` / `$reconcileAfterDomMutation()`](/guide/engine-wrappers#r-external-and-reconcileafterdommutation-—-dom-the-framework-doesn-t-own), [`$restoreFocus()`](/guide/engine-wrappers#restorefocus-selector-idx-—-keep-focus-on-a-row-across-keyed-reconciler-re-renders).
-
-## The trade, stated plainly
-
-Rozie spends a little modern-colocation ergonomics (separate data blocks instead of one `<script setup>`) and a little orthodoxy-bending-avoidance (a distinct write channel instead of free prop mutation) to buy **compiler determinism** — and that determinism is the whole product. It's what lets one `.rozie` file become six idiomatic, typed components instead of six hand-maintained wrappers. If you're the audience Rozie is for — someone who today keeps `react-sortablejs` + `vuedraggable` + `ngx-sortablejs` + a Svelte fork in sync by hand — that's a trade you've already been paying for the other way.

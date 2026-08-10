@@ -96,8 +96,8 @@ asserts the produced bundle contains compiled Rozie markers.
 
 ### Angular CLI (Application Builder / esbuild)
 
-Angular's modern Application Builder (Angular 17+ default) is esbuild under
-the hood. Use the unplugin's esbuild adapter via a custom builder hook, or
+Angular's Application Builder (the default builder since Angular 17;
+Rozie supports Angular 19+) is esbuild under the hood. Use the unplugin's esbuild adapter via a custom builder hook, or
 pre-compile via the CLI (recommended for first adoption).
 
 The **pre-compile path** is the lowest-friction:
@@ -236,8 +236,9 @@ pnpm rozie build src/components/ \
   --out dist/
 ```
 
-`.d.ts` files are emitted by default; pass `--no-types` to disable. Source
-maps are off by default; pass `--source-map` to enable.
+Type sidecars (`<Name>.d.rozie.ts`) are emitted by default; pass
+`--no-types` to disable. Source maps are off by default; pass
+`--source-map` to enable.
 
 Pass `--pretty` to pipe every emitted artefact through prettier before
 write. Off by default (v1's bar is "just works", not "pretty output");
@@ -289,7 +290,7 @@ For cross-Rozie composition, the `<components>` block does the right thing:
 <rozie name="ModalConsumer">
 
 <components>
-  import Modal from './Modal.rozie';
+{ Modal: './Modal.rozie' }
 </components>
 
 <template>
@@ -314,19 +315,22 @@ attempt.
 
 ### TypeScript types
 
-Every target emits its own `.d.ts` automatically:
+Typed `.rozie` imports come from a generated `<Name>.d.rozie.ts` sidecar
+declaration file the build writes next to each source: `Counter.rozie`
+gets a `Counter.d.rozie.ts` carrying the props interface, render-prop
+slot signatures, `onValueChange` callbacks for `model: true` props, and
+the `$expose` handle type. TypeScript resolves the sidecar via the
+`allowArbitraryExtensions` flag, which you must enable for every target
+except Vue (whose `vue-tsc` honors it by default) and Angular. Angular is
+the exception with no sidecar at all: its typed import surface is the
+disk-cache `<Name>.rozie.ts` standalone component the unplugin writes.
 
-- **React**: sibling `Counter.d.ts` with `interface CounterProps` + render-
-  prop slot signatures + `onValueChange` callbacks for `model: true` props.
-- **Vue / Svelte / Angular**: types inline via `defineProps<T>()`, `$props<T>()`,
-  and decorator-typed inputs — `vue-tsc` / `svelte-check` / `tsc` pick them
-  up.
-- **Solid**: sibling `.d.ts` like React.
-- **Lit**: typed class fields; consumers reading `el.value` get full
-  IntelliSense.
+[Install § Typed `.rozie` imports](/guide/install#typed-rozie-imports-per-framework-setup)
+is the canonical setup guide, covering the tsconfig flag, named handle
+imports, and the wildcard-shim migration.
 
 Six per-target consumer typecheck gates (`tsc`, `vue-tsc`, `svelte-check`)
-run in CI on every commit to keep these honest.
+run in CI on every commit to keep the emitted types accurate.
 
 ### CSS interop
 

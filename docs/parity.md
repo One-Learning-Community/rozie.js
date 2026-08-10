@@ -4,7 +4,7 @@ Rozie's goal is **high-percentage cross-framework parity** — one `.rozie`
 definition that compiles to idiomatic React, Vue, Svelte, Angular, Solid, and
 Lit. "High-percentage", not 100%: each target framework has its own
 capabilities and constraints, and a small set of documented edge cases is the
-honest, deliberate trade-off for a single author-side API.
+deliberate trade-off for a single author-side API.
 
 Every component behavior that matters — reactive state, two-way binding,
 events, lifecycle, slots, listeners — behaves identically across all six

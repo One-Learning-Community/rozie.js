@@ -1,6 +1,6 @@
 # Security & supply chain
 
-Rozie's pitch to a design-system author is a trust claim: "write one `.rozie` file, ship six idiomatic targets — and the emitted output is safe to put upstream of your build." A trust claim that can't be verified is just marketing. So Rozie doesn't ask you to trust it — **it tests itself, and here are the batteries.**
+Rozie's pitch to a design-system author is a trust claim: "write one `.rozie` file, ship six idiomatic targets — and the emitted output is safe to put upstream of your build." A trust claim that can't be verified is just marketing. So Rozie doesn't ask you to trust it: it tests itself, and here are the batteries.
 
 This page is the user-facing centerpiece of that posture. Every table below mirrors an executable test in the repo (`tests/security/`), and the tests are the source of truth — if this page and a test ever disagree, the test wins and this page is the bug.
 
@@ -17,7 +17,7 @@ Rozie runs four automated security batteries over the compiled-output corpus (`t
 
 ## Sanitizer-parity matrix
 
-This is the trust asset. When you bind a prop into `r-html`, Rozie lowers it to each target's native raw-HTML sink. The honest finding is an **asymmetry**: exactly one target's framework sanitizes the binding at runtime; the other five render raw HTML **by design**. That asymmetry is not a bug to "fix" — it is each framework's own documented behavior, surfaced here so you can make an informed decision about where your `r-html` content comes from.
+This is the trust asset. When you bind a prop into `r-html`, Rozie lowers it to each target's native raw-HTML sink. The finding is an asymmetry: exactly one target's framework sanitizes the binding at runtime; the other five render raw HTML **by design**. The asymmetry is each framework's own documented behavior, surfaced here so you can make an informed decision about where your `r-html` content comes from.
 
 | Target  | `r-html` emit form                          | Sanitized?                         |
 |---------|---------------------------------------------|------------------------------------|
@@ -60,7 +60,7 @@ A separate, documented cross-framework finding concerns `javascript:` and `data:
 
 > `javascript:`/`data:` URI schemes on `href`/`src` are **accepted in escaped (quoted-attribute) position** across all six targets. Rozie emits no compile-time URI-scheme diagnostic.
 
-This meets the project's accepted bar: hostile content lands in an **escaped attribute position** (it cannot break out of the attribute to inject markup), and **URL-scheme sanitization is the framework runtime's job**, not Rozie's compile step. The adversarial battery (Battery 3) proves the behavioral side — the scheme stays in escaped position, no raw markup, no new diagnostic expected. The parity test pins this as a stable, named policy so this page stays honest:
+This meets the project's accepted bar: hostile content lands in an **escaped attribute position** (it cannot break out of the attribute to inject markup), and **URL-scheme sanitization is the framework runtime's job**, not Rozie's compile step. The adversarial battery (Battery 3) proves the behavioral side — the scheme stays in escaped position, no raw markup, no new diagnostic expected. The parity test pins this as a stable, named policy so this page stays accurate:
 
 ```ts
 const POLICY = {
@@ -73,7 +73,7 @@ A compile-time `javascript:`/`data:` URI-scheme warning is a deferred idea for a
 
 ## Controls-not-tests register
 
-Some supply-chain controls are **operational** — they live in publish workflows and registry settings, not in the compiler. Phase 24 **documents** these so they don't fall off the radar; **implementation is separate follow-up work** and is explicitly out of scope here. This register is the honest status of each:
+Some supply-chain controls are **operational** — they live in publish workflows and registry settings, not in the compiler. Phase 24 **documents** these so they don't fall off the radar; **implementation is separate follow-up work** and is explicitly out of scope here. This register is the current status of each:
 
 | Control | Status | Action |
 |---------|--------|--------|

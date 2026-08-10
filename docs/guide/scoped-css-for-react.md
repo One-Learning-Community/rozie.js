@@ -103,7 +103,7 @@ input        { padding: 0.25rem 0.5rem; }
 </rozie>
 ```
 
-Half the line count. No `styles.foo` indirection. The `<style>` block is plain CSS — no preprocessor required (SCSS is opt-in via `<style lang="scss">`).
+Half the line count, with no `styles.foo` indirection. The `<style>` block is plain CSS — no preprocessor required (SCSS is opt-in via `<style lang="scss">`).
 
 ## What the compiler emits
 
@@ -115,7 +115,7 @@ Because the class name renders **literally** in the DOM (no hashing), `el.queryS
 
 ## Try it in five minutes
 
-Add the unplugin to your existing Vite or Next.js build, write one leaf component you've been styling with CSS Modules or Tailwind as a `.rozie` file, and import it like any other component. If the team doesn't like it, the compiled `.tsx` is a normal React component — delete the `.rozie` source and keep the output. Zero lock-in, zero runtime dependency.
+Add the unplugin to your existing Vite or Next.js build, write one leaf component you've been styling with CSS Modules or Tailwind as a `.rozie` file, and import it like any other component. If the team doesn't like it, the compiled `.tsx` is a normal React component — delete the `.rozie` source and keep the output, with no runtime dependency left behind.
 
 - [For React teams](/guide/for-react-teams) — the full React story: statically-computed `useEffect` deps, StrictMode-safe lifecycles, compile-time prop-mutation errors, two-way binding without a state library, and step-by-step Vite / Next.js install.
 - [Adopt incrementally](/guide/adopt-incrementally) — per-stack install (Vite, Next.js, Astro, Webpack, esbuild, Babel-only, CLI).
