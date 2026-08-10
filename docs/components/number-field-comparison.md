@@ -4,7 +4,7 @@ surface_hash: 7a049414b9f3
 
 # NumberField vs the per-framework alternatives
 
-A clamped, step-snapped, locale-formatted number input with +/- steppers, full keyboard control, and press-and-hold acceleration is something every form library re-implements — once per framework. `NumberField` is authored **once** in `NumberField.rozie` and compiled to all six. Here is what it replaces.
+A clamped, step-snapped, locale-formatted number input with +/- steppers, full keyboard control, and press-and-hold acceleration is something every form library re-implements, once per framework. `NumberField` is the same component, with the same API and behaviour, on all six frameworks. Here is what it replaces.
 
 ## The native `<input type="number">` it improves on
 
@@ -32,4 +32,4 @@ The platform `<input type="number">` is the usual starting point, but it is famo
 - **Optional scrub-on-drag** (`allowScrub`) for power users.
 - **Token theming** — the same `--rozie-number-field-*` variables and the shadcn / Material / Bootstrap bridges across every framework.
 
-The wedge is the usual Rozie one: you maintain **one** accessible, fully-featured number field, and every framework gets an idiomatic, byte-for-byte-consistent build of it.
+The case for Rozie here is the usual one: you maintain one accessible, fully-featured number field, and every framework gets an idiomatic, byte-for-byte-consistent build of it.

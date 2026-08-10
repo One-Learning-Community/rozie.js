@@ -18,7 +18,7 @@ surface_hash: c094ffccb048
 | Solid | — | None; hand-roll with `onMount`/`onCleanup`. |
 | Lit | — | None; hand-roll a custom element around the engine. |
 
-Every "hand-roll" row re-implements the same things: build the engine against a container ref, wire `on()` events to framework outputs, reconcile prop changes to `setOptions`/`setVolume`/`zoom`, guard the two-way position (and, with regions, a two-way *list*) against feedback loops, and tear down on unmount. That's exactly the boilerplate Rozie generates — **once**, from one source, for all six.
+Every "hand-roll" row re-implements the same things: build the engine against a container ref, wire `on()` events to framework outputs, reconcile prop changes to `setOptions`/`setVolume`/`zoom`, guard the two-way position (and, with regions, a two-way *list*) against feedback loops, and tear down on unmount. That is exactly the boilerplate `@rozie-ui/wavesurfer` ships, identically, for all six.
 
 ## What `@rozie-ui/wavesurfer` gives you
 
@@ -29,7 +29,7 @@ Every "hand-roll" row re-implements the same things: build the engine against a 
 - **Stateless plugins wired in** — `timeline` and `hover` are one boolean each, live-toggleable (register/unregister on the running engine, no remount) across every target.
 - **No CSS import** — wavesurfer renders a canvas; there's no stylesheet to remember.
 
-## Trade-offs (be honest)
+## Scope limits
 
 - **Scope is Core + Timeline + Hover + Regions.** The spectrogram, minimap, envelope, and record plugins are not yet surfaced. If you need one of those today, reach for it through the engine directly via `getWaveSurfer()` (the escape hatch), or wait for a follow-up phase.
 - **Plugin presence is live, with one asymmetry.** `timeline`/`hover` register/unregister on the running engine as you toggle them, and `regions` lazily registers the Regions plugin the first time it becomes an array — none of these require a remount (the `regions` **contents** are, as always, fully reactive). There is no live *un*register path for `regions`, though: once the Regions plugin is registered, setting `regions` back to `null` does not tear it down. `hoverColor`/`dragToCreateRegions`/`regionColor` are read only when their plugin is (re-)created.

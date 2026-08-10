@@ -20,9 +20,9 @@ How `@rozie-ui/captcha` compares to the existing CAPTCHA wrappers. Every provide
 | **Lit** | *(none)* | *(none)* | *(none)* | *(none)* | ❌ nothing |
 | **Rozie** | ✅ | ✅ | ✅ | ✅ | ✅ **one `provider` prop** |
 
-The pattern: React, Vue, Svelte, and Angular each have *reasonable* single-provider wrappers, but a developer who wants to **let their app switch providers** — or who simply wants the *same* component API regardless of provider — has to maintain several different dependencies with several different prop shapes and event names. **Solid is sparsely served and Lit has nothing.** Rozie ships one source to all six frameworks, with a single API across all four providers.
+The pattern: React, Vue, Svelte, and Angular each have *reasonable* single-provider wrappers, but a developer who wants to **let their app switch providers** — or who simply wants the *same* component API regardless of provider — has to maintain several different dependencies with several different prop shapes and event names. **Solid is sparsely served and Lit has nothing.** Rozie ships the same component, with the same API, to all six frameworks and across all four providers.
 
-For the scoreless, widget-less **reCAPTCHA v3**, Rozie ships a sibling [`RecaptchaV3`](/components/captcha#recaptchav3) component (same package, named export) — an imperative-first `execute(action) → Promise<token>` surface, again one source across all six frameworks.
+For the scoreless, widget-less **reCAPTCHA v3**, Rozie ships a sibling [`RecaptchaV3`](/components/captcha#recaptchav3) component (same package, named export) — an imperative-first `execute(action) → Promise<token>` surface, again identical across all six frameworks.
 
 ## Feature matrix
 
@@ -40,7 +40,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported · *
 | Imperative `reset` / `execute` / `getResponse` | ⚠️ via ref, names vary | ⚠️ via ref, names vary | ✅ uniform handle, all 6 targets |
 | Invisible / programmatic challenge | ⚠️ provider-specific | ⚠️ provider-specific | ✅ `size="invisible"` + `execute()` |
 | Angular `ControlValueAccessor` | ⚠️ some | ⚠️ some | ✅ automatic (single model) |
-| Same API across **all 6 frameworks** | ❌ | ❌ | ✅ one `.rozie` source |
+| Same API across **all 6 frameworks** | ❌ | ❌ | ✅ |
 | Same API across **all 3 providers** | ❌ | ❌ | ✅ |
 
 ## What Rozie does *not* do
@@ -51,4 +51,4 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported · *
 ## Cross-references
 
 - [Captcha — showcase & API](/components/captcha) — props, events, the imperative handle, and gotchas.
-- [Features](/guide/features) — the full Rozie author-side API that makes one source compile to six.
+- [Features](/guide/features) — the Rozie author-side API behind these packages.

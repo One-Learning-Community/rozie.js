@@ -4,7 +4,7 @@ surface_hash: 0af9f90c05e2
 
 # Node-flow editor libraries comparison
 
-How `@rozie-ui/rete` (`FlowCanvas`) compares to the existing per-framework node-flow / graph editor libraries. A node editor's hard parts — the graph model, viewport pan/zoom, node drag, and drag-to-connect — are inherently framework-agnostic; [Rete.js v2](https://retejs.org/) is the engine that owns all of them and delegates only *rendering* to a swappable layer. The per-framework editors each re-solve those hard parts from scratch, which is why the ecosystem is **siloed**: React and Svelte are well-served, Vue has a separate reimplementation, Angular has a couple of options, and **Solid has only an experiment while Lit has nothing**. Rozie ships one source to all six by wrapping the agnostic engine with a single vanilla render layer.
+How `@rozie-ui/rete` (`FlowCanvas`) compares to the existing per-framework node-flow / graph editor libraries. A node editor's hard parts — the graph model, viewport pan/zoom, node drag, and drag-to-connect — are inherently framework-agnostic; [Rete.js v2](https://retejs.org/) is the engine that owns all of them and delegates only *rendering* to a swappable layer. The per-framework editors each re-solve those hard parts from scratch, which is why the ecosystem is siloed: React and Svelte are well-served, Vue has a separate reimplementation, Angular has a couple of options, and Solid has only an experiment while Lit has nothing. Rozie wraps the agnostic engine with a single vanilla render layer and delivers the same idiomatic `<FlowCanvas>`, with the same graph model, events, and handle, on all six frameworks as pre-compiled per-framework packages.
 
 > Research snapshot: 2026-06-08. Versions and the landscape move; treat them as of that date. The full audit is in [`node-flow-editor-feasibility.md`](https://github.com/One-Learning-Community/rozie.js/blob/main/.planning/research/node-flow-editor-feasibility.md).
 
@@ -19,9 +19,9 @@ How `@rozie-ui/rete` (`FlowCanvas`) compares to the existing per-framework node-
 | **ngx-graph** | `@swimlane/ngx-graph` | **Angular only** | SVG (D3 + dagre) | RxJS | graph-viz-first, less an interactive editor |
 | **solid-flow** | `solid-flow` | Solid | SVG + DOM | signals | **single-author experiment**, not production-grade |
 | **Lit** | — | — | — | — | **no standalone library exists** |
-| **Rozie** | `@rozie-ui/rete-*` | **all 6** | DOM + SVG (vanilla render layer) | Rete `NodeEditor` (the engine owns it) | one source → React/Vue/Svelte/Angular/Solid/Lit |
+| **Rozie** | `@rozie-ui/rete-*` | **all 6** | DOM + SVG (vanilla render layer) | Rete `NodeEditor` (the engine owns it) | same API on React/Vue/Svelte/Angular/Solid/Lit |
 
-The big-framework editors above are **excellent, mature libraries** — for a single-React app, React Flow is the obvious pick, and Rozie does not claim to out-feature it on its home framework. The wedge is breadth: **no single library ships all six**, and two targets are essentially unserved. xyflow — the strongest brand — publishes only `@xyflow/react` and `@xyflow/svelte` (its shared `@xyflow/system` core has **no** Vue/Solid/Angular/Lit wrapper); Vue Flow is a wholly separate project; **Solid** has only a single-author `solid-flow` experiment; and **Lit / web-components has nothing at all**. The one ecosystem that even approaches breadth is **Rete.js**, whose render plugins cover React/Vue/Angular/Svelte/Lit — five divergent codebases, and still no Solid. Rozie replaces those five plugins with **one `.rozie` source and one vanilla render layer**, and adds the missing Solid (and a far thinner Lit) for free.
+On its home framework each of these is a solid pick; for a single-React app, React Flow is the obvious choice. The case for Rozie is breadth: no single library ships all six frameworks, and two targets are essentially unserved. xyflow, the strongest brand, publishes only `@xyflow/react` and `@xyflow/svelte` (its shared `@xyflow/system` core has no Vue/Solid/Angular/Lit wrapper); Vue Flow is a wholly separate project; Solid has only a single-author `solid-flow` experiment; and Lit / web components have nothing at all. The one ecosystem that even approaches breadth is Rete.js, whose render plugins cover React/Vue/Angular/Svelte/Lit in five divergent codebases, still with no Solid. `@rozie-ui/rete` covers all six with one API, including Solid and Lit.
 
 ## Why wrap Rete.js
 
@@ -43,7 +43,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | **Typed-socket validation** (auto-reject mismatch) | ⚠️ consumer-glue | ⚠️ | ⚠️ | ⚠️ | ⚠️ | hand-roll | ✅ `:validate-types` from `<Port type>` + `canConnect` override |
 | Two-way zoom binding | ⚠️ controlled | ⚠️ | ⚠️ | ⚠️ | ⚠️ | hand-roll | ✅ `r-model:zoom` (echo-guarded) |
 | Graph events (moved / connected / picked) | ✅ | ✅ | ✅ | ✅ | ⚠️ | hand-roll | ✅ 8 structured events |
-| Imperative handle | ✅ `useReactFlow` | ✅ `useVueFlow` | ✅ | ✅ service | ⚠️ | hand-roll | ✅ uniform 27-verb `$expose` |
+| Imperative handle | ✅ `useReactFlow` | ✅ `useVueFlow` | ✅ | ✅ service | ⚠️ | hand-roll | ✅ uniform `$expose` handle |
 | Selection surfaced + cascading delete | ✅ `onSelectionChange` / `deleteElements` | ✅ | ✅ | ⚠️ | ⚠️ | hand-roll | ✅ `@selection-change` + `deleteNode` verb / Delete key |
 | Direction arrowheads | ✅ `markerEnd` | ✅ | ✅ | ⚠️ | ⚠️ | hand-roll | ✅ per-edge SVG `marker-end` |
 | **Controls** overlay (zoom / fit) | ✅ `<Controls/>` | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ✅ built-in (`:controls`, opt-out) |
@@ -58,67 +58,26 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | **NodeResizer** (drag-to-resize) | ✅ `<NodeResizer/>` | ✅ | ✅ | ⚠️ | ⚠️ | ❌ | ✅ `<NodeType resizable>` corner handles |
 | TypeScript | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
 | Zero-config styling, re-skinnable | ⚠️ import CSS + vars | ⚠️ | ⚠️ | ⚠️ | ⚠️ | hand-roll | ✅ `--rozie-flow-*` tokens + shadcn/Material/Bootstrap bridges + zero-import dark |
-| One source → all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Same API on all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ## Where Rozie wins today
 
-- **One definition, six idiomatic packages** — including the two frameworks the ecosystem leaves out entirely: **Solid** (only a single-author experiment) and **Lit** (nothing). Those consumers get a real node editor they otherwise cannot have, from the same source that produces the four big-framework packages.
-- **A controlled-graph authoring model on all six** — the consumer binds **one `r-model:graph` object** and declares a couple of **`<NodeType type>` templates** (each with a `#body` and a typed `<Port>` schema); the canvas renders every node by its type and **writes layout + connections back** into the bound object, so there is no hand-reconciling. It is the xyflow `nodeTypes` + controlled-state mental model, Vue-natural — and it is the *same* model on Solid and Lit, which have no such library at all.
-- **Framework-native node bodies on all six** — each `<NodeType>`'s `#body` is a **reactive multi-instance portal**: one handle mounts per graph node of that type, rendering a real framework fragment (any component, any reactivity), re-rendered in place as the node's data / selection changes.
-- **Automatic typed-socket validation on all six** — port `type` lives on the `<Port>` schema, so the canvas auto-rejects type-mismatched connections (`:validate-types`, default on) with `canConnect` as the optional custom-rule override — a feature the standalone editors leave to consumer glue.
-- **The engine owns interaction, so behavior is identical by construction** — pan/zoom transform, node drag, edge drawing, and connection-handle hit-testing all live in Rete's `AreaPlugin` + `ConnectionPlugin`. Rozie never re-implements pointer math per target, so there is no cross-framework drift in *how the editor feels*.
-- **Built-in chrome on all six** — a **Controls** overlay (zoom in / out / fit, opt out with `:controls="false"`) and an opt-in **MiniMap** (`:minimap="true"`): an SVG overview that maps every node at its **measured** size + the current viewport window (outside dimmed) and is **pannable** (drag to recenter via `setCenter`). React Flow ships `<Controls/>` / `<MiniMap/>` only on React; here Solid and Lit — which have no node editor at all — get them too, pixel-identical.
-- **Workflow-builder essentials on all six** — **palette drag-drop** (`screenToFlowPosition` projects a drop point to graph coords so a sidebar item lands under the pointer), **top/bottom handle positioning** (`<Port position>` for vertical flows — decision trees, top-down pipelines), and **labeled / styled edges** (`connection.label` / `stroke` / `dashed` for conditional edges). The interactions that actually define a no-code / workflow builder, idiomatic on Solid and Lit too.
-- **A uniform 27-verb imperative handle** (`getEditor` / `getArea` / `addNode` / `removeNode` / `deleteNode` / `duplicateNode` / `addConnection` / `removeConnection` / `clear` / `clearSelection` / `selectAll` / `selectNode` / `getSelectedNodes` / `centerOnNode` / `autoArrange` / `undo` / `redo` / `canUndo` / `canRedo` / `zoomToFit` / `zoomTo` / `setCenter` / `setViewport` / `screenToFlowPosition` / `getNodes` / `getConnections` / `getTransform`) grabbed with each framework's native ref — versus "however this library happens to expose its instance" (a hook, a service, a ref).
-- **`getEditor()` / `getArea()` are always one hop from the raw engine**, so the full Rete API (custom plugins, `rete-engine` dataflow, `rete-auto-arrange-plugin`, …) is reachable on any target when the curated surface doesn't cover something.
-- **Zero-config styling that re-skins to any design system.** Rete ships *no* stylesheet, so the incumbents leave node / socket / connection chrome to consumer CSS. `@rozie-ui/rete` styles every value as a `--rozie-flow-*` CSS custom property with a built-in fallback — it looks right on drop-in, yet one `--rozie-flow-accent` override recolors every selection cue, and ready-made `themes/{base,shadcn,material,bootstrap}.css` bridges map it onto a design system. **Dark mode works with zero import** (a built-in `prefers-color-scheme` default on all six, Lit included); `themes/base.css` adds the app-toggled `.dark` class strategy on top. Same tokens on all six targets.
-
-## The controlled-graph + `<NodeType>` / `<Port>` model {#controlled-graph}
-
-`FlowCanvas` follows the **controlled-graph** mental model (xyflow's `nodeTypes` +
-controlled `nodes`/`edges`, made Vue-natural with `r-model`): the consumer binds **one
-`graph` object** and declares node **TYPE templates** — nothing more. The canvas is the
-middleware: it renders each node by its `type` (render-by-type), owns drag / zoom / connect
-/ validation, and **writes layout (`x`/`y` on drag) and connections (on connect /
-disconnect) back** into the bound object, so the developer never hand-reconciles.
-
-```html
-<FlowCanvas r-model:graph="$data.graph" :validate-types="true" @connection-rejected="onReject">
-  <NodeType type="source">
-    <template #body="{ node }">{{ node.data.label }}</template>
-    <Port output="num" type="number" />
-    <Port output="str" type="string" />
-  </NodeType>
-  <NodeType type="merge">
-    <template #body="{ node }">Merge</template>
-    <Port input="num" type="number" multiple />
-    <Port input="str" type="string" multiple />
-  </NodeType>
-</FlowCanvas>
-```
-
-with `$data.graph = { nodes: [{ id, type, x, y, data }], connections: [...] }` — the
-**single source of truth**.
-
-- **`<NodeType type>` declares a node TYPE once** (a `#body` template scoped `{ node, selected, emit }` + a nested `<Port>` schema). Every graph node whose `type` matches renders this template; a `<NodeType>` has **no** `id`/`x`/`y` — instance identity + position live in the bound `graph`, not on the tag. This cleanly separates "what a `source` looks like" from "this source exists at x,y" — the disjoint the old instance-children model (`<FlowNode id>`) conflated.
-- **`<Port output=|input= type= [multiple]>` declares one typed directional port** on its `<NodeType>`. Direction is the attribute name (`output` / `input`); `type` drives automatic validation. _(The attrs are `input`/`output`, not `in`/`out` — `in` is a JS reserved word that the Svelte `$props()` destructure rejects.)_
-- **Edges live ONLY in `graph.connections`.** There is no flat `<Connection>` child — drawing or removing an edge writes a fresh `connections` array back through the `graph` model.
-
-**Why the node body is a named `#body` slot, not bare children.** A node body has to *teleport* into the node element the Rete engine creates — it doesn't render in the normal component tree. Rozie mounts that body through a portal (`$portals.body`), which gives it a fresh framework render-root inside the engine-owned host. But a portal render-root has no tree ancestor, so context-consuming children placed inside it would not resolve their `$inject` on five of six targets (context is tree-scoped on React/Vue/Svelte/Solid/Lit). Separating the teleported body (`<template #body>`) from the context-consuming `<Port>` children (which stay in the normal child position) is therefore the robust cross-framework shape: the body teleports, the ports keep their tree scope and inject correctly. Verified behaviorally across all six targets (including the Angular real-build).
-
-This was built by dogfooding Rozie's own cross-component context primitive (`$provide` / `$inject`): `<FlowCanvas>` provides a per-TYPE registry, `<NodeType>` provides a nested per-type sub-context, and `<Port>` injects it.
+- **First-class packages for all six frameworks**, including the two the ecosystem leaves out entirely: Solid (only a single-author experiment) and Lit (nothing).
+- **A controlled-graph model with the same API everywhere.** The consumer binds one `r-model:graph` object and declares `<NodeType type>` templates, each with a `#body` and a typed `<Port>` schema; the canvas renders every node by its type and writes layout and connections back into the bound object, so there is no hand-reconciling. Node bodies are real framework fragments (any component, any reactivity) mounted per node and re-rendered as data / selection changes, and typed-socket validation auto-rejects mismatched connections (`:validate-types`, default on; `canConnect` overrides). The full [`<NodeType>` / `<Port>` recipe lives on the showcase page](/components/rete).
+- **The engine owns interaction, so behavior is identical by construction.** Pan/zoom transform, node drag, edge drawing, and connection-handle hit-testing all live in Rete's `AreaPlugin` + `ConnectionPlugin`. Rozie never re-implements pointer math per target, so there is no cross-framework drift in how the editor feels.
+- **Built-in chrome and workflow essentials on all six.** A Controls overlay (zoom in / out / fit), an opt-in MiniMap (measured node overview, pannable viewport window), palette drag-drop (`screenToFlowPosition` projects a drop point to graph coords), top/bottom port positioning for vertical flows, and labeled / styled edges (`connection.label` / `stroke` / `dashed`). React Flow ships its `<Controls/>` / `<MiniMap/>` only on React; here Solid and Lit get them too.
+- **A uniform imperative handle, one hop from the raw engine.** Node, connection, selection, viewport, and history verbs (`addNode`, `deleteNode`, `duplicateNode`, `undo` / `redo`, `zoomToFit`, `screenToFlowPosition`, and more) come through each framework's native ref, and `getEditor()` / `getArea()` expose the full Rete API (custom plugins, `rete-engine` dataflow, `rete-auto-arrange-plugin`, …) when the curated surface doesn't cover something. The full handle table is in the [API reference](/components/rete).
+- **Zero-config styling that re-skins to any design system.** Rete ships no stylesheet, so the incumbents leave node / socket / connection chrome to consumer CSS. `@rozie-ui/rete` styles every value as a `--rozie-flow-*` CSS custom property with a built-in fallback; one `--rozie-flow-accent` override recolors every selection cue, ready-made `themes/{base,shadcn,material,bootstrap}.css` bridges map it onto a design system, and dark mode works with zero import (a built-in `prefers-color-scheme` default on all six, Lit included).
 
 ## What Rozie defers {#what-rozie-defers}
 
-This page concedes where the standalone libraries are genuinely ahead — that's what keeps the comparison credible, and it doubles as Rozie's roadmap.
-
-- **NodeResizer aspect-ratio lock, plus assorted second-tier chrome.** NodeResizer is free-form width/height only — a `keepAspectRatio` lock is deferred out of v1. Also still deferred (unchanged from Phase 44's list): subflows/grouping, copy/paste across canvases, export-to-PNG/SVG, controlled selection (bound selected-ids), and per-node locked/draggable/deletable flags.
-- **Big-framework depth on the home framework.** React Flow (Zustand store, deep node/edge-type catalogs, helper hooks, layouting integrations) is a mature, multi-year library; on React it exposes more surface than Rozie's curated set. Rozie's value is **not** "more than React Flow on React" — it's the **same idiomatic editor on all six frameworks from one source**, with the unserved **Solid and Lit** finally covered.
-- **`@rozie-ui/rete` is `0.1.2`.** The surface (21 props / 12 events / 27-verb handle / `<NodeType>` render-by-type body portal + typed `<Port>` schema with top/bottom positioning + built-in Controls & MiniMap + labeled/styled edges + palette drag-drop) is stable and gate-verified (behavioral parity across all six targets), but it is younger than the incumbents.
+- **NodeResizer aspect-ratio lock, plus assorted second-tier chrome.** NodeResizer is free-form width/height only; a `keepAspectRatio` lock is deferred out of v1. Also still deferred: subflows/grouping, copy/paste across canvases, export-to-PNG/SVG, controlled selection (bound selected-ids), and per-node locked/draggable/deletable flags.
+- **Big-framework depth on the home framework.** React Flow (Zustand store, deep node/edge-type catalogs, helper hooks, layouting integrations) is a mature, multi-year library; on React it exposes more surface than Rozie's curated set. Rozie's value is the same idiomatic editor on all six frameworks, including the otherwise unserved Solid and Lit.
+- **`@rozie-ui/rete` is pre-1.0.** The surface is stable and gate-verified with behavioral parity across all six targets, but it is younger than the multi-year incumbents. The full prop, event, and handle tables live in the [showcase + API reference](/components/rete).
 
 ## Try it
 
-The [`@rozie-ui/rete` showcase + API reference](/components/rete) documents the `@rozie-ui/rete-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/rete-react rete rete-area-plugin rete-connection-plugin rete-render-utils`, etc.). Rete ships no stylesheet, and there is **no engine CSS to import** — all node / socket / connection chrome ships scoped and fully-tokenised inside the component. Every rendered value is a `--rozie-flow-*` custom property with an inline fallback, so it works zero-config yet re-skins by overriding a token — and **dark mode is on by default** (a built-in `prefers-color-scheme` block, all six targets). Add a design-system look or an app-toggled `.dark` class strategy with a one-line `themes/{base,shadcn,material,bootstrap}.css` import.
+The [`@rozie-ui/rete` showcase + API reference](/components/rete) documents the `@rozie-ui/rete-*` packages — one pre-compiled, per-framework install (`npm i @rozie-ui/rete-react rete rete-area-plugin rete-connection-plugin rete-render-utils`, etc.). Rete ships no stylesheet, and there is no engine CSS to import: all node / socket / connection chrome ships scoped and fully-tokenised inside the component. Every rendered value is a `--rozie-flow-*` custom property with an inline fallback, so it works zero-config yet re-skins by overriding a token, and dark mode is on by default (a built-in `prefers-color-scheme` block, all six targets). Add a design-system look or an app-toggled `.dark` class strategy with a one-line `themes/{base,shadcn,material,bootstrap}.css` import.
 
 ## Cross-references
 

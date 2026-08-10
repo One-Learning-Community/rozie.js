@@ -4,7 +4,7 @@ surface_hash: e0d05594bc13
 
 # Switch vs the per-framework alternatives
 
-An accessible on/off toggle — `role="switch"`, a controlled boolean, keyboard support, and a re-skinnable thumb/track — is something every design system re-implements, once per framework. `Switch` is authored **once** in `Switch.rozie` and compiled to all six. Here is what it replaces.
+An accessible on/off toggle — `role="switch"`, a controlled boolean, keyboard support, and a re-skinnable thumb/track — is something every design system re-implements, once per framework. `Switch` is the same component, with the same API and behaviour, on all six frameworks. Here is what it replaces.
 
 ## The native `<input type="checkbox" role="switch">` it improves on
 
@@ -31,4 +31,4 @@ A checkbox with `role="switch"` is the usual platform starting point, but the ba
 - **Angular `ControlValueAccessor`** so the switch is a first-class form control.
 - **Token theming** — the same `--rozie-switch-*` variables and the shadcn / Material / Bootstrap bridges across every framework.
 
-The wedge is the usual Rozie one: you maintain **one** accessible, fully-featured switch, and every framework gets an idiomatic, byte-for-byte-consistent build of it.
+The case for Rozie here is the usual one: you maintain one accessible, fully-featured switch, and every framework gets an idiomatic, byte-for-byte-consistent build of it.

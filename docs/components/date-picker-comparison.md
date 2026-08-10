@@ -5,23 +5,22 @@ surface_hash: 8d91af7afd25
 
 # DatePicker vs the per-framework date pickers
 
-Date pickers are one of the most-reimplemented widgets in front-end — and almost
-every option a design-system author can reach for is **single-framework**. The
+Date pickers are one of the most-reimplemented widgets in front-end, and almost
+every option a design-system author can reach for is single-framework. The
 accessible, headless ones (React Aria, Melt/Bits UI) are *locked to one
 framework*; the styled, feature-deep ones (MUI X, @vuepic/vue-datepicker,
 flatpickr) are likewise React-only, Vue-only, or a vanilla engine you re-wrap
 per target. So a team shipping a design system across React + Vue + Svelte +
-Angular (+ Solid + Lit) adopts and maintains a **different** date picker per
-framework — with divergent APIs, divergent theming, and **wildly divergent
-accessibility quality**.
+Angular (+ Solid + Lit) adopts and maintains a different date picker per
+framework, with divergent APIs, divergent theming, and wildly divergent
+accessibility quality.
 
-[`@rozie-ui/date-picker`](/components/date-picker) takes the other path: one
-`.rozie` source → six idiomatic, accessible packages with **one** API
+[`@rozie-ui/date-picker`](/components/date-picker) takes the other path: six
+idiomatic, accessible packages with one API
 (`value` model, `min`/`max`/`disabledDates`, roving-grid keyboard nav, a
-`#header` slot, a `focus`/`goToToday`/`clear` handle). It does **less** than the
-feature-deep incumbents on purpose — single-date **or range** selection (with
-preset shortcuts), headless, token-themed — and that scope is stated plainly
-below, not hidden.
+`#header` slot, a `focus`/`goToToday`/`clear` handle). It does less than the
+feature-deep incumbents on purpose: single-date or range selection (with
+preset shortcuts), headless, token-themed. That scope is spelled out below.
 
 > Research snapshot: **2026-06-24**. Versions, publish dates, and weekly-download
 > figures were verified live against the npm registry (`registry.npmjs.org`) and
@@ -36,7 +35,7 @@ partial / stale / lightly-documented.
 
 | Library | Framework(s) | Headless? | WAI-ARIA a11y | Maintained (latest / date) | Range / time | Notes |
 | --- | --- | :---: | :---: | --- | :---: | --- |
-| **[`@rozie-ui/date-picker`](/components/date-picker)** | **React + Vue + Svelte + Angular + Solid + Lit** | ✓ token-themed | ✓ ARIA grid + roving keyboard | this repo (2026-06) | range ✓ / time ✗ | One source → six idiomatic packages, one API. Single + range selection with presets; no time-of-day. |
+| **[`@rozie-ui/date-picker`](/components/date-picker)** | **React + Vue + Svelte + Angular + Solid + Lit** | ✓ token-themed | ✓ ARIA grid + roving keyboard | this repo (2026-06) | range ✓ / time ✗ | Same API, six idiomatic packages. Single + range selection with presets; no time-of-day. |
 | [react-datepicker](https://github.com/Hacker0x01/react-datepicker) | React | ✗ styled | ~ keyboard, partial ARIA | 9.1.0 / 2025-12 | ✓ / ✓ | ~4.7M wk. The popular default; opinionated CSS. |
 | [react-day-picker](https://daypicker.dev) | React | ~ restyleable | ✓ follows APG | 10.0.1 / 2026-05 | range ✓ / time ✗ | Strong a11y; non-Gregorian calendars. Powers shadcn/ui's calendar. |
 | [@mui/x-date-pickers](https://mui.com/x/react-date-pickers/) | React | ✗ Material | ✓ documented WCAG/ARIA | 9.6.0 / 2026-06 | time ✓ / **range Pro-only** | Date/time/datetime free; **range pickers are commercial**. |
@@ -57,9 +56,9 @@ partial / stale / lightly-documented.
 | [duet-date-picker](https://github.com/duetds/date-picker) | web component | ✗ themable | ✓ a11y was its pitch | 1.4.0 / 2021-06 | ✗ single-date | **Repo archived read-only 2024-09** — not maintained. |
 | [Cally](https://wicky.nillia.ms/cally/) | framework-agnostic WC | ~ CSS parts | ✓ a11y a core goal | 0.9.2 / 2026-02 | range ✓ / time ✗ | The modern up-and-comer; pre-1.0, framework-independent. |
 
-These libraries are **good** — on its home framework, most are the obvious pick,
-and Rozie does not claim to out-feature MUI X on React or @vuepic on Vue. The
-wedge is **coverage and consistency**, addressed next.
+On its home framework each of these is a solid pick, and Rozie does not claim
+to out-feature MUI X on React or @vuepic on Vue. The case for Rozie is
+coverage and consistency, addressed next.
 
 ## The cross-framework parity argument
 
@@ -92,24 +91,21 @@ Line the landscape up by framework and the gap is structural, not cosmetic:
   spot) or the promising web component [Cally](https://wicky.nillia.ms/cally/) —
   but flatpickr still needs a per-framework wrapper, and Cally is pre-1.0.
 
-So a single design system today binds **react-aria on React, @vuepic on Vue,
-bits-ui on Svelte, a MatDatepicker on Angular, and hand-rolls Solid/Lit** — five
+So a single design system today binds react-aria on React, @vuepic on Vue,
+bits-ui on Svelte, a MatDatepicker on Angular, and hand-rolls Solid/Lit: five
 APIs, five theming models, and accessibility that ranges from best-in-class
 (react-aria) to a documented pain point (flatpickr). `@rozie-ui/date-picker`
 authors the [WAI-ARIA grid pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/),
 the roving keyboard focus, the `min`/`max`/`disabledDates` gating, the two-way
-ISO `value` model, and the token theme **once**, and ships the *same* idiomatic
-`<DatePicker>` to all six — including an Angular `ControlValueAccessor` generated
+ISO `value` model, and the token theme once, and ships the *same* idiomatic
+`<DatePicker>` to all six, including an Angular `ControlValueAccessor` generated
 from the single `value` model, so `[(ngModel)]` and reactive forms bind directly.
 See the [API reference](/components/date-picker-api) for the exact surface.
 
 ## Where each alternative is the better pick
 
-This page is honest about where the incumbents win — that's what keeps it
-credible.
-
 - **You ship one framework and want maximum features.** If you're React-only and
-  need **time-of-day, month/year *picker modes*, or non-Gregorian systems**,
+  need time-of-day, month/year *picker modes*, or non-Gregorian systems,
   [@mui/x-date-pickers](https://mui.com/x/react-date-pickers/) or
   [react-datepicker](https://github.com/Hacker0x01/react-datepicker) out-feature
   Rozie outright (note MUI's *range* pickers are a commercial Pro tier — Rozie's
@@ -117,7 +113,7 @@ credible.
   [@vuepic/vue-datepicker](https://vue3datepicker.com) is deeper. Angular-only
   with a time requirement? [PrimeNG](https://primeng.org/datepicker).
 - **You need a date-*time* or multi-date picker today.** Rozie ships single-date
-  and date-**range** selection (with presets), but **not** time-of-day or
+  and date-range selection (with presets), but not time-of-day or
   arbitrary multi-date. Reach for flatpickr, @vuepic, MUI X, or PrimeNG (time)
   instead.
 - **You want the absolute accessibility ceiling on React.**
@@ -134,13 +130,13 @@ credible.
 
 ## What `@rozie-ui/date-picker` deliberately is **not**
 
-Rozie's scope is narrow on purpose; framing it as deliberate is the honest move.
+Rozie's scope is narrow on purpose.
 
 - **Not a date-time or arbitrary multi-date picker.** It selects a single date
   *or* a date **range** — `value` is one ISO `YYYY-MM-DD` string in single mode,
   or `{ start, end }` in `selectionMode="range"`, with optional preset shortcuts
-  (`presetRanges` + a `#presets` slot). **Time-of-day and arbitrary multi-date
-  (3+ discrete dates) remain out of scope** — areas where flatpickr, @vuepic,
+  (`presetRanges` + a `#presets` slot). Time-of-day and arbitrary multi-date
+  (3+ discrete dates) remain out of scope, areas where flatpickr, @vuepic,
   MUI X, and PrimeNG lead. (See the
   [`selectionMode` + `value` prop notes](/components/date-picker-api#props).)
 - **Not a popover/input combo.** It is the **calendar surface** — compose it
@@ -156,17 +152,17 @@ Rozie's scope is narrow on purpose; framing it as deliberate is the honest move.
   react-aria, bits-ui, and Melt inherit from Adobe's `@internationalized/date`.
 - **Not a date library.** It carries a tiny UTC-safe internal grid helper, not a
   general date toolkit — bring `date-fns` / `dayjs` / `Temporal` for arithmetic
-  elsewhere in your app. The upside: **no date-library dependency** in the bundle,
+  elsewhere in your app. The upside: no date-library dependency in the bundle,
   where the styled incumbents frequently pull `date-fns` / `dayjs` / `luxon`.
 
 ## What it does ship, on all six
 
-What Rozie *does* cover, it covers identically everywhere — and that uniformity
+What Rozie *does* cover, it covers identically everywhere. That uniformity
 is the point:
 
 | Capability | `@rozie-ui/date-picker` | Per-framework incumbents |
 | --- | --- | --- |
-| Cross-framework parity | ✓ one source → 6 idiomatic packages | ✗ a different library per framework |
+| Cross-framework parity | ✓ same API, 6 idiomatic packages | ✗ a different library per framework |
 | Headless / restyleable | ✓ token-themed + `#header` / `#footer` / `#presets` slots | ~ varies; usually opinionated CSS |
 | `min` / `max` / disabled dates | ✓ built in; a range can neither preview nor commit **across** a disabled day (pointer + keyboard) | ✓ usually |
 | Roving-grid keyboard a11y | ✓ [WAI-ARIA grid](https://www.w3.org/WAI/ARIA/apg/patterns/grid/) (arrows / Home / End / PageUp / PageDown / Enter / Space) | ~ ranges from best-in-class to a known weak spot |

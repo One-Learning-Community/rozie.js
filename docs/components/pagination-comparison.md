@@ -5,7 +5,7 @@ surface_hash: 93b6d215eb7e
 
 # Pagination vs the per-framework libraries it replaces
 
-A pager is one of those components every design system re-implements per framework. `@rozie-ui/pagination` is a **single accessible source** compiled to all six — so a component-library author maintains one file instead of one binding per framework.
+A pager is one of those components every design system re-implements per framework. `@rozie-ui/pagination` is a single accessible source compiled to all six: a component-library author maintains one file instead of one binding per framework.
 
 ## What it replaces
 
@@ -18,7 +18,7 @@ A pager is one of those components every design system re-implements per framewo
 | Solid | (few options — usually hand-rolled) | A bespoke component |
 | Lit | (few options — usually hand-rolled) | A bespoke custom element |
 
-With Rozie, the windowing algorithm, the bounds logic, the roving keyboard navigation, and the ARIA semantics are authored **once** and emit idiomatic output for each framework.
+With Rozie, the windowing algorithm, the bounds logic, the roving keyboard navigation, and the ARIA semantics are authored once and emit idiomatic output for each framework.
 
 ## How it differs
 
