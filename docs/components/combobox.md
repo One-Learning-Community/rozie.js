@@ -58,7 +58,7 @@ const frameworks = [
 </template>
 ```
 
-`r-model:value` is Rozie's [two-way bind](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Combobox` the selected value, `Combobox` writes the newly-picked value back, and the framework reconciler picks it up — no `onChange → setState` wiring. The input *text* is internal state, not a second model (two models would forfeit the form-control story); a `search` event exposes the typed query for async / server-side filtering. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Combobox` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Combobox` the selected value, `Combobox` writes the newly-picked value back, and the framework reconciler picks it up — no `onChange → setState` wiring. The input *text* is internal state, not a second model (two models would forfeit the form-control story); a `search` event exposes the typed query for async / server-side filtering. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Combobox` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## API
 

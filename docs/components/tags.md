@@ -49,7 +49,7 @@ Two-way bind `modelValue` (a `string[]`) and type — press Enter or comma to co
 </template>
 ```
 
-`r-model:modelValue` is Rozie's [two-way bind](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Tags` an array, `Tags` writes a fresh array back on every add/remove, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `modelValue` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Tags` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:modelValue` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Tags` an array, `Tags` writes a fresh array back on every add/remove, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `modelValue` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Tags` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## Custom chip rendering
 

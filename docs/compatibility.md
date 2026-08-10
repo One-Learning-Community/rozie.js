@@ -34,7 +34,7 @@ For the narrative behind each ⚠︎, follow the link to the matching section in
 | `r-show` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `r-for` with `:key` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `r-model` (form-input sugar) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `r-model` modifiers (`.lazy`, `.number`, `.trim`, custom) | [⚠︎](/guide/features#r-model-modifiers-—-lazy-number-trim) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `r-model` modifiers (`.lazy`, `.number`, `.trim`, custom) | [⚠︎](/guide/props-and-two-way#r-model-modifiers-—-lazy-number-trim) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `:prop="…"` binding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `{{ }}` interpolation in text | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | <span v-pre>`{{ }}`</span> interpolation in attribute values | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -65,7 +65,7 @@ For the narrative behind each ⚠︎, follow the link to the matching section in
 | `$expose({ … })` — consumer-callable imperative handle | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 The per-target handle idiom (and how a consumer obtains the handle in each framework) is
-documented in [`$expose`](/guide/features#expose-→-a-consumer-callable-imperative-handle-everywhere).
+documented in [`$expose`](/guide/composition#expose-→-a-consumer-callable-imperative-handle-everywhere).
 
 ## Two-way binding
 
@@ -104,7 +104,7 @@ The pattern across them is consistent:
 
 - **Slot ⚠︎** — the feature works at runtime; the consumer-side *authoring shape* differs (render prop, `data-rozie-params` attribute, additive `slots?:` / `snippets?:` / `templates?:` prop).
 - **Lifecycle ⚠︎** — the hooks fire; the *timing* differs on conditionally-rendered component roots (Lit / Solid keep the instance alive across the toggle).
-- **`r-model` modifiers ⚠︎ (React only)** — `.number`/`.trim`/custom value transforms behave identically across all six targets. The one divergence is React's `.lazy`: React has no true `change` event, so `r-model.lazy` emits an **uncontrolled `defaultValue` + `onBlur`** input (the idiomatic React deferred-commit pattern) instead of a controlled `value` + `onChange`. The trade-off — programmatic writes to the bound state mid-edit are not reflected by the uncontrolled input — is a documented parity gap, consistent with the render-prop-slot precedent. See [`r-model` modifiers](/guide/features#r-model-modifiers-—-lazy-number-trim).
+- **`r-model` modifiers ⚠︎ (React only)** — `.number`/`.trim`/custom value transforms behave identically across all six targets. The one divergence is React's `.lazy`: React has no true `change` event, so `r-model.lazy` emits an **uncontrolled `defaultValue` + `onBlur`** input (the idiomatic React deferred-commit pattern) instead of a controlled `value` + `onChange`. The trade-off — programmatic writes to the bound state mid-edit are not reflected by the uncontrolled input — is a documented parity gap, consistent with the render-prop-slot precedent. See [`r-model` modifiers](/guide/props-and-two-way#r-model-modifiers-—-lazy-number-trim).
 
 The only `❌` in the matrix is the Lit-specific scoped + dynamic slot name
 combination — a documented v1 limitation.

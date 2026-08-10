@@ -397,5 +397,5 @@ Chart.js paints to a `<canvas>`, so unlike DOM-based engines there is exactly on
 
 - [`Chart.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/chartjs/src/Chart.rozie) — the canonical wrapper.
 - [The portal-slot primitive](/examples/portal-list) — how `<slot name="X" portal />` routes a consumer fragment through each target's imperative-render API.
-- [`$expose` and the imperative handle](/guide/features#expose-→-a-consumer-callable-imperative-handle-everywhere)
+- [`$expose` and the imperative handle](/guide/composition#expose-→-a-consumer-callable-imperative-handle-everywhere)
 - [The LineChart example](/examples/line-chart) — a focused single-type walkthrough of the same wrapper.

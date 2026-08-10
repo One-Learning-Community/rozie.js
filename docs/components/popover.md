@@ -48,7 +48,7 @@ Two-way bind `open`, project a trigger into the `anchor` slot and the content in
 </template>
 ```
 
-`r-model:open` is Rozie's [two-way bind](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Popover` a boolean, `Popover` writes the new state back whenever the trigger or a dismissal toggles it — no `onChange → setState` wiring. The `anchor` slot exposes `{ open, toggle, show, hide }` so you can build any trigger element.
+`r-model:open` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Popover` a boolean, `Popover` writes the new state back whenever the trigger or a dismissal toggles it — no `onChange → setState` wiring. The `anchor` slot exposes `{ open, toggle, show, hide }` so you can build any trigger element.
 
 ## API
 

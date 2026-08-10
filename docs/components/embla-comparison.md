@@ -42,7 +42,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Zero-config styling, re-skinnable | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | — | ✅ CSS-var tokens + shadcn/Material/Bootstrap bridges |
 | Same API on all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 
-¹ Declarative (default-slot) mode resolves on Lit via the [`$slotted.<name>` sigil](/guide/features#slotted-name-—-resolve-slotted-elements-across-the-lit-shadow-boundary), which reaches across the shadow boundary that a bare `container.querySelectorAll('.rozie-embla__slide')` cannot see through.
+¹ Declarative (default-slot) mode resolves on Lit via the [`$slotted.<name>` sigil](/guide/engine-wrappers#slotted-name-—-resolve-slotted-elements-across-the-lit-shadow-boundary), which reaches across the shadow boundary that a bare `container.querySelectorAll('.rozie-embla__slide')` cannot see through.
 
 ## Where Rozie wins today
 

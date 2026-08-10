@@ -48,7 +48,7 @@ Two-way bind `size` and project the two panes into the `start` / `end` slots. Dr
 </template>
 ```
 
-`r-model:size` is Rozie's [two-way bind](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Resizable` a percent, `Resizable` writes the clamped new percent back on every drag / keyboard nudge, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `size` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — the splitter position **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:size` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Resizable` a percent, `Resizable` writes the clamped new percent back on every drag / keyboard nudge, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `size` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — the splitter position **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 For the full prop / event / handle / slot reference, see the [API page](/components/resizable-api). For the per-framework consumption code, see the [usage page](/components/resizable-usage).
 

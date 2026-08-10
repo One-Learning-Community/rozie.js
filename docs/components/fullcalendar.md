@@ -487,5 +487,5 @@ Per the v1 portal-slot constraint, the `event` slot re-renders only when FullCal
 
 - [`FullCalendar.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/fullcalendar/src/FullCalendar.rozie) — the canonical wrapper.
 - [The portal-slot primitive](/examples/portal-list) — how `<slot name="X" portal />` routes a consumer fragment through each target's imperative-render API.
-- [`$expose` and the imperative handle](/guide/features#expose-→-a-consumer-callable-imperative-handle-everywhere)
-- [`r-model` — two-way binding everywhere](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere)
+- [`$expose` and the imperative handle](/guide/composition#expose-→-a-consumer-callable-imperative-handle-everywhere)
+- [`r-model` — two-way binding everywhere](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere)

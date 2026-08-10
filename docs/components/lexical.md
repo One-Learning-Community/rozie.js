@@ -200,4 +200,4 @@ Lit carries a browser floor and open-shadow-DOM obligations the other five don't
 - [Lexical libraries comparison](/components/lexical-comparison) — the per-framework wrapper matrix + the market gap.
 - [Lexical — live demo](/components/lexical-demo) — the toolbar + editor running live on this page.
 - [Decorator node authoring recipe](/components/lexical-recipe-decorator) — write a custom node + its per-target mount bridge (incl. the Lit open-shadow-root bridge + its browser floor).
-- [`$provide` / `$inject` — cross-component context](/guide/features)
+- [`$provide` / `$inject` — cross-component context](/guide/composition)

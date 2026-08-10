@@ -36,7 +36,7 @@ Get a working `DataTable` on the page in one block: pass a `data` array, declare
 </template>
 ```
 
-Each `r-model:<slice>` is Rozie's [two-way bind](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `DataTable` a state slice, the table writes the fresh slice back on every transition, and the framework reconciler picks it up — no `onChange → setState` wiring. Every slice also has an **uncontrolled fallback**: a slice you do not bind is managed internally (and its change event still fires regardless of binding, so you can observe transitions without two-way binding).
+Each `r-model:<slice>` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `DataTable` a state slice, the table writes the fresh slice back on every transition, and the framework reconciler picks it up — no `onChange → setState` wiring. Every slice also has an **uncontrolled fallback**: a slice you do not bind is managed internally (and its change event still fires regardless of binding, so you can observe transitions without two-way binding).
 
 ## Per-framework code
 

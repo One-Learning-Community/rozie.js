@@ -45,7 +45,7 @@ There are **two slide-source modes** from one component:
 - **Config array** — pass `:slides="[...]"` and Rozie renders one slide per item (optionally via the scoped `slide` slot for custom markup).
 - **Declarative** — drop `<div class="rozie-embla__slide">…</div>` children into the default slot; Embla's native `watchSlides` reacts to adds/removes.
 
-The `rozie-embla__slide` class is **required**, not decorative, in both modes: the component measures slides by an explicit element list (the [`$slotted.<name>` sigil](/guide/features#slotted-name-—-resolve-slotted-elements-across-the-lit-shadow-boundary) resolves the default slot's content even across Lit's shadow boundary), so unclassed children are never measured as slides.
+The `rozie-embla__slide` class is **required**, not decorative, in both modes: the component measures slides by an explicit element list (the [`$slotted.<name>` sigil](/guide/engine-wrappers#slotted-name-—-resolve-slotted-elements-across-the-lit-shadow-boundary) resolves the default slot's content even across Lit's shadow boundary), so unclassed children are never measured as slides.
 
 Both modes work identically on all six targets, including Lit.
 

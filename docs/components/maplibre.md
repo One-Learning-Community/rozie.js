@@ -537,5 +537,5 @@ MapLibre needs an explicitly-sized container. The wrapper's `.rozie-maplibre` ho
 - [MapLibre libraries comparison](/components/maplibre-comparison) — the per-framework wrapper matrix, the Solid / Lit gap, and the honest "what Rozie defers" row.
 - [`MapLibre.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/maplibre/src/MapLibre.rozie) — the canonical wrapper.
 - [The portal-slot primitive](/examples/portal-list) — how `<slot name="X" portal reactive />` routes a consumer fragment through each target's imperative-render API.
-- [`$expose` and the imperative handle](/guide/features#expose-→-a-consumer-callable-imperative-handle-everywhere)
-- [`r-model` — two-way binding everywhere](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere)
+- [`$expose` and the imperative handle](/guide/composition#expose-→-a-consumer-callable-imperative-handle-everywhere)
+- [`r-model` — two-way binding everywhere](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere)

@@ -451,12 +451,12 @@ The handle methods are `openPicker` / `closePicker`, not `open` / `close`. This 
 
 ### Selector-style options
 
-Authored class names render **literally** on every target — React included (it scopes via a `[data-rozie-s-<hash>]` attribute, not by hashing the class name), so any flatpickr option that takes a class **selector** string matches the rendered class directly. [`$classSelector('cls')`](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) is an optional, typo-checked way to author such a selector (it validates the class against the component's `<style>` at compile time and lowers to the literal `".cls"` on all six targets). A `data-*` attribute selector remains a good choice when you want a selector that is independent of styling.
+Authored class names render **literally** on every target — React included (it scopes via a `[data-rozie-s-<hash>]` attribute, not by hashing the class name), so any flatpickr option that takes a class **selector** string matches the rendered class directly. [`$classSelector('cls')`](/guide/engine-wrappers#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) is an optional, typo-checked way to author such a selector (it validates the class against the component's `<style>` at compile time and lowers to the literal `".cls"` on all six targets). A `data-*` attribute selector remains a good choice when you want a selector that is independent of styling.
 
 ## Cross-references
 
 - [Flatpickr example & per-target output](/examples/flatpickr) — the live source plus compiled React/Vue/Svelte/Angular/Solid/Lit output side by side.
 - [`Flatpickr.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/flatpickr/src/Flatpickr.rozie) — the canonical wrapper.
-- [`$classSelector()` — class-name-as-selector for vanilla-JS engines](/guide/features#classselector-—-handing-a-class-name-to-a-vanilla-js-engine)
-- [`$expose` and the imperative handle](/guide/features#expose-→-a-consumer-callable-imperative-handle-everywhere)
-- [`r-model` — two-way binding everywhere](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere)
+- [`$classSelector()` — class-name-as-selector for vanilla-JS engines](/guide/engine-wrappers#classselector-—-handing-a-class-name-to-a-vanilla-js-engine)
+- [`$expose` and the imperative handle](/guide/composition#expose-→-a-consumer-callable-imperative-handle-everywhere)
+- [`r-model` — two-way binding everywhere](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere)

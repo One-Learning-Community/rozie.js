@@ -47,7 +47,7 @@ Two-way bind `value` and set `length` / `type` to get a segmented code input. Th
 </template>
 ```
 
-`r-model:value` is Rozie's [two-way bind](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Otp` a string, `Otp` writes the new contiguous code back on every edit (type, paste, backspace), and the framework reconciler picks it up — no `onChange → setState` wiring. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — an `Otp` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Otp` a string, `Otp` writes the new contiguous code back on every edit (type, paste, backspace), and the framework reconciler picks it up — no `onChange → setState` wiring. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — an `Otp` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## API
 

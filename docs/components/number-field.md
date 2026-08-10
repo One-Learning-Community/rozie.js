@@ -47,7 +47,7 @@ Two-way bind `modelValue` and set `min` / `max` / `step` to get a clamped, step-
 </template>
 ```
 
-`r-model:modelValue` is Rozie's [two-way bind](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `NumberField` a `number | null`, `NumberField` writes the new clamped + snapped value back on every commit, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `modelValue` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `NumberField` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:modelValue` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `NumberField` a `number | null`, `NumberField` writes the new clamped + snapped value back on every commit, and the framework reconciler picks it up — no `onChange → setState` wiring. Because `modelValue` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `NumberField` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## API
 

@@ -567,5 +567,5 @@ TipTap's marquee feature — **custom node views** — ships via the [`nodeView`
 - [`TipTap.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tiptap/src/TipTap.rozie) — the canonical wrapper.
 - [TipTap libraries comparison](/components/tiptap-comparison) — the per-framework wrapper matrix + the gap-closure status.
 - [The portal-slot primitive](/examples/portal-list) — how `<slot name="X" portal />` routes a consumer fragment through each target's imperative-render API. The `nodeView` slot adds the `reactive` flag for engine-driven in-place re-render.
-- [`$expose` and the imperative handle](/guide/features#expose-→-a-consumer-callable-imperative-handle-everywhere)
-- [`r-model` — two-way binding everywhere](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere)
+- [`$expose` and the imperative handle](/guide/composition#expose-→-a-consumer-callable-imperative-handle-everywhere)
+- [`r-model` — two-way binding everywhere](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere)

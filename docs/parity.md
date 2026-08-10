@@ -32,7 +32,7 @@ option), `--no-safe-interpolation` (CLI), or `<rozie safe-interpolation="false">
 restores the old raw per-target emit. Separately, a *bare* whole-object sigil
 (`{{ $data }}` rather than `{{ $data.columns }}`) has no portable v1 representation
 and is a uniform compile error (**ROZ978**), independent of `safeInterpolation`.
-See [Safe non-primitive interpolation](/guide/features#safe-non-primitive-interpolation-—-objects-render-as-portable-json-never-crash)
+See [Safe non-primitive interpolation](/guide/templates-and-events#safe-non-primitive-interpolation-—-objects-render-as-portable-json-never-crash)
 for the full mechanics.
 
 Relatedly, in **attribute position** the targets used to disagree on nullish values: a
@@ -44,7 +44,7 @@ six targets, matching Vue's native `:attr` binding and the web platform (so `[da
 presence selectors and `hasAttribute(...)` agree everywhere). The drop predicate is
 `value == null` **only** — `false` still stringifies, so `aria-expanded="false"` /
 `data-x="false"` are preserved. Text/interpolation position is unchanged (`null` → `''`, the
-table above). See [Attribute position — a nullish bound value drops the attribute](/guide/features#attribute-position-—-a-nullish-bound-value-drops-the-attribute).
+table above). See [Attribute position — a nullish bound value drops the attribute](/guide/templates-and-events#attribute-position-—-a-nullish-bound-value-drops-the-attribute).
 
 ## Slot consumer ergonomics
 

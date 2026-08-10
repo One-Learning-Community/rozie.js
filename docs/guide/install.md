@@ -37,7 +37,7 @@ import Counter from './Counter.rozie';
 
 ### Per-target options: `angular: { cva }`
 
-On the Angular target, components with exactly one `model: true` prop automatically implement `ControlValueAccessor` so they bind to `[(ngModel)]` / `formControlName` like native form controls (see [the forms-integration contract](/guide/features#angular-a-single-model-component-is-a-real-form-control)). This is **on by default**. To turn it off:
+On the Angular target, components with exactly one `model: true` prop automatically implement `ControlValueAccessor` so they bind to `[(ngModel)]` / `formControlName` like native form controls (see [the forms-integration contract](/guide/props-and-two-way#angular-a-single-model-component-is-a-real-form-control)). This is **on by default**. To turn it off:
 
 ```ts
 Rozie({ target: 'angular', angular: { cva: false } }),
@@ -106,7 +106,7 @@ const ref = useRef<DropdownHandle>(null);
 // <Dropdown ref={ref} />  →  ref.current?.open()
 ```
 
-The handle methods are typed from your `<script>` function signatures. See [`$expose` → Getting the handle from the consumer side](/guide/features#getting-the-handle-from-the-consumer-side) for the per-framework ref idiom.
+The handle methods are typed from your `<script>` function signatures. See [`$expose` → Getting the handle from the consumer side](/guide/composition#getting-the-handle-from-the-consumer-side) for the per-framework ref idiom.
 
 ### Migrating from the `declare module '*.rozie'` wildcard
 

@@ -48,7 +48,7 @@ Two-way bind `value` and set the `min` / `max` / `step` scale to get a single-th
 </template>
 ```
 
-`r-model:value` is Rozie's [two-way bind](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Slider` a value, `Slider` writes the new value back on every commit (drag end, keyboard, or programmatic step), and the framework reconciler picks it up — no `onChange → setState` wiring. In single mode `value` is a scalar number; in `range` mode it is a **sorted `[lo, hi]` array** (each thumb is neighbour-clamped, and a fresh array is written on every commit). Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Slider` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
+`r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Slider` a value, `Slider` writes the new value back on every commit (drag end, keyboard, or programmatic step), and the framework reconciler picks it up — no `onChange → setState` wiring. In single mode `value` is a scalar number; in `range` mode it is a **sorted `[lo, hi]` array** (each thumb is neighbour-clamped, and a fresh array is written on every commit). Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor` — a `Slider` **is** a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
 ## API
 

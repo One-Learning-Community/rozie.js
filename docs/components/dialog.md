@@ -52,7 +52,7 @@ Two-way bind `open` to a boolean and put your content in the default slot. A cli
 </template>
 ```
 
-`r-model:open` is Rozie's [two-way bind](/guide/features#model-true-→-idiomatic-two-way-binding-everywhere): the consumer owns the boolean, the component reconciles the native dialog to it (`showModal()` when it flips true, `close()` when it flips false), and writes `false` back on every dismiss — so `open` is always in sync with what's on screen, with no `onClose → setState` glue.
+`r-model:open` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer owns the boolean, the component reconciles the native dialog to it (`showModal()` when it flips true, `close()` when it flips false), and writes `false` back on every dismiss — so `open` is always in sync with what's on screen, with no `onClose → setState` glue.
 
 ## API
 
