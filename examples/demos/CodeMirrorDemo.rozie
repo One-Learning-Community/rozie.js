@@ -48,7 +48,15 @@
   emptyCode: "",
   language: 'javascript',
   readOnlyExt: false,
+  // D7S-04 — the `readOnly` PROP's own compartment (distinct from the
+  // `readOnlyExt` :extensions toggle above, which drives EditorView.editable
+  // instead). Drives Editor C's `:readOnly` binding.
+  readOnlyProp: false,
   panelOn: false,
+  // D7S-05 — a dedicated editor (Editor H) for the `basicSetup` prop's
+  // baselineCompartment reconfigure.
+  basicSetupCode: "function greet(name) {\n  return name\n}",
+  basicSetupOn: false,
   // G5 wave 1 — topPanel (mount-once) + tooltip (REACTIVE) portal slots.
   // tipCode drives a dedicated editor whose tooltip shows the live caret line/col.
   tipCode: "alpha\nbeta\ngamma",
@@ -111,6 +119,19 @@ const toggleLanguage = () => {
 // fill toggles $slots.panel presence; flipping it mounts/disposes the panel.
 const togglePanel = () => { $data.panelOn = !$data.panelOn }
 
+// D7S-04 — the `readOnly` PROP's own readOnlyCompartment reconfigure. Distinct
+// from `toggleExtensions` above (which flips EditorView.editable via
+// :extensions). CodeMirror surfaces state.readOnly on the DOM as
+// `aria-readonly="true"` on `.cm-content` (verified against the installed
+// @codemirror/view source) — the spec asserts that attribute, not pixels.
+const toggleReadOnly = () => { $data.readOnlyProp = !$data.readOnlyProp }
+
+// D7S-05 — the `basicSetup` PROP's baselineCompartment reconfigure. CM6's
+// bundled basicSetup includes foldGutter() (from @codemirror/language), which
+// renders a `.cm-foldGutter` gutter column the thin manual baseline never
+// does — a verified, non-flaky structural signal for the toggle.
+const toggleBasicSetup = () => { $data.basicSetupOn = !$data.basicSetupOn }
+
 // D-06 — the 8 $expose verbs, driven via the FRAMEWORK-NATIVE component ref
 // (`ref="cm"` → $refs.cm), NOT a $refs element read. Each runs from an @click
 // handler (post-mount; $refs are only safe after mount, and a click fires only
@@ -137,6 +158,33 @@ const handleGetSelection = () => {
 const handleGetView = () => {
   const view = $refs.cm?.getView?.()
   $data.handleOut = view ? 'view ok' : '(no handle)'
+}
+// D7S-07 — the 4 remaining $expose verbs the demo previously left unwired
+// (undo/redo/selectAll/dispatch), plus scrollToPos. Each writes an observable
+// marker into $data.handleOut so the spec can assert real behavior, not just
+// "didn't throw" — undo/redo round-trip the insertText('X') step above,
+// selectAll proves a full-document range, dispatch proves the raw-transaction
+// passthrough, scrollToPos proves the scroll-effect call is reachable.
+const handleUndo = () => {
+  $refs.cm?.undo?.()
+  $data.handleOut = String($refs.cm?.getValue?.() ?? '(no handle)')
+}
+const handleRedo = () => {
+  $refs.cm?.redo?.()
+  $data.handleOut = String($refs.cm?.getValue?.() ?? '(no handle)')
+}
+const handleSelectAll = () => {
+  $refs.cm?.selectAll?.()
+  const sel = $refs.cm?.getSelection?.()
+  $data.handleOut = sel ? `selall ${sel.from}-${sel.to}` : '(no handle)'
+}
+const handleDispatch = () => {
+  $refs.cm?.dispatch?.({ changes: { from: 0, to: 0, insert: 'D' } })
+  $data.handleOut = String($refs.cm?.getValue?.() ?? '(no handle)')
+}
+const handleScrollToPos = () => {
+  $refs.cm?.scrollToPos?.(0)
+  $data.handleOut = 'scrolled'
 }
 
 // G5 wave 1 — REACTIVE tooltip slot empirical proof. The reactive portal slot
@@ -229,6 +277,7 @@ const markDecoMount = (from) => {
       <span class="row-label">Surface</span>
       <button type="button" data-testid="toggle-extensions" @click="toggleExtensions">extensions</button>
       <button type="button" data-testid="toggle-language" @click="toggleLanguage">language</button>
+      <button type="button" data-testid="toggle-readonly" @click="toggleReadOnly">readOnly</button>
       <button type="button" data-testid="toggle-panel" @click="togglePanel">panel</button>
     </div>
     <div class="control-row">
@@ -238,6 +287,11 @@ const markDecoMount = (from) => {
       <button type="button" data-testid="handle-insert-text" @click="handleInsertText">insertText</button>
       <button type="button" data-testid="handle-get-selection" @click="handleGetSelection">getSelection</button>
       <button type="button" data-testid="handle-get-view" @click="handleGetView">getView</button>
+      <button type="button" data-testid="handle-undo" @click="handleUndo">undo</button>
+      <button type="button" data-testid="handle-redo" @click="handleRedo">redo</button>
+      <button type="button" data-testid="handle-select-all" @click="handleSelectAll">selectAll</button>
+      <button type="button" data-testid="handle-dispatch" @click="handleDispatch">dispatch</button>
+      <button type="button" data-testid="handle-scroll-to-pos" @click="handleScrollToPos">scrollToPos</button>
     </div>
 
     <!-- data-testid lives on the wrapping <div> (a plain element reliably
@@ -245,7 +299,7 @@ const markDecoMount = (from) => {
          is NOT forwarded to the rendered DOM on every target). The spec scopes
          its .cm-editor/.cm-content/.rozie-cm-panel locators within these. -->
     <div class="editor-cell" data-testid="surface-cell">
-      <span class="label">Editor C (extensions / language / handle)</span>
+      <span class="label">Editor C (extensions / language / readOnly / handle)</span>
       <CodeMirror
         ref="cm"
         r-model:value="$data.surfaceCode"
@@ -253,6 +307,7 @@ const markDecoMount = (from) => {
         theme="light"
         :language="$data.language"
         :extensions="surfaceExtensions()"
+        :readOnly="$data.readOnlyProp"
       />
     </div>
 
@@ -335,6 +390,26 @@ const markDecoMount = (from) => {
           <span class="cm-deco-fill" data-testid="deco-fill" :data-cap="markDecoMount(from)">✦</span>
         </template>
       </CodeMirror>
+    </div>
+
+    <!-- D7S-05 — basicSetup PROP baselineCompartment reconfigure. Editor H is a
+         dedicated cell (basicSetup interacts with lineNumbers/history, so it
+         gets its own editor rather than layering onto an existing one). CM6's
+         bundled basicSetup includes foldGutter() (@codemirror/language), which
+         renders a `.cm-foldGutter` gutter column the thin manual baseline
+         never does. -->
+    <div class="control-row">
+      <span class="row-label">Basic</span>
+      <button type="button" data-testid="toggle-basicsetup" @click="toggleBasicSetup">basicSetup</button>
+    </div>
+    <div class="editor-cell" data-testid="basicsetup-cell">
+      <span class="label">Editor H (basicSetup toggle)</span>
+      <CodeMirror
+        r-model:value="$data.basicSetupCode"
+        :height="120"
+        theme="light"
+        :basicSetup="$data.basicSetupOn"
+      />
     </div>
 
     <div class="state-pane">

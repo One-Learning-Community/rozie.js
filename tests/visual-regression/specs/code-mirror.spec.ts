@@ -146,16 +146,46 @@ for (const target of TARGETS) {
         `[code-mirror ${target}] editor-typing round-trip skipped: ${(e as Error).message}`,
       );
     }
+
+    // ---- theme prop reconfigure (D7S-03) ----
+    // Editor B's "Toggle Editor B theme" button flips `:theme` between 'light'
+    // and 'dark' through the themeCompartment (no remount). CM6's
+    // `EditorView.get themeClasses` composes into `.cm-editor`'s `class`
+    // attribute (verified against the installed @codemirror/view source:
+    // `class: "cm-editor" + (focused ? …) + this.themeClasses`), so a
+    // before/after className diff is a legitimate structural (non-pixel)
+    // proof that the theme actually reconfigured live.
+    const themeClassBefore = (await editorB.getAttribute('class')) ?? '';
+    const themeToggleBtn = mount.getByRole('button', {
+      name: 'Toggle Editor B theme',
+    });
+    await expect(themeToggleBtn).toBeVisible({ timeout: 5_000 });
+    await themeToggleBtn.click();
+    await expect
+      .poll(async () => (await editorB.getAttribute('class')) ?? '', {
+        timeout: 5_000,
+        intervals: [100, 200, 400],
+      })
+      .not.toBe(themeClassBefore);
+    // Toggle back — the class reverts (same compartment, no remount either way).
+    await themeToggleBtn.click();
+    await expect
+      .poll(async () => (await editorB.getAttribute('class')) ?? '', {
+        timeout: 5_000,
+        intervals: [100, 200, 400],
+      })
+      .toBe(themeClassBefore);
   });
 }
 
 /**
- * Expanded-surface behavioral smoke — Phase 29 Plan 04 (D-01..D-06).
+ * Expanded-surface behavioral smoke — Phase 29 Plan 04 (D-01..D-06), extended
+ * by quick 260810-d7s (D7S-04..D7S-07) to close the AUDIT.md coverage gaps.
  *
  * The round-trip block above proves D-08 (the model path is the only change
  * channel). THIS block proves the rest of the expanded surface BEHAVES at
  * runtime across all 6 targets, driving the new-surface rig in
- * `examples/demos/CodeMirrorDemo.rozie` (Editor C/D/E + the data-testid
+ * `examples/demos/CodeMirrorDemo.rozie` (Editor C/D/E/G/H + the data-testid
  * controls). Structural/behavioral assertions only — NO `toHaveScreenshot`
  * (the pixel tier is the SEPARATE CodeMirrorScreenshot cell below).
  *
@@ -167,14 +197,27 @@ for (const target of TARGETS) {
  *     without remount; the doc is preserved. (Plain-text vs javascript has no
  *     reliable cross-target DOM signal, so the proof is "doc preserved + state
  *     pane reflects the new language after the switch".)
+ *   - D7S-04 — toggle the `readOnly` prop (its OWN readOnlyCompartment,
+ *     distinct from the extensions-driven editable flip above). CodeMirror
+ *     surfaces `state.readOnly` as `aria-readonly="true"` on `.cm-content`
+ *     (verified against the installed @codemirror/view source) — the spec
+ *     asserts that attribute.
  *   - D-04 — the empty-doc placeholder editor shows `.cm-placeholder` text.
  *   - D-05 — the panel portal slot mounts a `.rozie-cm-panel` host when filled
  *     and disposes it when the panel-bearing editor unmounts.
- *   - D-06 — the 8 `$expose` verbs are callable via the framework-native ref
- *     with observable effects (getValue/replaceValue/insertText/getSelection/
- *     getView/focus/setSelection/dispatch — the rig exercises the value-shaping
- *     ones, replaceValue shares the suppress-echo guard so it does not
- *     ping-pong).
+ *   - D-06 / D7S-07 — all 12 `$expose` verbs are callable via the
+ *     framework-native ref with observable effects (getValue/replaceValue/
+ *     insertText/getSelection/getView/focus/setSelection/dispatch/undo/redo/
+ *     selectAll/scrollToPos — replaceValue shares the suppress-echo guard so
+ *     it does not ping-pong; undo/redo round-trip the insertText step).
+ *   - D7S-05 — toggle the `basicSetup` prop (its own baselineCompartment).
+ *     CM6's bundled `basicSetup` includes `foldGutter()`, which renders a
+ *     `.cm-foldGutter` gutter column the thin manual baseline never does —
+ *     a verified, non-flaky structural signal.
+ *   - D7S-06 — the `gutter` + `decoration` REACTIVE MULTI-INSTANCE portal
+ *     slots (Editor G, already rigged with mount counters but previously
+ *     never driven by this spec): assert the initial 2+2 mount count, then
+ *     drive the `toggle-marks` dispose/remount cycle via DOM element counts.
  */
 for (const target of TARGETS) {
   const built = existsSync(
@@ -240,6 +283,26 @@ for (const target of TARGETS) {
     // Doc preserved across the langCompartment reconfigure (no remount).
     await expect(surfaceContent).toContainText('answer');
 
+    // ---- D7S-04 readOnly compartment reconfigure ----
+    // Distinct compartment from the D-01/D-02 extensions-driven editable flip
+    // above. CodeMirror does NOT change `contenteditable` for `state.readOnly`
+    // — it sets `aria-readonly="true"` on `.cm-content` instead (verified
+    // against @codemirror/view's ContentView attrs — `if (state.readOnly)
+    // contentAttrs["aria-readonly"] = "true"`).
+    await expect(surfaceContent).not.toHaveAttribute('aria-readonly', 'true');
+    await mount.getByTestId('toggle-readonly').click();
+    await expect(surfaceContent).toHaveAttribute('aria-readonly', 'true', {
+      timeout: 10_000,
+    });
+    // Toggle back off — leaves the editor in the same state the D-06 handle
+    // block below expects (readOnly does not itself block the programmatic
+    // $expose verbs, since those bypass CM's input-handler readOnly checks,
+    // but toggling back keeps this leg self-contained).
+    await mount.getByTestId('toggle-readonly').click();
+    await expect(surfaceContent).not.toHaveAttribute('aria-readonly', 'true', {
+      timeout: 10_000,
+    });
+
     // ---- D-06 $expose verbs ($refs.cm handle, observable effects) ----
     // Driven via the framework-native component ref. On Angular a component ref
     // resolves to the host ElementRef rather than the exposed handle instance,
@@ -277,6 +340,45 @@ for (const target of TARGETS) {
       });
       await mount.getByTestId('handle-get-view').click();
       await expect(mount.getByTestId('state-handle-out')).toHaveText('view ok', {
+        timeout: 10_000,
+      });
+
+      // ---- D7S-07 the 4 remaining $expose verbs (undo/redo/selectAll/dispatch) ----
+      // At this point the doc is "X// replaced via handle" (the insertText
+      // step above inserted "X" at position 0 after replaceValue set the
+      // base text). undo/redo round-trip that insertText transaction —
+      // getSelection/getView above were selection/read-only calls that CM's
+      // history does not treat as undoable steps, so undo() reverts exactly
+      // the "X" insertion.
+      await mount.getByTestId('handle-undo').click();
+      await expect(mount.getByTestId('state-handle-out')).toHaveText(
+        '// replaced via handle',
+        { timeout: 10_000 },
+      );
+      await mount.getByTestId('handle-redo').click();
+      await expect(mount.getByTestId('state-handle-out')).toHaveText(
+        'X// replaced via handle',
+        { timeout: 10_000 },
+      );
+      // selectAll spans the full document — asserted as a "0-based start"
+      // prefix (exact end offset depends on the live doc length, which this
+      // assertion deliberately does not hardcode).
+      await mount.getByTestId('handle-select-all').click();
+      await expect(mount.getByTestId('state-handle-out')).toContainText(
+        'selall 0-',
+        { timeout: 10_000 },
+      );
+      // dispatch passes a raw transaction through verbatim — prepend "D".
+      await mount.getByTestId('handle-dispatch').click();
+      await expect(mount.getByTestId('state-handle-out')).toHaveText(
+        'DX// replaced via handle',
+        { timeout: 10_000 },
+      );
+      // scrollToPos writes a deterministic marker (no doc mutation, no
+      // reliable cross-target scroll-position DOM signal — the call-reached
+      // proof is the marker itself).
+      await mount.getByTestId('handle-scroll-to-pos').click();
+      await expect(mount.getByTestId('state-handle-out')).toHaveText('scrolled', {
         timeout: 10_000,
       });
     }
@@ -372,6 +474,68 @@ for (const target of TARGETS) {
       // Key synthesis unavailable on this target/host — the topPanel structural
       // gate already proved the wave-1 slot wiring; skip the caret-move bonus.
     }
+
+    // ---- D7S-05 basicSetup baselineCompartment reconfigure ----
+    // Editor H. CM6's bundled `basicSetup` includes `foldGutter()`
+    // (@codemirror/language), which renders a `.cm-foldGutter` gutter column;
+    // the thin manual baseline (lineNumbers + history + keymap) never does.
+    const basicSetupCell = mount.getByTestId('basicsetup-cell');
+    await expect(basicSetupCell).toBeVisible({ timeout: 10_000 });
+    await expect(basicSetupCell.locator('.cm-foldGutter')).toHaveCount(0, {
+      timeout: 10_000,
+    });
+    await mount.getByTestId('toggle-basicsetup').click();
+    await expect(basicSetupCell.locator('.cm-foldGutter')).toHaveCount(1, {
+      timeout: 10_000,
+    });
+    // Toggle back — the fold gutter is removed (baselineCompartment reverts to
+    // the thin manual baseline, no remount either way).
+    await mount.getByTestId('toggle-basicsetup').click();
+    await expect(basicSetupCell.locator('.cm-foldGutter')).toHaveCount(0, {
+      timeout: 10_000,
+    });
+
+    // ---- D7S-06 gutter + decoration REACTIVE MULTI-INSTANCE portal slots ----
+    // Editor G. The demo rig already mounts 2 gutter markers (lines 1 + 3) and
+    // 2 inline-widget decorations (offsets 0 + 9) on initial mount (markOn
+    // starts `true`) — this spec previously never visited `mark-cell` at all.
+    // Assert the initial multi-instance mount count via the counters, then
+    // drive the toggle-marks dispose/remount cycle via live DOM element
+    // counts (the counters themselves are one-shot-per-key and do NOT climb
+    // again on a remount of the SAME line/offset keys — DOM counts are the
+    // correct signal for the toggle cycle).
+    const markCell = mount.getByTestId('mark-cell');
+    await expect(markCell).toBeVisible({ timeout: 10_000 });
+    await expect(mount.getByTestId('state-gutter-mounts')).toHaveText(
+      'gutter:2',
+      { timeout: 10_000 },
+    );
+    await expect(mount.getByTestId('state-deco-mounts')).toHaveText('deco:2', {
+      timeout: 10_000,
+    });
+    await expect(markCell.locator('.cm-gutter-fill')).toHaveCount(2, {
+      timeout: 10_000,
+    });
+    await expect(markCell.locator('.cm-deco-fill')).toHaveCount(2, {
+      timeout: 10_000,
+    });
+    // Dispose: markOn -> false drops both driving props to [], tearing down
+    // all 4 live portal handles (the editor itself stays mounted/responsive).
+    await mount.getByTestId('toggle-marks').click();
+    await expect(markCell.locator('.cm-gutter-fill')).toHaveCount(0, {
+      timeout: 10_000,
+    });
+    await expect(markCell.locator('.cm-deco-fill')).toHaveCount(0, {
+      timeout: 10_000,
+    });
+    // Remount: markOn -> true again mounts a fresh set of 4 handles.
+    await mount.getByTestId('toggle-marks').click();
+    await expect(markCell.locator('.cm-gutter-fill')).toHaveCount(2, {
+      timeout: 10_000,
+    });
+    await expect(markCell.locator('.cm-deco-fill')).toHaveCount(2, {
+      timeout: 10_000,
+    });
   });
 }
 
