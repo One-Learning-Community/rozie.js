@@ -79,11 +79,11 @@ watch(() => sources, (live: any) => {
     id: props.id,
     spec: props.spec
   });
-});
+}, { flush: 'post' });
 watch(() => props.spec, (v: any) => {
   if (reg) reg.update(props.id, {
     id: props.id,
     spec: v
   });
-});
+}, { flush: 'post' });
 </script>

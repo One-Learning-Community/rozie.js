@@ -413,14 +413,14 @@ watch(() => props.data, (v: any) => {
   live.datasets.length = 0;
   live.datasets.push(...merged);
   instance.update(props.updateMode);
-}, { immediate: true });
+}, { immediate: true, flush: 'post' });
 watch(() => props.options, () => {
   if (!instance || !buildConfig) return;
   instance.options = buildConfig().options;
   instance.update('none');
-});
-watch(() => props.type, () => recreate());
-watch(() => props.plugins, () => recreate());
+}, { flush: 'post' });
+watch(() => props.type, () => recreate(), { flush: 'post' });
+watch(() => props.plugins, () => recreate(), { flush: 'post' });
 
 defineExpose({ getChart, updateChart, resizeChart, resetChart, renderChart, stopChart, clearChart, toBase64Image, setDatasetVisibility, isDatasetVisible, hideDataset, showDataset, setActiveElements, getActiveElements, getDatasetMeta });
 </script>

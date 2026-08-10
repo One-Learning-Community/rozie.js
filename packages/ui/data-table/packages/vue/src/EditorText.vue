@@ -85,5 +85,5 @@ onMounted(() => {
 
 watch(() => props.autofocus, (v: any) => {
   if (v) inputElRef.value?.focus();
-});
+}, { flush: 'post' });
 </script>

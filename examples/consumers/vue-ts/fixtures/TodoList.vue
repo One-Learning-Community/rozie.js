@@ -1,6 +1,6 @@
 <template>
 
-<div class="todo-list">
+<div class="todo-list" v-bind="$attrs">
   <header>
     <slot name="header" :remaining="remaining" :total="items.length">
       
@@ -51,7 +51,7 @@ defineSlots<{
 
 const draft = ref('');
 
-const remaining = computed(() => items.value.filter(i => !i.done).length);
+const remaining = computed(() => items.value.filter((i: any) => !i.done).length);
 
 const add = () => {
   const text = draft.value.trim();
@@ -64,26 +64,20 @@ const add = () => {
   draft.value = '';
   emit('add', text);
 };
-const toggle = id => {
-  items.value = items.value.map(i => i.id === id ? {
+const toggle = (id: any) => {
+  items.value = items.value.map((i: any) => i.id === id ? {
     ...i,
     done: !i.done
   } : i);
   emit('toggle', id);
 };
-
 // Internal method renamed from `remove` to `removeItem` to avoid colliding
 // with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
 // methods as class fields and the resulting `remove(id)` signature is
 // incompatible with the inherited `remove(): void`. Public API is unchanged:
 // the slot param is still `:remove`, the emitted event is still `'remove'`.
-// Internal method renamed from `remove` to `removeItem` to avoid colliding
-// with `HTMLElement.prototype.remove()` on the Lit target — Lit emits user
-// methods as class fields and the resulting `remove(id)` signature is
-// incompatible with the inherited `remove(): void`. Public API is unchanged:
-// the slot param is still `:remove`, the emitted event is still `'remove'`.
-const removeItem = id => {
-  items.value = items.value.filter(i => i.id !== id);
+const removeItem = (id: any) => {
+  items.value = items.value.filter((i: any) => i.id !== id);
   emit('remove', id);
 };
 </script>

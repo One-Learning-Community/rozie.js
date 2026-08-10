@@ -764,33 +764,33 @@ onMounted(() => {
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
 
-watch(() => value.value, (v: any) => writeDoc(v));
+watch(() => value.value, (v: any) => writeDoc(v), { flush: 'post' });
 watch(() => props.language, () => {
   scheduleReconfigure(langCompartment, langExt);
-});
+}, { flush: 'post' });
 watch(() => props.theme, () => {
   scheduleReconfigure(themeCompartment, themeExt);
-});
+}, { flush: 'post' });
 watch(() => props.readOnly, () => {
   scheduleReconfigure(readOnlyCompartment, () => EditorState.readOnly.of(props.readOnly));
-});
+}, { flush: 'post' });
 watch(() => props.placeholder, () => {
   scheduleReconfigure(placeholderCompartment, phExt);
-});
+}, { flush: 'post' });
 watch(() => props.extensions, () => {
   scheduleReconfigure(extensionsCompartment, () => props.extensions);
-});
+}, { flush: 'post' });
 watch(() => props.basicSetup, () => {
   scheduleReconfigure(baselineCompartment, baselineExt);
-});
+}, { flush: 'post' });
 watch(() => props.gutterLines, () => {
   if (!rebuildGutterExt) return;
   scheduleReconfigure(gutterCompartment, () => rebuildGutterExt());
-});
+}, { flush: 'post' });
 watch(() => props.decorations, () => {
   if (!rebuildDecorationExt) return;
   scheduleReconfigure(decorationCompartment, () => rebuildDecorationExt());
-});
+}, { flush: 'post' });
 
 defineExpose({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelection, setSelection, undo, redo, selectAll, scrollToPos });
 </script>

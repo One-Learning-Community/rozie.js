@@ -127,7 +127,7 @@ onMounted(() => {
 
 watch(() => open.value, (isOpen: any) => {
   sync(isOpen);
-});
+}, { flush: 'post' });
 
 defineExpose({ show, hide });
 </script>

@@ -810,7 +810,7 @@ watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () =
     windowVer.value = windowVer.value + 1;
     scheduleRemeasure();
   }
-});
+}, { flush: 'post' });
 
 defineExpose({ open, close, toggle, clear, focusControl });
 

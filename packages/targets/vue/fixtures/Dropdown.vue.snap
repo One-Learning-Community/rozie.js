@@ -60,7 +60,7 @@ onMounted(() => {
 
 watch(() => open.value, () => {
   if (open.value) reposition();
-});
+}, { flush: 'post' });
 
 defineExpose({ toggle, close });
 

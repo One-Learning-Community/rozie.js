@@ -312,22 +312,22 @@ watch(() => open.value, (isOpen: any) => {
   } else {
     stopTracking();
   }
-});
+}, { flush: 'post' });
 watch(() => props.placement, () => {
   if (open.value) position();
-});
+}, { flush: 'post' });
 watch(() => props.offset, () => {
   if (open.value) position();
-});
+}, { flush: 'post' });
 watch(() => props.disableFlip, () => {
   if (open.value) position();
-});
+}, { flush: 'post' });
 watch(() => props.disableShift, () => {
   if (open.value) position();
-});
+}, { flush: 'post' });
 watch(() => props.strategy, () => {
   if (open.value) position();
-});
+}, { flush: 'post' });
 
 defineExpose({ show, hide, toggle, reposition });
 

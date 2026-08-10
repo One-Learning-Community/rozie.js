@@ -1,6 +1,6 @@
 <template>
 
-<div class="dropdown">
+<div class="dropdown" v-bind="$attrs">
   <div ref="triggerElRef" @click="toggle">
     <slot name="trigger" :open="open" :toggle="toggle"></slot>
   </div>
@@ -38,8 +38,8 @@ const close = () => {
 };
 const reposition = () => {
   if (!panelElRef.value || !triggerElRef.value) return;
-  const rect = triggerElRef.value.getBoundingClientRect();
-  Object.assign(panelElRef.value.style, {
+  const rect = triggerElRef.value!.getBoundingClientRect();
+  Object.assign(panelElRef.value!.style, {
     top: `${rect.bottom}px`,
     left: `${rect.left}px`
   });
@@ -60,7 +60,9 @@ onMounted(() => {
 
 watch(() => open.value, () => {
   if (open.value) reposition();
-});
+}, { flush: 'post' });
+
+defineExpose({ toggle, close });
 
 useOutsideClick(
   [triggerElRef, panelElRef],
@@ -70,8 +72,8 @@ useOutsideClick(
 
 watchEffect((onCleanup) => {
   if (!(open.value && props.closeOnEscape)) return;
-  const handler = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape') return;
+  const handler = ($event: KeyboardEvent) => {
+    if ($event.key !== 'Escape') return;
     close();
   };
   document.addEventListener('keydown', handler);

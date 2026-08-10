@@ -92,7 +92,7 @@ watch(() => resolveSource(), (src: any) => {
   if (!reg || src == null || src === appliedSource) return;
   appliedSource = src;
   reg.update(props.id, buildSpec());
-});
+}, { flush: 'post' });
 watch(() => props.paint, () => {
   if (reg) reg.update(props.id, {
     id: props.id,
@@ -102,7 +102,7 @@ watch(() => props.paint, () => {
     source: resolveSource(),
     beforeId: props.beforeId
   });
-});
+}, { flush: 'post' });
 watch(() => props.layout, () => {
   if (reg) reg.update(props.id, {
     id: props.id,
@@ -112,7 +112,7 @@ watch(() => props.layout, () => {
     source: resolveSource(),
     beforeId: props.beforeId
   });
-});
+}, { flush: 'post' });
 watch(() => props.type, () => {
   if (reg) reg.update(props.id, {
     id: props.id,
@@ -122,5 +122,5 @@ watch(() => props.type, () => {
     source: resolveSource(),
     beforeId: props.beforeId
   });
-});
+}, { flush: 'post' });
 </script>

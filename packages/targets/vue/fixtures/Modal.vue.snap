@@ -70,7 +70,7 @@ onMounted(() => {
 
 watch(() => open.value, (isOpen: any) => {
   if (isOpen) lockScroll();else unlockScroll();
-});
+}, { flush: 'post' });
 
 watchEffect((onCleanup) => {
   if (!(open.value && props.closeOnEscape)) return;

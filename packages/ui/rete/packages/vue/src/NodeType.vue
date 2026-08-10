@@ -238,5 +238,5 @@ onUpdated(() => {
 
 watch(() => props.type, () => {
   if (cv) cv.registerType(props.type, buildSpec());
-});
+}, { flush: 'post' });
 </script>

@@ -1,6 +1,6 @@
 <template>
 
-<div class="search-input">
+<div class="search-input" v-bind="$attrs">
   
   <input ref="inputElRef" type="search" :placeholder="props.placeholder" v-model="query" @input="debouncedOnSearch" @keydown.enter="onSearch" @keydown.esc="clear" />
 

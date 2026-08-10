@@ -370,16 +370,16 @@ onMounted(() => {
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
 
-watch(() => props.disabled, (v: any) => instance?.option('disabled', v));
-watch(() => props.group, () => instance?.option('group', resolveGroup()));
-watch(() => props.cloneable, () => instance?.option('group', resolveGroup()));
-watch(() => props.swapThreshold, (v: any) => instance?.option('swapThreshold', v));
-watch(() => props.handle, (v: any) => instance?.option('handle', v));
-watch(() => props.ghostClass, (v: any) => instance?.option('ghostClass', v));
-watch(() => props.chosenClass, (v: any) => instance?.option('chosenClass', v));
-watch(() => props.dragClass, (v: any) => instance?.option('dragClass', v));
-watch(() => props.filter, (v: any) => instance?.option('filter', v));
-watch(() => props.easing, (v: any) => instance?.option('easing', v));
+watch(() => props.disabled, (v: any) => instance?.option('disabled', v), { flush: 'post' });
+watch(() => props.group, () => instance?.option('group', resolveGroup()), { flush: 'post' });
+watch(() => props.cloneable, () => instance?.option('group', resolveGroup()), { flush: 'post' });
+watch(() => props.swapThreshold, (v: any) => instance?.option('swapThreshold', v), { flush: 'post' });
+watch(() => props.handle, (v: any) => instance?.option('handle', v), { flush: 'post' });
+watch(() => props.ghostClass, (v: any) => instance?.option('ghostClass', v), { flush: 'post' });
+watch(() => props.chosenClass, (v: any) => instance?.option('chosenClass', v), { flush: 'post' });
+watch(() => props.dragClass, (v: any) => instance?.option('dragClass', v), { flush: 'post' });
+watch(() => props.filter, (v: any) => instance?.option('filter', v), { flush: 'post' });
+watch(() => props.easing, (v: any) => instance?.option('easing', v), { flush: 'post' });
 
 defineExpose({ getInstance, toArray, sort, option });
 </script>

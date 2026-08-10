@@ -5908,11 +5908,11 @@ data.value, dataDefault.value,
 props.columns, colReg.value], () => {
   reFeed();
   maybeClearHistoryOnExternalSwap();
-});
+}, { flush: 'post' });
 watch(() => [sorting.value, columnFilters.value, globalFilter.value, sortingDefault.value, columnFiltersDefault.value, globalFilterDefault.value], () => {
   const msg = buildSortFilterAnnounce();
   if (msg) liveAnnounce.value = msg;
-});
+}, { flush: 'post' });
 
 defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory });
 </script>

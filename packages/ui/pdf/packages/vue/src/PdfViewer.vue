@@ -581,40 +581,40 @@ onMounted(() => {
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
 
-watch(() => engineReady.value, () => load());
-watch(() => props.src, () => load());
-watch(() => props.password, () => load());
+watch(() => engineReady.value, () => load(), { flush: 'post' });
+watch(() => props.src, () => load(), { flush: 'post' });
+watch(() => props.password, () => load(), { flush: 'post' });
 watch(() => props.workerSrc, (v: any) => {
   if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
-});
+}, { flush: 'post' });
 watch(() => page.value, (v: any) => {
   if (typeof v === 'number' && v >= 1 && v !== current.value) {
     current.value = v;
     if (props.renderAllPages) scrollToPage(v);
   }
-});
+}, { flush: 'post' });
 watch(() => props.scale, (v: any) => {
   if (typeof v === 'number' && v > 0) zoom.value = v;
-});
+}, { flush: 'post' });
 watch(() => props.rotation, (v: any) => {
   if (typeof v === 'number') rot.value = (v % 360 + 360) % 360;
-});
+}, { flush: 'post' });
 watch(() => current.value, (v: any) => {
   page.value = v;
   emit('pagechange', {
     page: v
   });
   if (!props.renderAllPages) renderView();
-});
-watch(() => zoom.value, () => renderView());
-watch(() => rot.value, () => renderView());
-watch(() => props.renderAllPages, () => renderView());
-watch(() => props.textLayer, () => renderView());
+}, { flush: 'post' });
+watch(() => zoom.value, () => renderView(), { flush: 'post' });
+watch(() => rot.value, () => renderView(), { flush: 'post' });
+watch(() => props.renderAllPages, () => renderView(), { flush: 'post' });
+watch(() => props.textLayer, () => renderView(), { flush: 'post' });
 watch(() => props.query, (v: any) => {
   if (v == null) return;
   const q = String(v);
   if (q) find(q);else clearFind();
-});
+}, { flush: 'post' });
 
 defineExpose({ getDocument, getPageCount, goToPage, nextPage, prevPage, setScale, zoomIn, zoomOut, fitWidth, fitPage, rotateCW, rotateCCW, download, getMetadata, getOutline, getPageElement, find, findNext, findPrev, clearFind });
 </script>

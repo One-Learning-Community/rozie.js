@@ -820,28 +820,28 @@ watch(() => center.value, (v: any) => {
     center: v,
     animate: false
   }, PROGRAMMATIC);
-});
+}, { flush: 'post' });
 watch(() => zoom.value, (v: any) => {
   if (!instance || typeof v !== 'number' || v === instance.getZoom()) return;
   instance.easeTo({
     zoom: v,
     animate: false
   }, PROGRAMMATIC);
-});
+}, { flush: 'post' });
 watch(() => bearing.value, (v: any) => {
   if (!instance || typeof v !== 'number' || v === instance.getBearing()) return;
   instance.easeTo({
     bearing: v,
     animate: false
   }, PROGRAMMATIC);
-});
+}, { flush: 'post' });
 watch(() => pitch.value, (v: any) => {
   if (!instance || typeof v !== 'number' || v === instance.getPitch()) return;
   instance.easeTo({
     pitch: v,
     animate: false
   }, PROGRAMMATIC);
-});
+}, { flush: 'post' });
 watch(() => props.mapStyle, (v: any) => {
   if (!instance) return;
   // a new style wipes imperatively-added sources/layers — reset the applied
@@ -850,38 +850,38 @@ watch(() => props.mapStyle, (v: any) => {
   appliedSourceIds = [];
   instance.setStyle(v ?? DEFAULT_STYLE);
   instance.once('styledata', () => applyLayers());
-});
+}, { flush: 'post' });
 watch(() => props.minZoom, (v: any) => {
   if (instance && typeof v === 'number') instance.setMinZoom(v);
-});
+}, { flush: 'post' });
 watch(() => props.maxZoom, (v: any) => {
   if (instance && typeof v === 'number') instance.setMaxZoom(v);
-});
+}, { flush: 'post' });
 watch(() => props.maxBounds, (v: any) => {
   if (instance) instance.setMaxBounds(v || null);
-});
+}, { flush: 'post' });
 watch(() => props.markers, (v: any) => {
   if (reconcileMarkers) reconcileMarkers(v);
-});
+}, { flush: 'post' });
 watch(() => props.popups, (v: any) => {
   if (reconcilePopups) reconcilePopups(v);
-});
-watch(() => props.sources, () => applyLayers());
-watch(() => props.layers, () => applyLayers());
-watch(() => sourceReg.value, () => applyLayers());
-watch(() => layerReg.value, () => applyLayers());
+}, { flush: 'post' });
+watch(() => props.sources, () => applyLayers(), { flush: 'post' });
+watch(() => props.layers, () => applyLayers(), { flush: 'post' });
+watch(() => sourceReg.value, () => applyLayers(), { flush: 'post' });
+watch(() => layerReg.value, () => applyLayers(), { flush: 'post' });
 watch(() => props.interactiveLayerIds, (v: any) => {
   if (reconcileInteractive) reconcileInteractive(v);
-});
-watch(() => props.controls, () => applyControls());
-watch(() => props.dragPan, () => applyInteractionToggles());
-watch(() => props.dragRotate, () => applyInteractionToggles());
-watch(() => props.scrollZoom, () => applyInteractionToggles());
-watch(() => props.doubleClickZoom, () => applyInteractionToggles());
-watch(() => props.boxZoom, () => applyInteractionToggles());
-watch(() => props.keyboard, () => applyInteractionToggles());
-watch(() => props.touchZoomRotate, () => applyInteractionToggles());
-watch(() => props.touchPitch, () => applyInteractionToggles());
+}, { flush: 'post' });
+watch(() => props.controls, () => applyControls(), { flush: 'post' });
+watch(() => props.dragPan, () => applyInteractionToggles(), { flush: 'post' });
+watch(() => props.dragRotate, () => applyInteractionToggles(), { flush: 'post' });
+watch(() => props.scrollZoom, () => applyInteractionToggles(), { flush: 'post' });
+watch(() => props.doubleClickZoom, () => applyInteractionToggles(), { flush: 'post' });
+watch(() => props.boxZoom, () => applyInteractionToggles(), { flush: 'post' });
+watch(() => props.keyboard, () => applyInteractionToggles(), { flush: 'post' });
+watch(() => props.touchZoomRotate, () => applyInteractionToggles(), { flush: 'post' });
+watch(() => props.touchPitch, () => applyInteractionToggles(), { flush: 'post' });
 
 defineExpose({ getMap, flyTo, easeTo, jumpTo, fitBounds, getCenter, getZoom, resize, queryRenderedFeatures, project, unproject, getBounds, zoomIn, zoomOut, panBy });
 </script>

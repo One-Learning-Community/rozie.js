@@ -998,7 +998,7 @@ onBeforeUnmount(() => {
 
 watch(() => value.value, () => {
   syncQueryToValue();
-});
+}, { flush: 'post' });
 watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () => {
   if (expandedGroups.value && Object.keys(expandedGroups.value).length) expandedGroups.value = {};
   syncRows();
@@ -1008,7 +1008,7 @@ watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () =
     windowVer.value = windowVer.value + 1;
     scheduleRemeasure();
   }
-});
+}, { flush: 'post' });
 watch(() => props.virtual, () => {
   if (expandedGroups.value && Object.keys(expandedGroups.value).length) expandedGroups.value = {};
   if (props.virtual) {
@@ -1016,7 +1016,7 @@ watch(() => props.virtual, () => {
   } else {
     teardownVirtualizer();
   }
-});
+}, { flush: 'post' });
 
 defineExpose({ focus, clear, seedQuery, pinOpen });
 </script>

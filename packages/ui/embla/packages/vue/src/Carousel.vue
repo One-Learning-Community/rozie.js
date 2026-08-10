@@ -427,18 +427,18 @@ onBeforeUnmount(() => { _cleanup_0?.(); });
 
 watch(() => selectedIndex.value, (i: any) => {
   if (embla && typeof i === 'number' && i !== embla.selectedScrollSnap()) embla.scrollTo(i);
-});
-watch(() => [props.loop, props.align, props.axis, props.slidesToScroll, props.dragFree, props.draggable, props.containScroll, props.skipSnaps, props.duration, props.direction].join('|'), () => embla?.reInit(reinitOptions()));
-watch(() => `${props.autoplay}|${props.autoplayDelay}`, () => embla?.reInit(reinitOptions(), emblaPluginsFromProps()));
+}, { flush: 'post' });
+watch(() => [props.loop, props.align, props.axis, props.slidesToScroll, props.dragFree, props.draggable, props.containScroll, props.skipSnaps, props.duration, props.direction].join('|'), () => embla?.reInit(reinitOptions()), { flush: 'post' });
+watch(() => `${props.autoplay}|${props.autoplayDelay}`, () => embla?.reInit(reinitOptions(), emblaPluginsFromProps()), { flush: 'post' });
 watch(() => props.slides.length, () => {
   embla?.reInit(reinitOptions());
   emblaThumbs?.reInit(thumbsOptionsFromProps());
   syncNav();
-});
+}, { flush: 'post' });
 watch(() => [].length, () => {
   embla?.reInit(reinitOptions());
   syncNav();
-});
+}, { flush: 'post' });
 watch(() => props.thumbnails, (on: any) => {
   if (!on) {
     if (emblaThumbs) {
@@ -468,7 +468,7 @@ watch(() => props.thumbnails, (on: any) => {
   build();
   if (typeof queueMicrotask !== 'undefined') queueMicrotask(build);
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(build);
-});
+}, { flush: 'post' });
 
 defineExpose({ scrollNext, scrollPrev, scrollToIndex, reInitCarousel, canScrollNext, canScrollPrev, getSelectedIndex, scrollSnapList, scrollProgress, slidesInView, slidesNotInView, previousScrollSnap, getPlugins, getInstance });
 </script>

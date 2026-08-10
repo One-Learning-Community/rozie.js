@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
 
 const props = withDefaults(
   defineProps<{ closeOnEscape?: boolean; closeOnBackdrop?: boolean; lockBodyScroll?: boolean; title?: string }>(),
@@ -44,14 +44,11 @@ const close = () => {
   open.value = false;
   emit('close');
 };
-
-// Body-scroll-lock state lives outside reactive data because it tracks DOM
-// rather than UI; managed entirely via lifecycle and listeners.
 // Body-scroll-lock state lives outside reactive data because it tracks DOM
 // rather than UI; managed entirely via lifecycle and listeners.
 let savedBodyOverflow = '';
 const lockScroll = () => {
-  if (!props.lockBodyScroll) return;
+  if (!props.lockBodyScroll || !open.value) return;
   savedBodyOverflow = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
 };
@@ -60,7 +57,10 @@ const unlockScroll = () => {
   document.body.style.overflow = savedBodyOverflow;
 };
 
-// Colocated lifecycle pair — runs in source order alongside other hooks.
+// $watch re-fires on every `open` toggle — the cross-target primitive for
+// reacting to a prop change. The $onMount/$onUnmount pair anchors the
+// unmount-time restore; $onMount runs exactly once on every target (a
+// guarded no-op here) and must not be relied on to re-fire.
 
 onMounted(lockScroll);
 onBeforeUnmount(unlockScroll);
@@ -68,10 +68,14 @@ onMounted(() => {
   dialogElRef.value?.focus();
 });
 
+watch(() => open.value, (isOpen: any) => {
+  if (isOpen) lockScroll();else unlockScroll();
+}, { flush: 'post' });
+
 watchEffect((onCleanup) => {
   if (!(open.value && props.closeOnEscape)) return;
-  const handler = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape') return;
+  const handler = ($event: KeyboardEvent) => {
+    if ($event.key !== 'Escape') return;
     close();
   };
   document.addEventListener('keydown', handler);

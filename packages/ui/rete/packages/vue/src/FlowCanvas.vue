@@ -3916,17 +3916,17 @@ watch(() => graph.value, () => {
   // NEXT unrelated node-move/pan/zoom/selection-change) instead of following the box like
   // the minimap rects above already do.
   if (scheduleResizerTrack) scheduleResizerTrack();
-});
+}, { flush: 'post' });
 watch(() => portReg.value, () => {
   if (reconcileNodes) {
     Promise.resolve(reconcileNodes()).then(() => {
       if (reconcileConnections) reconcileConnections();
     });
   }
-});
+}, { flush: 'post' });
 watch(() => typeReg.value, () => {
   if (reconcileNodes) reconcileNodes();
-});
+}, { flush: 'post' });
 watch(() => zoom.value, (v: any) => {
   if (!area || typeof v !== 'number') return;
   if (v === area.area.transform.k) return;
@@ -3934,13 +3934,13 @@ watch(() => zoom.value, (v: any) => {
   Promise.resolve(area.area.zoom(v)).finally(() => {
     programmatic--;
   });
-});
+}, { flush: 'post' });
 watch(() => props.selectable, (v: any) => {
   if (v === false) clearSelection();
-});
+}, { flush: 'post' });
 watch(() => props.readonly, (v: any) => {
   if (v === true) clearSelection();
-});
+}, { flush: 'post' });
 
 defineExpose({ getEditor, getArea, addNode, removeNode, deleteNode, duplicateNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo, getSelectedNodes, selectNode, clearSelection, selectAll, centerOnNode });
 </script>

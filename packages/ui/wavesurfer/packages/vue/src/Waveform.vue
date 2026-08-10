@@ -466,68 +466,68 @@ onBeforeUnmount(() => { _cleanup_0?.(); });
 
 watch(() => props.src, (v: any) => {
   if (ws && typeof v === 'string' && v) ws.load(v);
-});
+}, { flush: 'post' });
 watch(() => props.height, (v: any) => {
   if (ws) ws.setOptions({
     height: v
   });
-});
+}, { flush: 'post' });
 watch(() => props.waveColor, (v: any) => {
   if (ws) ws.setOptions({
     waveColor: v
   });
-});
+}, { flush: 'post' });
 watch(() => props.progressColor, (v: any) => {
   if (ws) ws.setOptions({
     progressColor: v
   });
-});
+}, { flush: 'post' });
 watch(() => props.cursorColor, (v: any) => {
   if (ws) ws.setOptions({
     cursorColor: v
   });
-});
+}, { flush: 'post' });
 watch(() => props.cursorWidth, (v: any) => {
   if (ws) ws.setOptions({
     cursorWidth: v
   });
-});
+}, { flush: 'post' });
 watch(() => props.barWidth, (v: any) => {
   if (ws) ws.setOptions({
     barWidth: v ?? undefined
   });
-});
+}, { flush: 'post' });
 watch(() => props.barGap, (v: any) => {
   if (ws) ws.setOptions({
     barGap: v ?? undefined
   });
-});
+}, { flush: 'post' });
 watch(() => props.barRadius, (v: any) => {
   if (ws) ws.setOptions({
     barRadius: v ?? undefined
   });
-});
+}, { flush: 'post' });
 watch(() => props.normalizeAmplitude, (v: any) => {
   if (ws) ws.setOptions({
     normalize: v
   });
-});
+}, { flush: 'post' });
 watch(() => props.volume, (v: any) => {
   if (ws && typeof v === 'number') ws.setVolume(v);
-});
+}, { flush: 'post' });
 watch(() => props.playbackRate, (v: any) => {
   if (ws && typeof v === 'number') ws.setPlaybackRate(v);
-});
+}, { flush: 'post' });
 watch(() => props.minPxPerSec, (v: any) => {
   if (ws && typeof v === 'number' && v > 0) ws.zoom(v);
-});
+}, { flush: 'post' });
 watch(() => currentTime.value, (v: any) => {
   // Round-trip guard: skip if the incoming value already matches the engine
   // position (the timeupdate → $model → $watch echo), else seek.
   if (!ws || typeof v !== 'number') return;
   if (Math.abs(v - ws.getCurrentTime()) < 0.05) return;
   ws.setTime(v);
-});
+}, { flush: 'post' });
 watch(() => props.timeline, (v: any) => {
   if (!ws) return;
   if (v && !timelinePlugin) {
@@ -537,7 +537,7 @@ watch(() => props.timeline, (v: any) => {
     ws.unregisterPlugin(timelinePlugin);
     timelinePlugin = null;
   }
-});
+}, { flush: 'post' });
 watch(() => props.hover, (v: any) => {
   if (!ws) return;
   if (v && !hoverPlugin) {
@@ -549,7 +549,7 @@ watch(() => props.hover, (v: any) => {
     ws.unregisterPlugin(hoverPlugin);
     hoverPlugin = null;
   }
-});
+}, { flush: 'post' });
 watch(() => regions.value, (list: any) => {
   // Lazy registration: `regions` transitioned to an array after mount and the
   // plugin doesn't exist yet — register it now. If the engine has already
@@ -564,7 +564,7 @@ watch(() => regions.value, (list: any) => {
   // reconcileRegions so a writeback echo doesn't loop.
   if (!regionsReady) return;
   reconcileRegions(list);
-});
+}, { flush: 'post' });
 
 defineExpose({ play, pause, playPause, stop, seekTo, setTime, setVolume, setPlaybackRate, setZoom, load, isPlaying, getDuration, getCurrentTime, getWaveSurfer, addRegion, clearRegions, getRegions });
 </script>

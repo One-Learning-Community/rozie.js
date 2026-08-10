@@ -656,26 +656,26 @@ watch(() => props.events, (v: any) => {
   if (!instance) return;
   instance.removeAllEvents();
   for (const e of v as any) instance.addEvent(normalizeEvent(e));
-});
+}, { flush: 'post' });
 watch(() => view.value, (v: any) => {
   if (!instance || !v) return;
   if (v === instance.view.type) return;
   suppressViewSync = true;
   instance.changeView(v);
-});
-watch(() => props.weekends, (v: any) => instance?.setOption('weekends', v));
-watch(() => props.editable, (v: any) => instance?.setOption('editable', v));
-watch(() => props.selectable, (v: any) => instance?.setOption('selectable', v));
-watch(() => props.height, (v: any) => instance?.setOption('height', v));
-watch(() => props.locale, (v: any) => instance?.setOption('locale', v));
-watch(() => props.firstDay, (v: any) => instance?.setOption('firstDay', v));
-watch(() => props.slotDuration, (v: any) => instance?.setOption('slotDuration', v));
-watch(() => props.nowIndicator, (v: any) => instance?.setOption('nowIndicator', v));
-watch(() => props.headerToolbar, (v: any) => instance?.setOption('headerToolbar', v));
+}, { flush: 'post' });
+watch(() => props.weekends, (v: any) => instance?.setOption('weekends', v), { flush: 'post' });
+watch(() => props.editable, (v: any) => instance?.setOption('editable', v), { flush: 'post' });
+watch(() => props.selectable, (v: any) => instance?.setOption('selectable', v), { flush: 'post' });
+watch(() => props.height, (v: any) => instance?.setOption('height', v), { flush: 'post' });
+watch(() => props.locale, (v: any) => instance?.setOption('locale', v), { flush: 'post' });
+watch(() => props.firstDay, (v: any) => instance?.setOption('firstDay', v), { flush: 'post' });
+watch(() => props.slotDuration, (v: any) => instance?.setOption('slotDuration', v), { flush: 'post' });
+watch(() => props.nowIndicator, (v: any) => instance?.setOption('nowIndicator', v), { flush: 'post' });
+watch(() => props.headerToolbar, (v: any) => instance?.setOption('headerToolbar', v), { flush: 'post' });
 watch(() => props.options, (v: any) => {
   if (!instance) return;
   for (const k in v) instance.setOption(k, v[k]);
-});
+}, { flush: 'post' });
 
 defineExpose({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate, getDate, getEvents, scrollToTime, updateSize, prevYear, nextYear, selectRange, clearSelection });
 </script>

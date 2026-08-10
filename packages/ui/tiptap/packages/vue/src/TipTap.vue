@@ -1297,8 +1297,8 @@ watch(() => html.value, (v: any) => {
   refreshActive();
   refreshCount();
   refreshLink();
-});
-watch(() => props.editable, (v: any) => editor?.setEditable(v, false));
+}, { flush: 'post' });
+watch(() => props.editable, (v: any) => editor?.setEditable(v, false), { flush: 'post' });
 
 defineExpose({ getEditor, focusEditor, blurEditor, getHTML, getJSON, getText, setContent, clearContent, toggleBold, toggleItalic, toggleHeading, toggleBulletList, toggleUnderline, toggleOrderedList, undo, redo, chain, isActive, can, isEmpty, getCharacterCount, getWordCount, openLinkEditor, setLink, unsetLink });
 </script>

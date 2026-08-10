@@ -1,6 +1,6 @@
 <template>
 
-<div :class="['counter', { hovering: hovering }]" @mouseenter="hovering = true" @mouseleave="hovering = false">
+<div :class="['counter', { hovering: hovering }]" v-bind="$attrs" @mouseenter="hovering = true" @mouseleave="hovering = false">
   <button :disabled="!canDecrement" aria-label="Decrement" @click="decrement">−</button>
   <span class="value">{{ value }}</span>
   <button :disabled="!canIncrement" aria-label="Increment" @click="increment">+</button>

@@ -335,28 +335,28 @@ onBeforeUnmount(() => { _cleanup_0?.(); });
 watch(() => date.value, (v: any) => {
   if (!instance) return;
   if (v !== instance.input.value) instance.setDate(v, false);
-});
-watch(() => props.mode, (v: any) => instance?.set('mode', v));
-watch(() => props.minDate, (v: any) => instance?.set('minDate', v));
-watch(() => props.maxDate, (v: any) => instance?.set('maxDate', v));
-watch(() => props.dateFormat, (v: any) => instance?.set('dateFormat', v));
+}, { flush: 'post' });
+watch(() => props.mode, (v: any) => instance?.set('mode', v), { flush: 'post' });
+watch(() => props.minDate, (v: any) => instance?.set('minDate', v), { flush: 'post' });
+watch(() => props.maxDate, (v: any) => instance?.set('maxDate', v), { flush: 'post' });
+watch(() => props.dateFormat, (v: any) => instance?.set('dateFormat', v), { flush: 'post' });
 watch(() => props.disabled, (v: any) => {
   if (instance) instance.input.disabled = v;
-});
-watch(() => props.disable, (v: any) => instance?.set('disable', v));
-watch(() => props.enable, (v: any) => instance?.set('enable', v));
+}, { flush: 'post' });
+watch(() => props.disable, (v: any) => instance?.set('disable', v), { flush: 'post' });
+watch(() => props.enable, (v: any) => instance?.set('enable', v), { flush: 'post' });
 watch(() => props.locale, (v: any) => instance?.set('locale', {
   ...(v ?? {}),
   ...(props.firstDayOfWeek !== 0 ? {
     firstDayOfWeek: props.firstDayOfWeek
   } : {})
-}));
+}), { flush: 'post' });
 watch(() => props.firstDayOfWeek, (v: any) => instance?.set('locale', {
   ...(props.locale ?? {}),
   ...(v !== 0 ? {
     firstDayOfWeek: v
   } : {})
-}));
+}), { flush: 'post' });
 
 defineExpose({ clear, openPicker, closePicker, selectDate, jumpToDate, getSelectedDates, togglePicker, changeMonth, changeYear });
 </script>

@@ -72,6 +72,8 @@ function makeSelectIR() {
     refs: [],
     slots: [],
     emits: [],
+    // Phase 21 — IRComponent.expose is always present ([] when no $expose).
+    expose: [],
     lifecycle: [],
     listeners: [],
     setupBody: {

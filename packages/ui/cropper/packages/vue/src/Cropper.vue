@@ -324,22 +324,22 @@ onBeforeUnmount(() => { _cleanup_0?.(); });
 
 watch(() => props.src, (v: any) => {
   if (instance && typeof v === 'string' && v) instance.replace(v);
-});
+}, { flush: 'post' });
 watch(() => props.aspectRatio, (v: any) => {
   if (instance) instance.setAspectRatio(v);
-});
+}, { flush: 'post' });
 watch(() => props.dragMode, (v: any) => {
   if (instance && typeof v === 'string') instance.setDragMode(v);
-});
+}, { flush: 'post' });
 watch(() => props.disabled, (v: any) => {
   if (!instance) return;
   if (v) instance.disable();else instance.enable();
-});
+}, { flush: 'post' });
 watch(() => data.value, (v: any) => {
   if (!instance || !v) return;
   if (sameData(v, instance.getData())) return;
   instance.setData(v);
-});
+}, { flush: 'post' });
 
 defineExpose({ getCropper, getData, getCanvasData, getCropBoxData, getImageData, getContainerData, getCroppedCanvas, getCroppedDataURL, reset, clear, showCropBox, replace, rotateTo, rotateBy, zoomTo, zoomBy, scaleX, scaleY, scale, setCanvasData, setCropBoxData, moveTo, move, enable, disable, setAspectRatio, setDragMode });
 </script>

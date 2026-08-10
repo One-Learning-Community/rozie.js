@@ -1461,7 +1461,7 @@ watch(() => open.value, (isOpen: any) => {
     debounceTimerId = null;
     requestToken = nextRequestToken(requestToken);
   }
-});
+}, { flush: 'post' });
 
 defineExpose({ show, close, toggle, focus, goBack, openTo });
 

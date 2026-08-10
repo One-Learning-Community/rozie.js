@@ -138,5 +138,5 @@ onUpdated(() => {
 
 watch(() => [props.id, props.field, props.header, props.sortable, props.filterable, props.pinned, props.width, props.expandable, props.groupable, props.aggregationFn, props.editable, props.editor, props.editorOptions, props.validate], () => {
   if (reg) reg.registerColumn(colId(), buildSpec());
-});
+}, { flush: 'post' });
 </script>
