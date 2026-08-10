@@ -12,7 +12,7 @@ Component-library and design-system authors who today maintain manual bindings/w
 
 ## Status
 
-Pre-v1.0, published. The toolchain is live on npm under the `@rozie` scope — `@rozie/core`, `@rozie/unplugin`, `@rozie/cli`, and `@rozie/babel-plugin` (currently 0.3.x), plus the per-framework `@rozie/runtime-*` helper packages. The six target emitters ship bundled inside the toolchain packages rather than as separate npm packages. All six targets are gated by a byte-identical dist-parity suite — every reference component compiled across all six targets and every entrypoint (compile API / CLI / Babel plugin / unplugin) must match byte-for-byte. Each target ships with a consumer demo plus Playwright e2e coverage.
+Pre-v1.0, published. The toolchain is live on npm under the `@rozie` scope — `@rozie/core`, `@rozie/unplugin`, `@rozie/cli`, and `@rozie/babel-plugin` (see the [changelog](CHANGELOG.md) for current versions), plus the per-framework `@rozie/runtime-*` helper packages. The six target emitters ship bundled inside the toolchain packages rather than as separate npm packages. All six targets are gated by a byte-identical dist-parity suite — every reference component compiled across all six targets and every entrypoint (compile API / CLI / Babel plugin / unplugin) must match byte-for-byte. Each target ships with a consumer demo plus Playwright e2e coverage.
 
 | Package | Status |
 |---|---|

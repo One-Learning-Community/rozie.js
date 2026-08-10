@@ -4,7 +4,7 @@ import LineChartDemo from '../../examples/demos/LineChartDemo.rozie';
 
 # LineChart (Chart.js)
 
-A data-bound port of [Chart.js](https://www.chartjs.org/). Chart.js paints to a `<canvas>` the host framework never touches — and, like flatpickr, it has a wrapper in every framework (`react-chartjs-2`, `vue-chartjs`, `ng2-charts`, `svelte-chartjs`, …), each one a few hundred lines that mostly shuttle a `data` prop into a `new Chart()` call. `LineChart.rozie` collapses all of them into one source.
+A data-bound port of [Chart.js](https://www.chartjs.org/). Chart.js paints to a `<canvas>` the host framework never touches — and, like flatpickr, it has a wrapper in every framework (`react-chartjs-2`, `vue-chartjs`, `ng2-charts`, `svelte-chartjs`, …), each one a few hundred lines that mostly shuttle a `data` prop into a `new Chart()` call. `Chart.rozie` collapses all of them into a single component definition.
 
 It is the deepest-reactivity example in the set:
 

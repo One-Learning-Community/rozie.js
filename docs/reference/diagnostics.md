@@ -1,9 +1,11 @@
 # Diagnostics — ROZ code reference
 
-Every compile-time diagnostic Rozie emits carries a stable `ROZxxx` code. When the
-compiler reports a problem, the code appears alongside the message and a source-located
-code frame — for example `ROZ204: …`. This page is the lookup table: search for the code
-you hit in your terminal and land on its severity and cause.
+Every diagnostic Rozie emits carries a stable `ROZxxx` code. The registry spans the whole
+toolchain: compile-time errors and warnings from the core compiler, build-tool plugin and
+CLI failures, and runtime warnings from the helper packages. A reported problem shows the
+code alongside its message; compile-time diagnostics add a source-located code frame
+(for example `ROZ204: …`). This page is the lookup table: search for the code you hit in
+your terminal and land on its severity and cause.
 
 The codes are **public API** — a code string never renumbers across versions. (The
 internal member name shown in muted text next to each code may be renamed for clarity, but

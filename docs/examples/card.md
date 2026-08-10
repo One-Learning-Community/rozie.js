@@ -14,7 +14,7 @@ A wrapper-pair. `Card.rozie` declares `CardHeader` in its `<components>` block a
 
 ## Live demo
 
-The X button only renders because we passed an `onClose` handler — `CardHeader` does `r-if="$props.onClose"` on its close button.
+The X button only renders because we passed an `onClose` handler: `CardHeader` does `r-if="$props.onClose"` on its close button.
 
 <div class="rozie-demo">
   <ClientOnly>
@@ -26,9 +26,9 @@ The X button only renders because we passed an `onClose` handler — `CardHeader
 </div>
 
 Each target picks its idiomatic import + child-tag form for the cross-component reference:
-- **Vue / Svelte** — import with the target extension (`./CardHeader.vue`, `./CardHeader.svelte`).
-- **React / Solid** — bare-path import (`./CardHeader`).
-- **Angular** — named import + class added to `@Component({ imports: [...] })`, and the `<CardHeader>` tag rewritten to selector form `<rozie-card-header>`.
+- **Vue / Svelte**: import with the target extension (`./CardHeader.vue`, `./CardHeader.svelte`).
+- **React / Solid**: bare-path import (`./CardHeader`).
+- **Angular**: named import + class added to `@Component({ imports: [...] })`, and the `<CardHeader>` tag rewritten to selector form `<rozie-card-header>`.
 
 Note the auto kebab/camel conversion: the source writes `:on-close="$props.onClose"`, and each emitter reconciles that against the `onClose` prop declaration in the appropriate per-target idiom.
 
@@ -67,7 +67,7 @@ Note the auto kebab/camel conversion: the source writes `:on-close="$props.onClo
 
 ## CardHeader — source
 
-A tiny leaf component (~30 lines) — no `<components>` block, no slots, no lifecycle. Stands alone and is consumed by Card. Worth seeing because the contrast with Card highlights the cost-of-features model: leaves are cheap, only components that actually need composition/listeners/refs pay for them.
+A tiny leaf component (~30 lines): no `<components>` block, no slots, no lifecycle. Stands alone and is consumed by Card. Worth seeing because the contrast with Card highlights the cost-of-features model: leaves are cheap, only components that actually need composition/listeners/refs pay for them.
 
 ```rozie-src CardHeader
 ```

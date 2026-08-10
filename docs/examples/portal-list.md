@@ -7,11 +7,11 @@ import PortalListDemo from '../../examples/demos/PortalListDemo.rozie';
 
 The portal-slot primitive in action. `PortalList.rozie` ships a tiny inline vanilla-JS "engine" (`MiniListEngine`) that owns per-row `<li>` containers but delegates per-row CONTENT rendering to a portal slot. `PortalListDemo.rozie` fills the `#item` slot with `<template #item="{ item }">…</template>` and the per-target compiler routes the consumer's fragment through each framework's standard imperative-render API (React `createRoot`, Vue `render(h(...), container)`, Svelte `mount()`, Angular `vcr.createEmbeddedView`, Solid `render`, Lit `render`).
 
-**This is the cross-framework "foreign-engine cell rendering" pattern.** Portal slots are what unlock wrappers like FullCalendar (`eventContent`), AG-Grid (`cellRenderer`), Swiper (slide content), and TipTap (custom node views) — every engine whose plugin contract is "give us a callback that returns DOM, we'll mount it where we want." Rozie's `<slot name="X" portal />` + `$portals.X(container, scope) => disposeFn` shape is the cross-target equivalent of each official wrapper's per-framework portal mechanism (FullCalendar/React uses `createPortal`, FullCalendar/Vue uses `<Teleport>`, FullCalendar/Svelte uses `mount`, FullCalendar/Angular uses `ViewContainerRef`).
+This is the cross-framework "foreign-engine cell rendering" pattern. Portal slots are what unlock wrappers like FullCalendar (`eventContent`), AG-Grid (`cellRenderer`), Swiper (slide content), and TipTap (custom node views): every engine whose plugin contract is "give us a callback that returns DOM, we'll mount it where we want." Rozie's `<slot name="X" portal />` + `$portals.X(container, scope) => disposeFn` shape is the cross-target equivalent of each official wrapper's per-framework portal mechanism (FullCalendar/React uses `createPortal`, FullCalendar/Vue uses `<Teleport>`, FullCalendar/Svelte uses `mount`, FullCalendar/Angular uses `ViewContainerRef`).
 
 ## Live demo
 
-The PortalList below is the actual `examples/PortalList.rozie` + `examples/demos/PortalListDemo.rozie` files from the monorepo, compiled via `@rozie/unplugin/vite` at build time. The colored swatches, monospaced ids, and bold labels all come from the consumer's `<template #item>` filler — but the surrounding `<ul>` and per-row `<li>` are owned by the wrapper's inline `MiniListEngine`. **Open the dev tools and inspect the DOM:** each row is a `<li class="mini-list__row">` wrapping a `<div class="mini-list__cell">`, and the `<div>` was filled by mounting the consumer's framework-native fragment imperatively.
+The PortalList below is the actual `examples/PortalList.rozie` + `examples/demos/PortalListDemo.rozie` files from the monorepo, compiled via `@rozie/unplugin/vite` at build time. The colored swatches, monospaced ids, and bold labels all come from the consumer's `<template #item>` filler; the surrounding `<ul>` and per-row `<li>` are owned by the wrapper's inline `MiniListEngine`. Open the dev tools and inspect the DOM: each row is a `<li class="mini-list__row">` wrapping a `<div class="mini-list__cell">`, and the `<div>` was filled by mounting the consumer's framework-native fragment imperatively.
 
 <div class="rozie-demo">
   <ClientOnly>
@@ -21,12 +21,12 @@ The PortalList below is the actual `examples/PortalList.rozie` + `examples/demos
 
 ## Why portal slots exist
 
-Rozie's ordinary scoped slots compile to each target's native slot mechanism — Vue's `<slot>`, React's `children` prop, Svelte's `{@render}`, Angular's `<ng-template>`, etc. Native slots can only render INSIDE the framework's own template tree. They can NOT be invoked imperatively from inside a foreign engine's callback like `cellRenderer(item) => DOM`.
+Rozie's ordinary scoped slots compile to each target's native slot mechanism: Vue's `<slot>`, React's `children` prop, Svelte's `{@render}`, Angular's `<ng-template>`, etc. Native slots can only render INSIDE the framework's own template tree. They can NOT be invoked imperatively from inside a foreign engine's callback like `cellRenderer(item) => DOM`.
 
 Portal slots solve the gap by exposing the same `<slot name="X" />` authoring surface to the consumer but routing the producer-side invocation through each target's `imperative render → returned dispose handle` API. Authors write one wrapper; consumers fill it with `<template #X>` the same way they fill any other named slot.
 
 ::: tip V1 reactivity constraint
-Portal slots are NOT reactive after mount in v1. They re-render only when the wrapper's script re-invokes them — which is how real engine callbacks behave anyway (FullCalendar re-calls `eventContent` when the event data changes; AG-Grid re-calls `cellRenderer` when the row updates). A reactive variant that subscribes to scope changes is a post-v1 evolution.
+Portal slots are NOT reactive after mount in v1. They re-render only when the wrapper's script re-invokes them, which is how real engine callbacks behave anyway (FullCalendar re-calls `eventContent` when the event data changes; AG-Grid re-calls `cellRenderer` when the row updates). A reactive variant that subscribes to scope changes is a post-v1 evolution.
 :::
 
 ::: tip Styling engine-owned DOM
@@ -86,7 +86,7 @@ Each target gets a `portals` closure synthesized inside the mount-phase lifecycl
 | Solid   | `render(() => slot(scope), c)`             | Component body top     | `onCleanup`               |
 | Lit     | `render(slot(scope), c)`                   | `firstUpdated` body    | `disconnectedCallback`    |
 
-All six targets dispose every active portal mount BEFORE destroying the engine in cleanup order — otherwise we'd be unmounting framework trees from already-detached containers. The Svelte 5 case ships a small `PortalHost` Snippet→Component shim from `@rozie/runtime-svelte` because Svelte 5's `mount()` requires a Component, not a Snippet.
+All six targets dispose every active portal mount BEFORE destroying the engine in cleanup order; otherwise we'd be unmounting framework trees from already-detached containers. The Svelte 5 case ships a small `PortalHost` Snippet→Component shim from `@rozie/runtime-svelte` because Svelte 5's `mount()` requires a Component, not a Snippet.
 
 ## Source — PortalList.rozie
 

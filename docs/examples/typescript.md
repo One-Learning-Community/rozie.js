@@ -6,7 +6,7 @@ import TypedCard from '../../examples/typed/TypedCard.rozie';
 
 A `<script>` block can opt into TypeScript with a `lang="ts"` attribute. The compiler keeps every author-written annotation intact and routes it to the right place in each target: a typed `$computed` becomes a typed `computed()` / `useMemo` / `$derived` / `signal`, a typed prop flows into `defineProps<T>()` (Vue), a React `interface`, Svelte's `$props<T>()`, Angular's `@Input()` types. Rozie does not transpile the TypeScript itself — each target's own toolchain (`vue-tsc`, `svelte-check`, `tsc`) does, exactly as it would for a hand-written component.
 
-`TypedCard.rozie` is the type-*preservation* fixture. It is not a typed fork of an untyped example — it proves things no untyped component can:
+`TypedCard.rozie` is the type-*preservation* fixture. It proves things no untyped component can:
 
 - it declares an `interface` (`CardMeta`) and a `type` alias (`Tone`) *inside* the `<script lang="ts">` block
 - it uses a type-only import — `import type { Options } from 'sortablejs'`
