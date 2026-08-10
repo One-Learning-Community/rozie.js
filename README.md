@@ -38,7 +38,7 @@ Pre-v1.0, published. The toolchain is live on npm under the `@rozie` scope — `
 | [`tools/intellij-plugin`](tools/intellij-plugin) | Shipped — JetBrains IDE syntax + injection plugin |
 | [`tools/textmate`](tools/textmate) | Shipped — TextMate grammar (VS Code, IDEA Community, docs-site Shiki) |
 
-The toolchain (compiler, CLI, Babel plugin, unplugin, runtimes) and 16 of the 29 `@rozie-ui` component families are published on npm under MIT. The remaining families are built and gated in-repo, pending release verification. v1.0 of the toolchain is the next milestone.
+The toolchain (compiler, CLI, Babel plugin, unplugin, runtimes) and 17 of the 29 `@rozie-ui` component families are published on npm under MIT. The remaining families are built and gated in-repo, pending release verification. v1.0 of the toolchain is the next milestone.
 
 ## Quick look
 
@@ -106,7 +106,7 @@ Most families wrap a battle-tested vanilla-JS engine whose framework bindings ar
 | [FullCalendar](https://one-learning-community.github.io/rozie.js/components/fullcalendar) | FullCalendar event calendar | ✅ |
 | [Chart.js](https://one-learning-community.github.io/rozie.js/components/chartjs) | Chart.js canvas charts | pending |
 | [MapLibre](https://one-learning-community.github.io/rozie.js/components/maplibre) | MapLibre GL interactive maps | pending |
-| [FlowCanvas](https://one-learning-community.github.io/rozie.js/components/rete) | Rete.js node-flow editor | pending |
+| [FlowCanvas](https://one-learning-community.github.io/rozie.js/components/rete) | Rete.js node-flow editor | ✅ |
 | [Cropper](https://one-learning-community.github.io/rozie.js/components/cropper) | Cropper.js image cropping | ✅ |
 | [Waveform](https://one-learning-community.github.io/rozie.js/components/wavesurfer) | wavesurfer.js audio waveform + playback | pending |
 | [PdfViewer](https://one-learning-community.github.io/rozie.js/components/pdf) | pdf.js PDF rendering | ✅ |
