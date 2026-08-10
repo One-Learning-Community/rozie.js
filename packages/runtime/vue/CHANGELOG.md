@@ -1,5 +1,13 @@
 # @rozie/runtime-vue
 
+## 0.5.1
+
+### Patch Changes
+
+- Version-alignment release riding the changesets `fixed` group so the whole toolchain ships one coordinated version alongside the `@rozie/core` Solid emitter fix. No source change in this wave, no behavior change.
+- Updated dependencies
+  - @rozie/runtime-keynav-core@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes

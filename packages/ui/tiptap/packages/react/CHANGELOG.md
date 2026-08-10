@@ -1,5 +1,28 @@
 # @rozie-ui/tiptap-react
 
+## 0.3.0
+
+### Minor Changes
+
+- TipTap 0.3.0 — new imperative link-editor verbs plus four bubble-menu link-editor bug fixes, no breaking changes:
+  - **New `setLink(attrs)` / `unsetLink()` imperative-handle verbs.** Thin delegates over the exact same `applyLink` / `removeLink` the `#linkEditor` slot scope already hands a consumer fragment, so the imperative handle and the slot-scope verb can never disagree. The handle is now 25 verbs.
+  - **Fix: mount-time prefill.** The built-in link form now seeds its input from the live editor's link attributes at mount, so a document whose caret starts inside a link shows a prefilled URL instead of an empty field.
+  - **Fix: open/close silently no-op'd on all six targets whenever the editor already had focus** — the common case, since the create/close controls are `@mousedown.prevent`-guarded precisely so pressing them does not collapse the selection. TipTap's `focus` command dispatches nothing when the view is already focused, and `@tiptap/extension-bubble-menu`'s `update()` short-circuits when neither the doc nor the selection changed, so `shouldShow` never re-ran either. Now routed through the extension's own documented escape hatch, `view.dispatch(state.tr.setMeta(pluginKey, 'show' | 'hide'))`.
+  - **Fix: stale read on the reactive-refresh path.** The link scope was read in the same synchronous tick it was written — React's setState-is-async trap. The scope builder now takes `href` / `attrs` as parameters populated from the caller's freshly-computed locals. Consumer-visible effect: the `#linkEditor` slot scope's `href` / `attrs` now reflect the current link on every caret move rather than the previous one.
+  - Internal, stated because it is why the React leaf's emitted body moved: the component's `link` data key was renamed to `linkState` because it collided with React's auto-generated `setLink` state setter once `setLink` became a public verb. No public surface change.
+  - **Solid specifically:** before `@rozie/core@0.5.1`, the `#linkEditor` override slot's `setLink` / `unsetLink` / `close` threw a `ReferenceError` on Solid. The regenerated leaf here carries the emitter fix; Solid and Svelte 5 are now durably covered for this path for the first time.
+
+  No breaking changes.
+
+### Patch Changes
+
+- Stale-publish reconciliation. The published `0.2.2` tarball predates commit `1b0e5254`'s value-position stale-closure fix and never carried it — `pnpm publish` silently skips an already-published version, so the registry has been serving the pre-fix bytes at `0.2.2` since 2026-08-06.
+  - **Fix: `uploadImage` paste/drop handlers could keep calling a stale upload function after mount.** `0.2.2` already ref-mirrored _whether_ the image-upload hook is registered at all, evaluated fresh at the editor's construction. This release hardens the layer beneath that: `handlePaste`/`handleDrop` themselves are now ref-indirected, so if a consumer swaps to a new `uploadImage` function identity after mount (without ever passing `null`), a subsequent paste or drop now invokes that current function instead of continuing to call the one captured at construction time.
+  - No prop / event / slot / handle surface change.
+
+- Updated dependencies
+  - @rozie/runtime-react@0.5.1
+
 ## 0.2.2
 
 ### Patch Changes
@@ -10,6 +33,7 @@
   - **Prop reads** (12) — `ariaLabel`, `autofocus`, `bubbleMenuShouldShow`, `editorClass`, `editorProps`, `enforceMaxLength`, `extensions`, `maxLength`, `nodeSpecs`, `placeholder`, `starterKit`, `uploadImage`. The TipTap editor is constructed inside `$onMount`; these now read their current values at construction time rather than the first render's. `enforceMaxLength`/`maxLength` and `uploadImage` are the consumer-visible ones — a length cap or upload handler changed after mount is now honored.
   - **Helper calls** (4) — `buildDefaultLinkEditor`, `buildLinkScope`, `makeNodeViewExtensions`, `refreshLink`, so the bubble-menu link editor and node views operate on current state.
   - **`$emit` handler props** (4) — `onBlur`, `onFocus`, `onSelectionUpdate`, `onUpdate`. TipTap's event handlers are bound to the editor instance once at construction, so a consumer that swapped `onUpdate` after mount previously kept the original closure being called on every keystroke.
+
 - No API surface change.
 - @rozie/runtime-react@0.2.3
 

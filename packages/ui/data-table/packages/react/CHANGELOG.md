@@ -1,5 +1,17 @@
 # @rozie-ui/data-table-react
 
+## 0.2.6
+
+### Patch Changes
+
+- Stale-publish reconciliation. The published `0.2.5` tarball predates commit `1b0e5254`'s value-position stale-closure fix and never carried it — `pnpm publish` silently skips an already-published version, so the registry has been serving the pre-fix bytes at `0.2.5` since 2026-08-06.
+  - **Fix: the deferred indeterminate-checkbox sync ran against a stale closure.** `syncIndeterminate` was invoked twice per selection-change cycle — once synchronously through an already-fresh ref, and a second time deferred via `queueMicrotask`/`Promise.resolve().then()`, but that second call passed the raw mount-time function identity rather than the ref, so it kept re-running the closure captured when the table was first constructed instead of the current one. Both calls now route through the same fresh reference.
+  - **Fix: the 12 table-core `onXChange` callbacks (sorting, filters, pagination, selection, column visibility/sizing/order/pinning, grouping, expansion) were bound by identity at the table's one-time construction.** A consumer whose `onSortingChange`/etc. prop identity changes after mount — for example an inline handler closing over updated local state — had every subsequent table-core callback keep dispatching to that first-render closure. Each callback is now ref-indirected, so table-core always calls through to the consumer's current handler.
+  - No prop / event / slot / handle surface change.
+
+- Updated dependencies
+  - @rozie/runtime-react@0.5.1
+
 ## 0.2.5
 
 ### Patch Changes
@@ -12,6 +24,7 @@
   - **Helper calls** (`Column`, 2) — `buildSpec` and `colId`.
 
   In practice this is what makes a grid whose columns, filters or data source change after first paint keep its active-cell tracking, windowing and pagination writes consistent.
+
 - `Column`'s mount effect no longer emits the `react-hooks/exhaustive-deps` suppression.
 - No `$emit` handler prop was affected. No API surface change.
 - @rozie/runtime-react@0.2.3
