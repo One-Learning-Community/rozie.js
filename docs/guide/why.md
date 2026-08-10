@@ -6,7 +6,7 @@ If you ship a UI library that targets React, Vue, Svelte, Angular, and Solid tod
 
 ## What Rozie is
 
-A compiler. You write `.rozie` files in a Vue/Alpine-flavored block-based syntax. Rozie emits idiomatic React 18+, Vue 3.4+, Svelte 5+, Angular 19+, and Solid 1.8+ components plus Lit 3.2+ web components — each one using the target's native primitives (React's `useState`/`useMemo`, Vue's `defineModel`/`computed`, Svelte 5's runes, Angular's signals, Solid's `createSignal`/`createMemo`/`createEffect`, Lit's reactive properties + `@lit-labs/preact-signals`).
+A compiler. You write `.rozie` files in a Vue/Alpine-flavored block-based syntax. Rozie emits React 18+, Vue 3.4+, Svelte 5+, Angular 19+, and Solid 1.8+ components plus Lit 3.2+ web components — each one using the target's native primitives (React's `useState`/`useMemo`, Vue's `defineModel`/`computed`, Svelte 5's runes, Angular's signals, Solid's `createSignal`/`createMemo`/`createEffect`, Lit's reactive properties + `@lit-labs/preact-signals`).
 
 ## What Rozie is not
 
@@ -24,7 +24,7 @@ Six targets of cross-framework parity required Rozie to quietly normalize a lot 
 
 That makes Rozie attractive to a second audience the original positioning understated:
 
-- An **[Angular shop](/guide/for-angular-shops)** that wants Vue-flavored SFC ergonomics but can't migrate the codebase — write your next component in Rozie, ship idiomatic Angular standalone-component output.
+- An **[Angular shop](/guide/for-angular-shops)** that wants Vue-flavored SFC ergonomics but can't migrate the codebase — write your next component in Rozie, ship Angular standalone-component output.
 - A **[jQuery + plugins shop](/guide/for-vanilla-js-shops)** maintaining engine glue across pages — wrap each engine (flatpickr, Sortable, Leaflet, TipTap, …) once in Rozie; the same wrapper drops into any of your apps regardless of framework.
 - A **[React team](/guide/for-react-teams)** that wants Vue-style scoped CSS without paying the CSS-in-JS runtime tax.
 - A **[Lit / Web Components team](/guide/for-lit-teams)** that wants slots, scoped-slot params, and consumer-CSS-bridge — Rozie's compose model fills exactly the gap Lit's Web Components leave open.

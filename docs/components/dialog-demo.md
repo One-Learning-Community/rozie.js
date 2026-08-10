@@ -62,9 +62,9 @@ This is the **real `@rozie-ui/dialog-vue` package** running on this page (VitePr
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/dialog/src/Dialog.rozie{html}[Dialog.rozie — the single source]
+<<< ../../packages/ui/dialog/src/Dialog.rozie{html}[Dialog.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/dialog-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/dialog-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -77,7 +77,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same `close` event, same two-way `open`, same `show` / `hide` handle — identical on every target, built on the native `<dialog>` with no third-party engine behind it.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same `close` event, same two-way `open`, same `show` / `hide` handle — identical on every target, built on the native `<dialog>` with no third-party engine behind it.
 
 ## See also
 

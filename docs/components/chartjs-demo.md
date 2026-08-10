@@ -99,9 +99,9 @@ The `type` prop is bound reactively — flipping it re-creates the instance (Cha
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/chartjs/src/Chart.rozie{html}[Chart.rozie — the single source]
+<<< ../../packages/ui/chartjs/src/Chart.rozie{html}[Chart.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/chartjs-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/chartjs-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -114,11 +114,11 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineExpose`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, identical on every target.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineExpose`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, identical on every target.
 
 ## See also
 
-- [Chart.js — showcase & API](/components/chartjs) — install, quick starts for all six frameworks, per-type components, and the full reference.
+- [Chart.js — showcase & API](/components/chartjs) — install, per-framework quick starts, per-type components, and the full reference.
 - [The LineChart example](/examples/line-chart) — a focused single-type walkthrough of the same wrapper.
 
 <style scoped>

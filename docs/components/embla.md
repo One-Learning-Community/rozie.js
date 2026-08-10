@@ -31,7 +31,7 @@ npm i @rozie-ui/embla-vue embla-carousel embla-carousel-autoplay
 Each package ships its framework's native shape: compiled `.tsx` + types for React and Solid, `.vue` SFC source for Vue, `.svelte` source for Svelte, standalone component source for Angular, and a compiled custom element + types for Lit.
 
 ::: tip No engine CSS to import
-Unlike most engine wrappers, Embla ships **no** stylesheet you must import. The carousel skeleton styles — an `overflow: hidden` viewport, a `display: flex` container, and slide sizing — ship **scoped inside the component**. Slides are plain light-DOM framework children, so the scoped styles reach them on all six targets (including through Lit's shadow root).
+Unlike most engine wrappers, Embla ships **no** stylesheet you must import. The carousel skeleton styles — an `overflow: hidden` viewport, a `display: flex` container, and slide sizing — ship **scoped inside the component**. Slides are plain light-DOM framework children, so the scoped styles reach them (including through Lit's shadow root).
 :::
 
 ## Quick start
@@ -43,7 +43,7 @@ There are **two slide-source modes** from one component:
 
 The `rozie-embla__slide` class is **required**, not decorative, in both modes: the component measures slides by an explicit element list (the [`$slotted.<name>` sigil](/guide/engine-wrappers#slotted-name-—-resolve-slotted-elements-across-the-lit-shadow-boundary) resolves the default slot's content even across Lit's shadow boundary), so unclassed children are never measured as slides.
 
-Both modes work identically on all six targets, including Lit.
+Both modes work identically, including on Lit.
 
 The current snap is **two-way bound** through the single `selectedIndex` model prop. Dragging or scrolling writes the new index back through the model path (echo-guarded so a programmatic `scrollTo` doesn't ping-pong); a consumer write scrolls the carousel. Snap/settle/reInit/pointer lifecycle fires as native framework events. Note the model is `selectedIndex` while the snap-change event is `select` — distinct identifiers (a model prop must not share a name with an emit).
 
@@ -211,6 +211,6 @@ The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learn
 
 ## See also
 
-- [Embla — live demo](/components/embla-demo) — the real `@rozie-ui/embla-vue` package running in the page, plus the generated output for all six targets.
+- [Embla — live demo](/components/embla-demo) — the real `@rozie-ui/embla-vue` package running in the page, plus the generated output for each target.
 - [Embla libraries comparison](/components/embla-comparison) — how `@rozie-ui/embla` stacks up against `embla-carousel-{react,vue,svelte,solid}`, the Angular community wrapper, and the (absent) Lit story.
 - [`Carousel.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/src/Carousel.rozie)

@@ -452,7 +452,7 @@ When `src` is a URL on another origin, the fetch is subject to **CORS** — the 
 
 - [PDF libraries comparison](/components/pdf-comparison) — the per-framework wrapper matrix, the Solid / Lit gap, and the honest "what Rozie defers" row.
 - [`PdfViewer.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/pdf/src/PdfViewer.rozie) — the canonical wrapper.
-- [PdfViewer live demo](/components/pdf-demo) — the rendered viewer across all six targets.
+- [PdfViewer live demo](/components/pdf-demo) — the rendered viewer for each target.
 - [Cropper — showcase & API](/components/cropper) — the sibling no-slots engine-wrapper port.
 - [MapLibre — showcase & API](/components/maplibre) — the sibling engine-wrapper port (the two-way model + imperative-handle pattern).
 - [Features](/guide/features) — the full Rozie author-side API (`$expose`, `r-model`, the prop / event / slot surface).

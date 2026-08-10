@@ -71,7 +71,7 @@ documented in [`$expose`](/guide/composition#expose-→-a-consumer-callable-impe
 
 | Feature | React | Vue | Svelte | Angular | Solid | Lit |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Producer-side `model: true` → idiomatic two-way machinery | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Producer-side `model: true` → native two-way machinery | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Producer-side `$model.x` two-way write sigil | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Consumer-side `r-model:propName="…"` directive | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 

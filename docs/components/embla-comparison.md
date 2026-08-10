@@ -20,7 +20,7 @@ How `@rozie-ui/embla` compares to the existing per-framework [Embla Carousel](ht
 | **Lit / web components** | *(none)* | — | — | **No wrapper exists.** You hand-roll the engine attach + lifecycle yourself. |
 | **Rozie** | `@rozie-ui/embla-*` | a **component** | **deep** | Same API on all six: props, events, two-way `selectedIndex`, handle. |
 
-On its home framework each official wrapper is a solid pick. The case for Rozie is consistency and coverage: the four official surfaces are a hook, a composable, an action, and a primitive, four different mental models for the *same* engine; Angular has only a community package; and Lit has nothing. A team shipping a cross-framework design system today maintains four divergent bindings plus a hand-rolled Angular/Lit story. Rozie gives all six the same idiomatic `<Carousel>` component: the same props, events, two-way binding, and imperative handle.
+On its home framework each official wrapper is a solid pick. The case for Rozie is consistency and coverage: the four official surfaces are a hook, a composable, an action, and a primitive, four different mental models for the *same* engine; Angular has only a community package; and Lit has nothing. A team shipping a cross-framework design system today maintains four divergent bindings plus a hand-rolled Angular/Lit story. Rozie gives them all the same `<Carousel>` component: the same props, events, two-way binding, and imperative handle.
 
 ## Feature matrix
 
@@ -46,9 +46,9 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## Where Rozie wins today
 
-- **First-class packages for all six frameworks** — including Lit, which has **no Embla wrapper at all**, and Angular, which has only a single-maintainer community package. Lit gets an Embla custom element; Angular gets a signals component from the same family as the other five.
-- **The same component surface everywhere.** The four official wrappers are a hook, a composable, an action, and a primitive. `@rozie-ui/embla` is one `<Carousel>` component with the same props, events, and handle on all six: one component to learn, document, and migrate across your stack.
-- **A real two-way snap index on all six.** The `selectedIndex` model reads *and* drives the carousel: dragging echoes the new index out (via Embla's `select` event), and a consumer write scrolls the carousel (echo-guarded so a programmatic `scrollTo` doesn't ping-pong). The official wrappers surface the index via a one-way `select` listener; you wire the write-back yourself.
+- **First-class packages everywhere** — including Lit, which has **no Embla wrapper at all**, and Angular, which has only a single-maintainer community package. Lit gets an Embla custom element; Angular gets a signals component from the same family as the other five.
+- **The same component surface everywhere.** The four official wrappers are a hook, a composable, an action, and a primitive. `@rozie-ui/embla` is one `<Carousel>` component with the same props, events, and handle: one component to learn, document, and migrate across your stack.
+- **A real two-way snap index.** The `selectedIndex` model reads *and* drives the carousel: dragging echoes the new index out (via Embla's `select` event), and a consumer write scrolls the carousel (echo-guarded so a programmatic `scrollTo` doesn't ping-pong). The official wrappers surface the index via a one-way `select` listener; you wire the write-back yourself.
 - **A uniform 14-verb imperative handle** (`scrollNext` / `scrollPrev` / `scrollToIndex` / `reInitCarousel` / `canScrollNext` / `canScrollPrev` / `getSelectedIndex` / `scrollSnapList` / `scrollProgress` / `slidesInView` / `slidesNotInView` / `previousScrollSnap` / `getPlugins` / `getInstance`) grabbed with each framework's native ref, identical on every target.
 - **Two slide-source modes from one component.** Pass a `:slides` config array, or drop declarative `.rozie-embla__slide` children into the default slot. The official wrappers only support consumer-authored slide DOM.
 - **`getInstance()` is always one hop from the raw engine**, so the full Embla v8 API is reachable on any target when the curated surface doesn't cover something.
@@ -56,7 +56,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## What Rozie defers {#what-rozie-defers}
 
-- **React/Vue/Svelte/Solid depth on their home framework.** The four official wrappers are mature, maintained, and idiomatic for their framework's own conventions (a React dev expects a hook; a Svelte dev expects an action). On its home framework each is a perfectly good pick. Rozie's value is the same idiomatic component on all six frameworks, with Lit and Angular getting an Embla component they otherwise lack. For anything outside the curated surface, `getInstance()` hands you the raw engine on every target.
+- **React/Vue/Svelte/Solid depth on their home framework.** The four official wrappers are mature, maintained, and shaped to their framework's own conventions (a React dev expects a hook; a Svelte dev expects an action). On its home framework each is a perfectly good pick. Rozie's value is the same component everywhere, with Lit and Angular getting an Embla component they otherwise lack. For anything outside the curated surface, `getInstance()` hands you the raw engine on every target.
 - **Per-option setters.** Embla itself ships no per-option setters; `reInit(options)` is the only update path. So `@rozie-ui/embla` `$watch`es each runtime option and calls `reInit`, exactly as you would by hand with the official wrappers. A consumer rapidly mutating options can thrash `reInit`; debounce on the consumer side if needed (Embla's native `watchSlides` is incremental for slide changes).
 - **`@rozie-ui/embla` is pre-1.0** and younger than the official wrappers. The full surface is documented in the [showcase & API](/components/embla).
 - **Embla v8, not v9.** These packages wrap the mature v8. Embla v9 (RC at time of writing) renames the API surface; teams that want v9 are better served by it directly once it ships stable.

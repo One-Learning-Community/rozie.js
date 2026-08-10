@@ -21,7 +21,7 @@ The platform `<input type="number">` is the usual starting point, but it is famo
 | **Solid** — `@ark-ui/solid` NumberInput, or a `createSignal` + effect-driven `<input>` | `<NumberField modelValue={qty()} onModelValueChange={setQty} />` with a ref-callback handle. |
 | **Lit** — a hand-written custom element wrapping `<input type="number">` | `<rozie-number-field>` with reactive `modelValue`/`min`/`max`/`step` properties and `model-value-change` / `change` events. |
 
-## What you get in all six, for free
+## What you get for free
 
 - **Clamp + step-snap on every commit** — values land on `min + k·step`, inside `[min, max]`, regardless of how they arrive (typing, buttons, keyboard, scrub, programmatic).
 - **Full keyboard** — ArrowUp/Down (±`step`), PageUp/Down (±`largeStep`), Home/End (→`min`/`max`), Enter to commit.

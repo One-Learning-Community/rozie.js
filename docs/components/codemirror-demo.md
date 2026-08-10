@@ -88,9 +88,9 @@ The document is two-way bound with `v-model:value` — the readout above updates
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/codemirror/src/CodeMirror.rozie{html}[CodeMirror.rozie — the single source]
+<<< ../../packages/ui/codemirror/src/CodeMirror.rozie{html}[CodeMirror.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/codemirror-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/codemirror-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -103,11 +103,11 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same two-way `value`, same eight-verb imperative handle, same five portal slots, identical on every target.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same two-way `value`, same eight-verb imperative handle, same five portal slots, identical on every target.
 
 ## See also
 
-- [CodeMirror — showcase & API](/components/codemirror) — install, quick starts for all six frameworks, the `:extensions` passthrough, the language presets, and the full prop/handle/slot reference.
+- [CodeMirror — showcase & API](/components/codemirror) — install, per-framework quick starts, the `:extensions` passthrough, the language presets, and the full prop/handle/slot reference.
 - [CodeMirror libraries comparison](/components/codemirror-comparison) — how `@rozie-ui/codemirror` stacks up against the per-framework wrappers (including the Angular binding still on CodeMirror 5).
 
 <style scoped>

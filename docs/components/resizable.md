@@ -104,7 +104,7 @@ The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learn
 - The handle is a `role="separator"` with `tabindex="0"` and `aria-orientation` set perpendicular to the split axis (`vertical` for a horizontal split, `horizontal` for a vertical split — matching the WAI-ARIA window-splitter contract).
 - Live `aria-valuenow` / `aria-valuemin` / `aria-valuemax` report the first panel's percent and bounds; `aria-disabled` reflects the `disabled` prop.
 - The drag uses pointer capture, so a resize started on the handle keeps tracking through the whole gesture regardless of where the pointer travels — no lost-pointer dead zones.
-- Reading the container rect happens only inside post-mount pointer handlers and the imperative handle (never eagerly), so the behavior is identical on all six targets, including inside Lit's shadow root.
+- Reading the container rect happens only inside post-mount pointer handlers and the imperative handle (never eagerly), so the behavior is identical everywhere, including inside Lit's shadow root.
 
 ## See also
 

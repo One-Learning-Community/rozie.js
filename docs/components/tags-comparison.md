@@ -21,7 +21,7 @@ How `@rozie-ui/tags` compares to the existing tags / token / chips-input librari
 | **Tagify** | framework-agnostic vanilla engine (wrappers for React/Vue/Angular/jQuery) | ✅ | ⚠️ per-wrapper | ✅ | ⚠️ 3 fw via wrappers, no Svelte/Solid/Lit |
 | **Rozie** | `@rozie-ui/tags-*` | ✅ | ✅ `r-model:modelValue` (Angular CVA) | ✅ `validate` | ✅ |
 
-On its home framework each of these is a solid pick. The case for Rozie is consistency, coverage, and the no-engine native foundation: there is no tags component that spans all six frameworks with the same API. Even the agnostic option, Tagify, is a vanilla engine you wrap per framework, and it reaches neither Svelte, Solid, nor Lit. Solid and Lit have no mainstream dedicated tags input at all. Rozie gives all six the same idiomatic `<Tags>`, with no engine to ship.
+On its home framework each of these is a solid pick. The case for Rozie is consistency, coverage, and the no-engine native foundation: there is no tags component that spans every framework with the same API. Even the agnostic option, Tagify, is a vanilla engine you wrap per framework, and it reaches neither Svelte, Solid, nor Lit. Solid and Lit have no mainstream dedicated tags input at all. Rozie gives them all the same `<Tags>`, with no engine to ship.
 
 ## No engine, native input + chips: the design choice
 
@@ -30,11 +30,11 @@ The deepest decision in a tags component is what holds the text and what holds t
 - **A vanilla engine owns the DOM** (Tagify): a single library mounts into a container and renders the input + tags itself, mutating the DOM directly. Maximum features (drag-reorder, dropdown suggestions, inline edit) at the cost of a non-trivial engine dependency and a wrapper per framework that reconciles the engine's imperative state against the framework's.
 - **A native `<input>` + framework-rendered chips** (most per-framework libraries, **Rozie**): the typing surface is a real `<input>`; the chips are framework-rendered elements. Focus, the caret, the keyboard, and the clipboard come from the platform; the work is the choreography (commit on delimiter, bulk-add on paste, retreat on Backspace) and the dedup/validate/cap policy.
 
-Rozie picks the no-engine native camp deliberately. The highest-value surface (the keyboard, paste, focus, mobile input) is the browser's, identical on all six targets, while Rozie owns the author-side API, the commit/dedup/validate logic, and the focus choreography. That choreography runs through one container ref, never per-chip refs, which is what gives it a clean cross-target story including Lit's shadow root. There is no engine to import and no required CSS.
+Rozie picks the no-engine native camp deliberately. The highest-value surface (the keyboard, paste, focus, mobile input) is the browser's, while Rozie owns the author-side API, the commit/dedup/validate logic, and the focus choreography. That choreography runs through one container ref, never per-chip refs, which is what gives it a clean cross-target story including Lit's shadow root. There is no engine to import and no required CSS.
 
 ## Fully controlled tokens, one local draft
 
-Most tags components keep an internal array of tokens *and* reconcile it against the bound value: a controlled/uncontrolled split with the usual footguns. `@rozie-ui/tags` keeps the committed tokens as `modelValue` (the sole `model: true` prop) and writes a fresh array back on every mutation. The only local state is the in-progress `draft` text in the input, a genuine UI buffer that is never the committed value. That is what lets the component stay fully controlled and two-way bound on all six frameworks, and it is why the Angular output is a clean `ControlValueAccessor` (a tags input is a form control).
+Most tags components keep an internal array of tokens *and* reconcile it against the bound value: a controlled/uncontrolled split with the usual footguns. `@rozie-ui/tags` keeps the committed tokens as `modelValue` (the sole `model: true` prop) and writes a fresh array back on every mutation. The only local state is the in-progress `draft` text in the input, a genuine UI buffer that is never the committed value. That is what lets the component stay fully controlled and two-way bound, and it is why the Angular output is a clean `ControlValueAccessor` (a tags input is a form control).
 
 ## Feature matrix
 
@@ -56,10 +56,10 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## Where Rozie wins today
 
-- **First-class packages for all six frameworks** — including **Solid and Lit**, which have *no* mainstream tags input at all, and the same idiomatic surface on the frameworks Tagify's wrappers reach *plus* the ones they don't. These are categories the incumbents simply don't serve.
-- **The same component surface everywhere.** Where the ecosystem offers a different library per framework, `@rozie-ui/tags` is one `<Tags>` with the same props, the same `add` / `remove` / `change` events, the same two-way `modelValue`, and the same `clear` / `focus` handle on all six. One component to learn, document, and migrate across your stack.
+- **First-class packages everywhere** — including **Solid and Lit**, which have *no* mainstream tags input at all, and the same idiomatic surface on the frameworks Tagify's wrappers reach *plus* the ones they don't. These are categories the incumbents simply don't serve.
+- **The same component surface everywhere.** Where the ecosystem offers a different library per framework, `@rozie-ui/tags` is one `<Tags>` with the same props, the same `add` / `remove` / `change` events, the same two-way `modelValue`, and the same `clear` / `focus` handle. One component to learn, document, and migrate across your stack.
 - **First-class validation + dedup + cap.** `validate` (a normalize-or-reject function), `allowDuplicates`, and `max` are core props, not a feature you bolt on with an `onChange` interceptor.
-- **A real two-way value on all six.** `r-model:modelValue` reads *and* writes the tokens with no `onChange → setState` glue, and because it is the sole `model: true` prop the Angular output is a `ControlValueAccessor`, so `[formControl]` / `[(ngModel)]` bind directly.
+- **A real two-way value.** `r-model:modelValue` reads *and* writes the tokens with no `onChange → setState` glue, and because it is the sole `model: true` prop the Angular output is a `ControlValueAccessor`, so `[formControl]` / `[(ngModel)]` bind directly.
 - **Zero-config styling that re-skins to any design system, and no engine to ship.** Every rendered value is a `--rozie-tags-*` CSS custom property with a built-in fallback, plus ready-made token bridges for shadcn/ui, Material 3, and Bootstrap 5. There is no third-party engine dependency at all.
 
 ## What Rozie defers {#what-rozie-defers}
@@ -78,6 +78,6 @@ The [`@rozie-ui/tags` showcase + API reference](/components/tags) documents the 
 
 - [Tags — showcase](/components/tags) — the full `@rozie-ui/tags` overview, quick start, theming, and accessibility reference.
 - [Tags — API reference](/components/tags-api) — every prop, event, handle verb, and the scoped slot.
-- [Tags — live demo](/components/tags-demo) — the real Vue package running in the page, plus the Rozie source and all six generated outputs.
+- [Tags — live demo](/components/tags-demo) — the real Vue package running in the page, plus the Rozie source and the six generated outputs.
 - [`Tags.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tags/src/Tags.rozie)
 - [Otp — headless one-time-code input](/components/otp-comparison) — a sibling no-engine pure-Rozie input family built on native cells.

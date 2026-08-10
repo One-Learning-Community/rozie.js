@@ -39,15 +39,15 @@ The case for Rozie is strongest for Angular and Lit (no wrapper at all) and Vue 
 
 ## Where Rozie wins today
 
-- **First-class packages for all six frameworks**, including the two the ecosystem leaves entirely unserved: Angular (no wrapper) and Lit (no wrapper). An Angular or Lit developer today hand-rolls the whole editor integration; Rozie gives them an idiomatic standalone component / web component.
+- **First-class packages everywhere**, including the two the ecosystem leaves entirely unserved: Angular (no wrapper) and Lit (no wrapper). An Angular or Lit developer today hand-rolls the whole editor integration; Rozie gives them a standalone component / web component.
 - **A shared-editor context** (`$inject('rozie-lexical-editor')`) with the same shape on every target: the extension seam custom plugins and the toolbar ride on, versus each framework's bespoke context/provider idiom.
-- **A bidirectional selection-reading toolbar** out of the box on all six: buttons that both dispatch commands and reflect the caret's current formatting, where React/Vue/Solid consumers build it themselves.
+- **A bidirectional selection-reading toolbar** out of the box: buttons that both dispatch commands and reflect the caret's current formatting, where React/Vue/Solid consumers build it themselves.
 - **A neutral-descriptor decorator bridge** proven end-to-end across six targets by the reference `@mention` node (including Lit through an open shadow root), plus an [authoring recipe](/components/lexical-recipe-decorator) for custom nodes.
-- **Lockstep-pinned engine.** `lexical` and every `@lexical/*` subpackage are pinned to the same core version across all six packages, so the family never drifts behind core the way the community Vue/Solid/Svelte wrappers have.
+- **Lockstep-pinned engine.** `lexical` and every `@lexical/*` subpackage are pinned to the same core version in every package, so the family never drifts behind core the way the community Vue/Solid/Svelte wrappers have.
 
 ## Staging — what ships today vs v1.1 {#staging-v1-0-vs-v1-1}
 
-All six targets (including Lit) ship today; the staging table — what ships now versus what remains deferred to v1.1 (Markdown-shortcuts + Tables) — lives on the [showcase page's roadmap](/components/lexical#roadmap-staging).
+Every target (including Lit) ships today; the staging table — what ships now versus what remains deferred to v1.1 (Markdown-shortcuts + Tables) — lives on the [showcase page's roadmap](/components/lexical#roadmap-staging).
 
 ## Scope limits
 

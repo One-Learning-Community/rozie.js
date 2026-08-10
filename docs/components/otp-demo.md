@@ -67,9 +67,9 @@ This is the **real `@rozie-ui/otp-vue` package** running on this page (VitePress
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/otp/src/Otp.rozie{html}[Otp.rozie — the single source]
+<<< ../../packages/ui/otp/src/Otp.rozie{html}[Otp.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/otp-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/otp-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -82,7 +82,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `change` / `complete` events, same two-way `value`, same imperative handle — identical on every target, built on native `<input>` cells with no third-party engine behind it.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `change` / `complete` events, same two-way `value`, same imperative handle — identical on every target, built on native `<input>` cells with no third-party engine behind it.
 
 ## See also
 

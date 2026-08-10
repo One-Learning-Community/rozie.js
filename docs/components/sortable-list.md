@@ -1,6 +1,6 @@
 # SortableList — the cross-framework drag-and-drop component
 
-`SortableList` is a data-bound port of [SortableJS](https://sortablejs.github.io/Sortable/). It ships as idiomatic React, Vue, Svelte, Angular, Solid, and Lit components, with a feature set that every standalone library on the [Sortable libraries comparison](/components/sortable-comparison) matrix either skips or implements partially.
+`SortableList` is a data-bound port of [SortableJS](https://sortablejs.github.io/Sortable/). It ships as React, Vue, Svelte, Angular, Solid, and Lit components, with a feature set that every standalone library on the [Sortable libraries comparison](/components/sortable-comparison) matrix either skips or implements partially.
 
 This page covers the API reference, live demos, and the recipes for the long tail of what you'd want a drag-and-drop list to do. The [comparison page](/components/sortable-comparison) sets it against the per-framework alternatives.
 
@@ -60,7 +60,7 @@ The minimal consumer is a `<components>` block, a bound array, and the default s
 
 `r-model:items` is Rozie's [two-way bind on an array](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere) — the consumer hands SortableList an array, SortableList writes the reordered array back, and the framework reconciler picks up the change without any `onChange → setState` wiring.
 
-To see what each target's emitted code looks like, visit the [SortableList example page](/examples/sortable-list) — it ships the live source plus the per-target compiled output for all six targets.
+To see what each target's emitted code looks like, visit the [SortableList example page](/examples/sortable-list) — it ships the live source plus the per-target compiled output.
 
 ## API
 
@@ -193,7 +193,7 @@ The default behavior is "grab anywhere in the row." To require a specific drag h
 </SortableList>
 ```
 
-`$classSelector` lowers to the bare literal selector (`".grip"`) on all six targets — see [the dedicated `$classSelector` doc](/guide/engine-wrappers#classselector-—-handing-a-class-name-to-a-vanilla-js-engine). It isn't required for correctness (React keeps authored class names literal too, so a plain `".grip"` already matches); it's a compile-time typo-check so the engine can't reference a class you never declared.
+`$classSelector` lowers to the bare literal selector (`".grip"`) — see [the dedicated `$classSelector` doc](/guide/engine-wrappers#classselector-—-handing-a-class-name-to-a-vanilla-js-engine). It isn't required for correctness (React keeps authored class names literal too, so a plain `".grip"` already matches); it's a compile-time typo-check so the engine can't reference a class you never declared.
 
 The canonical example is [`SortableListDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListDemo.rozie).
 
@@ -280,7 +280,7 @@ A `data-*` attribute selector is the most robust choice — it's independent of 
 </SortableList>
 ```
 
-A class-selector filter (`filter=".item-locked"`) also works on all six targets now — authored class names render literally everywhere (React scopes via `[data-rozie-s-<hash>]`, it no longer hashes the class name), so SortableJS's literal-string match resolves. The `data-*` form is still recommended only because it's independent of styling. (`filter` has no `$classSelector`-style typo-check the way `handle` does — SortableJS doesn't expose a programmatic selector-rewrite path for this option — so a `data-*` selector keeps it simple.)
+A class-selector filter (`filter=".item-locked"`) also works now — authored class names render literally everywhere (React scopes via `[data-rozie-s-<hash>]`, it no longer hashes the class name), so SortableJS's literal-string match resolves. The `data-*` form is still recommended only because it's independent of styling. (`filter` has no `$classSelector`-style typo-check the way `handle` does — SortableJS doesn't expose a programmatic selector-rewrite path for this option — so a `data-*` selector keeps it simple.)
 
 The canonical example is [`SortableListFilterDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListFilterDemo.rozie).
 
@@ -335,7 +335,7 @@ This is a **construction-time-only** knob (SortableJS reads it once at `new Sort
 
 ### List and item class hooks
 
-`listClass` merges extra classes onto the SortableJS container; `itemClass` merges them onto every row. They're the styling hook for bridging a CSS framework (`.list-group` / `.list-group-item`) or a flex/grid parent onto the component's own DOM without forking the wrapper. Both accept any shape a Vue class binding does — a **string**, a **`string[]`**, or a **`Record<string, boolean>`** object — normalized identically across all six targets:
+`listClass` merges extra classes onto the SortableJS container; `itemClass` merges them onto every row. They're the styling hook for bridging a CSS framework (`.list-group` / `.list-group-item`) or a flex/grid parent onto the component's own DOM without forking the wrapper. Both accept any shape a Vue class binding does — a **string**, a **`string[]`**, or a **`Record<string, boolean>`** object — normalized identically:
 
 ```rozie
 <SortableList
@@ -403,7 +403,7 @@ SortableJS physically moves DOM nodes on drop. Five of six target reconcilers co
 
 ### Class-name props are literal on every target
 
-SortableJS reads `handle`, `filter`, `ghostClass`, `chosenClass`, and `dragClass` as literal strings. Authored class names render literally on all six targets — React scopes styles via a `[data-rozie-s-<hash>]` attribute rather than hashing the class name (the same model as Vue's `<style scoped>`), so a literal `'.grip'` selector matches the rendered `class="grip"` and `classList.add('ghost-highlight')` lands on a class your `<style>` rule targets.
+SortableJS reads `handle`, `filter`, `ghostClass`, `chosenClass`, and `dragClass` as literal strings. Authored class names render literally — React scopes styles via a `[data-rozie-s-<hash>]` attribute rather than hashing the class name (the same model as Vue's `<style scoped>`), so a literal `'.grip'` selector matches the rendered `class="grip"` and `classList.add('ghost-highlight')` lands on a class your `<style>` rule targets.
 
 That means none of these props need a per-target workaround:
 

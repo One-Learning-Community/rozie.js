@@ -71,9 +71,9 @@ The selected value is two-way bound with `v-model:date` — the readout above up
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/flatpickr/src/Flatpickr.rozie{html}[Flatpickr.rozie — the single source]
+<<< ../../packages/ui/flatpickr/src/Flatpickr.rozie{html}[Flatpickr.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/flatpickr-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/flatpickr-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -86,11 +86,11 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with a `ControlValueAccessor`, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, identical on every target.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with a `ControlValueAccessor`, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, identical on every target.
 
 ## See also
 
-- [Flatpickr — showcase & API](/components/flatpickr) — install, quick starts for all six frameworks, and the full reference.
+- [Flatpickr — showcase & API](/components/flatpickr) — install, per-framework quick starts, and the full reference.
 - [Flatpickr example & per-target output](/examples/flatpickr) — the live source plus compiled React/Vue/Svelte/Angular/Solid/Lit output side by side.
 
 <style scoped>

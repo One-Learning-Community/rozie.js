@@ -181,7 +181,7 @@ Grab a handle with your framework's native ref mechanism (React `useRef` / Vue t
 | `getResponse` | Read the current response token on demand (e.g. just before submitting a form). Returns `""` before render or after reset. |
 
 ::: tip Why there is no `render` verb
-`render()` is a `LitElement` lifecycle method — exposing it would clobber the Lit element's own renderer. The widget render is kept internal; the three handle verbs (`reset`/`execute`/`getResponse`) are collision-free across all six targets (no emit/model-setter/Lit-lifecycle clash).
+`render()` is a `LitElement` lifecycle method — exposing it would clobber the Lit element's own renderer. The widget render is kept internal; the three handle verbs (`reset`/`execute`/`getResponse`) are collision-free (no emit/model-setter/Lit-lifecycle clash).
 :::
 
 **React example:**

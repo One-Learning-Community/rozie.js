@@ -32,11 +32,11 @@ features:
   - title: Not a runtime framework
     details: Rozie compiles away. The heavy lifting still happens in your target — React, Vue, Svelte, Angular, Solid, or the browser's native custom-element runtime owns the rendering pipeline.
   - title: Built for component-library authors
-    details: Write a component once in a .rozie file and Rozie compiles it to six idiomatic consumer packages. If you maintain manual cross-framework wrappers today, that work goes away.
+    details: Write a component once in a .rozie file and Rozie compiles it to six consumer packages. If you maintain manual cross-framework wrappers today, that work goes away.
   - title: Stuck on one framework? Use Rozie for ONE new component this week
     details: Drop a single .rozie file into your existing Next.js / Nuxt / Angular CLI / SvelteKit / Astro app. Get Vue-flavored SFC authoring, scoped CSS without runtime tax, automatic attribute fallthrough, and engine-wrapper escape hatches that fix pain your stack can't fix for you.
   - title: Quietly fixes cross-framework grit
-    details: Scoped CSS that survives composition on every target — with literal class names everywhere (React included), so querySelector('.x') and engine selectors just work. Non-primitive {{ }} renders portable JSON on all six targets instead of crashing React. $reconcileAfterDomMutation() for engines that mutate DOM under the reconciler's feet. The creature-comforts matrix flips the compatibility table on its head.
+    details: Scoped CSS that survives composition on every target — with literal class names everywhere (React included), so querySelector('.x') and engine selectors just work. Non-primitive {{ }} renders portable JSON instead of crashing React. $reconcileAfterDomMutation() for engines that mutate DOM under the reconciler's feet. The creature-comforts matrix flips the compatibility table on its head.
 ---
 
 ## Ship-ready components

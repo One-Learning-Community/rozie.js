@@ -77,9 +77,9 @@ The camera is two-way bound with `v-model:center` and `v-model:zoom` — the rea
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/maplibre/src/MapLibre.rozie{html}[MapLibre.rozie — the single source]
+<<< ../../packages/ui/maplibre/src/MapLibre.rozie{html}[MapLibre.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/maplibre-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/maplibre-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -92,11 +92,11 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with `model()` signals, a Solid component, and a Lit custom element. Same props, same 20 events, same eight-verb imperative handle, same reactive `marker` / `popup` / `control` portal slots, identical on every target.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with `model()` signals, a Solid component, and a Lit custom element. Same props, same 20 events, same eight-verb imperative handle, same reactive `marker` / `popup` / `control` portal slots, identical on every target.
 
 ## See also
 
-- [MapLibre — showcase & API](/components/maplibre) — install, quick starts for all six frameworks, the 20 events, the four two-way camera bindings, the imperative handle, and the portal slots.
+- [MapLibre — showcase & API](/components/maplibre) — install, per-framework quick starts, the 20 events, the four two-way camera bindings, the imperative handle, and the portal slots.
 - [MapLibre libraries comparison](/components/maplibre-comparison) — how `@rozie-ui/maplibre` stacks up against the per-framework wrappers (and the Solid / Lit gap it closes).
 
 <style scoped>

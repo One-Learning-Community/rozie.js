@@ -70,9 +70,9 @@ The document is two-way bound with `v-model:html` — the readout above updates 
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/tiptap/src/TipTap.rozie{html}[TipTap.rozie — the single source]
+<<< ../../packages/ui/tiptap/src/TipTap.rozie{html}[TipTap.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/tiptap-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/tiptap-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -85,11 +85,11 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same 14-verb imperative handle, same portal slots, identical on every target.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same 14-verb imperative handle, same portal slots, identical on every target.
 
 ## See also
 
-- [TipTap — showcase & API](/components/tiptap) — install, quick starts for all six frameworks, the events, the imperative handle, and the toolbar / bubble-menu / floating-menu / node-view slots.
+- [TipTap — showcase & API](/components/tiptap) — install, per-framework quick starts, the events, the imperative handle, and the toolbar / bubble-menu / floating-menu / node-view slots.
 - [TipTap libraries comparison](/components/tiptap-comparison) — how `@rozie-ui/tiptap` stacks up against the per-framework wrappers.
 
 <style scoped>

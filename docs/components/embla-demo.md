@@ -54,9 +54,9 @@ The snap index is two-way bound with `v-model:selectedIndex` — the readout upd
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/embla/src/Carousel.rozie{html}[Carousel.rozie — the single source]
+<<< ../../packages/ui/embla/src/Carousel.rozie{html}[Carousel.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/embla-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/embla-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -69,11 +69,11 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same two-way `selectedIndex`, same imperative handle, identical on every target.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same two-way `selectedIndex`, same imperative handle, identical on every target.
 
 ## See also
 
-- [Embla — showcase & API](/components/embla) — install, quick starts for all six frameworks, and the full reference.
+- [Embla — showcase & API](/components/embla) — install, per-framework quick starts, and the full reference.
 - [Embla libraries comparison](/components/embla-comparison) — how `@rozie-ui/embla` stacks up against the per-framework wrappers.
 
 <style scoped>

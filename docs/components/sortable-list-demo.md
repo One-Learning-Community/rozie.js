@@ -84,9 +84,9 @@ The list is two-way bound with `v-model:items` — the readout above updates liv
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/sortable-list/src/SortableList.rozie{html}[SortableList.rozie — the single source]
+<<< ../../packages/ui/sortable-list/src/SortableList.rozie{html}[SortableList.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/sortable-list-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/sortable-list-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -99,11 +99,11 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, same default scoped slot, identical on every target.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, same default scoped slot, identical on every target.
 
 ## See also
 
-- [SortableList — showcase & API](/components/sortable-list) — install, quick starts for all six frameworks, and the full reference.
+- [SortableList — showcase & API](/components/sortable-list) — install, per-framework quick starts, and the full reference.
 - [Sortable libraries comparison](/components/sortable-comparison) — how `@rozie-ui/sortable-list` stacks up against react-sortablejs, dnd-kit, Vue.Draggable, svelte-dnd-action, and the Angular CDK.
 
 <style scoped>

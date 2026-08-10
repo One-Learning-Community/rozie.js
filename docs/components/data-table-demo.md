@@ -231,7 +231,7 @@ Each `v-model:<slice>` is a two-way bind — the readout updates the instant you
 
 ## Row windowing (virtualization)
 
-The same real `@rozie-ui/data-table-vue` package, now over **50,000 rows** with `virtual` + `maxHeight="400px"`. Only the visible slice renders inside the bounded scroll container — scroll the table below and watch the row count stay tiny while the scrollbar spans the full 50,000-row height. Row windowing is GA on all six targets and [**tested to 100,000 rows**](/components/data-table-comparison#feature-matrix) by a DOM/behavioral VR matrix; the default `virtual="false"` is byte-identical to a non-virtual table.
+The same real `@rozie-ui/data-table-vue` package, now over **50,000 rows** with `virtual` + `maxHeight="400px"`. Only the visible slice renders inside the bounded scroll container — scroll the table below and watch the row count stay tiny while the scrollbar spans the full 50,000-row height. Row windowing is GA and [**tested to 100,000 rows**](/components/data-table-comparison#feature-matrix) by a DOM/behavioral VR matrix; the default `virtual="false"` is byte-identical to a non-virtual table.
 
 <ClientOnly>
 <div class="dt-live">
@@ -251,9 +251,9 @@ Set `virtual` to opt in; bound `maxHeight` (or the `--rozie-data-table-max-heigh
 
 You author the component **once** as a `.rozie` file (the parent `DataTable.rozie` plus the declarative `Column.rozie` child):
 
-<<< ../../packages/ui/data-table/src/DataTable.rozie{html}[DataTable.rozie — the single source]
+<<< ../../packages/ui/data-table/src/DataTable.rozie{html}[DataTable.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/data-table-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/data-table-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -266,7 +266,7 @@ You author the component **once** as a `.rozie` file (the parent `DataTable.rozi
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same twelve two-way slices, same fourteen change events, same `<Column>` API, same scoped slots, same imperative handle — identical on every target, built on `@tanstack/table-core` with no per-framework adapter behind it.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same twelve two-way slices, same fourteen change events, same `<Column>` API, same scoped slots, same imperative handle — identical on every target, built on `@tanstack/table-core` with no per-framework adapter behind it.
 
 ## See also
 

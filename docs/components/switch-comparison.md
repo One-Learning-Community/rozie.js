@@ -21,7 +21,7 @@ A checkbox with `role="switch"` is the usual platform starting point, but the ba
 | **Solid** — `@ark-ui/solid` Switch, `@kobalte/core` Switch, or a `createSignal` + `<button role="switch">` | `<Switch modelValue={on()} onModelValueChange={setOn} />` with a ref-callback handle. |
 | **Lit** — a hand-written custom element wrapping a toggle | `<rozie-switch>` with a reactive `modelValue` property and `model-value-change` / `change` events. |
 
-## What you get in all six, for free
+## What you get for free
 
 - **Boolean two-way value** — `modelValue` reads and writes a plain `boolean`, no per-framework value adapter.
 - **Full keyboard** — Space **and** Enter toggle the switch (the WAI-ARIA switch pattern), Space without scrolling the page.

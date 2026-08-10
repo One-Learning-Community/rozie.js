@@ -109,9 +109,9 @@ The graph is **one controlled object** (`v-model:graph`) — the single source o
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/rete/src/FlowCanvas.rozie{html}[FlowCanvas.rozie — the single source]
+<<< ../../packages/ui/rete/src/FlowCanvas.rozie{html}[FlowCanvas.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/rete-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/rete-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -124,7 +124,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with `model()` signals, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, same render-by-type body portal, identical on every target — and the engine (graph model, pan/zoom/drag, drag-to-connect) is Rete.js on every target.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component with `model()` signals, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, same render-by-type body portal, identical on every target — and the engine (graph model, pan/zoom/drag, drag-to-connect) is Rete.js on every target.
 
 The companion `<NodeType>` and `<Port>` type-template tags compile the same way:
 
@@ -213,12 +213,12 @@ const onReject = (c) => {
 > **Try it in the playground.** The demo is registered as `bundle/FlowCanvasAdvancedDemo`
 > in the Rozie playground (`pnpm --filter rozie-playground dev`) — open the **Compare all
 > targets** grid to see the same controlled-graph typed pipeline (and its port colors)
-> rendered by all six frameworks side by side.
+> rendered side by side.
 
 ### Passing a function prop across all six targets
 
 `canConnect` is a **function-typed prop** — a slightly different pattern from the
-data-and-events props elsewhere in `@rozie-ui`. It binds idiomatically on every target;
+data-and-events props elsewhere in `@rozie-ui`. It binds the same way on every target;
 the only one that needs care is **Lit**, where a function must go through a **property**
 binding (a function cannot be serialized to an HTML attribute):
 
@@ -265,7 +265,7 @@ Each `<NodeType>`'s `#body` template carries a **✕ remove** button. The demo d
 with a **top-level `@pointerup` handler** that reads the node id off a `:data-id` attribute
 bind (`e.target.closest('[data-id]')`) and filters it out of `$data.graph.nodes` into a
 **fresh graph object** assigned back to `$data.graph` (controlled-model remove — the
-canvas reconciles the engine node away) — a pattern that works on all six targets
+canvas reconciles the engine node away) — a pattern that works everywhere,
 including Solid. (`@pointerup` rather than `@click` because Rete starts a node-drag on
 pointer-down and the browser never synthesizes a `click` from the drag gesture; and
 `@pointerup` over `@pointerdown` because Rete's drag handler `stopPropagation`s pointerdown
@@ -279,7 +279,7 @@ limitation), but `node-action` remains a first-class capability for consumers wh
 
 ## See also
 
-- [FlowCanvas — showcase & API](/components/rete) — install, quick starts for all six frameworks, the controlled `r-model:graph` binding, the `<NodeType>` / `<Port>` type templates, the events, the two-way zoom binding, and the imperative handle.
+- [FlowCanvas — showcase & API](/components/rete) — install, per-framework quick starts, the controlled `r-model:graph` binding, the `<NodeType>` / `<Port>` type templates, the events, the two-way zoom binding, and the imperative handle.
 - [Node-flow editor libraries comparison](/components/rete-comparison) — how `@rozie-ui/rete` stacks up against React Flow / Vue Flow / Svelte Flow / Foblex (and the Solid / Lit gap it closes).
 
 <style scoped>

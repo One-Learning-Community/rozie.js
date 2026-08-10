@@ -16,7 +16,7 @@ framework, with divergent APIs, divergent theming, and wildly divergent
 accessibility quality.
 
 [`@rozie-ui/date-picker`](/components/date-picker) takes the other path: six
-idiomatic, accessible packages with one API
+accessible packages with one API
 (`value` model, `min`/`max`/`disabledDates`, roving-grid keyboard nav, a
 `#header` slot, a `focus`/`goToToday`/`clear` handle). It does less than the
 feature-deep incumbents on purpose: single-date or range selection (with
@@ -35,7 +35,7 @@ partial / stale / lightly-documented.
 
 | Library | Framework(s) | Headless? | WAI-ARIA a11y | Maintained (latest / date) | Range / time | Notes |
 | --- | --- | :---: | :---: | --- | :---: | --- |
-| **[`@rozie-ui/date-picker`](/components/date-picker)** | **React + Vue + Svelte + Angular + Solid + Lit** | ✓ token-themed | ✓ ARIA grid + roving keyboard | pre-1.0, released together | range ✓ / time ✗ | Same API, six idiomatic packages. Single + range selection with presets; no time-of-day. |
+| **[`@rozie-ui/date-picker`](/components/date-picker)** | **React + Vue + Svelte + Angular + Solid + Lit** | ✓ token-themed | ✓ ARIA grid + roving keyboard | pre-1.0, released together | range ✓ / time ✗ | Same API, six packages. Single + range selection with presets; no time-of-day. |
 | [react-datepicker](https://github.com/Hacker0x01/react-datepicker) | React | ✗ styled | ~ keyboard, partial ARIA | 9.1.0 / 2025-12 | ✓ / ✓ | ~5.0M wk. The popular default; opinionated CSS. |
 | [react-day-picker](https://daypicker.dev) | React | ~ restyleable | ✓ follows APG | 10.0.1 / 2026-05 | range ✓ / time ✗ | Strong a11y; non-Gregorian calendars. Powers shadcn/ui's calendar. |
 | [@mui/x-date-pickers](https://mui.com/x/react-date-pickers/) | React | ✗ Material | ✓ documented WCAG/ARIA | 9.11.0 / 2026-08 | time ✓ / **range Pro-only** | Date/time/datetime free; **range pickers are commercial**. |
@@ -97,7 +97,7 @@ APIs, five theming models, and accessibility that ranges from best-in-class
 (react-aria) to a documented pain point (flatpickr). `@rozie-ui/date-picker`
 authors the [WAI-ARIA grid pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/),
 the roving keyboard focus, the `min`/`max`/`disabledDates` gating, the two-way
-ISO `value` model, and the token theme once, and ships the *same* idiomatic
+ISO `value` model, and the token theme once, and ships the *same*
 `<DatePicker>` to all six, including an Angular `ControlValueAccessor` generated
 from the single `value` model, so `[(ngModel)]` and reactive forms bind directly.
 See the [API reference](/components/date-picker-api) for the exact surface.
@@ -109,7 +109,7 @@ See the [API reference](/components/date-picker-api) for the exact surface.
   [@mui/x-date-pickers](https://mui.com/x/react-date-pickers/) or
   [react-datepicker](https://github.com/Hacker0x01/react-datepicker) out-feature
   Rozie outright (note MUI's *range* pickers are a commercial Pro tier — Rozie's
-  range is free and on all six frameworks). Vue-only?
+  range is free). Vue-only?
   [@vuepic/vue-datepicker](https://vue3datepicker.com) is deeper. Angular-only
   with a time requirement? [PrimeNG](https://primeng.org/datepicker).
 - **You need a date-*time* or multi-date picker today.** Rozie ships single-date
@@ -155,14 +155,14 @@ Rozie's scope is narrow on purpose.
   elsewhere in your app. The upside: no date-library dependency in the bundle,
   where the styled incumbents frequently pull `date-fns` / `dayjs` / `luxon`.
 
-## What it does ship, on all six
+## What it does ship
 
 What Rozie *does* cover, it covers identically everywhere. That uniformity
 is the point:
 
 | Capability | `@rozie-ui/date-picker` | Per-framework incumbents |
 | --- | --- | --- |
-| Cross-framework parity | ✓ same API, 6 idiomatic packages | ✗ a different library per framework |
+| Cross-framework parity | ✓ same API, 6 packages | ✗ a different library per framework |
 | Headless / restyleable | ✓ token-themed + `#header` / `#footer` / `#presets` slots | ~ varies; usually opinionated CSS |
 | `min` / `max` / disabled dates | ✓ built in; a range can neither preview nor commit **across** a disabled day (pointer + keyboard) | ✓ usually |
 | Roving-grid keyboard a11y | ✓ [WAI-ARIA grid](https://www.w3.org/WAI/ARIA/apg/patterns/grid/) (arrows / Home / End / PageUp / PageDown / Enter / Space) | ~ ranges from best-in-class to a known weak spot |

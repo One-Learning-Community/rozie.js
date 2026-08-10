@@ -187,7 +187,7 @@ Beyond props, the component exposes imperative methods declared once in the Rozi
 | `unsetLink` | Remove the link mark from the current selection. No-op before mount. |
 
 ::: tip The focus/blur verbs are `focusEditor` / `blurEditor`, not `focus` / `blur`
-The component emits `focus` and `blur` **events**, and on class-based targets (Angular) an output field and a method cannot share a name. The imperative verbs are therefore named `focusEditor` / `blurEditor`, keeping the event names idiomatic for consumers. Likewise the content setter is `setContent`, not `setHtml` — an `html` model prop makes the React target auto-generate a `setHtml` state setter.
+The component emits `focus` and `blur` **events**, and on class-based targets (Angular) an output field and a method cannot share a name. The imperative verbs are therefore named `focusEditor` / `blurEditor`, keeping the plain `focus` / `blur` event names for consumers. Likewise the content setter is `setContent`, not `setHtml` — an `html` model prop makes the React target auto-generate a `setHtml` state setter.
 :::
 
 **React example:**
@@ -457,15 +457,15 @@ A model two-way binding can ping-pong: the consumer's state signals back into th
 
 ### Why `focus` / `blur` are events but the verbs are renamed
 
-`focus` and `blur` are emitted as events (so consumers can wire save-on-blur or toolbar show/hide). Because an Angular output field and a method cannot share a name, the imperative commands are `focusEditor` / `blurEditor`. This keeps **both** capabilities — the focus/blur notifications *and* the imperative focus/blur control — alive across all six targets.
+`focus` and `blur` are emitted as events (so consumers can wire save-on-blur or toolbar show/hide). Because an Angular output field and a method cannot share a name, the imperative commands are `focusEditor` / `blurEditor`. This keeps **both** capabilities — the focus/blur notifications *and* the imperative focus/blur control — alive.
 
 ### Placeholder rendering is bundled
 
-The `placeholder` prop renders empty-state ghost text out of the box — the text shows only while the document is empty and hides as you type. `@rozie-ui/tiptap` bundles `@tiptap/extensions` (ships `Placeholder` in v3) and wires the prop to `Placeholder.configure({ placeholder })` at editor construction, so no consumer `:extensions` wiring is needed. The ghost-text CSS reaches the engine-rendered `.is-editor-empty` node (which carries no Rozie scope attribute) via the `:root { }` engine-DOM escape hatch on all six targets. The prop still also forwards `aria-placeholder` for assistive tech.
+The `placeholder` prop renders empty-state ghost text out of the box — the text shows only while the document is empty and hides as you type. `@rozie-ui/tiptap` bundles `@tiptap/extensions` (ships `Placeholder` in v3) and wires the prop to `Placeholder.configure({ placeholder })` at editor construction, so no consumer `:extensions` wiring is needed. The ghost-text CSS reaches the engine-rendered `.is-editor-empty` node (which carries no Rozie scope attribute) via the `:root { }` engine-DOM escape hatch. The prop still also forwards `aria-placeholder` for assistive tech.
 
 ### Feature-complete versus the official wrappers
 
-TipTap's marquee feature — **custom node views** — ships via the [`nodeView` reactive slot](/components/tiptap-node-views), and selection-anchored **bubble / floating menus** ship via the [`bubbleMenu` / `floatingMenu` slots](#bubble-floating-menu-slots), both uniformly across all six targets (including Solid and Lit, where no upstream renderer exists). Together with the bundled Placeholder and the auto-emitted Angular `ControlValueAccessor`, that closes every meaningful gap versus the official wrappers. The one intentionally-unmatched item is switching the *two-way model payload itself* to JSON (`ngx-tiptap`'s `outputFormat`) — read JSON off the `getJSON()` handle instead. See the [comparison page](/components/tiptap-comparison) for the full matrix.
+TipTap's marquee feature — **custom node views** — ships via the [`nodeView` reactive slot](/components/tiptap-node-views), and selection-anchored **bubble / floating menus** ship via the [`bubbleMenu` / `floatingMenu` slots](#bubble-floating-menu-slots), both uniformly (including Solid and Lit, where no upstream renderer exists). Together with the bundled Placeholder and the auto-emitted Angular `ControlValueAccessor`, that closes every meaningful gap versus the official wrappers. The one intentionally-unmatched item is switching the *two-way model payload itself* to JSON (`ngx-tiptap`'s `outputFormat`) — read JSON off the `getJSON()` handle instead. See the [comparison page](/components/tiptap-comparison) for the full matrix.
 
 ## Cross-references
 

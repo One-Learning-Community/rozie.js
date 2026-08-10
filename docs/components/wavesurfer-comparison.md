@@ -5,7 +5,7 @@ surface_hash: c094ffccb048
 
 # wavesurfer libraries — comparison
 
-[wavesurfer.js](https://wavesurfer.xyz) does the real work (canvas rendering + Web Audio). The question is the **wrapper**: how do you drop a waveform into *your* framework with idiomatic props, events, two-way state, and an imperative handle? Today that answer is uneven across ecosystems — which is the gap `@rozie-ui/wavesurfer` closes.
+[wavesurfer.js](https://wavesurfer.xyz) does the real work (canvas rendering + Web Audio). The question is the **wrapper**: how do you drop a waveform into *your* framework with framework-native props, events, two-way state, and an imperative handle? Today that answer is uneven across ecosystems — which is the gap `@rozie-ui/wavesurfer` closes.
 
 > Research snapshot: 2026-08-10. The wrapper landscape moves; treat these claims as of that date.
 
@@ -20,7 +20,7 @@ surface_hash: c094ffccb048
 | Solid | — | None; hand-roll with `onMount`/`onCleanup`. |
 | Lit | — | None; hand-roll a custom element around the engine. |
 
-Every "hand-roll" row re-implements the same things: build the engine against a container ref, wire `on()` events to framework outputs, reconcile prop changes to `setOptions`/`setVolume`/`zoom`, guard the two-way position (and, with regions, a two-way *list*) against feedback loops, and tear down on unmount. That is exactly the boilerplate `@rozie-ui/wavesurfer` ships, identically, for all six.
+Every "hand-roll" row re-implements the same things: build the engine against a container ref, wire `on()` events to framework outputs, reconcile prop changes to `setOptions`/`setVolume`/`zoom`, guard the two-way position (and, with regions, a two-way *list*) against feedback loops, and tear down on unmount. That is exactly the boilerplate `@rozie-ui/wavesurfer` ships, identically, everywhere.
 
 ## What `@rozie-ui/wavesurfer` gives you
 

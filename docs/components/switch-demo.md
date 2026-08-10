@@ -65,9 +65,9 @@ This is the **real `@rozie-ui/switch-vue` package** running on this page (VitePr
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/switch/src/Switch.rozie{html}[Switch.rozie — the single source]
+<<< ../../packages/ui/switch/src/Switch.rozie{html}[Switch.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/switch-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/switch-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -80,7 +80,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same prop, same `change` event, same two-way `modelValue`, same scoped slot, same imperative handle — identical on every target, built on a native focusable element with no third-party engine behind it.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same prop, same `change` event, same two-way `modelValue`, same scoped slot, same imperative handle — identical on every target, built on a native focusable element with no third-party engine behind it.
 
 ## See also
 

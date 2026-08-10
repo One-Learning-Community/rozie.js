@@ -26,7 +26,7 @@ With Rozie, the windowing algorithm, the bounds logic, the roving keyboard navig
 - **Controlled, single model.** The current page *is* `modelValue` — there is no internal page state to sync, and on Angular it is a real `ControlValueAccessor` (so `[(ngModel)]` / `[formControl]` work without a wrapper directive).
 - **Count-source flexible.** Supply `totalPages` directly, or `total` + `pageSize` and let the component derive the page count.
 - **MUI-parity windowing.** The page-item model matches the well-understood MUI `usePagination` semantics (constant-width window near a boundary; a one-page gap renders the bridging page rather than a one-page ellipsis), so the output is predictable for anyone migrating from MUI.
-- **Token-themed, framework-agnostic skin.** Every visual value is a `--rozie-pagination-*` custom property, with ready-made shadcn/Material/Bootstrap bridges — the same skin across all six frameworks.
+- **Token-themed, framework-agnostic skin.** Every visual value is a `--rozie-pagination-*` custom property, with ready-made shadcn/Material/Bootstrap bridges — the same skin everywhere.
 
 ## What it deliberately does NOT do
 

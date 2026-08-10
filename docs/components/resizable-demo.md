@@ -60,9 +60,9 @@ This is the **real `@rozie-ui/resizable-vue` package** running on this page (Vit
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/resizable/src/Resizable.rozie{html}[Resizable.rozie — the single source]
+<<< ../../packages/ui/resizable/src/Resizable.rozie{html}[Resizable.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/resizable-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/resizable-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -75,7 +75,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `resize` event, same two-way `size`, same imperative handle, same slots — identical on every target, built on native Pointer Events with no third-party engine behind it.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `resize` event, same two-way `size`, same imperative handle, same slots — identical on every target, built on native Pointer Events with no third-party engine behind it.
 
 ## See also
 

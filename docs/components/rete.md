@@ -1,6 +1,6 @@
 # FlowCanvas — the cross-framework node-flow editor
 
-`FlowCanvas` is a data-bound port of [Rete.js v2](https://retejs.org/), the framework-agnostic visual-programming engine whose core owns the graph model and all pointer interaction (pan, zoom, node drag, drag-to-connect). It ships as idiomatic React, Vue, Svelte, Angular, Solid, and Lit components with the same API.
+`FlowCanvas` is a data-bound port of [Rete.js v2](https://retejs.org/), the framework-agnostic visual-programming engine whose core owns the graph model and all pointer interaction (pan, zoom, node drag, drag-to-connect). It ships as React, Vue, Svelte, Angular, Solid, and Lit components with the same API.
 
 This fills a genuine cross-framework gap. No other node-flow editor ships all six idiomatically:
 
@@ -281,7 +281,7 @@ Swap `-react` for your target framework's package. The bridges are **colors-only
 
 **Dark mode is a zero-import, OS-driven default.** The component ships an
 `@media (prefers-color-scheme: dark)` block that re-skins the color tokens when the OS
-requests dark — no import, no config, on all six targets (it rides the `:root` engine-DOM
+requests dark — no import, no config (it rides the `:root` engine-DOM
 escape hatch, so it reaches the Lit shadow tree too). The light render is untouched (the
 query only matches in a dark context), so nothing changes for light-mode consumers.
 

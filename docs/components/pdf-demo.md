@@ -64,9 +64,9 @@ The current page is two-way bound with `v-model:page` (the readout tracks it as 
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/pdf/src/PdfViewer.rozie{html}[PdfViewer.rozie — the single source]
+<<< ../../packages/ui/pdf/src/PdfViewer.rozie{html}[PdfViewer.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/pdf-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/pdf-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -79,11 +79,11 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element — with the same props, events, and 12-verb imperative handle, identical on every target.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element — with the same props, events, and 12-verb imperative handle, identical on every target.
 
 ## See also
 
-- [PdfViewer — showcase & API](/components/pdf) — install, quick starts for all six frameworks, the worker setup, and the full reference.
+- [PdfViewer — showcase & API](/components/pdf) — install, per-framework quick starts, the worker setup, and the full reference.
 - [PDF libraries comparison](/components/pdf-comparison) — how `@rozie-ui/pdf` stacks up against react-pdf, vue-pdf-embed, ng2-pdf-viewer, and the underserved frameworks.
 
 <style scoped>

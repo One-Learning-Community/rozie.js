@@ -21,17 +21,17 @@ latest stable).
 | | **Rozie** | **Mitosis** | **Stencil** |
 | --- | --- | --- | --- |
 | Authoring syntax | Vue/Alpine-flavored `.rozie` SFC (`<template>` + `<script>` + `<style>` + `<props>` blocks, `r-*` directives, `{{ }}`) | JSX-like components with hooks (`useStore`, `useState`, `onMount`) | TSX components (decorators + JSX) |
-| Output model | **Idiomatic native** components per framework | **Idiomatic native** components per framework | Standards-based **web components** + generated framework wrappers |
+| Output model | **Native** components per framework | **Native** components per framework | Standards-based **web components** + generated framework wrappers |
 | Framework targets | React, Vue, Svelte, Angular, Solid, Lit (6) | React, Vue, Svelte, Angular, Solid, Qwik + more (Lit, Alpine, React Native, web components) | One web component → React / Vue / Angular wrapper output targets |
 | Runtime cost | None at runtime (the Lit target uses the browser's native custom-element runtime) | None at runtime | A small Stencil runtime ships inside the custom element |
 | Maturity | New, v1-track | `0.14.x`, pre-1.0, established with a broad community | `4.x`, mature, very large production footprint (Ionic Framework) |
-| Sweet spot | Component-library authors who want idiomatic native output across six frameworks, with Vue-style authoring | The widest target matrix, JSX authoring, and the Builder.io / Figma import pipeline | Shipping web components as the unit of distribution, with thin framework wrappers |
+| Sweet spot | Component-library authors who want native output across six frameworks, with Vue-style authoring | The widest target matrix, JSX authoring, and the Builder.io / Figma import pipeline | Shipping web components as the unit of distribution, with thin framework wrappers |
 
 ## Rozie and Mitosis — the closest peer
 
 Mitosis and Rozie share a thesis: **a component is mostly declarative, so compile
 it to each framework's native primitives rather than shipping a runtime that
-re-implements rendering.** Both emit idiomatic per-framework code — a real React
+re-implements rendering.** Both emit per-framework code — a real React
 function component, a real Vue SFC, real Svelte runes — and both are invisible at
 runtime. If you like Rozie's premise, you owe it to yourself to look at Mitosis;
 it pioneered this space and has the broadest reach in it.
@@ -61,7 +61,7 @@ Where they differ:
 - **Focus.** Mitosis is general-purpose and integrates with Builder.io's visual
   editor and Figma import. Rozie is purpose-built for **wrapping vanilla-JS
   engines** (date pickers, calendars, drag-and-drop, editors) once and shipping
-  idiomatic consumers for every framework — see the
+  native consumers for every framework — see the
   [`@rozie-ui`](/components/fullcalendar) component families.
 
 **Choose Mitosis** when you want the widest possible target matrix, prefer JSX
@@ -114,8 +114,8 @@ each framework, without a web-component runtime or shadow-DOM model in between.
   jobs they're built for.
 - Rozie's contribution is a **deliberately narrow bet**: six mainstream targets,
   Vue-flavored authoring, and depth on the cross-framework behavioral parity and
-  component-library affordances that make a single source ship as idiomatic
-  native code on every one of them.
+  component-library affordances that make a single source ship as native
+  code on every one of them.
 
 For the full statement of what Rozie is and isn't, see [Why Rozie?](/guide/why)
 and [Why Rozie looks this way](/guide/design-rationale).

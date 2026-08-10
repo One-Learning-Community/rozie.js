@@ -111,9 +111,9 @@ The playback position is two-way bound with `v-model:currentTime` — the readou
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/wavesurfer/src/Waveform.rozie{html}[Waveform.rozie — the single source]
+<<< ../../packages/ui/wavesurfer/src/Waveform.rozie{html}[Waveform.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (exactly what ships in `@rozie-ui/wavesurfer-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (exactly what ships in `@rozie-ui/wavesurfer-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -126,11 +126,11 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, identical on every target.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, identical on every target.
 
 ## See also
 
-- [Waveform — showcase & API](/components/wavesurfer) — install, quick starts for all six frameworks, and the full reference.
+- [Waveform — showcase & API](/components/wavesurfer) — install, per-framework quick starts, and the full reference.
 - [wavesurfer libraries comparison](/components/wavesurfer-comparison) — how `@rozie-ui/wavesurfer` stacks up against the per-framework wrappers.
 
 <style scoped>

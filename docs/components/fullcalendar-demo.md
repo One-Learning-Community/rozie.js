@@ -66,9 +66,9 @@ The active `view` is two-way bound with `v-model:view` — the readout updates w
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/fullcalendar/src/FullCalendar.rozie{html}[FullCalendar.rozie — the single source]
+<<< ../../packages/ui/fullcalendar/src/FullCalendar.rozie{html}[FullCalendar.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/fullcalendar-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/fullcalendar-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -81,11 +81,11 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, identical on every target.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same events, same imperative handle, identical on every target.
 
 ## See also
 
-- [FullCalendar — showcase & API](/components/fullcalendar) — install, quick starts for all six frameworks, the `:options` passthrough, the opt-in plugin model, and the full reference.
+- [FullCalendar — showcase & API](/components/fullcalendar) — install, per-framework quick starts, the `:options` passthrough, the opt-in plugin model, and the full reference.
 - [The portal-slot primitive](/examples/portal-list) — how the ten `*Content` render hooks route a consumer fragment through each target's imperative-render API.
 
 <style scoped>

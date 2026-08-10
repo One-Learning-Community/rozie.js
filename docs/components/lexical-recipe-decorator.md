@@ -175,7 +175,7 @@ A design note on the host: the emitted `LexicalEditor` keeps the `contenteditabl
 
 ## Roadmap / v1.1 staging {#roadmap-v1-1-staging}
 
-All six targets — **React / Vue / Svelte / Angular / Solid / Lit** — plus the `@mention` decorator node and its six per-target bridges are shipping today. The following remain explicitly deferred to **v1.1**, documented here so the current surface is never a surprise:
+The six targets — **React / Vue / Svelte / Angular / Solid / Lit** — plus the `@mention` decorator node and its six per-target bridges are shipping today. The following remain explicitly deferred to **v1.1**, documented here so the current surface is never a surprise:
 
 - **Markdown-shortcuts plugin** — deferred.
 - **Tables plugin** — deferred.

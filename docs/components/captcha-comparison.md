@@ -22,7 +22,7 @@ How `@rozie-ui/captcha` compares to the existing CAPTCHA wrappers. Every provide
 
 The pattern: React, Vue, Svelte, and Angular each have *reasonable* single-provider wrappers, but a developer who wants to **let their app switch providers** — or who simply wants the *same* component API regardless of provider — has to maintain several different dependencies with several different prop shapes and event names. **Solid is sparsely served and Lit has nothing.** Rozie ships the same component, with the same API, to all six frameworks and across all four providers.
 
-For the scoreless, widget-less **reCAPTCHA v3**, Rozie ships a sibling [`RecaptchaV3`](/components/captcha#recaptchav3) component (same package, named export) — an imperative-first `execute(action) → Promise<token>` surface, again identical across all six frameworks.
+For the scoreless, widget-less **reCAPTCHA v3**, Rozie ships a sibling [`RecaptchaV3`](/components/captcha#recaptchav3) component (same package, named export) — an imperative-first `execute(action) → Promise<token>` surface, again identical everywhere.
 
 ## Feature matrix
 
@@ -46,7 +46,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported · *
 ## What Rozie does *not* do
 
 - **It is not a CAPTCHA itself** — it wraps the providers' own widgets, which still do the bot-detection in their iframes. You still need a site key, and you still **verify the token server-side** against the provider's `siteverify` endpoint.
-- **[ALTCHA](https://altcha.org)** — the privacy-first, self-hostable alternative — is a **web component**, a different integration shape than the script-tag explicit-render contract here. Cleanly consuming a foreign web component across all six targets needs a compiler capability Rozie does not yet have, so ALTCHA is the **sole remaining deferred provider**.
+- **[ALTCHA](https://altcha.org)** — the privacy-first, self-hostable alternative — is a **web component**, a different integration shape than the script-tag explicit-render contract here. Cleanly consuming a foreign web component needs a compiler capability Rozie does not yet have, so ALTCHA is the **sole remaining deferred provider**.
 
 ## Cross-references
 

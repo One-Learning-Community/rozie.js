@@ -34,9 +34,9 @@ The editor is composed the way you'd compose it in your own app: a `<LexicalEdit
 
 The editor shell is one `.rozie` file:
 
-<<< ../../packages/ui/lexical/src/LexicalEditor.rozie{html}[LexicalEditor.rozie — the single source]
+<<< ../../packages/ui/lexical/src/LexicalEditor.rozie{html}[LexicalEditor.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the actual generated output for each target (this is exactly what the `@rozie-ui/lexical-{react,vue,svelte,angular,solid,lit}` packages build to):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the actual generated output for each target (this is exactly what the `@rozie-ui/lexical-{react,vue,svelte,angular,solid,lit}` packages build to):
 
 ::: code-group
 
@@ -49,7 +49,7 @@ The editor shell is one `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React hooks, Vue `<script setup>`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same `$provide`/`$inject` editor-sharing contract, same plugins, identical on every target.
+Each is a real component for its framework — React hooks, Vue `<script setup>`, Svelte 5 runes, an Angular standalone component, a Solid component, and a Lit custom element. Same props, same `$provide`/`$inject` editor-sharing contract, same plugins, identical on every target.
 
 ## See also
 

@@ -298,7 +298,7 @@ Grab a handle via your framework's native ref mechanism (`useRef` / template ref
 
 ### `normalizeAmplitude`, not `normalize`
 
-wavesurfer's option is `normalize`, but a reactive property named `normalize` would shadow the inherited `Node.prototype.normalize()` DOM method on the Lit custom element (a hard type error). The prop is therefore named **`normalizeAmplitude`** across all six frameworks and mapped to the engine's `normalize` option internally.
+wavesurfer's option is `normalize`, but a reactive property named `normalize` would shadow the inherited `Node.prototype.normalize()` DOM method on the Lit custom element (a hard type error). The prop is therefore named **`normalizeAmplitude`** and mapped to the engine's `normalize` option internally.
 
 ### Plugin presence is live
 

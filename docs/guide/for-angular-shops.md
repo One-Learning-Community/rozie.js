@@ -5,7 +5,7 @@ the syntax" pain point. `*ngFor`, decorator soup, `[(ngModel)]` ceremony,
 constructor-DI noise, the standalone-components migration tax — they're
 all things Angular users have asked their framework to fix for years.
 
-Rozie is a Vue-flavored authoring layer that compiles to idiomatic
+Rozie is a Vue-flavored authoring layer that compiles to
 Angular 19+: standalone components, signals, the new `@if` / `@for` block
 syntax, `input.required<T>()`, `model<T>()`, `output<T>()`,
 `inject(DestroyRef)`. You stay in Angular; only the authoring syntax
@@ -115,7 +115,7 @@ export class SearchInput {
 ```
 
 Roughly a third the size, reads top-to-bottom, no decorator soup. The
-compiler emits an idiomatic Angular standalone component using the same
+compiler emits an Angular standalone component using the same
 `signal()` / `input()` / `output()` / `viewChild()` / `inject(DestroyRef)`
 machinery you'd write by hand — see the
 [SearchInput example page](/examples/search-input) for the full Angular
@@ -213,7 +213,7 @@ component that works on its own — the same zero-lock-in exit
 
 ## What's idiomatic — what isn't
 
-### Idiomatic
+### Native
 
 - `signal()` / `computed()` / `effect()` / `inject(DestroyRef)`
 - `input()` / `input.required()` / `model()` / `output()` / `viewChild()`

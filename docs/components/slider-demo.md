@@ -77,9 +77,9 @@ This is the **real `@rozie-ui/slider-vue` package** running on this page (VitePr
 
 You author the component **once** as a `.rozie` file:
 
-<<< ../../packages/ui/slider/src/Slider.rozie{html}[Slider.rozie — the single source]
+<<< ../../packages/ui/slider/src/Slider.rozie{html}[Slider.rozie — the source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/slider-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six framework-native components. Switch the tabs to see the **actual generated output** for each target (this is exactly what ships in `@rozie-ui/slider-{react,vue,svelte,angular,solid,lit}`):
 
 ::: code-group
 
@@ -92,7 +92,7 @@ You author the component **once** as a `.rozie` file:
 
 :::
 
-Each is a real, idiomatic component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `change` event, same two-way `value`, same scoped slots, same imperative handle — identical on every target, built on the native `<input type="range">` with no third-party engine behind it.
+Each is a real component for its framework — React `forwardRef` + hooks, Vue `<script setup>` + `defineModel`, Svelte 5 runes, an Angular standalone component (with `ControlValueAccessor`), a Solid component, and a Lit custom element. Same props, same `change` event, same two-way `value`, same scoped slots, same imperative handle — identical on every target, built on the native `<input type="range">` with no third-party engine behind it.
 
 ## See also
 

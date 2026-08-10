@@ -40,7 +40,7 @@ Each `r-model:<slice>` is Rozie's [two-way bind](/guide/props-and-two-way#model-
 
 ## Per-framework code
 
-The idiomatic consumption snippet for each of the six targets is on the [usage page](/components/data-table-usage#columns-as-a-config-array).
+The consumption snippet for each of the six targets is on the [usage page](/components/data-table-usage#columns-as-a-config-array).
 
 ## Next steps
 

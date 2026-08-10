@@ -20,7 +20,7 @@ comma-joined `[object Object]`, Solid/Lit space-joined it, and **React threw
 `Objects are not valid as a React child` and crashed.** Rozie unifies this — a
 non-provably-primitive interpolation is wrapped in an internal `rozieDisplay`
 helper (Vue `toDisplayString` semantics, crash-safe on circular/BigInt structures)
-so the **same portable JSON renders on all six targets** and React no longer
+so the **same portable JSON renders everywhere** and React no longer
 crashes. Provably-primitive interpolations (typed `String`/`Number`/`Boolean`
 props, `.length`, comparisons, concatenations, boolean HTML attributes, …) stay
 raw and byte-identical to per-target hand-written output. Vue is untouched (its
@@ -147,7 +147,7 @@ The consumer side opts in to the matching two-way wiring via the
 
 #### Per-target emit
 
-The directive lowers to each target's idiomatic two-way binding shape:
+The directive lowers to each target's two-way binding shape:
 
 | Target  | `r-model:open="$data.open"` emit                                                                        |
 | ------- | ------------------------------------------------------------------------------------------------------- |
@@ -263,5 +263,4 @@ These are the *complete* set of documented limitations as of v1. Everything
 else — props, **producer-side** `model:` two-way machinery, **consumer-side**
 two-way binding (`r-model:propName=`), `<data>` reactive state, `$computed`,
 `<listeners>` (`<listener>` elements with modifiers + `r-if` conditional attach), `r-for` / `r-if` / form-input `r-model`,
-default + named slots, `$emit`, refs — behaves identically across all six
-targets.
+default + named slots, `$emit`, refs — behaves identically.
