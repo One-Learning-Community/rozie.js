@@ -721,52 +721,30 @@ private _portalContainers = new Set<HTMLElement>();
 
   updated(changedProperties: Map<string, unknown>): void {
     if (this.__rozieFirstUpdateDone && (changedProperties.has('language'))) { const __watchVal = (() => this.language)(); (() => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.langCompartment.reconfigure(this.langExt())
-      });
+      this.scheduleReconfigure(this.langCompartment, this.langExt);
     })(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('theme'))) { const __watchVal = (() => this.theme)(); (() => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.themeCompartment.reconfigure(this.themeExt())
-      });
+      this.scheduleReconfigure(this.themeCompartment, this.themeExt);
     })(); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('readOnly'))) { const __watchVal = (() => this.readOnly)(); ((v: any) => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.readOnlyCompartment.reconfigure(EditorState.readOnly.of(v))
-      });
-    })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('readOnly'))) { const __watchVal = (() => this.readOnly)(); (() => {
+      this.scheduleReconfigure(this.readOnlyCompartment, () => EditorState.readOnly.of(this.readOnly));
+    })(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('placeholder'))) { const __watchVal = (() => this.placeholder)(); (() => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.placeholderCompartment.reconfigure(this.phExt())
-      });
+      this.scheduleReconfigure(this.placeholderCompartment, this.phExt);
     })(); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('extensions'))) { const __watchVal = (() => this.extensions)(); ((v: any) => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.extensionsCompartment.reconfigure(v)
-      });
-    })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('extensions'))) { const __watchVal = (() => this.extensions)(); (() => {
+      this.scheduleReconfigure(this.extensionsCompartment, () => this.extensions);
+    })(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('basicSetup'))) { const __watchVal = (() => this.basicSetup)(); (() => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.baselineCompartment.reconfigure(this.baselineExt())
-      });
+      this.scheduleReconfigure(this.baselineCompartment, this.baselineExt);
     })(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('gutterLines'))) { const __watchVal = (() => this.gutterLines)(); (() => {
-      if (!this.view || !this.rebuildGutterExt) return;
-      this.view.dispatch({
-        effects: this.gutterCompartment.reconfigure(this.rebuildGutterExt())
-      });
+      if (!this.rebuildGutterExt) return;
+      this.scheduleReconfigure(this.gutterCompartment, () => this.rebuildGutterExt());
     })(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('decorations'))) { const __watchVal = (() => this.decorations)(); (() => {
-      if (!this.view || !this.rebuildDecorationExt) return;
-      this.view.dispatch({
-        effects: this.decorationCompartment.reconfigure(this.rebuildDecorationExt())
-      });
+      if (!this.rebuildDecorationExt) return;
+      this.scheduleReconfigure(this.decorationCompartment, () => this.rebuildDecorationExt());
     })(); }
     this.__rozieFirstUpdateDone = true;
   }
@@ -868,6 +846,26 @@ private _portalContainers = new Set<HTMLElement>();
   } finally {
     this.suppressEmit = false;
   }
+};
+
+  pendingReconfigures: any = null;
+
+  scheduleReconfigure = (compartment: any, buildExt: any) => {
+  if (!this.view) return;
+  if (!this.pendingReconfigures) {
+    this.pendingReconfigures = new Map();
+    queueMicrotask(() => {
+      const batch = this.pendingReconfigures;
+      this.pendingReconfigures = null;
+      if (!this.view || !batch) return;
+      const effects = [];
+      for (const entry of batch as any) effects.push(entry[0].reconfigure(entry[1]()));
+      this.view.dispatch({
+        effects
+      });
+    });
+  }
+  this.pendingReconfigures.set(compartment, buildExt);
 };
 
   getView() {

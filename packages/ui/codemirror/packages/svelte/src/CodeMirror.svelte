@@ -228,6 +228,39 @@ const writeDoc = (v: any) => {
 };
 
 // Consumer-driven value writes: reflect into the live editor (echo-guarded).
+// RE-ENTRANCY-SAFE compartment reconfigures (UAT 2026-08-10). On Vue the prop
+// $watches compile to PRE-flush watchers, and a portal-slot fill mounting
+// inside a CM update runs a nested render() that flushes any still-pending
+// sibling watcher SYNCHRONOUSLY — dispatching into the SAME EditorView
+// mid-update throws "Calls to EditorView.update are not allowed while an
+// update is in progress". Observed live: one toggle changing BOTH gutterLines
+// and decorations — the gutter reconfigure's marker toDOM portal-mounts its
+// fill, the nested render flushes the decorations watcher, boom. So every
+// reconfigure goes through this microtask-deferred batcher: same-tick prop
+// changes coalesce into ONE dispatch (deduped per compartment, extension
+// thunks re-read $props at flush so the LATEST values win), and the microtask
+// runs after the whole current task — outside any in-progress CM update, still
+// before paint on every target. The `value` writeDoc path above deliberately
+// stays synchronous: doc writes are echo-guarded by the sync-scoped
+// suppressEmit window, which a deferral would break.
+let pendingReconfigures: any = null;
+const scheduleReconfigure = (compartment: any, buildExt: any) => {
+  if (!view) return;
+  if (!pendingReconfigures) {
+    pendingReconfigures = new Map();
+    queueMicrotask(() => {
+      const batch = pendingReconfigures;
+      pendingReconfigures = null;
+      if (!view || !batch) return;
+      const effects = [];
+      for (const entry of batch as any) effects.push(entry[0].reconfigure(entry[1]()));
+      view.dispatch({
+        effects
+      });
+    });
+  }
+  pendingReconfigures.set(compartment, buildExt);
+};
 // Imperative handle (Phase 21 $expose). The 12 editor verbs a consumer can't
 // drive through props alone — exposed uniformly to all 6 targets. Each guards
 // the pre-mount/destroyed `view = null`. Collision-clear: none of the names
@@ -735,59 +768,37 @@ let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => value)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => writeDoc(v))(__watchVal); }); });
 let __rozieWatchInitial_1 = true;
 $effect(() => { (() => language)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => {
-  if (!view) return;
-  view.dispatch({
-    effects: langCompartment.reconfigure(langExt())
-  });
+  scheduleReconfigure(langCompartment, langExt);
 })(); }); });
 let __rozieWatchInitial_2 = true;
 $effect(() => { (() => theme)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => {
-  if (!view) return;
-  view.dispatch({
-    effects: themeCompartment.reconfigure(themeExt())
-  });
+  scheduleReconfigure(themeCompartment, themeExt);
 })(); }); });
 let __rozieWatchInitial_3 = true;
-$effect(() => { const __watchVal = (() => readOnly)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => {
-  if (!view) return;
-  view.dispatch({
-    effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(v))
-  });
-})(__watchVal); }); });
+$effect(() => { (() => readOnly)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
+  scheduleReconfigure(readOnlyCompartment, () => EditorState.readOnly.of(readOnly));
+})(); }); });
 let __rozieWatchInitial_4 = true;
 $effect(() => { (() => placeholder)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } (() => {
-  if (!view) return;
-  view.dispatch({
-    effects: placeholderCompartment.reconfigure(phExt())
-  });
+  scheduleReconfigure(placeholderCompartment, phExt);
 })(); }); });
 let __rozieWatchInitial_5 = true;
-$effect(() => { const __watchVal = (() => extensions)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => {
-  if (!view) return;
-  view.dispatch({
-    effects: extensionsCompartment.reconfigure(v)
-  });
-})(__watchVal); }); });
+$effect(() => { (() => extensions)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } (() => {
+  scheduleReconfigure(extensionsCompartment, () => extensions);
+})(); }); });
 let __rozieWatchInitial_6 = true;
 $effect(() => { (() => basicSetup)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } (() => {
-  if (!view) return;
-  view.dispatch({
-    effects: baselineCompartment.reconfigure(baselineExt())
-  });
+  scheduleReconfigure(baselineCompartment, baselineExt);
 })(); }); });
 let __rozieWatchInitial_7 = true;
 $effect(() => { (() => gutterLines)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } (() => {
-  if (!view || !rebuildGutterExt) return;
-  view.dispatch({
-    effects: gutterCompartment.reconfigure(rebuildGutterExt())
-  });
+  if (!rebuildGutterExt) return;
+  scheduleReconfigure(gutterCompartment, () => rebuildGutterExt());
 })(); }); });
 let __rozieWatchInitial_8 = true;
 $effect(() => { (() => decorations)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => {
-  if (!view || !rebuildDecorationExt) return;
-  view.dispatch({
-    effects: decorationCompartment.reconfigure(rebuildDecorationExt())
-  });
+  if (!rebuildDecorationExt) return;
+  scheduleReconfigure(decorationCompartment, () => rebuildDecorationExt());
 })(); }); });
 </script>
 

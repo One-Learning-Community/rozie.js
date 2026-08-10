@@ -4,6 +4,16 @@
 
 ### Patch Changes
 
+- Re-entrancy-safe compartment reconfigures: all eight prop-driven reconfigure
+  paths (`language`/`theme`/`readOnly`/`placeholder`/`extensions`/`basicSetup`/
+  `gutterLines`/`decorations`) now route through a microtask-deferred batcher
+  that coalesces same-tick prop changes into one dispatch. Changing two
+  reconfigurable props in the same tick (e.g. `gutterLines` + `decorations`
+  together) could previously dispatch into an in-progress editor update on Vue
+  ("Calls to EditorView.update are not allowed while an update is in progress")
+  when a portal-slot fill mounted mid-update. The `value` write path is
+  unchanged (synchronous, echo-guarded).
+
 - Debut release of `@rozie-ui/codemirror` — Rozie's cross-framework port of
   [CodeMirror 6](https://codemirror.net/), the de-facto modular code editor for
   the web. One `.rozie` source compiles to six idiomatic packages

@@ -211,52 +211,30 @@ export class CodeMirror {
   constructor() {
     effect(() => { const __watchVal = (() => this.value())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => this.writeDoc(v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.language())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.langCompartment.reconfigure(this.langExt())
-      });
+      this.scheduleReconfigure(this.langCompartment, this.langExt);
     })(); }); });
     effect(() => { const __watchVal = (() => this.theme())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.themeCompartment.reconfigure(this.themeExt())
-      });
+      this.scheduleReconfigure(this.themeCompartment, this.themeExt);
     })(); }); });
-    effect(() => { const __watchVal = (() => this.readOnly())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } ((v: any) => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.readOnlyCompartment.reconfigure(EditorState.readOnly.of(v))
-      });
-    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.readOnly())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
+      this.scheduleReconfigure(this.readOnlyCompartment, () => EditorState.readOnly.of(this.readOnly()));
+    })(); }); });
     effect(() => { const __watchVal = (() => this.placeholder())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.placeholderCompartment.reconfigure(this.phExt())
-      });
+      this.scheduleReconfigure(this.placeholderCompartment, this.phExt);
     })(); }); });
-    effect(() => { const __watchVal = (() => this.extensions())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.extensionsCompartment.reconfigure(v)
-      });
-    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.extensions())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => {
+      this.scheduleReconfigure(this.extensionsCompartment, () => this.extensions());
+    })(); }); });
     effect(() => { const __watchVal = (() => this.basicSetup())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => {
-      if (!this.view) return;
-      this.view.dispatch({
-        effects: this.baselineCompartment.reconfigure(this.baselineExt())
-      });
+      this.scheduleReconfigure(this.baselineCompartment, this.baselineExt);
     })(); }); });
     effect(() => { const __watchVal = (() => this.gutterLines())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => {
-      if (!this.view || !this.rebuildGutterExt) return;
-      this.view.dispatch({
-        effects: this.gutterCompartment.reconfigure(this.rebuildGutterExt())
-      });
+      if (!this.rebuildGutterExt) return;
+      this.scheduleReconfigure(this.gutterCompartment, () => this.rebuildGutterExt());
     })(); }); });
     effect(() => { const __watchVal = (() => this.decorations())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => {
-      if (!this.view || !this.rebuildDecorationExt) return;
-      this.view.dispatch({
-        effects: this.decorationCompartment.reconfigure(this.rebuildDecorationExt())
-      });
+      if (!this.rebuildDecorationExt) return;
+      this.scheduleReconfigure(this.decorationCompartment, () => this.rebuildDecorationExt());
     })(); }); });
   }
 
@@ -789,6 +767,24 @@ export class CodeMirror {
     } finally {
       this.suppressEmit = false;
     }
+  };
+  pendingReconfigures: any = null;
+  scheduleReconfigure = (compartment: any, buildExt: any) => {
+    if (!this.view) return;
+    if (!this.pendingReconfigures) {
+      this.pendingReconfigures = new Map();
+      queueMicrotask(() => {
+        const batch = this.pendingReconfigures;
+        this.pendingReconfigures = null;
+        if (!this.view || !batch) return;
+        const effects = [];
+        for (const entry of batch as any) effects.push(entry[0].reconfigure(entry[1]()));
+        this.view.dispatch({
+          effects
+        });
+      });
+    }
+    this.pendingReconfigures.set(compartment, buildExt);
   };
   getView = () => {
     return this.view;

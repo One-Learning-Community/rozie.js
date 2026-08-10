@@ -583,52 +583,30 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
   });
   createEffect(on(() => (() => value())(), (v) => untrack(() => ((v: any) => writeDoc(v))(v)), { defer: true }));
   createEffect(on(() => (() => local.language)(), (v) => untrack(() => (() => {
-    if (!view) return;
-    view.dispatch({
-      effects: langCompartment.reconfigure(langExt())
-    });
+    scheduleReconfigure(langCompartment, langExt);
   })()), { defer: true }));
   createEffect(on(() => (() => local.theme)(), (v) => untrack(() => (() => {
-    if (!view) return;
-    view.dispatch({
-      effects: themeCompartment.reconfigure(themeExt())
-    });
+    scheduleReconfigure(themeCompartment, themeExt);
   })()), { defer: true }));
-  createEffect(on(() => (() => local.readOnly)(), (v) => untrack(() => ((v: any) => {
-    if (!view) return;
-    view.dispatch({
-      effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(v))
-    });
-  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.readOnly)(), (v) => untrack(() => (() => {
+    scheduleReconfigure(readOnlyCompartment, () => EditorState.readOnly.of(local.readOnly));
+  })()), { defer: true }));
   createEffect(on(() => (() => local.placeholder)(), (v) => untrack(() => (() => {
-    if (!view) return;
-    view.dispatch({
-      effects: placeholderCompartment.reconfigure(phExt())
-    });
+    scheduleReconfigure(placeholderCompartment, phExt);
   })()), { defer: true }));
-  createEffect(on(() => (() => local.extensions)(), (v) => untrack(() => ((v: any) => {
-    if (!view) return;
-    view.dispatch({
-      effects: extensionsCompartment.reconfigure(v)
-    });
-  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.extensions)(), (v) => untrack(() => (() => {
+    scheduleReconfigure(extensionsCompartment, () => local.extensions);
+  })()), { defer: true }));
   createEffect(on(() => (() => local.basicSetup)(), (v) => untrack(() => (() => {
-    if (!view) return;
-    view.dispatch({
-      effects: baselineCompartment.reconfigure(baselineExt())
-    });
+    scheduleReconfigure(baselineCompartment, baselineExt);
   })()), { defer: true }));
   createEffect(on(() => (() => local.gutterLines)(), (v) => untrack(() => (() => {
-    if (!view || !rebuildGutterExt) return;
-    view.dispatch({
-      effects: gutterCompartment.reconfigure(rebuildGutterExt())
-    });
+    if (!rebuildGutterExt) return;
+    scheduleReconfigure(gutterCompartment, () => rebuildGutterExt());
   })()), { defer: true }));
   createEffect(on(() => (() => local.decorations)(), (v) => untrack(() => (() => {
-    if (!view || !rebuildDecorationExt) return;
-    view.dispatch({
-      effects: decorationCompartment.reconfigure(rebuildDecorationExt())
-    });
+    if (!rebuildDecorationExt) return;
+    scheduleReconfigure(decorationCompartment, () => rebuildDecorationExt());
   })()), { defer: true }));
   let hostElRef: HTMLElement | null = null;
 
@@ -763,6 +741,39 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
 
   // Consumer-driven value writes: reflect into the live editor (echo-guarded).
 
+  // RE-ENTRANCY-SAFE compartment reconfigures (UAT 2026-08-10). On Vue the prop
+  // $watches compile to PRE-flush watchers, and a portal-slot fill mounting
+  // inside a CM update runs a nested render() that flushes any still-pending
+  // sibling watcher SYNCHRONOUSLY — dispatching into the SAME EditorView
+  // mid-update throws "Calls to EditorView.update are not allowed while an
+  // update is in progress". Observed live: one toggle changing BOTH gutterLines
+  // and decorations — the gutter reconfigure's marker toDOM portal-mounts its
+  // fill, the nested render flushes the decorations watcher, boom. So every
+  // reconfigure goes through this microtask-deferred batcher: same-tick prop
+  // changes coalesce into ONE dispatch (deduped per compartment, extension
+  // thunks re-read $props at flush so the LATEST values win), and the microtask
+  // runs after the whole current task — outside any in-progress CM update, still
+  // before paint on every target. The `value` writeDoc path above deliberately
+  // stays synchronous: doc writes are echo-guarded by the sync-scoped
+  // suppressEmit window, which a deferral would break.
+  let pendingReconfigures: any = null;
+  function scheduleReconfigure(compartment: any, buildExt: any) {
+    if (!view) return;
+    if (!pendingReconfigures) {
+      pendingReconfigures = new Map();
+      queueMicrotask(() => {
+        const batch = pendingReconfigures;
+        pendingReconfigures = null;
+        if (!view || !batch) return;
+        const effects = [];
+        for (const entry of batch as any) effects.push(entry[0].reconfigure(entry[1]()));
+        view.dispatch({
+          effects
+        });
+      });
+    }
+    pendingReconfigures.set(compartment, buildExt);
+  }
   // Imperative handle (Phase 21 $expose). The 12 editor verbs a consumer can't
   // drive through props alone — exposed uniformly to all 6 targets. Each guards
   // the pre-mount/destroyed `view = null`. Collision-clear: none of the names

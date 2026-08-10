@@ -138,6 +138,7 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   const rebuildDecorationExt = useRef<any>(null);
   const suppressEmit = useRef(false);
   const view = useRef<any>(null);
+  const pendingReconfigures = useRef<any>(null);
   const [value, setValue] = useControllableState({
     value: props.value,
     defaultValue: props.defaultValue ?? '',
@@ -204,6 +205,23 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
     } finally {
       suppressEmit.current = false;
     }
+  }
+  function scheduleReconfigure(compartment: any, buildExt: any) {
+    if (!view.current) return;
+    if (!pendingReconfigures.current) {
+      pendingReconfigures.current = new Map();
+      queueMicrotask(() => {
+        const batch = pendingReconfigures.current;
+        pendingReconfigures.current = null;
+        if (!view.current || !batch) return;
+        const effects = [];
+        for (const entry of batch as any) effects.push(entry[0].reconfigure(entry[1]()));
+        view.current.dispatch({
+          effects
+        });
+      });
+    }
+    pendingReconfigures.current.set(compartment, buildExt);
   }
   // Imperative handle (Phase 21 $expose). The 12 editor verbs a consumer can't
   // drive through props alone — exposed uniformly to all 6 targets. Each guards
@@ -737,62 +755,38 @@ const CodeMirror = forwardRef<CodeMirrorHandle, CodeMirrorProps>(function CodeMi
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
-    if (!view.current) return;
-    view.current.dispatch({
-      effects: langCompartment.reconfigure(langExt())
-    });
+    scheduleReconfigure(langCompartment, langExt);
   }, [props.language]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
-    if (!view.current) return;
-    view.current.dispatch({
-      effects: themeCompartment.reconfigure(themeExt())
-    });
+    scheduleReconfigure(themeCompartment, themeExt);
   }, [props.theme]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch3First.current) { _watch3First.current = false; return; }
-    const v = props.readOnly;
-    if (!view.current) return;
-    view.current.dispatch({
-      effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(v))
-    });
-  }, [props.readOnly]);
+    scheduleReconfigure(readOnlyCompartment, () => EditorState.readOnly.of(props.readOnly));
+  }, [props.readOnly]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch4First.current) { _watch4First.current = false; return; }
-    if (!view.current) return;
-    view.current.dispatch({
-      effects: placeholderCompartment.reconfigure(phExt())
-    });
+    scheduleReconfigure(placeholderCompartment, phExt);
   }, [props.placeholder]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch5First.current) { _watch5First.current = false; return; }
-    const v = props.extensions;
-    if (!view.current) return;
-    view.current.dispatch({
-      effects: extensionsCompartment.reconfigure(v)
-    });
-  }, [props.extensions]);
+    scheduleReconfigure(extensionsCompartment, () => props.extensions);
+  }, [props.extensions]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch6First.current) { _watch6First.current = false; return; }
-    if (!view.current) return;
-    view.current.dispatch({
-      effects: baselineCompartment.reconfigure(baselineExt())
-    });
+    scheduleReconfigure(baselineCompartment, baselineExt);
   }, [props.basicSetup]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch7First.current) { _watch7First.current = false; return; }
-    if (!view.current || !rebuildGutterExt.current) return;
-    view.current.dispatch({
-      effects: gutterCompartment.reconfigure(rebuildGutterExt.current())
-    });
-  }, [props.gutterLines]);
+    if (!rebuildGutterExt.current) return;
+    scheduleReconfigure(gutterCompartment, () => rebuildGutterExt.current());
+  }, [props.gutterLines]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch8First.current) { _watch8First.current = false; return; }
-    if (!view.current || !rebuildDecorationExt.current) return;
-    view.current.dispatch({
-      effects: decorationCompartment.reconfigure(rebuildDecorationExt.current())
-    });
-  }, [props.decorations]);
+    if (!rebuildDecorationExt.current) return;
+    scheduleReconfigure(decorationCompartment, () => rebuildDecorationExt.current());
+  }, [props.decorations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieExposeRef = useRef({ getView, focus, getValue, replaceValue, dispatch, insertText, getSelection, setSelection, undo, redo, selectAll, scrollToPos });
   _rozieExposeRef.current = { getView, focus, getValue, replaceValue, dispatch, insertText, getSelection, setSelection, undo, redo, selectAll, scrollToPos };
