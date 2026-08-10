@@ -49,7 +49,12 @@ const CLUSTER_HEADER_RE = /^\s*\/\/\s*[-=]{2,}\s*(.*?)\s*[-=]{2,}\s*$/;
 /** An entry line: `MEMBER: 'ROZ123',` optionally with a trailing `// comment`. */
 const ENTRY_RE = /^\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*:\s*'(ROZ\d+)'\s*,?\s*(?:\/\/\s*(.*))?$/;
 
-const SEVERITY_RE = /\b(error|warning|warn|info|fatal|notice)\b/i;
+// `reserved` marks codes allocated in the registry but never emitted anywhere
+// in the toolchain; `retired` marks codes that once fired but no longer do
+// (kept because code strings are public API and never renumber). Both are
+// status tokens rendered in the Severity column so the table distinguishes
+// them from live diagnostics.
+const SEVERITY_RE = /\b(error|warning|warn|info|fatal|notice|reserved|retired)\b/i;
 
 function normalizeSeverity(raw: string): string {
   const m = raw.match(SEVERITY_RE);
@@ -65,7 +70,7 @@ function deriveCause(blob: string): string {
   let text = blob.replace(/\s+/g, ' ').trim();
   if (!text) return '-';
   // Drop a leading "error —"/"warning:"/"warn -" prefix (the severity column owns it).
-  text = text.replace(/^(error|warning|warn|info|fatal|notice)\b\s*[—:\-–]*\s*/i, '').trim();
+  text = text.replace(/^(error|warning|warn|info|fatal|notice|reserved|retired)\b\s*[—:\-–]*\s*/i, '').trim();
   if (!text) return '-';
   // First sentence: up to the first ". " boundary, else the whole line.
   const dot = text.indexOf('. ');

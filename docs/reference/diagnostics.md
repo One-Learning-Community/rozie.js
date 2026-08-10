@@ -19,8 +19,11 @@ compiler — every code the compiler knows about appears below, grouped into the
 the source file uses.
 
 - **Code** — the stable `ROZxxx` string, with the internal member name in muted text.
-- **Severity** — `error` halts compilation; `warning` is advisory; `-` means the registry
-  comment doesn't state a severity explicitly (many parse-level codes only describe the cause).
+- **Severity** — `error` halts compilation; `warning` is advisory; `info` is a
+  non-actionable FYI. Two status tokens mark codes that never fire: `reserved` is a code
+  allocated in the registry but not emitted anywhere in the toolchain, and `retired` is a
+  code that once fired but no longer does (code strings are public API and never renumber,
+  so both stay listed).
 - **Cause** — a one-line summary drawn directly from the registry comment. Where a comment is
   absent, this is `-`. Nothing here is invented; the page surfaces only what the source documents.
 

@@ -38,8 +38,8 @@ export const RozieErrorCode = {
   // ---- Block parse — declarative <props>/<data>/<listeners> (Plan 03) — ROZ010..ROZ029 ----
   INVALID_DECLARATIVE_EXPRESSION: 'ROZ010', // error — a <props>/<data>/<components> body fails to parse as a single JS expression.
   NOT_OBJECT_LITERAL: 'ROZ011', // error — a <props>/<data>/<components> body parses but is not an object literal — it lowered to an array or some other expression type.
-  LISTENER_KEY_NOT_STRING: 'ROZ012', // error — DORMANT (retired Phase 19): a <listeners> object-literal key was not a string; the object-walk that emitted this was replaced by the <listener> element form.
-  LISTENER_VALUE_NOT_OBJECT: 'ROZ013', // error — DORMANT (retired Phase 19): a <listeners> object-literal value was not an object; replaced by the <listener> element form.
+  LISTENER_KEY_NOT_STRING: 'ROZ012', // retired — DORMANT since Phase 19 (was error): a <listeners> object-literal key was not a string; the object-walk that emitted this was replaced by the <listener> element form
+  LISTENER_VALUE_NOT_OBJECT: 'ROZ013', // retired — DORMANT since Phase 19 (was error): a <listeners> object-literal value was not an object; replaced by the <listener> element form
   // A `<props>` entry declared `required: true` also carries a `default:` —
   // the default can never fire (a required prop is always passed), so Rozie
   // drops the default. Warning severity (260521-oao).
@@ -49,13 +49,13 @@ export const RozieErrorCode = {
   // walk (which emitted ROZ010/011/012/013 — those DEFINITIONS are kept below
   // but their emission is retired from parseListeners). Error severity; the tag
   // is skipped. Next free code after ROZ014 in the block-parse cluster.
-  LISTENER_ELEMENT_NO_EVENT: 'ROZ015',
+  LISTENER_ELEMENT_NO_EVENT: 'ROZ015', // error — a <listener> element carries zero @event attributes — it wires nothing; the tag is skipped
   // Phase 19 (code-review WR-01): distinct codes for the two OTHER element-walk
   // failure modes, split out of ROZ015 so consumers (IDE suppressors,
   // lint-as-code) can target each precisely. ROZ016 = a non-`<listener>` element
   // inside `<listeners>`; ROZ017 = a `<listener>` left unterminated (no `/>` or
   // close tag).
-  LISTENERS_UNEXPECTED_ELEMENT: 'ROZ016',
+  LISTENERS_UNEXPECTED_ELEMENT: 'ROZ016', // error — a non-<listener> element appears inside <listeners>; only <listener> elements are allowed (split out of ROZ015, WR-01)
   // Phase 19 (code-review WR-01): a `<listener>` element is left unterminated —
   // no self-closing `/>` and no closing tag. Error severity; the malformed tag
   // produces no listener and parsing recovers at the next element.
@@ -81,7 +81,7 @@ export const RozieErrorCode = {
   // (e.g. `tsx`). Only `ts`/`typescript` enable the TypeScript parser plugin;
   // any other non-empty `lang` would otherwise parse as plain JS and surface
   // confusing syntax errors with no hint at the real cause.
-  SCRIPT_UNRECOGNIZED_LANG: 'ROZ032',
+  SCRIPT_UNRECOGNIZED_LANG: 'ROZ032', // error — <script lang="..."> value unrecognized; only ts/typescript enable the TypeScript parser plugin
 
   // ---- Template parse (Plan 03) — ROZ050..ROZ069 ----
   TEMPLATE_UNCLOSED_ELEMENT: 'ROZ050', // error — a <template> element is left open (a mismatched close tag, or elements still on the stack at input end).
@@ -93,13 +93,13 @@ export const RozieErrorCode = {
   // ---- Style parse (Plan 03) — ROZ080..ROZ089 ----
   STYLE_PARSE_ERROR: 'ROZ080', // error — PostCSS threw parsing the <style> body, or an inline :style / style string literal.
   STYLE_MIXED_ROOT_SELECTOR: 'ROZ081', // error — a comma-separated selector list mixes :root with other selectors (like ':root, .foo {}'); split the unscoped :root rule from the scoped rules.
-  STYLE_PORTAL_INVALID_NESTING: 'ROZ082', // @portal nested inside @media (or any non-@portal at-rule) — invalid per Spike 004 locked decision #2
+  STYLE_PORTAL_INVALID_NESTING: 'ROZ082', // error — @portal nested inside @media (or any non-@portal at-rule) — invalid per Spike 004 locked decision #2
   // Spike 004 (string-form `:style` lowering, quick-task 260520-8iu): a
   // string-literal `:style` carries `!important` AND the target's object-form
   // lowering (React/Solid) silently drops it — per Spike 004 locked decision
   // #7 this is a WARN. Codes are public API and never renumber.
   STYLE_IMPORTANT_DROPPED_IN_STYLE_OBJECT: 'ROZ083',
-  STYLE_PORTAL_SELECTOR_PARSE_ERROR: 'ROZ084', // @portal block has empty/malformed prelude or unparseable inner content
+  STYLE_PORTAL_SELECTOR_PARSE_ERROR: 'ROZ084', // error — @portal block has empty/malformed prelude or unparseable inner content
   // Phase 10: `<style lang="scss">` was used but the optional `sass` (dart-sass)
   // peer dependency is not installed. Error severity, fail loud — there is no
   // SCSS-to-CSS path without the compiler, so emitting partial/raw output would
@@ -109,7 +109,7 @@ export const RozieErrorCode = {
   // Phase 10: dart-sass threw on invalid SCSS during `sass.compileString`. Per
   // D-08 the exception is COLLECTED, never propagated — the thrown
   // `sass.Exception` becomes this diagnostic and `parseStyle` returns node null.
-  STYLE_SCSS_COMPILE_ERROR: 'ROZ086',
+  STYLE_SCSS_COMPILE_ERROR: 'ROZ086', // error — dart-sass threw on invalid SCSS; the exception is collected (D-08) and parseStyle returns node null
   // Phase 10 (D-02): a `<style lang>` value that is neither `scss` nor `css`
   // (nor absent). Error severity with no `<style>` output — feeding Less/Sass-
   // indented syntax to `postcss.parse` would otherwise surface as a confusing
@@ -131,26 +131,26 @@ export const RozieErrorCode = {
   // ---- ROZ090..ROZ099 reserved for late-Phase-1 needs ----
 
   // ---- Semantic-binding errors (Phase 2 Plan 02) — ROZ100..ROZ199 ----
-  UNKNOWN_PROPS_REF: 'ROZ100', // SEM-01: $props.foo where foo not declared
-  UNKNOWN_DATA_REF: 'ROZ101', // SEM-01: $data.foo where foo not declared
-  UNKNOWN_REFS_REF: 'ROZ102', // SEM-01: $refs.foo where no template ref="foo"
-  UNKNOWN_SLOTS_REF: 'ROZ103', // SEM-01: $slots.foo where no <slot name="foo">
-  LIFECYCLE_OUTSIDE_SCRIPT: 'ROZ104', // $onMount/$onUnmount/$onUpdate called outside <script> block / Program top level
-  ASYNC_ONMOUNT_RETURN: 'ROZ105', // D-19 edge case: $onMount(async () => …) Promise return cannot be cleanup
-  COMPUTED_MAGIC_ACCESS: 'ROZ106', // $props['foo'] — magic accessors require static keys
-  CONDITIONAL_CLEANUP_RETURN: 'ROZ107', // $onMount(() => { return condition ? cleanA : cleanB }) — conditional cleanup shape
-  NON_FUNCTION_CLEANUP_RETURN: 'ROZ108', // $onMount(() => { return nonFnValue }) — return value is not a function
-  WATCH_INVALID_ARGS: 'ROZ109', // $watch requires (getterFn, callbackFn); skipping malformed call. Plan quick-260515-u2b.
-  UNKNOWN_MODIFIER: 'ROZ110', // .escspe (typo) — name not registered in ModifierRegistry
-  MODIFIER_ARITY_MISMATCH: 'ROZ111', // .debounce() (missing required ms arg)
-  MODIFIER_ARG_SHAPE: 'ROZ112', // .outside('not-a-ref') — refExpr expected, got literal
+  UNKNOWN_PROPS_REF: 'ROZ100', // error — SEM-01: $props.foo where foo not declared
+  UNKNOWN_DATA_REF: 'ROZ101', // error — SEM-01: $data.foo where foo not declared
+  UNKNOWN_REFS_REF: 'ROZ102', // error — SEM-01: $refs.foo where no template ref="foo"
+  UNKNOWN_SLOTS_REF: 'ROZ103', // error — SEM-01: $slots.foo where no <slot name="foo">
+  LIFECYCLE_OUTSIDE_SCRIPT: 'ROZ104', // error — $onMount/$onUnmount/$onUpdate called outside <script> block / Program top level
+  ASYNC_ONMOUNT_RETURN: 'ROZ105', // warning — D-19 edge case: $onMount(async () => …) Promise return cannot be cleanup
+  COMPUTED_MAGIC_ACCESS: 'ROZ106', // error — $props['foo'] — magic accessors require static keys
+  CONDITIONAL_CLEANUP_RETURN: 'ROZ107', // warning — $onMount(() => { return condition ? cleanA : cleanB }) — conditional cleanup shape
+  NON_FUNCTION_CLEANUP_RETURN: 'ROZ108', // warning — $onMount(() => { return nonFnValue }) — return value is not a function
+  WATCH_INVALID_ARGS: 'ROZ109', // warning — $watch requires (getterFn, callbackFn); skipping malformed call. Plan quick-260515-u2b.
+  UNKNOWN_MODIFIER: 'ROZ110', // error — .escspe (typo) — name not registered in ModifierRegistry
+  MODIFIER_ARITY_MISMATCH: 'ROZ111', // error — .debounce() (missing required ms arg)
+  MODIFIER_ARG_SHAPE: 'ROZ112', // error — .outside('not-a-ref') — refExpr expected, got literal
   // Phase 18 (D-08): `$model.<x>` where `x` is not a declared prop at all.
   // Sibling of UNKNOWN_PROPS_REF (ROZ100) in the 100 semantic-binding cluster.
   // NOTE: the 1-0-4 slot is TAKEN (LIFECYCLE_OUTSIDE_SCRIPT) and ROZ100..ROZ112
   // are all allocated — ROZ113 is the next free 100-cluster code (RESEARCH
   // §"Free ROZ Codes", Pitfall 1). Emitted from unknownRefValidator's `scope === 'model'`
   // branch; codeframe; never throws.
-  UNKNOWN_MODEL_REF: 'ROZ113', // $model.bogus — 'bogus' is not a declared prop
+  UNKNOWN_MODEL_REF: 'ROZ113', // error — $model.bogus — 'bogus' is not a declared prop
   // Phase 19 (D-04/D-06): a `<listener :target="...">` whose target is neither
   // `window` nor `document` (nor omitted → `$el`). `$refs.x` and arbitrary
   // expressions are DEFERRED (the IR `decodeTarget` already supports
@@ -165,12 +165,12 @@ export const RozieErrorCode = {
   // offending site; all error severity; compile() never throws (D-08). Each
   // malformed `$expose` shape gets its own code so IDE suppressors / lint-as-
   // code can target it precisely.
-  EXPOSE_ARG_NOT_OBJECT: 'ROZ115', // $expose(x) — argument is not an object literal
-  EXPOSE_SPREAD_PROPERTY: 'ROZ116', // $expose({ ...o }) — a property is a spread
-  EXPOSE_COMPUTED_KEY: 'ROZ117', // $expose({ [k]: v }) — a property has a computed key
-  EXPOSE_VALUE_NOT_FUNCTION: 'ROZ118', // $expose({ a: 1 }) / { a: notInScope } / { a: someComputed } — value is not an in-scope <script> function nor an inline arrow/function
-  EXPOSE_DUPLICATE_CALL: 'ROZ119', // two top-level $expose(...) calls — only one is allowed
-  EXPOSE_NOT_TOP_LEVEL: 'ROZ120', // $expose(...) called inside a nested function (not <script> Program top level)
+  EXPOSE_ARG_NOT_OBJECT: 'ROZ115', // error — $expose(x) — argument is not an object literal
+  EXPOSE_SPREAD_PROPERTY: 'ROZ116', // error — $expose({ ...o }) — a property is a spread
+  EXPOSE_COMPUTED_KEY: 'ROZ117', // error — $expose({ [k]: v }) — a property has a computed key
+  EXPOSE_VALUE_NOT_FUNCTION: 'ROZ118', // error — $expose({ a: 1 }) / { a: notInScope } / { a: someComputed } — value is not an in-scope <script> function nor an inline arrow/function
+  EXPOSE_DUPLICATE_CALL: 'ROZ119', // error — two top-level $expose(...) calls — only one is allowed
+  EXPOSE_NOT_TOP_LEVEL: 'ROZ120', // error — $expose(...) called inside a nested function (not <script> Program top level)
   // Quick 260601-jsy — an `$expose`'d method name collides with an emitted event
   // (`$emit('name', ...)`) OR, on class-based targets (Angular), a same-named
   // declared prop (`<props>` field, model or not). On class-based targets the
@@ -189,7 +189,7 @@ export const RozieErrorCode = {
   // model and a non-model `<props>` field break Angular the same way events do,
   // and ROZ524 does NOT cover the Angular direct-name (`$expose({ date })` vs
   // prop `date`) field-vs-method case — only the React `setX` setter form.
-  EXPOSE_EVENT_NAME_COLLISION: 'ROZ121', // $expose({ open }) where 'open' is an emitted event, or (on class-based targets) a same-named declared prop — field/method name clash
+  EXPOSE_EVENT_NAME_COLLISION: 'ROZ121', // error — $expose({ open }) where 'open' is an emitted event, or (on class-based targets) a same-named declared prop — field/method name clash
   // Quick 260601-l2u — a `$emit` call whose first argument is a STRING LITERAL
   // whose `.value.trim() === ''` (empty OR whitespace-only). An empty event name
   // is meaningless on every target — Angular emits a class field with an empty
@@ -202,7 +202,7 @@ export const RozieErrorCode = {
   // (dynamic names — `$emit(name)`, template literals, member exprs) are OUT OF
   // SCOPE — no false positive. ROZ122 is the next free code after ROZ121 in the
   // 100 semantic-binding cluster.
-  EMIT_EMPTY_EVENT_NAME: 'ROZ122', // $emit('') / $emit('   ') — empty/whitespace-only string-literal event name
+  EMIT_EMPTY_EVENT_NAME: 'ROZ122', // error — $emit('') / $emit('   ') — empty/whitespace-only string-literal event name
   // Quick 260602-dv1 — a `$refs.<member>` read in a PRE-MOUNT evaluation position.
   // `$refs` are only populated AFTER the component mounts, so reading one in a
   // position that is evaluated during setup/render is a silent cross-target
@@ -234,7 +234,7 @@ export const RozieErrorCode = {
   // read, naming the member. Never throws (D-08): all template re-parses are
   // try/catch-wrapped. ROZ123 is the next free code after ROZ122 in the 100
   // semantic-binding cluster.
-  REFS_READ_BEFORE_MOUNT: 'ROZ123', // $refs.x read in a $computed body / $watch getter / template binding|interpolation|r-if|r-show|r-for-iterable — evaluated before mount
+  REFS_READ_BEFORE_MOUNT: 'ROZ123', // error — $refs.x read in a $computed body / $watch getter / template binding|interpolation|r-if|r-show|r-for-iterable — evaluated before mount
   // Phase 23 (angular-cva-forms-integration) — a `$expose`d name that collides
   // with a reserved Angular ControlValueAccessor method name (`writeValue` /
   // `registerOnChange` / `registerOnTouched` / `setDisabledState`) on a
@@ -254,7 +254,7 @@ export const RozieErrorCode = {
   // registry; the emission logic lives in the Angular package (per
   // 23-RESEARCH.md). ROZ124 is the next free code after ROZ123 in the 100
   // semantic-binding cluster.
-  EXPOSE_CVA_NAME_COLLISION: 'ROZ124', // $expose({ writeValue }) (or registerOnChange/registerOnTouched/setDisabledState) on a single-model CVA-receiving Angular component — collides with the auto-emitted ControlValueAccessor method
+  EXPOSE_CVA_NAME_COLLISION: 'ROZ124', // error — $expose({ writeValue }) (or registerOnChange/registerOnTouched/setDisabledState) on a single-model CVA-receiving Angular component — collides with the auto-emitted ControlValueAccessor method
   // Phase 23 — info diagnostic: a component declares ≥2 `model: true` props, so
   // Angular's single-control ControlValueAccessor contract cannot be satisfied
   // (a CVA wraps exactly ONE form value). No accessor is auto-emitted; the
@@ -262,13 +262,13 @@ export const RozieErrorCode = {
   // `valueChange.emit(...)` outputs, just without ngModel/formControl forms
   // integration. Info severity (NOT an error — this is a legitimate,
   // documented shape, e.g. LeafletMap's center+zoom); collected, never throws.
-  CVA_MULTI_MODEL_NO_ACCESSOR: 'ROZ125', // ≥2 model:true props — no single-control ControlValueAccessor auto-emitted on the Angular target
+  CVA_MULTI_MODEL_NO_ACCESSOR: 'ROZ125', // info — ≥2 model:true props — no single-control ControlValueAccessor auto-emitted on the Angular target
   // Phase 23 — info diagnostic: a single-model CVA component declares NO
   // `disabled` prop, so the generated `setDisabledState(isDisabled)` accessor
   // method has no prop to write and is emitted as a documented no-op. Info
   // severity; the component still integrates with Angular forms — it just
   // ignores the disabled state Angular forwards. Collected, never throws.
-  CVA_NO_DISABLED_PROP: 'ROZ126', // single-model CVA component with no `disabled` prop — setDisabledState is a no-op on the Angular target
+  CVA_NO_DISABLED_PROP: 'ROZ126', // info — single-model CVA component with no `disabled` prop — setDisabledState is a no-op on the Angular target
   // Phase 28 (slot/prop same-name collision class) — a `<slot name="X">` whose
   // `X` equals a declared `<props>` key. Unsupportable uniformly across targets
   // because Svelte 5 unifies snippets and props into ONE `$props()` namespace:
@@ -532,9 +532,9 @@ export const RozieErrorCode = {
   PROP_EMIT_CALLBACK_NAME_COLLISION: 'ROZ148', // error — a <props> key equal to the on<Pascal> callback field React/Solid synthesize for a declared emit; both fields land on one props interface with different types (TS2300). Rename the prop or the emit.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
-  WRITE_TO_NON_MODEL_PROP: 'ROZ200', // SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
-  WRITE_TO_REF: 'ROZ201', // $refs.foo = … (refs are read-only DOM-element wrappers)
-  RESERVED_IDENTIFIER_COLLISION: 'ROZ202', // <data> field or r-for loop var named $el / $props / $data / $refs / $slots / $emit / $event / $attrs / $listeners / $restoreFocus / $model / $expose / $provide / $inject / $clone / $slotted. ($event is the closure-param name for event-handler emits — see emitTemplate's `($event) =>` convention in target-{react,svelte,solid,lit}.) Wired in semantic/validators/reservedIdentifierValidator.ts — keep RESERVED_SIGILS there in sync with this list.
+  WRITE_TO_NON_MODEL_PROP: 'ROZ200', // error — SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)
+  WRITE_TO_REF: 'ROZ201', // error — $refs.foo = … (refs are read-only DOM-element wrappers)
+  RESERVED_IDENTIFIER_COLLISION: 'ROZ202', // error — <data> field or r-for loop var named $el / $props / $data / $refs / $slots / $emit / $event / $attrs / $listeners / $restoreFocus / $model / $expose / $provide / $inject / $clone / $slotted. ($event is the closure-param name for event-handler emits — see emitTemplate's `($event) =>` convention in target-{react,svelte,solid,lit}.) Wired in semantic/validators/reservedIdentifierValidator.ts — keep RESERVED_SIGILS there in sync with this list.
   // 260530: expression-context `++`/`--` on reactive state ($data.<key> or a
   // model:true $props.<key>) where the UpdateExpression's value is CONSUMED
   // (parent is not an ExpressionStatement). Such reads can't be satisfied by a
@@ -623,28 +623,28 @@ export const RozieErrorCode = {
   // member sigil uses. A `<slot name="default">` collides with that
   // sentinel at the emitter layer. Rename the slot, or drop the `name`
   // attribute entirely to author an unnamed slot.
-  RESERVED_SLOT_NAME: 'ROZ210',
+  RESERVED_SLOT_NAME: 'ROZ210', // error — <slot name="default"> collides with the unnamed-slot sentinel key the emitters use; rename the slot or drop the name attribute
 
   // ---- Warnings (Phase 2 Plan 02) — ROZ300..ROZ399 ----
-  RFOR_MISSING_KEY: 'ROZ300', // SEM-03: r-for without :key
-  RFOR_KEY_IS_LOOP_VARIABLE: 'ROZ301', // SEM-03: :key="index" / :key="item" (loop var)
-  RFOR_KEY_IS_NON_PRIMITIVE: 'ROZ302', // :key="someObj" (Pitfall 6 secondary case)
+  RFOR_MISSING_KEY: 'ROZ300', // warning — SEM-03: r-for without :key
+  RFOR_KEY_IS_LOOP_VARIABLE: 'ROZ301', // warning — SEM-03: :key="index" / :key="item" (loop var)
+  RFOR_KEY_IS_NON_PRIMITIVE: 'ROZ302', // warning — :key="someObj" (Pitfall 6 secondary case)
   /** @deprecated placeholder — accessibility lint warnings deferred per CONTEXT.md A7. */
   RIF_ACCESSIBILITY_PLACEHOLDER: 'ROZ303', // RESERVED — not emitted in Phase 2 (deferred per A7)
   TEMPLATE_FOR_EMPTY_BODY: 'ROZ304', // warning — `<template r-for>` with no children (empty loop body; produces no output, and broke React/Solid emit before the guard)
 
   // ---- @rozie/unplugin configuration errors (Phase 3 D-52) — ROZ400..ROZ419 ----
-  UNPLUGIN_TARGET_REQUIRED: 'ROZ400', // D-49: target option missing
-  UNPLUGIN_TARGET_UNKNOWN: 'ROZ401', // target value not in 'vue'|'react'|'svelte'|'angular'
-  UNPLUGIN_TARGET_NOT_YET_SUPPORTED: 'ROZ402', // Phase 3 only ships 'vue'; react/svelte/angular ROZ402 until later phases
-  UNPLUGIN_PEER_DEP_MISSING: 'ROZ403', // @rozie/runtime-vue or @vitejs/plugin-vue not resolvable (Pitfall 8)
-  UNPLUGIN_PLUGIN_CHAIN_MISORDER: 'ROZ404', // detected vite-plugin-vue lacking; D-25 chain broken
-  UNPLUGIN_ANGULAR_OPTIONS_INVALID: 'ROZ405', // Phase 23 — malformed `angular` config shape (e.g. angular.cva not boolean); thrown at factory-call time before Vite hooks (T-23-04-OPT)
+  UNPLUGIN_TARGET_REQUIRED: 'ROZ400', // error — D-49: target option missing
+  UNPLUGIN_TARGET_UNKNOWN: 'ROZ401', // error — target value not in 'vue'|'react'|'svelte'|'angular'
+  UNPLUGIN_TARGET_NOT_YET_SUPPORTED: 'ROZ402', // error — Phase 3 only ships 'vue'; react/svelte/angular ROZ402 until later phases
+  UNPLUGIN_PEER_DEP_MISSING: 'ROZ403', // reserved — never emitted; allocated for: @rozie/runtime-vue or @vitejs/plugin-vue not resolvable (Pitfall 8)
+  UNPLUGIN_PLUGIN_CHAIN_MISORDER: 'ROZ404', // reserved — never emitted; allocated for: detected vite-plugin-vue lacking; D-25 chain broken
+  UNPLUGIN_ANGULAR_OPTIONS_INVALID: 'ROZ405', // error — Phase 23 — malformed `angular` config shape (e.g. angular.cva not boolean); thrown at factory-call time before Vite hooks (T-23-04-OPT)
 
   // ---- @rozie/target-vue lowering errors (Phase 3 D-52) — ROZ420..ROZ449 ----
   // (Reserved as safety net per CONTEXT D-52 — none anticipated for v1.)
-  TARGET_VUE_RESERVED: 'ROZ420', // RESERVED placeholder; emitter throws this only on internal-invariant violation
-  TARGET_VUE_RHTML_WITH_CHILDREN: 'ROZ421', // r-html via v-html cannot coexist with children; mirrors ROZ620/721
+  TARGET_VUE_RESERVED: 'ROZ420', // error — internal-invariant placeholder; the Vue emitter reports this only on internal-invariant violation
+  TARGET_VUE_RHTML_WITH_CHILDREN: 'ROZ421', // error — r-html via v-html cannot coexist with children; mirrors ROZ620/721
 
   // ---- Phase 3 emitter warnings — ROZ450..ROZ499 (Phase 7 hardening) ----
 
@@ -653,48 +653,48 @@ export const RozieErrorCode = {
   // allocated to Phase 6 compile() errors and ROZ850 is allocated to
   // CLI_INVALID_TARGET. Phase 06.3 codes use the unclaimed sub-range
   // ROZ810..ROZ819 for Solid; ROZ812 reserved for runtime-solid warnings.
-  UNPLUGIN_SOLID_PEER_DEP_MISSING: 'ROZ810', // vite-plugin-solid not resolvable from cwd (D-139)
-  UNPLUGIN_SOLID_DEP_MISSING: 'ROZ811',       // solid-js (^1.8) not resolvable from cwd (D-139)
+  UNPLUGIN_SOLID_PEER_DEP_MISSING: 'ROZ810', // error — vite-plugin-solid not resolvable from cwd (D-139)
+  UNPLUGIN_SOLID_DEP_MISSING: 'ROZ811', // error — solid-js (^1.8) not resolvable from cwd (D-139)
   // ---- @rozie/runtime-solid warnings (Phase 06.3) — ROZ812 ----
-  RUNTIME_SOLID_CONTROLLABLE_MODE_FLIP: 'ROZ812', // D-135 — createControllableSignal detected parent flipping controlled/uncontrolled mid-lifecycle
+  RUNTIME_SOLID_CONTROLLABLE_MODE_FLIP: 'ROZ812', // warning — D-135 — createControllableSignal detected parent flipping controlled/uncontrolled mid-lifecycle
   // ---- @rozie/target-solid lowering errors (Phase 07.1) — ROZ813..ROZ819 ----
-  TARGET_SOLID_RESERVED: 'ROZ813', // internal-invariant placeholder; mirrors TARGET_SVELTE_RESERVED/TARGET_ANGULAR_RESERVED. Solid emitter raises this when a modifier has no solid() hook.
+  TARGET_SOLID_RESERVED: 'ROZ813', // error — internal-invariant placeholder; the Solid emitter raises this when a modifier has no solid() hook (a few reuse sites — r-html-with-children, the $el-listener fallback — emit at warning severity)
 
   // ---- @rozie/unplugin React-branch configuration errors (Phase 4 D-63) — ROZ500..ROZ519 ----
-  UNPLUGIN_REACT_PEER_DEP_MISSING: 'ROZ500', // D-59: neither @vitejs/plugin-react nor @vitejs/plugin-react-swc installed (Pitfall 9)
-  UNPLUGIN_REACT_DEP_MISSING: 'ROZ501', // react peer dep not resolvable
-  UNPLUGIN_REACT_PLUGIN_CHAIN_MISORDER: 'ROZ502', // detected plugin-react/swc lacking; D-58 chain broken (no enforce: 'pre' on @rozie/unplugin)
+  UNPLUGIN_REACT_PEER_DEP_MISSING: 'ROZ500', // error — D-59: neither @vitejs/plugin-react nor @vitejs/plugin-react-swc installed (Pitfall 9)
+  UNPLUGIN_REACT_DEP_MISSING: 'ROZ501', // error — react peer dep not resolvable
+  UNPLUGIN_REACT_PLUGIN_CHAIN_MISORDER: 'ROZ502', // error — detected plugin-react/swc lacking; D-58 chain broken (no enforce: 'pre' on @rozie/unplugin)
 
   // ---- @rozie/target-react lowering errors (Phase 4 D-63) — ROZ520..ROZ549 ----
-  TARGET_REACT_RHTML_WITH_CHILDREN: 'ROZ520', // r-html with children — React's dangerouslySetInnerHTML can't coexist with children (Pitfall 10)
-  TARGET_REACT_NESTED_STATE_MUTATION: 'ROZ521', // Pitfall 7 — $data.foo.bar = 'x' nested member writes; v1 warns + leaves AST unchanged
-  TARGET_REACT_MODULE_LET_AUTO_HOISTED: 'ROZ522', // Pitfall 3/8 — module-scoped `let X` referenced from LifecycleHook setup auto-hoisted to useRef
-  TARGET_REACT_MODULE_LET_UNHOISTABLE: 'ROZ523', // Pitfall 3/8 — module-scoped `let X` referenced too indirectly to safely auto-hoist; user must refactor
-  TARGET_REACT_SETTER_NAME_COLLISION: 'ROZ524', // Phase 07.7 — user-defined function `set<X>` collides with auto-generated useState/useControllableState setter `setX` for state/model prop X; emits "already declared" + infinite recursion when `$data.X = v` rewrites to `setX(v)` inside the same-named user wrapper
+  TARGET_REACT_RHTML_WITH_CHILDREN: 'ROZ520', // warning — r-html with children — React's dangerouslySetInnerHTML can't coexist with children, children dropped (Pitfall 10); NOTE: also reused by React emit-path internal-invariant/modifier failures at error severity
+  TARGET_REACT_NESTED_STATE_MUTATION: 'ROZ521', // warning — Pitfall 7 — $data.foo.bar = 'x' nested member writes; v1 warns + leaves AST unchanged
+  TARGET_REACT_MODULE_LET_AUTO_HOISTED: 'ROZ522', // info — Pitfall 3/8 — module-scoped `let X` referenced from LifecycleHook setup auto-hoisted to useRef
+  TARGET_REACT_MODULE_LET_UNHOISTABLE: 'ROZ523', // error — Pitfall 3/8 — module-scoped `let X` referenced too indirectly to safely auto-hoist; user must refactor
+  TARGET_REACT_SETTER_NAME_COLLISION: 'ROZ524', // error — Phase 07.7 — user-defined function `set<X>` collides with auto-generated useState/useControllableState setter `setX` for state/model prop X; emits "already declared" + infinite recursion when `$data.X = v` rewrites to `setX(v)` inside the same-named user wrapper
 
   // ---- @rozie/runtime-react warnings (Phase 4 D-63) — ROZ550..ROZ579 ----
-  RUNTIME_REACT_CONTROLLABLE_MODE_FLIP: 'ROZ550', // D-57 — useControllableState detected parent flipping controlled/uncontrolled mid-lifecycle
+  RUNTIME_REACT_CONTROLLABLE_MODE_FLIP: 'ROZ550', // warning — D-57 — useControllableState detected parent flipping controlled/uncontrolled mid-lifecycle
 
   // ---- ROZ580..ROZ599 reserved for Phase 7 hardening ----
 
   // ---- @rozie/unplugin Svelte-branch + @rozie/target-svelte errors (Phase 5) — ROZ600..ROZ649 ----
-  UNPLUGIN_SVELTE_PEER_DEP_MISSING: 'ROZ600', // @sveltejs/vite-plugin-svelte not resolvable from cwd
-  UNPLUGIN_SVELTE_DEP_MISSING: 'ROZ601', // svelte itself (^5) not resolvable from cwd
+  UNPLUGIN_SVELTE_PEER_DEP_MISSING: 'ROZ600', // error — @sveltejs/vite-plugin-svelte not resolvable from cwd
+  UNPLUGIN_SVELTE_DEP_MISSING: 'ROZ601', // error — svelte itself (^5) not resolvable from cwd
   UNPLUGIN_SVELTE_PLUGIN_CHAIN_MISORDER: 'ROZ602', // RESERVED — enforce:'pre' guarantees this; placeholder for future
-  TARGET_SVELTE_RHTML_WITH_CHILDREN: 'ROZ620', // r-html with children; mirrors Vue/React Pitfall 10
-  TARGET_SVELTE_RESERVED: 'ROZ621', // internal-invariant placeholder; mirrors TARGET_VUE_RESERVED
+  TARGET_SVELTE_RHTML_WITH_CHILDREN: 'ROZ620', // error — r-html with children; mirrors Vue/React Pitfall 10
+  TARGET_SVELTE_RESERVED: 'ROZ621', // error — internal-invariant placeholder; mirrors TARGET_VUE_RESERVED (one reuse site — the $el-listener fallback — emits at warning severity)
 
   // ---- @rozie/runtime-svelte warnings (Phase 5) — ROZ650..ROZ699 (RESERVED for v2 helpers) ----
 
   // ---- @rozie/unplugin Angular-branch + @rozie/target-angular errors (Phase 5 D-72) — ROZ700..ROZ749 ----
-  UNPLUGIN_ANGULAR_PEER_DEP_MISSING: 'ROZ700', // @analogjs/vite-plugin-angular not resolvable from cwd (D-72)
-  UNPLUGIN_ANGULAR_DEP_MISSING: 'ROZ701', // @angular/core (^17) not resolvable
-  UNPLUGIN_ANGULAR_VITE_VERSION_TOO_LOW: 'ROZ702', // analogjs requires Vite ^6 (RESEARCH OQ6)
-  UNPLUGIN_ANGULAR_PLUGIN_CHAIN_MISORDER: 'ROZ703', // RESERVED — enforce:'pre' guarantees this
-  TARGET_ANGULAR_RFOR_MISSING_KEY: 'ROZ720', // Angular @for REQUIRES track expression (Pitfall 3); upgrade ROZ300 warning to error for Angular target
-  TARGET_ANGULAR_RHTML_WITH_CHILDREN: 'ROZ721', // r-html via [innerHTML] cannot coexist with children
-  TARGET_ANGULAR_RESERVED: 'ROZ722', // internal-invariant placeholder
-  TARGET_ANGULAR_LOOP_GUARD_HOIST: 'ROZ723', // an early-return event modifier (.self / key-filter) inside an r-for loop references the loop variable — Angular hoists the guard to a class-field arrow that cannot capture loop-scoped bindings
+  UNPLUGIN_ANGULAR_PEER_DEP_MISSING: 'ROZ700', // error — @analogjs/vite-plugin-angular not resolvable from cwd (D-72)
+  UNPLUGIN_ANGULAR_DEP_MISSING: 'ROZ701', // error — @angular/core (^17) not resolvable
+  UNPLUGIN_ANGULAR_VITE_VERSION_TOO_LOW: 'ROZ702', // error — analogjs requires Vite ^6 (RESEARCH OQ6)
+  UNPLUGIN_ANGULAR_PLUGIN_CHAIN_MISORDER: 'ROZ703', // reserved — never emitted; enforce:'pre' guarantees this
+  TARGET_ANGULAR_RFOR_MISSING_KEY: 'ROZ720', // error — Angular @for REQUIRES track expression (Pitfall 3); upgrades the ROZ300 r-for-missing-:key warning to an error on the Angular target
+  TARGET_ANGULAR_RHTML_WITH_CHILDREN: 'ROZ721', // error — r-html via [innerHTML] cannot coexist with children
+  TARGET_ANGULAR_RESERVED: 'ROZ722', // error — internal-invariant placeholder (one reuse site — the $el-listener fallback — emits at warning severity)
+  TARGET_ANGULAR_LOOP_GUARD_HOIST: 'ROZ723', // error — an early-return event modifier (.self / key-filter) inside an r-for loop references the loop variable — Angular hoists the guard to a class-field arrow that cannot capture loop-scoped bindings
 
   // ---- @rozie/runtime-angular warnings (Phase 5) — ROZ750..ROZ799 (RESERVED for v2 helpers) ----
 
@@ -703,45 +703,45 @@ export const RozieErrorCode = {
   //   ROZ820..ROZ849 — @rozie/babel-plugin (Plan 06-04)
   //   ROZ850..ROZ879 — @rozie/cli argv + filesystem errors (Plan 06-03)
   //   ROZ880..ROZ899 — .d.ts emission errors (Plan 06-02)
-  COMPILE_INVALID_TARGET: 'ROZ800', // unknown target token in opts.target
+  COMPILE_INVALID_TARGET: 'ROZ800', // error — unknown target token in opts.target
   COMPILE_INVALID_OPT_COMBO: 'ROZ801', // reserved — disallowed opts combination
   // ---- @rozie/babel-plugin (Plan 06-04) — ROZ820..ROZ829 ----
-  BABEL_PLUGIN_INVALID_TARGET: 'ROZ820', // missing or invalid `target` option (vue|react|svelte|angular required)
-  BABEL_PLUGIN_NO_FILENAME: 'ROZ821', // cannot resolve relative .rozie path without state.filename / file.opts.filename
+  BABEL_PLUGIN_INVALID_TARGET: 'ROZ820', // error — missing or invalid `target` option (vue|react|svelte|angular required)
+  BABEL_PLUGIN_NO_FILENAME: 'ROZ821', // error — cannot resolve relative .rozie path without state.filename / file.opts.filename
   BABEL_PLUGIN_COMPILE_ERROR: 'ROZ822', // compile() returned severity:'error' diagnostics during sibling write
-  BABEL_PLUGIN_SIBLING_WRITE_FAIL: 'ROZ823', // fs writeFileSync failed when emitting sibling .{ext}/.d.ts/.module.css/.global.css
+  BABEL_PLUGIN_SIBLING_WRITE_FAIL: 'ROZ823', // error — fs writeFileSync failed when emitting sibling .{ext}/.d.ts/.module.css/.global.css
   // ROZ824..ROZ829 reserved for future @rozie/babel-plugin needs (ROZ830..ROZ849 reallocated to Lit per D-LIT-19)
   // ---- @rozie/unplugin Lit-branch + @rozie/target-lit + @rozie/runtime-lit (Phase 06.4 — D-LIT-19 Option A) — ROZ830..ROZ849 ----
   // NOTE: This block sits inside the broader ROZ820..ROZ849 babel-plugin reserved range from Phase 6.
   // Babel-plugin currently uses ROZ820..ROZ823; ROZ824..ROZ829 stay reserved for future babel-plugin needs.
   // ROZ830..ROZ849 is hereby reallocated for Lit. The 850-range CLI block is untouched.
-  UNPLUGIN_LIT_PEER_DEP_MISSING: 'ROZ830', // lit (^3.2) not resolvable from cwd
-  UNPLUGIN_LIT_SIGNALS_PEER_DEP_MISSING: 'ROZ831', // @lit-labs/preact-signals (^1) not resolvable from cwd
+  UNPLUGIN_LIT_PEER_DEP_MISSING: 'ROZ830', // error — lit (^3.2) not resolvable from cwd
+  UNPLUGIN_LIT_SIGNALS_PEER_DEP_MISSING: 'ROZ831', // error — @lit-labs/preact-signals (^1) not resolvable from cwd
   // ---- @rozie/target-lit lowering errors (Phase 07.1) — ROZ832..ROZ839 ----
-  TARGET_LIT_RESERVED: 'ROZ832', // internal-invariant placeholder; mirrors TARGET_SVELTE_RESERVED/TARGET_ANGULAR_RESERVED. Lit emitter raises this when a modifier has no lit() hook.
-  TARGET_LIT_RHTML_WITH_CHILDREN: 'ROZ833', // r-html via unsafeHTML cannot coexist with children; mirrors ROZ620/721
+  TARGET_LIT_RESERVED: 'ROZ832', // error — internal-invariant placeholder; the Lit emitter raises this when a modifier has no lit() hook (one reuse site emits at warning severity)
+  TARGET_LIT_RHTML_WITH_CHILDREN: 'ROZ833', // error — r-html via unsafeHTML cannot coexist with children; mirrors ROZ620/721
   // ROZ834..ROZ839 reserved for future Lit-emitter diagnostics
   RUNTIME_LIT_CONTROLLABLE_MODE_FLIP: 'ROZ840', // createLitControllableProperty parent-flip warning (D-LIT-10)
   // ROZ841..ROZ849 reserved for future @rozie/runtime-lit warnings
   // ---- @rozie/cli argv parsing + filesystem errors (Plan 06-03) — ROZ850..ROZ879 ----
-  CLI_INVALID_TARGET: 'ROZ850', // unknown --target token (commander InvalidArgumentError)
-  CLI_MISSING_INPUT: 'ROZ851', // no .rozie files matched after expandInputs
-  CLI_OUT_REQUIRED: 'ROZ852', // --out required for multiple inputs or multiple targets
-  CLI_NULL_BYTE_INPUT: 'ROZ853', // null-byte injection in input arg (carries forward unplugin/transform.ts:235-237)
-  CLI_NON_ROZIE_INPUT: 'ROZ854', // file input that doesn't end with .rozie
-  CLI_REACT_REQUIRES_OUT_DIR: 'ROZ855', // target=react with no --out — sidecars (.d.ts/.module.css/.global.css) cannot stream to stdout
+  CLI_INVALID_TARGET: 'ROZ850', // error — unknown --target token (commander InvalidArgumentError)
+  CLI_MISSING_INPUT: 'ROZ851', // error — no .rozie files matched after expandInputs
+  CLI_OUT_REQUIRED: 'ROZ852', // error — --out required for multiple inputs or multiple targets
+  CLI_NULL_BYTE_INPUT: 'ROZ853', // error — null-byte injection in input arg (carries forward unplugin/transform.ts:235-237)
+  CLI_NON_ROZIE_INPUT: 'ROZ854', // error — file input that doesn't end with .rozie
+  CLI_REACT_REQUIRES_OUT_DIR: 'ROZ855', // error — target=react with no --out — sidecars (.d.ts/.module.css/.global.css) cannot stream to stdout
   // ROZ856..ROZ879 reserved for future @rozie/cli needs
   // ROZ880..ROZ899 reserved for .d.ts emitter (Plan 06-02)
 
   // ---- Phase 06.1 source-map composition (D-111) — ROZ900..ROZ919 ----
   // ROZ900..ROZ909: composeMaps errors (malformed child map, mismatched offsets, @ampproject/remapping failures)
-  SOURCEMAP_COMPOSE_FAILED: 'ROZ900', // composeMaps() threw or returned null
-  SOURCEMAP_CHILD_MAP_MALFORMED: 'ROZ901', // child map missing required Source Map v3 fields
-  SOURCEMAP_OFFSET_OUT_OF_RANGE: 'ROZ902', // ChildMap.outputOffset exceeds shellMs output length
-  SOURCEMAP_REMAPPING_THREW: 'ROZ903', // @ampproject/remapping internal error
+  SOURCEMAP_COMPOSE_FAILED: 'ROZ900', // reserved — never emitted; allocated for: composeMaps() threw or returned null
+  SOURCEMAP_CHILD_MAP_MALFORMED: 'ROZ901', // reserved — never emitted; allocated for: child map missing required Source Map v3 fields
+  SOURCEMAP_OFFSET_OUT_OF_RANGE: 'ROZ902', // reserved — never emitted; allocated for: ChildMap.outputOffset exceeds shellMs output length
+  SOURCEMAP_REMAPPING_THREW: 'ROZ903', // reserved — never emitted; allocated for: @ampproject/remapping internal error
   // ROZ910..ROZ919: emit-time position-anchoring failures
-  SOURCEMAP_AST_NODE_MISSING_LOC: 'ROZ910', // synthesized AST node lacks loc; falls back to nearest segment (D-104/D-106)
-  SOURCEMAP_PARSER_OFFSET_INVALID: 'ROZ911', // @babel/parser startLine/startColumn validation failed
+  SOURCEMAP_AST_NODE_MISSING_LOC: 'ROZ910', // reserved — never emitted; allocated for: synthesized AST node lacks loc; falls back to nearest segment (D-104/D-106)
+  SOURCEMAP_PARSER_OFFSET_INVALID: 'ROZ911', // reserved — never emitted; allocated for: @babel/parser startLine/startColumn validation failed
 
   // ---- Phase 06.2 component composition (D-123 sub-allocation) — ROZ920..ROZ939 ----
   // D-123 reserves ROZ920..ROZ939 for the <components> block + composition
@@ -749,16 +749,16 @@ export const RozieErrorCode = {
   // are per-primitive escape-hatch sub-codes resolving Open Question §2 from
   // RESEARCH.md (per-primitive hint messages provide better DX than a flat
   // ROZ920). ROZ929..ROZ939 reserved for future ROZ-COMP needs.
-  UNKNOWN_COMPONENT: 'ROZ920', // PascalCase tag matches neither outer name nor <components> entry
-  NON_ROZIE_IMPORT_PATH: 'ROZ921', // <components> entry value is not a `.rozie` string literal
+  UNKNOWN_COMPONENT: 'ROZ920', // error — PascalCase tag matches neither outer name nor <components> entry
+  NON_ROZIE_IMPORT_PATH: 'ROZ921', // error — <components> entry value is not a `.rozie` string literal
   LOWERCASE_LIKELY_TYPO: 'ROZ922', // warning: <counter> when Counter is declared
   DUPLICATE_COMPONENT_IMPORT_PATH: 'ROZ923', // warning: two <components> entries point at the same .rozie path
   UNUSED_COMPONENT_ENTRY: 'ROZ924', // warning: declared <components> entry never used in template
   // D-124 — per-primitive escape-hatch sub-codes (4 sub-codes, framework-specific hints)
-  ESCAPE_HATCH_REACT_SUSPENSE: 'ROZ925', // <Suspense> — use React directly
-  ESCAPE_HATCH_VUE_TELEPORT: 'ROZ926', // <Teleport> — use Vue directly
-  ESCAPE_HATCH_NG_CONTAINER: 'ROZ927', // <ng-container> — use Angular directly
-  ESCAPE_HATCH_SVELTE_FRAGMENT: 'ROZ928', // <svelte:fragment> — use Svelte directly
+  ESCAPE_HATCH_REACT_SUSPENSE: 'ROZ925', // error — <Suspense> — use React directly
+  ESCAPE_HATCH_VUE_TELEPORT: 'ROZ926', // error — <Teleport> — use Vue directly
+  ESCAPE_HATCH_NG_CONTAINER: 'ROZ927', // error — <ng-container> — use Angular directly
+  ESCAPE_HATCH_SVELTE_FRAGMENT: 'ROZ928', // error — <svelte:fragment> — use Svelte directly
   // ROZ929..ROZ939 reserved for future ROZ-COMP needs
 
   // ---- Phase 07.2 consumer-side slot fills (D-08 sub-allocation) — ROZ940..ROZ959 ----
