@@ -1,0 +1,334 @@
+{
+  "schemaVersion": "2.1.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "dist/index.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Rozie's cross-framework port of CodeMirror 6 — a data-bound, engine-mediated code editor with a two-way `value` binding, compartment-backed runtime reconfiguration, and five extension-mounted portal slots.",
+          "name": "CodeMirror",
+          "tagName": "rozie-code-mirror",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "value",
+              "description": "The two-way document text (`r-model:value`) — the editor's contents as a string. Typing in the editor writes the new text back through the model path (CodeMirror's `updateListener` extension); a consumer write reflects into the live document, echo-guarded so a programmatic set does not ping-pong. As the sole `model: true` prop this **is** the only change channel — there are no events.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "value",
+              "default": "\"\""
+            },
+            {
+              "kind": "field",
+              "name": "language",
+              "description": "Convenience language. `javascript` loads the bundled `@codemirror/lang-javascript`; any other value falls back to plain text (no syntax highlighting, no throw). Add other languages through `:extensions`. Runtime-updatable via a `langCompartment` reconfigure — switching the prop re-highlights without a remount.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "language",
+              "default": "\"javascript\""
+            },
+            {
+              "kind": "field",
+              "name": "theme",
+              "description": "Editor theme. The built-in strings `light` (the editor default — no theme) or `dark` (the bundled `@codemirror/theme-one-dark`), **or** a CodeMirror `Extension` / `Extension[]` passed straight through (G3) — drop in a theme package or an `EditorView.theme({…})`. A non-string theme is composed via the live `themeCompartment` so it reconfigures with no remount, same as the string forms.",
+              "type": {
+                "text": "unknown"
+              },
+              "attribute": "theme",
+              "default": "\"light\""
+            },
+            {
+              "kind": "field",
+              "name": "readOnly",
+              "description": "Make the document read-only. Runtime-updatable via a `readOnlyCompartment` reconfigure (no remount).",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "readonly",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "description": "Editor height in pixels, applied to the wrapper's host box.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "height",
+              "default": "240"
+            },
+            {
+              "kind": "field",
+              "name": "placeholder",
+              "description": "Placeholder text shown when the document is empty (the bundled `@codemirror/view` `placeholder` extension). An empty string means no placeholder. Runtime-updatable via a `placeholderCompartment` reconfigure.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "placeholder",
+              "default": "\"\""
+            },
+            {
+              "kind": "field",
+              "name": "extensions",
+              "description": "Consumer-extensible passthrough — an arbitrary `Extension[]` composed **last** so it wins CodeMirror's last-registered-wins facets. The CodeMirror 6 analog of an options bag: line-wrapping, autocomplete, linting, custom key-bindings, additional languages/themes — anything the curated props do not special-case. Runtime-reconfigurable via an `extensionsCompartment` (no remount when the array changes).",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "extensions",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "basicSetup",
+              "description": "When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. Runtime-updatable via a `baselineCompartment` reconfigure — toggling it swaps the bundle live, no remount required.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "basicsetup",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "gutterLines",
+              "description": "The 1-based line numbers that each get a custom gutter marker rendered by the `gutter` reactive multi-instance portal slot (one portal handle per visible marker). Out-of-range lines are ignored. Runtime-updatable via a `gutterCompartment` reconfigure — changing the array re-marks the lines with no remount. Only meaningful when the `gutter` slot is filled.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "gutterlines",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "decorations",
+              "description": "An array of `{ from, to? }` **0-based document offsets** that each get an inline widget rendered by the `decoration` reactive multi-instance portal slot (one portal handle per visible widget). A point widget is placed at `from`; `to` is passed through in scope for the consumer's awareness. Compute an offset from a line via `view.state.doc.line(n).from`. Runtime-updatable via a `decorationCompartment` reconfigure. Only meaningful when the `decoration` slot is filled.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "decorations",
+              "default": "[]"
+            },
+            {
+              "kind": "method",
+              "name": "getView",
+              "description": "Return the underlying CodeMirror `EditorView` for direct API access."
+            },
+            {
+              "kind": "method",
+              "name": "focus",
+              "description": "Focus the editor."
+            },
+            {
+              "kind": "method",
+              "name": "getValue",
+              "description": "Return the current document text as a string."
+            },
+            {
+              "kind": "method",
+              "name": "replaceValue",
+              "description": "Replace the document text — routes through the same suppress-echo guard as the `value` prop watcher."
+            },
+            {
+              "kind": "method",
+              "name": "dispatch",
+              "description": "Dispatch a raw CodeMirror transaction — `dispatch(tr)`."
+            },
+            {
+              "kind": "method",
+              "name": "insertText",
+              "description": "Insert text at the current main selection — `insertText(text)`."
+            },
+            {
+              "kind": "method",
+              "name": "getSelection",
+              "description": "Return the main selection range (`{ anchor, head, from, to }`) or null."
+            },
+            {
+              "kind": "method",
+              "name": "setSelection",
+              "description": "Set the selection — `setSelection(posNumber | { anchor, head })`."
+            },
+            {
+              "kind": "method",
+              "name": "undo",
+              "description": "Undo the last change (CodeMirror history command)."
+            },
+            {
+              "kind": "method",
+              "name": "redo",
+              "description": "Redo the last undone change."
+            },
+            {
+              "kind": "method",
+              "name": "selectAll",
+              "description": "Select the entire document."
+            },
+            {
+              "kind": "method",
+              "name": "scrollToPos",
+              "description": "Scroll a document position into view — `scrollToPos(pos, opts?)` (defaults to vertically centering). Not named `scrollIntoView`/`scrollTo` to avoid the Lit inherited-method shadow."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "value",
+              "description": "The two-way document text (`r-model:value`) — the editor's contents as a string. Typing in the editor writes the new text back through the model path (CodeMirror's `updateListener` extension); a consumer write reflects into the live document, echo-guarded so a programmatic set does not ping-pong. As the sole `model: true` prop this **is** the only change channel — there are no events.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "value",
+              "default": "\"\""
+            },
+            {
+              "name": "language",
+              "description": "Convenience language. `javascript` loads the bundled `@codemirror/lang-javascript`; any other value falls back to plain text (no syntax highlighting, no throw). Add other languages through `:extensions`. Runtime-updatable via a `langCompartment` reconfigure — switching the prop re-highlights without a remount.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "language",
+              "default": "\"javascript\""
+            },
+            {
+              "name": "theme",
+              "description": "Editor theme. The built-in strings `light` (the editor default — no theme) or `dark` (the bundled `@codemirror/theme-one-dark`), **or** a CodeMirror `Extension` / `Extension[]` passed straight through (G3) — drop in a theme package or an `EditorView.theme({…})`. A non-string theme is composed via the live `themeCompartment` so it reconfigures with no remount, same as the string forms.",
+              "type": {
+                "text": "unknown"
+              },
+              "fieldName": "theme",
+              "default": "\"light\""
+            },
+            {
+              "name": "readonly",
+              "description": "Make the document read-only. Runtime-updatable via a `readOnlyCompartment` reconfigure (no remount).",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "readOnly",
+              "default": "false"
+            },
+            {
+              "name": "height",
+              "description": "Editor height in pixels, applied to the wrapper's host box.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "height",
+              "default": "240"
+            },
+            {
+              "name": "placeholder",
+              "description": "Placeholder text shown when the document is empty (the bundled `@codemirror/view` `placeholder` extension). An empty string means no placeholder. Runtime-updatable via a `placeholderCompartment` reconfigure.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "placeholder",
+              "default": "\"\""
+            },
+            {
+              "name": "extensions",
+              "description": "Consumer-extensible passthrough — an arbitrary `Extension[]` composed **last** so it wins CodeMirror's last-registered-wins facets. The CodeMirror 6 analog of an options bag: line-wrapping, autocomplete, linting, custom key-bindings, additional languages/themes — anything the curated props do not special-case. Runtime-reconfigurable via an `extensionsCompartment` (no remount when the array changes).",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "extensions",
+              "default": "[]"
+            },
+            {
+              "name": "basicsetup",
+              "description": "When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. Runtime-updatable via a `baselineCompartment` reconfigure — toggling it swaps the bundle live, no remount required.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "basicSetup",
+              "default": "false"
+            },
+            {
+              "name": "gutterlines",
+              "description": "The 1-based line numbers that each get a custom gutter marker rendered by the `gutter` reactive multi-instance portal slot (one portal handle per visible marker). Out-of-range lines are ignored. Runtime-updatable via a `gutterCompartment` reconfigure — changing the array re-marks the lines with no remount. Only meaningful when the `gutter` slot is filled.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "gutterLines",
+              "default": "[]"
+            },
+            {
+              "name": "decorations",
+              "description": "An array of `{ from, to? }` **0-based document offsets** that each get an inline widget rendered by the `decoration` reactive multi-instance portal slot (one portal handle per visible widget). A point widget is placed at `from`; `to` is passed through in scope for the consumer's awareness. Compute an offset from a line via `view.state.doc.line(n).from`. Runtime-updatable via a `decorationCompartment` reconfigure. Only meaningful when the `decoration` slot is filled.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "decorations",
+              "default": "[]"
+            }
+          ],
+          "events": [
+            {
+              "name": "value-change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired with the updated `value` (`event.detail`) when it changes."
+            }
+          ],
+          "slots": [
+            {
+              "name": "panel",
+              "description": "Scoped slot — props: view."
+            },
+            {
+              "name": "topPanel",
+              "description": "Scoped slot — props: view."
+            },
+            {
+              "name": "tooltip",
+              "description": "Scoped slot — props: view, pos."
+            },
+            {
+              "name": "gutter",
+              "description": "Scoped slot — props: line, view."
+            },
+            {
+              "name": "decoration",
+              "description": "Scoped slot — props: from, to, view."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "CodeMirror",
+          "declaration": {
+            "name": "CodeMirror",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "CodeMirror",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-code-mirror",
+          "declaration": {
+            "name": "CodeMirror",
+            "module": "dist/index.mjs"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,150 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JetBrains/web-types/master/schema/web-types.json",
+  "name": "@rozie-ui/codemirror-vue",
+  "version": "0.1.0",
+  "description-markup": "markdown",
+  "framework": "vue",
+  "contributions": {
+    "html": {
+      "vue-components": [
+        {
+          "name": "CodeMirror",
+          "source": {
+            "module": "@rozie-ui/codemirror-vue",
+            "symbol": "CodeMirror"
+          },
+          "description": "Rozie's cross-framework port of CodeMirror 6 — a data-bound, engine-mediated code editor with a two-way `value` binding, compartment-backed runtime reconfiguration, and five extension-mounted portal slots.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "value",
+              "description": "The two-way document text (`r-model:value`) — the editor's contents as a string. Typing in the editor writes the new text back through the model path (CodeMirror's `updateListener` extension); a consumer write reflects into the live document, echo-guarded so a programmatic set does not ping-pong. As the sole `model: true` prop this **is** the only change channel — there are no events.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            },
+            {
+              "name": "language",
+              "description": "Convenience language. `javascript` loads the bundled `@codemirror/lang-javascript`; any other value falls back to plain text (no syntax highlighting, no throw). Add other languages through `:extensions`. Runtime-updatable via a `langCompartment` reconfigure — switching the prop re-highlights without a remount.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"javascript\""
+            },
+            {
+              "name": "theme",
+              "description": "Editor theme. The built-in strings `light` (the editor default — no theme) or `dark` (the bundled `@codemirror/theme-one-dark`), **or** a CodeMirror `Extension` / `Extension[]` passed straight through (G3) — drop in a theme package or an `EditorView.theme({…})`. A non-string theme is composed via the live `themeCompartment` so it reconfigures with no remount, same as the string forms.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "unknown"
+              ],
+              "default": "\"light\""
+            },
+            {
+              "name": "read-only",
+              "description": "Make the document read-only. Runtime-updatable via a `readOnlyCompartment` reconfigure (no remount).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "height",
+              "description": "Editor height in pixels, applied to the wrapper's host box.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "240"
+            },
+            {
+              "name": "placeholder",
+              "description": "Placeholder text shown when the document is empty (the bundled `@codemirror/view` `placeholder` extension). An empty string means no placeholder. Runtime-updatable via a `placeholderCompartment` reconfigure.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            },
+            {
+              "name": "extensions",
+              "description": "Consumer-extensible passthrough — an arbitrary `Extension[]` composed **last** so it wins CodeMirror's last-registered-wins facets. The CodeMirror 6 analog of an options bag: line-wrapping, autocomplete, linting, custom key-bindings, additional languages/themes — anything the curated props do not special-case. Runtime-reconfigurable via an `extensionsCompartment` (no remount when the array changes).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "basic-setup",
+              "description": "When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. Runtime-updatable via a `baselineCompartment` reconfigure — toggling it swaps the bundle live, no remount required.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "gutter-lines",
+              "description": "The 1-based line numbers that each get a custom gutter marker rendered by the `gutter` reactive multi-instance portal slot (one portal handle per visible marker). Out-of-range lines are ignored. Runtime-updatable via a `gutterCompartment` reconfigure — changing the array re-marks the lines with no remount. Only meaningful when the `gutter` slot is filled.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "decorations",
+              "description": "An array of `{ from, to? }` **0-based document offsets** that each get an inline widget rendered by the `decoration` reactive multi-instance portal slot (one portal handle per visible widget). A point widget is placed at `from`; `to` is passed through in scope for the consumer's awareness. Compute an offset from a line via `view.state.doc.line(n).from`. Runtime-updatable via a `decorationCompartment` reconfigure. Only meaningful when the `decoration` slot is filled.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "update:value",
+                "description": "Emitted with the updated `value` value; powers `v-model:value`.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "panel",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ view: any }"
+            },
+            {
+              "name": "topPanel",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ view: any }"
+            },
+            {
+              "name": "tooltip",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ view: any; pos: any }"
+            },
+            {
+              "name": "gutter",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ line: any; view: any }"
+            },
+            {
+              "name": "decoration",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ from: any; to: any; view: any }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
