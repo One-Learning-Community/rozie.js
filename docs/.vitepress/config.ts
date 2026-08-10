@@ -511,7 +511,7 @@ export default defineConfig({
     },
     socialLinks: [],
     footer: {
-      message: 'Pre-v1.0 — internal monorepo.',
+      message: 'Pre-1.0 — APIs may change between minor versions.',
       copyright: 'Copyright © 2026 One Learning Community LTD',
     },
   },

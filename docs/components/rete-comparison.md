@@ -6,7 +6,7 @@ surface_hash: 0af9f90c05e2
 
 How `@rozie-ui/rete` (`FlowCanvas`) compares to the existing per-framework node-flow / graph editor libraries. A node editor's hard parts — the graph model, viewport pan/zoom, node drag, and drag-to-connect — are inherently framework-agnostic; [Rete.js v2](https://retejs.org/) is the engine that owns all of them and delegates only *rendering* to a swappable layer. The per-framework editors each re-solve those hard parts from scratch, which is why the ecosystem is siloed: React and Svelte are well-served, Vue has a separate reimplementation, Angular has a couple of options, and Solid has only an experiment while Lit has nothing. Rozie wraps the agnostic engine with a single vanilla render layer and delivers the same idiomatic `<FlowCanvas>`, with the same graph model, events, and handle, on all six frameworks as pre-compiled per-framework packages.
 
-> Research snapshot: 2026-06-08. Versions and the landscape move; treat them as of that date. The full audit is in [`node-flow-editor-feasibility.md`](https://github.com/One-Learning-Community/rozie.js/blob/main/.planning/research/node-flow-editor-feasibility.md).
+> Research snapshot: 2026-08-10. Versions and the landscape move; treat them as of that date. The full audit is in [`node-flow-editor-feasibility.md`](https://github.com/One-Learning-Community/rozie.js/blob/main/.planning/research/node-flow-editor-feasibility.md).
 
 ## The libraries at a glance
 
@@ -14,14 +14,14 @@ How `@rozie-ui/rete` (`FlowCanvas`) compares to the existing per-framework node-
 | --- | --- | --- | --- | --- | --- |
 | **React Flow** | `@xyflow/react` | **React only** | SVG edges + DOM nodes | internal Zustand store | mature, deep — the category leader on React |
 | **Svelte Flow** | `@xyflow/svelte` | **Svelte only** | SVG + DOM | Svelte 5 runes | mature; shares `@xyflow/system` core with React Flow |
-| **Vue Flow** | `@vue-flow/core` | **Vue only** | SVG + DOM | own Vue store | mature, but a **separate** codebase — not xyflow's shared core |
+| **Vue Flow** | `@vue-flow/core` | **Vue only** | SVG + DOM | own Vue store | mature; the stable 1.x is a **separate** codebase, though a 2.0 rebuild on xyflow's shared core (`@xyflow/vue`) is in prerelease |
 | **Foblex Flow** | `@foblex/flow` | **Angular only** | DOM + SVG | Angular signals | active; Angular-only |
 | **ngx-graph** | `@swimlane/ngx-graph` | **Angular only** | SVG (D3 + dagre) | RxJS | graph-viz-first, less an interactive editor |
 | **solid-flow** | `solid-flow` | Solid | SVG + DOM | signals | **single-author experiment**, not production-grade |
 | **Lit** | — | — | — | — | **no standalone library exists** |
 | **Rozie** | `@rozie-ui/rete-*` | **all 6** | DOM + SVG (vanilla render layer) | Rete `NodeEditor` (the engine owns it) | same API on React/Vue/Svelte/Angular/Solid/Lit |
 
-On its home framework each of these is a solid pick; for a single-React app, React Flow is the obvious choice. The case for Rozie is breadth: no single library ships all six frameworks, and two targets are essentially unserved. xyflow, the strongest brand, publishes only `@xyflow/react` and `@xyflow/svelte` (its shared `@xyflow/system` core has no Vue/Solid/Angular/Lit wrapper); Vue Flow is a wholly separate project; Solid has only a single-author `solid-flow` experiment; and Lit / web components have nothing at all. The one ecosystem that even approaches breadth is Rete.js, whose render plugins cover React/Vue/Angular/Svelte/Lit in five divergent codebases, still with no Solid. `@rozie-ui/rete` covers all six with one API, including Solid and Lit.
+On its home framework each of these is a solid pick; for a single-React app, React Flow is the obvious choice. The case for Rozie is breadth: no single library ships all six frameworks, and two targets are essentially unserved. xyflow, the strongest brand, ships stable packages only for React and Svelte; the stable Vue Flow (`@vue-flow/core` 1.x) is a wholly separate codebase, and while an official `@xyflow/vue` (Vue Flow 2.0, rebuilt on the shared `@xyflow/system` core inside the xyflow monorepo) reached public prerelease in mid-2026, no stable release has shipped, and Solid / Angular / Lit still have no xyflow wrapper. Solid has only a single-author `solid-flow` experiment (last published 2022), and Lit / web components have nothing at all. The one ecosystem that even approaches breadth is Rete.js, whose render plugins cover React/Vue/Angular/Svelte/Lit in five divergent codebases, still with no Solid. `@rozie-ui/rete` covers all six with one API, including Solid and Lit.
 
 ## Why wrap Rete.js
 

@@ -6,16 +6,16 @@ surface_hash: 5b198fe4fe61
 
 How `@rozie-ui/maplibre` compares to the existing per-framework [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/) wrappers. MapLibre GL is the open-source (BSD-3) WebGL map engine — the community fork of Mapbox GL JS v1 — and it is framework-agnostic: every wrapper exists only to glue reactive state to the imperative `Map`, render markers / popups / controls as framework components, and forward the event set. The result is an uneven ecosystem: deep React, solid Vue / Svelte / Angular, a thin-and-stale Solid story, and effectively no Lit wrapper at all. Rozie delivers the same idiomatic map component, with the same props, events, two-way camera, and handle, on all six frameworks as pre-compiled per-framework packages.
 
-> Research snapshot: 2026-06-07. Versions and the wrapper landscape move; treat them as of that date.
+> Research snapshot: 2026-08-10. Versions and the wrapper landscape move; treat them as of that date.
 
 ## The wrappers at a glance
 
 | Wrapper | Package | Latest | Maintainer | Depth | Markers / popups | Solid / Lit reach |
 | --- | --- | --- | --- | :---: | :---: | :---: |
-| **React** | `react-map-gl` / `@vis.gl/react-maplibre` | 8.1.1 | vis.gl (OpenJS / Urban Computing Foundation) | **deep** | ✅ `<Marker>` / `<Popup>` | — |
-| **Vue** | `@indoorequal/vue-maplibre-gl` | 8.4.2 | indoorequal | **deep** | ✅ `MglMarker` / `MglPopup` | — |
-| **Svelte** | `svelte-maplibre-gl` (MIERUNE, Svelte 5 runes) | 2.0.1 | MIERUNE | **deep** | ✅ `<Marker>` / `<Popup>` | — |
-| **Angular** | `@maplibre/ngx-maplibre-gl` (official org) | 21.0.2 | MapLibre org | **deep** | ✅ `mgl-marker` / `mgl-popup` | — |
+| **React** | `react-map-gl` / `@vis.gl/react-maplibre` | 8.1.2 | vis.gl (OpenJS / Urban Computing Foundation) | **deep** | ✅ `<Marker>` / `<Popup>` | — |
+| **Vue** | `@indoorequal/vue-maplibre-gl` | 9.0.1 | indoorequal | **deep** | ✅ `MglMarker` / `MglPopup` | — |
+| **Svelte** | `svelte-maplibre-gl` (MIERUNE, Svelte 5 runes) | 2.2.0 | MIERUNE | **deep** | ✅ `<Marker>` / `<Popup>` | — |
+| **Angular** | `@maplibre/ngx-maplibre-gl` (official org) | 22.1.0 | MapLibre org | **deep** | ✅ `mgl-marker` / `mgl-popup` | — |
 | **Solid** | `solid-maplibre` | 0.5.0 (npm 2025-03) | community | **thin** | ⚠️ partial / sparse docs | low adoption, stale |
 | **Lit** | `@trailstash/maplibre-component` | 1.0.1 (2024) | community | **minimal** | ❌ none | a single thin `<map-libre>` element |
 | **Rozie** | `@rozie-ui/maplibre-*` | pre-1.0 | One Learning Community | **deep** | ✅ `marker` / `popup` reactive portal slots (all 6) | ✅ full surface on both Solid and Lit |

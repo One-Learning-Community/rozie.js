@@ -6,7 +6,7 @@ surface_hash: 882fa245fb67
 
 How `@rozie-ui/embla` compares to the existing per-framework [Embla Carousel](https://www.embla-carousel.com) wrappers. Embla is the de-facto dependency-free, library-agnostic carousel engine: its core is pure vanilla JS that attaches to a viewport, reads the consumer's slide DOM, and drives `transform: translate3d(...)`. Every framework wrapper exists only to glue reactive state to that imperative engine, surface its options as props, and forward the event set. The result is a lopsided ecosystem: four official wrappers with four divergent APIs, a single-maintainer Angular community package, and nothing at all for Lit / web components. Rozie ships the same `<Carousel>`, with the same props, events, two-way `selectedIndex`, and imperative handle, to all six frameworks as pre-compiled per-framework packages.
 
-> Research snapshot: 2026-06-10. Versions and the wrapper landscape move; treat them as of that date. All six Rozie packages wrap **Embla v8** (`embla-carousel@^8.6`); Embla v9 is RC-only and renames the API surface, so it is deliberately not targeted yet.
+> Research snapshot: 2026-08-10. Versions and the wrapper landscape move; treat them as of that date. All six Rozie packages wrap **Embla v8** (`embla-carousel@^8.6`); Embla v9 is RC-only and renames the API surface, so it is deliberately not targeted yet.
 
 ## The wrappers at a glance
 
@@ -32,13 +32,13 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Idiomatic **component** surface | ⚠️ hook | ⚠️ composable | ⚠️ action | ⚠️ primitive | ⚠️ directive | hand-roll | ✅ `<Carousel>` |
 | Option surface as props | ⚠️ via options object | ⚠️ via options object | ⚠️ via options object | ⚠️ via options object | ⚠️ | — | ✅ 20 props |
 | **Two-way snap index** | ⚠️ via `select` listener | ⚠️ via `select` listener | ⚠️ via `select` listener | ⚠️ via `select` listener | ⚠️ | — | ✅ `selectedIndex` model (echo-guarded) |
-| Runtime option reconcile | ⚠️ manual `reInit` | ⚠️ manual `reInit` | ⚠️ manual `reInit` | ⚠️ manual `reInit` | ⚠️ | — | ✅ 17 of 20 options `$watch`→`reInit` |
+| Runtime option reconcile | ⚠️ manual `reInit` | ⚠️ manual `reInit` | ⚠️ manual `reInit` | ⚠️ manual `reInit` | ⚠️ | — | ✅ 13 of 20 props `$watch`→`reInit` (17 runtime-reactive in all) |
 | Autoplay plugin toggle | ⚠️ wire the plugin yourself | ⚠️ | ⚠️ | ⚠️ | ⚠️ | — | ✅ `autoplay` prop |
 | Imperative handle | ✅ via the api object | ✅ via the api object | ✅ via the api object | ✅ via the api accessor | ⚠️ | hand-roll | ✅ uniform 14-verb `$expose` |
 | Plugin / options escape hatch | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ `:plugins` + `:options` |
 | Config-array **and** declarative slides | ❌ (slot only) | ❌ | ❌ | ❌ | ❌ | — | ✅ `:slides` array OR default slot, on all six targets¹ |
 | TypeScript | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
-| Accessibility (carousel ARIA role, keyboard nav, labels) | ❓ not verified | ❓ not verified | ❓ not verified | ❓ not verified | ❓ not verified | — | ⚠️ arrow/dot `aria-label`s only — no carousel role, no keyboard nav on the viewport; planned for 0.2.0 (D9) |
+| Accessibility (carousel ARIA role, keyboard nav, labels) | ❓ not verified | ❓ not verified | ❓ not verified | ❓ not verified | ❓ not verified | — | ⚠️ arrow/dot `aria-label`s only — no carousel role, no keyboard nav on the viewport; fuller carousel a11y is on the roadmap |
 | Zero-config styling, re-skinnable | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | ⚠️ unstyled, wire it | — | ✅ CSS-var tokens + shadcn/Material/Bootstrap bridges |
 | Same API on all 6 frameworks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 

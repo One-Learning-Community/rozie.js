@@ -6,7 +6,7 @@ surface_hash: ede21101d217
 
 How `@rozie-ui/dialog` compares to the existing modal / dialog libraries across the six frameworks. Like the slider, listbox, and OTP families, the dialog has no shared vanilla-JS engine — but unlike those, the "engine" it leans on is the browser platform itself: the native `<dialog>` element + `showModal()`. The modal landscape is overwhelmingly per-framework (Radix / Base UI / Ariakit on React, Headless UI on React + Vue, vue-final-modal on Vue, Angular CDK / Material on Angular, Reka UI on Vue, …), and almost all of them re-implement in JavaScript what the platform now gives for free: a top-layer surface, a scrim, a focus trap, and Esc handling. Rozie builds on the native element and ships the same idiomatic `<Dialog>` to all six frameworks: the same two-way `open`, the same `close` event with a `reason`, the same `show`/`hide` handle.
 
-> Research snapshot: 2026-06-23. The modal/dialog landscape moves quickly; treat the library names, framework coverage, and feature columns as of that date.
+> Research snapshot: 2026-08-10. The modal/dialog landscape moves quickly; treat the library names, framework coverage, and feature columns as of that date.
 
 ## The libraries at a glance
 

@@ -127,7 +127,7 @@ import Counter from '../components/Counter.rozie';
 <Counter />
 ```
 
-Astro renders the custom-element tag on the server (light DOM only), and the browser upgrades it in place once its defining module reaches the client. Whether you need a `client:` directive depends on how that module is shipped: the island snippet earlier on this page uses `client:visible`, and that is the safe default. Verify the no-directive path in your own project before relying on it.
+Astro renders the custom-element tag on the server (light DOM only), and the browser upgrades it in place once its defining module reaches the client. For the Lit target no `client:` directive is needed on the tag itself — but the element's defining module must still reach the browser via a client `<script>` that imports it. The repo's `examples/consumers/astro-rozie` smoke exercises exactly this split: framework islands mount with `client:load`, while the Lit `<rozie-counter>` carries no directive and is registered by a plain client script.
 
 For richer interactive islands where you want a framework runtime — swap `target: 'lit'` for `target: 'react'` / `'vue'` / `'svelte'` / `'solid'` per file (via Astro's overrides), or per project.
 

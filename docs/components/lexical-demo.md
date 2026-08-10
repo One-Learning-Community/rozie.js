@@ -36,7 +36,7 @@ The editor shell is one `.rozie` file:
 
 <<< ../../packages/ui/lexical/src/LexicalEditor.rozie{html}[LexicalEditor.rozie — the single source]
 
-…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the actual generated output for each target (this is exactly what ships in `@rozie-ui/lexical-{react,vue,svelte,angular,solid,lit}`):
+…and Rozie compiles it to six idiomatic, framework-native components. Switch the tabs to see the actual generated output for each target (this is exactly what the `@rozie-ui/lexical-{react,vue,svelte,angular,solid,lit}` packages build to):
 
 ::: code-group
 

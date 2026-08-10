@@ -6,7 +6,7 @@ surface_hash: ad041055bdfa
 
 How `@rozie-ui/pdf` compares to the existing per-framework [PDF.js](https://mozilla.github.io/pdf.js/) wrappers. PDF.js (mozilla/pdf.js, shipped as `pdfjs-dist`) is the de-facto vanilla-JS PDF rendering engine, and it is framework-agnostic: every wrapper exists only to glue reactive state to PDF.js's imperative `getDocument()` / `page.render()` flow, configure the Web Worker, render the page canvas (and, for the good ones, the selectable text layer), and forward the page / load events. The result is a lopsided ecosystem: a deep, maintained React wrapper; decent Vue and Angular options; a thin Svelte story; and effectively nothing for Solid or Lit. Rozie ships the same viewer — same props, two-way `page`, events, handle, and text layer — to all six.
 
-> Research snapshot: 2026-06-08. Versions and the wrapper landscape move; treat them as of that date. Note `@react-pdf/renderer` is a different library — it *generates* PDFs from React components; it is not a viewer, so it's out of scope here.
+> Research snapshot: 2026-08-10. Versions and the wrapper landscape move; treat them as of that date. Note `@react-pdf/renderer` is a different library — it *generates* PDFs from React components; it is not a viewer, so it's out of scope here.
 
 ## The wrappers at a glance
 

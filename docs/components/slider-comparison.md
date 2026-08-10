@@ -6,7 +6,7 @@ surface_hash: b3eea757a447
 
 How `@rozie-ui/slider` compares to the existing slider libraries across the six frameworks. Like the listbox, the slider has no shared vanilla-JS engine, but unlike the listbox, the cross-framework slider landscape splits along a second axis: **headless-behaviour libraries** (React Aria, Radix, Kobalte, Melt, Angular CDK) that reimplement the WAI-ARIA [slider pattern](https://www.w3.org/WAI/ARIA/apg/patterns/slider/) per ecosystem, versus the **native-input wrappers** (rc-slider, MUI Slider, noUiSlider) that ship a styled, batteries-included widget. Rozie sits deliberately in a third spot: `@rozie-ui/slider` builds the behaviour on the browser's own `<input type="range">` and delivers the same idiomatic `<Slider>` on all six frameworks, with the same props, events, two-way `value`, slots, and handle, installed as a pre-compiled per-framework package with no Rozie toolchain required.
 
-> Research snapshot: 2026-06-16. The headless-UI landscape moves quickly; treat the library names, framework coverage, and feature columns as of that date.
+> Research snapshot: 2026-08-10. The headless-UI landscape moves quickly; treat the library names, framework coverage, and feature columns as of that date.
 
 ## The libraries at a glance
 
@@ -17,7 +17,7 @@ How `@rozie-ui/slider` compares to the existing slider libraries across the six 
 | **Svelte** | Melt UI, Bits UI | builders / actions | ✅ | ✅ | ❌ | A separate community ecosystem (builders) — **no Radix/Headless-UI port**; its own mental model again. |
 | **Solid** | Kobalte Slider, Ark UI (Solid) | components | ✅ | ✅ | ❌ | Community headless libraries; no first-party suite. |
 | **Angular** | Angular CDK (no slider) / Material `mat-slider` | components | ⚠️ | ✅ | ✅ (Material 3 uses native input internally) | **The CDK has no headless slider primitive.** `mat-slider` is a *styled* Material component, not headless behaviour you re-skin. |
-| **Lit / web components** | *(none headless)* | — | ❌ | ❌ | — | No headless slider primitive. Shoelace `<sl-range>` is a *styled* single-thumb component (no range), not re-skinnable headless behaviour. You hand-roll the ARIA. |
+| **Lit / web components** | *(none headless)* | — | ❌ | ❌ | — | No headless slider primitive. Shoelace (archived March 2026 in favour of Web Awesome) `<sl-range>` is a *styled* single-thumb component (no range), not re-skinnable headless behaviour. You hand-roll the ARIA. |
 | **noUiSlider** | framework-agnostic vanilla | imperative lib | ⚠️ | ✅ | ❌ | The closest cross-framework option — but it owns its own DOM/drag engine, ships its own (overridable) CSS, and you write a thin wrapper per framework yourself. Not native `<input>`, not idiomatic-component. |
 | **Rozie** | `@rozie-ui/slider-*` | a **component** | ✅ | ✅ | ✅ (native `<input type=range>`) | Same API on all six: props / events / two-way `value` / slots / handle. Single and range in one component (a `range` boolean flip), built on the native input. |
 

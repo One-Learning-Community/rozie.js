@@ -6,17 +6,17 @@ surface_hash: 3858339832a2
 
 How `@rozie-ui/tiptap` compares to the existing per-framework TipTap wrappers. TipTap's editor core (`@tiptap/core` + ProseMirror) is framework-agnostic and mounts anywhere; every wrapper exists only to glue reactive state, forward extensions, and bridge node views. The ecosystem is uneven: first-party React/Vue, healthy community Svelte/Angular, a thin and stalling Solid story, and nothing for Lit. `@rozie-ui/tiptap` ships the same `<TipTap>` to all six frameworks: same props, same events, same two-way `html` binding, same command handle, installed as a pre-compiled package for your framework with no Rozie toolchain required.
 
-> Research snapshot: 2026-06-06. Versions and download counts move; treat them as of that date.
+> Research snapshot: 2026-08-10. Versions and download counts move; treat them as of that date.
 
 ## The wrappers at a glance
 
 | Wrapper | Package | Latest | Weekly downloads | Maintainer | Node-view renderer |
 | --- | --- | --- | --- | --- | :---: |
-| **React** (official) | `@tiptap/react` | 3.26.0 | ~9.3M | ueberdosis (first-party) | ✅ `ReactNodeViewRenderer` |
-| **Vue** (official) | `@tiptap/vue-3` | 3.26.0 | ~1.1M | ueberdosis (first-party) | ✅ `VueNodeViewRenderer` |
-| **Angular** (community) | `ngx-tiptap` | 14.0.1 | ~46k | sibiraj-s | ✅ `AngularNodeViewRenderer` |
-| **Svelte** (community) | `svelte-tiptap` | 3.0.1 | ~20.5k | sibiraj-s | ✅ `SvelteNodeViewRenderer` |
-| **Solid** (community) | `solid-tiptap` | 0.8.0 | ~3.9k | lxsmnsyc | ❌ none |
+| **React** (official) | `@tiptap/react` | 3.29.2 | ~13.6M | ueberdosis (first-party) | ✅ `ReactNodeViewRenderer` |
+| **Vue** (official) | `@tiptap/vue-3` | 3.29.2 | ~1.5M | ueberdosis (first-party) | ✅ `VueNodeViewRenderer` |
+| **Angular** (community) | `ngx-tiptap` | 14.0.1 | ~58k | sibiraj-s | ✅ `AngularNodeViewRenderer` |
+| **Svelte** (community) | `svelte-tiptap` | 3.0.1 | ~36k | sibiraj-s | ✅ `SvelteNodeViewRenderer` |
+| **Solid** (community) | `solid-tiptap` | 0.8.0 | ~7.3k | lxsmnsyc | ❌ none |
 | **Lit** | — | — | — | — | ❌ no wrapper exists |
 | **Rozie** | `@rozie-ui/tiptap-*` | pre-1.0 | — | One Learning Community | ✅ `nodeView` reactive portal slot (all 6) |
 
@@ -31,7 +31,7 @@ The gap is widest for Lit, which has no wrapper at all, and Solid, whose wrapper
 | Imperative command handle | ✅ (the `Editor`) | ✅ (the `Editor`) | ✅ (you own `Editor`) | ✅ (store) | ✅ (read hooks) | hand-roll | ✅ uniform `$expose` handle |
 | Batteries-included toolbar | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ internal toolbar |
 | Consumer toolbar slot (bound to editor) | build it yourself | build it yourself | build it yourself | build it yourself | build it yourself | hand-roll | ✅ `toolbar` portal slot |
-| Link-editing UI in the wrapper | ⚠️ separate UI-components package | ❌ | ❌ | ❌ | hand-roll | hand-roll | ✅ built-in link editor + `linkEditor` reactive slot |
+| Link-editing UI in the wrapper | ⚠️ CLI-copied source components⁴ | ❌ | ❌ | ❌ | hand-roll | hand-roll | ✅ built-in link editor + `linkEditor` reactive slot |
 | `extensions` passthrough | ✅ | ✅ | ✅ | ✅ | ✅ | hand-roll | ✅ |
 | `editorProps` passthrough | ✅ | ✅ | ✅ | ✅ | ✅ | hand-roll | ✅ |
 | **Node-view component renderer** | ✅ | ✅ | ✅ | ✅ | ❌ | hand-roll | ✅ `nodeView` reactive slot (all 6) |
@@ -44,13 +44,15 @@ The gap is widest for Lit, which has no wrapper at all, and Solid, whose wrapper
 
 ² SSR supported but requires the `immediatelyRender: false` ritual (+ `'use client'` on Next.js / the Nuxt guide). ³ Rozie's wrapper instantiates the engine inside the mount hook only (no top-level DOM), so it is SSR-safe by construction.
 
+⁴ **TipTap UI Components, including an official Link Popover, are React-only and CLI-copied.** TipTap now offers first-party UI Components (a Link Popover that adds / edits / removes links, toolbars, and more), but they are React-only, and they are not an installable runtime dependency of `@tiptap/react`: `npx @tiptap/cli add link-popover` copies editable source files into your project, shadcn-style (MIT where the underlying extension is open source). Vue and every community wrapper still ship no link UI. Rozie's link editor is a built-in component feature on all six targets, replaceable via the `linkEditor` reactive slot.
+
 ## Where Rozie wins today
 
 - **First-class packages for all six frameworks** — including the two the ecosystem underserves: Lit (zero existing wrapper) and Solid (thin, no node views, stalling). A Solid dev today hand-rolls node views and all menu UI; a Lit dev hand-rolls everything.
 - **The same editor everywhere.** One `<TipTap>` to learn, document, and migrate across your stack: the same props, the same `update`/`selectionUpdate`/`focus`/`blur` events, the same slots, the same command handle on every target, versus a different wrapper API (hook return, ref, store, directive input) per framework.
 - **Controlled two-way `html`** out of the box on all six, with a shared echo-guard: the thing every React/Vue/Svelte consumer reimplements by hand. On Angular it doubles as a `ControlValueAccessor`, so reactive forms bind directly.
 - **A batteries-included toolbar** (Bold / Italic / H1 / H2 / Bullet / Underline / Ordered list / Link with live active-state, plus Undo/Redo) and a `toolbar` portal slot that hands your replacement UI the live editor. Neither official wrapper ships any toolbar.
-- **A built-in link editor.** Clicking a link (or the toolbar Link button, or calling `openLinkEditor()`) surfaces an edit/create form in a bubble-menu surface; the reactive `linkEditor` slot swaps in your own form with `{ editor, href, attrs, setLink, unsetLink, close }` in scope. Every other wrapper leaves link UI entirely to you.
+- **A built-in link editor.** Clicking a link (or the toolbar Link button, or calling `openLinkEditor()`) surfaces an edit/create form in a bubble-menu surface; the reactive `linkEditor` slot swaps in your own form with `{ editor, href, attrs, setLink, unsetLink, close }` in scope. On React, TipTap's CLI-copied UI Components now include an official Link Popover (source files you then own and maintain); every other wrapper leaves link UI entirely to you, and none ships it as a built-in feature of the component itself.
 - **Node views on all six.** A single `nodeView` reactive portal slot renders a framework fragment as a custom ProseMirror node (mention chips, embeds, editable callouts) and re-renders it in place on each transaction. This is TipTap's marquee feature, and Rozie ships it where the ecosystem has gaps: Solid and Lit get it too.
 - **Selection-anchored `bubbleMenu` / `floatingMenu` portal slots** over the Floating-UI menu extensions: bring your own menu fragment, handed the live editor, uniform across all six targets.
 - **Bundled Placeholder and a live character/word counter** with zero setup: set `placeholder` for empty-state ghost text, `:max-length` for a live counter with an overridable `count` scoped slot and `getCharacterCount()` / `getWordCount()` handle reads.

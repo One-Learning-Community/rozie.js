@@ -7,12 +7,14 @@ surface_hash: c094ffccb048
 
 [wavesurfer.js](https://wavesurfer.xyz) does the real work (canvas rendering + Web Audio). The question is the **wrapper**: how do you drop a waveform into *your* framework with idiomatic props, events, two-way state, and an imperative handle? Today that answer is uneven across ecosystems — which is the gap `@rozie-ui/wavesurfer` closes.
 
+> Research snapshot: 2026-08-10. The wrapper landscape moves; treat these claims as of that date.
+
 ## The landscape
 
 | Framework | Common option | State |
 | --- | --- | --- |
 | React | [`@wavesurfer/react`](https://www.npmjs.com/package/@wavesurfer/react) | Official, well-maintained hook + component. |
-| Vue | community wrappers | Thin/aging; often just a `ref` + manual `WaveSurfer.create`. |
+| Vue | community wrappers | Thin/low-adoption (well under 1k weekly downloads); often just a `ref` + manual `WaveSurfer.create`. |
 | Svelte | — | No maintained wrapper; hand-roll in `onMount`. |
 | Angular | community wrappers | Sparse/stale; hand-roll with `ngAfterViewInit`. |
 | Solid | — | None; hand-roll with `onMount`/`onCleanup`. |

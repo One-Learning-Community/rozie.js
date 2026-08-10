@@ -6,17 +6,17 @@ surface_hash: 5f9d16684713
 
 How `@rozie-ui/captcha` compares to the existing CAPTCHA wrappers. Every provider — Google reCAPTCHA, hCaptcha, Cloudflare Turnstile — ships a framework-agnostic vanilla-JS widget; each wrapper exists only to inject the provider script, render the widget into an element, surface its config as props, and forward the `verify`/`expire`/`error` callbacks. Because that glue is rewritten **per provider × per framework**, the ecosystem is a sprawl of small, independently-versioned packages — and crucially, **almost none is multi-provider**: switching from reCAPTCHA to Turnstile means swapping libraries, not flipping a prop.
 
-> Research snapshot: 2026-06. Versions and the wrapper landscape move; treat them as of that date.
+> Research snapshot: 2026-08-10. Versions and the wrapper landscape move; treat them as of that date.
 
 ## The wrappers at a glance
 
 | Framework | reCAPTCHA | hCaptcha | Turnstile | Friendly | Multi-provider? |
 | --- | --- | --- | --- | --- | :---: |
-| **React** | `react-google-recaptcha` | `@hcaptcha/react-hcaptcha` | `react-turnstile` / `@marsidev/react-turnstile` | `@friendlycaptcha/react-widget` | ❌ separate libs |
+| **React** | `react-google-recaptcha` | `@hcaptcha/react-hcaptcha` | `react-turnstile` / `@marsidev/react-turnstile` | `@friendlycaptcha/sdk` *(SDK, no dedicated React pkg)* | ❌ separate libs |
 | **Vue** | `vue-recaptcha` / `vue3-recaptcha2` | `@hcaptcha/vue3-hcaptcha` | `vue-turnstile` | *(thin / community)* | ❌ separate libs |
 | **Svelte** | `svelte-recaptcha-v2` | *(thin / community)* | `svelte-turnstile` | *(community)* | ❌ separate libs |
 | **Angular** | `ngx-captcha` / `ng-recaptcha` | *(community)* | `ngx-turnstile` | *(community)* | ⚠️ partial (`ngx-captcha`) |
-| **Solid** | *(community / hand-roll)* | *(none)* | `solid-turnstile` | *(none)* | ❌ mostly absent |
+| **Solid** | *(community / hand-roll)* | `solid-hcaptcha` | `solid-turnstile` | *(none)* | ❌ mostly absent |
 | **Lit** | *(none)* | *(none)* | *(none)* | *(none)* | ❌ nothing |
 | **Rozie** | ✅ | ✅ | ✅ | ✅ | ✅ **one `provider` prop** |
 

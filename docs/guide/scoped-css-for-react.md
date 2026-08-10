@@ -53,7 +53,7 @@ styled-components or Emotion solves the authoring ergonomics but adds:
 - A runtime parse + inject pass on every component render
 - Serialization fights with Server Components / streaming SSR
 - A separate "what's a styled component" mental model
-- Bundle weight: 11–17kB gzipped just for the runtime
+- Bundle weight: roughly 8–12kB min+gzip just for the runtime (bundlephobia, 2026-08: `@emotion/react` 11.14 ≈ 8kB; `styled-components` 6.1 ≈ 11kB, before any styles of yours)
 - Theme-context dependency graphs that break tree-shaking
 
 The React community has been openly looking for a way out for years. [Zero-runtime CSS-in-JS libraries](https://github.com/callstack/linaria) exist but are a different ecosystem each.

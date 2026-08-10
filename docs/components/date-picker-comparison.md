@@ -22,7 +22,7 @@ idiomatic, accessible packages with one API
 feature-deep incumbents on purpose: single-date or range selection (with
 preset shortcuts), headless, token-themed. That scope is spelled out below.
 
-> Research snapshot: **2026-06-24**. Versions, publish dates, and weekly-download
+> Research snapshot: **2026-08-10**. Versions, publish dates, and weekly-download
 > figures were verified live against the npm registry (`registry.npmjs.org`) and
 > the npm downloads API. The date-picker landscape moves; re-check before relying
 > on a specific number. Download counts are a single-week sample and bounce week
@@ -35,23 +35,23 @@ partial / stale / lightly-documented.
 
 | Library | Framework(s) | Headless? | WAI-ARIA a11y | Maintained (latest / date) | Range / time | Notes |
 | --- | --- | :---: | :---: | --- | :---: | --- |
-| **[`@rozie-ui/date-picker`](/components/date-picker)** | **React + Vue + Svelte + Angular + Solid + Lit** | ✓ token-themed | ✓ ARIA grid + roving keyboard | this repo (2026-06) | range ✓ / time ✗ | Same API, six idiomatic packages. Single + range selection with presets; no time-of-day. |
-| [react-datepicker](https://github.com/Hacker0x01/react-datepicker) | React | ✗ styled | ~ keyboard, partial ARIA | 9.1.0 / 2025-12 | ✓ / ✓ | ~4.7M wk. The popular default; opinionated CSS. |
+| **[`@rozie-ui/date-picker`](/components/date-picker)** | **React + Vue + Svelte + Angular + Solid + Lit** | ✓ token-themed | ✓ ARIA grid + roving keyboard | pre-1.0, released together | range ✓ / time ✗ | Same API, six idiomatic packages. Single + range selection with presets; no time-of-day. |
+| [react-datepicker](https://github.com/Hacker0x01/react-datepicker) | React | ✗ styled | ~ keyboard, partial ARIA | 9.1.0 / 2025-12 | ✓ / ✓ | ~5.0M wk. The popular default; opinionated CSS. |
 | [react-day-picker](https://daypicker.dev) | React | ~ restyleable | ✓ follows APG | 10.0.1 / 2026-05 | range ✓ / time ✗ | Strong a11y; non-Gregorian calendars. Powers shadcn/ui's calendar. |
-| [@mui/x-date-pickers](https://mui.com/x/react-date-pickers/) | React | ✗ Material | ✓ documented WCAG/ARIA | 9.6.0 / 2026-06 | time ✓ / **range Pro-only** | Date/time/datetime free; **range pickers are commercial**. |
-| [react-aria](https://react-spectrum.adobe.com/react-aria/useDatePicker.html) (`useDatePicker`/`useCalendar`) | React | ✓ hooks | ✓ best-in-class | 1.19.0 / 2026-06 | ✓ / ✓ | Adobe; the accessibility gold standard. React-only. |
-| [Ariakit](https://ariakit.com/components) | React | ✓ | n/a | 0.4.30 / 2026-06 | — | **No date/calendar primitive at all** — build it from Popover yourself. |
+| [@mui/x-date-pickers](https://mui.com/x/react-date-pickers/) | React | ✗ Material | ✓ documented WCAG/ARIA | 9.11.0 / 2026-08 | time ✓ / **range Pro-only** | Date/time/datetime free; **range pickers are commercial**. |
+| [react-aria](https://react-spectrum.adobe.com/react-aria/useDatePicker.html) (`useDatePicker`/`useCalendar`) | React | ✓ hooks | ✓ best-in-class | 3.51.0 / 2026-07 | ✓ / ✓ | Adobe; the accessibility gold standard. React-only. |
+| [Ariakit](https://ariakit.com/components) | React | ✓ | n/a | 0.4.37 / 2026-08 | — | **No date/calendar primitive at all** — build it from Popover yourself. |
 | [@vuepic/vue-datepicker](https://vue3datepicker.com) | Vue 3 | ✗ styled | ✓ documented | 14.0.0 / 2026-06 | ✓ / ✓ | Deepest Vue option: range, time, month/year/week, multi-cal. |
-| [v-calendar](https://vcalendar.io) | Vue (3.x via `@next`) | ✗ styled | ~ weak | 3.1.2 / 2023-10 | range ✓ / time ✗ | Vue-3 build **~2.5 yrs stale**; a11y long-flagged. |
+| [v-calendar](https://vcalendar.io) | Vue (3.x via `@next`) | ✗ styled | ~ weak | 3.1.2 / 2023-10 | range ✓ / time ✗ | Vue-3 build **~3 yrs stale**; a11y long-flagged. |
 | [vue-datepicker-next](https://github.com/mengxiong10/vue-datepicker-next) | Vue 3 | ✗ styled | ✗ undocumented | 1.0.3 / 2023-03 | ✓ / ✓ | Unmaintained (>3 yrs). |
 | [bits-ui](https://bits-ui.com/docs/components/date-picker) | Svelte 5 | ✓ headless | ✓ (on `@internationalized/date`) | 2.18.1 / 2026-05 | ✓ / ✓ | The live, maintained Svelte choice; wraps Melt internally. |
 | [@melt-ui/svelte](https://www.melt-ui.com/docs/builders/calendar) | Svelte 3/4/5 | ✓ builders | ✓ strongest Svelte a11y docs | 0.86.6 / 2025-03 | ✓ / ✓ | Builder API; momentum shifted to bits-ui. |
-| [date-picker-svelte](https://date-picker-svelte.kasper.space) | Svelte 3/4/5 | ✗ styled | ~ undocumented | 2.17.0 / 2025-11 | time ✓ / range ✗ | Small, single-date + time. |
+| [date-picker-svelte](https://date-picker-svelte.kasper.space) | Svelte 5 | ✗ styled | ~ undocumented | 3.0.0 / 2026-07 | time ✓ / range ✗ | Small, single-date + time. |
 | [svelty-picker](https://github.com/mskocik/svelty-picker) | Svelte 5 | ~ themable | ~ keyboard claimed | 6.1.6 / 2025-09 | range ✓ / time ✓ | Niche (~5k wk), Bootstrap-flavored. |
-| [@angular/material](https://material.angular.dev/components/datepicker) (MatDatepicker) | Angular | ✗ Material | ✓ documented | 22.0.2 / 2026-06 | range ✓ / sep. timepicker | First-party; tracks the Angular release train. |
-| [PrimeNG](https://primeng.org/datepicker) DatePicker | Angular | ✗ themed | ✓ documented | 21.1.9 / 2026-06 | ✓ / ✓ | Deepest Angular feature set (range/time/month/year). |
+| [@angular/material](https://material.angular.dev/components/datepicker) (MatDatepicker) | Angular | ✗ Material | ✓ documented | 22.1.1 / 2026-08 | range ✓ / sep. timepicker | First-party; tracks the Angular release train. |
+| [PrimeNG](https://primeng.org/datepicker) DatePicker | Angular | ✗ themed | ✓ documented | 22.0.0 / 2026-07 | ✓ / ✓ | Deepest Angular feature set (range/time/month/year). |
 | [ng-bootstrap](https://ng-bootstrap.github.io) (NgbDatepicker) | Angular | ✗ Bootstrap | ~ gaps reported | 21.0.0 / 2026-06 | range ✓ / time ✗ | Needs Bootstrap CSS; documented screen-reader gaps. |
-| [flatpickr](https://flatpickr.js.org) | vanilla (re-wrapped) | ✗ styled | ✗ known weak spot | 4.6.13 / **2022-04** | ✓ / ✓ | Huge usage (~1.7M wk) but **~4 yrs stale**; a11y a known pain point. |
+| [flatpickr](https://flatpickr.js.org) | vanilla (re-wrapped) | ✗ styled | ✗ known weak spot | 4.6.13 / **2022-04** | ✓ / ✓ | Huge usage (~1.8M wk) but **4+ yrs stale**; a11y a known pain point. |
 | [air-datepicker](https://air-datepicker.com) | vanilla | ✗ styled | ~ thin | 3.6.0 / 2025-05 | ✓ / ✓ | Dependency-free; ARIA not comprehensively documented. |
 | [duet-date-picker](https://github.com/duetds/date-picker) | web component | ✗ themable | ✓ a11y was its pitch | 1.4.0 / 2021-06 | ✗ single-date | **Repo archived read-only 2024-09** — not maintained. |
 | [Cally](https://wicky.nillia.ms/cally/) | framework-agnostic WC | ~ CSS parts | ✓ a11y a core goal | 0.9.2 / 2026-02 | range ✓ / time ✗ | The modern up-and-comer; pre-1.0, framework-independent. |

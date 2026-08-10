@@ -4,31 +4,31 @@ surface_hash: 17f8b8d41384
 
 # Cropper libraries comparison
 
-How `@rozie-ui/cropper` compares to the existing per-framework [Cropper.js](https://github.com/fengyuanchen/cropperjs) wrappers. Cropper.js is the de-facto vanilla-JS image-cropping engine, and it is framework-agnostic: every wrapper exists only to glue reactive state to the imperative `Cropper` instance, surface its options as props, and forward the event set. The result is a lopsided ecosystem: a deep, maintained React wrapper; an older Vue one; and for Angular / Svelte / Solid / Lit, either an *unrelated* cropping engine or nothing at all. Rozie ships the same `<Cropper>`, with the same props, events, two-way crop box, and imperative handle, to all six frameworks as pre-compiled per-framework packages.
+How `@rozie-ui/cropper` compares to the existing per-framework [Cropper.js](https://github.com/fengyuanchen/cropperjs) wrappers. Cropper.js is the de-facto vanilla-JS image-cropping engine, and it is framework-agnostic: every wrapper exists only to glue reactive state to the imperative `Cropper` instance, surface its options as props, and forward the event set. The result is a lopsided ecosystem: a deep but no-longer-shipping React wrapper; an older Vue one; and for Angular / Svelte / Solid / Lit, a stale or negligible-adoption wrapper, an *unrelated* cropping engine, or nothing at all. Rozie ships the same `<Cropper>`, with the same props, events, two-way crop box, and imperative handle, to all six frameworks as pre-compiled per-framework packages.
 
-> Research snapshot: 2026-06-07. Versions and the wrapper landscape move; treat them as of that date. Where a framework's popular "image cropper" is a **different engine** (not Cropper.js), that's called out; it means there is no idiomatic *Cropper.js* option there.
+> Research snapshot: 2026-08-10. Versions and the wrapper landscape move; treat them as of that date. Where a framework's popular "image cropper" is a **different engine** (not Cropper.js), that's called out; it means there is no idiomatic *Cropper.js* option there.
 
 ## The wrappers at a glance
 
 | Framework | Cropper.js wrapper | Engine | Depth | Notes |
 | --- | --- | --- | :---: | --- |
-| **React** | `react-cropper` | Cropper.js v1 | **deep** | Mature, maintained, the obvious React pick. |
-| **Vue** | `vue-cropperjs` | Cropper.js v1 | **moderate** | Official-org thin wrapper; Vue-2-era lineage, sparse Vue 3 momentum. |
-| **Angular** | *(none for Cropper.js)* | — | — | `ngx-image-cropper` is popular but a **different engine**, not Cropper.js. |
-| **Svelte** | *(none for Cropper.js)* | — | — | `svelte-easy-crop` exists but wraps a **different engine** (react-easy-crop's). |
+| **React** | `react-cropper` | Cropper.js v1 | **deep** | Mature and widely used (~412k wk); last published 2023-04. |
+| **Vue** | `vue-cropperjs` | Cropper.js v1 | **moderate** | Official-org thin wrapper; last published 2021-02, sparse Vue 3 momentum. |
+| **Angular** | `angular-cropperjs` *(stale)* | Cropper.js v1 | **thin** | Last published 2023-06 (~8.7k wk). The popular pick, `ngx-image-cropper` (~328k wk), is a **different engine**, not Cropper.js. |
+| **Svelte** | *(no mainstream option)* | — | — | `svelte-easy-crop` wraps a **different engine** (react-easy-crop's); the one Cropper.js wrapper (`@cloudparker/easy-cropperjs-svelte`) has negligible adoption (~59 wk). |
 | **Solid** | *(none)* | — | — | No dedicated Cropper.js (or comparable) wrapper. |
 | **Lit** | *(none)* | — | — | No web-component wrapper for Cropper.js v1. |
 | **Rozie** | `@rozie-ui/cropper-*` | Cropper.js v1 | **deep** | Same API on all six: props, events, two-way binding, handle. |
 
-On React, `react-cropper` is a mature library and the obvious single-framework pick. The case for Rozie is everywhere else. Vue's `vue-cropperjs` is a thin, low-momentum wrapper. Angular and Svelte developers reach for a *different* cropping engine (`ngx-image-cropper`, `svelte-easy-crop`) because no idiomatic Cropper.js wrapper exists. Solid and Lit have nothing. Rozie gives all five underserved targets a first-class, consistent Cropper.js component, the same one it ships for React.
+On React, `react-cropper` is a mature library and the obvious single-framework pick, though it has not shipped since 2023-04. The case for Rozie is everywhere else. Vue's `vue-cropperjs` is a thin, low-momentum wrapper. Angular and Svelte developers reach for a *different* cropping engine (`ngx-image-cropper`, `svelte-easy-crop`) because no maintained, mainstream Cropper.js wrapper exists there (`angular-cropperjs` last shipped 2023-06). Solid and Lit have nothing. Rozie gives all five underserved targets a first-class, consistent Cropper.js component, the same one it ships for React.
 
 ## Feature matrix
 
 Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / not present · **⚠️** = partial / different-engine / consumer-glue-required.
 
-| Capability | `react-cropper` | `vue-cropperjs` | Angular (none) | Svelte (none) | Solid (none) | Lit (none) | **`@rozie-ui/cropper`** |
+| Capability | `react-cropper` | `vue-cropperjs` | Angular (stale wrapper) | Svelte (niche wrapper) | Solid (none) | Lit (none) | **`@rozie-ui/cropper`** |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Cropper.js v1 engine | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Cropper.js v1 engine | ✅ | ✅ | ⚠️ stale | ⚠️ niche | ❌ | ❌ | ✅ |
 | Mount cropper from `src` | ✅ | ✅ | hand-roll | hand-roll | hand-roll | hand-roll | ✅ |
 | Full option surface as props | ✅ | ⚠️ partial | — | — | — | — | ✅ 21 props |
 | **Two-way crop box** | ⚠️ via `crop` callback | ⚠️ via event | — | — | — | — | ✅ `data` model (round-trip-guarded) |
@@ -41,7 +41,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## Where Rozie wins today
 
-- **First-class packages for all six frameworks** — including the four with **no Cropper.js option at all** (Angular, Svelte, Solid, Lit). An Angular or Svelte dev today must adopt a *different* cropping engine with its own API and look; a Solid or Lit dev hand-rolls everything around the raw engine. Rozie hands all four a first-class Cropper.js component.
+- **First-class packages for all six frameworks** — including the four with **no maintained, mainstream Cropper.js option** (Angular's `angular-cropperjs` last shipped 2023-06; Svelte's only Cropper.js wrapper has negligible adoption; Solid and Lit have nothing). An Angular or Svelte dev today adopts a *different* cropping engine with its own API and look, or a stale wrapper; a Solid or Lit dev hand-rolls everything around the raw engine. Rozie hands all four a first-class Cropper.js component.
 - **A real two-way crop box on all six.** The `data` model (`{ x, y, width, height, rotate, scaleX, scaleY }`) reads *and* drives the crop box, echoed on every `crop` event and applied via `setData` with a round-trip guard. `react-cropper` and `vue-cropperjs` surface the box via a one-way callback or event; you wire the write-back yourself.
 - **A uniform 27-verb imperative handle** (`getCroppedCanvas` / `getCroppedDataURL` / `rotateBy` / `zoomBy` / `scaleX` / `setAspectRatio` / …) grabbed with each framework's native ref. It is identical on every target, versus however a given wrapper happens to expose the instance (a `.cropper` ref property, `$refs` methods, …).
 - **Angular gets a `ControlValueAccessor` for free.** Because `data` is the lone model prop, `[(ngModel)]="box"` and reactive `formControl` bindings work out of the box. No Cropper.js wrapper offers this today.

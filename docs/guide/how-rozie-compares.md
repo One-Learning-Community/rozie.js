@@ -12,8 +12,9 @@ the goal here is to help you pick the right one, and to mark where Rozie's bet
 is deliberately narrow.
 
 Facts on this page were verified against the npm registry and GitHub on
-**2026-06-05**: Mitosis `@builder.io/mitosis@0.13.1` (published 2026-06-03,
-pre-1.0); Stencil `@stencil/core@4.43.5` (published 2026-05-28).
+**2026-08-10**: Mitosis `@builder.io/mitosis@0.14.0` (published 2026-07-21,
+pre-1.0); Stencil `@stencil/core@4.43.5` (published 2026-05-28, still the
+latest stable).
 
 ## At a glance
 
@@ -23,7 +24,7 @@ pre-1.0); Stencil `@stencil/core@4.43.5` (published 2026-05-28).
 | Output model | **Idiomatic native** components per framework | **Idiomatic native** components per framework | Standards-based **web components** + generated framework wrappers |
 | Framework targets | React, Vue, Svelte, Angular, Solid, Lit (6) | React, Vue, Svelte, Angular, Solid, Qwik + more (Lit, Alpine, React Native, web components) | One web component → React / Vue / Angular wrapper output targets |
 | Runtime cost | None at runtime (the Lit target uses the browser's native custom-element runtime) | None at runtime | A small Stencil runtime ships inside the custom element |
-| Maturity | New, v1-track | `0.13.x`, pre-1.0, established with a broad community | `4.x`, mature, very large production footprint (Ionic Framework) |
+| Maturity | New, v1-track | `0.14.x`, pre-1.0, established with a broad community | `4.x`, mature, very large production footprint (Ionic Framework) |
 | Sweet spot | Component-library authors who want idiomatic native output across six frameworks, with Vue-style authoring | The widest target matrix, JSX authoring, and the Builder.io / Figma import pipeline | Shipping web components as the unit of distribution, with thin framework wrappers |
 
 ## Rozie and Mitosis — the closest peer

@@ -16,7 +16,7 @@ Cell legend: **✓** = documented out-of-the-box · **✗** = not supported / no
 
 | Wrapper | Frameworks | Last maintained | Latest-framework support | Two-way binding | Runtime reconcile | Imperative handle | Angular CVA | rangePlugin |
 | ------- | ---------- | --------------- | ------------------------ | :-------------: | :---------------: | :---------------: | :---------: | :---------: |
-| **[Rozie @rozie-ui/flatpickr](/examples/flatpickr)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | this repo (2026-06) | R18+ / V3.4+ / Sv5 / Ng19+ / Solid / Lit | ✓ `r-model:date` | ✓ managed | ✓ `$expose` | **✓** | ✓ |
+| **[Rozie @rozie-ui/flatpickr](/examples/flatpickr)** | **6 — React + Vue + Svelte + Angular + Solid + Lit** | pre-1.0, released together | R18+ / V3.4+ / Sv5 / Ng19+ / Solid / Lit | ✓ `r-model:date` | ✓ managed | ✓ `$expose` | **✓** | ✓ |
 | [react-flatpickr](https://github.com/haoxins/react-flatpickr) | React | 2025-07 | React 19 (peer `>= 16 <= 19`) | ✓ value + onChange | **~** `useMemo` | ✓ `.flatpickr` ref | n/a | ~ |
 | [vue-flatpickr-component](https://github.com/ankurk91/vue-flatpickr-component) | Vue 3 | **✗ archived 2025-03** | Vue 3 only | ✓ v-model | ✓ watches config | ~ not documented | n/a | ~ |
 | [angularx-flatpickr](https://github.com/mattlewis92/angularx-flatpickr) | Angular | 2024-11 | "Angular 17+" (19 in range) | ✓ ngModel / CVA | ~ not documented | ~ via directive | **✓** | ~ |
@@ -24,9 +24,9 @@ Cell legend: **✓** = documented out-of-the-box · **✗** = not supported / no
 | [lit-flatpickr](https://github.com/Matsuuu/lit-flatpickr) | Lit 2 | 2025-03 | **Lit 2 only** (pre-1.0) | ✓ attr + `set()` | ~ `set()` only | ✓ rich methods | n/a | ~ |
 | Solid | — | — | *no flatpickr wrapper exists* | ✗ | ✗ | ✗ | n/a | ✗ |
 
-**Weekly downloads** (npm, snapshot 2026-05-25→31, dated color rather than a quality verdict): react-flatpickr **195.6k** · vue-flatpickr-component **113.3k** · angularx-flatpickr **32.8k** · svelte-flatpickr **11.8k** · lit-flatpickr **1.0k** · Rozie `@rozie-ui/flatpickr`: new.
+**Weekly downloads** (npm, snapshot 2026-08-03→08-09, dated color rather than a quality verdict): react-flatpickr **237.4k** · vue-flatpickr-component **108.8k** · angularx-flatpickr **47.3k** · svelte-flatpickr **9.3k** · lit-flatpickr **1.0k** · Rozie `@rozie-ui/flatpickr`: new.
 
-The matrix scores each wrapper against what it documents out of the box, without consumer-authored glue. All competitor facts were verified against the npm registry, the GitHub API, and each project's README on **2026-06-02**; re-check the dates before relying on them.
+The matrix scores each wrapper against what it documents out of the box, without consumer-authored glue. All competitor facts were verified against the npm registry, the GitHub API, and each project's README on **2026-08-10**; re-check the dates before relying on them.
 
 ## Where Rozie wins today
 
@@ -52,7 +52,7 @@ The ✓ cells in Rozie's row are backed by [`flatpickr-behavior.spec.ts`](https:
 
 - **Shadow-DOM rangePlugin caveat.** `rangePlugin`'s second-input option must be passed the element, not a selector string, in any shadow-DOM / custom-element (Lit) context: `document.querySelector` cannot see into shadow DOM and fails silently. The warning callout lives in [Two-input range via rangePlugin](/components/flatpickr#two-input-range-via-rangeplugin).
 
-- **Single-framework ergonomics are not the contest.** The matrix scores out-of-the-box, cross-framework capability. On its home framework each of these is a solid pick: react-flatpickr (195.6k downloads/wk, React-19-ready), angularx-flatpickr (real CVA), and the others. The case for Rozie is one date picker to learn, document, and migrate across your whole stack.
+- **Single-framework ergonomics are not the contest.** The matrix scores out-of-the-box, cross-framework capability. On its home framework each of these is a solid pick: react-flatpickr (237.4k downloads/wk, React-19-ready), angularx-flatpickr (real CVA), and the others. The case for Rozie is one date picker to learn, document, and migrate across your whole stack.
 
 ## Try the live demo
 

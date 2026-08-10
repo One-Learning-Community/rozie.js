@@ -24,7 +24,7 @@ Radix and Headless UI are React-first (Radix has a Vue port; Headless UI covers 
 
 ## vs Tippy.js / Floating Vue (tooltips)
 
-Tippy.js is a popular standalone tooltip library (itself built on Floating UI's predecessor Popper, and Floating UI in v6+). Floating Vue is the Vue-specific successor. Both are great for tooltips but are framework-coupled (Tippy ships per-framework wrappers; Floating Vue is Vue-only). `@rozie-ui/popover` serves **both tooltip (`trigger="hover"`/`"focus"`, `role="tooltip"`) and click-popover modes** from one component, on all six frameworks. A click popover is non-modal and role-neutral by default (the slot content owns its ARIA role); opt into `modal` for `role="dialog"` + `aria-modal="true"` (bring your own focus trap — see below).
+Tippy.js is a popular standalone tooltip library (its v6 line is built on Popper v2, the predecessor the Floating UI team now recommends migrating away from). Floating Vue is the Vue-specific successor. Both are great for tooltips but are framework-coupled (Tippy ships per-framework wrappers; Floating Vue is Vue-only). `@rozie-ui/popover` serves **both tooltip (`trigger="hover"`/`"focus"`, `role="tooltip"`) and click-popover modes** from one component, on all six frameworks. A click popover is non-modal and role-neutral by default (the slot content owns its ARIA role); opt into `modal` for `role="dialog"` + `aria-modal="true"` (bring your own focus trap — see below).
 
 ## When NOT to use it
 

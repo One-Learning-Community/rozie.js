@@ -6,7 +6,7 @@ surface_hash: c83abab3c6aa
 
 How `@rozie-ui/combobox` compares to the existing combobox / autocomplete libraries across the six frameworks. Like the slider and otp, the combobox has no shared vanilla-JS engine. Unlike a slider, though, the combobox/autocomplete landscape is overwhelmingly per-framework: every ecosystem grew its own typeahead (`@headlessui/react` Combobox, `downshift`, `react-select`, Ariakit, `vue-select`, PrimeVue AutoComplete, Bits/Melt UI, Kobalte, the Angular autocomplete, …) with its own props, its own filtering model, and its own accessibility story. Rozie ships the same idiomatic `<Combobox>` to all six frameworks, with the same WAI-ARIA implementation, filtering model, two-way `value`, events, and handle, each installed as a pre-compiled package with no Rozie toolchain required.
 
-> Research snapshot: 2026-06-22. The combobox landscape is fragmented and fast-moving; treat the library names, framework coverage, and feature columns as of that date. Two facts moved recently: Angular now has a first-party *headless* combobox (`@angular/aria/combobox`, Angular 20-era, beyond this project's Angular 19 floor), and Shoelace was archived (March 2026) in favour of Web Awesome.
+> Research snapshot: 2026-08-10. The combobox landscape is fragmented and fast-moving; treat the library names, framework coverage, and feature columns as of that date. Two facts moved recently: Angular now has a first-party *headless* combobox (`@angular/aria/combobox`, introduced as a developer preview in Angular 21, beyond this project's Angular 19 floor), and Shoelace was archived (March 2026) in favour of Web Awesome.
 
 ## The libraries at a glance
 
