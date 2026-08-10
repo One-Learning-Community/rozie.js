@@ -260,7 +260,7 @@ Portal slots unlock the "foreign-engine cell rendering" pattern: CodeMirror owns
 <CodeMirror
   value={value()}
   onValueChange={setValue}
-  panel={({ view }) => (
+  panelSlot={({ view }) => (
     <span class="cm-status">Lines: {view.state.doc.lines}</span>
   )}
 />

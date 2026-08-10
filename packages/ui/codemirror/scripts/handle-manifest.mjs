@@ -4,9 +4,10 @@
  *
  * The exposed methods are derived structurally from the source via
  * `ir.expose` (`getView`, `focus`, `getValue`, `replaceValue`, `dispatch`,
- * `insertText`, `getSelection`, `setSelection` — the Phase 21 `$expose({ ... })`
- * call in CodeMirror.rozie), but their human-readable descriptions have no
- * first-class IR source — so the prose lives here.
+ * `insertText`, `getSelection`, `setSelection`, `undo`, `redo`, `selectAll`,
+ * `scrollToPos` — the Phase 21 `$expose({ ... })` call in CodeMirror.rozie),
+ * but their human-readable descriptions have no first-class IR source — so
+ * the prose lives here.
  *
  * KEYS MUST stay in lockstep with `ir.expose`: codegen.mjs asserts every
  * exposed method name has an entry here and throws if one is missing.
