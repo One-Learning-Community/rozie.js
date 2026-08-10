@@ -30,10 +30,13 @@
  *   6. ENFORCE validateDocsPropsTable against docs/components/slider.md
  *      (THROWS on drift of the IR-derivable structural columns — prop name,
  *      type, default — but NEVER rewrites the hand-authored prose)
+ *   7. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
+ *      name must appear backticked in the docs page(s) (../../docs-surface-guard.mjs)
  */
-import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -62,7 +65,8 @@ function leafPkgName(dir) {
 /** Copy src/themes/ → leaf src/themes/ (the design-token presets). */
 function copyThemes(leafSrc) {
   const src = resolve(ROOT, 'src/themes');
-  if (!existsSync(src)) throw new Error('codegen: src/themes/ not found (token presets must exist)');
+  if (!existsSync(src))
+    throw new Error('codegen: src/themes/ not found (token presets must exist)');
   cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
 }
 
@@ -76,12 +80,16 @@ function main() {
   // Keep the hand-kept manifests in lockstep with the IR.
   for (const ev of ir.emits) {
     if (!eventManifest[ev]) {
-      throw new Error(`codegen: event "${ev}" is emitted by the source but has no entry in event-manifest.mjs`);
+      throw new Error(
+        `codegen: event "${ev}" is emitted by the source but has no entry in event-manifest.mjs`,
+      );
     }
   }
   for (const m of ir.expose) {
     if (!handleManifest[m.name]) {
-      throw new Error(`codegen: method "${m.name}" is exposed by the source but has no entry in handle-manifest.mjs`);
+      throw new Error(
+        `codegen: method "${m.name}" is exposed by the source but has no entry in handle-manifest.mjs`,
+      );
     }
   }
 
@@ -136,7 +144,9 @@ function main() {
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ themes/)`);
+    console.log(
+      `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ themes/)`,
+    );
   }
 
   // (6) ENFORCE docs props-table validation.
@@ -159,6 +169,9 @@ function main() {
   console.log(
     `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING; throws on drift)`,
   );
+
+  // (7) ENFORCE docs events/handle name-presence (see ../../docs-surface-guard.mjs).
+  validateDocsSurfaceNames(ir, 'slider', REPO_ROOT);
 
   console.log('codegen: done — 6 targets emitted, themes vendored, 6 READMEs rendered.');
 }

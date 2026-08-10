@@ -30,6 +30,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
@@ -45,12 +46,60 @@ const FILENAME = 'Chart.rozie';
  *   handle     — whether the emitter exports a named `<Name>Handle` type
  */
 const TARGETS = {
-  react: { dir: 'react', file: 'Chart.tsx', vfile: (n) => `${n}.tsx`, build: 'tsdown', ext: '', exportStyle: 'default', handle: true },
-  vue: { dir: 'vue', file: 'Chart.vue', vfile: (n) => `${n}.vue`, build: 'source', ext: '.vue', exportStyle: 'default', handle: false },
-  svelte: { dir: 'svelte', file: 'Chart.svelte', vfile: (n) => `${n}.svelte`, build: 'source', ext: '.svelte', exportStyle: 'default', handle: false },
-  angular: { dir: 'angular', file: 'Chart.ts', vfile: (n) => `${n}.ts`, build: 'source', ext: '', exportStyle: 'named', handle: false },
-  solid: { dir: 'solid', file: 'Chart.tsx', vfile: (n) => `${n}.tsx`, build: 'tsdown', ext: '', exportStyle: 'default', handle: true },
-  lit: { dir: 'lit', file: 'Chart.ts', vfile: (n) => `${n}.ts`, build: 'tsdown', ext: '', exportStyle: 'default', handle: false },
+  react: {
+    dir: 'react',
+    file: 'Chart.tsx',
+    vfile: (n) => `${n}.tsx`,
+    build: 'tsdown',
+    ext: '',
+    exportStyle: 'default',
+    handle: true,
+  },
+  vue: {
+    dir: 'vue',
+    file: 'Chart.vue',
+    vfile: (n) => `${n}.vue`,
+    build: 'source',
+    ext: '.vue',
+    exportStyle: 'default',
+    handle: false,
+  },
+  svelte: {
+    dir: 'svelte',
+    file: 'Chart.svelte',
+    vfile: (n) => `${n}.svelte`,
+    build: 'source',
+    ext: '.svelte',
+    exportStyle: 'default',
+    handle: false,
+  },
+  angular: {
+    dir: 'angular',
+    file: 'Chart.ts',
+    vfile: (n) => `${n}.ts`,
+    build: 'source',
+    ext: '',
+    exportStyle: 'named',
+    handle: false,
+  },
+  solid: {
+    dir: 'solid',
+    file: 'Chart.tsx',
+    vfile: (n) => `${n}.tsx`,
+    build: 'tsdown',
+    ext: '',
+    exportStyle: 'default',
+    handle: true,
+  },
+  lit: {
+    dir: 'lit',
+    file: 'Chart.ts',
+    vfile: (n) => `${n}.ts`,
+    build: 'tsdown',
+    ext: '',
+    exportStyle: 'default',
+    handle: false,
+  },
 };
 
 // Common registerables every variant needs (legend + tooltip are enabled by the
@@ -63,12 +112,35 @@ const COMMON_REG = ['Legend', 'Tooltip', 'Colors'];
  * only for readability.
  */
 const VARIANTS = [
-  { name: 'Line', type: 'line', reg: ['LineController', 'LineElement', 'PointElement', 'LinearScale', 'CategoryScale', 'Filler'] },
-  { name: 'Bar', type: 'bar', reg: ['BarController', 'BarElement', 'LinearScale', 'CategoryScale'] },
+  {
+    name: 'Line',
+    type: 'line',
+    reg: [
+      'LineController',
+      'LineElement',
+      'PointElement',
+      'LinearScale',
+      'CategoryScale',
+      'Filler',
+    ],
+  },
+  {
+    name: 'Bar',
+    type: 'bar',
+    reg: ['BarController', 'BarElement', 'LinearScale', 'CategoryScale'],
+  },
   { name: 'Pie', type: 'pie', reg: ['PieController', 'ArcElement'] },
   { name: 'Doughnut', type: 'doughnut', reg: ['DoughnutController', 'ArcElement'] },
-  { name: 'PolarArea', type: 'polarArea', reg: ['PolarAreaController', 'ArcElement', 'RadialLinearScale'] },
-  { name: 'Radar', type: 'radar', reg: ['RadarController', 'LineElement', 'PointElement', 'RadialLinearScale', 'Filler'] },
+  {
+    name: 'PolarArea',
+    type: 'polarArea',
+    reg: ['PolarAreaController', 'ArcElement', 'RadialLinearScale'],
+  },
+  {
+    name: 'Radar',
+    type: 'radar',
+    reg: ['RadarController', 'LineElement', 'PointElement', 'RadialLinearScale', 'Filler'],
+  },
   { name: 'Scatter', type: 'scatter', reg: ['ScatterController', 'PointElement', 'LinearScale'] },
   { name: 'Bubble', type: 'bubble', reg: ['BubbleController', 'PointElement', 'LinearScale'] },
 ];
@@ -82,7 +154,10 @@ const VARIANTS = [
 function makeVariantSource(src, variant) {
   const reg = [...variant.reg, ...COMMON_REG];
   const guard = (cond, msg) => {
-    if (!cond) throw new Error(`codegen variant ${variant.name}: transform guard failed — ${msg} (Chart.rozie source shape changed; re-derive the transform)`);
+    if (!cond)
+      throw new Error(
+        `codegen variant ${variant.name}: transform guard failed — ${msg} (Chart.rozie source shape changed; re-derive the transform)`,
+      );
   };
   let s = src;
 
@@ -162,7 +237,9 @@ function patchBundledLeafPackaging(dir) {
   const ext = dir === 'lit' ? '.ts' : '.tsx'; // react/solid emit .tsx, lit .ts
   const entryRe = /entry:\s*\[[^\]]*\],/;
   if (!entryRe.test(tsdown)) {
-    throw new Error(`codegen bundled-leaf ${dir}: tsdown.config.ts has no \`entry: [...]\` array to patch (config shape changed)`);
+    throw new Error(
+      `codegen bundled-leaf ${dir}: tsdown.config.ts has no \`entry: [...]\` array to patch (config shape changed)`,
+    );
   }
   // Per-variant + Chart files emit as their own chunks; barrel (index) + auto
   // stay entries so `.` and `/auto` keep working unchanged.
@@ -231,7 +308,9 @@ function main() {
   // handle manifest lockstep with ir.expose (Phase 21).
   for (const m of ir.expose) {
     if (!handleManifest[m.name]) {
-      throw new Error(`codegen: method "${m.name}" is exposed by the source but has no entry in handle-manifest.mjs`);
+      throw new Error(
+        `codegen: method "${m.name}" is exposed by the source but has no entry in handle-manifest.mjs`,
+      );
     }
   }
 
@@ -301,7 +380,13 @@ function main() {
     // README from the single IR parse (+ a per-type components note rendered by
     // readme.mjs from the VARIANTS list passed through).
     const pkgName = leafPkgName(cfg.dir);
-    const readme = renderReadme(target, ir, pkgName, handleManifest, VARIANTS.map((v) => v.name));
+    const readme = renderReadme(
+      target,
+      ir,
+      pkgName,
+      handleManifest,
+      VARIANTS.map((v) => v.name),
+    );
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
@@ -312,7 +397,9 @@ function main() {
     if (cfg.build === 'tsdown') patchBundledLeafPackaging(cfg.dir);
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → Chart + ${VARIANTS.length} variants + barrel + auto${sidecars}  ✓`);
+    console.log(
+      `codegen: ${target.padEnd(8)} → Chart + ${VARIANTS.length} variants + barrel + auto${sidecars}  ✓`,
+    );
   }
 
   // ENFORCE docs props-table validation (VALIDATE-NOT-OVERWRITE).
@@ -336,10 +423,17 @@ function main() {
           result.errors.map((e) => `  - ${e}`).join('\n'),
       );
     }
-    console.log(`codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING)`);
+    console.log(
+      `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING)`,
+    );
   }
 
-  console.log(`codegen: done — 6 leaves × (Chart + ${VARIANTS.length} variants), 6 barrels, 6 /auto entries, 6 READMEs, 6 LICENSEs.`);
+  // ENFORCE docs events/handle name-presence (see ../../docs-surface-guard.mjs).
+  validateDocsSurfaceNames(ir, 'chartjs', REPO_ROOT);
+
+  console.log(
+    `codegen: done — 6 leaves × (Chart + ${VARIANTS.length} variants), 6 barrels, 6 /auto entries, 6 READMEs, 6 LICENSEs.`,
+  );
 }
 
 main();

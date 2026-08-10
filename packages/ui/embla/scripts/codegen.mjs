@@ -38,10 +38,13 @@
  *      columns — prop name, type, default. Never rewrites the hand-authored prose.
  *      ROZIE_EMBLA_SKIP_GUIDE=1 relaxes the absent-guide throw to a skip so the
  *      leaves can be emitted before the guide lands.)
+ *   6. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
+ *      name must appear backticked in the docs page(s) (../../docs-surface-guard.mjs)
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -70,7 +73,8 @@ function leafPkgName(dir) {
 /** Copy src/themes/ → leaf src/themes/ (the design-token presets). */
 function copyThemes(leafSrc) {
   const src = resolve(ROOT, 'src/themes');
-  if (!existsSync(src)) throw new Error('codegen: src/themes/ not found (token presets must exist)');
+  if (!existsSync(src))
+    throw new Error('codegen: src/themes/ not found (token presets must exist)');
   cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
 }
 
@@ -173,7 +177,9 @@ function main() {
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ themes/)`);
+    console.log(
+      `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ themes/)`,
+    );
   }
 
   // (5) ENFORCE docs props-table validation against docs/components/embla.md.
@@ -209,7 +215,12 @@ function main() {
     );
   }
 
-  console.log('codegen: done — 6 targets emitted, 6 theme-sets vendored, 6 READMEs rendered, 6 LICENSEs vendored.');
+  // (6) ENFORCE docs events/handle name-presence (see ../../docs-surface-guard.mjs).
+  validateDocsSurfaceNames(ir, 'embla', REPO_ROOT);
+
+  console.log(
+    'codegen: done — 6 targets emitted, 6 theme-sets vendored, 6 READMEs rendered, 6 LICENSEs vendored.',
+  );
 }
 
 main();

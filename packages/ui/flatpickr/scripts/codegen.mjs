@@ -25,10 +25,13 @@
  *   4. render each leaf README from the IR + the hand-kept event manifest
  *   5. (optional) ENFORCE validateDocsPropsTable IF a guide page with a
  *      "### Props" table exists (none ships for flatpickr today — skipped).
+ *   6. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
+ *      name must appear backticked in the docs page(s) (../../docs-surface-guard.mjs)
  */
-import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -283,7 +286,10 @@ function main() {
             'Re-confirm the emitted flatpickr() call and update (or remove) this aid.',
         );
       }
-      code = code.replace(NEEDLE, 'this.instance = (flatpickr as any)(this.inputEl()!.nativeElement, {');
+      code = code.replace(
+        NEEDLE,
+        'this.instance = (flatpickr as any)(this.inputEl()!.nativeElement, {',
+      );
     }
     writeFileSync(resolve(leafSrc, cfg.file), code);
 
@@ -366,6 +372,9 @@ function main() {
       'codegen: docs props-table validation SKIPPED — no docs/components/flatpickr.md props table (showcase page only)',
     );
   }
+
+  // (6) ENFORCE docs events/handle name-presence (see ../../docs-surface-guard.mjs).
+  validateDocsSurfaceNames(ir, 'flatpickr', REPO_ROOT);
 
   console.log('codegen: done — 6 targets emitted, 6 READMEs rendered.');
 }

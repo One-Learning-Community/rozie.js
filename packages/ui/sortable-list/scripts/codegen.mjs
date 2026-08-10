@@ -23,21 +23,17 @@
  *   6. ENFORCE validateDocsPropsTable against docs/components/sortable-list.md
  *      (THROWS on drift of the IR-derivable structural columns — prop name,
  *      type, default — but NEVER rewrites the hand-authored prose; Plan 20-04)
+ *   7. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
+ *      name must appear backticked in the docs page(s) (../../docs-surface-guard.mjs)
  */
-import {
-  cpSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
-import { existsSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { buildCustomElementsManifest } from './cem.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
-import { buildCustomElementsManifest } from './cem.mjs';
 import { buildWebTypes } from './web-types.mjs';
 
 // JetBrains web-types sidecar copy (component description + docs URL). PhpStorm/
@@ -385,10 +381,7 @@ function main() {
         eventManifest,
         handleManifest,
       });
-      writeFileSync(
-        resolve(leafDir, 'custom-elements.json'),
-        `${JSON.stringify(cem, null, 2)}\n`,
-      );
+      writeFileSync(resolve(leafDir, 'custom-elements.json'), `${JSON.stringify(cem, null, 2)}\n`);
       litPkg.customElements = 'custom-elements.json';
       if (!litPkg.files.includes('custom-elements.json')) {
         litPkg.files = [...litPkg.files, 'custom-elements.json'];
@@ -426,6 +419,9 @@ function main() {
   console.log(
     `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING; throws on drift)`,
   );
+
+  // (7) ENFORCE docs events/handle name-presence (see ../../docs-surface-guard.mjs).
+  validateDocsSurfaceNames(ir, 'sortable-list', REPO_ROOT);
 
   console.log('codegen: done — 6 targets emitted, internal/ vendored, 6 READMEs rendered.');
 }

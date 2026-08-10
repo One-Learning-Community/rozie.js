@@ -20,9 +20,10 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { buildCustomElementsManifest } from './cem.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
-import { buildCustomElementsManifest } from './cem.mjs';
 import { buildWebTypes } from './web-types.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/rete
@@ -116,7 +117,13 @@ const CEM_DESCRIPTIONS = {
 const TARGETS = {
   react: { dir: 'react', ext: 'tsx', barrelExt: '', exportStyle: 'default', build: 'tsdown' },
   vue: { dir: 'vue', ext: 'vue', barrelExt: '.vue', exportStyle: 'default', build: 'source' },
-  svelte: { dir: 'svelte', ext: 'svelte', barrelExt: '.svelte', exportStyle: 'default', build: 'source' },
+  svelte: {
+    dir: 'svelte',
+    ext: 'svelte',
+    barrelExt: '.svelte',
+    exportStyle: 'default',
+    build: 'source',
+  },
   angular: { dir: 'angular', ext: 'ts', barrelExt: '', exportStyle: 'named', build: 'source' },
   solid: { dir: 'solid', ext: 'tsx', barrelExt: '', exportStyle: 'default', build: 'tsdown' },
   lit: { dir: 'lit', ext: 'ts', barrelExt: '', exportStyle: 'default', build: 'tsdown' },
@@ -138,7 +145,8 @@ function leafPkgName(dir) {
  */
 function copyThemes(leafSrc) {
   const src = resolve(ROOT, 'src/themes');
-  if (!existsSync(src)) throw new Error('codegen: src/themes/ not found (token presets must exist)');
+  if (!existsSync(src))
+    throw new Error('codegen: src/themes/ not found (token presets must exist)');
   cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
 }
 
@@ -258,7 +266,9 @@ function main() {
         ? `export { ${name} } from './${name}${bx}';\n`
         : `export { default as ${name} } from './${name}${bx}';\n`;
 
-    const childExports = COMPONENTS.filter((n) => n !== PARENT).map(reexport).join('');
+    const childExports = COMPONENTS.filter((n) => n !== PARENT)
+      .map(reexport)
+      .join('');
     const handleType =
       (target === 'react' || target === 'solid') && ir.expose.length > 0
         ? `\n/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
@@ -360,10 +370,7 @@ function main() {
           ...childMod.exports.filter((e) => !(e.kind === 'js' && e.name === 'default')),
         );
       }
-      writeFileSync(
-        resolve(leafDir, 'custom-elements.json'),
-        `${JSON.stringify(cem, null, 2)}\n`,
-      );
+      writeFileSync(resolve(leafDir, 'custom-elements.json'), `${JSON.stringify(cem, null, 2)}\n`);
       litPkg.customElements = 'custom-elements.json';
       if (!litPkg.files.includes('custom-elements.json')) {
         litPkg.files = [...litPkg.files, 'custom-elements.json'];
@@ -373,7 +380,9 @@ function main() {
 
     const sidecars = target === 'react' ? ' (+ .css + .global.css + .d.ts)' : '';
     const files = COMPONENTS.map((n) => `${n}.${cfg.ext}`).join(', ');
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓ (+ themes/)`);
+    console.log(
+      `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓ (+ themes/)`,
+    );
   }
 
   // ENFORCE docs props-table validation against docs/components/rete.md (the
@@ -408,6 +417,14 @@ function main() {
       `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING)`,
     );
   }
+
+  // ENFORCE docs events/handle name-presence — aggregated across all
+  // component IRs (see ../../docs-surface-guard.mjs).
+  const surfaceIr = {
+    emits: [...new Set(Object.values(irs).flatMap((i) => i.emits ?? []))],
+    expose: Object.values(irs).flatMap((i) => i.expose ?? []),
+  };
+  validateDocsSurfaceNames(surfaceIr, 'rete', REPO_ROOT);
 
   console.log(
     `codegen: done — ${COMPONENTS.length} components × 6 targets emitted (${COMPONENTS.join(', ')}), 6 theme-sets vendored, 6 READMEs rendered, 6 LICENSEs vendored.`,

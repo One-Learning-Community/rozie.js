@@ -35,13 +35,16 @@
  *      flag, and even with the flag set the props-table validator still runs (the
  *      flag only ever relaxed the *absent-guide* throw, never the drift check). The
  *      branch is retained only as a guarded historical fallback; do not set the flag.
+ *   6. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
+ *      name must appear backticked in the docs page(s) (../../docs-surface-guard.mjs)
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { buildCustomElementsManifest } from './cem.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
-import { buildCustomElementsManifest } from './cem.mjs';
 import { buildWebTypes } from './web-types.mjs';
 
 // Custom Elements Manifest description for the LIT leaf (`<rozie-tip-tap>`). Both
@@ -207,10 +210,7 @@ function main() {
         description: CEM_DESCRIPTION,
         handleManifest,
       });
-      writeFileSync(
-        resolve(leafDir, 'custom-elements.json'),
-        `${JSON.stringify(cem, null, 2)}\n`,
-      );
+      writeFileSync(resolve(leafDir, 'custom-elements.json'), `${JSON.stringify(cem, null, 2)}\n`);
       litPkg.customElements = 'custom-elements.json';
       if (!litPkg.files.includes('custom-elements.json')) {
         litPkg.files = [...litPkg.files, 'custom-elements.json'];
@@ -255,6 +255,9 @@ function main() {
       `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING; throws on drift)`,
     );
   }
+
+  // (6) ENFORCE docs events/handle name-presence (see ../../docs-surface-guard.mjs).
+  validateDocsSurfaceNames(ir, 'tiptap', REPO_ROOT);
 
   console.log('codegen: done — 6 targets emitted, 6 READMEs rendered, 6 LICENSEs vendored.');
 }

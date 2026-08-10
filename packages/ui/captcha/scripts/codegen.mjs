@@ -17,16 +17,17 @@
  * BUILD-ORDER CONTRACT: writes each leaf src/<Name>.*, so it MUST run before the
  * bundled-leaf tsdown builds (turbo run build --force).
  */
-import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
 const BT = String.fromCharCode(96);
 // The family slug (docs path, lit element prefix). The PRIMARY component owns it.
-const SLUG = "captcha";
+const SLUG = 'captcha';
 const STYLED = false;
 const ENGINE = null;
 const ENGINE_VERSION = null;
@@ -133,8 +134,8 @@ function emitVueDualPackaging({ leafDir, components, externals, engineDevDeps })
   // alias); every subsequent component is named-only (one default per package).
   const indexLines = components.map((comp, i) =>
     i === 0
-      ? "export { default, default as " + comp.name + " } from './" + comp.name + ".vue';"
-      : "export { default as " + comp.name + " } from './" + comp.name + ".vue';",
+      ? 'export { default, default as ' + comp.name + " } from './" + comp.name + ".vue';"
+      : 'export { default as ' + comp.name + " } from './" + comp.name + ".vue';",
   );
   writeFileSync(resolve(leafDir, 'src', 'index.ts'), indexLines.join('\n') + '\n');
 
@@ -213,8 +214,13 @@ function main() {
     for (const ev of ir.emits) {
       if (!evManifest[ev]) {
         throw new Error(
-          'codegen: event "' + ev + '" is emitted by ' + name +
-            ' but has no entry in event-manifest.mjs[' + name + ']',
+          'codegen: event "' +
+            ev +
+            '" is emitted by ' +
+            name +
+            ' but has no entry in event-manifest.mjs[' +
+            name +
+            ']',
         );
       }
     }
@@ -225,8 +231,13 @@ function main() {
     for (const m of ir.expose) {
       if (!hManifest[m.name]) {
         throw new Error(
-          'codegen: method "' + m.name + '" is exposed by ' + name +
-            ' but has no entry in handle-manifest.mjs[' + name + ']',
+          'codegen: method "' +
+            m.name +
+            '" is exposed by ' +
+            name +
+            ' but has no entry in handle-manifest.mjs[' +
+            name +
+            ']',
         );
       }
     }
@@ -245,7 +256,10 @@ function main() {
       const errs = r.diagnostics.filter((d) => d.severity === 'error');
       if (errs.length) {
         throw new Error(
-          'codegen ' + target + ' (' + comp.name +
+          'codegen ' +
+            target +
+            ' (' +
+            comp.name +
             '): compile emitted error diagnostics (SCOPE FENCE: do NOT edit any emitter — fix the codegen path):\n' +
             errs.map((e) => '  ' + e.code + ': ' + e.message).join('\n'),
         );
@@ -257,7 +271,9 @@ function main() {
         if (r.css) {
           if (!STYLED) {
             throw new Error(
-              'codegen react (' + comp.name + '): the source emitted CSS but this family was scaffolded UNSTYLED. ' +
+              'codegen react (' +
+                comp.name +
+                '): the source emitted CSS but this family was scaffolded UNSTYLED. ' +
                 'Re-scaffold with --styled (wires the react .css copy + ambient decl) or remove the style block.',
             );
           }
@@ -290,10 +306,10 @@ function main() {
       const barrelLines = [];
       comps.forEach((comp, i) => {
         if (i === 0) {
-          barrelLines.push("export { default as " + comp.name + " } from './" + comp.name + "';");
+          barrelLines.push('export { default as ' + comp.name + " } from './" + comp.name + "';");
           barrelLines.push("export { default } from './" + comp.name + "';");
         } else {
-          barrelLines.push("export { default as " + comp.name + " } from './" + comp.name + "';");
+          barrelLines.push('export { default as ' + comp.name + " } from './" + comp.name + "';");
         }
       });
       // react/solid additionally re-export each exposing component's Handle type.
@@ -303,11 +319,21 @@ function main() {
           if (comp.ir.expose.length > 0) {
             barrelLines.push('');
             barrelLines.push(
-              '/** The ' + BT + '$expose' + BT + ' imperative handle for ' + comp.name +
-                ' received via ' + BT + 'ref' + BT + ' — { ' +
-                comp.ir.expose.map((m) => m.name).join(', ') + ' }. */',
+              '/** The ' +
+                BT +
+                '$expose' +
+                BT +
+                ' imperative handle for ' +
+                comp.name +
+                ' received via ' +
+                BT +
+                'ref' +
+                BT +
+                ' — { ' +
+                comp.ir.expose.map((m) => m.name).join(', ') +
+                ' }. */',
             );
-            barrelLines.push("export type { " + comp.name + "Handle } from './" + comp.name + "';");
+            barrelLines.push('export type { ' + comp.name + "Handle } from './" + comp.name + "';");
           }
         }
       }
@@ -341,13 +367,16 @@ function main() {
       const comp = comps.find((c) => c.name === name);
       const result = validateDocsPropsTable(comp.ir, docs, { heading });
       if (!result.ok) {
-        allErrors.push(
-          ...result.errors.map((e) => name + ' (' + heading + '): ' + e),
-        );
+        allErrors.push(...result.errors.map((e) => name + ' (' + heading + '): ' + e));
       } else {
         console.log(
           'codegen: docs props-table validation PASS — ' +
-            result.checkedRows + ' rows match ' + name + ' ir.props (' + heading + ')',
+            result.checkedRows +
+            ' rows match ' +
+            name +
+            ' ir.props (' +
+            heading +
+            ')',
         );
       }
     }
@@ -360,8 +389,18 @@ function main() {
       );
     }
   } else {
-    console.log('codegen: docs props-table validation SKIPPED — no docs/components/' + SLUG + '.md');
+    console.log(
+      'codegen: docs props-table validation SKIPPED — no docs/components/' + SLUG + '.md',
+    );
   }
+
+  // ENFORCE docs events/handle name-presence — aggregated across all
+  // components (see ../../docs-surface-guard.mjs).
+  const surfaceIr = {
+    emits: [...new Set(comps.flatMap((c) => c.ir.emits ?? []))],
+    expose: comps.flatMap((c) => c.ir.expose ?? []),
+  };
+  validateDocsSurfaceNames(surfaceIr, SLUG, REPO_ROOT);
 
   console.log(
     'codegen: done — 6 targets × ' + COMPONENTS.length + ' components emitted, 6 READMEs rendered.',

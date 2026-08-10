@@ -27,7 +27,7 @@ The docs counterpart to [`packages/ui/ADDING-A-FAMILY.md`](../packages/ui/ADDING
   - `null` → `` `null` ``; number `0` → `` `0` ``; boolean → `` `true` ``/`` `false` ``
   - arrow/object factory `() => ({})` → `` `{}` ``
   - **no default / required** → `—` (the validator skips the default check for these, so any text is allowed — use `—`).
-- **Events** and **Imperative handle** tables in the same file are **free prose** — not validated. Still keep them accurate; they mirror `ir.emits` / `ir.expose`.
+- **Events** and **Imperative handle** tables in the same file are **name-presence-asserted** by codegen via `packages/ui/docs-surface-guard.mjs` (`validateDocsSurfaceNames`): every `ir.emits` name and every `ir.expose` method name must appear **backticked** somewhere in `<slug>.md` or `<slug>-api.md` (grep-level — `` `name` `` or `` `name(` ``), or codegen **throws**. Descriptions, payload shapes, and table layout remain **free prose** — keep them accurate; they mirror `ir.emits` / `ir.expose`.
 
 ### `<slug>-demo.md` — live demo
 
@@ -50,11 +50,15 @@ Frontmatter `title:`, then a `<script setup>` importing the **default** export o
 
 The recipe above is scoped to **creating** a family. When a *shipped* family **gains or
 changes a capability** — a new prop, emit, slot, `$expose` verb, or a model-shape change
-like single→range — a different set of surfaces drifts, and only one of them is
+like single→range — a different set of surfaces drifts, and only some of them are
 machine-protected:
 
 - The `### Props` table in `<slug>.md` is **codegen-validated** (`validateDocsPropsTable`)
   and will **fail the build** if it goes stale.
+- **Events / Imperative-handle names** are **presence-asserted** by codegen
+  (`validateDocsSurfaceNames` in `packages/ui/docs-surface-guard.mjs`): each `ir.emits` /
+  `ir.expose` name must appear backticked in `<slug>.md` or `<slug>-api.md`, or codegen
+  throws. Only the **names** are protected — descriptions remain free prose.
 - The hand-authored `<slug>-comparison.md` capability claims are protected **only** by the
   `surface_hash` guard (see below), which **forces a human re-read** when the surface
   changes but does **NOT** auto-correct the prose. This is exactly the gap that let
@@ -64,7 +68,8 @@ machine-protected:
 So a capability change has a **must-review checklist**:
 
 - [ ] `<slug>.md` Props / Events / Imperative-handle tables reflect the new surface (the
-      Props table is codegen-validated; Events / handle are free prose — keep them accurate
+      Props table is codegen-validated; Events / handle **names** are presence-asserted by
+      `docs-surface-guard.mjs` — but the descriptions are free prose, so keep them accurate
       against `ir.emits` / `ir.expose`).
 - [ ] `<slug>-comparison.md` capability claims — landscape-table cells **and** prose —
       re-read and corrected (e.g. "single-date only" → "single or range", a missing

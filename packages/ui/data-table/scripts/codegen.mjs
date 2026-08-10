@@ -61,13 +61,16 @@
  *   7. VALIDATE-NOT-OVERWRITE the docs props-table against docs/components/data-table.md
  *        (THROWS on structural drift; ROZIE_DATA_TABLE_SKIP_GUIDE=1 relaxes the
  *        absent-guide throw to a skip while the docs page is a later wave)
+ *   8. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
+ *      name must appear backticked in the docs page(s) (../../docs-surface-guard.mjs)
  *
  * BUILD-ORDER CONTRACT: this writes each leaf's src/<Component>.*, so it MUST run
  * before the bundled-leaf tsdown builds (`turbo run build --force`).
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { compile, createDefaultRegistry, lowerToIR, parse, ProducerResolver } from '@rozie/core';
+import { compile, createDefaultRegistry, lowerToIR, ProducerResolver, parse } from '@rozie/core';
+import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { derivePeerLabel, renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -86,7 +89,20 @@ const PARENT = 'DataTable';
 // from the published `@rozie-ui/popover-<target>` package (resolved at compile
 // time via the ProducerResolver below), NOT a vendored sibling. Each of the rest
 // becomes a NAMED re-export via childExports; DataTable stays the default.
-const COMPONENTS = [PARENT, 'Column', 'EditorText', 'EditorNumber', 'EditorSelect', 'EditorCheckbox', 'EditorDate', 'FilterText', 'FilterNumberRange', 'FilterSelect', 'GroupBar', 'DetailPanel'];
+const COMPONENTS = [
+  PARENT,
+  'Column',
+  'EditorText',
+  'EditorNumber',
+  'EditorSelect',
+  'EditorCheckbox',
+  'EditorDate',
+  'FilterText',
+  'FilterNumberRange',
+  'FilterSelect',
+  'GroupBar',
+  'DetailPanel',
+];
 
 /**
  * Per-target leaf dir + emitted file extension (`build` mode is informational).
@@ -102,7 +118,13 @@ const COMPONENTS = [PARENT, 'Column', 'EditorText', 'EditorNumber', 'EditorSelec
 const TARGETS = {
   react: { dir: 'react', ext: 'tsx', barrelExt: '', exportStyle: 'default', build: 'tsdown' },
   vue: { dir: 'vue', ext: 'vue', barrelExt: '.vue', exportStyle: 'default', build: 'source' },
-  svelte: { dir: 'svelte', ext: 'svelte', barrelExt: '.svelte', exportStyle: 'default', build: 'source' },
+  svelte: {
+    dir: 'svelte',
+    ext: 'svelte',
+    barrelExt: '.svelte',
+    exportStyle: 'default',
+    build: 'source',
+  },
   angular: { dir: 'angular', ext: 'ts', barrelExt: '', exportStyle: 'named', build: 'source' },
   solid: { dir: 'solid', ext: 'tsx', barrelExt: '', exportStyle: 'default', build: 'tsdown' },
   lit: { dir: 'lit', ext: 'ts', barrelExt: '', exportStyle: 'default', build: 'tsdown' },
@@ -136,7 +158,8 @@ function leafPkg(dir) {
 /** Copy src/themes/ → leaf src/themes/ (the design-token presets). */
 function copyThemes(leafSrc) {
   const src = resolve(ROOT, 'src/themes');
-  if (!existsSync(src)) throw new Error('codegen: src/themes/ not found (token presets must exist)');
+  if (!existsSync(src))
+    throw new Error('codegen: src/themes/ not found (token presets must exist)');
   cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
 }
 
@@ -191,12 +214,16 @@ function main() {
   // Keep the hand-kept manifests in lockstep with the IR.
   for (const ev of ir.emits) {
     if (!eventManifest[ev]) {
-      throw new Error(`codegen: event "${ev}" is emitted by the source but has no entry in event-manifest.mjs`);
+      throw new Error(
+        `codegen: event "${ev}" is emitted by the source but has no entry in event-manifest.mjs`,
+      );
     }
   }
   for (const m of ir.expose) {
     if (!handleManifest[m.name]) {
-      throw new Error(`codegen: method "${m.name}" is exposed by the source but has no entry in handle-manifest.mjs`);
+      throw new Error(
+        `codegen: method "${m.name}" is exposed by the source but has no entry in handle-manifest.mjs`,
+      );
     }
   }
 
@@ -270,7 +297,9 @@ function main() {
     // is an external published package (`@rozie-ui/popover-<target>`), not a
     // compiled sibling, so there is nothing local to re-export; consumers who want a
     // standalone popover use `@rozie-ui/popover-<target>` directly.
-    const childExports = COMPONENTS.filter((n) => n !== PARENT).map(reexport).join('');
+    const childExports = COMPONENTS.filter((n) => n !== PARENT)
+      .map(reexport)
+      .join('');
     const handleType =
       (target === 'react' || target === 'solid') && ir.expose.length > 0
         ? `\n/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
@@ -303,7 +332,9 @@ function main() {
 
     const sidecars = target === 'react' ? ' (+ .css/.global.css/.d.ts)' : '';
     const files = COMPONENTS.map((n) => `${n}.${cfg.ext}`).join(', ');
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓ (+ themes/)`);
+    console.log(
+      `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/{${files}}${sidecars}  ✓ (+ themes/)`,
+    );
   }
 
   // (7) ENFORCE docs props-table validation against docs/components/data-table-api.md
@@ -340,6 +371,9 @@ function main() {
       `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING)`,
     );
   }
+
+  // (8) ENFORCE docs events/handle name-presence (see ../../docs-surface-guard.mjs).
+  validateDocsSurfaceNames(ir, 'data-table', REPO_ROOT);
 
   console.log(
     `codegen: done — ${COMPONENTS.length} components × 6 targets emitted (${COMPONENTS.join(', ')}), ` +

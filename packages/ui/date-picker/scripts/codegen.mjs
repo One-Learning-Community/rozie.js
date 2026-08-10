@@ -34,15 +34,18 @@
  *      (its `## Props` is a `rozie-props DatePicker` fence regenerated at the
  *      docs build, so the validator short-circuits to a pass; the structural
  *      throw-on-drift path stays available for a hand-authored table)
+ *   7. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
+ *      name must appear backticked in the docs page(s) (../../docs-surface-guard.mjs)
  *
  * The Vue leaf is dual-packaged (compiled dist/index.mjs + raw ./source) via a
  * committed vite.config.ts / tsconfig.json / src/index.ts; codegen only writes
  * its src/DatePicker.vue + internal + themes + README (it never cleans the leaf
  * src, so the committed barrel survives).
  */
-import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
@@ -71,14 +74,16 @@ function leafPkgName(dir) {
 /** Copy src/themes/ → leaf src/themes/ (the design-token presets). */
 function copyThemes(leafSrc) {
   const src = resolve(ROOT, 'src/themes');
-  if (!existsSync(src)) throw new Error('codegen: src/themes/ not found (token presets must exist)');
+  if (!existsSync(src))
+    throw new Error('codegen: src/themes/ not found (token presets must exist)');
   cpSync(src, resolve(leafSrc, 'themes'), { recursive: true });
 }
 
 /** Copy src/internal/ → leaf src/internal/, excluding any *.test.ts. */
 function copyInternal(leafSrc) {
   const src = resolve(ROOT, 'src/internal');
-  if (!existsSync(src)) throw new Error('codegen: src/internal/ not found (the calendar-grid algorithm must exist)');
+  if (!existsSync(src))
+    throw new Error('codegen: src/internal/ not found (the calendar-grid algorithm must exist)');
   cpSync(src, resolve(leafSrc, 'internal'), {
     recursive: true,
     filter: (from) => !from.endsWith('.test.ts'),
@@ -95,12 +100,16 @@ function main() {
   // Keep the hand-kept manifests in lockstep with the IR.
   for (const ev of ir.emits) {
     if (!eventManifest[ev]) {
-      throw new Error(`codegen: event "${ev}" is emitted by the source but has no entry in event-manifest.mjs`);
+      throw new Error(
+        `codegen: event "${ev}" is emitted by the source but has no entry in event-manifest.mjs`,
+      );
     }
   }
   for (const m of ir.expose) {
     if (!handleManifest[m.name]) {
-      throw new Error(`codegen: method "${m.name}" is exposed by the source but has no entry in handle-manifest.mjs`);
+      throw new Error(
+        `codegen: method "${m.name}" is exposed by the source but has no entry in handle-manifest.mjs`,
+      );
     }
   }
 
@@ -156,7 +165,9 @@ function main() {
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ internal/ + themes/)`);
+    console.log(
+      `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars}  ✓ (+ internal/ + themes/)`,
+    );
   }
 
   // (6) ENFORCE docs props-table validation against the API reference page. Its
@@ -182,6 +193,9 @@ function main() {
   console.log(
     `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING; throws on drift)`,
   );
+
+  // (7) ENFORCE docs events/handle name-presence (see ../../docs-surface-guard.mjs).
+  validateDocsSurfaceNames(ir, 'date-picker', REPO_ROOT);
 
   console.log('codegen: done — 6 targets emitted, internal + themes vendored, 6 READMEs rendered.');
 }

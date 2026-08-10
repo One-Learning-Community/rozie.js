@@ -39,10 +39,13 @@
  *      hand-authored prose. Plan 29-03 ships the guide; until then the
  *      ROZIE_CODEMIRROR_SKIP_GUIDE escape hatch relaxes the throw to a skip
  *      — see the step-(5) block.)
+ *   6. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
+ *      name must appear backticked in the docs page(s) (../../docs-surface-guard.mjs)
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 
@@ -249,7 +252,9 @@ function patchLeafLangPackaging(dir, cfg) {
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 
   if (!pkg.exports || !pkg.exports['.']) {
-    throw new Error(`codegen ${dir}: package.json has no \`exports["."]\` to anchor the \`./languages\` subpath (config shape changed)`);
+    throw new Error(
+      `codegen ${dir}: package.json has no \`exports["."]\` to anchor the \`./languages\` subpath (config shape changed)`,
+    );
   }
   if (cfg.build === 'tsdown') {
     pkg.exports['./languages'] = {
@@ -295,7 +300,9 @@ function patchLeafLangPackaging(dir, cfg) {
   const entryRe = /entry:\s*\[([^\]]*)\],/;
   const m = entryRe.exec(tsdown);
   if (!m) {
-    throw new Error(`codegen ${dir}: tsdown.config.ts has no \`entry: [...]\` array to patch (config shape changed)`);
+    throw new Error(
+      `codegen ${dir}: tsdown.config.ts has no \`entry: [...]\` array to patch (config shape changed)`,
+    );
   }
   if (!m[1].includes('languages')) {
     const items = m[1]
@@ -314,7 +321,9 @@ function patchLeafLangPackaging(dir, cfg) {
       // Anchor on the existing lang-javascript peer external — every leaf lists it.
       const anchor = "'@codemirror/lang-javascript',";
       if (!tsdown.includes(anchor)) {
-        throw new Error(`codegen ${dir}: tsdown.config.ts external array missing the \`${anchor}\` anchor for lang-package insertion (config shape changed)`);
+        throw new Error(
+          `codegen ${dir}: tsdown.config.ts external array missing the \`${anchor}\` anchor for lang-package insertion (config shape changed)`,
+        );
       }
       tsdown = tsdown.replace(anchor, `${anchor}\n    '${spec}',`);
     }
@@ -415,9 +424,12 @@ function main() {
     // change. Vue/Svelte/Angular are type-neutral and never see it; Lit is
     // already covered by the `themeExt = (): any =>` aid above.
     if (cfg.dir === 'react' || cfg.dir === 'solid') {
-      const themeToken = cfg.dir === 'react' ? 'const themeExt = useCallback(() =>' : 'function themeExt()';
+      const themeToken =
+        cfg.dir === 'react' ? 'const themeExt = useCallback(() =>' : 'function themeExt()';
       const themeAnnotated =
-        cfg.dir === 'react' ? 'const themeExt = useCallback((): any =>' : 'function themeExt(): any';
+        cfg.dir === 'react'
+          ? 'const themeExt = useCallback((): any =>'
+          : 'function themeExt(): any';
       if (!code.includes(themeToken)) {
         throw new Error(
           `codegen ${cfg.dir}: expected to annotate \`themeExt\`'s return \`: any\` (G3 widened-theme ` +
@@ -572,7 +584,9 @@ function main() {
     patchLeafLangPackaging(cfg.dir, cfg);
 
     const sidecars = target === 'react' ? ' (+ .css + .d.ts)' : '';
-    console.log(`codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars} + languages.ts  ✓`);
+    console.log(
+      `codegen: ${target.padEnd(8)} → ${cfg.dir}/src/${cfg.file}${sidecars} + languages.ts  ✓`,
+    );
   }
 
   // (5) ENFORCE docs props-table validation: the IR-derivable structural columns
@@ -621,6 +635,9 @@ function main() {
       `codegen: docs props-table validation PASS — ${result.checkedRows} rows match ir.props (ENFORCING; throws on drift)`,
     );
   }
+
+  // (6) ENFORCE docs events/handle name-presence (see ../../docs-surface-guard.mjs).
+  validateDocsSurfaceNames(ir, 'codemirror', REPO_ROOT);
 
   console.log('codegen: done — 6 targets emitted, 6 READMEs rendered, 6 LICENSEs vendored.');
 }
