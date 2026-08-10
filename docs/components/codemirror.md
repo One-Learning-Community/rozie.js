@@ -19,17 +19,15 @@ The full source for `CodeMirror.rozie` lives in the [`@rozie-ui/codemirror` pack
 | `@rozie-ui/codemirror-solid` | `npm i @rozie-ui/codemirror-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/codemirror/packages/solid/README.md) |
 | `@rozie-ui/codemirror-lit` | `npm i @rozie-ui/codemirror-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/codemirror/packages/lit/README.md) |
 
-Each package carries **sixteen required engine peers** plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). The engine peers are the five core packages (`@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/lang-javascript`, `@codemirror/theme-one-dark`), the `codemirror` meta-package (it supplies the `basicSetup` bundle), and the ten additional `@codemirror/lang-*` packages behind the [language presets](#language-presets). Installing the `lang-*` peers adds no bundle weight for presets you never import (the presets are tree-shakable, side-effect-free exports), but they must all be present for the install to resolve. One command covers the lot:
+Each package carries **six required engine peers** plus its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common`, `solid-js`, or `lit`). The required engine peers are the core packages (`@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/theme-one-dark`), the `codemirror` meta-package (it supplies the `basicSetup` bundle), and `@codemirror/lang-javascript` (the built-in `language="javascript"` convenience):
 
 ```bash
 npm i @rozie-ui/codemirror-react \
   @codemirror/state @codemirror/view @codemirror/commands \
-  @codemirror/theme-one-dark codemirror \
-  @codemirror/lang-javascript @codemirror/lang-html @codemirror/lang-css \
-  @codemirror/lang-sass @codemirror/lang-vue @codemirror/lang-json \
-  @codemirror/lang-markdown @codemirror/lang-yaml @codemirror/lang-xml \
-  @codemirror/lang-python @codemirror/lang-sql
+  @codemirror/theme-one-dark codemirror @codemirror/lang-javascript
 ```
+
+The ten other `@codemirror/lang-*` packages behind the [language presets](#language-presets) are **optional peers**: install only the ones whose presets you import (e.g. `npm i @codemirror/lang-python` to use the `python` preset). Presets are tree-shakable, side-effect-free exports, so uninstalled languages cost nothing and unused installed ones add no bundle weight.
 
 CodeMirror 6 has **no large "options bag"** — everything is an `Extension`. Anything the curated prop surface doesn't special-case (other languages, custom themes, line-wrapping, autocomplete, linting, key-bindings) comes through the first-class `:extensions` passthrough, which the wrapper composes **last** so consumer extensions win CodeMirror's last-registered-wins facets.
 

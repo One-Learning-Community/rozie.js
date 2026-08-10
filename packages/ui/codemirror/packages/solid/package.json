@@ -88,34 +88,34 @@
       "optional": false
     },
     "@codemirror/lang-html": {
-      "optional": false
+      "optional": true
     },
     "@codemirror/lang-css": {
-      "optional": false
+      "optional": true
     },
     "@codemirror/lang-sass": {
-      "optional": false
+      "optional": true
     },
     "@codemirror/lang-vue": {
-      "optional": false
+      "optional": true
     },
     "@codemirror/lang-json": {
-      "optional": false
+      "optional": true
     },
     "@codemirror/lang-markdown": {
-      "optional": false
+      "optional": true
     },
     "@codemirror/lang-yaml": {
-      "optional": false
+      "optional": true
     },
     "@codemirror/lang-xml": {
-      "optional": false
+      "optional": true
     },
     "@codemirror/lang-python": {
-      "optional": false
+      "optional": true
     },
     "@codemirror/lang-sql": {
-      "optional": false
+      "optional": true
     }
   },
   "scripts": {
