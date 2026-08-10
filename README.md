@@ -38,7 +38,7 @@ Pre-v1.0, published. The toolchain is live on npm under the `@rozie` scope — `
 | [`tools/intellij-plugin`](tools/intellij-plugin) | Shipped — JetBrains IDE syntax + injection plugin |
 | [`tools/textmate`](tools/textmate) | Shipped — TextMate grammar (VS Code, IDEA Community, docs-site Shiki) |
 
-The toolchain (compiler, CLI, Babel plugin, unplugin, runtimes) and 17 of the 29 `@rozie-ui` component families are published on npm under MIT. The remaining families are built and gated in-repo, pending release verification. v1.0 of the toolchain is the next milestone.
+The toolchain (compiler, CLI, Babel plugin, unplugin, runtimes) and 18 of the 29 `@rozie-ui` component families are published on npm under MIT. The remaining families are built and gated in-repo, pending release verification. v1.0 of the toolchain is the next milestone.
 
 ## Quick look
 
@@ -99,7 +99,7 @@ Most families wrap a battle-tested vanilla-JS engine whose framework bindings ar
 |---|---|---|
 | [DataTable](https://one-learning-community.github.io/rozie.js/components/data-table) | `@tanstack/table-core` — table + WAI-ARIA grid modes, editing, grouping, virtualization | ✅ |
 | [SortableList](https://one-learning-community.github.io/rozie.js/components/sortable-list) | SortableJS drag-and-drop | ✅ |
-| [CodeMirror](https://one-learning-community.github.io/rozie.js/components/codemirror) | CodeMirror 6 code editor | pending |
+| [CodeMirror](https://one-learning-community.github.io/rozie.js/components/codemirror) | CodeMirror 6 code editor | ✅ |
 | [TipTap](https://one-learning-community.github.io/rozie.js/components/tiptap) | TipTap rich-text editor (ProseMirror) | ✅ |
 | [Lexical](https://one-learning-community.github.io/rozie.js/components/lexical) | Lexical rich-text editor (Meta) | pending |
 | [Flatpickr](https://one-learning-community.github.io/rozie.js/components/flatpickr) | flatpickr date/time picker | ✅ |
