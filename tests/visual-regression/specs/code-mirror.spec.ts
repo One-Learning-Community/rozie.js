@@ -227,6 +227,26 @@ for (const target of TARGETS) {
   runner(`code-mirror [${target}]: expanded surface (extensions/language/placeholder/panel/$expose) behaves`, async ({
     page,
   }) => {
+    // ERROR TRAP (UAT 2026-08-10): a clean run emits zero uncaught page errors
+    // and zero console.error. This was RED on 4/6 targets before the render-
+    // purity fixes: the demo's capture fns mutated $data during fill render
+    // (Svelte state_unsafe_mutation / Angular NG0600 / Solid stack overflow),
+    // and the component's pre-flush reconfigure $watches dispatched into an
+    // in-progress EditorView.update on Vue (toggle-marks changes gutterLines +
+    // decorations same-tick; the nested portal render flushed the second
+    // watcher mid-update). Asserted at the END of the test so every driven leg
+    // (caret moves, toggles, reconfigures) is covered.
+    const pageErrors: string[] = [];
+    const consoleErrors: string[] = [];
+    page.on('pageerror', (err) => {
+      pageErrors.push(err.message);
+    });
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+
     await page.goto(`/?example=CodeMirror&target=${target}`);
     const mount = page.getByTestId('rozie-mount');
     await expect(mount).toBeVisible();
@@ -536,6 +556,13 @@ for (const target of TARGETS) {
     await expect(markCell.locator('.cm-deco-fill')).toHaveCount(2, {
       timeout: 10_000,
     });
+
+    // ---- ERROR TRAP (see the listener block at the top of this test) ----
+    // Settle one more macrotask so any deferred reconfigure/capture flush from
+    // the last toggle has landed before the error tally is read.
+    await page.waitForTimeout(250);
+    expect(pageErrors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
   });
 }
 

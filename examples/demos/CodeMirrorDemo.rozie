@@ -189,32 +189,82 @@ const handleScrollToPos = () => {
 
 // G5 wave 1 — REACTIVE tooltip slot empirical proof. The reactive portal slot
 // re-renders the consumer fragment IN PLACE on every caret move. `capTip` runs
-// as a side effect from a `:data-cap` binding in the slot fill (the proven
+// as a side effect from a `:data-cap` binding in the slot fill (the
 // reactive-slot capture idiom — cf. TipTapNodeViewDemo's captureEditor): it
 // recomputes the live line/col from the engine `view` + `pos` scope params and
 // bumps the update counter on EVERY render. The mount counter is bumped ONLY on
 // the first render of a freshly-mounted fragment (tracked by a closure flag that
 // resets when the DOM host node identity changes). tipMounts staying at 1 while
 // tipUpdates climbs is the in-place-no-remount proof.
+//
+// CROSS-TARGET RENDER-PURITY CONSTRAINT (UAT 2026-08-10): a `:data-cap` capture
+// fn runs DURING the fill fragment's render, so it must NEVER write $data
+// synchronously — that is a render-time reactive mutation, which 4 of the 6
+// targets reject outright: Svelte 5 throws `state_unsafe_mutation`, Angular
+// throws NG0600 (both killed Editor G's whole mount because the throw escapes
+// EditorState.create), Solid re-entered render until "Maximum call stack size
+// exceeded", and Vue intermittently re-entered `EditorView.update` mid-flush.
+// TipTap's original idiom is safe ONLY because it writes a non-reactive window
+// global. So: capture into the non-reactive `capBuf` and flush into $data in a
+// deferred macrotask (setTimeout 0) — outside every framework's reactive flush.
+// Same-value re-assignments are no-ops under all six targets' equality checks,
+// so the flush→fill-re-render chain settles after one extra round instead of
+// looping.
+const capBuf = { tipLine: 1, tipCol: 1, tipUpdates: 0, tipMounts: 0, gutterMounts: 0, decoMounts: 0 }
+let capFlushQueued = false
+const queueCapFlush = () => {
+  if (capFlushQueued) return
+  capFlushQueued = true
+  setTimeout(() => {
+    capFlushQueued = false
+    $data.tipLine = capBuf.tipLine
+    $data.tipCol = capBuf.tipCol
+    $data.tipUpdates = capBuf.tipUpdates
+    $data.tipMounts = capBuf.tipMounts
+    $data.gutterMounts = capBuf.gutterMounts
+    $data.decoMounts = capBuf.decoMounts
+  }, 0)
+}
 let tipFragMounted = false
+// Last captured caret pos. Angular re-evaluates template expressions on EVERY
+// change-detection pass (including the pass triggered by the flush itself), so
+// an unconditional bump loops forever at macrotask cadence there. Gating on an
+// actual pos change makes `updates` count real caret moves on all six targets
+// and lets the flush→re-render chain settle (unchanged pos → early return → no
+// new flush).
+let lastCapPos = -1
 const capTip = (view, pos) => {
   if (!view) return ''
+  const p = pos ?? 0
+  if (tipFragMounted && p === lastCapPos) return ''
+  lastCapPos = p
   // Recompute line/col from the live caret position (pos) against the doc.
-  const line = view.state.doc.lineAt(pos ?? 0)
-  $data.tipLine = line.number
-  $data.tipCol = (pos ?? 0) - line.from + 1
-  $data.tipUpdates = $data.tipUpdates + 1
+  const line = view.state.doc.lineAt(p)
+  capBuf.tipLine = line.number
+  capBuf.tipCol = p - line.from + 1
+  capBuf.tipUpdates = capBuf.tipUpdates + 1
   if (!tipFragMounted) {
     tipFragMounted = true
-    $data.tipMounts = $data.tipMounts + 1
+    capBuf.tipMounts = capBuf.tipMounts + 1
   }
+  queueCapFlush()
   return ''
 }
 
 // G5 wave 2 — gutter + decoration MULTI-INSTANCE proof. The driving props are
 // computed (empty arrays when markOn is off, exercising live mount/dispose).
-const gutterLinesValue = () => $data.markOn ? [1, 3] : []
-const decorationsValue = () => $data.markOn ? [{ from: 0 }, { from: 9 }] : []
+// IDENTITY-STABLE driving props (UAT 2026-08-10): these were plain functions
+// (`gutterLinesValue()`) called from the binding, which returned a FRESH array
+// on every demo render. The component's identity-based prop $watches then saw a
+// "change" per re-render and queued a compartment-reconfigure dispatch — on Vue
+// those pre-flush watchers get flushed synchronously by the portal fill's
+// nested render() while the SAME editor's update is in progress → "Calls to
+// EditorView.update are not allowed while an update is in progress". $computed
+// caches until `markOn` actually flips, so the identity only changes on a real
+// toggle. (The component-side re-entrancy hazard is filed as emitter backlog —
+// consumers binding inline array literals could still trigger it on Vue.)
+const gutterLinesComputed = $computed(() => $data.markOn ? [1, 3] : [])
+const decorationsComputed = $computed(() => $data.markOn ? [{ from: 0 }, { from: 9 }] : [])
 const toggleMarks = () => { $data.markOn = !$data.markOn }
 
 // Per-instance mount/dispose tracking. The slot fragment renders ONCE per marker/
@@ -231,7 +281,10 @@ const markGutterMount = (line) => {
   const key = String(line)
   if (!gutterSeen.has(key)) {
     gutterSeen.add(key)
-    $data.gutterMounts = $data.gutterMounts + 1
+    // Buffered + deferred — render-time $data writes are illegal on 4/6
+    // targets (see the capBuf constraint note above capTip).
+    capBuf.gutterMounts = capBuf.gutterMounts + 1
+    queueCapFlush()
   }
   return ''
 }
@@ -240,7 +293,8 @@ const markDecoMount = (from) => {
   const key = String(from)
   if (!decoSeen.has(key)) {
     decoSeen.add(key)
-    $data.decoMounts = $data.decoMounts + 1
+    capBuf.decoMounts = capBuf.decoMounts + 1
+    queueCapFlush()
   }
   return ''
 }
@@ -380,8 +434,8 @@ const markDecoMount = (from) => {
         r-model:value="$data.markCode"
         :height="120"
         theme="light"
-        :gutterLines="gutterLinesValue()"
-        :decorations="decorationsValue()"
+        :gutterLines="gutterLinesComputed"
+        :decorations="decorationsComputed"
       >
         <template #gutter="{ line, view }">
           <span class="cm-gutter-fill" data-testid="gutter-fill" :data-cap="markGutterMount(line)">●</span>
