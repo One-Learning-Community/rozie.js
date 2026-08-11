@@ -104,6 +104,16 @@ const ENGINE_DEMOS = [
   // slot fill across all 6 targets) surfaces in this fast gate.
   'demos/ChartScreenshotDemo.rozie',
   'demos/ChartBehaviorDemo.rozie',
+  // quick-task 260811-9qe — ChartCoverageDemo closes the ten deferred
+  // COVERAGE-GAPs from the 260810-usc audit: the `live === next` aliasing
+  // guard (G-02), `datasetIdKey` keyed matching + positional fallback (G-03),
+  // `redraw` (G-04), `updateMode` threading (G-05), `destroyDelay` (G-06),
+  // `ariaLabel` (G-07), the `fallback` slot (G-08), and hover composition
+  // (G-10). It ALSO composes the Bar/Doughnut per-type variants from
+  // ../../packages/ui/chartjs/src/variants/ (G-01) — compiled here so a
+  // per-target consumer-side regression on any of those surfaces up in this
+  // fast gate.
+  'demos/ChartCoverageDemo.rozie',
   // Phase 32 (tiptap) — the content-stable SCREENSHOT consumer (fixed rich doc +
   // caret-neutralized editorProps, never focused) and the behavioral consumer
   // (internal-toolbar bullet-list command + the $expose handle via ref). Both

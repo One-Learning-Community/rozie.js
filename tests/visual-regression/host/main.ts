@@ -231,6 +231,16 @@ export const EXAMPLES = [
   // :plugins passthrough + tooltip portal-slot fill), deliberately NOT in
   // matrix.spec.ts EXAMPLES. Distinct from the line-typed 'LineChart' cell.
   'ChartBehavior',
+  // quick-task 260811-9qe — ChartCoverage closes the ten deferred COVERAGE-GAPs
+  // from the 260810-usc audit (aliasing guard, datasetIdKey reorder/rename,
+  // redraw, updateMode, destroyDelay, ariaLabel, fallback slot, hover
+  // composition, per-type variant runtime). Loader resolves to
+  // examples/demos/ChartCoverageDemo.rozie, which composes the generic Chart
+  // PLUS the Bar/Doughnut per-type variants from
+  // ../../packages/ui/chartjs/src/variants/. Behavioral-only — covered by
+  // chart-coverage.spec.ts — deliberately NOT in matrix.spec.ts EXAMPLES
+  // (same convention as ChartBehavior).
+  'ChartCoverage',
   // Phase 32 (tiptap) — TipTapScreenshot is the content-STABLE SCREENSHOT demo
   // (loader → examples/demos/TipTapScreenshotDemo.rozie, which imports
   // ../../packages/ui/tiptap/src/TipTap.rozie). A fixed rich-HTML doc with the
@@ -1307,6 +1317,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // ChartScreenshotDemo / ChartBehaviorDemo.
   ChartScreenshot: 'rozie-chart-screenshot',
   ChartBehavior: 'rozie-chart-behavior',
+  // quick-task 260811-9qe — the lit entry appends '-demo' → tag
+  // 'rozie-chart-coverage-demo' = kebab of ChartCoverageDemo.
+  ChartCoverage: 'rozie-chart-coverage',
   // Phase 32 (tiptap) — the lit entry appends '-demo' → tags
   // 'rozie-tip-tap-screenshot-demo' / 'rozie-tip-tap-behavior-demo' = kebab of
   // TipTapScreenshotDemo / TipTapBehaviorDemo.
@@ -1748,6 +1761,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // clickCount in <data>. No parent-supplied props.
   ChartScreenshot: {},
   ChartBehavior: {},
+  // quick-task 260811-9qe — ChartCoverageDemo is self-contained (all state in
+  // <data>, seeded/mutated by its own script). No parent-supplied props.
+  ChartCoverage: {},
   // Phase 32 (tiptap) — both TipTap demos are self-contained: TipTapScreenshot
   // hardcodes its fixed rich doc in <script>; TipTapBehavior seeds its content +
   // out state in <data>. No parent props needed.

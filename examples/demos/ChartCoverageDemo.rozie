@@ -1,0 +1,332 @@
+<!--
+  ChartCoverageDemo.rozie — companion rig for `tests/visual-regression/specs/
+  chart-coverage.spec.ts`, quick-task 260811-9qe. Closes the ten deferred
+  COVERAGE-GAPs from the 260810-usc audit (§3) that `ChartBehaviorDemo` and
+  `LineChartDemo` cannot take without overloading them — the audit
+  pre-approved exactly one additional rig, so everything below lives in this
+  ONE file.
+
+  TWO HARD RIG RULES, both derived from documented per-target behavior:
+
+    RULE 1 — no component refs anywhere in this rig. Angular resolves a
+    component ref to the host element rather than the exposed handle
+    (tiptap.spec.ts / code-mirror.spec.ts), so a handle-based probe cannot
+    assert on all six targets. Every probe here reads the live chart instance
+    off the EVENT PAYLOAD instead (`{ event, elements, chart }` on both
+    `hover` and `click`) — the `$expose` handle path is already covered by
+    ChartBehaviorDemo + chart.spec.ts and is not this rig's job.
+
+    RULE 2 — no arrow functions inside template interpolations (Angular AOT
+    blank-renders on those), and the `options` object bound to the Line cell
+    is a MODULE-LEVEL const with stable identity — a fresh object per render
+    would re-fire the wrapper's `options` $watch (`update('none')`) and
+    corrupt the G-05 observation.
+
+  Registration (the G-01 proof): this demo registers ONLY the line/cartesian
+  controller set the generic `Chart` needs. It deliberately does NOT register
+  BarController/DoughnutController — the Bar and Doughnut cells below
+  therefore only paint if each per-type variant's OWN module-level
+  registration (packages/ui/chartjs/src/variants/{Bar,Doughnut}.rozie)
+  executed.
+
+  Gap -> leg map (see chart-coverage.spec.ts for the runtime assertions):
+    G-01 variant runtime          -> Bar/Doughnut cells + bar push
+    G-02 aliasing guard           -> line hover probe (label count survives)
+    G-03 datasetIdKey matching    -> reorder + rename buttons
+    G-04 redraw wholesale re-create -> redraw toggle + getContext delta
+    G-05 updateMode threading     -> none-mode toggle + instrumented update()
+    G-06 destroyDelay             -> unmount + two timed destroy probes
+    G-07 ariaLabel                -> static `aria-label` on the Line cell
+    G-08 fallback slot            -> element-wrapped `#fallback` fill
+    G-09 /auto registration       -> covered by generated-entries.test.ts, not this rig
+    G-10 hover composition        -> two hover counters (Rozie + consumer)
+-->
+
+<rozie name="ChartCoverageDemo">
+
+<components>
+{
+  Chart: '../../packages/ui/chartjs/src/Chart.rozie',
+  Bar: '../../packages/ui/chartjs/src/variants/Bar.rozie',
+  Doughnut: '../../packages/ui/chartjs/src/variants/Doughnut.rozie',
+}
+</components>
+
+<data>
+{
+  lineData: {
+    labels: ['A', 'B', 'C', 'D', 'E'],
+    datasets: [
+      { label: 'A', data: [12, 19, 8, 15, 22], borderColor: '#3b82f6' },
+      { label: 'B', data: [5, 9, 14, 6, 11], borderColor: '#10b981' },
+    ],
+  },
+  barData: {
+    labels: ['Q1', 'Q2', 'Q3'],
+    datasets: [
+      { label: 'Bar', data: [4, 8, 6], backgroundColor: '#f59e0b' },
+    ],
+  },
+  mounted: true,
+  redrawOn: false,
+  noneModeOn: false,
+  probeText: '',
+  barProbeText: '',
+  lastUpdateMode: '',
+  destroyProbe150: '',
+  destroyProbe700: '',
+  hoverCount: 0,
+  consumerHoverCount: 0,
+}
+</data>
+
+<script>
+import { Chart as ChartJS, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Legend, Tooltip, Colors } from 'chart.js'
+// Deliberately register ONLY the line/cartesian controller set the generic
+// Chart needs — no BarController/DoughnutController. The Bar and Doughnut
+// cells below therefore only paint if each variant's OWN module-level
+// registration executed (packages/ui/chartjs/src/variants/{Bar,Doughnut}.rozie).
+// This is the G-01 per-type registration proof.
+ChartJS.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Legend, Tooltip, Colors)
+
+// Static Doughnut cell data — paint smoke only (G-01), never mutated.
+const doughnutData = {
+  labels: ['X', 'Y', 'Z'],
+  datasets: [{ data: [30, 45, 25], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'] }],
+}
+
+// Module-level capture of the last-seen LIVE line-chart instance, read off
+// the hover/click payload's `chart` field (RULE 1 — never via a component
+// ref). `dying` in unmountChart() closes over this before the mount flag
+// flips, so the two timed destroy probes (G-06) can inspect the OLD
+// instance after teardown.
+let liveChart = null
+
+// Identity-guarded instrumentation of the live instance's update() — mirrors
+// the established getContext monkey-patch style (chart-recreation.spec.ts):
+// patch a PUBLIC engine method to observe wrapper behavior, never read engine
+// internals. Guarded by instance identity so a redraw-created instance
+// re-wraps on its next hover instead of double-wrapping the old one.
+let instrumentedInstance = null
+const instrumentUpdate = (chart) => {
+  if (instrumentedInstance === chart) return
+  instrumentedInstance = chart
+  const orig = chart.update.bind(chart)
+  chart.update = (mode) => {
+    $data.lastUpdateMode = mode === undefined ? '(none/undefined)' : String(mode)
+    return orig(mode)
+  }
+}
+
+// Probe builder (G-02 + G-03 in one string): captures + instruments the
+// instance, then records the live label count and each dataset's key paired
+// with its border color.
+const buildProbe = (chart) => {
+  const labels = chart.data.labels ?? []
+  const parts = (chart.data.datasets ?? []).map((ds) => `${ds.label}:${ds.borderColor}`)
+  return `labels=${labels.length} ${parts.join(' ')}`
+}
+const probeLine = (chart) => {
+  liveChart = chart
+  instrumentUpdate(chart)
+  $data.probeText = buildProbe(chart)
+}
+const probeBar = (chart) => {
+  const labels = chart.data.labels ?? []
+  $data.barProbeText = `labels=${labels.length}`
+}
+
+const onLineHover = (payload) => {
+  $data.hoverCount = $data.hoverCount + 1
+  probeLine(payload.chart)
+}
+const onLineClick = (payload) => {
+  probeLine(payload.chart)
+}
+const onBarHover = (payload) => {
+  probeBar(payload.chart)
+}
+
+// Stable options const (RULE 2) — a consumer-supplied hover callback bumps
+// the SECOND counter (G-10's non-clobber proof: the wrapper's composed
+// onHover calls this FIRST, then emits its own `hover`).
+const lineOptions = {
+  plugins: { legend: { display: true, position: 'bottom' } },
+  onHover: () => { $data.consumerHoverCount = $data.consumerHoverCount + 1 },
+}
+
+// $watch(() => $props.data) reconciles a FRESH data object into the live
+// chart on every one of these actions (never mutates $data.lineData/$data.barData
+// in place — the wrapper's reconcile identity check needs a genuinely new object).
+const pushLinePoint = () => {
+  $data.lineData = {
+    labels: [...$data.lineData.labels, `L${$data.lineData.labels.length + 1}`],
+    // Spread each dataset — preserves BOTH its key (label) and its color.
+    datasets: $data.lineData.datasets.map((ds) => ({
+      ...ds,
+      data: [...ds.data, Math.round(5 + Math.random() * 20)],
+    })),
+  }
+}
+
+// Reorder (G-03, keyed-matching leg): swap the two datasets' array order AND
+// omit their border colors. Keyed matching (ds[datasetIdKey], default
+// 'label') should make each color follow ITS key across the swap.
+const reorderDatasets = () => {
+  const [a, b] = $data.lineData.datasets
+  $data.lineData = {
+    labels: $data.lineData.labels,
+    datasets: [
+      { label: b.label, data: b.data },
+      { label: a.label, data: a.data },
+    ],
+  }
+}
+
+// Rename (G-03, positional-fallback leg): the first dataset's key changes to
+// an UNSEEN value ('Z') with its color again omitted. An unmatched key falls
+// back to positional (index) matching — the renamed dataset should inherit
+// the color of the SLOT it landed in (index 0's prior color), not carry any
+// color of its own.
+const renameDataset = () => {
+  const [a, b] = $data.lineData.datasets
+  $data.lineData = {
+    labels: $data.lineData.labels,
+    datasets: [
+      { label: 'Z', data: a.data },
+      { label: b.label, data: b.data },
+    ],
+  }
+}
+
+const pushBarPoint = () => {
+  $data.barData = {
+    labels: [...$data.barData.labels, `Q${$data.barData.labels.length + 1}`],
+    datasets: $data.barData.datasets.map((ds) => ({
+      ...ds,
+      data: [...ds.data, Math.round(3 + Math.random() * 10)],
+    })),
+  }
+}
+
+// Unmount (G-06): flip the mount flag (r-if unmounts the Chart cell, running
+// its $onMount teardown) and schedule two timed probes straddling the
+// configured destroyDelay (400ms below). Chart.js nulls `instance.canvas` on
+// destroy(), so `dying.canvas` truthiness is the deferral signal without
+// touching any other internals.
+const unmountChart = () => {
+  const dying = liveChart
+  $data.mounted = false
+  setTimeout(() => {
+    $data.destroyProbe150 = dying && dying.canvas ? 'alive' : 'destroyed'
+  }, 150)
+  setTimeout(() => {
+    $data.destroyProbe700 = dying && dying.canvas ? 'alive' : 'destroyed'
+  }, 700)
+}
+
+const toggleRedraw = () => { $data.redrawOn = !$data.redrawOn }
+const toggleNoneMode = () => { $data.noneModeOn = !$data.noneModeOn }
+
+// Maps the none-mode flag to the Chart.js mode string or to no mode at all —
+// bound to the Line cell's `updateMode` prop (G-05).
+const updateModeValue = $computed(() => ($data.noneModeOn ? 'none' : undefined))
+</script>
+
+<template>
+<div class="chart-coverage-demo">
+  <div class="controls">
+    <button type="button" data-testid="coverage-push-point-btn" @click="pushLinePoint()">Push point</button>
+    <button type="button" data-testid="coverage-reorder-btn" @click="reorderDatasets()">Reorder datasets</button>
+    <button type="button" data-testid="coverage-rename-btn" @click="renameDataset()">Rename dataset</button>
+    <button type="button" data-testid="coverage-toggle-redraw-btn" @click="toggleRedraw()">Toggle redraw</button>
+    <button type="button" data-testid="coverage-toggle-none-mode-btn" @click="toggleNoneMode()">Toggle none-mode</button>
+    <button type="button" data-testid="coverage-push-bar-btn" @click="pushBarPoint()">Push bar point</button>
+    <button type="button" data-testid="coverage-unmount-btn" @click="unmountChart()">Unmount chart</button>
+  </div>
+
+  <div class="status">
+    <span data-testid="coverage-probe">{{ $data.probeText }}</span>
+    <span data-testid="coverage-bar-probe">{{ $data.barProbeText }}</span>
+    <span data-testid="coverage-hover-count">hover={{ $data.hoverCount }}</span>
+    <span data-testid="coverage-consumer-hover-count">consumerHover={{ $data.consumerHoverCount }}</span>
+    <span data-testid="coverage-last-mode">mode={{ $data.lastUpdateMode }}</span>
+    <span data-testid="coverage-destroy-150">d150={{ $data.destroyProbe150 }}</span>
+    <span data-testid="coverage-destroy-700">d700={{ $data.destroyProbe700 }}</span>
+    <span data-testid="coverage-redraw-flag">redraw={{ $data.redrawOn }}</span>
+    <span data-testid="coverage-none-mode-flag">noneMode={{ $data.noneModeOn }}</span>
+  </div>
+
+  <div class="chart-wrap" data-testid="coverage-line-wrap">
+    <Chart
+      r-if="$data.mounted"
+      :data="$data.lineData"
+      :options="lineOptions"
+      type="line"
+      :height="220"
+      :redraw="$data.redrawOn"
+      :update-mode="updateModeValue"
+      :destroy-delay="400"
+      aria-label="Coverage Line Chart"
+      dataset-id-key="label"
+      @hover="onLineHover"
+      @click="onLineClick"
+    >
+      <template #fallback>
+        <span data-testid="coverage-fallback">chart fallback content</span>
+      </template>
+    </Chart>
+  </div>
+
+  <div class="chart-wrap" data-testid="coverage-bar-wrap">
+    <Bar :data="$data.barData" :height="180" @hover="onBarHover" />
+  </div>
+
+  <div class="chart-wrap" data-testid="coverage-doughnut-wrap">
+    <Doughnut :data="doughnutData" :height="180" />
+  </div>
+</div>
+</template>
+
+<style>
+.chart-coverage-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 640px;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+.controls button {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+.chart-wrap {
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: #fff;
+}
+</style>
+
+</rozie>
