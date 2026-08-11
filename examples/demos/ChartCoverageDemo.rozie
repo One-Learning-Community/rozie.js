@@ -36,7 +36,9 @@
     G-04 redraw wholesale re-create -> redraw toggle + getContext delta
     G-05 updateMode threading     -> none-mode toggle + instrumented update()
     G-06 destroyDelay             -> unmount + two timed destroy probes
-    G-07 ariaLabel                -> static `aria-label` on the Line cell
+    G-07 ariaLabel                -> `:aria-label="'...'"` on the Line cell (colon-bound —
+                                      see the EMITTER-BACKLOG todo on why a plain kebab
+                                      attribute silently drops on React/Svelte/Solid)
     G-08 fallback slot            -> element-wrapped `#fallback` fill
     G-09 /auto registration       -> covered by generated-entries.test.ts, not this rig
     G-10 hover composition        -> two hover counters (Rozie + consumer)
