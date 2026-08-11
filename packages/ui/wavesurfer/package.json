@@ -7,7 +7,7 @@
   "scripts": {
     "surface": "node scripts/compile-wavesurfer-check.mjs",
     "build": "node scripts/codegen.mjs",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "typecheck": "echo 'no TS sources (the .rozie is codegen-compiled; leaves typecheck the emitted output)'"
   },
   "devDependencies": {

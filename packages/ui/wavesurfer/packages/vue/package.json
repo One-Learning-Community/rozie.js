@@ -39,7 +39,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "web-types.json"
   ],
   "peerDependencies": {
     "vue": "^3.4",
@@ -68,5 +69,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "web-types": "./web-types.json"
 }

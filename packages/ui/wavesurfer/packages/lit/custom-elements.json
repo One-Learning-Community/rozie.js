@@ -1,0 +1,758 @@
+{
+  "schemaVersion": "2.1.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "dist/index.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Rozie's cross-framework port of wavesurfer.js v7 — a data-bound audio waveform player with two two-way bindings (`currentTime`, `regions`), live plugin presence (Timeline/Hover/Regions), and an imperative handle.",
+          "name": "Waveform",
+          "tagName": "rozie-waveform",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "src",
+              "description": "The audio URL the waveform loads. Bound at construction and reconciled at runtime — changing it calls the engine `load(url)`.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "src",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "peaks",
+              "description": "Pre-computed waveform peaks (an array of channel sample arrays, or a single `number[]`). Renders the waveform without downloading or decoding audio — pair with `duration`. Construction-only.",
+              "type": {
+                "text": "unknown"
+              },
+              "attribute": "peaks",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "duration",
+              "description": "The audio duration in seconds. Required alongside `peaks` when rendering without a decodable `src` (the timeline/ruler and region positions are derived from it). Construction-only.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "duration",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "description": "The waveform height in pixels. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "height",
+              "default": "128"
+            },
+            {
+              "kind": "field",
+              "name": "waveColor",
+              "description": "The color of the unplayed portion of the waveform. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "wavecolor",
+              "default": "\"#8a2be2\""
+            },
+            {
+              "kind": "field",
+              "name": "progressColor",
+              "description": "The color of the played (progress) portion of the waveform. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "progresscolor",
+              "default": "\"#5a189a\""
+            },
+            {
+              "kind": "field",
+              "name": "cursorColor",
+              "description": "The color of the playback cursor. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "cursorcolor",
+              "default": "\"#333333\""
+            },
+            {
+              "kind": "field",
+              "name": "cursorWidth",
+              "description": "The width of the playback cursor in pixels. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "cursorwidth",
+              "default": "1"
+            },
+            {
+              "kind": "field",
+              "name": "barWidth",
+              "description": "Draw the waveform as bars of this pixel width. `null` (default) renders a continuous waveform. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "unknown"
+              },
+              "attribute": "barwidth",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "barGap",
+              "description": "The pixel gap between bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "unknown"
+              },
+              "attribute": "bargap",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "barRadius",
+              "description": "The corner radius of bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "unknown"
+              },
+              "attribute": "barradius",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "minPxPerSec",
+              "description": "The minimum pixels-per-second zoom level. Reconciled at runtime via `zoom`.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "minpxpersec",
+              "default": "1"
+            },
+            {
+              "kind": "field",
+              "name": "volume",
+              "description": "Playback volume (`0`–`1`). Reconciled at runtime via `setVolume`.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "volume",
+              "default": "1"
+            },
+            {
+              "kind": "field",
+              "name": "playbackRate",
+              "description": "Playback speed multiplier. Reconciled at runtime via `setPlaybackRate`.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "playbackrate",
+              "default": "1"
+            },
+            {
+              "kind": "field",
+              "name": "autoplay",
+              "description": "Begin playback as soon as the audio is ready. Construction-only.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "autoplay",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "normalizeAmplitude",
+              "description": "Normalize the waveform by its largest peak (wavesurfer's `normalize` option). Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "normalizeamplitude",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "hideScrollbar",
+              "description": "Hide the horizontal scrollbar when the waveform is zoomed wider than its container. Construction-only.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "hidescrollbar",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "disableInteraction",
+              "description": "Disable click/seek interaction with the waveform (the engine defaults to interactive). Construction-only.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "disableinteraction",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "disableDragToSeek",
+              "description": "Disable drag-to-seek across the waveform (the engine defaults to drag-seekable). Construction-only.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "disabledragtoseek",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "timeline",
+              "description": "Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Live-toggleable — registers/unregisters on the running engine, no remount.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "timeline",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "hover",
+              "description": "Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Live-toggleable — registers/unregisters on the running engine, no remount.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "hover",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "hoverColor",
+              "description": "The line color of the Hover plugin cursor (only applies when `hover` is enabled). Read/applied when the Hover plugin is (re-)created — not live on an already-registered instance.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "hovercolor",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "regions",
+              "description": "The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin — at construction if it's already an array, or lazily the first time `regions` transitions from `null`/`undefined` to an array. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).",
+              "type": {
+                "text": "unknown"
+              },
+              "attribute": "regions",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "dragToCreateRegions",
+              "description": "Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "dragtocreateregions",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "regionColor",
+              "description": "Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "regioncolor",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "options",
+              "description": "Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`sampleRate`, `mediaControls`, `splitChannels`, `barHeight`, …).",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "options",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "currentTime",
+              "description": "The current playback position in seconds. The lone two-way `model: true` prop: playback writes the live position back on every `timeupdate` (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write seeks the engine via `setTime`.",
+              "type": {
+                "text": "unknown"
+              },
+              "attribute": "currenttime",
+              "default": "undefined"
+            },
+            {
+              "kind": "method",
+              "name": "play",
+              "description": "Start playback."
+            },
+            {
+              "kind": "method",
+              "name": "pause",
+              "description": "Pause playback."
+            },
+            {
+              "kind": "method",
+              "name": "playPause",
+              "description": "Toggle between play and pause."
+            },
+            {
+              "kind": "method",
+              "name": "stop",
+              "description": "Stop playback and return the cursor to the start."
+            },
+            {
+              "kind": "method",
+              "name": "seekTo",
+              "description": "Seek to a relative position — `seekTo(progress)` where `progress` is `0`–`1`."
+            },
+            {
+              "kind": "method",
+              "name": "setTime",
+              "description": "Seek to an absolute position in seconds — `setTime(seconds)`."
+            },
+            {
+              "kind": "method",
+              "name": "setVolume",
+              "description": "Set the playback volume — `setVolume(v)` where `v` is `0`–`1`."
+            },
+            {
+              "kind": "method",
+              "name": "setPlaybackRate",
+              "description": "Set the playback speed multiplier — `setPlaybackRate(rate)`."
+            },
+            {
+              "kind": "method",
+              "name": "setZoom",
+              "description": "Set the zoom level in pixels-per-second — `setZoom(pxPerSec)`."
+            },
+            {
+              "kind": "method",
+              "name": "load",
+              "description": "Load a new audio source URL — `load(url)`."
+            },
+            {
+              "kind": "method",
+              "name": "isPlaying",
+              "description": "Return whether audio is currently playing (`boolean`)."
+            },
+            {
+              "kind": "method",
+              "name": "getDuration",
+              "description": "Return the total duration in seconds (`0` before the audio is ready)."
+            },
+            {
+              "kind": "method",
+              "name": "getCurrentTime",
+              "description": "Return the current playback position in seconds."
+            },
+            {
+              "kind": "method",
+              "name": "getWaveSurfer",
+              "description": "Return the underlying wavesurfer instance for direct API access (the engine escape hatch). Null before mount."
+            },
+            {
+              "kind": "method",
+              "name": "addRegion",
+              "description": "Add a region imperatively — `addRegion({ start, end?, id?, content?, color?, drag?, resize? })`. Returns the created engine Region. Requires the `regions` array to have registered the plugin. Null when regions are disabled."
+            },
+            {
+              "kind": "method",
+              "name": "clearRegions",
+              "description": "Remove all regions."
+            },
+            {
+              "kind": "method",
+              "name": "getRegions",
+              "description": "Return the live engine Region objects (empty array when regions are disabled)."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "src",
+              "description": "The audio URL the waveform loads. Bound at construction and reconciled at runtime — changing it calls the engine `load(url)`.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "src",
+              "default": "null"
+            },
+            {
+              "name": "peaks",
+              "description": "Pre-computed waveform peaks (an array of channel sample arrays, or a single `number[]`). Renders the waveform without downloading or decoding audio — pair with `duration`. Construction-only.",
+              "type": {
+                "text": "unknown"
+              },
+              "fieldName": "peaks",
+              "default": "undefined"
+            },
+            {
+              "name": "duration",
+              "description": "The audio duration in seconds. Required alongside `peaks` when rendering without a decodable `src` (the timeline/ruler and region positions are derived from it). Construction-only.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "duration",
+              "default": "null"
+            },
+            {
+              "name": "height",
+              "description": "The waveform height in pixels. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "height",
+              "default": "128"
+            },
+            {
+              "name": "wavecolor",
+              "description": "The color of the unplayed portion of the waveform. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "waveColor",
+              "default": "\"#8a2be2\""
+            },
+            {
+              "name": "progresscolor",
+              "description": "The color of the played (progress) portion of the waveform. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "progressColor",
+              "default": "\"#5a189a\""
+            },
+            {
+              "name": "cursorcolor",
+              "description": "The color of the playback cursor. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "cursorColor",
+              "default": "\"#333333\""
+            },
+            {
+              "name": "cursorwidth",
+              "description": "The width of the playback cursor in pixels. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "cursorWidth",
+              "default": "1"
+            },
+            {
+              "name": "barwidth",
+              "description": "Draw the waveform as bars of this pixel width. `null` (default) renders a continuous waveform. Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "unknown"
+              },
+              "fieldName": "barWidth",
+              "default": "null"
+            },
+            {
+              "name": "bargap",
+              "description": "The pixel gap between bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "unknown"
+              },
+              "fieldName": "barGap",
+              "default": "null"
+            },
+            {
+              "name": "barradius",
+              "description": "The corner radius of bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "unknown"
+              },
+              "fieldName": "barRadius",
+              "default": "null"
+            },
+            {
+              "name": "minpxpersec",
+              "description": "The minimum pixels-per-second zoom level. Reconciled at runtime via `zoom`.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "minPxPerSec",
+              "default": "1"
+            },
+            {
+              "name": "volume",
+              "description": "Playback volume (`0`–`1`). Reconciled at runtime via `setVolume`.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "volume",
+              "default": "1"
+            },
+            {
+              "name": "playbackrate",
+              "description": "Playback speed multiplier. Reconciled at runtime via `setPlaybackRate`.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "playbackRate",
+              "default": "1"
+            },
+            {
+              "name": "autoplay",
+              "description": "Begin playback as soon as the audio is ready. Construction-only.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "autoplay",
+              "default": "false"
+            },
+            {
+              "name": "normalizeamplitude",
+              "description": "Normalize the waveform by its largest peak (wavesurfer's `normalize` option). Reconciled at runtime via `setOptions`.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "normalizeAmplitude",
+              "default": "false"
+            },
+            {
+              "name": "hidescrollbar",
+              "description": "Hide the horizontal scrollbar when the waveform is zoomed wider than its container. Construction-only.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "hideScrollbar",
+              "default": "false"
+            },
+            {
+              "name": "disableinteraction",
+              "description": "Disable click/seek interaction with the waveform (the engine defaults to interactive). Construction-only.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "disableInteraction",
+              "default": "false"
+            },
+            {
+              "name": "disabledragtoseek",
+              "description": "Disable drag-to-seek across the waveform (the engine defaults to drag-seekable). Construction-only.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "disableDragToSeek",
+              "default": "false"
+            },
+            {
+              "name": "timeline",
+              "description": "Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Live-toggleable — registers/unregisters on the running engine, no remount.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "timeline",
+              "default": "false"
+            },
+            {
+              "name": "hover",
+              "description": "Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Live-toggleable — registers/unregisters on the running engine, no remount.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "hover",
+              "default": "false"
+            },
+            {
+              "name": "hovercolor",
+              "description": "The line color of the Hover plugin cursor (only applies when `hover` is enabled). Read/applied when the Hover plugin is (re-)created — not live on an already-registered instance.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "hoverColor",
+              "default": "null"
+            },
+            {
+              "name": "regions",
+              "description": "The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin — at construction if it's already an array, or lazily the first time `regions` transitions from `null`/`undefined` to an array. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).",
+              "type": {
+                "text": "unknown"
+              },
+              "fieldName": "regions",
+              "default": "undefined"
+            },
+            {
+              "name": "dragtocreateregions",
+              "description": "Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "dragToCreateRegions",
+              "default": "false"
+            },
+            {
+              "name": "regioncolor",
+              "description": "Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "regionColor",
+              "default": "null"
+            },
+            {
+              "name": "options",
+              "description": "Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`sampleRate`, `mediaControls`, `splitChannels`, `barHeight`, …).",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "options",
+              "default": "{}"
+            },
+            {
+              "name": "currenttime",
+              "description": "The current playback position in seconds. The lone two-way `model: true` prop: playback writes the live position back on every `timeupdate` (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write seeks the engine via `setTime`.",
+              "type": {
+                "text": "unknown"
+              },
+              "fieldName": "currentTime",
+              "default": "undefined"
+            }
+          ],
+          "events": [
+            {
+              "name": "regionCreated",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "regionUpdated",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "regionRemoved",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "regionClicked",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "regionIn",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "regionOut",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "ready",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "playing",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "paused",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "finished",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "timeupdate",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "seeking",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "interaction",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "loading",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "error",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "regions-change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired with the updated `regions` (`event.detail`) when it changes."
+            },
+            {
+              "name": "currentTime-change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired with the updated `currentTime` (`event.detail`) when it changes."
+            }
+          ],
+          "slots": []
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Waveform",
+          "declaration": {
+            "name": "Waveform",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "Waveform",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-waveform",
+          "declaration": {
+            "name": "Waveform",
+            "module": "dist/index.mjs"
+          }
+        }
+      ]
+    }
+  ]
+}

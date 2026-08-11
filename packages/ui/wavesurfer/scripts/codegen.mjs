@@ -27,8 +27,21 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { buildCustomElementsManifest } from './cem.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
+import { buildWebTypes } from './web-types.mjs';
+
+// JetBrains web-types (Vue leaf) + Custom Elements Manifest (Lit leaf) sidecar
+// prose (D-05, ported from the codemirror/rete precedent). PhpStorm/WebStorm
+// read `web-types` — NOT vue-tsc's `__VLS_` .d.ts (WEB-57769) — for prop/
+// event/model completion; VS Code (lit-plugin) AND JetBrains both read the CEM
+// for `<rozie-waveform>` completion.
+const IDE_SIDECAR_DESCRIPTION =
+  "Rozie's cross-framework port of wavesurfer.js v7 — a data-bound audio " +
+  'waveform player with two two-way bindings (`currentTime`, `regions`), ' +
+  'live plugin presence (Timeline/Hover/Regions), and an imperative handle.';
+const IDE_SIDECAR_DOC_URL = 'https://github.com/One-Learning-Community/rozie.js#readme';
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/wavesurfer
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
@@ -282,6 +295,64 @@ function main() {
     const pkgName = leafPkgName(cfg.dir);
     const readme = renderReadme(target, ir, pkgName, handleManifest);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
+
+    // JetBrains web-types sidecar for the Vue leaf (D-05) — emitted from the
+    // SAME IR the README uses so it never drifts. PhpStorm/WebStorm read this
+    // (NOT vue-tsc's `__VLS_` .d.ts, WEB-57769) for prop/event/model
+    // completion. The version is read from the leaf package.json AT
+    // GENERATION TIME, so a version bump must be followed by a regen — see
+    // tests/sidecars.test.ts, which turns the stale-sidecar failure mode
+    // (commit 4a095fdd) into a red test instead of a silently re-dirtying
+    // build. The Vue codegen does not otherwise rewrite the leaf
+    // package.json, so wire the `web-types` field + `files` entry idempotently.
+    if (target === 'vue') {
+      const leafDir = resolve(ROOT, 'packages', cfg.dir);
+      const vuePkgPath = resolve(leafDir, 'package.json');
+      const vuePkg = JSON.parse(readFileSync(vuePkgPath, 'utf8'));
+      const webTypesDoc = buildWebTypes({
+        ir,
+        pkgName: vuePkg.name,
+        version: vuePkg.version,
+        componentName: 'Waveform',
+        description: IDE_SIDECAR_DESCRIPTION,
+        docUrl: IDE_SIDECAR_DOC_URL,
+      });
+      writeFileSync(
+        resolve(leafDir, 'web-types.json'),
+        `${JSON.stringify(webTypesDoc, null, 2)}\n`,
+      );
+      vuePkg['web-types'] = './web-types.json';
+      if (!vuePkg.files.includes('web-types.json')) {
+        vuePkg.files = [...vuePkg.files, 'web-types.json'];
+      }
+      writeFileSync(vuePkgPath, `${JSON.stringify(vuePkg, null, 2)}\n`);
+    }
+
+    // Lit leaf: emit a Custom Elements Manifest (`custom-elements.json`, D-05)
+    // from the SAME IR + wire the leaf package.json (`customElements` field +
+    // files entry). Both VS Code (lit-plugin) and JetBrains read it for
+    // `<rozie-waveform>` attribute/property/event completion. Wired
+    // idempotently — the Lit codegen does not otherwise rewrite this manifest.
+    if (target === 'lit') {
+      const leafDir = resolve(ROOT, 'packages', cfg.dir);
+      const litPkgPath = resolve(leafDir, 'package.json');
+      const litPkg = JSON.parse(readFileSync(litPkgPath, 'utf8'));
+      const cemDoc = buildCustomElementsManifest({
+        ir,
+        componentName: 'Waveform',
+        description: IDE_SIDECAR_DESCRIPTION,
+        handleManifest,
+      });
+      writeFileSync(
+        resolve(leafDir, 'custom-elements.json'),
+        `${JSON.stringify(cemDoc, null, 2)}\n`,
+      );
+      litPkg.customElements = 'custom-elements.json';
+      if (!litPkg.files.includes('custom-elements.json')) {
+        litPkg.files = [...litPkg.files, 'custom-elements.json'];
+      }
+      writeFileSync(litPkgPath, `${JSON.stringify(litPkg, null, 2)}\n`);
+    }
 
     // Vendor the repo LICENSE into each published leaf.
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));

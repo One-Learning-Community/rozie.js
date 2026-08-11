@@ -1,0 +1,342 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JetBrains/web-types/master/schema/web-types.json",
+  "name": "@rozie-ui/wavesurfer-vue",
+  "version": "0.1.1",
+  "description-markup": "markdown",
+  "framework": "vue",
+  "contributions": {
+    "html": {
+      "vue-components": [
+        {
+          "name": "Waveform",
+          "source": {
+            "module": "@rozie-ui/wavesurfer-vue",
+            "symbol": "Waveform"
+          },
+          "description": "Rozie's cross-framework port of wavesurfer.js v7 — a data-bound audio waveform player with two two-way bindings (`currentTime`, `regions`), live plugin presence (Timeline/Hover/Regions), and an imperative handle.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "src",
+              "description": "The audio URL the waveform loads. Bound at construction and reconciled at runtime — changing it calls the engine `load(url)`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "peaks",
+              "description": "Pre-computed waveform peaks (an array of channel sample arrays, or a single `number[]`). Renders the waveform without downloading or decoding audio — pair with `duration`. Construction-only.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "unknown"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "duration",
+              "description": "The audio duration in seconds. Required alongside `peaks` when rendering without a decodable `src` (the timeline/ruler and region positions are derived from it). Construction-only.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "height",
+              "description": "The waveform height in pixels. Reconciled at runtime via `setOptions`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "128"
+            },
+            {
+              "name": "wave-color",
+              "description": "The color of the unplayed portion of the waveform. Reconciled at runtime via `setOptions`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"#8a2be2\""
+            },
+            {
+              "name": "progress-color",
+              "description": "The color of the played (progress) portion of the waveform. Reconciled at runtime via `setOptions`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"#5a189a\""
+            },
+            {
+              "name": "cursor-color",
+              "description": "The color of the playback cursor. Reconciled at runtime via `setOptions`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"#333333\""
+            },
+            {
+              "name": "cursor-width",
+              "description": "The width of the playback cursor in pixels. Reconciled at runtime via `setOptions`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "1"
+            },
+            {
+              "name": "bar-width",
+              "description": "Draw the waveform as bars of this pixel width. `null` (default) renders a continuous waveform. Reconciled at runtime via `setOptions`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "unknown"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "bar-gap",
+              "description": "The pixel gap between bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "unknown"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "bar-radius",
+              "description": "The corner radius of bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "unknown"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "min-px-per-sec",
+              "description": "The minimum pixels-per-second zoom level. Reconciled at runtime via `zoom`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "1"
+            },
+            {
+              "name": "volume",
+              "description": "Playback volume (`0`–`1`). Reconciled at runtime via `setVolume`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "1"
+            },
+            {
+              "name": "playback-rate",
+              "description": "Playback speed multiplier. Reconciled at runtime via `setPlaybackRate`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "1"
+            },
+            {
+              "name": "autoplay",
+              "description": "Begin playback as soon as the audio is ready. Construction-only.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "normalize-amplitude",
+              "description": "Normalize the waveform by its largest peak (wavesurfer's `normalize` option). Reconciled at runtime via `setOptions`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "hide-scrollbar",
+              "description": "Hide the horizontal scrollbar when the waveform is zoomed wider than its container. Construction-only.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "disable-interaction",
+              "description": "Disable click/seek interaction with the waveform (the engine defaults to interactive). Construction-only.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "disable-drag-to-seek",
+              "description": "Disable drag-to-seek across the waveform (the engine defaults to drag-seekable). Construction-only.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "timeline",
+              "description": "Render a time-ruler beneath the waveform (the wavesurfer Timeline plugin). Live-toggleable — registers/unregisters on the running engine, no remount.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "hover",
+              "description": "Show a hover cursor with a time label as the pointer moves over the waveform (the wavesurfer Hover plugin). Live-toggleable — registers/unregisters on the running engine, no remount.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "hover-color",
+              "description": "The line color of the Hover plugin cursor (only applies when `hover` is enabled). Read/applied when the Hover plugin is (re-)created — not live on an already-registered instance.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "regions",
+              "description": "The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin — at construction if it's already an array, or lazily the first time `regions` transitions from `null`/`undefined` to an array. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "unknown"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "drag-to-create-regions",
+              "description": "Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "region-color",
+              "description": "Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "options",
+              "description": "Raw wavesurfer `WaveSurferOptions` passthrough — spread into `WaveSurfer.create()` before the curated keys (explicit props win). Use it for any v7 option not surfaced as a first-class prop (`sampleRate`, `mediaControls`, `splitChannels`, `barHeight`, …).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "current-time",
+              "description": "The current playback position in seconds. The lone two-way `model: true` prop: playback writes the live position back on every `timeupdate` (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write seeks the engine via `setTime`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "unknown"
+              ],
+              "default": "undefined"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "regionCreated",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "regionUpdated",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "regionRemoved",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "regionClicked",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "regionIn",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "regionOut",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "ready",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "playing",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "paused",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "finished",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "timeupdate",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "seeking",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "interaction",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "loading",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "error",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "update:regions",
+                "description": "Emitted with the updated `regions` value; powers `v-model:regions`.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "update:currentTime",
+                "description": "Emitted with the updated `currentTime` value; powers `v-model:currentTime`.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": []
+        }
+      ]
+    }
+  }
+}
