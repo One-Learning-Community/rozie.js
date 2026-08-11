@@ -1,5 +1,12 @@
 # @rozie-ui/combobox-react
 
+## 0.4.4
+
+### Patch Changes
+
+- Stale-publish reconciliation: republish so the tarball matches the committed generated source. The sole drift was a documentation-comment correction in the generated component source (removal of a stale "byte-identical to today" claim from the groupCap prose) that landed without a version bump. No behavioral change.
+  - @rozie/runtime-react@0.5.2
+
 ## 0.4.3
 
 ### Patch Changes
@@ -7,6 +14,7 @@
 - Mount-time staleness fix. Values read inside `$onMount` are now mirrored through synced refs, so a callback registered once at mount no longer reads the first render's values for the lifetime of the component. A consumer that changes a prop — or passes a new handler identity — after mount is now observed by the mount-registered callback instead of being silently ignored.
 
   Only the **helper-call** read kind landed here — `buildVirtualizer()`, `syncQueryToValue()` and `syncRows()` are now invoked through synced refs, so the mount-registered wiring operates on the current rows/query state rather than the state captured at mount. No prop read or `$emit` handler in this component was affected.
+
 - The mount effect's dependency array is now honest, so the `react-hooks/exhaustive-deps` suppression is no longer emitted.
 - No API surface change.
 - @rozie/runtime-react@0.2.3

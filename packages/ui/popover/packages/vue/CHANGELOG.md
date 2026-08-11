@@ -1,5 +1,12 @@
 # @rozie-ui/popover-vue
 
+## 0.1.3
+
+### Patch Changes
+
+- Regenerated with the toolchain's Vue `$watch` flush:'post' fix: all `$watch`-driven prop/data reconcilers now run post-flush (after the DOM update, matching the React/Solid/Svelte/Angular/Lit leaves' timing) instead of Vue's default pre-flush. This closes the portal re-entrancy class (a portal fill mounting from inside an engine update can no longer synchronously flush a pending sibling watcher into the same engine mid-update) and the pre-flush `$refs`-read-too-early class (e.g. the embla runtime `thumbnails` toggle previously failed to build its thumb engine on Vue). No API surface change.
+  - @rozie/runtime-vue@0.5.2
+
 ## 0.1.2
 
 ### Patch Changes

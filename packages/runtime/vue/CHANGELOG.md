@@ -1,5 +1,11 @@
 # @rozie/runtime-vue
 
+## 0.5.2
+
+### Patch Changes
+
+- @rozie/runtime-keynav-core@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes

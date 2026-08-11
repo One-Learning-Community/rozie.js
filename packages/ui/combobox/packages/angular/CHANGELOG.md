@@ -1,5 +1,11 @@
 # @rozie-ui/combobox-angular
 
+## 0.4.2
+
+### Patch Changes
+
+- Stale-publish reconciliation: republish so the tarball matches the committed generated source. The sole drift was a documentation-comment correction in the generated component source (removal of a stale "byte-identical to today" claim from the groupCap prose) that landed without a version bump. No behavioral change.
+
 ## 0.4.1
 
 ### Patch Changes

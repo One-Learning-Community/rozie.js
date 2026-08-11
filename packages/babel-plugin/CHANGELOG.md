@@ -1,5 +1,12 @@
 # @rozie/babel-plugin
 
+## 0.5.2
+
+### Patch Changes
+
+- Vue emitter: `$watch` now compiles to `watch(getter, cb, { flush: 'post' })` (and `{ immediate: true, flush: 'post' }` for eager watchers) instead of Vue's default pre-flush timing. This aligns Vue watcher timing with the other five targets' post-render primitives (React `useEffect`, Solid `createEffect`, Angular `effect()`, Svelte `$effect`, Lit `updated()`) and structurally closes the pre-flush re-entrancy class where a portal fill's nested `render()` could synchronously flush a still-pending sibling watcher into an engine mid-update ("Calls to EditorView.update are not allowed while an update is in progress"). Also fixes the pre-flush `$refs`-read-too-early class (watcher callbacks now observe the updated DOM). The `immediate` initial fire remains synchronous at registration — the documented "immediate lands before `$onMount` on vue" contract is unchanged. Rides via the bundled `@rozie/target-vue`.
+  - @rozie/core@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes
