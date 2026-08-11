@@ -1,4 +1,4 @@
-# @rozie-ui/wavesurfer-svelte
+# @rozie-ui/wavesurfer-angular
 
 ## 0.1.3
 
@@ -19,10 +19,3 @@ AUDIT.md`) found no public-surface change from this shore-up wave — no prop, e
   runtime exercise was a single static pixel cell). It also added JetBrains web-types.json
   (Vue) and a Custom Elements Manifest (Lit) IDE sidecars, generated from the same lowered
   IR the READMEs use.
-
-## 0.1.1
-
-### Patch Changes
-
-- Updated dependencies [364f4c5]
-  - @rozie/runtime-svelte@0.2.0
