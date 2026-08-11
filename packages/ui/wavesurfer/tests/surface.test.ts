@@ -62,19 +62,19 @@ describe('Waveform.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (27 props)', () => {
+  it('props surface matches', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
 
-  it('model:true props match (currentTime, regions)', () => {
+  it('model:true props match', () => {
     const modelNames = ir.props
       .filter((p: { isModel?: boolean }) => p.isModel)
       .map((p: { name: string }) => p.name);
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches (15 emits)', () => {
+  it('emits surface matches', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
@@ -83,7 +83,7 @@ describe('Waveform.rozie surface gate', () => {
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 
-  it('expose surface matches (17 verbs)', () => {
+  it('expose surface matches', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

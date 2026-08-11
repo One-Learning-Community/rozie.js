@@ -13,11 +13,12 @@
  * subpaths) directly, so the leaves carry no colocated bridge and there is NO
  * internal-helper copy step.
  *
- * Waveform.rozie's 9 emits + 14 expose verbs compile strict-tsc-clean
- * as-authored (the container `ref` is a well-typed `div`, so — unlike cropper's
- * `<img>` — there is NO per-leaf React type-aid `code.replace(...)` patch). If a
- * future emit shape needs one, ADD it as a fail-loud token-anchored replace — do
- * NOT edit the emitter (SCOPE FENCE).
+ * Waveform.rozie's emits + expose verbs (see tests/surface.test.ts's EXPECT
+ * block for the current counts — not restated here to avoid re-rotting)
+ * compile strict-tsc-clean as-authored (the container `ref` is a well-typed
+ * `div`, so — unlike cropper's `<img>` — there is NO per-leaf React type-aid
+ * `code.replace(...)` patch). If a future emit shape needs one, ADD it as a
+ * fail-loud token-anchored replace — do NOT edit the emitter (SCOPE FENCE).
  *
  * BUILD-ORDER CONTRACT: this script writes each leaf's src/Waveform.*, so it MUST
  * run before the bundled-leaf tsdown builds (`turbo run build --force`).
