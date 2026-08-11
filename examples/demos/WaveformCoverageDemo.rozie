@@ -1,0 +1,643 @@
+<!--
+  WaveformCoverageDemo.rozie — companion rig for `tests/visual-regression/specs/
+  waveform-coverage.spec.ts`, quick-task 260811-kt2. Closes every COVERAGE-GAP
+  group (G-A through G-K) named in `.planning/quick/260811-kt2-wavesurfer-
+  debut-shore-up/AUDIT.md` §3 — the family's ONLY prior runtime exercise was a
+  single static pixel cell (WaveformScreenshotDemo). Nothing here touches that
+  rig; it is a SEPARATE, behavioral-only file.
+
+  DISCOVERED RED-FIRST (now documented as a Gotcha in docs/components/
+  wavesurfer.md): `dragToCreateRegions` needs `disableDragToSeek: true` to
+  actually work. wavesurfer.js's CORE renderer registers its own
+  `pointerdown` + document-level `pointermove` drag-to-seek tracker on the
+  SAME wrapper element at CONSTRUCTION time (`initDrag()`), before the
+  Regions plugin's `enableDragSelection` tracker registers (only once the
+  `regions` plugin exists). Both use the identical threshold-tracking
+  pattern, and each tracker's pointermove handler bails out early if
+  `event.defaultPrevented` is already true — so whichever tracker registered
+  FIRST (always drag-to-seek, since it is wired at construction) calls
+  `preventDefault()` first and silently starves the later one. Confirmed via
+  direct engine event instrumentation: with `disableDragToSeek: false`
+  (wavesurfer's default), a drag gesture over empty waveform space fires
+  `dragstart`/`drag`/`dragend`/`interaction` (the CORE seek path) and ZERO
+  `region-initialized`/`region-created` events. This is wavesurfer.js's own
+  behavior, not a Rozie source bug — the source passes `dragToSeek` straight
+  through. `main` below sets `:disable-drag-to-seek="true"` for exactly this
+  reason (G-K's disableDragToSeek/disableInteraction opt-out proof lives on
+  the separate `construct` cell instead, so nothing is lost).
+
+  DETERMINISM LADDER (audit STEP 3 decision, recorded here):
+    - Everything that does NOT require actual media playback (construction
+      options, setOptions reconciles, plugin presence, region CRUD, the
+      regions model) drives the `main` peaks-only cell — fixed computed peaks
+      + a pinned duration render and fire `ready` with ZERO network/decode,
+      the same lever WaveformScreenshotDemo already proves works ×6. This
+      rig's own PEAKS/PEAKS2 constants are separate from that rig's.
+    - Playback-dependent behavior (the play/pause/finish/timeupdate/seeking
+      event set, the playback verbs, currentTime's engine-writeback
+      direction, region-in/out) needs REAL decodable audio. AUDIO_FIXTURE is
+      a deterministically-synthesized tone WAV, base64-inlined — no network,
+      no file the VR host has to serve, exact 2.0s duration (asserted
+      exactly, since it is a fixture property, not measured).
+    - Assertion discipline: exact duration; exact positions only after a
+      PROGRAMMATIC seek; playback progress asserted as monotonic advance,
+      never an elapsed-time value.
+
+  FIVE HARD RIG RULES (all derived from documented per-target behavior):
+    RULE 1 — prefer emit/model probes over refs. This family publishes its
+    WHOLE observable surface through 15 emits + 2 models with ZERO slots, so
+    almost every gap group is provable without a ref. Angular resolves a
+    component ref to the host element, not the $expose handle (code-mirror.
+    spec.ts:346-353) — so ONLY genuinely handle-only assertions (the $expose
+    verbs themselves: play/pause/stop/seekTo/setTime/setVolume/
+    setPlaybackRate/setZoom/load/isPlaying/getDuration/getCurrentTime/
+    getWaveSurfer/addRegion/clearRegions/getRegions) route through
+    `$refs.main` / `$refs.playback`, and those legs gate on target in the
+    spec, citing this precedent.
+    RULE 2 — no arrow functions inside template interpolations (Angular AOT
+    blank-renders on those). Every handler is a named script-block function.
+    RULE 3 — no `$computed` wrapping any object/array prop binding (breaks
+    Lit's reactivity, per `.planning/todos/pending/react-object-prop-
+    stability-vs-lit-computed-getter.md`). The `regions` array bound to
+    `main` is a plain $data array; the React-reference-churn hazard for it is
+    observed red-first (the "rebuild identical regions" leg), never
+    engineered around.
+    RULE 4 — WaveformScreenshotDemo.rozie is untouched; nothing here is added
+    to the screenshot matrix.
+    RULE 5 — `main`/`playback`/`autoplay`/`construct` all read `$refs.*` (or
+    their own container ref internally, inside Waveform.rozie) ONLY inside
+    `$onMount`-adjacent handler functions triggered by user interaction,
+    never during template evaluation.
+
+  Gap-group -> mount/leg map (see waveform-coverage.spec.ts for the runtime
+  assertions):
+    G-A construction-time options   -> `construct` cell (peaks/duration/
+                                        disableInteraction/disableDragToSeek
+                                        first-class props) + `autoplay` cell
+                                        (autoplay, hideScrollbar)
+    G-B setOptions-reconciled       -> `main` cell: height (canvas attribute)
+                                        + waveColor (pixel sample) + a
+                                        catch-all repaint-delta leg for the
+                                        rest (cursorColor/cursorWidth/
+                                        barWidth/barGap/barRadius/
+                                        normalizeAmplitude)
+    G-C dedicated-call reconciles   -> `main` cell: src->load (readyCount),
+                                        minPxPerSec->zoom (repaint delta),
+                                        volume/playbackRate -> instrumented
+                                        via the handle panel (no emit exists)
+    G-D plugin presence, live       -> `main` cell: timeline/hover toggled,
+                                        DOM-node-count delta + readyCount
+                                        stays flat (no engine rebuild)
+    G-E regions construction+lazy   -> `playback` cell (construction-time
+                                        array) + `main` cell (null->array
+                                        lazy transition, gated by
+                                        dragToCreateRegions)
+    G-F region CRUD events          -> `main` cell: regionCreated (real
+                                        drag-to-create gesture), regionClicked
+                                        (real click), regionUpdated (real
+                                        drag-move); regionRemoved via the
+                                        handle's clearRegions() (Angular-gated)
+    G-G regions model (two-way)     -> `main` cell: writeback + id-less echo
+                                        (drag-created region gets an id) +
+                                        the sameRegions no-oscillation guard
+                                        (rebuild-identical leg) + controlled
+                                        add/update/remove-by-id (via the
+                                        handle's getRegions(), Angular-gated
+                                        readback)
+    G-H currentTime model (two-way) -> `playback` cell: consumer-write
+                                        (non-ref, all 6 targets) + engine
+                                        writeback during real playback
+                                        (ref-triggered play, Angular-gated)
+    G-I playback events + verbs     -> `playback` cell (ref-triggered,
+                                        Angular-gated) + `autoplay` cell
+                                        (construction-time, ALL 6 targets —
+                                        Angular's only path to the
+                                        playing/timeupdate/finished emits)
+    G-J imperative handle           -> the handle panel (Angular-gated)
+    G-K construction-only opt-outs  -> `construct` cell, remounted with
+                                        disableInteraction/disableDragToSeek
+                                        toggled, click vs drag gestures
+-->
+
+<rozie name="WaveformCoverageDemo">
+
+<components>
+{
+  Waveform: '../../packages/ui/wavesurfer/src/Waveform.rozie',
+}
+</components>
+
+<data>
+{
+  // ── main cell — driven props ──────────────────────────────────────────
+  height: 100,
+  waveColor: '#8a2be2',
+  cursorColor: '#333333',
+  cursorWidth: 1,
+  barWidth: 2,
+  barGap: 1,
+  barRadius: 2,
+  normalizeAmplitude: false,
+  minPxPerSec: 1,
+  timeline: false,
+  hover: false,
+  hoverColor: null,
+  mainSrc: null,
+  volume: 1,
+  playbackRate: 1,
+  dragToCreateRegions: false,
+  regionColor: null,
+  regionsList: null,
+
+  // ── main cell — probes ────────────────────────────────────────────────
+  mainReadyCount: 0,
+  mainReadyDuration: '',
+  mainLoadingProbe: '',
+  mainErrorProbe: '',
+  mainInteractionProbe: '',
+  mainSeekingProbe: '',
+  regionCreatedCount: 0,
+  regionUpdatedCount: 0,
+  regionRemovedCount: 0,
+  regionClickedCount: 0,
+  regionInCount: 0,
+  regionOutCount: 0,
+  regionsEchoIdProbe: '',
+  handleProbe: '',
+
+  // ── playback cell ─────────────────────────────────────────────────────
+  playTime: 0,
+  playReadyCount: 0,
+  playReadyDuration: '',
+  playingCount: 0,
+  pausedCount: 0,
+  finishedCount: 0,
+  timeupdateCount: 0,
+  seekingCount: 0,
+  regionInPlaybackProbe: '',
+  regionOutPlaybackProbe: '',
+
+  // ── autoplay cell (all-6, no ref needed) ──────────────────────────────
+  autoplayReadyDuration: '',
+  autoplayPlayingCount: 0,
+  autoplayFinishedCount: 0,
+
+  // ── construct cell (remountable, first-class peaks/duration + K group) ─
+  constructMounted: true,
+  constructReadyCount: 0,
+  interactDisabled: false,
+  dragSeekDisabled: false,
+  interactionCount: 0,
+}
+</data>
+
+<script>
+// FIXED deterministic waveform peaks (offline, no network/decode/wall-clock —
+// the same lever WaveformScreenshotDemo already proves works ×6). Own
+// constants, deliberately separate from that rig's.
+const PEAKS = Array.from({ length: 160 }, (_, i) =>
+  Math.sin(i * 0.21) * 0.5 + Math.sin(i * 0.05) * 0.35,
+)
+const PEAKS2 = Array.from({ length: 90 }, (_, i) => Math.sin(i * 0.3) * 0.6)
+const MAIN_DURATION = 8
+const CONSTRUCT_DURATION = 5
+
+// Deterministically-synthesized tone WAV (no Date/Math.random), base64
+// data-URI — network-free, exact 2.0s duration by construction
+// (n = floor(2*8000) = 16000 samples / 8000Hz = exactly 2.0s).
+function makeToneWav(seconds, sampleRate) {
+  const n = Math.floor(seconds * sampleRate)
+  const dataLen = n * 2
+  const buf = new ArrayBuffer(44 + dataLen)
+  const dv = new DataView(buf)
+  const w = (off, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)) }
+  w(0, 'RIFF'); dv.setUint32(4, 36 + dataLen, true); w(8, 'WAVE')
+  w(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true)
+  dv.setUint32(24, sampleRate, true); dv.setUint32(28, sampleRate * 2, true)
+  dv.setUint16(32, 2, true); dv.setUint16(34, 16, true)
+  w(36, 'data'); dv.setUint32(40, dataLen, true)
+  for (let i = 0; i < n; i++) {
+    const t = i / sampleRate
+    // A time-varying (not constant) amplitude envelope — deterministic, no
+    // Date/random. A CONSTANT-amplitude tone renders as a visually
+    // IDENTICAL peak pattern at every zoom level/time-window (the waveform
+    // is a uniform band), which made a zoom-level canvas-checksum
+    // comparison a false negative during red-first authoring (see
+    // waveform-coverage.spec.ts's zoom leg comment). The envelope makes
+    // different time-windows visually distinct.
+    const env = 0.35 + 0.3 * Math.sin(t * 3.1) + 0.2 * Math.sin(t * 0.7)
+    const s = Math.sin(2 * Math.PI * 220 * t) * env
+    dv.setInt16(44 + i * 2, s * 32767, true)
+  }
+  let bin = ''
+  const bytes = new Uint8Array(buf)
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+  return 'data:audio/wav;base64,' + btoa(bin)
+}
+const AUDIO_FIXTURE = makeToneWav(2, 8000)
+
+// Fixed region carried by the `playback` cell from CONSTRUCTION (proves
+// G-E's construction-time array path — the `main` cell separately proves the
+// lazy null->array path). Spans 0.3s-1.0s inside the 2.0s fixture so a
+// natural 0->2s playback run crosses BOTH boundaries.
+const PLAYBACK_REGIONS = [{ id: 'seg', start: 0.3, end: 1.0, color: 'rgba(45,212,191,0.3)' }]
+
+// ── main cell handlers ────────────────────────────────────────────────────
+const onMainReady = (duration) => {
+  $data.mainReadyCount = $data.mainReadyCount + 1
+  $data.mainReadyDuration = String(duration)
+}
+const onMainLoading = (percent) => { $data.mainLoadingProbe = String(percent) }
+const onMainError = (err) => { $data.mainErrorProbe = err ? String(err) : 'error' }
+const onMainInteraction = (t) => { $data.mainInteractionProbe = String(t) }
+const onMainSeeking = (t) => { $data.mainSeekingProbe = String(t) }
+const onRegionCreated = (r) => {
+  $data.regionCreatedCount = $data.regionCreatedCount + 1
+  $data.regionsEchoIdProbe = r && r.id ? String(r.id) : '(no id)'
+}
+const onRegionUpdated = () => { $data.regionUpdatedCount = $data.regionUpdatedCount + 1 }
+const onRegionRemoved = () => { $data.regionRemovedCount = $data.regionRemovedCount + 1 }
+const onRegionClicked = () => { $data.regionClickedCount = $data.regionClickedCount + 1 }
+const onRegionIn = () => { $data.regionInCount = $data.regionInCount + 1 }
+const onRegionOut = () => { $data.regionOutCount = $data.regionOutCount + 1 }
+
+// G-B: toggle each setOptions-reconciled prop to a visibly-different value in
+// one shot — the spec asserts the canvas repaints (a colored-pixel-count
+// delta) after each, proving the reconcile watchers fire.
+const toggleWaveColor = () => { $data.waveColor = $data.waveColor === '#8a2be2' ? '#22c55e' : '#8a2be2' }
+const toggleHeight = () => { $data.height = $data.height === 100 ? 60 : 100 }
+const toggleCursorAndBars = () => {
+  $data.cursorColor = $data.cursorColor === '#333333' ? '#ef4444' : '#333333'
+  $data.cursorWidth = $data.cursorWidth === 1 ? 4 : 1
+  $data.barWidth = $data.barWidth === 2 ? null : 2
+  $data.barGap = $data.barGap === 1 ? null : 1
+  $data.barRadius = $data.barRadius === 2 ? null : 2
+  $data.normalizeAmplitude = !$data.normalizeAmplitude
+}
+
+// G-C: src reconcile -> load() (readyCount increments past 1 without a
+// remount) and minPxPerSec -> zoom() (repaint delta).
+const loadRealAudio = () => { $data.mainSrc = AUDIO_FIXTURE }
+// 400px/s * 8s duration = 3200px total width, well beyond the ~621px
+// container — the container is ~77px/s already at its natural fit
+// (containerWidth/duration), so minPxPerSec must clear THAT effective floor
+// (wavesurfer uses max(minPxPerSec, containerWidth/duration)) to visibly
+// change anything; a small value like 40 is silently a no-op.
+const zoomIn = () => { $data.minPxPerSec = $data.minPxPerSec === 1 ? 400 : 1 }
+
+// G-D: plugin-presence live toggles.
+const toggleTimeline = () => { $data.timeline = !$data.timeline }
+const toggleHover = () => { $data.hover = !$data.hover; $data.hoverColor = $data.hover ? '#f59e0b' : null }
+
+// G-E (lazy) + G-F (regionCreated via a real drag): enable drag-create, THEN
+// (a separate click) register the plugin by transitioning `regions` from
+// null to an array — two steps so the ordering the source's
+// plugin-creation-time read of `dragToCreateRegions` depends on is explicit
+// and deterministic, not a same-tick race.
+const enableDragCreate = () => { $data.dragToCreateRegions = true; $data.regionColor = 'rgba(138,43,226,0.25)' }
+const registerRegionsLazily = () => { $data.regionsList = [] }
+
+// G-G: rebuild the SAME content into a brand-new array/object references —
+// the react-object-prop-stability hazard, observed red-first. A regressed
+// `sameRegions` guard would re-fire region-created/updated; the correct
+// guard leaves the counts untouched.
+const rebuildIdenticalRegions = () => {
+  if (!Array.isArray($data.regionsList)) return
+  $data.regionsList = $data.regionsList.map((r) => ({ ...r }))
+}
+// Controlled add/update/remove-by-id: replaces whatever is live with two
+// EXPLICITLY-keyed regions — exercised via reconcileRegions's controlled
+// path (reconciling=true, so no region-created/updated emit fires for this;
+// the handle panel's getRegions() call is the readback proof).
+const setControlledRegions = () => {
+  $data.regionsList = [
+    { id: 'ctrl-a', start: 0.5, end: 1.5 },
+    { id: 'ctrl-b', start: 2, end: 3 },
+  ]
+}
+
+// ── playback cell handlers ────────────────────────────────────────────────
+const onPlayReady = (duration) => {
+  $data.playReadyCount = $data.playReadyCount + 1
+  $data.playReadyDuration = String(duration)
+}
+const onPlaying = () => { $data.playingCount = $data.playingCount + 1 }
+const onPaused = () => { $data.pausedCount = $data.pausedCount + 1 }
+const onFinished = () => { $data.finishedCount = $data.finishedCount + 1 }
+const onTimeupdate = () => { $data.timeupdateCount = $data.timeupdateCount + 1 }
+const onSeeking = () => { $data.seekingCount = $data.seekingCount + 1 }
+const onRegionInPlayback = (r) => { $data.regionInPlaybackProbe = r && r.id ? String(r.id) : '(none)' }
+const onRegionOutPlayback = (r) => { $data.regionOutPlaybackProbe = r && r.id ? String(r.id) : '(none)' }
+
+// G-H direction 2 (consumer write -> engine seek), NON-ref, all 6 targets:
+// the round-trip guard (|v - getCurrentTime()| < 0.05) only skips when the
+// incoming value ALREADY matches the live position — an explicit consumer
+// seek to a value far from 0 always threads through to setTime().
+const consumerSeek = () => { $data.playTime = 1.5 }
+
+// ── autoplay cell handlers (all 6 targets, no ref) ────────────────────────
+const onAutoplayReady = (duration) => { $data.autoplayReadyDuration = String(duration) }
+const onAutoplayPlaying = () => { $data.autoplayPlayingCount = $data.autoplayPlayingCount + 1 }
+const onAutoplayFinished = () => { $data.autoplayFinishedCount = $data.autoplayFinishedCount + 1 }
+
+// ── construct cell (G-A first-class peaks/duration, G-K opt-outs) ────────
+const onConstructReady = () => { $data.constructReadyCount = $data.constructReadyCount + 1 }
+const onConstructInteraction = () => { $data.interactionCount = $data.interactionCount + 1 }
+// Remount so the CONSTRUCTION-ONLY disableInteraction/disableDragToSeek
+// props actually take a new value at buildWaveSurfer() time (they are read
+// once at construction and never reconciled — reactively assigning $data
+// alone has zero live effect, by design).
+const remountConstruct = () => {
+  $data.constructMounted = false
+  setTimeout(() => { $data.constructMounted = true }, 50)
+}
+const enableInteractOptOuts = () => { $data.interactDisabled = true; $data.dragSeekDisabled = true }
+const disableInteractOptOuts = () => { $data.interactDisabled = false; $data.dragSeekDisabled = false }
+
+// ── handle panel (G-J imperative handle, G-C volume/rate readback, G-D
+// no-rebuild + registerPlugin/unregisterPlugin instrumentation, G-F
+// regionRemoved via clearRegions(), G-G controlled-regions readback) ──────
+// Angular resolves a component ref to the host element, not the $expose
+// handle (code-mirror.spec.ts:346-353) — every call below optional-chains so
+// a target whose ref doesn't resolve the handle surfaces a stable
+// "(no handle)" string rather than throwing.
+let instrumentedWs = null
+let volumeCalls = []
+let rateCalls = []
+let registerCalls = 0
+let unregisterCalls = 0
+
+const installInstrumentation = () => {
+  const ws = $refs.main && $refs.main.getWaveSurfer ? $refs.main.getWaveSurfer() : null
+  if (!ws || ws === instrumentedWs) {
+    $data.handleProbe = ws ? 'already-instrumented' : '(no handle)'
+    return
+  }
+  instrumentedWs = ws
+  const origSetVolume = ws.setVolume.bind(ws)
+  ws.setVolume = (v) => { volumeCalls.push(v); return origSetVolume(v) }
+  const origSetRate = ws.setPlaybackRate.bind(ws)
+  ws.setPlaybackRate = (r) => { rateCalls.push(r); return origSetRate(r) }
+  const origRegister = ws.registerPlugin.bind(ws)
+  ws.registerPlugin = (p) => { registerCalls += 1; return origRegister(p) }
+  const origUnregister = ws.unregisterPlugin.bind(ws)
+  ws.unregisterPlugin = (p) => { unregisterCalls += 1; return origUnregister(p) }
+  $data.handleProbe = 'instrumented'
+}
+const bumpVolume = () => { $data.volume = $data.volume === 1 ? 0.4 : 1 }
+const bumpRate = () => { $data.playbackRate = $data.playbackRate === 1 ? 1.5 : 1 }
+const readInstrumentation = () => {
+  $data.handleProbe = `vol=${volumeCalls.length} rate=${rateCalls.length} reg=${registerCalls} unreg=${unregisterCalls} sameWs=${$refs.main && $refs.main.getWaveSurfer && $refs.main.getWaveSurfer() === instrumentedWs}`
+}
+const callIsPlaying = () => {
+  const v = $refs.playback && $refs.playback.isPlaying ? $refs.playback.isPlaying() : '(no handle)'
+  $data.handleProbe = `isPlaying=${v}`
+}
+const callGetDuration = () => {
+  const v = $refs.playback && $refs.playback.getDuration ? $refs.playback.getDuration() : '(no handle)'
+  $data.handleProbe = `duration=${v}`
+}
+const callGetCurrentTime = () => {
+  const v = $refs.playback && $refs.playback.getCurrentTime ? $refs.playback.getCurrentTime() : '(no handle)'
+  $data.handleProbe = `currentTime=${v}`
+}
+const callAddRegion = () => {
+  const r = $refs.main && $refs.main.addRegion ? $refs.main.addRegion({ start: 5, end: 6 }) : null
+  $data.handleProbe = r ? `added=${r.id}` : '(no handle)'
+}
+const callGetRegions = () => {
+  const list = $refs.main && $refs.main.getRegions ? $refs.main.getRegions() : null
+  $data.handleProbe = list ? `count=${list.length} ids=${list.map((r) => r.id).sort().join(',')}` : '(no handle)'
+}
+const callClearRegions = () => {
+  if ($refs.main && $refs.main.clearRegions) { $refs.main.clearRegions(); $data.handleProbe = 'cleared' }
+  else $data.handleProbe = '(no handle)'
+}
+const callSetZoom = () => {
+  if ($refs.main && $refs.main.setZoom) { $refs.main.setZoom(15); $data.handleProbe = 'zoomed' }
+  else $data.handleProbe = '(no handle)'
+}
+const callPlay = () => { if ($refs.playback && $refs.playback.play) $refs.playback.play(); else $data.handleProbe = '(no handle)' }
+const callPause = () => { if ($refs.playback && $refs.playback.pause) $refs.playback.pause(); else $data.handleProbe = '(no handle)' }
+const callStop = () => { if ($refs.playback && $refs.playback.stop) $refs.playback.stop(); else $data.handleProbe = '(no handle)' }
+const callSeekTo = () => { if ($refs.playback && $refs.playback.seekTo) $refs.playback.seekTo(0.9); else $data.handleProbe = '(no handle)' }
+const callSetTime = () => { if ($refs.playback && $refs.playback.setTime) $refs.playback.setTime(0.2); else $data.handleProbe = '(no handle)' }
+const callLoad = () => { if ($refs.playback && $refs.playback.load) $refs.playback.load(AUDIO_FIXTURE); else $data.handleProbe = '(no handle)' }
+const callGetWaveSurfer = () => {
+  const v = $refs.main && $refs.main.getWaveSurfer ? $refs.main.getWaveSurfer() : null
+  $data.handleProbe = v ? 'wavesurfer-instance' : '(no handle)'
+}
+</script>
+
+<template>
+<div class="waveform-coverage-demo">
+  <section class="cell" data-testid="coverage-main-wrap">
+    <h3>main (peaks-only, driven)</h3>
+    <div class="controls">
+      <button type="button" data-testid="main-toggle-wavecolor" @click="toggleWaveColor()">Toggle waveColor</button>
+      <button type="button" data-testid="main-toggle-height" @click="toggleHeight()">Toggle height</button>
+      <button type="button" data-testid="main-toggle-cursor-bars" @click="toggleCursorAndBars()">Toggle cursor+bars+normalize</button>
+      <button type="button" data-testid="main-load-audio" @click="loadRealAudio()">Load real audio (src reconcile)</button>
+      <button type="button" data-testid="main-zoom-in" @click="zoomIn()">Zoom (minPxPerSec)</button>
+      <button type="button" data-testid="main-toggle-timeline" @click="toggleTimeline()">Toggle timeline</button>
+      <button type="button" data-testid="main-toggle-hover" @click="toggleHover()">Toggle hover</button>
+      <button type="button" data-testid="main-enable-drag-create" @click="enableDragCreate()">Enable drag-create</button>
+      <button type="button" data-testid="main-register-regions" @click="registerRegionsLazily()">Register regions (lazy)</button>
+      <button type="button" data-testid="main-rebuild-identical" @click="rebuildIdenticalRegions()">Rebuild identical regions</button>
+      <button type="button" data-testid="main-set-controlled-regions" @click="setControlledRegions()">Set controlled regions</button>
+    </div>
+    <div class="status">
+      <span data-testid="main-ready-count">readyCount={{ $data.mainReadyCount }}</span>
+      <span data-testid="main-ready-duration">readyDuration={{ $data.mainReadyDuration }}</span>
+      <span data-testid="main-interaction-probe">interaction={{ $data.mainInteractionProbe }}</span>
+      <span data-testid="main-seeking-probe">seeking={{ $data.mainSeekingProbe }}</span>
+      <span data-testid="region-created-count">regionCreated={{ $data.regionCreatedCount }}</span>
+      <span data-testid="region-updated-count">regionUpdated={{ $data.regionUpdatedCount }}</span>
+      <span data-testid="region-removed-count">regionRemoved={{ $data.regionRemovedCount }}</span>
+      <span data-testid="region-clicked-count">regionClicked={{ $data.regionClickedCount }}</span>
+      <span data-testid="regions-echo-id">echoId={{ $data.regionsEchoIdProbe }}</span>
+    </div>
+    <Waveform
+      ref="main"
+      :options="{ peaks: [PEAKS], duration: MAIN_DURATION }"
+      :height="$data.height"
+      :wave-color="$data.waveColor"
+      progress-color="#5a189a"
+      :cursor-color="$data.cursorColor"
+      :cursor-width="$data.cursorWidth"
+      :bar-width="$data.barWidth"
+      :bar-gap="$data.barGap"
+      :bar-radius="$data.barRadius"
+      :normalize-amplitude="$data.normalizeAmplitude"
+      :min-px-per-sec="$data.minPxPerSec"
+      :timeline="$data.timeline"
+      :hover="$data.hover"
+      :hover-color="$data.hoverColor"
+      :src="$data.mainSrc"
+      :volume="$data.volume"
+      :playback-rate="$data.playbackRate"
+      r-model:regions="$data.regionsList"
+      :drag-to-create-regions="$data.dragToCreateRegions"
+      :region-color="$data.regionColor"
+      :disable-drag-to-seek="true"
+      @ready="onMainReady"
+      @loading="onMainLoading"
+      @error="onMainError"
+      @interaction="onMainInteraction"
+      @seeking="onMainSeeking"
+      @region-created="onRegionCreated"
+      @region-updated="onRegionUpdated"
+      @region-removed="onRegionRemoved"
+      @region-clicked="onRegionClicked"
+      @region-in="onRegionIn"
+      @region-out="onRegionOut"
+    />
+  </section>
+
+  <section class="cell" data-testid="coverage-playback-wrap">
+    <h3>playback (real decodable fixture)</h3>
+    <div class="controls">
+      <button type="button" data-testid="play-consumer-seek" @click="consumerSeek()">Consumer seek to 1.5s</button>
+    </div>
+    <div class="status">
+      <span data-testid="play-ready-duration">readyDuration={{ $data.playReadyDuration }}</span>
+      <span data-testid="play-time">playTime={{ $data.playTime }}</span>
+      <span data-testid="play-playing-count">playing={{ $data.playingCount }}</span>
+      <span data-testid="play-paused-count">paused={{ $data.pausedCount }}</span>
+      <span data-testid="play-finished-count">finished={{ $data.finishedCount }}</span>
+      <span data-testid="play-timeupdate-count">timeupdate={{ $data.timeupdateCount }}</span>
+      <span data-testid="play-seeking-count">seeking={{ $data.seekingCount }}</span>
+      <span data-testid="play-region-in">regionIn={{ $data.regionInPlaybackProbe }}</span>
+      <span data-testid="play-region-out">regionOut={{ $data.regionOutPlaybackProbe }}</span>
+    </div>
+    <Waveform
+      ref="playback"
+      :src="AUDIO_FIXTURE"
+      r-model:currentTime="$data.playTime"
+      :regions="PLAYBACK_REGIONS"
+      @ready="onPlayReady"
+      @playing="onPlaying"
+      @paused="onPaused"
+      @finished="onFinished"
+      @timeupdate="onTimeupdate"
+      @seeking="onSeeking"
+      @region-in="onRegionInPlayback"
+      @region-out="onRegionOutPlayback"
+    />
+  </section>
+
+  <section class="cell" data-testid="coverage-autoplay-wrap">
+    <h3>autoplay (construction-only, all 6 targets — Angular's non-ref path)</h3>
+    <div class="status">
+      <span data-testid="autoplay-ready-duration">readyDuration={{ $data.autoplayReadyDuration }}</span>
+      <span data-testid="autoplay-playing-count">playing={{ $data.autoplayPlayingCount }}</span>
+      <span data-testid="autoplay-finished-count">finished={{ $data.autoplayFinishedCount }}</span>
+    </div>
+    <Waveform
+      :src="AUDIO_FIXTURE"
+      :autoplay="true"
+      :hide-scrollbar="true"
+      :height="60"
+      @ready="onAutoplayReady"
+      @playing="onAutoplayPlaying"
+      @finished="onAutoplayFinished"
+    />
+  </section>
+
+  <section class="cell" data-testid="coverage-construct-wrap">
+    <h3>construct (first-class peaks/duration, interaction opt-outs)</h3>
+    <div class="controls">
+      <button type="button" data-testid="construct-enable-optouts" @click="enableInteractOptOuts()">Disable interaction+drag-seek</button>
+      <button type="button" data-testid="construct-disable-optouts" @click="disableInteractOptOuts()">Enable interaction+drag-seek</button>
+      <button type="button" data-testid="construct-remount" @click="remountConstruct()">Remount</button>
+    </div>
+    <div class="status">
+      <span data-testid="construct-ready-count">readyCount={{ $data.constructReadyCount }}</span>
+      <span data-testid="construct-interaction-count">interactionCount={{ $data.interactionCount }}</span>
+    </div>
+    <Waveform
+      r-if="$data.constructMounted"
+      :peaks="PEAKS2"
+      :duration="CONSTRUCT_DURATION"
+      :height="70"
+      :disable-interaction="$data.interactDisabled"
+      :disable-drag-to-seek="$data.dragSeekDisabled"
+      @ready="onConstructReady"
+      @interaction="onConstructInteraction"
+    />
+  </section>
+
+  <section class="cell" data-testid="coverage-handle-wrap">
+    <h3>imperative handle (Angular-gated — component refs resolve to the host element there)</h3>
+    <div class="controls">
+      <button type="button" data-testid="handle-install-instrumentation" @click="installInstrumentation()">Install instrumentation</button>
+      <button type="button" data-testid="handle-bump-volume" @click="bumpVolume()">Bump volume</button>
+      <button type="button" data-testid="handle-bump-rate" @click="bumpRate()">Bump rate</button>
+      <button type="button" data-testid="handle-read-instrumentation" @click="readInstrumentation()">Read instrumentation</button>
+      <button type="button" data-testid="handle-is-playing" @click="callIsPlaying()">isPlaying</button>
+      <button type="button" data-testid="handle-get-duration" @click="callGetDuration()">getDuration</button>
+      <button type="button" data-testid="handle-get-current-time" @click="callGetCurrentTime()">getCurrentTime</button>
+      <button type="button" data-testid="handle-add-region" @click="callAddRegion()">addRegion</button>
+      <button type="button" data-testid="handle-get-regions" @click="callGetRegions()">getRegions</button>
+      <button type="button" data-testid="handle-clear-regions" @click="callClearRegions()">clearRegions</button>
+      <button type="button" data-testid="handle-set-zoom" @click="callSetZoom()">setZoom</button>
+      <button type="button" data-testid="handle-play" @click="callPlay()">play</button>
+      <button type="button" data-testid="handle-pause" @click="callPause()">pause</button>
+      <button type="button" data-testid="handle-stop" @click="callStop()">stop</button>
+      <button type="button" data-testid="handle-seek-to" @click="callSeekTo()">seekTo</button>
+      <button type="button" data-testid="handle-set-time" @click="callSetTime()">setTime</button>
+      <button type="button" data-testid="handle-load" @click="callLoad()">load</button>
+      <button type="button" data-testid="handle-get-wavesurfer" @click="callGetWaveSurfer()">getWaveSurfer</button>
+    </div>
+    <div class="status">
+      <span data-testid="handle-out">{{ $data.handleProbe }}</span>
+    </div>
+  </section>
+</div>
+</template>
+
+<style>
+.waveform-coverage-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 640px;
+}
+.cell {
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: #fff;
+}
+.cell h3 {
+  margin: 0 0 0.375rem;
+  font-size: 0.8125rem;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+.controls button {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+}
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.375rem;
+  font-size: 0.7rem;
+  color: rgba(0, 0, 0, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+</style>
+
+</rozie>

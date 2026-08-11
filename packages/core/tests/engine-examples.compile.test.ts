@@ -138,6 +138,22 @@ const ENGINE_DEMOS = [
   // slot fills across all 6 targets) surfaces in this fast gate.
   'demos/MapLibreScreenshotDemo.rozie',
   'demos/MapLibreDemo.rozie',
+  // quick-task 260811-kt2 — WaveformCoverageDemo closes every COVERAGE-GAP
+  // group (G-A construction-time options, G-B setOptions reconciles, G-C
+  // dedicated-call reconciles incl. src->load and minPxPerSec->zoom, G-D
+  // live plugin-presence toggling, G-E regions construction+lazy
+  // registration, G-F the region CRUD event set, G-G the regions two-way
+  // model incl. the sameRegions no-oscillation guard, G-H the currentTime
+  // two-way model, G-I the playback event set + verbs, G-J the imperative
+  // handle, G-K the construction-only interaction opt-outs) named in
+  // .planning/quick/260811-kt2-wavesurfer-debut-shore-up/AUDIT.md — the
+  // family's only prior runtime exercise was a single static pixel cell.
+  // Imports ../../packages/ui/wavesurfer/src/Waveform.rozie; compiled here
+  // so a per-target consumer-side regression on any of those surfaces up in
+  // this fast gate. Behavioral-only — covered by waveform-coverage.spec.ts —
+  // deliberately NOT a VR screenshot cell (WaveformScreenshotDemo is
+  // untouched, per the standing Linux-baseline rule).
+  'demos/WaveformCoverageDemo.rozie',
 ] as const;
 
 describe('engine-wrapper examples — cross-target compile gate', () => {

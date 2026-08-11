@@ -329,6 +329,19 @@ export const EXAMPLES = [
   // ruler, container pinned to 480px for D-10. Registered as a screenshot cell in
   // matrix.spec.ts EXAMPLES.
   'WaveformScreenshot',
+  // quick-task 260811-kt2 — WaveformCoverage closes every COVERAGE-GAP group
+  // from the 260811-kt2 audit (construction-time options, setOptions
+  // reconciles, dedicated-call reconciles, live plugin-presence toggling,
+  // regions construction+lazy registration, the region CRUD event set, the
+  // regions two-way model incl. the sameRegions no-oscillation guard, the
+  // currentTime two-way model, the playback event set + verbs, the
+  // imperative handle, the construction-only interaction opt-outs). Loader
+  // resolves to examples/demos/WaveformCoverageDemo.rozie, which composes
+  // the SAME ../../packages/ui/wavesurfer/src/Waveform.rozie as
+  // WaveformScreenshotDemo above. Behavioral-only — covered by
+  // waveform-coverage.spec.ts — deliberately NOT in matrix.spec.ts EXAMPLES
+  // (same convention as ChartCoverage / ChartBehavior).
+  'WaveformCoverage',
   // PdfViewer (PDF.js / pdfjs-dist v6) — the dynamic-import + canvas-render +
   // two-way-page cell. BEHAVIORAL (loader → examples/demos/PdfViewerDemo.rozie,
   // which imports ../../packages/ui/pdf/src/PdfViewer.rozie): a bundled worker + a
@@ -1350,6 +1363,9 @@ export const LIT_TAGS: Record<Example, string> = {
   // Waveform — the lit entry appends '-demo' → tag
   // 'rozie-waveform-screenshot-demo' = kebab of WaveformScreenshotDemo.
   WaveformScreenshot: 'rozie-waveform-screenshot',
+  // quick-task 260811-kt2 — the lit entry appends '-demo' → tag
+  // 'rozie-waveform-coverage-demo' = kebab of WaveformCoverageDemo.
+  WaveformCoverage: 'rozie-waveform-coverage',
   // PdfViewer — the lit entry appends '-demo' → tag 'rozie-pdf-viewer-demo' =
   // kebab of PdfViewerDemo (the wrapper component is name="PdfViewer" →
   // 'rozie-pdf-viewer'). Behavioral only — no screenshot cell.
@@ -1764,6 +1780,12 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // quick-task 260811-9qe — ChartCoverageDemo is self-contained (all state in
   // <data>, seeded/mutated by its own script). No parent-supplied props.
   ChartCoverage: {},
+  // quick-task 260811-kt2 — WaveformCoverageDemo is self-contained (all
+  // state in <data>, seeded/mutated by its own script). No parent-supplied
+  // props. WaveformScreenshot has no DEFAULT_PROPS entry of its own
+  // (pre-existing, out of this task's scope); WaveformCoverage follows the
+  // established self-contained-demo convention instead.
+  WaveformCoverage: {},
   // Phase 32 (tiptap) — both TipTap demos are self-contained: TipTapScreenshot
   // hardcodes its fixed rich doc in <script>; TipTapBehavior seeds its content +
   // out state in <data>. No parent props needed.
