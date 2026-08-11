@@ -1778,7 +1778,11 @@ $expose({ show, close, toggle, focus, goBack, openTo })
       driven by command-palette's INTERNAL $data (A5 — not a third public model);
       the change is re-emitted as the public `select` event. `:inline="true"` keeps
       the results list IN FLOW inside the overflow-clipped panel; the combobox uses
-      `idBase` (not `id`) so it is `:id-base` here.
+      `idBase` (not `id`) so it is `:id-base` here. `ariaLabel` is bound
+      camelCase (NOT `:aria-label`): React/Svelte/Solid kebab-preserve
+      `aria-*`/`data-*` names on custom components, so the kebab form never
+      reaches Combobox's declared prop on those targets — see
+      todos/pending/aria-data-kebab-preserved-on-custom-components.md.
     -->
     <Combobox
       ref="combobox"
@@ -1794,7 +1798,7 @@ $expose({ show, close, toggle, focus, goBack, openTo })
       :option-value="commandValue"
       :option-disabled="commandDisabled"
       :placeholder="currentPlaceholder()"
-      :aria-label="$props.ariaLabel"
+      :ariaLabel="$props.ariaLabel"
       :id-base="$props.idBase"
       r-model:value="$data.activeValue"
       @change="onComboboxChange($event)"

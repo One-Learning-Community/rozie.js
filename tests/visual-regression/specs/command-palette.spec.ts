@@ -1524,3 +1524,34 @@ for (const target of TARGETS) {
     await expect.poll(async () => countOptions(page), { timeout: 10_000 }).toBe(0);
   });
 }
+
+// ---------------------------------------------------------------------------
+// Search-input accessible name (quick 260811: CommandPalette → Combobox
+// `ariaLabel` composition). The palette resolves its own `ariaLabel` default
+// ('Command palette') and forwards it to the composed <Combobox>, which names
+// the search input. Historically the source spelled the binding kebab
+// (`:aria-label`), which React/Svelte/Solid kebab-preserve on custom
+// components (see todos/pending/aria-data-kebab-preserved-on-custom-
+// components.md) — the value silently never reached Combobox's declared prop
+// and the input shipped with NO accessible name on those three targets.
+// The source now binds camelCase (`:ariaLabel`), correct on all six.
+// ---------------------------------------------------------------------------
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  runner(`command-palette-input-accessible-name [${target}]: the search input carries the palette's ariaLabel`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=CommandPaletteBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('open-palette').click();
+    const input = page.locator('input[role="combobox"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    // The demo binds ariaLabel="Command palette" on the palette; the value
+    // must thread through the palette's Combobox composition to the input.
+    await expect(input).toHaveAttribute('aria-label', 'Command palette');
+  });
+}
