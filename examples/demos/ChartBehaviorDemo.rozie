@@ -104,7 +104,7 @@ const toggleDatasetVisibility = () => {
     <button type="button" :class="{ active: $data.chartType === 'doughnut' }" @click="setType('doughnut')">Doughnut</button>
     <button type="button" data-testid="chart-export-png-btn" @click="exportPng()">Export PNG</button>
     <button type="button" data-testid="chart-toggle-series-btn" @click="toggleDatasetVisibility()">Toggle series</button>
-    <span class="status" data-testid="chart-status">type={{ $data.chartType }} clicks={{ $data.clickCount }} consumerClicks={{ $data.consumerOnClickCount }} visible={{ $data.datasetVisible }}</span>
+    <span class="status" data-testid="chart-status">type={{ $data.chartType }} clicks={{ $data.clickCount }} consumerClicks={{ $data.consumerOnClickCount }} visible={{ $data.datasetVisible ? 'true' : 'false' }}</span>
   </div>
 
   <div class="chart-wrap">

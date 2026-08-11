@@ -102,6 +102,17 @@ const doughnutData = {
 // instance after teardown.
 let liveChart = null
 
+// Plain (non-reactive) counter for the consumer-supplied hover callback
+// (G-10's non-clobber proof). Bumped from INSIDE `lineOptions.onHover` below
+// — that closure touches ONLY this plain variable, never $data, which is
+// what keeps `lineOptions` itself eligible for a genuinely stable, once-only
+// per-instance identity across every target (see the comment on
+// `lineOptions`). `onLineHover` (an already template-bound `@hover` handler)
+// mirrors it into $data.consumerHoverCount on every Rozie hover emit, which
+// Chart.rozie's composedOnHover always fires immediately AFTER the consumer
+// callback — so the mirrored value is never stale by the time it's read.
+let consumerHoverRaw = 0
+
 // Identity-guarded instrumentation of the live instance's update() — mirrors
 // the established getContext monkey-patch style (chart-recreation.spec.ts):
 // patch a PUBLIC engine method to observe wrapper behavior, never read engine
@@ -138,6 +149,7 @@ const probeBar = (chart) => {
 
 const onLineHover = (payload) => {
   $data.hoverCount = $data.hoverCount + 1
+  $data.consumerHoverCount = consumerHoverRaw
   probeLine(payload.chart)
 }
 const onLineClick = (payload) => {
@@ -147,12 +159,37 @@ const onBarHover = (payload) => {
   probeBar(payload.chart)
 }
 
-// Stable options const (RULE 2) — a consumer-supplied hover callback bumps
-// the SECOND counter (G-10's non-clobber proof: the wrapper's composed
-// onHover calls this FIRST, then emits its own `hover`).
+// Stable options const (RULE 2) — plain object, deliberately NOT `$computed`.
+// `onHover` touches only the plain `consumerHoverRaw` variable above, never
+// `$data`, so nothing reactive is read inside this closure.
+//
+// Two shapes were tried red-first before landing here (see the EMITTER-
+// BACKLOG todo filed for this quick task, `.planning/todos/pending/`):
+//   1. A plain object whose `onHover` read-modify-wrote `$data` directly
+//      (`$data.x = $data.x + 1`). On React/Solid that read makes the
+//      compiler treat the WHOLE containing object as render-scoped (rebuilt
+//      fresh every render), so ANY unrelated $data write on the page
+//      (including just hovering — hoverCount alone triggers a re-render)
+//      gives Chart's `options` prop a new reference, re-firing the
+//      wrapper's `options` $watch (`instance.update('none')`) and stomping
+//      the G-05 mode-threading observation with a spurious 'none'.
+//   2. Wrapping the object in `$computed(...)` fixes exactly that on
+//      React/Solid (a properly memoized, dependency-free result) — but on
+//      Lit it compiles to a plain UN-CACHED getter re-evaluated on every
+//      access (unlike a bare object, which Lit assigns ONCE in the
+//      constructor), so `options` churns on every render there too, which
+//      cascades into a live re-render loop and the hover handler stops
+//      firing at all within any observable window.
+// This plain (non-`$computed`) object is genuinely stable on Vue / Svelte /
+// Angular / Lit (each assigns it once at setup) and on Solid (whose
+// fine-grained reactivity never rebuilds an unreferenced top-level const).
+// Only React still churns it every render — the `updateMode` leg below
+// documents and skips the ONE sub-assertion that shape confounds on React,
+// rather than accepting a worse (Lit hover-dead) trade on five targets to
+// fully clean up one.
 const lineOptions = {
   plugins: { legend: { display: true, position: 'bottom' } },
-  onHover: () => { $data.consumerHoverCount = $data.consumerHoverCount + 1 },
+  onHover: () => { consumerHoverRaw = consumerHoverRaw + 1 },
 }
 
 // $watch(() => $props.data) reconciles a FRESH data object into the live
@@ -253,8 +290,8 @@ const updateModeValue = $computed(() => ($data.noneModeOn ? 'none' : undefined))
     <span data-testid="coverage-last-mode">mode={{ $data.lastUpdateMode }}</span>
     <span data-testid="coverage-destroy-150">d150={{ $data.destroyProbe150 }}</span>
     <span data-testid="coverage-destroy-700">d700={{ $data.destroyProbe700 }}</span>
-    <span data-testid="coverage-redraw-flag">redraw={{ $data.redrawOn }}</span>
-    <span data-testid="coverage-none-mode-flag">noneMode={{ $data.noneModeOn }}</span>
+    <span data-testid="coverage-redraw-flag">redraw={{ $data.redrawOn ? 'true' : 'false' }}</span>
+    <span data-testid="coverage-none-mode-flag">noneMode={{ $data.noneModeOn ? 'true' : 'false' }}</span>
   </div>
 
   <div class="chart-wrap" data-testid="coverage-line-wrap">
@@ -267,8 +304,8 @@ const updateModeValue = $computed(() => ($data.noneModeOn ? 'none' : undefined))
       :redraw="$data.redrawOn"
       :update-mode="updateModeValue"
       :destroy-delay="400"
-      aria-label="Coverage Line Chart"
-      dataset-id-key="label"
+      :aria-label="'Coverage Line Chart'"
+      :dataset-id-key="'label'"
       @hover="onLineHover"
       @click="onLineClick"
     >
