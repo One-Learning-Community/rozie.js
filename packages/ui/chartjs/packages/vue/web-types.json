@@ -1,0 +1,1165 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JetBrains/web-types/master/schema/web-types.json",
+  "name": "@rozie-ui/chartjs-vue",
+  "version": "0.1.0",
+  "description-markup": "markdown",
+  "framework": "vue",
+  "contributions": {
+    "html": {
+      "vue-components": [
+        {
+          "name": "Chart",
+          "source": {
+            "module": "@rozie-ui/chartjs-vue",
+            "symbol": "Chart"
+          },
+          "description": "Rozie's cross-framework port of Chart.js — the generic chart, whose `type` prop switches the chart kind across the whole Chart.js controller set.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ]
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "type",
+              "description": "The chart kind — any Chart.js controller (`line`/`bar`/`pie`/`doughnut`/`radar`/`polarArea`/`scatter`/`bubble`/…). Changing it **re-creates** the instance, since Chart.js has no stable runtime type-swap.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"line\""
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "update-mode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "dataset-id-key",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"label\""
+            },
+            {
+              "name": "destroy-delay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "click",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "datasetClick",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "hover",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "fallback",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            },
+            {
+              "name": "tooltip",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ model: any }"
+            }
+          ]
+        },
+        {
+          "name": "Line",
+          "source": {
+            "module": "@rozie-ui/chartjs-vue",
+            "symbol": "Line"
+          },
+          "description": "The Line chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'line'` and registering only its own Chart.js controller set.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ]
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "update-mode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "dataset-id-key",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"label\""
+            },
+            {
+              "name": "destroy-delay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "click",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "datasetClick",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "hover",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "fallback",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            },
+            {
+              "name": "tooltip",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ model: any }"
+            }
+          ]
+        },
+        {
+          "name": "Bar",
+          "source": {
+            "module": "@rozie-ui/chartjs-vue",
+            "symbol": "Bar"
+          },
+          "description": "The Bar chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'bar'` and registering only its own Chart.js controller set.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ]
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "update-mode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "dataset-id-key",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"label\""
+            },
+            {
+              "name": "destroy-delay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "click",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "datasetClick",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "hover",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "fallback",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            },
+            {
+              "name": "tooltip",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ model: any }"
+            }
+          ]
+        },
+        {
+          "name": "Pie",
+          "source": {
+            "module": "@rozie-ui/chartjs-vue",
+            "symbol": "Pie"
+          },
+          "description": "The Pie chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'pie'` and registering only its own Chart.js controller set.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ]
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "update-mode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "dataset-id-key",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"label\""
+            },
+            {
+              "name": "destroy-delay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "click",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "datasetClick",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "hover",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "fallback",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            },
+            {
+              "name": "tooltip",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ model: any }"
+            }
+          ]
+        },
+        {
+          "name": "Doughnut",
+          "source": {
+            "module": "@rozie-ui/chartjs-vue",
+            "symbol": "Doughnut"
+          },
+          "description": "The Doughnut chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'doughnut'` and registering only its own Chart.js controller set.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ]
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "update-mode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "dataset-id-key",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"label\""
+            },
+            {
+              "name": "destroy-delay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "click",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "datasetClick",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "hover",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "fallback",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            },
+            {
+              "name": "tooltip",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ model: any }"
+            }
+          ]
+        },
+        {
+          "name": "PolarArea",
+          "source": {
+            "module": "@rozie-ui/chartjs-vue",
+            "symbol": "PolarArea"
+          },
+          "description": "The PolarArea chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'polarArea'` and registering only its own Chart.js controller set.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ]
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "update-mode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "dataset-id-key",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"label\""
+            },
+            {
+              "name": "destroy-delay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "click",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "datasetClick",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "hover",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "fallback",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            },
+            {
+              "name": "tooltip",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ model: any }"
+            }
+          ]
+        },
+        {
+          "name": "Radar",
+          "source": {
+            "module": "@rozie-ui/chartjs-vue",
+            "symbol": "Radar"
+          },
+          "description": "The Radar chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'radar'` and registering only its own Chart.js controller set.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ]
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "update-mode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "dataset-id-key",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"label\""
+            },
+            {
+              "name": "destroy-delay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "click",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "datasetClick",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "hover",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "fallback",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            },
+            {
+              "name": "tooltip",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ model: any }"
+            }
+          ]
+        },
+        {
+          "name": "Scatter",
+          "source": {
+            "module": "@rozie-ui/chartjs-vue",
+            "symbol": "Scatter"
+          },
+          "description": "The Scatter chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'scatter'` and registering only its own Chart.js controller set.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ]
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "update-mode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "dataset-id-key",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"label\""
+            },
+            {
+              "name": "destroy-delay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "click",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "datasetClick",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "hover",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "fallback",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            },
+            {
+              "name": "tooltip",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ model: any }"
+            }
+          ]
+        },
+        {
+          "name": "Bubble",
+          "source": {
+            "module": "@rozie-ui/chartjs-vue",
+            "symbol": "Bubble"
+          },
+          "description": "The Bubble chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'bubble'` and registering only its own Chart.js controller set.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ]
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "object"
+              ],
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "array"
+              ],
+              "default": "[]"
+            },
+            {
+              "name": "update-mode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "undefined"
+            },
+            {
+              "name": "dataset-id-key",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"label\""
+            },
+            {
+              "name": "destroy-delay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "0"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "click",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "datasetClick",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "hover",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "fallback",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            },
+            {
+              "name": "tooltip",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ model: any }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

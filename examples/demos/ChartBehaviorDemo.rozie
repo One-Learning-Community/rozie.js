@@ -7,12 +7,19 @@
   Exercises the EXPANDED Chart surface beyond the line-typed LineChartDemo:
     - runtime `type`-switching across THREE kinds (line -> bar -> doughnut), each
       re-creating the instance correctly (Chart.js has no runtime type-swap);
-    - the `@click` event (composed onto Chart.js's onClick) -> a click counter;
+    - the `@click` event (composed onto Chart.js's onClick) -> a click counter,
+      AND a consumer-supplied `options.onClick` alongside it -> a SECOND
+      counter, proving the wrapper composes over a consumer handler rather than
+      clobbering it (AUDIT.md COVERAGE-GAP closure);
     - the `:plugins` consumer-extensibility passthrough (an inline custom
       background plugin);
     - the external-HTML `tooltip` portal slot consumer-fill (the consumer's
       framework-native fragment mounted over the canvas) — proves the portal
-      slot consumer experience compiles + mounts on all 6 targets.
+      slot consumer experience compiles + mounts on all 6 targets;
+    - the imperative handle, driven via the FRAMEWORK-NATIVE component ref
+      (`ref="chart"` -> `$refs.chart`, the CodeMirrorDemo `ref="cm"` idiom):
+      `toBase64Image` (Export PNG) and `setDatasetVisibility`/
+      `isDatasetVisible` (Toggle series) (AUDIT.md COVERAGE-GAP closures).
 -->
 
 <rozie name="ChartBehaviorDemo">
@@ -27,6 +34,9 @@
 {
   chartType: 'line',
   clickCount: 0,
+  consumerOnClickCount: 0,
+  pngUrl: '',
+  datasetVisible: true,
 }
 </data>
 
@@ -48,6 +58,10 @@ const chartData = {
 
 const chartOptions = {
   plugins: { legend: { display: true, position: 'bottom' } },
+  // Consumer-supplied onClick, alongside the wrapper's own @click event below.
+  // Chart.rozie composes ITS handler over this one (this one runs FIRST) —
+  // this counter proves the consumer handler is never clobbered.
+  onClick: () => { $data.consumerOnClickCount = $data.consumerOnClickCount + 1 },
 }
 
 // :plugins passthrough — an inline custom plugin painting a faint background.
@@ -67,6 +81,19 @@ const setType = (t) => { $data.chartType = t }
 const onClick = (payload) => {
   $data.clickCount = $data.clickCount + (payload.elements.length > 0 ? 1 : 0)
 }
+
+// Imperative handle, via the framework-native component ref (ref="chart" ->
+// $refs.chart), NOT a $refs element read. Each runs from an @click handler
+// (post-mount). Optional-chained so the demo never throws on a target where
+// the ref momentarily resolves before the handle is attached.
+const exportPng = () => {
+  $data.pngUrl = $refs.chart?.toBase64Image?.() ?? ''
+}
+const toggleDatasetVisibility = () => {
+  const next = !($refs.chart?.isDatasetVisible?.(0) ?? true)
+  $refs.chart?.setDatasetVisibility?.(0, next)
+  $data.datasetVisible = next
+}
 </script>
 
 <template>
@@ -75,11 +102,13 @@ const onClick = (payload) => {
     <button type="button" :class="{ active: $data.chartType === 'line' }" @click="setType('line')">Line</button>
     <button type="button" :class="{ active: $data.chartType === 'bar' }" @click="setType('bar')">Bar</button>
     <button type="button" :class="{ active: $data.chartType === 'doughnut' }" @click="setType('doughnut')">Doughnut</button>
-    <span class="status" data-testid="chart-status">type={{ $data.chartType }} clicks={{ $data.clickCount }}</span>
+    <button type="button" data-testid="chart-export-png-btn" @click="exportPng()">Export PNG</button>
+    <button type="button" data-testid="chart-toggle-series-btn" @click="toggleDatasetVisibility()">Toggle series</button>
+    <span class="status" data-testid="chart-status">type={{ $data.chartType }} clicks={{ $data.clickCount }} consumerClicks={{ $data.consumerOnClickCount }} visible={{ $data.datasetVisible }}</span>
   </div>
 
   <div class="chart-wrap">
-    <Chart :data="chartData" :options="chartOptions" :type="$data.chartType" :plugins="consumerPlugins" :height="240" @click="onClick">
+    <Chart ref="chart" :data="chartData" :options="chartOptions" :type="$data.chartType" :plugins="consumerPlugins" :height="240" @click="onClick">
       <template #tooltip="{ model }">
         <div class="rozie-demo-tip" data-testid="chart-tooltip">
           <strong>{{ model.title.join(' ') }}</strong>
@@ -87,6 +116,8 @@ const onClick = (payload) => {
       </template>
     </Chart>
   </div>
+
+  <img r-if="$data.pngUrl" :src="$data.pngUrl" alt="exported chart" data-testid="chart-png-output" class="chart-png-output" />
 </div>
 </template>
 

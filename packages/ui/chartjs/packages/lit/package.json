@@ -83,7 +83,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "custom-elements.json"
   ],
   "dependencies": {
     "@rozie/runtime-lit": "workspace:*"
@@ -114,5 +115,6 @@
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "customElements": "custom-elements.json"
 }

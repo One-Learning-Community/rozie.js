@@ -1,0 +1,3076 @@
+{
+  "schemaVersion": "2.1.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "dist/Chart.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Rozie's cross-framework port of Chart.js — the generic chart, whose `type` prop switches the chart kind across the whole Chart.js controller set.",
+          "name": "Chart",
+          "tagName": "rozie-chart",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "data"
+            },
+            {
+              "kind": "field",
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "options",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "type",
+              "description": "The chart kind — any Chart.js controller (`line`/`bar`/`pie`/`doughnut`/`radar`/`polarArea`/`scatter`/`bubble`/…). Changing it **re-creates** the instance, since Chart.js has no stable runtime type-swap.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "type",
+              "default": "\"line\""
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "height",
+              "default": "240"
+            },
+            {
+              "kind": "field",
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "width",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "plugins",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "updateMode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "updatemode",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "redraw",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "arialabel",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "datasetIdKey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "datasetidkey",
+              "default": "\"label\""
+            },
+            {
+              "kind": "field",
+              "name": "destroyDelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "destroydelay",
+              "default": "0"
+            },
+            {
+              "kind": "method",
+              "name": "getChart",
+              "description": "Return the underlying Chart.js instance for direct API access (e.g. `getChart().update()`)."
+            },
+            {
+              "kind": "method",
+              "name": "updateChart",
+              "description": "Re-render the chart after mutating its data/options — `updateChart(mode?)` (Chart.js `update` mode string)."
+            },
+            {
+              "kind": "method",
+              "name": "resizeChart",
+              "description": "Resize the chart to its container, or to explicit dimensions — `resizeChart(width?, height?)`."
+            },
+            {
+              "kind": "method",
+              "name": "resetChart",
+              "description": "Reset the chart elements to their initial (pre-animation) state."
+            },
+            {
+              "kind": "method",
+              "name": "renderChart",
+              "description": "Re-render the chart from its current state without recalculating the scales."
+            },
+            {
+              "kind": "method",
+              "name": "stopChart",
+              "description": "Stop the current animation loop (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "clearChart",
+              "description": "Clear the chart canvas (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "toBase64Image",
+              "description": "Export the current canvas as a base64-encoded PNG data URL — `toBase64Image(type?, quality?)`."
+            },
+            {
+              "kind": "method",
+              "name": "setDatasetVisibility",
+              "description": "Set a dataset visible/hidden INSTANTLY — `setDatasetVisibility(datasetIndex, visible)`. Drives a custom external legend."
+            },
+            {
+              "kind": "method",
+              "name": "isDatasetVisible",
+              "description": "Whether a dataset is currently visible — `isDatasetVisible(datasetIndex)`. Pairs with `setDatasetVisibility` for custom-legend styling."
+            },
+            {
+              "kind": "method",
+              "name": "hideDataset",
+              "description": "Hide a dataset (or a single element) with ANIMATION — `hideDataset(datasetIndex, dataIndex?)` (Chart.js `hide`)."
+            },
+            {
+              "kind": "method",
+              "name": "showDataset",
+              "description": "Show a previously-hidden dataset (or element) with ANIMATION — `showDataset(datasetIndex, dataIndex?)` (Chart.js `show`)."
+            },
+            {
+              "kind": "method",
+              "name": "setActiveElements",
+              "description": "Programmatically set the active/hovered elements (open the tooltip from external interaction) — `setActiveElements([{ datasetIndex, index }])`."
+            },
+            {
+              "kind": "method",
+              "name": "getActiveElements",
+              "description": "Return the currently active/hovered elements (mirror hover state into sibling UI)."
+            },
+            {
+              "kind": "method",
+              "name": "getDatasetMeta",
+              "description": "Return a dataset’s computed metadata (pixel geometry, controller) for positioning custom overlays — `getDatasetMeta(datasetIndex)`."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "data"
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "options",
+              "default": "{}"
+            },
+            {
+              "name": "type",
+              "description": "The chart kind — any Chart.js controller (`line`/`bar`/`pie`/`doughnut`/`radar`/`polarArea`/`scatter`/`bubble`/…). Changing it **re-creates** the instance, since Chart.js has no stable runtime type-swap.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "type",
+              "default": "\"line\""
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "height",
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "width",
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "plugins",
+              "default": "[]"
+            },
+            {
+              "name": "updatemode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "updateMode",
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "redraw",
+              "default": "false"
+            },
+            {
+              "name": "arialabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "undefined"
+            },
+            {
+              "name": "datasetidkey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "datasetIdKey",
+              "default": "\"label\""
+            },
+            {
+              "name": "destroydelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "destroyDelay",
+              "default": "0"
+            }
+          ],
+          "events": [
+            {
+              "name": "click",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "datasetClick",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "hover",
+              "type": {
+                "text": "CustomEvent"
+              }
+            }
+          ],
+          "slots": [
+            {
+              "name": "fallback"
+            },
+            {
+              "name": "tooltip",
+              "description": "Scoped slot — props: model."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Chart",
+          "declaration": {
+            "name": "Chart",
+            "module": "dist/Chart.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "Chart",
+            "module": "dist/Chart.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-chart",
+          "declaration": {
+            "name": "Chart",
+            "module": "dist/Chart.mjs"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "dist/Line.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "The Line chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'line'` and registering only its own Chart.js controller set.",
+          "name": "Line",
+          "tagName": "rozie-line",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "data"
+            },
+            {
+              "kind": "field",
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "options",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "height",
+              "default": "240"
+            },
+            {
+              "kind": "field",
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "width",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "plugins",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "updateMode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "updatemode",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "redraw",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "arialabel",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "datasetIdKey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "datasetidkey",
+              "default": "\"label\""
+            },
+            {
+              "kind": "field",
+              "name": "destroyDelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "destroydelay",
+              "default": "0"
+            },
+            {
+              "kind": "method",
+              "name": "getChart",
+              "description": "Return the underlying Chart.js instance for direct API access (e.g. `getChart().update()`)."
+            },
+            {
+              "kind": "method",
+              "name": "updateChart",
+              "description": "Re-render the chart after mutating its data/options — `updateChart(mode?)` (Chart.js `update` mode string)."
+            },
+            {
+              "kind": "method",
+              "name": "resizeChart",
+              "description": "Resize the chart to its container, or to explicit dimensions — `resizeChart(width?, height?)`."
+            },
+            {
+              "kind": "method",
+              "name": "resetChart",
+              "description": "Reset the chart elements to their initial (pre-animation) state."
+            },
+            {
+              "kind": "method",
+              "name": "renderChart",
+              "description": "Re-render the chart from its current state without recalculating the scales."
+            },
+            {
+              "kind": "method",
+              "name": "stopChart",
+              "description": "Stop the current animation loop (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "clearChart",
+              "description": "Clear the chart canvas (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "toBase64Image",
+              "description": "Export the current canvas as a base64-encoded PNG data URL — `toBase64Image(type?, quality?)`."
+            },
+            {
+              "kind": "method",
+              "name": "setDatasetVisibility",
+              "description": "Set a dataset visible/hidden INSTANTLY — `setDatasetVisibility(datasetIndex, visible)`. Drives a custom external legend."
+            },
+            {
+              "kind": "method",
+              "name": "isDatasetVisible",
+              "description": "Whether a dataset is currently visible — `isDatasetVisible(datasetIndex)`. Pairs with `setDatasetVisibility` for custom-legend styling."
+            },
+            {
+              "kind": "method",
+              "name": "hideDataset",
+              "description": "Hide a dataset (or a single element) with ANIMATION — `hideDataset(datasetIndex, dataIndex?)` (Chart.js `hide`)."
+            },
+            {
+              "kind": "method",
+              "name": "showDataset",
+              "description": "Show a previously-hidden dataset (or element) with ANIMATION — `showDataset(datasetIndex, dataIndex?)` (Chart.js `show`)."
+            },
+            {
+              "kind": "method",
+              "name": "setActiveElements",
+              "description": "Programmatically set the active/hovered elements (open the tooltip from external interaction) — `setActiveElements([{ datasetIndex, index }])`."
+            },
+            {
+              "kind": "method",
+              "name": "getActiveElements",
+              "description": "Return the currently active/hovered elements (mirror hover state into sibling UI)."
+            },
+            {
+              "kind": "method",
+              "name": "getDatasetMeta",
+              "description": "Return a dataset’s computed metadata (pixel geometry, controller) for positioning custom overlays — `getDatasetMeta(datasetIndex)`."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "data"
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "options",
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "height",
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "width",
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "plugins",
+              "default": "[]"
+            },
+            {
+              "name": "updatemode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "updateMode",
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "redraw",
+              "default": "false"
+            },
+            {
+              "name": "arialabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "undefined"
+            },
+            {
+              "name": "datasetidkey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "datasetIdKey",
+              "default": "\"label\""
+            },
+            {
+              "name": "destroydelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "destroyDelay",
+              "default": "0"
+            }
+          ],
+          "events": [
+            {
+              "name": "click",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "datasetClick",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "hover",
+              "type": {
+                "text": "CustomEvent"
+              }
+            }
+          ],
+          "slots": [
+            {
+              "name": "fallback"
+            },
+            {
+              "name": "tooltip",
+              "description": "Scoped slot — props: model."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Line",
+          "declaration": {
+            "name": "Line",
+            "module": "dist/Line.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "Line",
+            "module": "dist/Line.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-line",
+          "declaration": {
+            "name": "Line",
+            "module": "dist/Line.mjs"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "dist/Bar.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "The Bar chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'bar'` and registering only its own Chart.js controller set.",
+          "name": "Bar",
+          "tagName": "rozie-bar",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "data"
+            },
+            {
+              "kind": "field",
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "options",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "height",
+              "default": "240"
+            },
+            {
+              "kind": "field",
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "width",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "plugins",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "updateMode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "updatemode",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "redraw",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "arialabel",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "datasetIdKey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "datasetidkey",
+              "default": "\"label\""
+            },
+            {
+              "kind": "field",
+              "name": "destroyDelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "destroydelay",
+              "default": "0"
+            },
+            {
+              "kind": "method",
+              "name": "getChart",
+              "description": "Return the underlying Chart.js instance for direct API access (e.g. `getChart().update()`)."
+            },
+            {
+              "kind": "method",
+              "name": "updateChart",
+              "description": "Re-render the chart after mutating its data/options — `updateChart(mode?)` (Chart.js `update` mode string)."
+            },
+            {
+              "kind": "method",
+              "name": "resizeChart",
+              "description": "Resize the chart to its container, or to explicit dimensions — `resizeChart(width?, height?)`."
+            },
+            {
+              "kind": "method",
+              "name": "resetChart",
+              "description": "Reset the chart elements to their initial (pre-animation) state."
+            },
+            {
+              "kind": "method",
+              "name": "renderChart",
+              "description": "Re-render the chart from its current state without recalculating the scales."
+            },
+            {
+              "kind": "method",
+              "name": "stopChart",
+              "description": "Stop the current animation loop (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "clearChart",
+              "description": "Clear the chart canvas (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "toBase64Image",
+              "description": "Export the current canvas as a base64-encoded PNG data URL — `toBase64Image(type?, quality?)`."
+            },
+            {
+              "kind": "method",
+              "name": "setDatasetVisibility",
+              "description": "Set a dataset visible/hidden INSTANTLY — `setDatasetVisibility(datasetIndex, visible)`. Drives a custom external legend."
+            },
+            {
+              "kind": "method",
+              "name": "isDatasetVisible",
+              "description": "Whether a dataset is currently visible — `isDatasetVisible(datasetIndex)`. Pairs with `setDatasetVisibility` for custom-legend styling."
+            },
+            {
+              "kind": "method",
+              "name": "hideDataset",
+              "description": "Hide a dataset (or a single element) with ANIMATION — `hideDataset(datasetIndex, dataIndex?)` (Chart.js `hide`)."
+            },
+            {
+              "kind": "method",
+              "name": "showDataset",
+              "description": "Show a previously-hidden dataset (or element) with ANIMATION — `showDataset(datasetIndex, dataIndex?)` (Chart.js `show`)."
+            },
+            {
+              "kind": "method",
+              "name": "setActiveElements",
+              "description": "Programmatically set the active/hovered elements (open the tooltip from external interaction) — `setActiveElements([{ datasetIndex, index }])`."
+            },
+            {
+              "kind": "method",
+              "name": "getActiveElements",
+              "description": "Return the currently active/hovered elements (mirror hover state into sibling UI)."
+            },
+            {
+              "kind": "method",
+              "name": "getDatasetMeta",
+              "description": "Return a dataset’s computed metadata (pixel geometry, controller) for positioning custom overlays — `getDatasetMeta(datasetIndex)`."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "data"
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "options",
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "height",
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "width",
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "plugins",
+              "default": "[]"
+            },
+            {
+              "name": "updatemode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "updateMode",
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "redraw",
+              "default": "false"
+            },
+            {
+              "name": "arialabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "undefined"
+            },
+            {
+              "name": "datasetidkey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "datasetIdKey",
+              "default": "\"label\""
+            },
+            {
+              "name": "destroydelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "destroyDelay",
+              "default": "0"
+            }
+          ],
+          "events": [
+            {
+              "name": "click",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "datasetClick",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "hover",
+              "type": {
+                "text": "CustomEvent"
+              }
+            }
+          ],
+          "slots": [
+            {
+              "name": "fallback"
+            },
+            {
+              "name": "tooltip",
+              "description": "Scoped slot — props: model."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Bar",
+          "declaration": {
+            "name": "Bar",
+            "module": "dist/Bar.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "Bar",
+            "module": "dist/Bar.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-bar",
+          "declaration": {
+            "name": "Bar",
+            "module": "dist/Bar.mjs"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "dist/Pie.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "The Pie chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'pie'` and registering only its own Chart.js controller set.",
+          "name": "Pie",
+          "tagName": "rozie-pie",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "data"
+            },
+            {
+              "kind": "field",
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "options",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "height",
+              "default": "240"
+            },
+            {
+              "kind": "field",
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "width",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "plugins",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "updateMode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "updatemode",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "redraw",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "arialabel",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "datasetIdKey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "datasetidkey",
+              "default": "\"label\""
+            },
+            {
+              "kind": "field",
+              "name": "destroyDelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "destroydelay",
+              "default": "0"
+            },
+            {
+              "kind": "method",
+              "name": "getChart",
+              "description": "Return the underlying Chart.js instance for direct API access (e.g. `getChart().update()`)."
+            },
+            {
+              "kind": "method",
+              "name": "updateChart",
+              "description": "Re-render the chart after mutating its data/options — `updateChart(mode?)` (Chart.js `update` mode string)."
+            },
+            {
+              "kind": "method",
+              "name": "resizeChart",
+              "description": "Resize the chart to its container, or to explicit dimensions — `resizeChart(width?, height?)`."
+            },
+            {
+              "kind": "method",
+              "name": "resetChart",
+              "description": "Reset the chart elements to their initial (pre-animation) state."
+            },
+            {
+              "kind": "method",
+              "name": "renderChart",
+              "description": "Re-render the chart from its current state without recalculating the scales."
+            },
+            {
+              "kind": "method",
+              "name": "stopChart",
+              "description": "Stop the current animation loop (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "clearChart",
+              "description": "Clear the chart canvas (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "toBase64Image",
+              "description": "Export the current canvas as a base64-encoded PNG data URL — `toBase64Image(type?, quality?)`."
+            },
+            {
+              "kind": "method",
+              "name": "setDatasetVisibility",
+              "description": "Set a dataset visible/hidden INSTANTLY — `setDatasetVisibility(datasetIndex, visible)`. Drives a custom external legend."
+            },
+            {
+              "kind": "method",
+              "name": "isDatasetVisible",
+              "description": "Whether a dataset is currently visible — `isDatasetVisible(datasetIndex)`. Pairs with `setDatasetVisibility` for custom-legend styling."
+            },
+            {
+              "kind": "method",
+              "name": "hideDataset",
+              "description": "Hide a dataset (or a single element) with ANIMATION — `hideDataset(datasetIndex, dataIndex?)` (Chart.js `hide`)."
+            },
+            {
+              "kind": "method",
+              "name": "showDataset",
+              "description": "Show a previously-hidden dataset (or element) with ANIMATION — `showDataset(datasetIndex, dataIndex?)` (Chart.js `show`)."
+            },
+            {
+              "kind": "method",
+              "name": "setActiveElements",
+              "description": "Programmatically set the active/hovered elements (open the tooltip from external interaction) — `setActiveElements([{ datasetIndex, index }])`."
+            },
+            {
+              "kind": "method",
+              "name": "getActiveElements",
+              "description": "Return the currently active/hovered elements (mirror hover state into sibling UI)."
+            },
+            {
+              "kind": "method",
+              "name": "getDatasetMeta",
+              "description": "Return a dataset’s computed metadata (pixel geometry, controller) for positioning custom overlays — `getDatasetMeta(datasetIndex)`."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "data"
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "options",
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "height",
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "width",
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "plugins",
+              "default": "[]"
+            },
+            {
+              "name": "updatemode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "updateMode",
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "redraw",
+              "default": "false"
+            },
+            {
+              "name": "arialabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "undefined"
+            },
+            {
+              "name": "datasetidkey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "datasetIdKey",
+              "default": "\"label\""
+            },
+            {
+              "name": "destroydelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "destroyDelay",
+              "default": "0"
+            }
+          ],
+          "events": [
+            {
+              "name": "click",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "datasetClick",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "hover",
+              "type": {
+                "text": "CustomEvent"
+              }
+            }
+          ],
+          "slots": [
+            {
+              "name": "fallback"
+            },
+            {
+              "name": "tooltip",
+              "description": "Scoped slot — props: model."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Pie",
+          "declaration": {
+            "name": "Pie",
+            "module": "dist/Pie.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "Pie",
+            "module": "dist/Pie.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-pie",
+          "declaration": {
+            "name": "Pie",
+            "module": "dist/Pie.mjs"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "dist/Doughnut.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "The Doughnut chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'doughnut'` and registering only its own Chart.js controller set.",
+          "name": "Doughnut",
+          "tagName": "rozie-doughnut",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "data"
+            },
+            {
+              "kind": "field",
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "options",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "height",
+              "default": "240"
+            },
+            {
+              "kind": "field",
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "width",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "plugins",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "updateMode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "updatemode",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "redraw",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "arialabel",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "datasetIdKey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "datasetidkey",
+              "default": "\"label\""
+            },
+            {
+              "kind": "field",
+              "name": "destroyDelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "destroydelay",
+              "default": "0"
+            },
+            {
+              "kind": "method",
+              "name": "getChart",
+              "description": "Return the underlying Chart.js instance for direct API access (e.g. `getChart().update()`)."
+            },
+            {
+              "kind": "method",
+              "name": "updateChart",
+              "description": "Re-render the chart after mutating its data/options — `updateChart(mode?)` (Chart.js `update` mode string)."
+            },
+            {
+              "kind": "method",
+              "name": "resizeChart",
+              "description": "Resize the chart to its container, or to explicit dimensions — `resizeChart(width?, height?)`."
+            },
+            {
+              "kind": "method",
+              "name": "resetChart",
+              "description": "Reset the chart elements to their initial (pre-animation) state."
+            },
+            {
+              "kind": "method",
+              "name": "renderChart",
+              "description": "Re-render the chart from its current state without recalculating the scales."
+            },
+            {
+              "kind": "method",
+              "name": "stopChart",
+              "description": "Stop the current animation loop (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "clearChart",
+              "description": "Clear the chart canvas (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "toBase64Image",
+              "description": "Export the current canvas as a base64-encoded PNG data URL — `toBase64Image(type?, quality?)`."
+            },
+            {
+              "kind": "method",
+              "name": "setDatasetVisibility",
+              "description": "Set a dataset visible/hidden INSTANTLY — `setDatasetVisibility(datasetIndex, visible)`. Drives a custom external legend."
+            },
+            {
+              "kind": "method",
+              "name": "isDatasetVisible",
+              "description": "Whether a dataset is currently visible — `isDatasetVisible(datasetIndex)`. Pairs with `setDatasetVisibility` for custom-legend styling."
+            },
+            {
+              "kind": "method",
+              "name": "hideDataset",
+              "description": "Hide a dataset (or a single element) with ANIMATION — `hideDataset(datasetIndex, dataIndex?)` (Chart.js `hide`)."
+            },
+            {
+              "kind": "method",
+              "name": "showDataset",
+              "description": "Show a previously-hidden dataset (or element) with ANIMATION — `showDataset(datasetIndex, dataIndex?)` (Chart.js `show`)."
+            },
+            {
+              "kind": "method",
+              "name": "setActiveElements",
+              "description": "Programmatically set the active/hovered elements (open the tooltip from external interaction) — `setActiveElements([{ datasetIndex, index }])`."
+            },
+            {
+              "kind": "method",
+              "name": "getActiveElements",
+              "description": "Return the currently active/hovered elements (mirror hover state into sibling UI)."
+            },
+            {
+              "kind": "method",
+              "name": "getDatasetMeta",
+              "description": "Return a dataset’s computed metadata (pixel geometry, controller) for positioning custom overlays — `getDatasetMeta(datasetIndex)`."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "data"
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "options",
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "height",
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "width",
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "plugins",
+              "default": "[]"
+            },
+            {
+              "name": "updatemode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "updateMode",
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "redraw",
+              "default": "false"
+            },
+            {
+              "name": "arialabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "undefined"
+            },
+            {
+              "name": "datasetidkey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "datasetIdKey",
+              "default": "\"label\""
+            },
+            {
+              "name": "destroydelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "destroyDelay",
+              "default": "0"
+            }
+          ],
+          "events": [
+            {
+              "name": "click",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "datasetClick",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "hover",
+              "type": {
+                "text": "CustomEvent"
+              }
+            }
+          ],
+          "slots": [
+            {
+              "name": "fallback"
+            },
+            {
+              "name": "tooltip",
+              "description": "Scoped slot — props: model."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Doughnut",
+          "declaration": {
+            "name": "Doughnut",
+            "module": "dist/Doughnut.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "Doughnut",
+            "module": "dist/Doughnut.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-doughnut",
+          "declaration": {
+            "name": "Doughnut",
+            "module": "dist/Doughnut.mjs"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "dist/PolarArea.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "The PolarArea chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'polarArea'` and registering only its own Chart.js controller set.",
+          "name": "PolarArea",
+          "tagName": "rozie-polar-area",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "data"
+            },
+            {
+              "kind": "field",
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "options",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "height",
+              "default": "240"
+            },
+            {
+              "kind": "field",
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "width",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "plugins",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "updateMode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "updatemode",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "redraw",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "arialabel",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "datasetIdKey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "datasetidkey",
+              "default": "\"label\""
+            },
+            {
+              "kind": "field",
+              "name": "destroyDelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "destroydelay",
+              "default": "0"
+            },
+            {
+              "kind": "method",
+              "name": "getChart",
+              "description": "Return the underlying Chart.js instance for direct API access (e.g. `getChart().update()`)."
+            },
+            {
+              "kind": "method",
+              "name": "updateChart",
+              "description": "Re-render the chart after mutating its data/options — `updateChart(mode?)` (Chart.js `update` mode string)."
+            },
+            {
+              "kind": "method",
+              "name": "resizeChart",
+              "description": "Resize the chart to its container, or to explicit dimensions — `resizeChart(width?, height?)`."
+            },
+            {
+              "kind": "method",
+              "name": "resetChart",
+              "description": "Reset the chart elements to their initial (pre-animation) state."
+            },
+            {
+              "kind": "method",
+              "name": "renderChart",
+              "description": "Re-render the chart from its current state without recalculating the scales."
+            },
+            {
+              "kind": "method",
+              "name": "stopChart",
+              "description": "Stop the current animation loop (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "clearChart",
+              "description": "Clear the chart canvas (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "toBase64Image",
+              "description": "Export the current canvas as a base64-encoded PNG data URL — `toBase64Image(type?, quality?)`."
+            },
+            {
+              "kind": "method",
+              "name": "setDatasetVisibility",
+              "description": "Set a dataset visible/hidden INSTANTLY — `setDatasetVisibility(datasetIndex, visible)`. Drives a custom external legend."
+            },
+            {
+              "kind": "method",
+              "name": "isDatasetVisible",
+              "description": "Whether a dataset is currently visible — `isDatasetVisible(datasetIndex)`. Pairs with `setDatasetVisibility` for custom-legend styling."
+            },
+            {
+              "kind": "method",
+              "name": "hideDataset",
+              "description": "Hide a dataset (or a single element) with ANIMATION — `hideDataset(datasetIndex, dataIndex?)` (Chart.js `hide`)."
+            },
+            {
+              "kind": "method",
+              "name": "showDataset",
+              "description": "Show a previously-hidden dataset (or element) with ANIMATION — `showDataset(datasetIndex, dataIndex?)` (Chart.js `show`)."
+            },
+            {
+              "kind": "method",
+              "name": "setActiveElements",
+              "description": "Programmatically set the active/hovered elements (open the tooltip from external interaction) — `setActiveElements([{ datasetIndex, index }])`."
+            },
+            {
+              "kind": "method",
+              "name": "getActiveElements",
+              "description": "Return the currently active/hovered elements (mirror hover state into sibling UI)."
+            },
+            {
+              "kind": "method",
+              "name": "getDatasetMeta",
+              "description": "Return a dataset’s computed metadata (pixel geometry, controller) for positioning custom overlays — `getDatasetMeta(datasetIndex)`."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "data"
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "options",
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "height",
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "width",
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "plugins",
+              "default": "[]"
+            },
+            {
+              "name": "updatemode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "updateMode",
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "redraw",
+              "default": "false"
+            },
+            {
+              "name": "arialabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "undefined"
+            },
+            {
+              "name": "datasetidkey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "datasetIdKey",
+              "default": "\"label\""
+            },
+            {
+              "name": "destroydelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "destroyDelay",
+              "default": "0"
+            }
+          ],
+          "events": [
+            {
+              "name": "click",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "datasetClick",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "hover",
+              "type": {
+                "text": "CustomEvent"
+              }
+            }
+          ],
+          "slots": [
+            {
+              "name": "fallback"
+            },
+            {
+              "name": "tooltip",
+              "description": "Scoped slot — props: model."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "PolarArea",
+          "declaration": {
+            "name": "PolarArea",
+            "module": "dist/PolarArea.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "PolarArea",
+            "module": "dist/PolarArea.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-polar-area",
+          "declaration": {
+            "name": "PolarArea",
+            "module": "dist/PolarArea.mjs"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "dist/Radar.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "The Radar chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'radar'` and registering only its own Chart.js controller set.",
+          "name": "Radar",
+          "tagName": "rozie-radar",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "data"
+            },
+            {
+              "kind": "field",
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "options",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "height",
+              "default": "240"
+            },
+            {
+              "kind": "field",
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "width",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "plugins",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "updateMode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "updatemode",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "redraw",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "arialabel",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "datasetIdKey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "datasetidkey",
+              "default": "\"label\""
+            },
+            {
+              "kind": "field",
+              "name": "destroyDelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "destroydelay",
+              "default": "0"
+            },
+            {
+              "kind": "method",
+              "name": "getChart",
+              "description": "Return the underlying Chart.js instance for direct API access (e.g. `getChart().update()`)."
+            },
+            {
+              "kind": "method",
+              "name": "updateChart",
+              "description": "Re-render the chart after mutating its data/options — `updateChart(mode?)` (Chart.js `update` mode string)."
+            },
+            {
+              "kind": "method",
+              "name": "resizeChart",
+              "description": "Resize the chart to its container, or to explicit dimensions — `resizeChart(width?, height?)`."
+            },
+            {
+              "kind": "method",
+              "name": "resetChart",
+              "description": "Reset the chart elements to their initial (pre-animation) state."
+            },
+            {
+              "kind": "method",
+              "name": "renderChart",
+              "description": "Re-render the chart from its current state without recalculating the scales."
+            },
+            {
+              "kind": "method",
+              "name": "stopChart",
+              "description": "Stop the current animation loop (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "clearChart",
+              "description": "Clear the chart canvas (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "toBase64Image",
+              "description": "Export the current canvas as a base64-encoded PNG data URL — `toBase64Image(type?, quality?)`."
+            },
+            {
+              "kind": "method",
+              "name": "setDatasetVisibility",
+              "description": "Set a dataset visible/hidden INSTANTLY — `setDatasetVisibility(datasetIndex, visible)`. Drives a custom external legend."
+            },
+            {
+              "kind": "method",
+              "name": "isDatasetVisible",
+              "description": "Whether a dataset is currently visible — `isDatasetVisible(datasetIndex)`. Pairs with `setDatasetVisibility` for custom-legend styling."
+            },
+            {
+              "kind": "method",
+              "name": "hideDataset",
+              "description": "Hide a dataset (or a single element) with ANIMATION — `hideDataset(datasetIndex, dataIndex?)` (Chart.js `hide`)."
+            },
+            {
+              "kind": "method",
+              "name": "showDataset",
+              "description": "Show a previously-hidden dataset (or element) with ANIMATION — `showDataset(datasetIndex, dataIndex?)` (Chart.js `show`)."
+            },
+            {
+              "kind": "method",
+              "name": "setActiveElements",
+              "description": "Programmatically set the active/hovered elements (open the tooltip from external interaction) — `setActiveElements([{ datasetIndex, index }])`."
+            },
+            {
+              "kind": "method",
+              "name": "getActiveElements",
+              "description": "Return the currently active/hovered elements (mirror hover state into sibling UI)."
+            },
+            {
+              "kind": "method",
+              "name": "getDatasetMeta",
+              "description": "Return a dataset’s computed metadata (pixel geometry, controller) for positioning custom overlays — `getDatasetMeta(datasetIndex)`."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "data"
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "options",
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "height",
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "width",
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "plugins",
+              "default": "[]"
+            },
+            {
+              "name": "updatemode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "updateMode",
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "redraw",
+              "default": "false"
+            },
+            {
+              "name": "arialabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "undefined"
+            },
+            {
+              "name": "datasetidkey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "datasetIdKey",
+              "default": "\"label\""
+            },
+            {
+              "name": "destroydelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "destroyDelay",
+              "default": "0"
+            }
+          ],
+          "events": [
+            {
+              "name": "click",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "datasetClick",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "hover",
+              "type": {
+                "text": "CustomEvent"
+              }
+            }
+          ],
+          "slots": [
+            {
+              "name": "fallback"
+            },
+            {
+              "name": "tooltip",
+              "description": "Scoped slot — props: model."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Radar",
+          "declaration": {
+            "name": "Radar",
+            "module": "dist/Radar.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "Radar",
+            "module": "dist/Radar.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-radar",
+          "declaration": {
+            "name": "Radar",
+            "module": "dist/Radar.mjs"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "dist/Scatter.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "The Scatter chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'scatter'` and registering only its own Chart.js controller set.",
+          "name": "Scatter",
+          "tagName": "rozie-scatter",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "data"
+            },
+            {
+              "kind": "field",
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "options",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "height",
+              "default": "240"
+            },
+            {
+              "kind": "field",
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "width",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "plugins",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "updateMode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "updatemode",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "redraw",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "arialabel",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "datasetIdKey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "datasetidkey",
+              "default": "\"label\""
+            },
+            {
+              "kind": "field",
+              "name": "destroyDelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "destroydelay",
+              "default": "0"
+            },
+            {
+              "kind": "method",
+              "name": "getChart",
+              "description": "Return the underlying Chart.js instance for direct API access (e.g. `getChart().update()`)."
+            },
+            {
+              "kind": "method",
+              "name": "updateChart",
+              "description": "Re-render the chart after mutating its data/options — `updateChart(mode?)` (Chart.js `update` mode string)."
+            },
+            {
+              "kind": "method",
+              "name": "resizeChart",
+              "description": "Resize the chart to its container, or to explicit dimensions — `resizeChart(width?, height?)`."
+            },
+            {
+              "kind": "method",
+              "name": "resetChart",
+              "description": "Reset the chart elements to their initial (pre-animation) state."
+            },
+            {
+              "kind": "method",
+              "name": "renderChart",
+              "description": "Re-render the chart from its current state without recalculating the scales."
+            },
+            {
+              "kind": "method",
+              "name": "stopChart",
+              "description": "Stop the current animation loop (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "clearChart",
+              "description": "Clear the chart canvas (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "toBase64Image",
+              "description": "Export the current canvas as a base64-encoded PNG data URL — `toBase64Image(type?, quality?)`."
+            },
+            {
+              "kind": "method",
+              "name": "setDatasetVisibility",
+              "description": "Set a dataset visible/hidden INSTANTLY — `setDatasetVisibility(datasetIndex, visible)`. Drives a custom external legend."
+            },
+            {
+              "kind": "method",
+              "name": "isDatasetVisible",
+              "description": "Whether a dataset is currently visible — `isDatasetVisible(datasetIndex)`. Pairs with `setDatasetVisibility` for custom-legend styling."
+            },
+            {
+              "kind": "method",
+              "name": "hideDataset",
+              "description": "Hide a dataset (or a single element) with ANIMATION — `hideDataset(datasetIndex, dataIndex?)` (Chart.js `hide`)."
+            },
+            {
+              "kind": "method",
+              "name": "showDataset",
+              "description": "Show a previously-hidden dataset (or element) with ANIMATION — `showDataset(datasetIndex, dataIndex?)` (Chart.js `show`)."
+            },
+            {
+              "kind": "method",
+              "name": "setActiveElements",
+              "description": "Programmatically set the active/hovered elements (open the tooltip from external interaction) — `setActiveElements([{ datasetIndex, index }])`."
+            },
+            {
+              "kind": "method",
+              "name": "getActiveElements",
+              "description": "Return the currently active/hovered elements (mirror hover state into sibling UI)."
+            },
+            {
+              "kind": "method",
+              "name": "getDatasetMeta",
+              "description": "Return a dataset’s computed metadata (pixel geometry, controller) for positioning custom overlays — `getDatasetMeta(datasetIndex)`."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "data"
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "options",
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "height",
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "width",
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "plugins",
+              "default": "[]"
+            },
+            {
+              "name": "updatemode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "updateMode",
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "redraw",
+              "default": "false"
+            },
+            {
+              "name": "arialabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "undefined"
+            },
+            {
+              "name": "datasetidkey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "datasetIdKey",
+              "default": "\"label\""
+            },
+            {
+              "name": "destroydelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "destroyDelay",
+              "default": "0"
+            }
+          ],
+          "events": [
+            {
+              "name": "click",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "datasetClick",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "hover",
+              "type": {
+                "text": "CustomEvent"
+              }
+            }
+          ],
+          "slots": [
+            {
+              "name": "fallback"
+            },
+            {
+              "name": "tooltip",
+              "description": "Scoped slot — props: model."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Scatter",
+          "declaration": {
+            "name": "Scatter",
+            "module": "dist/Scatter.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "Scatter",
+            "module": "dist/Scatter.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-scatter",
+          "declaration": {
+            "name": "Scatter",
+            "module": "dist/Scatter.mjs"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "dist/Bubble.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "The Bubble chart — Rozie's cross-framework port of Chart.js, pinned to `type: 'bubble'` and registering only its own Chart.js controller set.",
+          "name": "Bubble",
+          "tagName": "rozie-bubble",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "data"
+            },
+            {
+              "kind": "field",
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "options",
+              "default": "{}"
+            },
+            {
+              "kind": "field",
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "height",
+              "default": "240"
+            },
+            {
+              "kind": "field",
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "width",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "attribute": "plugins",
+              "default": "[]"
+            },
+            {
+              "kind": "field",
+              "name": "updateMode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "updatemode",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "redraw",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "arialabel",
+              "default": "undefined"
+            },
+            {
+              "kind": "field",
+              "name": "datasetIdKey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "datasetidkey",
+              "default": "\"label\""
+            },
+            {
+              "kind": "field",
+              "name": "destroyDelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "destroydelay",
+              "default": "0"
+            },
+            {
+              "kind": "method",
+              "name": "getChart",
+              "description": "Return the underlying Chart.js instance for direct API access (e.g. `getChart().update()`)."
+            },
+            {
+              "kind": "method",
+              "name": "updateChart",
+              "description": "Re-render the chart after mutating its data/options — `updateChart(mode?)` (Chart.js `update` mode string)."
+            },
+            {
+              "kind": "method",
+              "name": "resizeChart",
+              "description": "Resize the chart to its container, or to explicit dimensions — `resizeChart(width?, height?)`."
+            },
+            {
+              "kind": "method",
+              "name": "resetChart",
+              "description": "Reset the chart elements to their initial (pre-animation) state."
+            },
+            {
+              "kind": "method",
+              "name": "renderChart",
+              "description": "Re-render the chart from its current state without recalculating the scales."
+            },
+            {
+              "kind": "method",
+              "name": "stopChart",
+              "description": "Stop the current animation loop (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "clearChart",
+              "description": "Clear the chart canvas (returns the instance)."
+            },
+            {
+              "kind": "method",
+              "name": "toBase64Image",
+              "description": "Export the current canvas as a base64-encoded PNG data URL — `toBase64Image(type?, quality?)`."
+            },
+            {
+              "kind": "method",
+              "name": "setDatasetVisibility",
+              "description": "Set a dataset visible/hidden INSTANTLY — `setDatasetVisibility(datasetIndex, visible)`. Drives a custom external legend."
+            },
+            {
+              "kind": "method",
+              "name": "isDatasetVisible",
+              "description": "Whether a dataset is currently visible — `isDatasetVisible(datasetIndex)`. Pairs with `setDatasetVisibility` for custom-legend styling."
+            },
+            {
+              "kind": "method",
+              "name": "hideDataset",
+              "description": "Hide a dataset (or a single element) with ANIMATION — `hideDataset(datasetIndex, dataIndex?)` (Chart.js `hide`)."
+            },
+            {
+              "kind": "method",
+              "name": "showDataset",
+              "description": "Show a previously-hidden dataset (or element) with ANIMATION — `showDataset(datasetIndex, dataIndex?)` (Chart.js `show`)."
+            },
+            {
+              "kind": "method",
+              "name": "setActiveElements",
+              "description": "Programmatically set the active/hovered elements (open the tooltip from external interaction) — `setActiveElements([{ datasetIndex, index }])`."
+            },
+            {
+              "kind": "method",
+              "name": "getActiveElements",
+              "description": "Return the currently active/hovered elements (mirror hover state into sibling UI)."
+            },
+            {
+              "kind": "method",
+              "name": "getDatasetMeta",
+              "description": "Return a dataset’s computed metadata (pixel geometry, controller) for positioning custom overlays — `getDatasetMeta(datasetIndex)`."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "data",
+              "description": "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "data"
+            },
+            {
+              "name": "options",
+              "description": "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "options",
+              "default": "{}"
+            },
+            {
+              "name": "height",
+              "description": "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "height",
+              "default": "240"
+            },
+            {
+              "name": "width",
+              "description": "Optional fixed chart width in pixels. Omit for the default full-width responsive box.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "width",
+              "default": "undefined"
+            },
+            {
+              "name": "plugins",
+              "description": "Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.",
+              "type": {
+                "text": "any[]"
+              },
+              "fieldName": "plugins",
+              "default": "[]"
+            },
+            {
+              "name": "updatemode",
+              "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "updateMode",
+              "default": "undefined"
+            },
+            {
+              "name": "redraw",
+              "description": "When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "redraw",
+              "default": "false"
+            },
+            {
+              "name": "arialabel",
+              "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "undefined"
+            },
+            {
+              "name": "datasetidkey",
+              "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "datasetIdKey",
+              "default": "\"label\""
+            },
+            {
+              "name": "destroydelay",
+              "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "destroyDelay",
+              "default": "0"
+            }
+          ],
+          "events": [
+            {
+              "name": "click",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "datasetClick",
+              "type": {
+                "text": "CustomEvent"
+              }
+            },
+            {
+              "name": "hover",
+              "type": {
+                "text": "CustomEvent"
+              }
+            }
+          ],
+          "slots": [
+            {
+              "name": "fallback"
+            },
+            {
+              "name": "tooltip",
+              "description": "Scoped slot — props: model."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Bubble",
+          "declaration": {
+            "name": "Bubble",
+            "module": "dist/Bubble.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "Bubble",
+            "module": "dist/Bubble.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-bubble",
+          "declaration": {
+            "name": "Bubble",
+            "module": "dist/Bubble.mjs"
+          }
+        }
+      ]
+    }
+  ]
+}

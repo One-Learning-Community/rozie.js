@@ -21,22 +21,30 @@
   Where `data` matches Chart.js's
   `{ labels: string[], datasets: [{ label, data, ... }] }` shape.
 
-  Feature-rich surface (Phase 30):
-    - 9 props: data / options / type / height / width / plugins / updateMode /
-      redraw / ariaLabel. `:plugins` is the consumer-extensibility passthrough
-      (per-instance Chart.js `Plugin[]`) — the Chart.js analog of CodeMirror's
-      `:extensions` and FullCalendar's merged `:options.plugins`.
-    - 3 events: @click / @hover / @datasetClick — composed onto Chart.js's
+  Feature-rich surface (Phase 30 — see the `<props>` block, the `$expose` call,
+  and the `<template>` below for the authoritative, always-current surface; the
+  counts are intentionally not restated here so this comment cannot rot the way
+  a hand-counted number does):
+    - props: data / options / type / height / width / plugins / updateMode /
+      redraw / ariaLabel / datasetIdKey / destroyDelay. `:plugins` is the
+      consumer-extensibility passthrough (per-instance Chart.js `Plugin[]`) —
+      the Chart.js analog of CodeMirror's `:extensions` and FullCalendar's
+      merged `:options.plugins`.
+    - events: @click / @hover / @datasetClick — composed onto Chart.js's
       `options.onClick`/`onHover` WITHOUT clobbering a consumer-supplied handler.
-    - 8 $expose verbs over the live instance: getChart / updateChart /
+    - $expose verbs over the live instance: getChart / updateChart /
       resizeChart / resetChart / renderChart / stopChart / clearChart /
-      toBase64Image (the marquee PNG export). NOTE the verb names are SUFFIXED
-      (`updateChart`, not `update`) — bare `update`/`render` collide with
-      LitElement's reactive-lifecycle methods (`update()`/`render()`) and would
-      shadow them on the Lit leaf. This is the Chart.js analog of CodeMirror's
-      setValue→replaceValue ($expose-verb-vs-framework-reserved-method) lesson.
-    - 1 external-HTML `tooltip` portal slot — canvas owns its own paint, so the
-      external-tooltip handler is the single real slot showcase.
+      toBase64Image (the marquee PNG export) / setDatasetVisibility /
+      isDatasetVisible / hideDataset / showDataset / setActiveElements /
+      getActiveElements / getDatasetMeta. NOTE the lifecycle/redraw verb names
+      are SUFFIXED (`updateChart`, not `update`) — bare `update`/`render`
+      collide with LitElement's reactive-lifecycle methods (`update()`/
+      `render()`) and would shadow them on the Lit leaf. This is the Chart.js
+      analog of CodeMirror's setValue→replaceValue
+      ($expose-verb-vs-framework-reserved-method) lesson.
+    - 2 slots: a non-portal `fallback` slot (in-canvas a11y content) and an
+      external-HTML `tooltip` portal slot — canvas owns its own paint, so the
+      external-tooltip handler is the one real portal-slot showcase.
 
   $snapshot discipline: Chart.js's internal `Object.defineProperty` on its data
   config conflicts with Svelte 5's `$state` proxy (`state_descriptors_fixed`);

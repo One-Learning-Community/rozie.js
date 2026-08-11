@@ -31,8 +31,28 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { buildCustomElementsManifest } from './cem.mjs';
 import { handleManifest } from './handle-manifest.mjs';
 import { renderReadme, validateDocsPropsTable } from './readme.mjs';
+import { buildWebTypes } from './web-types.mjs';
+
+// JetBrains web-types (Vue leaf) + Custom Elements Manifest (Lit leaf) prose
+// (D-05). PhpStorm/WebStorm read `web-types` — NOT vue-tsc's `__VLS_` .d.ts
+// (WEB-57769) — for prop/event/slot completion; VS Code (lit-plugin) AND
+// JetBrains both read the CEM for `<rozie-chart>`/`<rozie-line>`/…
+// completion. Both sidecars cover all NINE components (generic Chart + 8
+// per-type variants) — see the MULTI-COMPONENT notes in web-types.mjs / cem.mjs.
+const IDE_SIDECAR_DOC_URL = 'https://github.com/One-Learning-Community/rozie.js#readme';
+const IDE_SIDECAR_DESCRIPTION_GENERIC =
+  "Rozie's cross-framework port of Chart.js — the generic chart, whose `type` " +
+  'prop switches the chart kind across the whole Chart.js controller set.';
+/** Per-variant description: "The Bar chart — Chart.rozie pinned to type: 'bar'." */
+function variantDescription(variant) {
+  return (
+    `The ${variant.name} chart — Rozie's cross-framework port of Chart.js, pinned to ` +
+    `\`type: '${variant.type}'\` and registering only its own Chart.js controller set.`
+  );
+}
 
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/chartjs
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
@@ -317,6 +337,17 @@ function main() {
   // Pre-build the variant sources once (target-independent).
   const variantSources = VARIANTS.map((v) => ({ ...v, source: makeVariantSource(source, v) }));
 
+  // Lower each variant's IR once too (target-independent) — the IDE sidecars
+  // (web-types.json / custom-elements.json) need per-component prop/emit/slot/
+  // expose data for all 9 components, not just the generic Chart's `ir` above.
+  const variantIRs = new Map(
+    variantSources.map((v) => {
+      const { ast: vAst } = parse(v.source, { filename: `${v.name}.rozie` });
+      const { ir: vIr } = lowerToIR(vAst, { modifierRegistry: createDefaultRegistry() });
+      return [v.name, vIr];
+    }),
+  );
+
   for (const [target, cfg] of Object.entries(TARGETS)) {
     const leafSrc = resolve(ROOT, 'packages', cfg.dir, 'src');
     mkdirSync(leafSrc, { recursive: true });
@@ -389,6 +420,109 @@ function main() {
     );
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
+    // JetBrains web-types sidecar for the Vue leaf (D-05) — emitted from the
+    // SAME lowered IRs the READMEs use so it never drifts. PhpStorm/WebStorm
+    // read this (NOT vue-tsc's `__VLS_` .d.ts, WEB-57769) for prop/event/slot
+    // completion. The version is read from the leaf package.json AT
+    // GENERATION TIME, so a version bump must be followed by a regen — see
+    // tests/sidecars.test.ts, which turns the stale-sidecar failure mode
+    // (commit 4a095fdd) into a red test instead of a silently re-dirtying
+    // build. The Vue codegen does not otherwise rewrite the leaf
+    // package.json, so wire the `web-types` field + `files` entry idempotently.
+    //
+    // MULTI-COMPONENT MERGE (see web-types.mjs header): buildWebTypes is
+    // single-component by construction — call it once per component (Chart +
+    // 8 variants, in VARIANTS order) and splice the nine `vue-components[0]`
+    // entries into ONE document, keeping Chart's document as the base.
+    if (target === 'vue') {
+      const leafDir = resolve(ROOT, 'packages', cfg.dir);
+      const vuePkgPath = resolve(leafDir, 'package.json');
+      const vuePkg = JSON.parse(readFileSync(vuePkgPath, 'utf8'));
+      const perComponent = [
+        buildWebTypes({
+          ir,
+          pkgName: vuePkg.name,
+          version: vuePkg.version,
+          componentName: 'Chart',
+          description: IDE_SIDECAR_DESCRIPTION_GENERIC,
+          docUrl: IDE_SIDECAR_DOC_URL,
+        }),
+        ...VARIANTS.map((v) =>
+          buildWebTypes({
+            ir: variantIRs.get(v.name),
+            pkgName: vuePkg.name,
+            version: vuePkg.version,
+            componentName: v.name,
+            description: variantDescription(v),
+            docUrl: IDE_SIDECAR_DOC_URL,
+          }),
+        ),
+      ];
+      const webTypesDoc = perComponent[0];
+      webTypesDoc.contributions.html['vue-components'] = perComponent.map(
+        (d) => d.contributions.html['vue-components'][0],
+      );
+      writeFileSync(
+        resolve(leafDir, 'web-types.json'),
+        `${JSON.stringify(webTypesDoc, null, 2)}\n`,
+      );
+      vuePkg['web-types'] = './web-types.json';
+      if (!vuePkg.files.includes('web-types.json')) {
+        vuePkg.files = [...vuePkg.files, 'web-types.json'];
+      }
+      writeFileSync(vuePkgPath, `${JSON.stringify(vuePkg, null, 2)}\n`);
+    }
+
+    // Lit leaf: emit a Custom Elements Manifest (`custom-elements.json`, D-05)
+    // from the SAME lowered IRs + wire the leaf package.json (`customElements`
+    // field + files entry). Both VS Code (lit-plugin) and JetBrains read it
+    // for `<rozie-chart>`/`<rozie-line>`/…/`<rozie-bubble>`
+    // attribute/property/event/slot completion. Wired idempotently — the Lit
+    // codegen does not otherwise rewrite this manifest.
+    //
+    // MULTI-COMPONENT MODULE TOPOLOGY (see cem.mjs header): unlike rete's
+    // merge-into-one-module shape, chartjs's tsdown build genuinely emits each
+    // component as its own chunk (dist/Chart.mjs, dist/Line.mjs, …), so this
+    // concatenates the nine single-module documents' `modules[]` arrays
+    // instead of forcing them into one module.
+    if (target === 'lit') {
+      const leafDir = resolve(ROOT, 'packages', cfg.dir);
+      const litPkgPath = resolve(leafDir, 'package.json');
+      const litPkg = JSON.parse(readFileSync(litPkgPath, 'utf8'));
+      const perComponent = [
+        buildCustomElementsManifest({
+          ir,
+          componentName: 'Chart',
+          description: IDE_SIDECAR_DESCRIPTION_GENERIC,
+          modulePath: 'dist/Chart.mjs',
+          handleManifest,
+        }),
+        ...VARIANTS.map((v) =>
+          buildCustomElementsManifest({
+            ir: variantIRs.get(v.name),
+            componentName: v.name,
+            description: variantDescription(v),
+            modulePath: `dist/${v.name}.mjs`,
+            handleManifest,
+          }),
+        ),
+      ];
+      const cemDoc = {
+        schemaVersion: perComponent[0].schemaVersion,
+        readme: '',
+        modules: perComponent.flatMap((d) => d.modules),
+      };
+      writeFileSync(
+        resolve(leafDir, 'custom-elements.json'),
+        `${JSON.stringify(cemDoc, null, 2)}\n`,
+      );
+      litPkg.customElements = 'custom-elements.json';
+      if (!litPkg.files.includes('custom-elements.json')) {
+        litPkg.files = [...litPkg.files, 'custom-elements.json'];
+      }
+      writeFileSync(litPkgPath, `${JSON.stringify(litPkg, null, 2)}\n`);
+    }
+
     cpSync(resolve(REPO_ROOT, 'LICENSE'), resolve(ROOT, 'packages', cfg.dir, 'LICENSE'));
 
     // BUNDLED leaves (tsdown → dist/) get multi-entry chunking + per-variant
@@ -436,4 +570,18 @@ function main() {
   );
 }
 
-main();
+// Guarded entry point: `main()` writes files as a side effect, so it must only
+// run when this script is EXECUTED (`node scripts/codegen.mjs`), never when it
+// is IMPORTED — `tests/surface.test.ts` imports `VARIANTS`/`makeVariantSource`
+// below to build the per-type variant IR the same way codegen does, and a bare
+// `main()` call at module scope would make importing this file for that purpose
+// silently regenerate every leaf as a test side effect.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}
+
+// Exported for tests/surface.test.ts (the per-type variant transform + list is
+// otherwise only reachable by re-deriving it — this is the SAME source codegen
+// uses for the barrels, the deep-import subpaths, and the IDE sidecars, so the
+// test can never drift from what actually ships).
+export { VARIANTS, TARGETS, makeVariantSource };
