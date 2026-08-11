@@ -38,7 +38,7 @@ Pre-v1.0, published. The toolchain is live on npm under the `@rozie` scope — `
 | [`tools/intellij-plugin`](tools/intellij-plugin) | Shipped — JetBrains IDE syntax + injection plugin |
 | [`tools/textmate`](tools/textmate) | Shipped — TextMate grammar (VS Code, IDEA Community, docs-site Shiki) |
 
-The toolchain (compiler, CLI, Babel plugin, unplugin, runtimes) and 18 of the 29 `@rozie-ui` component families are published on npm under MIT. The remaining families are built and gated in-repo, pending release verification. v1.0 of the toolchain is the next milestone.
+The toolchain (compiler, CLI, Babel plugin, unplugin, runtimes) and 19 of the 29 `@rozie-ui` component families are published on npm under MIT. The remaining families are built and gated in-repo, pending release verification. v1.0 of the toolchain is the next milestone.
 
 ## Quick look
 
@@ -104,7 +104,7 @@ Most families wrap a battle-tested vanilla-JS engine whose framework bindings ar
 | [Lexical](https://one-learning-community.github.io/rozie.js/components/lexical) | Lexical rich-text editor (Meta) | pending |
 | [Flatpickr](https://one-learning-community.github.io/rozie.js/components/flatpickr) | flatpickr date/time picker | ✅ |
 | [FullCalendar](https://one-learning-community.github.io/rozie.js/components/fullcalendar) | FullCalendar event calendar | ✅ |
-| [Chart.js](https://one-learning-community.github.io/rozie.js/components/chartjs) | Chart.js canvas charts | pending |
+| [Chart.js](https://one-learning-community.github.io/rozie.js/components/chartjs) | Chart.js canvas charts | ✅ |
 | [MapLibre](https://one-learning-community.github.io/rozie.js/components/maplibre) | MapLibre GL interactive maps | pending |
 | [FlowCanvas](https://one-learning-community.github.io/rozie.js/components/rete) | Rete.js node-flow editor | ✅ |
 | [Cropper](https://one-learning-community.github.io/rozie.js/components/cropper) | Cropper.js image cropping | ✅ |
