@@ -81,6 +81,22 @@ const CHARTJS_SRC = resolve(
   'chartjs',
   'src',
 );
+// quick-task 260811-9qe — the 8 per-type variant sources materialized under
+// `packages/ui/chartjs/src/variants/` (ChartCoverageDemo composes Bar/Doughnut
+// from here via <components>). The Angular sub-build walks this subdirectory
+// too (it is under CHARTJS_SRC's own `prebuildExtraRoots` walk) and drops the
+// same cross-tree `.rozie.ts` disk-cache PLUS a `<Name>.ts` cross-rozie shim
+// per variant. The CHARTJS_SRC sweep above is a FLAT (non-recursive)
+// readdirSync and does not reach this subdirectory, so it needs its own sweep
+// block (see cleanupCrossTreeAngularArtifacts).
+const CHARTJS_VARIANTS_SRC = resolve(
+  REPO_ROOT,
+  'packages',
+  'ui',
+  'chartjs',
+  'src',
+  'variants',
+);
 // Same packaging move for @rozie-ui/tiptap (Phase 32): TipTap.rozie lives in the
 // package src; the Angular sub-build walks it via `prebuildExtraRoots` and drops
 // the same cross-tree `.rozie.ts` + `TipTap.ts` shim artefacts that must be swept
@@ -479,6 +495,22 @@ function cleanupCrossTreeAngularArtifacts() {
     // chartjs src always exists post-port — defensive only
   }
   rmSync(resolve(CHARTJS_SRC, 'Chart.ts'), { force: true });
+  // Same sweep for the chartjs per-type variants subdirectory (quick-task
+  // 260811-9qe): ChartCoverageDemo composes Bar/Doughnut via <components>
+  // from `src/variants/`, so the Angular sub-build emits `<Name>.rozie.ts` +
+  // a `<Name>.ts` cross-rozie shim per composed variant here too. A blanket
+  // `.ts` sweep is safe in this directory — it holds nothing but the 8
+  // generated `.rozie` variant sources (see codegen.mjs), never a legitimate
+  // hand-authored `.ts` file.
+  try {
+    for (const entry of readdirSync(CHARTJS_VARIANTS_SRC)) {
+      if (entry.endsWith('.ts')) {
+        rmSync(resolve(CHARTJS_VARIANTS_SRC, entry), { force: true });
+      }
+    }
+  } catch {
+    // variants dir always exists post quick-task 260811-9qe — defensive only
+  }
   // Same sweep for @rozie-ui/tiptap's package src (TipTapDemo composes TipTap via
   // <components>, so the Angular sub-build emits TipTap.rozie.ts + the TipTap.ts
   // shim here). Leftovers (the emitted .rozie.ts imports @angular/core) poison the

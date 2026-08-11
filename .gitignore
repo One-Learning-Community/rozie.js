@@ -110,6 +110,15 @@ packages/ui/rete/src/*.ts
 # the regenerated shims.
 packages/ui/data-table/src/*.ts
 
+# quick-task 260811-9qe — @rozie-ui/chartjs per-type variant sources
+# (packages/ui/chartjs/src/variants/*.rozie). Same cross-rozie-shim story as
+# maplibre/rete/data-table above: when ChartCoverageDemo composes Bar/Doughnut
+# via <components>, the Angular prebuild emits a transient
+# `// @rozie-cross-rozie-shim` `<Name>.ts` next to the .rozie source, and the
+# VR `build-cells.mjs` sweep deletes it. Only `.rozie` sources are legit-tracked
+# in this directory; dir-wide `*.ts` ignores only the regenerated shims.
+packages/ui/chartjs/src/variants/*.ts
+
 # IntelliJ plugin subproject (Phase 8)
 tools/intellij-plugin/build/
 tools/intellij-plugin/.gradle/

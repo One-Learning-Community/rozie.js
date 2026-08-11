@@ -337,6 +337,39 @@ function main() {
   // Pre-build the variant sources once (target-independent).
   const variantSources = VARIANTS.map((v) => ({ ...v, source: makeVariantSource(source, v) }));
 
+  // Materialize the per-type variant sources on disk as real `.rozie` files
+  // (quick-task 260811-9qe). Until now `makeVariantSource` only built these
+  // strings in memory — the six leaves' COMPILED per-target output
+  // (Bar.tsx/Bar.vue/…) landed on disk, but the SOURCE never did, so nothing
+  // could mount a per-type variant at runtime: no `.rozie` file existed for a
+  // VR demo to import via `<components>`. Writing them here closes that gap —
+  // the VR host can now compose `Bar`/`Doughnut`/etc. from
+  // `src/variants/<Name>.rozie`, and because that file IS the exact string
+  // `makeVariantSource` produces, mounting it is mounting what every leaf
+  // compiles from — a runtime pass on the materialized variant is a runtime
+  // pass on what ships.
+  //
+  // Write VERBATIM: no banner comment, no reformatting, no trailing-newline
+  // normalization. Byte-identity is load-bearing twice over — (1) the demo-rig
+  // guarantee above only holds if nothing diverges between the written file
+  // and the `source` string codegen builds every leaf from, and (2) a leading
+  // comment above the `<rozie>` element shifts source byte offsets, a known
+  // emitter hazard (feedback_rozie_leading_comments) — so prepending a
+  // generated-file banner here would force a leaf regeneration this task is
+  // forbidden to make.
+  //
+  // These files are GENERATED — never hand-edit them.
+  // `tests/generated-entries.test.ts` enforces the byte-identity against
+  // `makeVariantSource` output, so a hand edit or accidental reformat goes red
+  // immediately. The BUILD-ORDER CONTRACT in this file's header ("this writes
+  // each leaf's src/*, so it MUST run before the bundled-leaf tsdown builds")
+  // covers these files too.
+  const variantsSrcDir = resolve(ROOT, 'src', 'variants');
+  mkdirSync(variantsSrcDir, { recursive: true });
+  for (const v of variantSources) {
+    writeFileSync(resolve(variantsSrcDir, `${v.name}.rozie`), v.source);
+  }
+
   // Lower each variant's IR once too (target-independent) — the IDE sidecars
   // (web-types.json / custom-elements.json) need per-component prop/emit/slot/
   // expose data for all 9 components, not just the generic Chart's `ir` above.

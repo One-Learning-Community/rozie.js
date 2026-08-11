@@ -1,0 +1,465 @@
+<!--
+  Chart.rozie — data-bound port of Chart.js (chartjs/Chart.js).
+
+  Chart.js has wrappers in every framework (react-chartjs-2, vue-chartjs,
+  ng2-charts/ng-charts, svelte-chartjs, …) — each one a 200-2000 LOC project
+  that mostly exists to shuttle props into a `new Chart()` call and forward
+  events out. Five maintenance burdens, ONE Rozie source.
+
+  This is the GENERIC chart: the public component is named `Chart` (the engine
+  class is aliased `ChartJS` on import so the name is free) and the `type` prop
+  switches the chart kind across the WHOLE Chart.js controller set — `line`,
+  `bar`, `pie`, `doughnut`, `radar`, `polarArea`, `scatter`, `bubble`, and any
+  registerable. `ChartJS.register(...registerables)` registers every controller,
+  so `type` genuinely switches kind. Chart.js has no stable runtime type-swap,
+  so a type change re-creates the instance (rare enough to be acceptable).
+
+  Usage:
+
+    <Chart :data="$data.chartData" :options="$data.chartOpts" type="bar" />
+
+  Where `data` matches Chart.js's
+  `{ labels: string[], datasets: [{ label, data, ... }] }` shape.
+
+  Feature-rich surface (Phase 30 — see the `<props>` block, the `$expose` call,
+  and the `<template>` below for the authoritative, always-current surface; the
+  counts are intentionally not restated here so this comment cannot rot the way
+  a hand-counted number does):
+    - props: data / options / type / height / width / plugins / updateMode /
+      redraw / ariaLabel / datasetIdKey / destroyDelay. `:plugins` is the
+      consumer-extensibility passthrough (per-instance Chart.js `Plugin[]`) —
+      the Chart.js analog of CodeMirror's `:extensions` and FullCalendar's
+      merged `:options.plugins`.
+    - events: @click / @hover / @datasetClick — composed onto Chart.js's
+      `options.onClick`/`onHover` WITHOUT clobbering a consumer-supplied handler.
+    - $expose verbs over the live instance: getChart / updateChart /
+      resizeChart / resetChart / renderChart / stopChart / clearChart /
+      toBase64Image (the marquee PNG export) / setDatasetVisibility /
+      isDatasetVisible / hideDataset / showDataset / setActiveElements /
+      getActiveElements / getDatasetMeta. NOTE the lifecycle/redraw verb names
+      are SUFFIXED (`updateChart`, not `update`) — bare `update`/`render`
+      collide with LitElement's reactive-lifecycle methods (`update()`/
+      `render()`) and would shadow them on the Lit leaf. This is the Chart.js
+      analog of CodeMirror's setValue→replaceValue
+      ($expose-verb-vs-framework-reserved-method) lesson.
+    - 2 slots: a non-portal `fallback` slot (in-canvas a11y content) and an
+      external-HTML `tooltip` portal slot — canvas owns its own paint, so the
+      external-tooltip handler is the one real portal-slot showcase.
+
+  $snapshot discipline: Chart.js's internal `Object.defineProperty` on its data
+  config conflicts with Svelte 5's `$state` proxy (`state_descriptors_fixed`);
+  `$snapshot(x)` lowers to `$state.snapshot(x)` on Svelte and to identity on the
+  other five targets. Every object handed to the engine is snapshotted first.
+
+  $refs discipline: `$refs.canvasEl` is read ONCE inside `$onMount` and captured
+  into a plain `canvasEl` let; re-creates use the captured node (never re-read
+  $refs outside the mount hook — ROZ123 / project_refs_only_safe_in_onmount).
+-->
+
+<rozie name="Radar" inherit-attrs="false" inherit-listeners="false" adopt-document-styles>
+
+<props>
+{
+  data: {
+    type: Object,
+    default: () => ({ labels: [], datasets: [] }),
+    docs: {
+      description:
+        "Chart.js data in its own `{ labels, datasets }` shape. Reconciled **in place** on change — the wrapper mutates `chart.data` and calls `chart.update()` so series tween point-to-point instead of remounting.",
+      example: '<Chart :data="$data.chartData" type="bar" />',
+    },
+  },
+  options: {
+    type: Object,
+    default: () => ({}),
+    docs: {
+      description:
+        "Chart.js options (scales, legend, plugins config, …). Merged over the wrapper's responsive defaults and reapplied wholesale on change with `update('none')`. A consumer-supplied `options.onClick`/`onHover` is **composed**, not clobbered.",
+    },
+  },
+  height: {
+    type: Number,
+    default: 240,
+    docs: {
+      description:
+        "Chart height in pixels, applied to the wrapper's host box; the canvas fills it responsively.",
+    },
+  },
+  width: {
+    type: Number,
+    default: undefined,
+    docs: {
+      description:
+        'Optional fixed chart width in pixels. Omit for the default full-width responsive box.',
+    },
+  },
+  plugins: {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'Per-instance Chart.js `Plugin[]` — the consumer-extensibility passthrough. Merged into the config; changing the array **re-creates** the instance, since Chart.js has no stable runtime plugin-swap.',
+    },
+  },
+  updateMode: {
+    type: String,
+    default: undefined,
+    docs: {
+      description:
+        'The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).',
+    },
+  },
+  redraw: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'When `true`, a `data` change **re-creates** the chart wholesale instead of reconciling in place — mirrors react-chartjs-2 `redraw` for charts whose plugins do not survive an in-place update.',
+    },
+  },
+  ariaLabel: {
+    type: String,
+    default: undefined,
+    docs: {
+      description:
+        'Accessible label applied to the `<canvas role="img">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.',
+    },
+  },
+  // Dataset diff key (react-chartjs-2 parity): datasets are matched across
+  // updates by ds[datasetIdKey], falling back to array index when the key is
+  // absent — guards the "first dataset copied over the others" hazard.
+  datasetIdKey: {
+    type: String,
+    default: 'label',
+    docs: {
+      description:
+        'The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the "first dataset copied over the others" hazard.',
+    },
+  },
+  // ms grace before destroy() on unmount so exit transitions can finish
+  // (vue-chartjs parity). 0 = destroy immediately.
+  destroyDelay: {
+    type: Number,
+    default: 0,
+    docs: {
+      description:
+        'Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.',
+    },
+  },
+}
+</props>
+
+<script>
+import { Chart as ChartJS, RadarController, LineElement, PointElement, RadialLinearScale, Filler, Legend, Tooltip, Colors } from 'chart.js'
+// Radar registers only its own Chart.js controller/element/scale set
+// (tree-shakable — importing this component does not pull every controller).
+ChartJS.register(RadarController, LineElement, PointElement, RadialLinearScale, Filler, Legend, Tooltip, Colors)
+
+// Chart.js v3+ ships with no controllers/elements/scales pre-registered. The
+// generic Chart does NOT auto-register — the consumer registers only what they
+// use (the tree-shakable Chart.js v3+ idiom every framework wrapper follows), so
+// an app that only renders line charts doesn't ship every controller. Two paths:
+//   - selective: `import { Chart, LineController, ... } from 'chart.js';
+//     Chart.register(LineController, ...)` once at app startup; OR
+//   - kitchen sink: import this package's `/auto` entry
+//     (`@rozie-ui/chartjs-<fw>/auto`), or `import 'chart.js/auto'`, which
+//     registers everything.
+// The per-type components (Line/Bar/…) register their own controller set, so
+// importing one is tree-shakable by construction.
+
+let instance = null
+// $refs.canvasEl is read ONLY inside $onMount (ROZ123); re-creates use this
+// captured node so no $refs read ever executes outside the mount hook.
+let canvasEl = null
+// buildConfig is DEFINED inside $onMount (so its $emit/$portals/$slots
+// references are bound in the mount-lifecycle scope the per-target emitters
+// provide — mirrors FullCalendar's mount-built opts + CodeMirror's panelExt
+// note) and stored here so the top-level re-create $watches can call it.
+let buildConfig = null
+
+$onMount(() => {
+  canvasEl = $refs.canvasEl
+
+  // ─── @click / @hover / @datasetClick — composed, never clobbering ──────────
+  // Chart.js calls onClick/onHover with (event, activeElements, chart). We call
+  // any consumer-supplied handler first (read off $props.options), then emit a
+  // structured payload resolving the hit element(s) via getElementsAtEventForMode.
+  const composedOnClick = (e, activeEls, chart) => {
+    const userOnClick = $props.options?.onClick
+    if (typeof userOnClick === 'function') userOnClick(e, activeEls, chart)
+    const nearest = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false)
+    $emit('click', { event: e, elements: nearest, chart })
+    const dataset = chart.getElementsAtEventForMode(e, 'dataset', { intersect: true }, false)
+    if (dataset.length) {
+      $emit('datasetClick', { event: e, elements: dataset, datasetIndex: dataset[0].datasetIndex, chart })
+    }
+  }
+  const composedOnHover = (e, activeEls, chart) => {
+    const userOnHover = $props.options?.onHover
+    if (typeof userOnHover === 'function') userOnHover(e, activeEls, chart)
+    $emit('hover', { event: e, elements: activeEls, chart })
+  }
+
+  // ─── external-HTML tooltip portal slot ─────────────────────────────────────
+  // Only active when the consumer fills <slot name="tooltip">. The external
+  // handler positions a container over the canvas and mounts the consumer's
+  // framework-native fragment through $portals.tooltip(dom, scope). The scope
+  // carries the live tooltip model (title/body/dataPoints/position). Chart.js
+  // throttles external calls to active-element changes, so the dispose+remount
+  // on body-change is cheap. enabled:false suppresses the built-in canvas
+  // tooltip when we take over.
+  //
+  // Mount-locals (not top-level script `let`s) — read only by tooltipExternal
+  // and the returned teardown below, both defined in THIS $onMount closure.
+  // Emitter-hardening backlog item #2 (project_emitter_hardening_backlog):
+  // every target keeps a $onMount setup-local in scope for its own returned
+  // teardown, so these no longer need the prior COMPONENT-scope workaround.
+  let tooltipEl = null
+  let tooltipDispose = null
+  let tooltipKey = ''
+  const tooltipExternal = (context) => {
+    const { chart, tooltip } = context
+    if (!tooltipEl) {
+      tooltipEl = document.createElement('div')
+      tooltipEl.className = 'rozie-chart-tooltip'
+      tooltipEl.style.position = 'absolute'
+      tooltipEl.style.pointerEvents = 'none'
+      tooltipEl.style.transition = 'opacity 0.1s ease'
+      chart.canvas.parentNode.appendChild(tooltipEl)
+    }
+    if (tooltip.opacity === 0) {
+      tooltipEl.style.opacity = '0'
+      return
+    }
+    const title = (tooltip.title || []).join(' ')
+    const body = (tooltip.body || []).map((b) => b.lines.join(' ')).join(' | ')
+    const key = `${title}::${body}`
+    if (key !== tooltipKey) {
+      tooltipKey = key
+      tooltipDispose?.()
+      // The scope MUST match the slot's declared param (`model`): the consumer's
+      // <slot name="tooltip"> receives a single `model` scoped value.
+      const scope = {
+        model: {
+          title: tooltip.title || [],
+          body: (tooltip.body || []).map((b) => b.lines),
+          dataPoints: tooltip.dataPoints || [],
+          opacity: tooltip.opacity,
+        },
+      }
+      tooltipDispose = $portals.tooltip(tooltipEl, scope)
+    }
+    const { offsetLeft, offsetTop } = chart.canvas
+    tooltipEl.style.opacity = '1'
+    tooltipEl.style.left = `${offsetLeft + tooltip.caretX}px`
+    tooltipEl.style.top = `${offsetTop + tooltip.caretY}px`
+  }
+
+  // ─── config builder ────────────────────────────────────────────────────────
+  // $snapshot strips Svelte 5's $state proxy first; Chart.js redefines property
+  // descriptors on whatever object it is handed.
+  buildConfig = () => {
+    const userOpts = $snapshot($props.options) || {}
+    const tooltipOpt = $slots.tooltip
+      ? { ...(userOpts.plugins?.tooltip || {}), enabled: false, external: tooltipExternal }
+      : userOpts.plugins?.tooltip
+    return {
+      type: 'radar',
+      data: $snapshot($props.data),
+      // per-instance plugins[] — the consumer-extensibility passthrough.
+      plugins: $snapshot($props.plugins),
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        ...userOpts,
+        onClick: composedOnClick,
+        onHover: composedOnHover,
+        plugins: {
+          ...(userOpts.plugins || {}),
+          tooltip: tooltipOpt,
+        },
+      },
+    }
+  }
+
+  instance = new ChartJS(canvasEl, buildConfig())
+  return () => {
+    tooltipDispose?.()
+    tooltipEl?.remove()
+    // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
+    // can finish. The captured `dying` instance is destroyed after the grace;
+    // 0 (default) destroys synchronously.
+    const dying = instance
+    if ($props.destroyDelay > 0) {
+      setTimeout(() => dying?.destroy(), $props.destroyDelay)
+    } else {
+      dying?.destroy()
+    }
+  }
+})
+
+// Re-create the live instance. Chart.js exposes no stable runtime type-swap or
+// plugin-swap, so `type`/`plugins`/`redraw`-driven changes re-create. Uses the
+// captured canvasEl (never re-reads $refs outside $onMount).
+const recreate = () => {
+  if (!buildConfig || !canvasEl) return
+  instance?.destroy()
+  instance = new ChartJS(canvasEl, buildConfig())
+}
+
+// Reconcile prop changes. Mutating chart.data in place and calling update() is
+// the Chart.js-supported runtime path — re-creating on every data tick would
+// flicker and leak. (When `redraw` is set, re-create wholesale instead.)
+$watch(() => $props.data, (v) => {
+  if (!instance) return
+  if ($props.redraw) { recreate(); return }
+
+  // Reconcile a new data object into the LIVE chart instead of replacing
+  // instance.data. Chart.js matches dataset controllers and point elements by
+  // array index across an update(), so mutating the existing labels/datasets
+  // arrays lets it tween every point from old value to new. Assigning a fresh
+  // instance.data severs that identity.
+  const next = $snapshot(v)
+  const live = instance.data
+
+  // Aliasing guard. On identity-$snapshot targets (React / Solid / Lit) $snapshot
+  // returns its argument unchanged, and Chart.js stores config.data by reference,
+  // so a freshly-constructed chart has `instance.data === $props.data === next`.
+  // The in-place `live.labels.length = 0` below would then empty the very array we
+  // read from on the next line (`next.labels` IS `live.labels`), wiping the labels
+  // → cartesian charts lose their category axis and render an empty plot (the
+  // doughnut, being radial, survives — it doesn't position by label). When live and
+  // next alias there is nothing to reconcile: the chart already holds this data, so
+  // just repaint. (Vue/Angular never hit this — their immediate $watch runs before
+  // $onMount, when instance is still null.)
+  if (live === next) { instance.update($props.updateMode); return }
+
+  live.labels ??= []
+  live.labels.length = 0
+  live.labels.push(...(next.labels ?? []))
+
+  // Datasets are matched by `ds[datasetIdKey]` (default 'label') so a stable
+  // keyed dataset reconciles onto its prior slot even if its array index moved —
+  // this guards the "first dataset copied over the others" hazard react-chartjs-2
+  // documents. Datasets without the key fall back to positional (index) matching.
+  live.datasets ??= []
+  const nextSets = next.datasets ?? []
+  const key = $props.datasetIdKey
+  const prev = live.datasets.slice()
+  const byKey = new Map()
+  prev.forEach((ds, i) => {
+    if (ds && ds[key] != null) byKey.set(ds[key], ds)
+  })
+  const merged = nextSets.map((ds, i) => {
+    const match = (ds && ds[key] != null && byKey.get(ds[key])) || prev[i]
+    if (match) { Object.assign(match, ds); return match }
+    return ds
+  })
+  live.datasets.length = 0
+  live.datasets.push(...merged)
+
+  instance.update($props.updateMode)
+}, { immediate: true })
+
+// Options aren't tweened point-to-point; rebuild the merged options object
+// (re-applying the composed onClick/onHover + tooltip external) and assign
+// wholesale. Skip the animation rather than rescale-flicker on every tick.
+$watch(() => $props.options, () => {
+  if (!instance || !buildConfig) return
+  instance.options = buildConfig().options
+  instance.update('none')
+})
+
+// No stable runtime type-swap / plugin-swap → re-create.
+$watch(() => $props.plugins, () => recreate())
+
+// Imperative handle (Phase 21 $expose). The lifecycle/redraw verbs are SUFFIXED
+// with `Chart` because bare `update`/`render` collide with LitElement's
+// reactive-lifecycle methods (`update(changedProperties)` / `render()`) and
+// would shadow them on the Lit leaf; `resize`/`reset`/`stop`/`clear` are
+// suffixed too for a consistent, unambiguous handle. `getChart` returns the live
+// instance for direct API access; `toBase64Image` is the marquee PNG-export.
+//
+// The visibility + active-element family (added later) is the #1 reason a
+// consumer reaches for a chart handle — custom legends, externally-driven
+// tooltips/highlights, overlay positioning — none reachable via prop/event:
+//   - setDatasetVisibility / isDatasetVisible: drive a custom legend's series
+//     show/hide (INSTANT toggle).
+//   - hideDataset / showDataset: the ANIMATED hide/show (Chart.js hide()/show()).
+//     SUFFIXED with `Dataset` both to dodge inherited HTMLElement-ish ambiguity
+//     and to disambiguate the dataset-vs-element overload.
+//   - setActiveElements / getActiveElements: programmatically open/read the
+//     hovered/active points (sync hover from a table row, a map pin, a sibling
+//     chart) — events only REPORT hover, they cannot SET it.
+//   - getDatasetMeta: read computed geometry (pixel coords, controller) to
+//     position custom overlays/annotations over the canvas.
+// Collision-clear: none of the 15 names collide with the 11 props or the 3
+// emits (click/datasetClick/hover).
+function getChart()                   { return instance }
+function updateChart(mode)            { instance?.update(mode) }
+function resizeChart(w, h)            { instance?.resize(w, h) }
+function resetChart()                 { instance?.reset() }
+function renderChart()                { instance?.render() }
+function stopChart()                  { return instance?.stop() }
+function clearChart()                 { return instance?.clear() }
+function toBase64Image(type, quality) { return instance ? instance.toBase64Image(type, quality) : null }
+function setDatasetVisibility(datasetIndex, visible) { instance?.setDatasetVisibility(datasetIndex, visible) }
+function isDatasetVisible(datasetIndex)              { return instance ? instance.isDatasetVisible(datasetIndex) : false }
+function hideDataset(datasetIndex, dataIndex)        { instance?.hide(datasetIndex, dataIndex) }
+function showDataset(datasetIndex, dataIndex)        { instance?.show(datasetIndex, dataIndex) }
+function setActiveElements(elements)                 { instance?.setActiveElements(elements ?? []) }
+function getActiveElements()                         { return instance ? instance.getActiveElements() : [] }
+function getDatasetMeta(datasetIndex)                { return instance ? instance.getDatasetMeta(datasetIndex) : null }
+
+$expose({
+  getChart, updateChart, resizeChart, resetChart, renderChart, stopChart, clearChart, toBase64Image,
+  setDatasetVisibility, isDatasetVisible, hideDataset, showDataset,
+  setActiveElements, getActiveElements, getDatasetMeta,
+})
+</script>
+
+<template>
+<div class="rozie-chart" :style="{ height: $props.height + 'px', width: $props.width ? $props.width + 'px' : undefined }">
+  <!--
+    The `fallback` slot is rendered INSIDE the <canvas> — the canvas-fallback a11y
+    idiom (content shown to assistive tech / browsers that can't render the canvas;
+    Chart.js paints over it visually). Non-portal named slot; omit it and the canvas
+    renders normally. Guarded so an empty slot adds nothing.
+  -->
+  <canvas ref="canvasEl" role="img" :aria-label="$props.ariaLabel"><slot name="fallback" /></canvas>
+</div>
+<!--
+  External-HTML tooltip portal slot. Declared but NOT rendered in the template —
+  per-target template emitters skip it. The wrapper invokes the slot from script
+  via $portals.tooltip(dom, scope) inside Chart.js's external tooltip handler;
+  the portal helper mounts the consumer's framework-native fragment into the
+  wrapper-owned tooltip node and returns a dispose handle.
+-->
+<slot name="tooltip" portal :params="['model']" />
+</template>
+
+<style>
+.rozie-chart {
+  position: relative;
+  width: 100%;
+}
+.rozie-chart canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+:root {
+  .rozie-chart .rozie-chart-tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 12px;
+    transform: translate(-50%, calc(-100% - 8px));
+    white-space: nowrap;
+  }
+}
+</style>
+
+</rozie>
