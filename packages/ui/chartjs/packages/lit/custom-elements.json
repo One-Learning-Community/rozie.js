@@ -310,7 +310,7 @@
               }
             },
             {
-              "name": "datasetClick",
+              "name": "dataset-click",
               "type": {
                 "text": "CustomEvent"
               }
@@ -649,7 +649,7 @@
               }
             },
             {
-              "name": "datasetClick",
+              "name": "dataset-click",
               "type": {
                 "text": "CustomEvent"
               }
@@ -988,7 +988,7 @@
               }
             },
             {
-              "name": "datasetClick",
+              "name": "dataset-click",
               "type": {
                 "text": "CustomEvent"
               }
@@ -1327,7 +1327,7 @@
               }
             },
             {
-              "name": "datasetClick",
+              "name": "dataset-click",
               "type": {
                 "text": "CustomEvent"
               }
@@ -1666,7 +1666,7 @@
               }
             },
             {
-              "name": "datasetClick",
+              "name": "dataset-click",
               "type": {
                 "text": "CustomEvent"
               }
@@ -2005,7 +2005,7 @@
               }
             },
             {
-              "name": "datasetClick",
+              "name": "dataset-click",
               "type": {
                 "text": "CustomEvent"
               }
@@ -2344,7 +2344,7 @@
               }
             },
             {
-              "name": "datasetClick",
+              "name": "dataset-click",
               "type": {
                 "text": "CustomEvent"
               }
@@ -2683,7 +2683,7 @@
               }
             },
             {
-              "name": "datasetClick",
+              "name": "dataset-click",
               "type": {
                 "text": "CustomEvent"
               }
@@ -3022,7 +3022,7 @@
               }
             },
             {
-              "name": "datasetClick",
+              "name": "dataset-click",
               "type": {
                 "text": "CustomEvent"
               }

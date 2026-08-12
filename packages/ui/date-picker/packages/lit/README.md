@@ -36,8 +36,10 @@ el.presetRanges = [
   { label: 'Q1 2026', range: { start: '2026-01-01', end: '2026-03-31' } },
   { label: 'Last 7 days', range: () => ({ start: '2026-06-19', end: '2026-06-25' }) },
 ];
-// The custom event name is CASE-PRESERVED on Lit → 'rangeComplete'.
-el.addEventListener('rangeComplete', (e) => {
+// The custom event name is KEBAB-CASED on Lit dispatch, matching every
+// other multi-word Rozie emit → 'range-complete' (NOT the source-name
+// 'rangeComplete', which is the one form that would silently never fire).
+el.addEventListener('range-complete', (e) => {
   console.log('range:', e.detail.value);
 });
 ```
@@ -72,10 +74,12 @@ import '@rozie-ui/date-picker-lit/themes/shadcn.css';    // or material.css, boo
 
 ## Events
 
+`addEventListener` name — the Lit target dispatches multi-word event names kebab-cased.
+
 | Event | Description |
 | --- | --- |
 | `change` | Fired whenever the selected value changes — selecting a day, applying a preset, or a programmatic `clear()`. Payload `{ value }` — the new value: in `single` mode the selected ISO `YYYY-MM-DD` string (or `""` when cleared); in `range` mode the `{ start, end }` object (an in-progress anchor is `{ start, end: "" }`; cleared is `{ start: "", end: "" }`). Not fired when the picked date equals the current selection. |
-| `rangeComplete` | Range mode only. Fired when a range selection **completes** — the second endpoint lands (the two-click commit) or a preset is applied. Payload `{ value }` — the ordered `{ start, end }` object (`start <= end`). NOT fired on the first (anchor-only) click. Per-target consumer prop casing differs: React `onRangeComplete`, Vue `@range-complete`, Svelte `onrangecomplete` (lowercased), Angular `(rangeComplete)`, Solid `onRangeComplete`, Lit `@rangeComplete`. |
+| `range-complete` | Range mode only. Fired when a range selection **completes** — the second endpoint lands (the two-click commit) or a preset is applied. Payload `{ value }` — the ordered `{ start, end }` object (`start <= end`). NOT fired on the first (anchor-only) click. Per-target consumer prop casing differs: React `onRangeComplete`, Vue `@range-complete`, Svelte `onrangecomplete` (lowercased), Angular `(rangeComplete)`, Solid `onRangeComplete`, Lit `range-complete` (`addEventListener` — kebab-cased at dispatch, NOT case-preserved). |
 
 ## Imperative handle
 

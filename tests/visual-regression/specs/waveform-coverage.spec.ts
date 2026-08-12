@@ -546,21 +546,8 @@ for (const target of TARGETS) {
         'a 2s fixture at 1x rate must reach `finished` well within this timeout',
       ).not.toContainText('finished=0', { timeout: 15_000 });
 
-      // EMITTER-BACKLOG (see .planning/todos/pending/
-      // lit-multiword-emit-kebab-camelcase-mismatch.md) — on Lit specifically,
-      // a consumer's kebab-cased `@region-in`/`@region-out` template binding
-      // never fires: the child dispatches the raw camelCase source name
-      // (`regionIn`/`regionOut`) verbatim, so the two never match
-      // (`addEventListener` is case-sensitive). Confirmed the underlying
-      // engine events genuinely fire (a listener installed directly on the
-      // live RegionsPlugin instance sees them on schedule) — this is a
-      // listener-wiring gap in the Lit target, not a source or engine bug,
-      // and it affects every multi-word `$emit()` name consumed via
-      // component-to-component composition on Lit, not just this family.
-      if (target !== 'lit') {
-        await expect(mount.getByTestId('play-region-in')).toContainText('seg', { timeout: 5_000 });
-        await expect(mount.getByTestId('play-region-out')).toContainText('seg', { timeout: 5_000 });
-      }
+      await expect(mount.getByTestId('play-region-in')).toContainText('seg', { timeout: 5_000 });
+      await expect(mount.getByTestId('play-region-out')).toContainText('seg', { timeout: 5_000 });
     },
   );
 }
@@ -607,19 +594,10 @@ for (const target of TARGETS) {
       await expect(out).toContainText('added=', { timeout: 5_000 });
       await mount.getByTestId('handle-clear-regions').click();
       await expect(out).toContainText('cleared', { timeout: 5_000 });
-      // EMITTER-BACKLOG (see .planning/todos/pending/
-      // lit-multiword-emit-kebab-camelcase-mismatch.md) — same shape as Leg
-      // 8's region-in/region-out skip: `@region-removed` never fires on Lit
-      // because the child dispatches the raw camelCase `regionRemoved` name
-      // verbatim while the consumer template listens for the literal kebab
-      // string. `clearRegions()` itself is proven working above (the handle
-      // reports 'cleared'); only the listener-side observation is gapped.
-      if (target !== 'lit') {
-        await expect(
-          mount.getByTestId('region-removed-count'),
-          'clearRegions() genuinely removes engine regions outside the reconcile guard, so it must fire regionRemoved',
-        ).not.toContainText(removedBefore ?? '');
-      }
+      await expect(
+        mount.getByTestId('region-removed-count'),
+        'clearRegions() genuinely removes engine regions outside the reconcile guard, so it must fire regionRemoved',
+      ).not.toContainText(removedBefore ?? '');
 
       await mount.getByTestId('handle-set-zoom').click();
       await expect(out).toContainText('zoomed', { timeout: 5_000 });

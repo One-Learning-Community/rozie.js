@@ -17,7 +17,9 @@
  * repo's emitter uses, verified against the emitted Chart.ts / Bar.ts / …:
  *   - tag name        = `rozie-` + kebab(componentName)   (@customElement)
  *   - HTML attribute  = Lit default = propName.toLowerCase() (no explicit `attribute:`)
- *   - source events   = ir.emits, dispatched verbatim as CustomEvents
+ *   - source events   = ir.emits, kebab-cased at dispatch (quick 260811-nre,
+ *     D-01 — a multi-word emit name is dispatched hyphenated, matching the
+ *     tag-name kebab() below, NOT dispatched verbatim as the raw source name)
  *     (chartjs has no model:true props, so no `<prop>-change` writeback event)
  *
  * MULTI-COMPONENT MODULE TOPOLOGY (unlike rete's FlowCanvas/NodeType/Port,
@@ -158,10 +160,11 @@ export function buildCustomElementsManifest({
     return a;
   });
 
-  // Events: source emits, dispatched verbatim as CustomEvents (no model
-  // writeback event — chartjs has no model:true props).
+  // Events: source emits, kebab-cased at dispatch (D-01 — same `kebab()`
+  // helper as the tag name, mirroring the compiler's toKebabCase). No model
+  // writeback event — chartjs has no model:true props.
   const events = ir.emits.map((name) => ({
-    name,
+    name: kebab(name),
     type: { text: 'CustomEvent' },
     ...(eventManifest[name] ? { description: eventManifest[name] } : {}),
   }));

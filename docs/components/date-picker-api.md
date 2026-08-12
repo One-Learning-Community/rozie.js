@@ -22,14 +22,14 @@ The two-way model also fires the framework-native update event (`onValueChange` 
 
 ### Per-target `rangeComplete` consumer-prop casing
 
-`rangeComplete` is a camelCase event, and each framework derives the consumer-facing prop name its own way. Bind the **exact** name for your target — the **Svelte one is lowercase**, and a PascalCase binding there silently never fires:
+`rangeComplete` is a camelCase source event, and each framework derives the consumer-facing prop name its own way. Bind the **exact** name for your target — the **Svelte one is lowercase**, and a PascalCase binding there silently never fires. **Lit is the exception: it does NOT preserve the source casing** — the compiler kebab-cases multi-word emit names at dispatch, so the DOM event name is `range-complete`, not `rangeComplete` (quick 260811-nre; previously documented here as case-preserved, which was true before that fix and is no longer):
 
 | Target | Consumer binding |
 | --- | --- |
 | React / Solid | `onRangeComplete={...}` |
 | Vue | `@rangeComplete="..."` (`emit('rangeComplete')`) |
 | Angular | `(rangeComplete)="..."` output |
-| Lit | `addEventListener('rangeComplete', ...)` — `CustomEvent("rangeComplete")`, case-preserved |
+| **Lit** | **`addEventListener('range-complete', ...)`** — `CustomEvent("range-complete")`, kebab-cased at dispatch (NOT `rangeComplete`) |
 | **Svelte** | **`onrangecomplete={...}`** — ⚠ LOWERCASE (NOT `onRangeComplete`) |
 
 ## Slots

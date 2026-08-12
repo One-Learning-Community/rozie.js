@@ -20,7 +20,9 @@
  *   - tag name        = `rozie-` + kebab(componentName)   (@customElement)
  *   - model event     = `<modelProp>-change`              (createLitControllable…)
  *   - HTML attribute  = Lit default = propName.toLowerCase() (no explicit `attribute:`)
- *   - source events   = ir.emits, dispatched verbatim as CustomEvents
+ *   - source events   = ir.emits, kebab-cased at dispatch (quick 260811-nre,
+ *     D-01 — a multi-word emit name like `regionIn` is dispatched hyphenated
+ *     as `region-in`, NOT dispatched verbatim)
  *
  * Pure glue over the `@rozie/core` public IR — NO compiler/emitter surface.
  */
@@ -143,9 +145,10 @@ export function buildCustomElementsManifest({
     return a;
   });
 
-  // Events: source emits (dispatched verbatim) + the model `<prop>-change` writeback.
+  // Events: source emits, kebab-cased at dispatch (D-01 — same `kebab()`
+  // helper as the tag name) + the model `<prop>-change` writeback.
   const events = ir.emits.map((name) => ({
-    name,
+    name: kebab(name),
     type: { text: 'CustomEvent' },
     ...(eventManifest[name] ? { description: eventManifest[name] } : {}),
   }));

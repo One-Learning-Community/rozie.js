@@ -56,10 +56,12 @@ Or use a **per-type component** — each pins its `type` and registers only its 
 
 ## Events
 
+`addEventListener` name — the Lit target dispatches multi-word event names kebab-cased.
+
 | Event | Description |
 | --- | --- |
 | `click` | |
-| `datasetClick` | |
+| `dataset-click` | |
 | `hover` | |
 
 ## Imperative handle

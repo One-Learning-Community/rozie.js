@@ -180,11 +180,11 @@ export function Demo() {
     code: `import '@rozie-ui/wavesurfer-lit';
 
 // <rozie-waveform> is a custom element. Bind \`src\`/\`currentTime\` as properties
-// and listen for \`currentTime-change\` (the two-way channel) + \`ready\`.
+// and listen for \`current-time-change\` (the two-way channel) + \`ready\`.
 const el = document.querySelector('rozie-waveform');
 el.src = '/audio.mp3';
 el.timeline = true;
-el.addEventListener('currentTime-change', (e) => { el.currentTime = e.detail; });
+el.addEventListener('current-time-change', (e) => { el.currentTime = e.detail; });
 el.addEventListener('ready', (e) => console.log('duration', e.detail));`,
   },
 };
@@ -265,6 +265,20 @@ const dur = el.getDuration();`,
 };
 
 // ---------------------------------------------------------------------------
+// Lit event-name kebab-casing (quick 260811-nre, D-01). The compiled Lit
+// target dispatches a MULTI-WORD `$emit()` name kebab-cased, so the Lit
+// README's Events table must render the DISPATCHED string, not the raw
+// `ir.emits` source name. Algorithm copied VERBATIM from
+// packages/targets/lit/src/emit/emitDecorator.ts:15 (`toKebabCase`) — must
+// stay byte-identical to that helper or this README's Events table can drift
+// from what the compiler actually dispatches.
+// ---------------------------------------------------------------------------
+function litEventName(name) {
+  const hyphenated = name.replace(/([a-z0-9]|[A-Z](?=[A-Z][a-z]))([A-Z])/g, '$1-$2');
+  return hyphenated.toLowerCase();
+}
+
+// ---------------------------------------------------------------------------
 // README rendering.
 // ---------------------------------------------------------------------------
 
@@ -324,10 +338,17 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   if (ir.emits && ir.emits.length > 0) {
     lines.push('## Events');
     lines.push('');
+    if (target === 'lit') {
+      lines.push(
+        '`addEventListener` name — the Lit target dispatches multi-word event names kebab-cased.',
+      );
+      lines.push('');
+    }
     lines.push('| Event | Description |');
     lines.push('| --- | --- |');
     for (const ev of ir.emits) {
-      lines.push(`| \`${ev}\` | |`);
+      const eventCol = target === 'lit' ? litEventName(ev) : ev;
+      lines.push(`| \`${eventCol}\` | |`);
     }
     lines.push('');
   }

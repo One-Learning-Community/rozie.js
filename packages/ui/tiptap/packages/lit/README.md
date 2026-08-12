@@ -43,10 +43,12 @@ el.addEventListener('html-change', (e) => console.log(e.detail));
 
 ## Events
 
+`addEventListener` name — the Lit target dispatches multi-word event names kebab-cased.
+
 | Event | Description |
 | --- | --- |
 | `update` | The document changed — payload is the new HTML string. |
-| `selectionUpdate` | The selection (caret/range) moved. |
+| `selection-update` | The selection (caret/range) moved. |
 | `focus` | The editor gained focus. |
 | `blur` | The editor lost focus. |
 

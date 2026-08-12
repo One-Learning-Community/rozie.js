@@ -293,8 +293,10 @@ el.presetRanges = [
   { label: 'Q1 2026', range: { start: '2026-01-01', end: '2026-03-31' } },
   { label: 'Last 7 days', range: () => ({ start: '2026-06-19', end: '2026-06-25' }) },
 ];
-// The custom event name is CASE-PRESERVED on Lit → 'rangeComplete'.
-el.addEventListener('rangeComplete', (e) => {
+// The custom event name is KEBAB-CASED on Lit dispatch, matching every
+// other multi-word Rozie emit → 'range-complete' (NOT the source-name
+// 'rangeComplete', which is the one form that would silently never fire).
+el.addEventListener('range-complete', (e) => {
   console.log('range:', e.detail.value);
 });
 ```

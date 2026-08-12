@@ -16,11 +16,11 @@ Peer dependencies: the `wavesurfer.js` engine (`^7`) + `lit + @lit-labs/preact-s
 import '@rozie-ui/wavesurfer-lit';
 
 // <rozie-waveform> is a custom element. Bind `src`/`currentTime` as properties
-// and listen for `currentTime-change` (the two-way channel) + `ready`.
+// and listen for `current-time-change` (the two-way channel) + `ready`.
 const el = document.querySelector('rozie-waveform');
 el.src = '/audio.mp3';
 el.timeline = true;
-el.addEventListener('currentTime-change', (e) => { el.currentTime = e.detail; });
+el.addEventListener('current-time-change', (e) => { el.currentTime = e.detail; });
 el.addEventListener('ready', (e) => console.log('duration', e.detail));
 ```
 
@@ -58,14 +58,16 @@ el.addEventListener('ready', (e) => console.log('duration', e.detail));
 
 ## Events
 
+`addEventListener` name — the Lit target dispatches multi-word event names kebab-cased.
+
 | Event | Description |
 | --- | --- |
-| `regionCreated` | |
-| `regionUpdated` | |
-| `regionRemoved` | |
-| `regionClicked` | |
-| `regionIn` | |
-| `regionOut` | |
+| `region-created` | |
+| `region-updated` | |
+| `region-removed` | |
+| `region-clicked` | |
+| `region-in` | |
+| `region-out` | |
 | `ready` | |
 | `playing` | |
 | `paused` | |

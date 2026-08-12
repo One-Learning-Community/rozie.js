@@ -620,37 +620,37 @@
           ],
           "events": [
             {
-              "name": "regionCreated",
+              "name": "region-created",
               "type": {
                 "text": "CustomEvent"
               }
             },
             {
-              "name": "regionUpdated",
+              "name": "region-updated",
               "type": {
                 "text": "CustomEvent"
               }
             },
             {
-              "name": "regionRemoved",
+              "name": "region-removed",
               "type": {
                 "text": "CustomEvent"
               }
             },
             {
-              "name": "regionClicked",
+              "name": "region-clicked",
               "type": {
                 "text": "CustomEvent"
               }
             },
             {
-              "name": "regionIn",
+              "name": "region-in",
               "type": {
                 "text": "CustomEvent"
               }
             },
             {
-              "name": "regionOut",
+              "name": "region-out",
               "type": {
                 "text": "CustomEvent"
               }

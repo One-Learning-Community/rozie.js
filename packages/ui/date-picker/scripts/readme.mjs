@@ -17,6 +17,21 @@
 import { renderPropDescription } from '@rozie/core';
 
 // ---------------------------------------------------------------------------
+// Lit event-name kebab-casing (quick 260811-nre, D-01). The compiled Lit
+// target dispatches a MULTI-WORD `$emit()` name kebab-cased, so the Lit
+// README's Events table must render the DISPATCHED string, not the raw
+// `ir.emits` source name — otherwise a reader is handed a string
+// `addEventListener` will not accept. Algorithm copied VERBATIM from
+// packages/targets/lit/src/emit/emitDecorator.ts:15 (`toKebabCase`) — must
+// stay byte-identical to that helper or this README's Events table can drift
+// from what the compiler actually dispatches.
+// ---------------------------------------------------------------------------
+function litEventName(name) {
+  const hyphenated = name.replace(/([a-z0-9]|[A-Z](?=[A-Z][a-z]))([A-Z])/g, '$1-$2');
+  return hyphenated.toLowerCase();
+}
+
+// ---------------------------------------------------------------------------
 // IR-derivation helpers (shared by README rendering AND the docs validator).
 // renderPropType / renderPropDefault stay LOCAL (display-syntax twins of the
 // core helpers); only the Description cell is sourced from the shared helper.
@@ -357,8 +372,10 @@ el.presetRanges = [
   { label: 'Q1 2026', range: { start: '2026-01-01', end: '2026-03-31' } },
   { label: 'Last 7 days', range: () => ({ start: '2026-06-19', end: '2026-06-25' }) },
 ];
-// The custom event name is CASE-PRESERVED on Lit → 'rangeComplete'.
-el.addEventListener('rangeComplete', (e) => {
+// The custom event name is KEBAB-CASED on Lit dispatch, matching every
+// other multi-word Rozie emit → 'range-complete' (NOT the source-name
+// 'rangeComplete', which is the one form that would silently never fire).
+el.addEventListener('range-complete', (e) => {
   console.log('range:', e.detail.value);
 });`,
   },
@@ -553,12 +570,19 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   // Events
   lines.push('## Events');
   lines.push('');
+  if (target === 'lit') {
+    lines.push(
+      '`addEventListener` name — the Lit target dispatches multi-word event names kebab-cased.',
+    );
+    lines.push('');
+  }
   lines.push('| Event | Description |');
   lines.push('| --- | --- |');
   for (const ev of ir.emits) {
     const desc = eventManifest[ev];
     if (!desc) throw new Error(`renderReadme: event "${ev}" missing from event-manifest`);
-    lines.push(`| \`${ev}\` | ${desc} |`);
+    const eventCol = target === 'lit' ? litEventName(ev) : ev;
+    lines.push(`| \`${eventCol}\` | ${desc} |`);
   }
   lines.push('');
 

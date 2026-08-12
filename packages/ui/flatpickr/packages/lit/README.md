@@ -68,16 +68,18 @@ el.addEventListener('change', (e) => {
 
 ## Events
 
+`addEventListener` name — the Lit target dispatches multi-word event names kebab-cased.
+
 | Event | Description |
 | --- | --- |
 | `change` | Fired when the selected date(s) change. Payload `{ value, selectedDates }`. In range mode the bound string commits only when the range is complete (2 dates) unless `commitOn: "change"`. |
 | `ready` | Fired once the calendar is initialised and mounted. Payload `{ value, selectedDates }`. |
 | `open` | Fired when the calendar popover opens. |
 | `close` | Fired when the calendar popover closes. |
-| `monthChange` | Fired when the displayed month changes. |
-| `yearChange` | Fired when the displayed year changes. |
-| `valueUpdate` | Fired on every internal value update (including partial range clicks), before the `change` commit. Payload `{ value, selectedDates }`. |
-| `dayCreate` | Fired for each day cell as the calendar renders. Payload is the day `HTMLElement`, for per-day decoration. |
+| `month-change` | Fired when the displayed month changes. |
+| `year-change` | Fired when the displayed year changes. |
+| `value-update` | Fired on every internal value update (including partial range clicks), before the `change` commit. Payload `{ value, selectedDates }`. |
+| `day-create` | Fired for each day cell as the calendar renders. Payload is the day `HTMLElement`, for per-day decoration. |
 
 ## Imperative handle
 

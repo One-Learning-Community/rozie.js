@@ -56,11 +56,13 @@ el.addEventListener('select', (e) => console.log('snap', e.detail));
 
 ## Events
 
+`addEventListener` name — the Lit target dispatches multi-word event names kebab-cased (`reInit` dispatches as `re-init`, not `reinit`).
+
 | Event | Payload | Description |
 | --- | --- | --- |
 | `select` | index: number | Fires on every snap change (drag, scroll, or programmatic). Distinct from the `selectedIndex` model prop — a model prop must not share a name with an emit. |
 | `settle` | — | Fires when carousel motion stops (after a drag, scroll, or reInit settles). |
-| `reInit` | — | Fires when the engine re-initialises (an option flip, a slide add/remove, or a manual `reInitCarousel()` call). The current snap is preserved across it. |
+| `re-init` | — | Fires when the engine re-initialises (an option flip, a slide add/remove, or a manual `reInitCarousel()` call). The current snap is preserved across it. |
 | `pointer-down` | — | Fires when a pointer drag begins on the viewport. |
 
 ## Imperative handle
