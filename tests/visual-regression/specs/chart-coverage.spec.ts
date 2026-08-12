@@ -347,33 +347,17 @@ for (const target of TARGETS) {
 
 // ─── Leg 8 (G-07): ariaLabel ─────────────────────────────────────────────────
 //
-// EMITTER-BACKLOG (see .planning/todos/pending/) — React, Svelte, and Solid
-// each carry a `colonPropToJsxName`-shaped helper (React:
-// packages/targets/react/src/emit/emitTemplateAttribute.ts; Svelte/Solid have
-// their own copies) that UNCONDITIONALLY preserves an `aria-*`/`data-*`
-// attribute name in kebab-case, even when the binding target is a CUSTOM
-// COMPONENT (`elementTagKind === 'component'`) with `inherit-attrs="false"`
-// and an explicitly declared camelCase prop of that exact name (Chart.rozie's
-// `ariaLabel`). The kebab-case preservation is a deliberate, documented
-// design choice for the common case (an `inherit-attrs`-forwarding wrapper
-// whose root element needs the literal HTML attribute name to survive a
-// rest-props spread) — Chart.rozie's combination of `inherit-attrs="false"`
-// PLUS an explicit `ariaLabel` prop falls outside that case, so the
-// consumer-supplied value never reaches the prop on these three targets
-// (`_props.ariaLabel` stays `undefined`). Angular ([ariaLabel] Input
-// binding), Lit (.ariaLabel= property binding), and Vue (whose runtime
-// resolves hyphenated/camelCase prop names as equivalent regardless of what
-// the compiled `h()` call literally emits) are unaffected.
-const ARIA_LABEL_KNOWN_FAILING: ReadonlySet<typeof TARGETS[number]> = new Set<
-  typeof TARGETS[number]
->(['react', 'svelte', 'solid']);
-
+// Quick task 260812-2ur closed the React/Svelte/Solid emitter gap this leg
+// used to be gated on: a kebab-spelled `aria-*`/`data-*` attribute bound on a
+// composed component tag now resolves against the callee's DECLARED prop
+// names (threaded via `TemplateElementIR.producerProps`) and converts to the
+// declared camelCase key when it matches one — so Chart.rozie's explicit
+// `ariaLabel` prop receives the consumer's value on all six targets.
 for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
-  const runner =
-    !built || ARIA_LABEL_KNOWN_FAILING.has(target) ? test.fixme : test;
+  const runner = !built ? test.fixme : test;
   runner(
     `chart-coverage [${target}]: the canvas carries role=img and the bound ariaLabel as its accessible name`,
     async ({ page }) => {
