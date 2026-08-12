@@ -1,8 +1,8 @@
 # @rozie-ui/tiptap-lit
 
-## 0.4.0
+## 0.3.1
 
-### Minor Changes
+### Patch Changes
 
 - Fixed: the multi-word `$emit('selectionUpdate', …)` event was dispatched in
   its raw camelCase source casing instead of being kebab-cased, so a consumer's

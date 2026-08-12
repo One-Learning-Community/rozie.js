@@ -8,7 +8,7 @@
   casing description (rendered into every target's README Events table) is
   corrected to state the Lit target's ACTUAL behavior — `range-complete`,
   kebab-cased at dispatch — instead of the stale "CASE-PRESERVED" claim fixed
-  in `@rozie-ui/date-picker-lit`'s minor release in this same wave. Because the
+  in `@rozie-ui/date-picker-lit`'s patch release in this same wave. Because the
   description is a single shared string sourced from one manifest entry and
   rendered into every target's README, correcting it for Lit accuracy also
   updates the sentence in this target's README even though this target's own

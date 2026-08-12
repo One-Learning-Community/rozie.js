@@ -1,8 +1,8 @@
 # @rozie-ui/fullcalendar-lit
 
-## 0.2.0
+## 0.1.3
 
-### Minor Changes
+### Patch Changes
 
 - Fixed: a multi-word `$emit()` event was dispatched in its raw camelCase source
   casing instead of being kebab-cased, so a consumer's kebab-cased

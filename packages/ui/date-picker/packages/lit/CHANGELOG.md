@@ -1,8 +1,8 @@
 # @rozie-ui/date-picker-lit
 
-## 0.2.0
+## 0.1.6
 
-### Minor Changes
+### Patch Changes
 
 - Fixed: the multi-word `$emit('rangeComplete', …)` event was dispatched in its
   raw camelCase source casing instead of being kebab-cased, so a consumer's
