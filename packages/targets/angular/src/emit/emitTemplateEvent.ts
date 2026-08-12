@@ -229,12 +229,17 @@ function collectTopLevelScriptBindings(
  *      immediately, allocation-free, deterministic.
  *   3. Canonical match: the first declared emit whose `sanitizeEventName`
  *      equals `sanitizeEventName(rawEventName)` — this is the
- *      kebab-equivalence step (`sort-change` / `sortChange` / `sort_change`
- *      all canonicalize identically), resolved in FIRST-DECLARATION-ORDER
+ *      kebab-equivalence step (`sort-change` and `sortChange` canonicalize
+ *      identically; note `sort_change` does NOT — it is identifier-legal, so
+ *      the fast path keeps it verbatim), resolved in FIRST-DECLARATION-ORDER
  *      when more than one declared emit collapses to the same canonical key
- *      (source-order stable, never cache-order dependent — a residual, not a
- *      diagnostic; see the `toolchain-patch-pending-event-name-fixes.md`
- *      todo).
+ *      (source-order stable, never cache-order dependent). As of ROZ997
+ *      (quick task 260812-i67, `validateEmitNameCollision` in core's
+ *      lowerToIR) a freshly-compiled callee can no longer REACH that
+ *      ambiguity — the declaration side hard-errors a canonical emit-name
+ *      collision before emit. The first-declaration-order rule survives as
+ *      defense-in-depth for manifest surfaces produced by an OLDER toolchain
+ *      (a published rozie-manifest.json can still carry a colliding pair).
  *   4. No match → literal passthrough (D-06 fallback — the bound name
  *      doesn't correspond to anything this callee declares; NO diagnostic,
  *      see D-06's rationale: a native DOM event bound on a component tag,

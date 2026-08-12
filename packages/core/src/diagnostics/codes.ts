@@ -971,6 +971,36 @@ export const RozieErrorCode = {
   KEYNAV_GRID_LOOP_CONFLICT: 'ROZ994', // error — `.grid()` combined with `.loop` (boundary/@keynav-page events replace wrapping)
   KEYNAV_GRID_BAD_COLUMNS: 'ROZ995', // error — `.grid` missing its argument, or the argument fails to parse as an expression (non-number literal, ref handle, or unparsable $-path)
   KEYNAV_NESTED_ROOTS: 'ROZ996', // error — an r-keynav root found inside another r-keynav root's subtree; roots must be siblings/cousins, never ancestors of one another
+
+  // ---- quick 260812-i67 cross-target event-name contract — ROZ997..ROZ998 ----
+  // The last two silent-failure modes in the cross-target event-name contract
+  // (both 260811-trz residuals): a DECLARATION whose emit names collapse to one
+  // canonical key on some target, and a CONSUMER listener that provably matches
+  // nothing its resolved callee declares. ROZ996 (Phase 77 keynav) was the
+  // verified highest allocated code; ROZ997/ROZ998 are the next two free.
+  // HONEST BAND NOTE: ROZ999 is now the LAST free code in the 9xx band — future
+  // allocations should continue in the lower bands (e.g. the 100 semantic-
+  // binding cluster's tail, or the reserved ROZ090..ROZ099 / ROZ929..ROZ939 /
+  // ROZ948..ROZ959 gaps), never renumber, and never reuse retired codes.
+  //
+  // ROZ997 — two (or more) distinct declared `$emit` spellings collapse to the
+  // SAME canonical event key under kebab/camel/snake separator equivalence
+  // (`sort-change` / `sortChange` / `sort_change`). Such a component already
+  // compiles to BROKEN output today, so rejecting it is a fix, not a
+  // tightening: React/Solid synthesize the same `on<Pascal>` callback field
+  // TWICE on one props interface (hard TS2300 on every strict-TS consumer, and
+  // both `$emit` calls collapse onto invoking ONE callback at runtime); a
+  // kebab/camel pair collides the Angular `output()` class-field identifier
+  // (duplicate class member — invalid TypeScript) and the Lit kebab
+  // CustomEvent dispatch name. Grouping happens in
+  // `ir/validateEmitNameCollision.ts`, wired into lowerToIR (the chokepoint
+  // compile() AND @rozie/unplugin share). NOTE the deliberate OVERLAP with
+  // ROZ981's Svelte-normalization collapse: the two equivalences differ
+  // (Svelte's strip-hyphen+lowercase collides case-only pairs this key does
+  // not; this key collides snake+camel pairs Svelte's does not) — neither
+  // subsumes the other, so both checks coexist and a kebab/camel pair fires
+  // both codes.
+  EMIT_NAME_CANONICAL_COLLISION: 'ROZ997', // error — a component declares two $emit names that collapse to the same canonical key by kebab/camel/snake equivalence (e.g. 'sort-change' + 'sortChange'); settle on ONE spelling — the pair emits duplicate React/Solid callback fields (TS2300), duplicate Angular output() class fields, and colliding Lit dispatch names.
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

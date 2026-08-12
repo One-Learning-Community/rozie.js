@@ -47,6 +47,7 @@ import { typeNeutralizeScript } from '../codegen/typeNeutralizeScript.js';
 import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import { validateClassSelector } from './validateClassSelector.js';
 import { validateSlotPropCollision } from './validateSlotPropCollision.js';
+import { validateEmitNameCollision } from './validateEmitNameCollision.js';
 import { validateDefaultPortalCollision } from './validateDefaultPortalCollision.js';
 import { annotateDisplayWrap } from './annotateDisplayWrap.js';
 import { validateRestoreFocus } from './validateRestoreFocus.js';
@@ -329,6 +330,17 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // @rozie/unplugin. Local-IR-only (ir.slots vs ir.props) — no resolver/cache.
   // Collected-not-thrown (D-08): pushes ROZ127; never mutates `ir`.
   validateSlotPropCollision(ir, diagnostics);
+
+  // Quick 260812-i67 — two (or more) declared $emit names collapsing to the
+  // same canonical event key by kebab/camel/snake equivalence are a HARD ERROR
+  // (ROZ997): the pair already compiles to broken output (duplicate
+  // React/Solid on<Pascal> callback fields — TS2300; duplicate Angular
+  // output() class fields for kebab/camel pairs; colliding Lit dispatch
+  // names). Wired into this SAME lowerToIR chokepoint (not compile()) so it
+  // fires for BOTH compile() AND @rozie/unplugin, regardless of entrypoint.
+  // Local-IR-only (ir.emits); collected-not-thrown (D-08): pushes ROZ997;
+  // never mutates `ir`.
+  validateEmitNameCollision(ir, diagnostics);
 
   // Phase 37 ($portals.default) — a DEFAULT portal slot (`<slot portal />`)
   // reserves the portal key "default" (`$portals.default`). A component that
