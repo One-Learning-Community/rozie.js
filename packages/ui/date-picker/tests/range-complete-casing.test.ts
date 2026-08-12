@@ -16,7 +16,10 @@
  *   React:   onRangeComplete              (capitalized on*)
  *   Solid:   onRangeComplete
  *   Svelte:  onrangecomplete              (LOWERCASED — the trap)
- *   Lit:     new CustomEvent("rangeComplete")   (case-preserved dispatch)
+ *   Lit:     new CustomEvent("range-complete")  (kebab-cased dispatch — D-01,
+ *            quick 260811-nre; PREVIOUSLY case-preserved as "rangeComplete",
+ *            which was the actual bug: the consumer's kebab-cased
+ *            `@range-complete` template listener never matched it)
  *   Angular: rangeComplete = output()
  *   Vue:     emit('rangeComplete')
  */
@@ -58,9 +61,12 @@ describe('rangeComplete per-target consumer-prop casing (REQ-EVT)', () => {
     expect(code).not.toMatch(/onRangeComplete/);
   });
 
-  it('Lit dispatches a case-preserved CustomEvent("rangeComplete")', () => {
+  it('Lit dispatches a kebab-cased CustomEvent("range-complete") — D-01', () => {
     const code = emit('lit');
-    expect(code).toMatch(/new CustomEvent\(\s*["']rangeComplete["']/);
+    expect(code).toMatch(/new CustomEvent\(\s*["']range-complete["']/);
+    // …and must NOT dispatch the raw source-name casing (the fixed bug: a
+    // consumer's kebab-cased `@range-complete` listener never matched it).
+    expect(code).not.toMatch(/new CustomEvent\(\s*["']rangeComplete["']/);
   });
 
   it('Angular declares rangeComplete = output()', () => {
