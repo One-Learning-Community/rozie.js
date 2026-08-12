@@ -61,3 +61,54 @@ export function sanitizeEventName(eventName: string): string {
   if (out === '') out = '_event';
   return out;
 }
+
+/**
+ * Quick task 260811-trz (D-04) — the Angular `output()` declaration shape
+ * for one authored `$emit` event name, decomposed so BOTH emit seams
+ * (`emitScript.ts`'s `output()` field declaration AND
+ * `emitTemplateEvent.ts`'s consumer-side binding-name resolution) consume
+ * the SAME derivation instead of each re-deriving it independently — the
+ * single-source-of-truth link that makes the two sides structurally
+ * un-driftable.
+ */
+export interface AngularOutputBinding {
+  /** The class-field identifier (`sanitizeEventName(authoredEmitName)`). */
+  fieldId: string;
+  /**
+   * The `output({ alias })` value, or `null` when no alias is emitted
+   * (i.e. `fieldId === authoredEmitName`, matching `emitScript.ts`'s
+   * existing `fieldId === e` gate).
+   */
+  alias: string | null;
+  /**
+   * What a CONSUMER must bind to receive this event — `alias ?? fieldId`.
+   *
+   * Derivation note (read before "simplifying" this): because the
+   * declaration side emits an alias exactly when `fieldId !== authoredEmitName`,
+   * and the alias VALUE is always `authoredEmitName`, `publicName` collapses
+   * to `authoredEmitName` in BOTH branches today — no-alias means
+   * `fieldId === authoredEmitName`, aliased means `alias === authoredEmitName`.
+   * That collapse is a CONSEQUENCE of the current alias rule (`emitScript.ts`
+   * §6d: emit `{ alias }` iff `fieldId !== e`), not the rule itself — express
+   * this as `alias ?? fieldId`, not a direct return of `authoredEmitName`, so
+   * the invariant survives if the alias rule ever changes independently.
+   */
+  publicName: string;
+}
+
+/**
+ * Compute the `AngularOutputBinding` for one authored `$emit` event name.
+ * Consumed by:
+ *   - `emitScript.ts` §6d (the `for (const e of ir.emits)` output-declaration
+ *     loop) — emits `${fieldId} = output<T>()` when `alias === null`, else
+ *     `${fieldId} = output<T>({ alias: '${alias}' })`.
+ *   - `emitTemplateEvent.ts`'s `resolveEventBindingName` — the resolved
+ *     callee emit name's `publicName` is what the consumer's lowered
+ *     `(eventName)=` binding must use.
+ */
+export function angularOutputBinding(authoredEmitName: string): AngularOutputBinding {
+  const fieldId = sanitizeEventName(authoredEmitName);
+  const alias = fieldId !== authoredEmitName ? authoredEmitName : null;
+  const publicName = alias ?? fieldId;
+  return { fieldId, alias, publicName };
+}

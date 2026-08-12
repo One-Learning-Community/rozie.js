@@ -245,7 +245,16 @@ export function extractParentBoundNames(
     case 'lit':
       return [...tagText.matchAll(/@([a-zA-Z0-9-]+)=\$\{/g)].map((m) => m[1]!).sort();
     case 'angular':
-      return [...tagText.matchAll(/\((\w+)\)=/g)].map((m) => m[1]!).sort();
+      // Quick task 260811-trz — widened from `\w+` (no hyphen) to `[\w-]+`.
+      // The `\w+`-only form was correct under 260811-r2m's unconditional
+      // camelize (every component-tag binding was a valid identifier by
+      // construction) but is now stale: callee-IR resolution correctly
+      // emits a HYPHENATED binding for a kebab-authored (aliased) callee
+      // event (`(edge-click)=`, matching the child's ALIAS, not its field
+      // id) — the pre-widening regex silently captured zero names for any
+      // such binding, which is exactly what made the fixture-B angular leg
+      // look like a genuine disagreement instead of an extraction miss.
+      return [...tagText.matchAll(/\(([\w-]+)\)=/g)].map((m) => m[1]!).sort();
   }
 }
 

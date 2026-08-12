@@ -392,22 +392,24 @@ function emitEvents(
   events: Listener[],
   ctx: EmitNodeCtx,
   tagKind: 'html' | 'component' | 'self',
+  producerEmits: readonly string[] | undefined,
 ): string {
   if (events.length === 0) return '';
 
   // Group by the LOWERED bound event-BINDING name (quick task 260811-r2m /
-  // D-01 — the grouping key must be derived from the SAME name the emitted
-  // binding will use, not the raw authored name: an authored-hyphenated and
-  // an authored-camelCase listener for the SAME component event must collapse
-  // into ONE group, or Angular rejects the resulting duplicate `(event)=`
-  // binding at template-parse time). `resolveEventBindingName` is the exact
-  // same helper `emitTemplateEvent` uses for the final binding-string, so the
-  // group key and the eventually-emitted name can never disagree. The
-  // CORRECTLY-CASED bound name (not the lowercased key) is retained per group
-  // for the final binding text.
+  // D-01, resolution superseded by 260811-trz / D-05 — the grouping key must
+  // be derived from the SAME name the emitted binding will use, not the raw
+  // authored name: an authored-hyphenated and an authored-camelCase listener
+  // for the SAME component event must collapse into ONE group, or Angular
+  // rejects the resulting duplicate `(event)=` binding at template-parse
+  // time). `resolveEventBindingName` is the exact same helper
+  // `emitTemplateEvent` uses for the final binding-string, so the group key
+  // and the eventually-emitted name can never disagree. The CORRECTLY-CASED
+  // bound name (not the lowercased key) is retained per group for the final
+  // binding text.
   const groups = new Map<string, { boundName: string; listeners: Listener[] }>();
   for (const ev of events) {
-    const boundName = resolveEventBindingName(ev.event, tagKind);
+    const boundName = resolveEventBindingName(ev.event, tagKind, producerEmits);
     const key = boundName.toLowerCase();
     const existing = groups.get(key);
     if (existing) {
@@ -431,6 +433,7 @@ function emitEvents(
         cvaModelProp: ctx.cvaModelProp,
         cvaMergeDisabled: ctx.cvaMergeDisabled,
         elementTagKind: tagKind,
+        producerEmits,
       });
       out.push(result.eventAttr);
       if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
@@ -461,6 +464,7 @@ function emitEvents(
         cvaModelProp: ctx.cvaModelProp,
         cvaMergeDisabled: ctx.cvaMergeDisabled,
         elementTagKind: tagKind,
+        producerEmits,
       });
       if (sub.scriptInjection) ctx.scriptInjections.push(sub.scriptInjection);
       for (const d of sub.diagnostics) ctx.diagnostics.push(d);
@@ -703,7 +707,13 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   // `(click)="__merged_click_N($event)"` template binding (Angular forbids
   // duplicate `(event)=` attributes on one element — Pitfall 1; mandatory).
   const combinedEvents: Listener[] = [...node.events, ...syntheticListenerEvents];
-  const eventText = emitEvents(combinedEvents, ctx, node.tagKind);
+  // Quick task 260811-trz (D-05) — thread the callee's declared emit names
+  // (absent for html/custom-element tags, or a component/self tag whose
+  // producer didn't resolve or declares none) into the events arm ONLY. The
+  // two attribute-context `elementTagKind` assignments (`emitAttributes` /
+  // `emitListenerSpread`, above/below) are a SEPARATE code path — leave them
+  // alone, per the plan's explicit scope fence.
+  const eventText = emitEvents(combinedEvents, ctx, node.tagKind, node.producerEmits);
 
   // Emit each dynamic ListenerSpreadIR as a per-element template-ref +
   // effect()/Renderer2.listen() body. Returns the `#rozieListenersTarget_<N>`

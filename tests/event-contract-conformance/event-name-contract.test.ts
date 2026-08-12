@@ -215,47 +215,44 @@ describe('fixture B — separator-authored emit (the aliased-output residual)', 
     });
   }
 
-  // ANGULAR RESIDUAL — an executable it.fails WITNESS, not a prose exclusion
-  // (composed-ref-witness.test.ts idiom). AliasEmitChild.rozie authors
-  // `$emit('edge-click', ...)` directly. Angular declares
+  // ANGULAR — THE SHIPPED CONTRACT (quick task 260811-trz). AliasEmitChild.rozie
+  // authors `$emit('edge-click', ...)` directly. Angular declares
   // `edgeClick = output<unknown>({ alias: 'edge-click' })` — Angular
   // resolves template bindings against the ALIAS when present, so the
   // child's PUBLIC binding name is the raw hyphenated `edge-click`, not the
-  // camelCase field id `edgeClick`. quick 260811-r2m's consumer-side
-  // camelization fix lowers the parent's `@edge-click=` listener to
-  // `(edgeClick)=` (matching the FIELD ID, which is correct for the
-  // NON-aliased fixture-A case) — which now MISSES the aliased output.
-  // See .planning/todos/pending/angular-aliased-kebab-emit-output-unbindable.md
-  // for the full analysis, including the empirical search proving this is
-  // a LIVE shape (command-palette's `@action-select`), not hypothetical.
+  // camelCase field id `edgeClick`. Quick 260811-r2m's consumer-side
+  // camelization fix lowered EVERY component-tag listener unconditionally
+  // to `(edgeClick)=` — correct for a camel-authored, non-aliased emit, but
+  // wrong here, where it MISSED the aliased output.
   //
-  // This `it.fails` asserts the DESIRED end state (agreement) — it fails
-  // for real today, and inverts to green the moment a declaration-side fix
-  // lands, at which point vitest reports "expected to fail but passed",
-  // forcing whoever lands that fix to convert this to a plain `it`.
-  it.fails(
-    'angular: edge-click (aliased output) currently DISAGREES — public name is the alias "edge-click", bound name is the field id "edgeClick" — see angular-aliased-kebab-emit-output-unbindable.md',
-    () => {
-      const { childCode, parentCode } = compilePair(CHILD_B, PARENT_B, 'angular');
-      const childTag = childTagFor('AliasEmitChild', 'angular');
-      const childEntry = findEntry(extractChildPublicNames(childCode, 'angular'), AUTHORED_B);
-      const boundName = findBound(
-        extractParentBoundNames(parentCode, childTag, 'angular'),
-        AUTHORED_B,
-      );
+  // Quick 260811-trz replaced that unconditional camelize with CALLEE-IR
+  // RESOLUTION: the consumer's authored `@edge-click=` listener now resolves
+  // against `AliasEmitChild`'s ACTUAL declared emit list (`['edge-click']`,
+  // threaded via `TemplateElementIR.producerEmits`), exact-matches the raw
+  // authored name, and lowers through the SAME `angularOutputBinding`
+  // function the declaration side uses — so the emitted binding is
+  // `(edge-click)=`, matching the alias exactly.
+  //
+  // This was a genuine `it.fails` WITNESS (composed-ref-witness.test.ts
+  // idiom) that has now inverted to green, per the plan's requirement that
+  // whoever lands the fix converts it to a plain `it` — done here. See
+  // `.planning/todos/done/angular-aliased-kebab-emit-output-unbindable.md`
+  // for the closed record.
+  it('angular: edge-click (aliased output) agrees — the consumer resolves against the callee-declared alias, not a name-shape guess', () => {
+    const { childCode, parentCode } = compilePair(CHILD_B, PARENT_B, 'angular');
+    const childTag = childTagFor('AliasEmitChild', 'angular');
+    const childEntry = findEntry(extractChildPublicNames(childCode, 'angular'), AUTHORED_B);
+    const boundName = findBound(
+      extractParentBoundNames(parentCode, childTag, 'angular'),
+      AUTHORED_B,
+    );
 
-      // Observed values: childEntry.name === 'edge-click' (the alias),
-      // boundName === 'edgeClick' (the field id the consumer-side fix
-      // lowers to). canonicalize() is identity for angular, so these must
-      // be pinned to disagree today.
-      expect(
-        canonicalize(childEntry.name, 'angular'),
-        `[angular] edge-click residual: childPublic "${childEntry.name}" (alias) vs parentBound ` +
-          `"${boundName}" (field id) — pinned per ` +
-          `.planning/todos/pending/angular-aliased-kebab-emit-output-unbindable.md`,
-      ).toBe(canonicalize(boundName, 'angular'));
-    },
-  );
+    expect(
+      canonicalize(childEntry.name, 'angular'),
+      `[angular] edge-click: childPublic "${childEntry.name}" vs parentBound "${boundName}" ` +
+        `must canonicalize equal`,
+    ).toBe(canonicalize(boundName, 'angular'));
+  });
 });
 
 describe('lit runtime — the extracted names interoperate through a real DOM EventTarget', () => {

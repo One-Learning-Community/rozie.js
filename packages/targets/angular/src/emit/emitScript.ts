@@ -62,7 +62,7 @@ import {
   hoistPolymorphicModelGuards,
   normalizeModelAccessor,
 } from '../rewrite/rewriteScript.js';
-import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
+import { angularOutputBinding } from '../rewrite/sanitizeEventName.js';
 import { collectComponentRefTypes } from '../rewrite/componentRefs.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import {
@@ -1217,11 +1217,16 @@ export function emitScript(
   //     are already valid identifiers stay byte-identical (no alias arg).
   for (const e of ir.emits) {
     const outputType = emitsWithPayload.has(e) ? 'unknown' : 'void';
-    const fieldId = sanitizeEventName(e);
-    if (fieldId === e) {
+    // Quick task 260811-trz (D-04) — routed through the single
+    // `angularOutputBinding` source of truth both this declaration side AND
+    // `emitTemplateEvent.ts`'s consumer-side resolution consume. Emitted
+    // lines are byte-identical to the pre-refactor direct sanitizeEventName
+    // form (pinned by a dedicated declaration-side byte-identity test).
+    const { fieldId, alias } = angularOutputBinding(e);
+    if (alias === null) {
       fieldLines.push(`${fieldId} = output<${outputType}>();`);
     } else {
-      fieldLines.push(`${fieldId} = output<${outputType}>({ alias: '${e}' });`);
+      fieldLines.push(`${fieldId} = output<${outputType}>({ alias: '${alias}' });`);
     }
   }
 

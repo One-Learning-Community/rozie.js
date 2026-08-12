@@ -34,7 +34,7 @@ import type { ModifierArg } from '../../../../core/src/modifier-grammar/parseMod
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
+import { angularOutputBinding, sanitizeEventName } from '../rewrite/sanitizeEventName.js';
 
 export interface AngularScriptInjection {
   /** Field name (e.g., `debouncedOnSearch`). */
@@ -54,10 +54,20 @@ export interface EmitEventCtx {
    * Quick task 260811-r2m (D-01) — the element's tagKind, mirroring the
    * field `EmitAttrCtx` already carries for the PROP side's `resolveBindingName`
    * component-tag gate. When 'component' or 'self', the emitted event-BINDING
-   * name is lowered through `sanitizeEventName` (see `resolveEventBindingName`
-   * below) — the event-side twin of the prop side's `kebabToCamel` gate.
+   * name is resolved against the callee's declared emit list (see
+   * `resolveEventBindingName` below, superseded by quick task 260811-trz —
+   * callee-IR resolution replaces r2m's unconditional camelize).
    */
   elementTagKind?: 'html' | 'component' | 'self' | undefined;
+  /**
+   * Quick task 260811-trz (D-05) — the composed child's RAW authored `$emit`
+   * names (`TemplateElementIR.producerEmits`, threaded by `threadParamTypes`),
+   * when the callee resolved AND declares at least one emit. `undefined`
+   * when the callee did not resolve (dynamic tag, resolver miss, cycle,
+   * parse failure, manifest failure) OR declares no emits — either way,
+   * `resolveEventBindingName` falls back to literal passthrough (D-06).
+   */
+  producerEmits?: readonly string[] | undefined;
   /**
    * Bug 5: handler-name → parameter-count map (from the un-rewritten script
    * Program). Lets guarded-wrapper synthesis decide whether to forward the
@@ -194,22 +204,45 @@ function collectTopLevelScriptBindings(
 }
 
 /**
- * Quick task 260811-r2m (D-01/D-02) — resolve the Angular event-BINDING name
- * for a raw, authored listener event name. Event-side twin of
- * `resolveBindingName`'s component-tag gate in `emitTemplateAttribute.ts`
- * (`if (isComponentTag(ctx)) return kebabToCamel(name);`): when the element
- * being bound is a Rozie component/self-recursion tag, the CONSUMER's
- * authored listener name is lowered through `sanitizeEventName` — the SAME
- * function `emitScript.ts` uses (`sanitizeEventName(e) = output<T>()`) to
- * produce the child's `output()` field id — so the two sides cannot drift
- * apart silently (D-02). `sanitizeEventName` is deliberately used here
- * instead of the prop side's `kebabToCamel`: it is strictly more correct
- * (handles `_`/whitespace separators and a separator followed by a digit,
- * which the prop side's `-([a-z])` regex misses) and it IS the function that
- * produces the declaration side's identifier, making the two sides
- * un-driftable by construction. HTML/custom-element tags keep the authored
- * name verbatim — native DOM events are case-sensitive strings the browser
- * defines, not Angular-declared class members.
+ * Quick task 260811-trz (D-05) — resolve the Angular event-BINDING name for
+ * a raw, authored listener event name, by CALLEE-IR RESOLUTION rather than
+ * r2m's pure name-shape transform. Supersedes quick task 260811-r2m's
+ * unconditional `sanitizeEventName` camelize, which was correct for a
+ * camel-authored emit (`$emit('rangeComplete')`, no alias — public name IS
+ * the camelCase field id) but WRONG for a kebab-authored one
+ * (`$emit('sort-change')`, aliased — public name is the raw hyphenated
+ * string, not the camelCase field id). Both are legitimate, both-published
+ * authoring conventions; only callee-IR resolution can serve both.
+ *
+ * Native/custom HTML element tags (`tagKind` neither 'component' nor 'self')
+ * keep the authored name verbatim — native DOM events are case-sensitive
+ * strings the browser defines, not Angular-declared class members. This
+ * branch is unconditional: it runs BEFORE `producerEmits` is even consulted,
+ * so an accidentally-threaded `producerEmits` on a non-component tag (which
+ * never happens in the real `threadParamTypes` pipeline, but is exercised
+ * directly here as a unit-level pin) still cannot affect a native binding.
+ *
+ * Resolution (component/self tags only):
+ *   1. `producerEmits` absent or empty → literal passthrough (D-06 fallback
+ *      — the callee never resolved, or resolved but declares no emits).
+ *   2. Exact match: `rawEventName` equals some declared emit verbatim — wins
+ *      immediately, allocation-free, deterministic.
+ *   3. Canonical match: the first declared emit whose `sanitizeEventName`
+ *      equals `sanitizeEventName(rawEventName)` — this is the
+ *      kebab-equivalence step (`sort-change` / `sortChange` / `sort_change`
+ *      all canonicalize identically), resolved in FIRST-DECLARATION-ORDER
+ *      when more than one declared emit collapses to the same canonical key
+ *      (source-order stable, never cache-order dependent — a residual, not a
+ *      diagnostic; see the `toolchain-patch-pending-event-name-fixes.md`
+ *      todo).
+ *   4. No match → literal passthrough (D-06 fallback — the bound name
+ *      doesn't correspond to anything this callee declares; NO diagnostic,
+ *      see D-06's rationale: a native DOM event bound on a component tag,
+ *      e.g. `<DataTable @click="...">`, is common and legitimate and would
+ *      false-positive against any "unmatched name" warning).
+ *   5. A match resolves to `angularOutputBinding(declared).publicName` — the
+ *      SAME function `emitScript.ts` uses to declare the child's `output()`
+ *      field/alias, so the two emit seams cannot drift apart silently.
  *
  * This function is used ONLY to compose the final emitted binding-string —
  * the `ModifierContext.event` field passed to every `impl.<target>()` hook
@@ -218,11 +251,22 @@ function collectTopLevelScriptBindings(
 export function resolveEventBindingName(
   rawEventName: string,
   tagKind: 'html' | 'component' | 'self' | undefined,
+  producerEmits?: readonly string[] | undefined,
 ): string {
-  if (tagKind === 'component' || tagKind === 'self') {
-    return sanitizeEventName(rawEventName);
+  if (tagKind !== 'component' && tagKind !== 'self') {
+    return rawEventName;
   }
-  return rawEventName;
+  if (producerEmits === undefined || producerEmits.length === 0) {
+    return rawEventName;
+  }
+  const canonicalRaw = sanitizeEventName(rawEventName);
+  const declared =
+    producerEmits.find((e) => e === rawEventName) ??
+    producerEmits.find((e) => sanitizeEventName(e) === canonicalRaw);
+  if (declared === undefined) {
+    return rawEventName;
+  }
+  return angularOutputBinding(declared).publicName;
 }
 
 function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'statement' {
@@ -544,11 +588,16 @@ export function emitTemplateEvent(
     attrValue = `${wrapperName}($event)`;
   }
 
-  // Quick task 260811-r2m (D-01) — the descriptor context above (every
-  // `impl.angular(modifierArgs, { source, event: eventName, ... })` call)
-  // deliberately used the AUTHORED `eventName` verbatim; the lowering below
-  // applies ONLY to the final binding-string composition.
-  const boundEventName = resolveEventBindingName(eventName, ctx.elementTagKind);
+  // Quick task 260811-r2m (D-01), resolution superseded by 260811-trz (D-05)
+  // — the descriptor context above (every `impl.angular(modifierArgs, {
+  // source, event: eventName, ... })` call) deliberately used the AUTHORED
+  // `eventName` verbatim; the resolution below applies ONLY to the final
+  // binding-string composition.
+  const boundEventName = resolveEventBindingName(
+    eventName,
+    ctx.elementTagKind,
+    ctx.producerEmits,
+  );
   const eventAttr = `(${boundEventName})="${attrValue}"`;
 
   const result: EmitTemplateEventResult = { eventAttr, diagnostics };
