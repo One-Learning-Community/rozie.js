@@ -35,11 +35,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *      no-oscillation guard observed red-first, controlled add/update/
  *      remove-by-id via the handle's getRegions() readback).
  *   8. G-H currentTime two-way model (consumer-write -> engine seek on all
- *      6 targets; engine-writeback during real playback, Angular-gated).
- *   9. G-I playback event set + verbs (ref-triggered on 5/6 targets;
- *      construction-time autoplay cell gives Angular its only non-ref path).
- *   10. G-J imperative handle (Angular-gated — component refs resolve to the
- *       host element there, per code-mirror.spec.ts:346-353).
+ *      6 targets; engine-writeback during real playback, all 6 targets).
+ *   9. G-I playback event set + verbs ($refs-triggered, all 6 targets —
+ *      quick task 260811-r2m probed and lifted the prior Angular gate; see
+ *      Leg 8/9/10's comments).
+ *   10. G-J imperative handle (all 6 targets — see Leg 8/9/10's comments).
  *   11. G-K construction-only interaction opt-outs (disableInteraction /
  *       disableDragToSeek, proven via remount + click/drag gestures).
  *
@@ -58,39 +58,37 @@ type Target = (typeof TARGETS)[number];
 const KNOWN_FAILING: ReadonlySet<Target> = new Set<Target>();
 
 /**
- * DRAG_CREATE_KNOWN_FAILING — Angular AND Lit, scoped to the two legs that
- * depend on wavesurfer.js's RegionsPlugin `enableDragSelection` drag-to-
- * create gesture (Leg 4 and Leg 5). Root-caused red-first via direct engine
- * instrumentation (see `.planning/todos/pending/
- * angular-zonejs-wavesurfer-drag-threshold-tracking.md`) on BOTH targets:
- *   - A plain click on the SAME canvas correctly fires `interaction` on both
- *     targets (coordinates and event delivery are fine).
- *   - The RegionsPlugin's `pointerdown` listener IS correctly registered on
- *     `main`'s wrapper element on both targets, at the expected time, scoped
- *     to the expected element (confirmed via an `addEventListener`
- *     instrumented init script that walks each `pointerdown` registration
- *     back to its owning `data-testid`) — including confirming
- *     `disableDragToSeek` correctly suppressed the CONSTRUCTION-time
- *     drag-to-seek tracker on `main` (only ONE `main`-scoped listener ever
- *     appears, registered exactly when `enableDragSelection` runs).
- *   - Despite both of the above, no combination of drag speed/step-count/
- *     pause-length, nor a hand-crafted native `PointerEvent` sequence
- *     dispatched directly (bypassing Playwright's CDP mouse synthesis
- *     entirely), ever produces a `region-created`/`region-initialized` event
- *     on either target.
- * This is NOT a Rozie source or emitter bug: the boolean prop threads
- * identically to all six targets and the listener wiring is provably
- * correct on both. The suspected (UNCONFIRMED) common thread is that both
- * targets run a global reactive-scheduling layer that patches browser APIs
- * (Angular's zone.js patches `addEventListener`/`setTimeout`/`Promise`; the
- * Lit leaf's `@lit-labs/preact-signals` peer does analogous DOM-patching
- * scheduling) that may interfere with wavesurfer.js's own vanilla
- * `document`-level pointermove/pointerup threshold-tracking closure — a
- * third-party/third-party interaction outside either library Rozie
- * controls. NOT worked around; recorded as an evidenced per-target
- * limitation per the plan's explicit instruction.
+ * DRAG_CREATE_KNOWN_FAILING — LIT ONLY, scoped to the two legs that depend on
+ * wavesurfer.js's RegionsPlugin `enableDragSelection` drag-to-create gesture
+ * (Leg 4 and Leg 5).
+ *
+ * Quick task 260811-r2m — Angular's entry was REMOVED. It was originally
+ * gated alongside Lit on a zone.js-interference hypothesis (see the now-
+ * withdrawn history in `.planning/todos/pending/
+ * angular-lit-wavesurfer-drag-threshold-tracking.md`), but empirical probing
+ * during 260811-r2m proved the Angular failure was ENTIRELY a consumer-side
+ * event-listener-name bug, unrelated to zone.js: `<Waveform
+ * @region-created="onRegionCreated" ...>` in `WaveformCoverageDemo.rozie` is
+ * a hyphenated multi-word listener on a `<components>`-composed CHILD
+ * COMPONENT tag — exactly the shape 260811-r2m's Angular event-binding
+ * camelization fix (`resolveEventBindingName` in
+ * `packages/targets/angular/src/emit/emitTemplateEvent.ts`) corrects. Before
+ * the fix, Angular emitted `(region-created)="..."` while `Waveform`'s
+ * Angular class declares the camelCase `regionCreated = output<...>()` field
+ * — an exact-match requirement Angular enforces — so the CONSUMER's handler
+ * never ran even though the engine's own drag-to-create mechanic (pointerdown
+ * registration, threshold tracking) worked correctly the whole time. That is
+ * exactly why the earlier direct-engine instrumentation found nothing wrong
+ * at the engine layer: the break was one layer up, at the Angular
+ * output()-binding-name mismatch, not in wavesurfer.js or zone.js at all.
+ * Un-gating ONLY the Angular entry and re-running both legs against the
+ * post-fix Angular bundle turned them green with NO other change. The
+ * zone.js hypothesis is WITHDRAWN for Angular. Lit's entry is untouched —
+ * its `@lit-labs/preact-signals`-based hypothesis was never tested by this
+ * task and remains the open, still-unconfirmed question; see the retitled
+ * todo (now scoped to Lit only).
  */
-const DRAG_CREATE_KNOWN_FAILING: ReadonlySet<Target> = new Set<Target>(['angular', 'lit']);
+const DRAG_CREATE_KNOWN_FAILING: ReadonlySet<Target> = new Set<Target>(['lit']);
 
 function runnerFor(target: Target) {
   const built = existsSync(
@@ -352,7 +350,8 @@ for (const target of TARGETS) {
 }
 
 // ─── Leg 4 (G-E/G-F/G-G): lazy regions registration + CRUD + two-way model ─
-// Angular-skipped — see DRAG_CREATE_KNOWN_FAILING above.
+// Lit-skipped — see DRAG_CREATE_KNOWN_FAILING above (Angular un-gated by
+// quick task 260811-r2m; it was this fix's bug class all along).
 for (const target of TARGETS) {
   dragCreateRunnerFor(target)(
     `waveform-coverage [${target}]: regions register lazily, a drag-create fires regionCreated + echoes an engine-assigned id, and identical rebuilds do not oscillate`,
@@ -418,9 +417,9 @@ for (const target of TARGETS) {
 }
 
 // ─── Leg 5 (G-F regionClicked / regionUpdated): real gestures on a region ───
-// Angular-skipped — see DRAG_CREATE_KNOWN_FAILING above (this leg's setup
-// depends on the same drag-to-create gesture Leg 4 documents as failing
-// there).
+// Lit-skipped — see DRAG_CREATE_KNOWN_FAILING above (this leg's setup
+// depends on the same drag-to-create gesture Leg 4 documents; Angular
+// un-gated by quick task 260811-r2m).
 for (const target of TARGETS) {
   dragCreateRunnerFor(target)(
     `waveform-coverage [${target}]: a real click on a region fires regionClicked, and a real drag-move fires regionUpdated`,
@@ -511,11 +510,24 @@ for (const target of TARGETS) {
 }
 
 // ─── Leg 8 (G-I ref-triggered verbs/emits, G-H engine-writeback, G-J handle
-//      basics) — Angular-gated (component refs resolve to the host element
-//      there, per code-mirror.spec.ts:346-353) ───────────────────────────
+//      basics) — all 6 targets ─────────────────────────────────────────────
+//
+// Quick task 260811-r2m — this leg (and Legs 9/10 below) previously carried
+// a `target === 'angular' ? test.fixme` gate citing "component refs resolve
+// to the host element there, per code-mirror.spec.ts:346-353". That blocker
+// is about `$refs` resolution on a composed CHILD COMPONENT, a DIFFERENT
+// mechanism from this task's event-listener-name fix — so it was NOT
+// un-gated on the strength of the fix landing; it was probed empirically per
+// the plan's instruction. Result: this leg passes on Angular BOTH before and
+// after 260811-r2m's fix (verified by temporarily reverting
+// `emitTemplateEvent.ts`/`emitTemplateNode.ts`, rebuilding, and re-running —
+// still green). The cited `$refs`-resolves-to-host-element blocker does NOT
+// reproduce for `Waveform`'s refs (`$refs.playback.play`/`$refs.main.
+// getDuration` etc. all resolve correctly); this leg's gate was stale,
+// unrelated to any live bug, and is lifted here because the leg is
+// independently green — not as a claim that 260811-r2m fixed it.
 for (const target of TARGETS) {
-  const runner = target === 'angular' ? test.fixme : runnerFor(target);
-  runner(
+  runnerFor(target)(
     `waveform-coverage [${target}]: play()/pause() drive real playback (playing/timeupdate/finished fire, currentTime writes back and advances monotonically)`,
     async ({ page }) => {
       const mount = await gotoCoverage(page, target);
@@ -552,10 +564,11 @@ for (const target of TARGETS) {
   );
 }
 
-// ─── Leg 9 (G-J imperative handle) — Angular-gated ─────────────────────────
+// ─── Leg 9 (G-J imperative handle) — all 6 targets ─────────────────────────
+// Quick task 260811-r2m — see Leg 8's comment above; same probe result
+// (green both before and after the fix, stale unrelated gate lifted).
 for (const target of TARGETS) {
-  const runner = target === 'angular' ? test.fixme : runnerFor(target);
-  runner(
+  runnerFor(target)(
     `waveform-coverage [${target}]: the imperative handle's remaining verbs resolve and return sane values`,
     async ({ page }) => {
       const mount = await gotoCoverage(page, target);
@@ -605,11 +618,12 @@ for (const target of TARGETS) {
   );
 }
 
-// ─── Leg 10 (G-C volume/playbackRate reconciles) — Angular-gated (the only
+// ─── Leg 10 (G-C volume/playbackRate reconciles, all 6 targets — the only
 //      observation channel is the handle-installed instrumentation) ────────
+// Quick task 260811-r2m — see Leg 8's comment above; same probe result
+// (green both before and after the fix, stale unrelated gate lifted).
 for (const target of TARGETS) {
-  const runner = target === 'angular' ? test.fixme : runnerFor(target);
-  runner(
+  runnerFor(target)(
     `waveform-coverage [${target}]: volume/playbackRate reconciles call the engine setters (no emit exists for this — instrumented via the handle)`,
     async ({ page }) => {
       const mount = await gotoCoverage(page, target);
