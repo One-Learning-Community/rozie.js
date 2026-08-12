@@ -280,17 +280,17 @@ private __rozieFirstUpdateDone = false;
         bubbles: true,
         composed: true
       })),
-      onMonthChange: () => this.dispatchEvent(new CustomEvent("monthChange", {
+      onMonthChange: () => this.dispatchEvent(new CustomEvent("month-change", {
         detail: undefined,
         bubbles: true,
         composed: true
       })),
-      onYearChange: () => this.dispatchEvent(new CustomEvent("yearChange", {
+      onYearChange: () => this.dispatchEvent(new CustomEvent("year-change", {
         detail: undefined,
         bubbles: true,
         composed: true
       })),
-      onValueUpdate: (d: any, s: any) => this.dispatchEvent(new CustomEvent("valueUpdate", {
+      onValueUpdate: (d: any, s: any) => this.dispatchEvent(new CustomEvent("value-update", {
         detail: {
           value: s,
           selectedDates: d
@@ -298,7 +298,7 @@ private __rozieFirstUpdateDone = false;
         bubbles: true,
         composed: true
       })),
-      onDayCreate: (_d: any, _s: any, _fp: any, dayElem: any) => this.dispatchEvent(new CustomEvent("dayCreate", {
+      onDayCreate: (_d: any, _s: any, _fp: any, dayElem: any) => this.dispatchEvent(new CustomEvent("day-create", {
         detail: dayElem,
         bubbles: true,
         composed: true

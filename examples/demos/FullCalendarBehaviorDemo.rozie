@@ -175,8 +175,8 @@ const readApiTitle = () => {
       :selectable="true"
       :editable="true"
       @select="onSelect"
-      @eventResize="onEventResize"
-      @datesSet="onDatesSet"
+      @event-resize="onEventResize"
+      @dates-set="onDatesSet"
     />
   </div>
 

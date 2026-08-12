@@ -704,7 +704,7 @@ private _portalContainers = new Set<HTMLElement>();
       onSelectionUpdate: () => {
         this.refreshActive();
         this.refreshLink();
-        this.dispatchEvent(new CustomEvent("selectionUpdate", {
+        this.dispatchEvent(new CustomEvent("selection-update", {
           detail: undefined,
           bubbles: true,
           composed: true

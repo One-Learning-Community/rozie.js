@@ -60,7 +60,7 @@ const onRangeComplete = (e) => {
     :numberOfMonths="2"
     :weekStartsOn="0"
     locale="en-US"
-    @rangeComplete="onRangeComplete($event)"
+    @range-complete="onRangeComplete($event)"
   />
 </div>
 </template>

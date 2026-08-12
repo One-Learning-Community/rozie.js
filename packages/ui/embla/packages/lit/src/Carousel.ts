@@ -324,7 +324,7 @@ private __rozieFirstUpdateDone = false;
       composed: true
     })));
     this.embla.on('reInit', () => {
-      this.dispatchEvent(new CustomEvent("reInit", {
+      this.dispatchEvent(new CustomEvent("re-init", {
         detail: undefined,
         bubbles: true,
         composed: true

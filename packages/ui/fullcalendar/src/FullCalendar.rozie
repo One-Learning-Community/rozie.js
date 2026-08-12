@@ -13,8 +13,8 @@
     <FullCalendar
       r-model:view="$data.view"
       :events="$data.events"
-      @eventClick="onEventClick"
-      @dateClick="onDateClick"
+      @event-click="onEventClick"
+      @date-click="onDateClick"
     />
 
   FullCalendar v6 auto-injects its CSS — consumers do NOT need a manual

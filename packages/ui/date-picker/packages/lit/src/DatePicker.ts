@@ -778,7 +778,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
       bubbles: true,
       composed: true
     }));
-    this.dispatchEvent(new CustomEvent("rangeComplete", {
+    this.dispatchEvent(new CustomEvent("range-complete", {
       detail: {
         value: next
       },
@@ -984,7 +984,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
     bubbles: true,
     composed: true
   }));
-  this.dispatchEvent(new CustomEvent("rangeComplete", {
+  this.dispatchEvent(new CustomEvent("range-complete", {
     detail: {
       value: next
     },

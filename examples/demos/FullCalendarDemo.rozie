@@ -144,9 +144,9 @@ const formatStart = (e) => {
       r-model:view="$data.view"
       :events="$data.events"
       :height="420"
-      @eventClick="onEventClick"
-      @dateClick="onDateClick"
-      @eventDrop="onEventDrop"
+      @event-click="onEventClick"
+      @date-click="onDateClick"
+      @event-drop="onEventDrop"
     >
       <!--
         Portal-slot primitive (Spike 003) — supply a templated event

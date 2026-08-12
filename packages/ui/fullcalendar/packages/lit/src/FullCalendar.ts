@@ -451,7 +451,7 @@ private _portalContainers = new Set<HTMLElement>();
       // toolbar; the built-in default lives in the `headerToolbar` prop default.
       headerToolbar: this.headerToolbar,
       eventClick: (info: any) => {
-        this.dispatchEvent(new CustomEvent("eventClick", {
+        this.dispatchEvent(new CustomEvent("event-click", {
           detail: {
             event: {
               id: info.event.id,
@@ -466,7 +466,7 @@ private _portalContainers = new Set<HTMLElement>();
         }));
       },
       dateClick: (info: any) => {
-        this.dispatchEvent(new CustomEvent("dateClick", {
+        this.dispatchEvent(new CustomEvent("date-click", {
           detail: {
             date: info.date,
             dateStr: info.dateStr,
@@ -477,7 +477,7 @@ private _portalContainers = new Set<HTMLElement>();
         }));
       },
       eventDrop: (info: any) => {
-        this.dispatchEvent(new CustomEvent("eventDrop", {
+        this.dispatchEvent(new CustomEvent("event-drop", {
           detail: {
             event: {
               id: info.event.id,
@@ -505,7 +505,7 @@ private _portalContainers = new Set<HTMLElement>();
         }));
       },
       eventResize: (info: any) => {
-        this.dispatchEvent(new CustomEvent("eventResize", {
+        this.dispatchEvent(new CustomEvent("event-resize", {
           detail: {
             event: {
               id: info.event.id,
@@ -521,7 +521,7 @@ private _portalContainers = new Set<HTMLElement>();
         }));
       },
       datesSet: (info: any) => {
-        this.dispatchEvent(new CustomEvent("datesSet", {
+        this.dispatchEvent(new CustomEvent("dates-set", {
           detail: {
             start: info.start,
             end: info.end,
@@ -532,7 +532,7 @@ private _portalContainers = new Set<HTMLElement>();
         }));
       },
       eventMouseEnter: (info: any) => {
-        this.dispatchEvent(new CustomEvent("eventMouseEnter", {
+        this.dispatchEvent(new CustomEvent("event-mouse-enter", {
           detail: {
             event: {
               id: info.event.id,
@@ -547,7 +547,7 @@ private _portalContainers = new Set<HTMLElement>();
         }));
       },
       eventMouseLeave: (info: any) => {
-        this.dispatchEvent(new CustomEvent("eventMouseLeave", {
+        this.dispatchEvent(new CustomEvent("event-mouse-leave", {
           detail: {
             event: {
               id: info.event.id,
@@ -584,7 +584,7 @@ private _portalContainers = new Set<HTMLElement>();
       eventsSet: (events: any) => {
         // `eventsSet` receives the array of current EventApi objects — map each to
         // the normalized floor shape for persistence/sync consumers.
-        this.dispatchEvent(new CustomEvent("eventsSet", {
+        this.dispatchEvent(new CustomEvent("events-set", {
           detail: {
             events: events.map((e: any) => ({
               id: e.id,

@@ -204,7 +204,7 @@ private _portalContainers = new Set<HTMLElement>();
         intersect: true
       }, false);
       if (dataset.length) {
-        this.dispatchEvent(new CustomEvent("datasetClick", {
+        this.dispatchEvent(new CustomEvent("dataset-click", {
           detail: {
             event: e,
             elements: dataset,

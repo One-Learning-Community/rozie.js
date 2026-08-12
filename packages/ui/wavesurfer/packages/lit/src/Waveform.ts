@@ -369,7 +369,7 @@ private __rozieFirstUpdateDone = false;
   wireRegionsPluginEvents = (plugin: any) => {
   plugin.on('region-created', (region: any) => {
     if (this.reconciling) return;
-    this.dispatchEvent(new CustomEvent("regionCreated", {
+    this.dispatchEvent(new CustomEvent("region-created", {
       detail: this.serializeRegion(region),
       bubbles: true,
       composed: true
@@ -378,7 +378,7 @@ private __rozieFirstUpdateDone = false;
   });
   plugin.on('region-updated', (region: any) => {
     if (this.reconciling) return;
-    this.dispatchEvent(new CustomEvent("regionUpdated", {
+    this.dispatchEvent(new CustomEvent("region-updated", {
       detail: this.serializeRegion(region),
       bubbles: true,
       composed: true
@@ -387,7 +387,7 @@ private __rozieFirstUpdateDone = false;
   });
   plugin.on('region-removed', (region: any) => {
     if (this.reconciling) return;
-    this.dispatchEvent(new CustomEvent("regionRemoved", {
+    this.dispatchEvent(new CustomEvent("region-removed", {
       detail: this.serializeRegion(region),
       bubbles: true,
       composed: true
@@ -395,7 +395,7 @@ private __rozieFirstUpdateDone = false;
     this.writeBackRegions();
   });
   plugin.on('region-clicked', (region: any) => {
-    this.dispatchEvent(new CustomEvent("regionClicked", {
+    this.dispatchEvent(new CustomEvent("region-clicked", {
       detail: this.serializeRegion(region),
       bubbles: true,
       composed: true
@@ -405,14 +405,14 @@ private __rozieFirstUpdateDone = false;
   // fire regardless of the reconcile guard. The events for active-segment
   // highlighting, transcript/karaoke sync, and loop-a-region.
   plugin.on('region-in', (region: any) => {
-    this.dispatchEvent(new CustomEvent("regionIn", {
+    this.dispatchEvent(new CustomEvent("region-in", {
       detail: this.serializeRegion(region),
       bubbles: true,
       composed: true
     }));
   });
   plugin.on('region-out', (region: any) => {
-    this.dispatchEvent(new CustomEvent("regionOut", {
+    this.dispatchEvent(new CustomEvent("region-out", {
       detail: this.serializeRegion(region),
       bubbles: true,
       composed: true
