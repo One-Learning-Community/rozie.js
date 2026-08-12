@@ -19,11 +19,14 @@
  *   - tag name        = `rozie-` + kebab(componentName)   (@customElement)
  *   - model event     = `<modelProp>-change`              (createLitControllable…)
  *   - HTML attribute  = Lit default = propName.toLowerCase() (no explicit `attribute:`)
- *   - source events   = ir.emits, dispatched verbatim as CustomEvents (empty
- *     for codemirror — D-08, no events)
+ *   - source events   = ir.emits, kebab-cased at dispatch via the shared
+ *     litEventName (the compiler's own toKebabCase algorithm — a superset of
+ *     the tag-name kebab() below; empty for codemirror — D-08, no events)
  *
  * Pure glue over the `@rozie/core` public IR — NO compiler/emitter surface.
  */
+
+import { litEventName } from '../../lit-event-name.mjs';
 
 const SCHEMA_VERSION = '2.1.0';
 
@@ -143,10 +146,10 @@ export function buildCustomElementsManifest({
     return a;
   });
 
-  // Events: source emits (dispatched verbatim, empty for codemirror — D-08) +
-  // the model `<prop>-change` writeback.
+  // Events: source emits, kebab-cased at dispatch via the shared litEventName
+  // (empty for codemirror — D-08) + the model `<prop>-change` writeback.
   const events = ir.emits.map((name) => ({
-    name,
+    name: litEventName(name),
     type: { text: 'CustomEvent' },
     ...(eventManifest[name] ? { description: eventManifest[name] } : {}),
   }));

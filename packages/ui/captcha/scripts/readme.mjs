@@ -6,6 +6,9 @@
  * parse of Captcha.rozie. Only the USAGE / HANDLE_USAGE snippets below are
  * hand-authored PLACEHOLDERS — refine them for the real component API.
  */
+
+import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
+
 const BT = String.fromCharCode(96);
 const NAME = "Captcha";
 const SLUG = "captcha";
@@ -586,6 +589,10 @@ export function renderReadme(target, components, eventManifest, pkgName, handleM
 
     lines.push('### Events');
     lines.push('');
+    if (target === 'lit' && litEventNamesDiverge(ir.emits)) {
+      lines.push(LIT_EVENT_NOTE);
+      lines.push('');
+    }
     lines.push('| Event | Description |');
     lines.push('| --- | --- |');
     for (const ev of ir.emits) {
@@ -595,7 +602,8 @@ export function renderReadme(target, components, eventManifest, pkgName, handleM
           'renderReadme: event "' + ev + '" of ' + comp.name + ' missing from event-manifest',
         );
       }
-      lines.push('| ' + c(ev) + ' | ' + desc + ' |');
+      const eventCol = target === 'lit' ? litEventName(ev) : ev;
+      lines.push('| ' + c(eventCol) + ' | ' + desc + ' |');
     }
     lines.push('');
 

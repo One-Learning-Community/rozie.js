@@ -10,6 +10,7 @@
  * no README re-authors prop prose.
  */
 import { renderPropDescription } from '@rozie/core';
+import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
 
 const BT = String.fromCharCode(96);
 const SLUG = 'lexical';
@@ -245,6 +246,10 @@ export function renderReadme(target, components, eventManifest, pkgName, handleM
       const evManifest = eventManifest[comp.name] ?? {};
       lines.push('### Events');
       lines.push('');
+      if (target === 'lit' && litEventNamesDiverge(ir.emits)) {
+        lines.push(LIT_EVENT_NOTE);
+        lines.push('');
+      }
       lines.push('| Event | Description |');
       lines.push('| --- | --- |');
       for (const ev of ir.emits) {
@@ -254,7 +259,8 @@ export function renderReadme(target, components, eventManifest, pkgName, handleM
             'renderReadme: event "' + ev + '" of ' + comp.name + ' missing from event-manifest',
           );
         }
-        lines.push('| ' + c(ev) + ' | ' + desc + ' |');
+        const eventCol = target === 'lit' ? litEventName(ev) : ev;
+        lines.push('| ' + c(eventCol) + ' | ' + desc + ' |');
       }
       lines.push('');
     }

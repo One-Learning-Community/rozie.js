@@ -10,6 +10,8 @@
  * Pure glue over the `@rozie/core` public IR — NO compiler/emitter surface.
  */
 
+import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
+
 // ---------------------------------------------------------------------------
 // IR-derivation helpers (shared by README rendering AND the docs validator).
 // ---------------------------------------------------------------------------
@@ -351,12 +353,17 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   if (ir.emits && ir.emits.length > 0) {
     lines.push('## Events');
     lines.push('');
+    if (target === 'lit' && litEventNamesDiverge(ir.emits)) {
+      lines.push(LIT_EVENT_NOTE);
+      lines.push('');
+    }
     lines.push('| Event | Description |');
     lines.push('| --- | --- |');
     for (const ev of ir.emits) {
       const desc = eventManifest[ev];
       if (!desc) throw new Error(`renderReadme: event "${ev}" missing from event-manifest`);
-      lines.push(`| \`${ev}\` | ${desc} |`);
+      const eventCol = target === 'lit' ? litEventName(ev) : ev;
+      lines.push(`| \`${eventCol}\` | ${desc} |`);
     }
     lines.push('');
   }
