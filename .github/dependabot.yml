@@ -1,0 +1,42 @@
+# Please see the documentation for all configuration options:
+# https://help.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+#
+# Scope: toolchain + test packages only. The 174 @rozie-ui leaf manifests
+# (packages/ui/*/packages/*) are codegen-managed — dependabot must NOT touch
+# them (it would fight the family codegen). docs/ is excluded (VitePress churn).
+# NOTE: dependency bumps may trip scripts/check-dep-drift.mjs until the pinned
+# version in scripts/dep-allowlist.txt is updated — that red is the gate
+# working, not noise.
+
+version: 2
+updates:
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "npm"
+    directories:
+      - "/"
+      - "/packages/core"
+      - "/packages/cli"
+      - "/packages/unplugin"
+      - "/packages/babel-plugin"
+      - "/packages/language-server"
+      - "/packages/runtime/*"
+      - "/packages/targets/*"
+      - "/tests/*"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    groups:
+      # Babel packages release together and must be upgraded in lockstep
+      # (see CLAUDE.md Version Compatibility).
+      babel:
+        patterns:
+          - "@babel/*"
