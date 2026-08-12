@@ -1,0 +1,14 @@
+{
+  "name": "@rozie/event-contract-conformance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@rozie/core": "workspace:*",
+    "happy-dom": "^15",
+    "vitest": "^4"
+  }
+}

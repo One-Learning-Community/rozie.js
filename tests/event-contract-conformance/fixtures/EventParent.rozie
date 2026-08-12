@@ -1,0 +1,33 @@
+<!--
+  EventParent.rozie — quick 260811-sdd event-name contract conformance parent.
+
+  Composes EventChild via <components> and binds the CANONICAL hyphenated
+  form of both child emits (`@item-activated`, `@ready`) — this is the
+  authoring contract under test: author camelCase in `$emit`, bind kebab in
+  templates, and the two must agree on every target's own event mechanism.
+-->
+<rozie name="EventParent">
+
+<components>{ EventChild: './EventChild.rozie' }</components>
+
+<data>
+{ lastId: 0, readyCount: 0 }
+</data>
+
+<script lang="ts">
+function onActivated(payload) {
+  $data.lastId = payload.id
+}
+function onReady() {
+  $data.readyCount += 1
+}
+</script>
+
+<template>
+<div>
+  <EventChild @item-activated="onActivated($event)" @ready="onReady()" />
+  <output>{{ $data.lastId }}-{{ $data.readyCount }}</output>
+</div>
+</template>
+
+</rozie>

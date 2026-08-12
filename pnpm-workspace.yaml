@@ -22,6 +22,7 @@ packages:
   - "tests/react-typecheck"
   - "tests/strict-conformance"
   - "tests/composed-ref-conformance"
+  - "tests/event-contract-conformance"
   - "tests/visual-regression"
   - "tests/slot-matrix"
   - "tests/regressions"

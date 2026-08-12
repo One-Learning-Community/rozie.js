@@ -1,0 +1,29 @@
+<!--
+  AliasEmitParent.rozie — quick 260811-sdd event-name contract conformance
+  parent, SEPARATOR-AUTHORED variant. Binds the SAME separator-bearing name
+  the child authors (`@edge-click`). See AliasEmitChild.rozie header and
+  .planning/todos/pending/angular-aliased-kebab-emit-output-unbindable.md for
+  why the Angular leg is a pinned RED residual, not a passing contract.
+-->
+<rozie name="AliasEmitParent">
+
+<components>{ AliasEmitChild: './AliasEmitChild.rozie' }</components>
+
+<data>
+{ lastId: 0 }
+</data>
+
+<script lang="ts">
+function onEdge(payload) {
+  $data.lastId = payload.id
+}
+</script>
+
+<template>
+<div>
+  <AliasEmitChild @edge-click="onEdge($event)" />
+  <output>{{ $data.lastId }}</output>
+</div>
+</template>
+
+</rozie>

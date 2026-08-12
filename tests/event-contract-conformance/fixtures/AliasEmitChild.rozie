@@ -1,0 +1,40 @@
+<!--
+  AliasEmitChild.rozie — quick 260811-sdd event-name contract conformance
+  child, SEPARATOR-AUTHORED variant.
+
+  Unlike EventChild.rozie (which authors camelCase and lets the compiler
+  derive the per-target public name), this fixture authors a
+  separator-bearing `$emit('edge-click', ...)` directly. This pair exists
+  solely to pin the Angular aliased-output residual documented in
+  .planning/todos/pending/angular-aliased-kebab-emit-output-unbindable.md:
+  Angular declares `edgeClick = output<unknown>({ alias: 'edge-click' })`,
+  whose PUBLIC binding name is the alias `edge-click`, not the field id
+  `edgeClick` — so a consumer's `@edge-click=` listener, once lowered by
+  quick 260811-r2m's consumer-side camelization fix to `(edgeClick)=`, no
+  longer matches the alias. Five targets AGREE; Angular is the documented
+  RED residual (see event-name-contract.test.ts fixture-B describe).
+-->
+<rozie name="AliasEmitChild">
+
+<props>
+{
+  label: { type: String, default: 'item' },
+}
+</props>
+
+<data>
+{ count: 0 }
+</data>
+
+<script lang="ts">
+function fire() {
+  $data.count += 1
+  $emit('edge-click', { id: $data.count })
+}
+</script>
+
+<template>
+<button type="button" @click="fire()">{{ $props.label }}</button>
+</template>
+
+</rozie>

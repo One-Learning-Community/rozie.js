@@ -1,0 +1,35 @@
+<!--
+  EventChild.rozie — quick 260811-sdd event-name contract conformance child.
+
+  Authors a MULTI-WORD camelCase emit (`itemActivated`) and a SINGLE-WORD
+  control emit (`ready`). The suite compiles this alongside EventParent.rozie
+  (which binds the CANONICAL hyphenated `@item-activated` / `@ready` forms)
+  and asserts, per target, that the child's dispatch/declaration name and the
+  parent's listener-registration name AGREE under that target's own event
+  mechanism. See event-name-contract.test.ts for the full contract.
+-->
+<rozie name="EventChild">
+
+<props>
+{
+  label: { type: String, default: 'item' },
+}
+</props>
+
+<data>
+{ count: 0 }
+</data>
+
+<script lang="ts">
+function fire() {
+  $data.count += 1
+  $emit('itemActivated', { id: $data.count })
+  $emit('ready')
+}
+</script>
+
+<template>
+<button type="button" @click="fire()">{{ $props.label }}</button>
+</template>
+
+</rozie>
