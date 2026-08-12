@@ -1001,6 +1001,20 @@ export const RozieErrorCode = {
   // subsumes the other, so both checks coexist and a kebab/camel pair fires
   // both codes.
   EMIT_NAME_CANONICAL_COLLISION: 'ROZ997', // error — a component declares two $emit names that collapse to the same canonical key by kebab/camel/snake equivalence (e.g. 'sort-change' + 'sortChange'); settle on ONE spelling — the pair emits duplicate React/Solid callback fields (TS2300), duplicate Angular output() class fields, and colliding Lit dispatch names.
+  //
+  // ROZ998 — a listener authored on a composed component tag whose callee
+  // RESOLVED and declares emits, where the listener name matches no declared
+  // emit (neither exact nor `canonicalEventKey`-canonical), is not a native
+  // DOM event (`diagnostics/nativeDomEvents.ts` allowlist — `@click` on
+  // `<DataTable>` is common and correct), and is not a Rozie-synthetic
+  // runtime event (the `keynav-` prefix family the runtime dispatches
+  // itself). Warning, not error, with a did-you-mean hint naming the
+  // declared emits. An UNRESOLVED callee (producerEmits absent) stays
+  // deliberately silent — the 260811-trz D-06 case-1 decision survives: the
+  // check is structurally nested inside threadParamTypes'
+  // non-empty-producerEmits branch, so unresolved and zero-emit callees can
+  // never reach it.
+  UNMATCHED_COMPONENT_LISTENER: 'ROZ998', // warning — a component-tag listener names an event the RESOLVED callee does not declare (neither exact nor canonical) and that is not a native DOM event or a Rozie-synthetic runtime event; the hint carries a did-you-mean suggestion plus the callee's declared emit list.
 } as const;
 
 export type RozieErrorCode = (typeof RozieErrorCode)[keyof typeof RozieErrorCode];

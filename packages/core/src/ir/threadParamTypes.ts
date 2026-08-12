@@ -44,6 +44,24 @@
  * dedicated tests (`threadProducerEmits.test.ts` T6 / T7 and
  * `threadProducerProps.test.ts` T6 / T7).
  *
+ * The `if (producerEmits.length > 0)` branch that threads
+ * `node.producerEmits` also hosts the ROZ998 UNMATCHED_COMPONENT_LISTENER
+ * check (quick task 260812-i67) — deliberately nested INSIDE that branch,
+ * NOT hoisted before it, NOT moved after the slot-filler early-return.
+ * WHY: an UNRESOLVED callee (resolver miss, cycle,
+ * parse failure, manifest failure) and a resolved callee that declares ZERO
+ * emits are both structurally UNREACHABLE by the check — `producerEmits` is
+ * empty on those paths, so the branch never runs. That structural
+ * unreachability is what keeps case 1 of the unmatched-listener todo
+ * (`angular-event-name-unmatched-listener-no-diagnostic.md`) deliberately
+ * silent: a listener on a callee the compiler could not resolve produces
+ * BYTE-IDENTICAL diagnostics to before this change. A tag with no authored
+ * listeners iterates an empty `node.events` array and stays silent for free.
+ * Do NOT hoist the listener loop out of the non-empty-producerEmits branch —
+ * doing so would re-open the false-positive surface D-06 documented (every
+ * unresolved callee's listeners would suddenly warn) and is pinned by the
+ * unresolved-callee case in `unmatchedComponentListener.test.ts`.
+ *
  * When the cache returns null (cycle, parse failure, or unreadable file), this
  * pass silently degrades — type-flow and `producerEmits` become empty for
  * that consumer but the compile succeeds (collected-not-thrown discipline).
@@ -60,6 +78,9 @@
 import type { IRComponent, SlotDecl, TemplateNode } from './types.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
+import { canonicalEventKey } from '../diagnostics/canonicalEventKey.js';
+import { didYouMean } from '../diagnostics/didYouMean.js';
+import { isKnownNonEmitEvent } from '../diagnostics/nativeDomEvents.js';
 import type { IRCache } from './cache.js';
 import type { ProducerResolver } from '../resolver/index.js';
 import type { RozieTarget } from '../codegen/rewriteRozieImport.js';
@@ -339,6 +360,38 @@ export function threadParamTypes(
     // slot-filler early-return below.
     if (producerEmits.length > 0) {
       node.producerEmits = producerEmits;
+
+      // Quick task 260812-i67 (ROZ998) — flag a consumer listener on this
+      // RESOLVED, emit-declaring callee that matches no declared emit. Nested
+      // INSIDE this non-empty-producerEmits branch on purpose — see the
+      // module docstring's DIAGNOSTIC-GATING INVARIANT section before moving
+      // it. Matching mirrors the Angular target's resolveEventBindingName
+      // exactly: exact string first, then `canonicalEventKey` equivalence
+      // (pinned to sanitizeEventName by the agreement test) — a listener that
+      // resolves on the targets must stay silent here. The RAW authored name
+      // is what feeds the native-DOM / Rozie-synthetic allowlist: `@click` on
+      // a component tag binds the native bubbling event and is correct.
+      const declaredCanonical = new Set(
+        producerEmits.map((e) => canonicalEventKey(e)),
+      );
+      for (const listener of node.events) {
+        const raw = listener.event;
+        if (producerEmits.includes(raw)) continue;
+        if (declaredCanonical.has(canonicalEventKey(raw))) continue;
+        if (isKnownNonEmitEvent(raw)) continue;
+        const suggestion = didYouMean(raw, producerEmits);
+        const declaredList = [...producerEmits]
+          .sort()
+          .map((e) => `'${e}'`)
+          .join(', ');
+        diagnostics.push({
+          code: RozieErrorCode.UNMATCHED_COMPONENT_LISTENER,
+          severity: 'warning',
+          message: `@${raw} on ${producerLabel} matches no event the callee declares — the listener will never fire from a declared $emit (and '${raw}' is not a native DOM event).`,
+          loc: listener.sourceLoc,
+          hint: `${suggestion !== null ? `Did you mean '${suggestion}'? ` : ''}${producerLabel} declares: ${declaredList}.`,
+        });
+      }
     }
 
     // Quick task 260812-2ur — the prop-side sibling of the emit line above:
