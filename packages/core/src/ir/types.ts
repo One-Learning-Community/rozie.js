@@ -868,6 +868,26 @@ export interface TemplateElementIR {
    */
   producerEmits?: readonly string[];
   /**
+   * Quick task 260812-2ur — the callee's DECLARED prop names, verbatim, in
+   * declaration order. Populated only when `tagKind === 'component' | 'self'`,
+   * the tag's producer resolved successfully, AND the producer declares at
+   * least one prop — absent (not `[]`) otherwise, so IR for every
+   * non-composing element and every prop-less producer stays byte-identical
+   * to before this field existed.
+   *
+   * Threaded by `threadParamTypes` across all three producer branches
+   * (self / published-manifest / local resolver+cache), the exact sibling of
+   * `producerEmits` above. Consumed by per-target attribute emitters
+   * (react/svelte/solid) that must decide whether a kebab-spelled consumer
+   * attribute (`:aria-label="expr"` / `aria-label="str"`) is a DECLARED prop
+   * of the callee (`ariaLabel` — convert to the declared camelCase key) or a
+   * genuine passthrough attribute (keep the hyphenated form so it survives
+   * `$$restProps` / `_rest` spreads onto the wrapper's root element). See
+   * `threadParamTypes` for the resolution algorithm and its diagnostic-gating
+   * invariant.
+   */
+  producerProps?: readonly string[];
+  /**
    * `r-external` marker — the author has declared that third-party code may
    * mutate the DOM INSIDE this element (e.g. a SortableJS-bound list, a
    * TipTap-bound editor, a Leaflet-bound map container). Combined with the

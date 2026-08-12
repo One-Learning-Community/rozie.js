@@ -19,6 +19,13 @@
  *     component/self tag, independent of whether it has slot fillers — this
  *     is why producer resolution runs unconditionally now, not gated behind
  *     "has slot fillers" as it was before this task.
+ *   - `node.producerProps` — the producer's DECLARED prop names, verbatim,
+ *     when non-empty (quick task 260812-2ur). The exact prop-side sibling of
+ *     `producerEmits`: same three branches, same non-empty gate, same
+ *     placement before the slot-filler early-return. Consumed by the
+ *     react/svelte/solid attribute emitters to decide whether a kebab-spelled
+ *     consumer attribute is a declared prop (convert to the declared
+ *     camelCase key) or a genuine passthrough attribute (preserve).
  *
  * DIAGNOSTIC-GATING INVARIANT (read before touching the guard below): making
  * producer resolution run unconditionally means a component tag with NO slot
@@ -29,10 +36,13 @@
  * diagnostic pushes are therefore gated on a local `hasSlotFillers` boolean,
  * computed once per node before resolution: a no-filler tag with an
  * unresolvable producer degrades SILENTLY (no `producerEmits`, no
- * diagnostic) — a filler-bearing tag still gets the diagnostic exactly as
- * before. Do not "simplify" this gate back to an unconditional push; the two
- * halves of this invariant are each pinned by a dedicated test
- * (`threadProducerEmits.test.ts` T6 / T7).
+ * `producerProps`, no diagnostic) — a filler-bearing tag still gets the
+ * diagnostic exactly as before. The prop-side `producerProps` field (quick
+ * task 260812-2ur) obeys the IDENTICAL gate — it adds no diagnostic of its
+ * own and changes no existing one. Do not "simplify" this gate back to an
+ * unconditional push; the two halves of this invariant are each pinned by
+ * dedicated tests (`threadProducerEmits.test.ts` T6 / T7 and
+ * `threadProducerProps.test.ts` T6 / T7).
  *
  * When the cache returns null (cycle, parse failure, or unreadable file), this
  * pass silently degrades — type-flow and `producerEmits` become empty for
@@ -329,6 +339,15 @@ export function threadParamTypes(
     // slot-filler early-return below.
     if (producerEmits.length > 0) {
       node.producerEmits = producerEmits;
+    }
+
+    // Quick task 260812-2ur — the prop-side sibling of the emit line above:
+    // thread the callee's DECLARED prop names when non-empty (absent, not
+    // `[]`, otherwise — keeps IR for every prop-less producer byte-identical).
+    // Same load-bearing placement: before the slot-filler early-return, so
+    // no-filler tags (the common composition case) get it too.
+    if (producerProps.length > 0) {
+      node.producerProps = producerProps.map((p) => p.name);
     }
 
     if (!node.slotFillers || node.slotFillers.length === 0) return;
