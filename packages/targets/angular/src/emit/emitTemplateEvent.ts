@@ -51,6 +51,14 @@ export interface EmitEventCtx {
   /** Per-component counter so suffix names are stable + collision-free. */
   injectionCounter?: { next: number } | undefined;
   /**
+   * Quick task 260811-r2m (D-01) — the element's tagKind, mirroring the
+   * field `EmitAttrCtx` already carries for the PROP side's `resolveBindingName`
+   * component-tag gate. When 'component' or 'self', the emitted event-BINDING
+   * name is lowered through `sanitizeEventName` (see `resolveEventBindingName`
+   * below) — the event-side twin of the prop side's `kebabToCamel` gate.
+   */
+  elementTagKind?: 'html' | 'component' | 'self' | undefined;
+  /**
    * Bug 5: handler-name → parameter-count map (from the un-rewritten script
    * Program). Lets guarded-wrapper synthesis decide whether to forward the
    * event arg to a zero-arg handler. Keyed by the ORIGINAL user handler name.
@@ -183,6 +191,38 @@ function collectTopLevelScriptBindings(
     }
   }
   return names;
+}
+
+/**
+ * Quick task 260811-r2m (D-01/D-02) — resolve the Angular event-BINDING name
+ * for a raw, authored listener event name. Event-side twin of
+ * `resolveBindingName`'s component-tag gate in `emitTemplateAttribute.ts`
+ * (`if (isComponentTag(ctx)) return kebabToCamel(name);`): when the element
+ * being bound is a Rozie component/self-recursion tag, the CONSUMER's
+ * authored listener name is lowered through `sanitizeEventName` — the SAME
+ * function `emitScript.ts` uses (`sanitizeEventName(e) = output<T>()`) to
+ * produce the child's `output()` field id — so the two sides cannot drift
+ * apart silently (D-02). `sanitizeEventName` is deliberately used here
+ * instead of the prop side's `kebabToCamel`: it is strictly more correct
+ * (handles `_`/whitespace separators and a separator followed by a digit,
+ * which the prop side's `-([a-z])` regex misses) and it IS the function that
+ * produces the declaration side's identifier, making the two sides
+ * un-driftable by construction. HTML/custom-element tags keep the authored
+ * name verbatim — native DOM events are case-sensitive strings the browser
+ * defines, not Angular-declared class members.
+ *
+ * This function is used ONLY to compose the final emitted binding-string —
+ * the `ModifierContext.event` field passed to every `impl.<target>()` hook
+ * (see the `eventName` local below) stays the AUTHORED raw name, unchanged.
+ */
+export function resolveEventBindingName(
+  rawEventName: string,
+  tagKind: 'html' | 'component' | 'self' | undefined,
+): string {
+  if (tagKind === 'component' || tagKind === 'self') {
+    return sanitizeEventName(rawEventName);
+  }
+  return rawEventName;
 }
 
 function classifyHandler(node: t.Expression): 'identifier' | 'callable' | 'statement' {
@@ -504,7 +544,12 @@ export function emitTemplateEvent(
     attrValue = `${wrapperName}($event)`;
   }
 
-  const eventAttr = `(${eventName})="${attrValue}"`;
+  // Quick task 260811-r2m (D-01) — the descriptor context above (every
+  // `impl.angular(modifierArgs, { source, event: eventName, ... })` call)
+  // deliberately used the AUTHORED `eventName` verbatim; the lowering below
+  // applies ONLY to the final binding-string composition.
+  const boundEventName = resolveEventBindingName(eventName, ctx.elementTagKind);
+  const eventAttr = `(${boundEventName})="${attrValue}"`;
 
   const result: EmitTemplateEventResult = { eventAttr, diagnostics };
   if (scriptInjection) {

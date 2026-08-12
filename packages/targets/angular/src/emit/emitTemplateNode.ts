@@ -45,7 +45,12 @@ import {
   findRHtml,
   findRShow,
 } from './emitTemplateAttribute.js';
-import { emitTemplateEvent, type AngularScriptInjection } from './emitTemplateEvent.js';
+import {
+  emitTemplateEvent,
+  resolveEventBindingName,
+  type AngularScriptInjection,
+} from './emitTemplateEvent.js';
+import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
 import { emitSlotInvocation } from './emitSlotInvocation.js';
 import { emitConditional } from './emitConditional.js';
 import { toKebabCase } from './emitDecorator.js';
@@ -383,21 +388,38 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
  * disallows duplicate `(event)` bindings on the same element (template parse
  * error). We need to merge same-event handlers into a single binding.
  */
-function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
+function emitEvents(
+  events: Listener[],
+  ctx: EmitNodeCtx,
+  tagKind: 'html' | 'component' | 'self',
+): string {
   if (events.length === 0) return '';
 
-  // Group by lowercase event name.
-  const groups = new Map<string, Listener[]>();
+  // Group by the LOWERED bound event-BINDING name (quick task 260811-r2m /
+  // D-01 — the grouping key must be derived from the SAME name the emitted
+  // binding will use, not the raw authored name: an authored-hyphenated and
+  // an authored-camelCase listener for the SAME component event must collapse
+  // into ONE group, or Angular rejects the resulting duplicate `(event)=`
+  // binding at template-parse time). `resolveEventBindingName` is the exact
+  // same helper `emitTemplateEvent` uses for the final binding-string, so the
+  // group key and the eventually-emitted name can never disagree. The
+  // CORRECTLY-CASED bound name (not the lowercased key) is retained per group
+  // for the final binding text.
+  const groups = new Map<string, { boundName: string; listeners: Listener[] }>();
   for (const ev of events) {
-    const key = ev.event.toLowerCase();
-    const list = groups.get(key) ?? [];
-    list.push(ev);
-    groups.set(key, list);
+    const boundName = resolveEventBindingName(ev.event, tagKind);
+    const key = boundName.toLowerCase();
+    const existing = groups.get(key);
+    if (existing) {
+      existing.listeners.push(ev);
+    } else {
+      groups.set(key, { boundName, listeners: [ev] });
+    }
   }
 
   const out: string[] = [];
 
-  for (const [eventName, group] of groups) {
+  for (const { boundName: eventName, listeners: group } of groups.values()) {
     if (group.length === 1) {
       const result = emitTemplateEvent(group[0]!, {
         ir: ctx.ir,
@@ -408,6 +430,7 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
         handlerArity: ctx.handlerArity,
         cvaModelProp: ctx.cvaModelProp,
         cvaMergeDisabled: ctx.cvaMergeDisabled,
+        elementTagKind: tagKind,
       });
       out.push(result.eventAttr);
       if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
@@ -417,7 +440,14 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
 
     // Multiple listeners on same event — synthesize ONE `(event)="..."` binding
     // via a class-body wrapper method that runs each listener's body.
-    const wrapperName = `_merged_${eventName}_${ctx.injectionCounter.next++}`;
+    //
+    // Quick task 260811-r2m — `eventName` here is the CORRECTLY-CASED bound
+    // name (camelCase for a component/self tag, native verbatim — possibly
+    // hyphenated — for an HTML/custom-element tag). The wrapper FIELD name
+    // must always be a valid JS identifier regardless, so it is routed
+    // through `sanitizeEventName` separately from the (possibly still
+    // hyphenated, for native elements) binding text itself.
+    const wrapperName = `_merged_${sanitizeEventName(eventName)}_${ctx.injectionCounter.next++}`;
     const guardLines: string[] = [];
 
     for (const ev of group) {
@@ -430,13 +460,20 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx): string {
         handlerArity: ctx.handlerArity,
         cvaModelProp: ctx.cvaModelProp,
         cvaMergeDisabled: ctx.cvaMergeDisabled,
+        elementTagKind: tagKind,
       });
       if (sub.scriptInjection) ctx.scriptInjections.push(sub.scriptInjection);
       for (const d of sub.diagnostics) ctx.diagnostics.push(d);
 
       // Extract the inner attrValue from `(event)="X"` so we can splice it
-      // into the merged wrapper.
-      const m = sub.eventAttr.match(/^\([a-zA-Z]+\)="(.*)"$/s);
+      // into the merged wrapper. Quick task 260811-r2m — widened the event-
+      // name character class from `[a-zA-Z]+` to `[a-zA-Z][\w-]*` so a
+      // separator-bearing NATIVE event name (e.g. `my-event`, which stays
+      // hyphenated verbatim on an HTML tag per the D-01 gate) still matches;
+      // previously the handler body was silently DROPPED for any event name
+      // containing a hyphen. Single capturing group is unchanged — no index
+      // shift for callers of `m[1]`.
+      const m = sub.eventAttr.match(/^\([a-zA-Z][\w-]*\)="(.*)"$/s);
       if (!m) continue;
       let inner = m[1]!;
       // The handler invocation references identifiers that need `this.` prefix
@@ -666,7 +703,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   // `(click)="__merged_click_N($event)"` template binding (Angular forbids
   // duplicate `(event)=` attributes on one element — Pitfall 1; mandatory).
   const combinedEvents: Listener[] = [...node.events, ...syntheticListenerEvents];
-  const eventText = emitEvents(combinedEvents, ctx);
+  const eventText = emitEvents(combinedEvents, ctx, node.tagKind);
 
   // Emit each dynamic ListenerSpreadIR as a per-element template-ref +
   // effect()/Renderer2.listen() body. Returns the `#rozieListenersTarget_<N>`
