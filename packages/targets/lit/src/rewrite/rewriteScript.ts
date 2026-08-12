@@ -13,7 +13,8 @@
  *   - `$slotted.X`        → `this._slotXAssigned.value` (quick 260807-cor D4
  *                            — LIVE only when the component reads the sigil;
  *                            gated by emitSlotDecl.ts's collectSlottedReads)
- *   - `$emit('name', x)`  → `this.dispatchEvent(new CustomEvent('name', { detail: x, bubbles: true, composed: true }))`
+ *   - `$emit('name', x)`  → `this.dispatchEvent(new CustomEvent('kebab-name', { detail: x, bubbles: true, composed: true }))`
+ *                            (event name is kebab-cased at dispatch — D-01, quick 260811-nre)
  *   - `$el`               → `this`
  *
  * Inputs are deep-cloned BEFORE traversal so the IR's referential preservation
@@ -43,6 +44,7 @@ import {
 import { redirectNestedThis } from './redirectNestedThis.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import type { RuntimeLitImportCollector } from './collectLitImports.js';
+import { kebabize } from '../emit/resolveLitSetterText.js';
 
 // CJS interop normalization.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -1024,7 +1026,12 @@ export function rewriteScript(
       if (callee.name === '$emit' && args.length > 0) {
         const firstArg = args[0]!;
         if (!t.isStringLiteral(firstArg)) return;
-        const eventName = firstArg.value;
+        // D-01 (quick 260811-nre): normalize the DISPATCH side to kebab-case
+        // via the same helper the two-way model path uses (byte-equal
+        // contract, resolveLitSetterText.ts), so a consumer's kebab-cased
+        // `@region-in` listener binding is never orphaned by a raw
+        // camelCase dispatch. See emit-multiword-kebab.test.ts.
+        const eventName = kebabize(firstArg.value);
         const restArgs = args.slice(1);
         const detail = restArgs.length === 0
           ? t.identifier('undefined')

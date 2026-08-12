@@ -14,7 +14,7 @@
  *   $refs.X       → this._refX
  *   $slots.X      → this._hasSlot<Suffix>  ; portal slot → this.X !== undefined
  *   scoped slot   → (this._hasSlot<Suffix> || this.X !== undefined)
- *   $emit('n', x) → this.dispatchEvent(new CustomEvent('n', {...}))
+ *   $emit('n', x) → this.dispatchEvent(new CustomEvent('kebab-n', {...})) (D-01, quick 260811-nre)
  *   $snapshot(x)  → x ; $el → this._ref__rozieRoot
  *   bare method/computed name → this.name (with parent-position + shadowing skips)
  */

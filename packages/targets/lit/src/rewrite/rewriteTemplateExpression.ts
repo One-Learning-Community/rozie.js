@@ -8,7 +8,8 @@
  *   - `$data.X`          → `this._X.value`
  *   - `$refs.X`          → `this._refX`
  *   - `$slots.X`         → `this._hasSlot<Suffix>`
- *   - `$emit('n', x)`    → `this.dispatchEvent(new CustomEvent('n', { detail: x, bubbles: true, composed: true }))`
+ *   - `$emit('n', x)`    → `this.dispatchEvent(new CustomEvent('kebab-n', { detail: x, bubbles: true, composed: true }))`
+ *                          (event name is kebab-cased at dispatch — D-01, quick 260811-nre)
  *   - bare computed name → `this.<name>` (computed getters are class methods)
  *
  * @experimental — shape may change before v1.0
@@ -19,6 +20,7 @@ import _traverse from '@babel/traverse';
 import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
+import { kebabize } from '../emit/resolveLitSetterText.js';
 
 type GenerateFn = typeof import('@babel/generator').default;
 const generate: GenerateFn =
@@ -372,7 +374,12 @@ export function rewriteTemplateExpression(
       const firstArg = args[0]!;
       if (!t.isStringLiteral(firstArg)) return;
 
-      const eventName = firstArg.value;
+      // D-01 (quick 260811-nre): normalize the DISPATCH side to kebab-case
+      // via the same helper the two-way model path uses (byte-equal
+      // contract, resolveLitSetterText.ts), and via the same helper the
+      // sibling rewriteScript.ts $emit lowering uses (Pitfall 4 — the two
+      // lowerings must not drift). See emit-multiword-kebab.test.ts.
+      const eventName = kebabize(firstArg.value);
       const restArgs = args.slice(1);
       const detail =
         restArgs.length === 0

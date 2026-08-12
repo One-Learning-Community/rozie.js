@@ -12,7 +12,7 @@
  *   $data.X          → this._X.value
  *   $refs.X          → this._refX
  *   $slots.X         → this._hasSlot<Suffix>
- *   $emit('n', x)    → this.dispatchEvent(new CustomEvent('n', {...}))
+ *   $emit('n', x)    → this.dispatchEvent(new CustomEvent('kebab-n', {...})) (D-01, quick 260811-nre)
  *   bare computed    → this.<name>
  *
  * `opts.shadowAliases` names are NOT rewritten (locally-bound, e.g. r-for
