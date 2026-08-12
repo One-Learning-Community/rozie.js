@@ -22,6 +22,8 @@
  * Pure glue over the `@rozie/core` public IR — NO compiler/emitter surface.
  */
 
+import { litEventName } from '../../lit-event-name.mjs';
+
 const SCHEMA_VERSION = '2.1.0';
 
 /** camelCase / PascalCase → kebab-case (for the custom-element tag name). */
@@ -140,10 +142,11 @@ export function buildCustomElementsManifest({
     return a;
   });
 
-  // Events: source emits, kebab-cased at dispatch (D-01 — same `kebab()`
-  // helper as the tag name) + the model `<prop>-change` writeback.
+  // Events: source emits, kebab-cased at dispatch via the shared litEventName
+  // (the compiler's own toKebabCase algorithm — a superset of the tag-name
+  // kebab()) + the model `<prop>-change` writeback.
   const events = ir.emits.map((name) => ({
-    name: kebab(name),
+    name: litEventName(name),
     type: { text: 'CustomEvent' },
     ...(eventManifest[name] ? { description: eventManifest[name] } : {}),
   }));

@@ -15,6 +15,8 @@
  * so there is NO engine-CSS import section.)
  */
 
+import { litEventName, litEventNamesDiverge } from '../../lit-event-name.mjs';
+
 // ---------------------------------------------------------------------------
 // IR-derivation helpers (shared by README rendering AND the docs validator).
 // ---------------------------------------------------------------------------
@@ -266,21 +268,6 @@ const i = el.getSelectedIndex();`,
 // README rendering.
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Lit event-name kebab-casing (quick 260811-nre, D-01). The compiled Lit
-// target dispatches a MULTI-WORD `$emit()` name kebab-cased, so the Lit
-// README's Events table must render the DISPATCHED string, not the raw
-// `ir.emits` source name — e.g. `reInit` dispatches as `re-init`, NOT
-// `reinit`. Algorithm copied VERBATIM from
-// packages/targets/lit/src/emit/emitDecorator.ts:15 (`toKebabCase`) — must
-// stay byte-identical to that helper or this README's Events table can drift
-// from what the compiler actually dispatches.
-// ---------------------------------------------------------------------------
-function litEventName(name) {
-  const hyphenated = name.replace(/([a-z0-9]|[A-Z](?=[A-Z][a-z]))([A-Z])/g, '$1-$2');
-  return hyphenated.toLowerCase();
-}
-
 export function renderReadme(target, ir, pkgName, handleManifest = {}, eventManifest = {}) {
   const usage = USAGE[target];
   if (!usage) throw new Error(`renderReadme: no usage snippet for target "${target}"`);
@@ -356,7 +343,10 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}, eventMani
   if (ir.emits && ir.emits.length > 0) {
     lines.push('## Events');
     lines.push('');
-    if (target === 'lit') {
+    if (target === 'lit' && litEventNamesDiverge(ir.emits)) {
+      // Family-specific extension of the shared LIT_EVENT_NOTE prose (adds a
+      // concrete `reInit` example). Kept inline: byte-identity with the shipped
+      // Lit README forbids swapping it for the bare constant (260812-3tv D-03).
       lines.push(
         '`addEventListener` name — the Lit target dispatches multi-word event names kebab-cased ' +
           '(`reInit` dispatches as `re-init`, not `reinit`).',

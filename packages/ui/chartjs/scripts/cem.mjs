@@ -18,8 +18,9 @@
  *   - tag name        = `rozie-` + kebab(componentName)   (@customElement)
  *   - HTML attribute  = Lit default = propName.toLowerCase() (no explicit `attribute:`)
  *   - source events   = ir.emits, kebab-cased at dispatch (quick 260811-nre,
- *     D-01 — a multi-word emit name is dispatched hyphenated, matching the
- *     tag-name kebab() below, NOT dispatched verbatim as the raw source name)
+ *     D-01 — a multi-word emit name is dispatched hyphenated, NOT verbatim;
+ *     rendered via the shared litEventName, the compiler's own toKebabCase
+ *     algorithm — a superset of the tag-name kebab() below)
  *     (chartjs has no model:true props, so no `<prop>-change` writeback event)
  *
  * MULTI-COMPONENT MODULE TOPOLOGY (unlike rete's FlowCanvas/NodeType/Port,
@@ -38,6 +39,8 @@
  *
  * Pure glue over the `@rozie/core` public IR — NO compiler/emitter surface.
  */
+
+import { litEventName } from '../../lit-event-name.mjs';
 
 const SCHEMA_VERSION = '2.1.0';
 
@@ -160,11 +163,11 @@ export function buildCustomElementsManifest({
     return a;
   });
 
-  // Events: source emits, kebab-cased at dispatch (D-01 — same `kebab()`
-  // helper as the tag name, mirroring the compiler's toKebabCase). No model
-  // writeback event — chartjs has no model:true props.
+  // Events: source emits, kebab-cased at dispatch via the shared litEventName
+  // (the compiler's own toKebabCase algorithm — a superset of the tag-name
+  // kebab() above). No model writeback event — chartjs has no model:true props.
   const events = ir.emits.map((name) => ({
-    name: kebab(name),
+    name: litEventName(name),
     type: { text: 'CustomEvent' },
     ...(eventManifest[name] ? { description: eventManifest[name] } : {}),
   }));
