@@ -847,6 +847,27 @@ export interface TemplateElementIR {
    */
   slotFillers?: SlotFillerDecl[];
   /**
+   * Quick task 260811-trz (D-01) — the callee's RAW AUTHORED `$emit` names,
+   * verbatim, in declaration order. Populated only when `tagKind ===
+   * 'component' | 'self'`, the tag's producer resolved successfully, AND the
+   * producer declares at least one emit — absent (not `[]`) otherwise, so IR
+   * for every non-composing element and every non-emitting producer stays
+   * byte-identical to before this field existed.
+   *
+   * Deliberately RAW rather than a pre-resolved per-target name: core has no
+   * business knowing what a specific target (e.g. Angular's `{ alias }`
+   * convention) does with a hyphen. This keeps the derivation rule in exactly
+   * one place per target (see `@rozie/target-angular`'s
+   * `angularOutputBinding`) and lets every target's consumer-side event
+   * lowering — plus the sibling prop-side `aria-*`/`data-*` fix this also
+   * unblocks — consume the same threaded fact without a second resolution
+   * pass. Threaded by `threadParamTypes` across all three producer branches
+   * (self / published-manifest / local resolver+cache) alongside `paramTypes`
+   * — see that module for the resolution algorithm and its diagnostic-gating
+   * invariant.
+   */
+  producerEmits?: readonly string[];
+  /**
    * `r-external` marker — the author has declared that third-party code may
    * mutate the DOM INSIDE this element (e.g. a SortableJS-bound list, a
    * TipTap-bound editor, a Leaflet-bound map container). Combined with the

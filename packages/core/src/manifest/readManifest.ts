@@ -36,6 +36,15 @@ export interface ManifestError {
 export interface ProducerSurface {
   slots: SlotDecl[];
   props: Pick<PropDecl, 'name' | 'isModel'>[];
+  /**
+   * Quick task 260811-trz (D-03) — the producer's RAW authored `$emit`
+   * names, verbatim, in declaration order. Already structurally validated by
+   * the `emitsRaw` loop below (each entry must be a string); this field
+   * simply surfaces the validated array instead of discarding it, giving a
+   * PUBLISHED cross-package consumer the same `producerEmits` threading
+   * parity local `.rozie` consumers get via `IRComponent.emits`.
+   */
+  emits: string[];
   expose: { name: string }[];
 }
 
@@ -216,8 +225,10 @@ export function parseManifest(
     slots.push(slot);
   }
 
+  const emits: string[] = [];
   for (const e of emitsRaw) {
     if (typeof e !== 'string') return malformed('Manifest "emits" entry is not a string.');
+    emits.push(e);
   }
 
   const expose: { name: string }[] = [];
@@ -227,5 +238,5 @@ export function parseManifest(
     expose.push(member);
   }
 
-  return { surface: { slots, props, expose }, error: null };
+  return { surface: { slots, props, emits, expose }, error: null };
 }

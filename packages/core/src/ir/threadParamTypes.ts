@@ -2,24 +2,42 @@
  * threadParamTypes — Phase 07.2 Plan 01 Task 3 (R4 + R7).
  *
  * Post-pass that walks the lowered IR template, resolves each component-tag's
- * `componentRef.importPath` to a producer `.rozie` file via the resolver,
- * looks up the producer's IR via the cache, then for each consumer
- * `SlotFillerDecl`:
+ * (or self-recursive tag's) producer across three branches — 'self' → the
+ * consumer's own IR, a PUBLISHED cross-package specifier → the compiled
+ * `rozie-manifest.json` surface, otherwise → `resolveProducerPath` + the
+ * `.rozie` `IRCache` — and threads TWO producer facts onto the consuming
+ * component-tag node (quick task 260811-trz, D-02):
  *
- *   - Threads `paramTypes` from the producer's matching `SlotDecl.paramTypes`
- *     onto `filler.paramTypes` (R4 type-flow).
- *   - Validates that consumer scoped-param names exist in the producer
+ *   - `filler.paramTypes` — for each consumer `SlotFillerDecl`, from the
+ *     producer's matching `SlotDecl.paramTypes` (R4 type-flow). Also
+ *     validates that consumer scoped-param names exist in the producer
  *     `SlotDecl.params` — mismatches push ROZ947 `SCOPED_PARAM_MISMATCH`
- *     (D-09).
- *   - When the producer doesn't declare the filled slot at all, pushes ROZ941
- *     `UNKNOWN_SLOT_NAME` (warning per D-08).
+ *     (D-09). When the producer doesn't declare the filled slot at all,
+ *     pushes ROZ941 `UNKNOWN_SLOT_NAME` (warning per D-08).
+ *   - `node.producerEmits` — the producer's RAW authored `$emit` names,
+ *     verbatim, when non-empty (D-01). Threaded for EVERY resolved
+ *     component/self tag, independent of whether it has slot fillers — this
+ *     is why producer resolution runs unconditionally now, not gated behind
+ *     "has slot fillers" as it was before this task.
  *
- * When the resolver returns null, pushes ROZ945 `CROSS_PACKAGE_LOOKUP_FAILED`
- * at the `<components>` source loc.
+ * DIAGNOSTIC-GATING INVARIANT (read before touching the guard below): making
+ * producer resolution run unconditionally means a component tag with NO slot
+ * fillers can now reach a resolution-failure branch that was previously
+ * unreachable for it. `CROSS_PACKAGE_LOOKUP_FAILED` (ROZ945) and the
+ * manifest-error branch are BOTH `severity: 'error'` — newly firing either
+ * for a no-filler tag would hard-fail compiles that pass today. Both
+ * diagnostic pushes are therefore gated on a local `hasSlotFillers` boolean,
+ * computed once per node before resolution: a no-filler tag with an
+ * unresolvable producer degrades SILENTLY (no `producerEmits`, no
+ * diagnostic) — a filler-bearing tag still gets the diagnostic exactly as
+ * before. Do not "simplify" this gate back to an unconditional push; the two
+ * halves of this invariant are each pinned by a dedicated test
+ * (`threadProducerEmits.test.ts` T6 / T7).
  *
  * When the cache returns null (cycle, parse failure, or unreadable file), this
- * pass silently degrades — type-flow becomes empty for that consumer-side
- * filler but the compile succeeds (collected-not-thrown discipline).
+ * pass silently degrades — type-flow and `producerEmits` become empty for
+ * that consumer but the compile succeeds (collected-not-thrown discipline).
+ * This silent-degrade behavior is unchanged by this task.
  *
  * Per D-08: NEVER throws. All failures push a diagnostic and continue.
  *
@@ -202,67 +220,118 @@ export function threadParamTypes(
   walkTemplate(ir.template, (node) => {
     if (node.type !== 'TemplateElement') return;
     if (node.tagKind !== 'component' && node.tagKind !== 'self') return;
-    if (!node.slotFillers || node.slotFillers.length === 0) return;
-    if (!node.componentRef) return;
 
-    // 'self' tagKind references the outer-name component (recursion case) — the
-    // producer is the consumer itself. Skip resolver+cache; use ir.slots.
+    // Quick task 260811-trz (D-02) — computed BEFORE producer resolution so
+    // both diagnostic-push sites below can gate on it. See the module
+    // docstring's DIAGNOSTIC-GATING INVARIANT section.
+    const hasSlotFillers =
+      node.slotFillers !== undefined && node.slotFillers.length > 0;
+
+    // 'self' tagKind references the outer-name component (recursion case) —
+    // the producer is the consumer itself. Skip resolver+cache; use ir.slots
+    // / ir.props / ir.emits directly. Unlike 'component', 'self' NEVER sets
+    // `componentRef` (see lowerTemplate.ts's `annotateTagKind`), so the
+    // componentRef guard below is scoped to the 'component' branch only —
+    // gating it unconditionally (as a top-level check before this branch)
+    // would silently skip every self-recursive tag.
     let producerSlots: readonly SlotDecl[];
     let producerProps: readonly { name: string }[];
+    let producerEmits: readonly string[];
     if (node.tagKind === 'self') {
       producerSlots = ir.slots;
       producerProps = ir.props;
-    } else if (isPublishedSpecifier(node.componentRef.importPath)) {
-      // Phase 75 Plan 02 (COMP-04 bounded exception) — PUBLISHED cross-package
-      // specifier: thread producer slots/props from the compiled
-      // rozie-manifest.json (D-08/D-09/D-10) instead of resolveProducerPath +
-      // IRCache. No `.rozie` producer source is read for this branch.
-      const { surface, error } = resolveManifestProducer({
-        specifier: node.componentRef.importPath,
-        target,
-        fromFile: consumerPath,
-        resolver,
-      });
-      if (error !== null) {
-        diagnostics.push({
-          code: error.code,
-          severity: 'error',
-          message: error.message,
-          loc: node.componentRef.sourceLoc,
-          hint: 'Verify the per-target package is installed as a dependency and ships a compatible rozie-manifest.json.',
-        });
-        return;
-      }
-      // parseManifest never returns { surface: null, error: null } — but
-      // narrow defensively rather than assert, per D-08 collected-not-thrown.
-      if (surface === null) return;
-      producerSlots = surface.slots;
-      producerProps = surface.props;
+      producerEmits = ir.emits;
     } else {
-      const resolvedPath = resolver.resolveProducerPath(
-        node.componentRef.importPath,
-        consumerPath,
-      );
-      if (resolvedPath === null) {
-        diagnostics.push({
-          code: RozieErrorCode.CROSS_PACKAGE_LOOKUP_FAILED,
-          severity: 'error',
-          message: `Cannot resolve <components> import '${node.componentRef.importPath}' from '${consumerPath}'.`,
-          loc: node.componentRef.sourceLoc,
-          hint: 'Verify the path exists and is reachable via tsconfig "paths" / Node module resolution / npm install.',
+      const componentRef = node.componentRef;
+      if (componentRef === undefined) return;
+
+      if (isPublishedSpecifier(componentRef.importPath)) {
+        // Phase 75 Plan 02 (COMP-04 bounded exception) — PUBLISHED cross-package
+        // specifier: thread producer slots/props/emits from the compiled
+        // rozie-manifest.json (D-08/D-09/D-10) instead of resolveProducerPath +
+        // IRCache. No `.rozie` producer source is read for this branch.
+        const { surface, error } = resolveManifestProducer({
+          specifier: componentRef.importPath,
+          target,
+          fromFile: consumerPath,
+          resolver,
         });
-        return;
+        if (error !== null) {
+          // Quick task 260811-trz (D-02 / T6-T7) — producer resolution now
+          // runs for EVERY component tag, including ones with no slot
+          // fillers (previously unreached). Gate on hasSlotFillers so a
+          // no-filler tag's diagnostic surface stays byte-identical to
+          // before this restructure (T6); a filler-bearing tag still gets
+          // the diagnostic exactly as before (T7 — no over-suppression).
+          if (hasSlotFillers) {
+            diagnostics.push({
+              code: error.code,
+              severity: 'error',
+              message: error.message,
+              loc: componentRef.sourceLoc,
+              hint: 'Verify the per-target package is installed as a dependency and ships a compatible rozie-manifest.json.',
+            });
+          }
+          return;
+        }
+        // parseManifest never returns { surface: null, error: null } — but
+        // narrow defensively rather than assert, per D-08 collected-not-thrown.
+        if (surface === null) return;
+        producerSlots = surface.slots;
+        producerProps = surface.props;
+        producerEmits = surface.emits;
+      } else {
+        const resolvedPath = resolver.resolveProducerPath(
+          componentRef.importPath,
+          consumerPath,
+        );
+        if (resolvedPath === null) {
+          // Quick task 260811-trz (D-02 / T6-T7) — SAME diagnostic-gating
+          // invariant as the manifest-error branch above.
+          if (hasSlotFillers) {
+            diagnostics.push({
+              code: RozieErrorCode.CROSS_PACKAGE_LOOKUP_FAILED,
+              severity: 'error',
+              message: `Cannot resolve <components> import '${componentRef.importPath}' from '${consumerPath}'.`,
+              loc: componentRef.sourceLoc,
+              hint: 'Verify the path exists and is reachable via tsconfig "paths" / Node module resolution / npm install.',
+            });
+          }
+          return;
+        }
+        const producerIR = cache.getIRComponent(resolvedPath, consumerPath);
+        if (producerIR === null) return; // cycle or parse failure — silent degrade (unchanged)
+        producerSlots = producerIR.slots;
+        producerProps = producerIR.props;
+        producerEmits = producerIR.emits;
       }
-      const producerIR = cache.getIRComponent(resolvedPath, consumerPath);
-      if (producerIR === null) return; // cycle or parse failure — silent degrade
-      producerSlots = producerIR.slots;
-      producerProps = producerIR.props;
     }
 
     const producerSlotsByName = new Map(
       producerSlots.map((s) => [s.name, s] as const),
     );
     const producerPropNames = new Set(producerProps.map((p) => p.name));
+    // Quick task 260811-trz — a human-readable producer label for the
+    // filler-loop diagnostic messages below. `node.componentRef` is
+    // undefined for 'self' tagKind by construction (see the branch above),
+    // so those messages cannot dereference `.importPath` unconditionally —
+    // this label substitutes the component's own name for the self case.
+    const producerLabel =
+      node.tagKind === 'self'
+        ? `<self recursion: ${ir.name}>`
+        : (node.componentRef?.importPath ?? '<unresolved producer>');
+
+    // Quick task 260811-trz (D-01) — thread the callee's raw declared emit
+    // names onto this component/self tag when non-empty (absent, not `[]`,
+    // otherwise — keeps IR for every non-emitting producer byte-identical).
+    // Populated regardless of slot-filler presence: T2's load-bearing
+    // no-filler assertion is exactly this line running before the
+    // slot-filler early-return below.
+    if (producerEmits.length > 0) {
+      node.producerEmits = producerEmits;
+    }
+
+    if (!node.slotFillers || node.slotFillers.length === 0) return;
 
     for (const filler of node.slotFillers) {
       // Dynamic-name fills cannot be statically matched against a producer
@@ -277,7 +346,7 @@ export function threadParamTypes(
           severity: 'warning',
           message: `<template #${
             filler.name || 'default'
-          }> does not match any slot declared by ${node.componentRef.importPath}.`,
+          }> does not match any slot declared by ${producerLabel}.`,
           loc: filler.sourceLoc,
         });
         // Phase 07.2 Plan 05 — ROZ944 REPROJECTION_UNDECLARED_INNER_SLOT.
@@ -292,7 +361,7 @@ export function threadParamTypes(
             message: `<template #${
               filler.name || 'default'
             }> contains a <slot> re-projection but ${
-              node.componentRef.importPath
+              producerLabel
             } does not declare a '${
               filler.name || 'default'
             }' slot — the re-projection is pointless because the fill itself never reaches the inner producer.`,
@@ -302,7 +371,7 @@ export function threadParamTypes(
                 filler.name || 'default'
               }> fill or add a matching <slot name="${
                 filler.name || 'default'
-              }"> declaration to ${node.componentRef.importPath}.`,
+              }"> declaration to ${producerLabel}.`,
           });
         }
         continue;
@@ -350,7 +419,7 @@ export function threadParamTypes(
               severity: 'error',
               message: `Scoped param '${consumerParam.name}' is not declared by producer slot '${
                 filler.name || 'default'
-              }' in ${node.componentRef.importPath}.`,
+              }' in ${producerLabel}.`,
               loc: consumerParam.sourceLoc,
               hint:
                 matchingSlot.params.length > 0
