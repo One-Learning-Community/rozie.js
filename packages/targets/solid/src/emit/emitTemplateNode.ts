@@ -1001,7 +1001,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       loopValueBindings: ctx.loopValueBindings,      scopeAccessorParams: ctx.scopeAccessorParams,
     });
     workingAttrs = workingAttrs.filter((a) => a !== rHtmlAttr);
-    const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams, elementTagKind: node.tagKind, tagName: node.tagName });
+    const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams, elementTagKind: node.tagKind, tagName: node.tagName, producerProps: node.producerProps });
     for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
     const listenerResult = emitElementListeners(node, ctx);
     const headParts = [
@@ -1054,7 +1054,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   }
 
   // Standard attribute emission
-  const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams, elementTagKind: node.tagKind, tagName: node.tagName });
+  const attrsResult = emitAttributes(workingAttrs, { ir: ctx.ir, collectors: ctx.collectors, invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams, elementTagKind: node.tagKind, tagName: node.tagName, producerProps: node.producerProps });
   for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
 
   const listenerResult = emitElementListeners(node, ctx);

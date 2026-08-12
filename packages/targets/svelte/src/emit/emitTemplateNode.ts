@@ -594,6 +594,8 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   const attrText = emitAttributes(node.attributes, {
     ir: ctx.ir,
     elementTagKind: node.tagKind,
+    // 260812-2ur — callee's declared prop names (threadParamTypes).
+    producerProps: node.producerProps,
     // Phase 26 — thread the runtime-import accumulator so attribute/class
     // interpolations can register `rozieDisplay` when they wrap.
     runtimeImports: ctx.runtimeImports,

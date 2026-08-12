@@ -71,6 +71,14 @@ export interface EmitAttrCtx {
    */
   elementTagKind?: 'html' | 'component' | 'self';
   tagName?: string;
+  /**
+   * Quick task 260812-2ur — the callee's declared prop names, threaded from
+   * `TemplateElementIR.producerProps` (populated by `threadParamTypes` when
+   * the composed child resolved and declares at least one prop). Absent for
+   * native elements and unresolved callees — which is exactly what makes the
+   * kebab-preservation fallback path the default.
+   */
+  producerProps?: readonly string[] | undefined;
 }
 
 /**
@@ -346,10 +354,62 @@ const BOOLEAN_HTML_ATTRS: ReadonlySet<string> = new Set([
  * declared `autofocus` prop never receives — found via EditorText's
  * reactive-refocus VR test failing on React only).
  */
-function htmlAttrToJsxName(name: string, elementTagKind?: 'html' | 'component' | 'self'): string {
+function htmlAttrToJsxName(
+  name: string,
+  elementTagKind?: 'html' | 'component' | 'self',
+  producerProps?: readonly string[],
+): string {
+  // Quick task 260812-2ur — declared-prop resolution front-runs the
+  // component/self verbatim return, so a PLAIN kebab-spelled attribute
+  // (`aria-label="str"`) bound on a composed child that DECLARES `ariaLabel`
+  // reaches the declared prop. No hit → verbatim, exactly as before.
+  const declared = resolveDeclaredProp(name, elementTagKind, producerProps);
+  if (declared !== null) return declared;
   if (elementTagKind === 'component' || elementTagKind === 'self') return name;
   const lower = name.toLowerCase();
   return HTML_TO_JSX_ATTR[lower] ?? name;
+}
+
+/**
+ * Quick task 260812-2ur — resolve a bound attribute name against the composed
+ * callee's DECLARED prop list (`EmitAttrCtx.producerProps`, threaded from
+ * `TemplateElementIR.producerProps`). Returns the matching DECLARED prop name
+ * — so the callee's own destructuring key list receives it, never a
+ * locally-recomputed camelization — or null to fall through to the current
+ * logic untouched (260811-trz's D-05/D-06 resolve-then-fallback shape).
+ *
+ * Semantics (identical across react/svelte/solid):
+ *   1. Null unless the tag kind is component or self.
+ *   2. Null when the declared-prop list is absent or empty.
+ *   3. Exact match against a declared name wins first.
+ *   4. Otherwise match a declared name equal to the kebab-to-camel transform
+ *      of the bare name.
+ *
+ * Rule 3 is what preserves byte-identity for everything that is not
+ * hyphenated: a single-word bound name can only ever match itself (its
+ * kebab-to-camel transform is the identity), so it emits the same string it
+ * emits today — do NOT "simplify" the exact-first ordering away. Prior art:
+ * Angular's `emitTemplateAttribute.ts` camelizes UNCONDITIONALLY on component
+ * tags (which is why Angular delivered `ariaLabel` all along); this is the
+ * declaration-gated form of that rule — the aria-/data- preservation below
+ * still applies verbatim to native elements and to genuine passthrough
+ * attributes (no declared match / unresolved callee).
+ */
+function resolveDeclaredProp(
+  bareName: string,
+  elementTagKind?: 'html' | 'component' | 'self',
+  producerProps?: readonly string[],
+): string | null {
+  if (elementTagKind !== 'component' && elementTagKind !== 'self') return null;
+  if (producerProps === undefined || producerProps.length === 0) return null;
+  for (const declared of producerProps) {
+    if (declared === bareName) return declared;
+  }
+  const camel = bareName.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  for (const declared of producerProps) {
+    if (declared === camel) return declared;
+  }
+  return null;
 }
 
 /**
@@ -363,9 +423,21 @@ function htmlAttrToJsxName(name: string, elementTagKind?: 'html' | 'component' |
  * Then the HTML→JSX attribute alias map is applied for special-cased names
  * (native DOM elements only — see `htmlAttrToJsxName`).
  */
-function colonPropToJsxName(name: string, elementTagKind?: 'html' | 'component' | 'self'): string {
+function colonPropToJsxName(
+  name: string,
+  elementTagKind?: 'html' | 'component' | 'self',
+  producerProps?: readonly string[],
+): string {
   // strip the leading ':' if present
   const bare = name.startsWith(':') ? name.slice(1) : name;
+  // Quick task 260812-2ur — declared-prop resolution front-runs the aria-/
+  // data- preservation: on a composed component tag whose callee DECLARES a
+  // matching prop (exact, then kebab→camel equivalence), the declared name
+  // wins. No hit → the current logic below runs untouched (resolve-then-
+  // fallback, 260811-trz D-05/D-06). See `resolveDeclaredProp` for why this
+  // cannot change the shape of any non-hyphenated attribute.
+  const declared = resolveDeclaredProp(bare, elementTagKind, producerProps);
+  if (declared !== null) return declared;
   // Preserve aria-/data- hyphenated form
   if (bare.startsWith('aria-') || bare.startsWith('data-')) return bare;
   // Convert kebab to camel
@@ -1188,7 +1260,8 @@ function emitNonClassAttribute(
   }
   if (attr.kind === 'static') {
     // Apply HTML→JSX alias for special-cased names (tabindex → tabIndex, etc.)
-    const jsxName = htmlAttrToJsxName(attr.name, ctx.elementTagKind);
+    // 260812-2ur — ctx.producerProps lets a declared prop win on component tags.
+    const jsxName = htmlAttrToJsxName(attr.name, ctx.elementTagKind, ctx.producerProps);
     // Valueless boolean HTML attribute (`<input multiple>`) — emit the JSX
     // boolean form `multiple={true}` (not `multiple=""`, which is a string
     // and fails React's boolean-typed JSX prop, TS2322). Quick task
@@ -1226,7 +1299,7 @@ function emitNonClassAttribute(
     // A `null`-fallback ternary (`x ? … : null`) is normalized to yield
     // `undefined` so React's `string | undefined` attr types accept it
     // (quick task 260520-w18). `style`/`class` already handled above.
-    const jsxName = colonPropToJsxName(attr.name, ctx.elementTagKind);
+    const jsxName = colonPropToJsxName(attr.name, ctx.elementTagKind, ctx.producerProps);
     const normalizedAttrExpr = normalizeNullAttrBinding(attr.expression);
     const exprCode = renderExpr(normalizedAttrExpr, ctx.ir);
     // Phase 26 (D-06/SPEC-4) — attribute-binding wrap. When the IR flags this

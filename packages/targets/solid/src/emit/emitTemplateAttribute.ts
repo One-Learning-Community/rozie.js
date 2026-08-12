@@ -63,6 +63,14 @@ export interface EmitAttrCtx {
    */
   elementTagKind?: 'html' | 'component' | 'self';
   tagName?: string;
+  /**
+   * Quick task 260812-2ur — the callee's declared prop names, threaded from
+   * `TemplateElementIR.producerProps` (populated by `threadParamTypes` when
+   * the composed child resolved and declares at least one prop). Absent for
+   * native elements and unresolved callees — which is exactly what makes the
+   * kebab-preservation fallback path the default.
+   */
+  producerProps?: readonly string[] | undefined;
 }
 
 /** Form-input tags whose `value`/`checked` are controlled-input PROPERTIES. */
@@ -269,10 +277,60 @@ function hasNullishBranch(expr: t.Expression): boolean {
 function htmlAttrToSolidName(
   name: string,
   elementTagKind?: 'html' | 'component' | 'self',
+  producerProps?: readonly string[],
 ): string {
+  // Quick task 260812-2ur — declared-prop resolution front-runs the
+  // component/self verbatim return, so a PLAIN kebab-spelled attribute
+  // (`aria-label="str"`) bound on a composed child that DECLARES `ariaLabel`
+  // reaches the declared prop. No hit → verbatim, exactly as before.
+  const declared = resolveDeclaredProp(name, elementTagKind, producerProps);
+  if (declared !== null) return declared;
   if (elementTagKind === 'component' || elementTagKind === 'self') return name;
   const lower = name.toLowerCase();
   return HTML_TO_SOLID_ATTR[lower] ?? name;
+}
+
+/**
+ * Quick task 260812-2ur — resolve a bound attribute name against the composed
+ * callee's DECLARED prop list (`EmitAttrCtx.producerProps`, threaded from
+ * `TemplateElementIR.producerProps`). Returns the matching DECLARED prop name
+ * — so the callee's own `splitProps` key list (built from its `ir.props`)
+ * receives it, never a locally-recomputed camelization — or null to fall
+ * through to the current logic untouched (260811-trz's D-05/D-06
+ * resolve-then-fallback shape).
+ *
+ * Semantics (identical across react/svelte/solid):
+ *   1. Null unless the tag kind is component or self.
+ *   2. Null when the declared-prop list is absent or empty.
+ *   3. Exact match against a declared name wins first.
+ *   4. Otherwise match a declared name equal to the kebab-to-camel transform
+ *      of the bare name.
+ *
+ * Rule 3 is what preserves byte-identity for everything that is not
+ * hyphenated: a single-word bound name can only ever match itself (its
+ * kebab-to-camel transform is the identity), so it emits the same string it
+ * emits today — do NOT "simplify" the exact-first ordering away. Prior art:
+ * Angular's `emitTemplateAttribute.ts` camelizes UNCONDITIONALLY on component
+ * tags (which is why Angular delivered `ariaLabel` all along); this is the
+ * declaration-gated form of that rule — the file-header "KEBAB PASSTHROUGH"
+ * rule still applies verbatim to native elements and to genuine passthrough
+ * attributes (no declared match / unresolved callee).
+ */
+function resolveDeclaredProp(
+  bareName: string,
+  elementTagKind?: 'html' | 'component' | 'self',
+  producerProps?: readonly string[],
+): string | null {
+  if (elementTagKind !== 'component' && elementTagKind !== 'self') return null;
+  if (producerProps === undefined || producerProps.length === 0) return null;
+  for (const declared of producerProps) {
+    if (declared === bareName) return declared;
+  }
+  const camel = bareName.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  for (const declared of producerProps) {
+    if (declared === camel) return declared;
+  }
+  return null;
 }
 
 /**
@@ -485,8 +543,17 @@ function splitClassStyleFromLiteral(obj: t.ObjectExpression): {
 function colonPropToSolidName(
   name: string,
   elementTagKind?: 'html' | 'component' | 'self',
+  producerProps?: readonly string[],
 ): string {
   const bare = name.startsWith(':') ? name.slice(1) : name;
+  // Quick task 260812-2ur — declared-prop resolution front-runs the aria-/
+  // data- preservation: on a composed component tag whose callee DECLARES a
+  // matching prop (exact, then kebab→camel equivalence), the declared name
+  // wins. No hit → the current logic below runs untouched (resolve-then-
+  // fallback, 260811-trz D-05/D-06). See `resolveDeclaredProp` for why this
+  // cannot change the shape of any non-hyphenated attribute.
+  const declared = resolveDeclaredProp(bare, elementTagKind, producerProps);
+  if (declared !== null) return declared;
   if (bare.startsWith('aria-') || bare.startsWith('data-')) return bare;
   let out = bare;
   // kebab→camel runs on EVERY tag kind — `:my-prop` → `myProp` is the
@@ -841,7 +908,8 @@ function emitNonClassAttribute(
   }
 
   if (attr.kind === 'static') {
-    const jsxName = htmlAttrToSolidName(attr.name, ctx.elementTagKind);
+    // 260812-2ur — ctx.producerProps lets a declared prop win on component tags.
+    const jsxName = htmlAttrToSolidName(attr.name, ctx.elementTagKind, ctx.producerProps);
     if (NUMERIC_HTML_ATTRS.has(attr.name.toLowerCase()) && /^-?\d+(?:\.\d+)?$/.test(attr.value)) {
       return { jsx: `${jsxName}={${attr.value}}`, diagnostics };
     }
@@ -867,7 +935,7 @@ function emitNonClassAttribute(
       }
       // ObjectExpression falls through to the generic binding emit.
     }
-    const jsxName = colonPropToSolidName(attr.name, ctx.elementTagKind);
+    const jsxName = colonPropToSolidName(attr.name, ctx.elementTagKind, ctx.producerProps);
     const exprCode = renderExpr(attr.expression, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
     // Phase 26 (D-06/SPEC-4) — attribute-binding wrap on an HTML host attribute
     // text position only (structural component props / controlled-input props

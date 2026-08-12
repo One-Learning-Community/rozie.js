@@ -476,6 +476,8 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       collectors: ctx.collectors,
       elementTagKind: node.tagKind,
       tagName: node.tagName,
+      // 260812-2ur — callee's declared prop names (threadParamTypes).
+      producerProps: node.producerProps,
     });
     for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
     const listenerResult = emitElementListeners(node, childCtx);
@@ -594,6 +596,8 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     collectors: ctx.collectors,
     elementTagKind: node.tagKind,
     tagName: node.tagName,
+    // 260812-2ur — callee's declared prop names (threadParamTypes).
+    producerProps: node.producerProps,
   });
   for (const d of attrsResult.diagnostics) ctx.diagnostics.push(d);
 

@@ -78,6 +78,14 @@ export interface EmitAttrCtx {
    * call sites (no wrap possible) stay unaffected.
    */
   runtimeImports?: Set<string>;
+  /**
+   * Quick task 260812-2ur — the callee's declared prop names, threaded from
+   * `TemplateElementIR.producerProps` (populated by `threadParamTypes` when
+   * the composed child resolved and declares at least one prop). Absent for
+   * native elements and unresolved callees — which is exactly what makes the
+   * kebab-preservation fallback path the default.
+   */
+  producerProps?: readonly string[] | undefined;
 }
 
 /**
@@ -194,8 +202,62 @@ function resolveAttrName(name: string, ctx: EmitAttrCtx): string {
   if (ctx.elementTagKind !== 'component' && ctx.elementTagKind !== 'self') {
     return name;
   }
+  // Quick task 260812-2ur — declared-prop resolution front-runs the
+  // natural-kebab preservation: on a composed component tag whose callee
+  // DECLARES a matching prop (exact, then kebab→camel equivalence), the
+  // declared name wins so the callee's `$props()` destructuring receives it.
+  // No hit → the current logic below runs untouched (resolve-then-fallback,
+  // 260811-trz D-05/D-06) — genuine passthrough attributes keep the kebab
+  // form and survive `$$restProps` onto the wrapper's root element. See
+  // `resolveDeclaredProp` for why no non-hyphenated attribute can change
+  // shape. Svelte has ONE path for both authored forms (`:aria-label="expr"`
+  // and `aria-label="str"`), so this is the single wiring point.
+  const declared = resolveDeclaredProp(name, ctx.elementTagKind, ctx.producerProps);
+  if (declared !== null) return declared;
   if (isHtmlNaturalKebabName(name)) return name;
   return kebabToCamel(name);
+}
+
+/**
+ * Quick task 260812-2ur — resolve a bound attribute name against the composed
+ * callee's DECLARED prop list (`EmitAttrCtx.producerProps`, threaded from
+ * `TemplateElementIR.producerProps`). Returns the matching DECLARED prop name
+ * — so the callee's own `$props()` key list receives it, never a
+ * locally-recomputed camelization — or null to fall through to the current
+ * logic untouched (260811-trz's D-05/D-06 resolve-then-fallback shape).
+ *
+ * Semantics (identical across react/svelte/solid):
+ *   1. Null unless the tag kind is component or self.
+ *   2. Null when the declared-prop list is absent or empty.
+ *   3. Exact match against a declared name wins first.
+ *   4. Otherwise match a declared name equal to the kebab-to-camel transform
+ *      of the bare name.
+ *
+ * Rule 3 is what preserves byte-identity for everything that is not
+ * hyphenated: a single-word bound name can only ever match itself (its
+ * kebab-to-camel transform is the identity), so it emits the same string it
+ * emits today — do NOT "simplify" the exact-first ordering away. Prior art:
+ * Angular's `emitTemplateAttribute.ts` camelizes UNCONDITIONALLY on component
+ * tags (which is why Angular delivered `ariaLabel` all along); this is the
+ * declaration-gated form of that rule — the natural-kebab preservation above
+ * still applies verbatim to native elements and to genuine passthrough
+ * attributes (no declared match / unresolved callee).
+ */
+function resolveDeclaredProp(
+  bareName: string,
+  elementTagKind?: 'html' | 'component' | 'self',
+  producerProps?: readonly string[],
+): string | null {
+  if (elementTagKind !== 'component' && elementTagKind !== 'self') return null;
+  if (producerProps === undefined || producerProps.length === 0) return null;
+  for (const declared of producerProps) {
+    if (declared === bareName) return declared;
+  }
+  const camel = kebabToCamel(bareName);
+  for (const declared of producerProps) {
+    if (declared === camel) return declared;
+  }
+  return null;
 }
 
 /** Minimal HTML attribute-value escape. */
