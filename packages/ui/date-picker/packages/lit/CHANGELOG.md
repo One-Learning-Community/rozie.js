@@ -1,5 +1,36 @@
 # @rozie-ui/date-picker-lit
 
+## 0.2.0
+
+### Minor Changes
+
+- Fixed: the multi-word `$emit('rangeComplete', …)` event was dispatched in its
+  raw camelCase source casing instead of being kebab-cased, so a consumer's
+  kebab-cased `@range-complete` template listener never fired on the Lit
+  target — `addEventListener` is case-sensitive, and the two names never
+  matched. The dispatch side now kebab-cases the event name to match the
+  listener, the same convention the two-way model event path (`<prop>-change`)
+  already used.
+
+  **This changes the DOM event name string a Lit consumer must pass to
+  `addEventListener`.**
+
+  | Old (broken, never fired) | New (correct)    |
+  | ------------------------- | ---------------- |
+  | `rangeComplete`           | `range-complete` |
+
+  **This package's own README and the docs site previously stated, explicitly
+  and in three places, that the Lit event name was "CASE-PRESERVED" —
+  `addEventListener('rangeComplete', …)`. That documented contract is now
+  superseded.** It was a deliberate-looking claim, but it described the same
+  bug this changeset fixes: the dispatched name never matched what a
+  kebab-cased Rozie-template listener binds. Anyone who followed that prior
+  documentation and bound `rangeComplete` directly must switch to
+  `range-complete`.
+
+  `change` (single-word) is unaffected — kebab-casing a single lowercase word
+  is a no-op.
+
 ## 0.1.5
 
 ### Patch Changes

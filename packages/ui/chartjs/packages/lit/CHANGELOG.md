@@ -1,5 +1,30 @@
 # @rozie-ui/chartjs-lit
 
+## 0.2.0
+
+### Minor Changes
+
+- Fixed: the multi-word `$emit('datasetClick', …)` event was dispatched in its
+  raw camelCase source casing instead of being kebab-cased, so a consumer's
+  kebab-cased `@dataset-click` template listener never fired on the Lit
+  target — `addEventListener` is case-sensitive, and the two names never
+  matched. The dispatch side now kebab-cases the event name to match the
+  listener, the same convention the two-way model event path (`<prop>-change`)
+  already used.
+
+  **This changes the DOM event name string a Lit consumer must pass to
+  `addEventListener`.** If you discovered the camelCase name empirically — the
+  only form that worked before this fix — you must update your listener name:
+
+  | Old (broken, never fired) | New (correct)   |
+  | ------------------------- | --------------- |
+  | `datasetClick`            | `dataset-click` |
+
+  Single-word events (`click`, `hover`) are unaffected — kebab-casing a single
+  lowercase word is a no-op. This applies identically to `Chart` and all 8
+  per-type variant components (`Bar`, `Bubble`, `Doughnut`, `Line`, `Pie`,
+  `PolarArea`, `Radar`, `Scatter`), which share the same emit surface.
+
 ## 0.1.3
 
 ### Patch Changes

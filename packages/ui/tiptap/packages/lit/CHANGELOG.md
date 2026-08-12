@@ -1,5 +1,28 @@
 # @rozie-ui/tiptap-lit
 
+## 0.4.0
+
+### Minor Changes
+
+- Fixed: the multi-word `$emit('selectionUpdate', …)` event was dispatched in
+  its raw camelCase source casing instead of being kebab-cased, so a consumer's
+  kebab-cased `@selection-update` template listener never fired on the Lit
+  target — `addEventListener` is case-sensitive, and the two names never
+  matched. The dispatch side now kebab-cases the event name to match the
+  listener, the same convention the two-way model event path (`<prop>-change`)
+  already used.
+
+  **This changes the DOM event name string a Lit consumer must pass to
+  `addEventListener`.** If you discovered the camelCase name empirically — the
+  only form that worked before this fix — you must update your listener name:
+
+  | Old (broken, never fired) | New (correct)      |
+  | ------------------------- | ------------------ |
+  | `selectionUpdate`         | `selection-update` |
+
+  Single-word events (`update`, `focus`, `blur`) are unaffected — kebab-casing
+  a single lowercase word is a no-op.
+
 ## 0.3.0
 
 ### Minor Changes

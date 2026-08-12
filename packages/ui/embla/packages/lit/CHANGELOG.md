@@ -1,5 +1,34 @@
 # @rozie-ui/embla-lit
 
+## 0.2.0
+
+### Minor Changes
+
+- Fixed: the multi-word `$emit('reInit', …)` event was dispatched in its raw
+  camelCase source casing instead of being kebab-cased, so a consumer's
+  kebab-cased template listener never fired on the Lit target —
+  `addEventListener` is case-sensitive, and the two names never matched. The
+  dispatch side now kebab-cases the event name to match the listener, the same
+  convention the two-way model event path (`<prop>-change`) already used.
+
+  **This changes the DOM event name string a Lit consumer must pass to
+  `addEventListener`.** If you discovered the camelCase name empirically — the
+  only form that worked before this fix — you must update your listener name:
+
+  | Old (broken, never fired) | New (correct) |
+  | ------------------------- | ------------- |
+  | `reInit`                  | `re-init`     |
+
+  **Note the exact result:** `reInit` kebab-cases to `re-init`, **not**
+  `reinit` — the adjacent-capital-free run `Init` still gets a hyphen inserted
+  before it because it follows a lowercase letter (`re` + `Init`), matching the
+  same algorithm the compiler uses everywhere else. This is the one name in
+  this release wave nobody would guess correctly from the source spelling
+  alone.
+
+  `pointer-down` (already kebab in source) and `select`/`settle` (single-word)
+  are unaffected.
+
 ## 0.1.5
 
 ### Patch Changes

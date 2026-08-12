@@ -1,5 +1,20 @@
 # @rozie-ui/date-picker-svelte
 
+## 0.1.5
+
+### Patch Changes
+
+- Docs-only, no runtime change. The `rangeComplete` event's shared per-target
+  casing description (rendered into every target's README Events table) is
+  corrected to state the Lit target's ACTUAL behavior — `range-complete`,
+  kebab-cased at dispatch — instead of the stale "CASE-PRESERVED" claim fixed
+  in `@rozie-ui/date-picker-lit`'s minor release in this same wave. Because the
+  description is a single shared string sourced from one manifest entry and
+  rendered into every target's README, correcting it for Lit accuracy also
+  updates the sentence in this target's README even though this target's own
+  runtime behavior is unchanged — bumped to keep the published tarball in sync
+  with source.
+
 ## 0.1.4
 
 ### Patch Changes
