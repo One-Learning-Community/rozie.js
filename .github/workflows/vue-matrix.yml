@@ -64,6 +64,29 @@ jobs:
       - name: Strict-conformance gate — cross-target strict-tsc leaf baseline
         run: pnpm --filter @rozie/strict-conformance test
 
+      # quick task 260811-sdd. Lives here (not a per-target matrix) for the
+      # SAME reason as the strict-conformance gate immediately above: this
+      # workflow's trigger has NO path filter, so it runs on EVERY PR to
+      # main regardless of which files changed — and an event-name
+      # asymmetry between a child's dispatch name and a consumer's listener
+      # name is BY DEFINITION a cross-target concern (any of the six targets
+      # can drift independently). Placed AFTER `pnpm turbo run build` above
+      # because the suite compiles fixtures through the BUILT `@rozie/core`
+      # dist, matching composed-ref-conformance/slot-matrix precedent. The
+      # gate is compile-only (regex extraction over compiler output — no
+      # tsc/vue-tsc/svelte-check subprocess), seconds not minutes, which is
+      # exactly why it can afford to run on every PR (unlike
+      # composed-ref-conformance's real-checker legs — see
+      # .planning/todos/pending/composed-ref-conformance-not-ci-wired.md for
+      # why THAT suite stays off every-PR CI). Red here is REAL: a failing
+      # leg means a consumer's listener is silently dead on that target —
+      # the exact class of both 82918527 (Lit) and 9d651e12 (Angular). The
+      # suite also runs under `turbo run test` (root `pnpm test` and
+      # `scripts/ci-prepush.sh`) by virtue of being a workspace package;
+      # this step is the CI guarantee, the turbo path is the local one.
+      - name: Event-name contract gate — cross-target $emit ↔ listener-name agreement
+        run: pnpm --filter @rozie/event-contract-conformance test
+
       # quick task 260623-jwh + 260629-ksp: the @rozie-ui Vue-leaf gate. Runs
       # AFTER the `pnpm turbo run build` above so every Vue leaf's compiled dist
       # (+ dist .d.ts) AND each leaf's node_modules exist before the gates run.

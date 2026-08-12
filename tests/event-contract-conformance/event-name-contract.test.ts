@@ -22,12 +22,62 @@
  * no target — nor a regression, nor a future seventh target — can
  * reintroduce the asymmetry against.
  *
- * ── RED-VERIFICATION (mutation check, observed …) ────────────────────────
- * TODO(Task 2): both emitter fixes are already landed, so this suite is born
- * green — which proves nothing on its own (a fixture that passes pre-fix
- * cements the bug; memory feedback_snapshot_tests_cement_bugs). Task 2 fills
- * this block by mutating each fix in turn, observing the resulting RED
- * verbatim, and restoring.
+ * ── RED-VERIFICATION (mutation check, observed 2026-08-11) ──────────────────
+ * Both emitter fixes are already landed, so this suite is born green — which
+ * proves nothing on its own (a fixture that passes pre-fix cements the bug;
+ * memory feedback_snapshot_tests_cement_bugs). Proven by mutating each fix in
+ * turn and observing RED, then restoring and observing green again. Both
+ * mutations were rebuilt via `pnpm turbo run build --filter=@rozie/core
+ * --force` ONLY (never a whole-repo build while an emitter fix is reverted —
+ * `packages/core/dist` is gitignored, so `git status --porcelain packages/`
+ * stayed empty across both mutate/rebuild/restore/rebuild cycles regardless).
+ *
+ * Mutation 1 (Lit, quick 260811-nre) — packages/targets/lit/src/rewrite/
+ * rewriteScript.ts:1034: `const eventName = kebabize(firstArg.value);` →
+ * `const eventName = firstArg.value;`. Observed failure (both the fixture-A
+ * "lit" leg and the lit-runtime leg went red):
+ *
+ *   FAIL  fixture A … > lit: itemActivated + ready agree, are
+ *   provenance-clean, and are internally linked
+ *   AssertionError: [lit] itemActivated: childPublic "itemActivated" vs
+ *   parentBound "item-activated" must canonicalize equal: expected
+ *   'itemActivated' to be 'item-activated'
+ *
+ *   FAIL  lit runtime … > dispatching the EXTRACTED child name against the
+ *   EXTRACTED parent-bound name delivers detail.id via a real CustomEvent
+ *   AssertionError: expected 'itemActivated' to be 'item-activated'
+ *
+ * i.e. the dispatch stayed raw camelCase (`new CustomEvent("itemActivated"`)
+ * while the parent's listener stayed hyphenated (`@item-activated=${`) —
+ * exactly the shape orchestrator_evidence predicted. Restored the line,
+ * rebuilt with the same filtered command, re-ran: 14 passed | 1 expected
+ * fail (15) — green.
+ *
+ * Mutation 2 (Angular, quick 260811-r2m) — packages/targets/angular/src/
+ * emit/emitTemplateEvent.ts's `resolveEventBindingName`: made it return
+ * `rawEventName` unconditionally (dropped the
+ * `tagKind === 'component' || tagKind === 'self'` branch). Observed failure
+ * (angular leg, fixture A):
+ *
+ *   FAIL  fixture A … > angular: itemActivated + ready agree,
+ *   are provenance-clean, and are internally linked
+ *   AssertionError: [angular] expected exactly 2 parent-bound listener
+ *   names, got: ["ready"]: expected 1 to be 2
+ *
+ * The parent's `itemActivated` listener stayed the raw authored hyphenated
+ * string (`(item-activated)="onActivated($event)"`) instead of being
+ * camelized to match the child's `itemActivated = output<unknown>()` field —
+ * the extractor's `\((\w+)\)=` binding regex (deliberately `\w+`, no hyphen,
+ * matching a valid Angular binding identifier) cannot even capture a raw
+ * hyphenated binding, so the exact-2-names guard fails before the
+ * canonicalize comparison is reached. That is itself the RED signal: the
+ * suite catches the un-camelized listener at the extraction-count layer
+ * rather than the agreement layer, which is exactly the "silently dropped
+ * event" case the exact-set-size guard exists for. Restored, rebuilt,
+ * re-ran: 14 passed | 1 expected fail (15) — green.
+ *
+ * After both restorations, `git status --porcelain packages/` was verified
+ * empty — no emitter, no leaf source, no leaf dist left modified.
  * ──────────────────────────────────────────────────────────────────────────
  */
 import { describe, expect, it } from 'vitest';
