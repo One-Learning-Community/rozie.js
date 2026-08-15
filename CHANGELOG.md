@@ -6,6 +6,32 @@ changesets in Phase 6 (DIST distribution hardening).
 
 ## [Unreleased]
 
+### Removed — `@rozie-ui/command-palette` dead `option-*` tokens (2026-08-15)
+
+Six public `--rozie-command-palette-option-*` custom properties are removed
+from `themes/base.css` and from the `shadcn.css` / `material.css` /
+`bootstrap.css` design-system bridges:
+
+- `--rozie-command-palette-option-active-bg`
+- `--rozie-command-palette-option-active-color`
+- `--rozie-command-palette-option-color`
+- `--rozie-command-palette-option-disabled-opacity`
+- `--rozie-command-palette-option-padding`
+- `--rozie-command-palette-option-radius`
+
+Nothing in the component reads any of these six tokens: the palette's option
+row is wrapped in combobox's own `.rozie-combobox-option` element, which
+already supplies the row's padding, cursor, and active/disabled styling — the
+palette's own option rule is layout-only (gap between icon/main/actions/
+trailing), and duplicating padding/radius/color here would double up with the
+combobox row it composes. A repo-wide `grep -ra` read scan (excluding
+`themes/`) confirmed zero references before deletion, so any consumer
+override of these six tokens was already a no-op. `--rozie-command-palette-
+option-gap`, the one token in this cluster that IS read, is unaffected.
+
+Restyle path: theme the palette's option row through combobox's own
+`--rozie-combobox-option-*` tokens instead.
+
 ### Internal — `:class` normalizer (`rozieClass`), on `main`, not yet published (2026-06-20)
 
 A shared clsx-style `rozieClass()` normalizer is wired into the `:class` emit

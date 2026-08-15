@@ -13,9 +13,6 @@
   --rozie-command-palette-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
   --rozie-command-palette-divider-color: var(--md-sys-color-outline-variant, rgba(0, 0, 0, 0.12));
 
-  --rozie-command-palette-option-active-bg: var(--md-sys-color-secondary-container, rgba(0, 102, 204, 0.12));
-  --rozie-command-palette-option-active-color: var(--md-sys-color-on-secondary-container, inherit);
-
   --rozie-command-palette-group-color: var(--md-sys-color-on-surface-variant, rgba(0, 0, 0, 0.5));
   --rozie-command-palette-empty-color: var(--md-sys-color-on-surface-variant, rgba(0, 0, 0, 0.5));
   --rozie-command-palette-footer-color: var(--md-sys-color-on-surface-variant, rgba(0, 0, 0, 0.55));

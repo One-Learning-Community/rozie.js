@@ -74,12 +74,6 @@
   /* list + options — also the option icon, fuzzy-match highlight, trailing slot, and group-heading spacing */
   --rozie-command-palette-list-padding: 0.5rem;
   --rozie-command-palette-option-gap: 0.75rem;
-  --rozie-command-palette-option-padding: 0.5rem 0.625rem;
-  --rozie-command-palette-option-radius: 0.5rem;
-  --rozie-command-palette-option-color: inherit;
-  --rozie-command-palette-option-active-bg: rgba(0, 102, 204, 0.12);
-  --rozie-command-palette-option-active-color: inherit;
-  --rozie-command-palette-option-disabled-opacity: 0.45;
   --rozie-command-palette-icon-color: inherit;
   --rozie-command-palette-icon-size: 1rem;
   --rozie-command-palette-match-color: inherit;
