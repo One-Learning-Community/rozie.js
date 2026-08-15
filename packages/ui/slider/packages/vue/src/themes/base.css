@@ -66,4 +66,16 @@
   --rozie-slider-bubble-fg: #fff;
   --rozie-slider-bubble-bg: var(--rozie-slider-accent);
   --rozie-slider-bubble-radius: 4px;
+
+  /* runtime fill — computed per-render from value/min/max and written as
+     inline custom properties on the root (the `fillStyle` $computed). The
+     inline style always wins over anything declared here. Declared `initial`
+     on purpose: the two read sites disagree on their own local fallback (the
+     fill underlay supplies a `0%` fallback, the bubble read supplies none),
+     so freezing either value would collapse the other. `initial` resets the
+     custom property to the guaranteed-invalid value, which makes each var()
+     substitute its OWN local fallback when the inline value is absent —
+     render-neutral, since the inline style takes priority regardless. */
+  --rozie-slider-fill-start: initial;
+  --rozie-slider-fill-end: initial;
 }

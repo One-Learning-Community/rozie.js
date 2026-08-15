@@ -50,6 +50,8 @@
   /* stacked mode (opt-in `stacked` prop) — collapsed depth transform */
   --rozie-toast-stack-offset: 8px;
   --rozie-toast-stack-scale-step: 0.05;
+  --rozie-toast-depth: 0;
+  --rozie-toast-swipe-exit: 1;
 
   /* the decorative 'loading' type spinner */
   --rozie-toast-spinner-size: 1em;

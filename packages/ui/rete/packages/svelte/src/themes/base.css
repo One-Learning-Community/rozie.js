@@ -81,8 +81,17 @@
   --rozie-flow-minimap-bg: rgba(255, 255, 255, 0.82);
   --rozie-flow-minimap-border: rgba(0, 0, 0, 0.16);
   --rozie-flow-minimap-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+  /* The two tokens below are read from JS via a getComputedStyle-backed
+     flowToken() lookup at render time (canvas paint code, not a CSS var())
+     — declared here (and correctly base-only per the probe) so the public
+     surface stays discoverable in one place. */
   --rozie-flow-minimap-node-fill: #94a3b8;
   --rozie-flow-minimap-mask: rgba(15, 23, 42, 0.18);
+
+  /* resize handle (the four corner drag affordances on the canvas) */
+  --rozie-flow-resize-handle-bg: #ffffff;
+  --rozie-flow-resize-handle-border: var(--rozie-flow-accent, #3b82f6);
+  --rozie-flow-resize-handle-size: 8px;
 
   /* NodeToolbar overlay */
   --rozie-flow-toolbar-bg: #ffffff;

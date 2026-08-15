@@ -28,6 +28,8 @@
   --rozie-resizable-handle-bg: rgba(0, 0, 0, 0.08);
   --rozie-resizable-handle-hover-bg: rgba(0, 0, 0, 0.16);
   --rozie-resizable-handle-active-bg: var(--rozie-resizable-accent);
+  /* the first panel's basis along the split axis */
+  --rozie-resizable-size: 50%;
 
   /* the default grip (the short centered bar) */
   --rozie-resizable-grip-bg: rgba(0, 0, 0, 0.35);
