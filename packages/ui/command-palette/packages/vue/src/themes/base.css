@@ -22,7 +22,7 @@
   --rozie-command-palette-backdrop-bg: rgba(0, 0, 0, 0.5);
   --rozie-command-palette-backdrop-filter: none;
 
-  /* panel chrome */
+  /* panel chrome — also the depth>0 header's title weight (shares the panel's chrome semantics) */
   --rozie-command-palette-width: min(40rem, 100%);
   --rozie-command-palette-max-height: 70vh;
   --rozie-command-palette-font: inherit;
@@ -33,33 +33,116 @@
   --rozie-command-palette-shadow: 0 10px 38px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.25);
   --rozie-command-palette-border-width: 1px;
   --rozie-command-palette-divider-color: rgba(0, 0, 0, 0.1);
+  --rozie-command-palette-title-weight: 600;
 
-  /* search input */
+  /* search input — also drives the vendored <Combobox>'s render-neutral tokens (panel-scope aliasing) */
   --rozie-command-palette-search-padding: 0.75rem;
   --rozie-command-palette-input-padding: 0.5rem 0.75rem;
   --rozie-command-palette-input-font-size: 1.05rem;
   --rozie-command-palette-input-bg: transparent;
   --rozie-command-palette-input-border: none;
   --rozie-command-palette-input-radius: 0.5rem;
+  --rozie-command-palette-input-border-color: transparent;
+  --rozie-command-palette-input-focus-border-color: transparent;
+  --rozie-command-palette-input-focus-ring-width: 0;
+  --rozie-command-palette-input-underline: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
 
-  /* list + options */
+  /* breadcrumb/back header (depth>0) */
+  --rozie-command-palette-header-font-size: 0.875rem;
+  --rozie-command-palette-header-gap: 0.5rem;
+  --rozie-command-palette-header-padding: 0.5rem 0.75rem;
+
+  /* back button */
+  --rozie-command-palette-back-bg: transparent;
+  --rozie-command-palette-back-border: none;
+  --rozie-command-palette-back-font-size: 1.1rem;
+  --rozie-command-palette-back-hover-bg: rgba(0, 0, 0, 0.06);
+  --rozie-command-palette-back-padding: 0.125rem 0.375rem;
+  --rozie-command-palette-back-radius: 0.375rem;
+
+  /* breadcrumb trail */
+  --rozie-command-palette-breadcrumb-color: rgba(0, 0, 0, 0.55);
+  --rozie-command-palette-breadcrumb-current-color: inherit;
+  --rozie-command-palette-breadcrumb-current-weight: 600;
+  --rozie-command-palette-breadcrumb-gap: 0.25rem;
+  --rozie-command-palette-breadcrumb-jump-hover-color: var(--rozie-command-palette-breadcrumb-current-color, inherit);
+  --rozie-command-palette-breadcrumb-jump-hover-decoration: underline;
+  --rozie-command-palette-breadcrumb-jump-radius: 0.25rem;
+  --rozie-command-palette-breadcrumb-separator-color: rgba(0, 0, 0, 0.35);
+  --rozie-command-palette-breadcrumb-weight: 400;
+
+  /* list + options — also the option icon, fuzzy-match highlight, trailing slot, and group-heading spacing */
   --rozie-command-palette-list-padding: 0.5rem;
   --rozie-command-palette-option-gap: 0.75rem;
-  --rozie-command-palette-option-padding: 0.5rem 0.625rem;
-  --rozie-command-palette-option-radius: 0.5rem;
-  --rozie-command-palette-option-color: inherit;
-  --rozie-command-palette-option-active-bg: rgba(0, 102, 204, 0.12);
-  --rozie-command-palette-option-active-color: inherit;
-  --rozie-command-palette-option-disabled-opacity: 0.45;
+  --rozie-command-palette-icon-color: inherit;
+  --rozie-command-palette-icon-size: 1rem;
+  --rozie-command-palette-match-color: inherit;
+  --rozie-command-palette-match-weight: 600;
+  --rozie-command-palette-trailing-color: rgba(0, 0, 0, 0.5);
+  --rozie-command-palette-trailing-font-size: 0.75rem;
+  --rozie-command-palette-section-gap: 0.375rem;
 
   /* per-item group label */
   --rozie-command-palette-group-font-size: 0.75rem;
   --rozie-command-palette-group-color: rgba(0, 0, 0, 0.5);
   --rozie-command-palette-group-transform: uppercase;
 
-  /* empty state */
+  /* option actions (the row's right-side hint + the flyout trigger) */
+  --rozie-command-palette-actions-color: rgba(0, 0, 0, 0.55);
+  --rozie-command-palette-actions-font-size: 0.75rem;
+  --rozie-command-palette-actions-gap: 0.375rem;
+  --rozie-command-palette-actions-hint-bg: rgba(0, 0, 0, 0.06);
+  --rozie-command-palette-actions-hint-color: inherit;
+  --rozie-command-palette-actions-hint-font-size: 0.6875rem;
+  --rozie-command-palette-actions-hint-padding: 0.0625rem 0.3125rem;
+  --rozie-command-palette-actions-hint-radius: 0.25rem;
+  --rozie-command-palette-actions-hover-bg: rgba(0, 0, 0, 0.06);
+  --rozie-command-palette-actions-hover-color: rgba(0, 0, 0, 0.85);
+  --rozie-command-palette-actions-radius: 0.25rem;
+
+  /* per-item hotkey teaching badge — each falls back to the matching actions-hint-* token above */
+  --rozie-command-palette-hotkey-bg: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
+  --rozie-command-palette-hotkey-color: var(--rozie-command-palette-actions-hint-color, inherit);
+  --rozie-command-palette-hotkey-font-size: var(--rozie-command-palette-actions-hint-font-size, 0.6875rem);
+  --rozie-command-palette-hotkey-padding: var(--rozie-command-palette-actions-hint-padding, 0.0625rem 0.3125rem);
+  --rozie-command-palette-hotkey-radius: var(--rozie-command-palette-actions-hint-radius, 0.25rem);
+
+  /* action menu flyout */
+  --rozie-command-palette-action-active-bg: rgba(0, 0, 0, 0.08);
+  --rozie-command-palette-action-bg: #fff;
+  --rozie-command-palette-action-border: 1px solid rgba(0, 0, 0, 0.1);
+  --rozie-command-palette-action-disabled-opacity: 0.5;
+  --rozie-command-palette-action-gap: 0.5rem;
+  --rozie-command-palette-action-icon-color: inherit;
+  --rozie-command-palette-action-item-padding: 0.375rem 0.5rem;
+  --rozie-command-palette-action-item-radius: 0.375rem;
+  --rozie-command-palette-action-max-width: 16rem;
+  --rozie-command-palette-action-min-width: 10rem;
+  --rozie-command-palette-action-padding: 0.25rem;
+  --rozie-command-palette-action-radius: 0.5rem;
+  --rozie-command-palette-action-right: 0.5rem;
+  --rozie-command-palette-action-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  --rozie-command-palette-action-shortcut-color: rgba(0, 0, 0, 0.5);
+  --rozie-command-palette-action-shortcut-font-size: 0.75rem;
+  --rozie-command-palette-action-z: 10;
+
+  /* panel-internal args surface (chip + fields form, replaces the result list at depth) */
+  --rozie-command-palette-args-chip-bg: rgba(0, 0, 0, 0.06);
+  --rozie-command-palette-args-chip-color: inherit;
+  --rozie-command-palette-args-chip-padding: 0.125rem 0.5rem;
+  --rozie-command-palette-args-dim-opacity: 0.45;
+  --rozie-command-palette-args-field-bg: var(--rozie-command-palette-input-bg, transparent);
+  --rozie-command-palette-args-field-border: var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1));
+  --rozie-command-palette-args-field-padding: var(--rozie-command-palette-input-padding, 0.5rem 0.75rem);
+  --rozie-command-palette-args-field-radius: var(--rozie-command-palette-input-radius, 0.5rem);
+  --rozie-command-palette-args-gap: 0.5rem;
+  --rozie-command-palette-args-padding: 0.75rem;
+
+  /* empty state — also the loading and error re-projections into the same #empty region */
   --rozie-command-palette-empty-padding: 1.5rem;
   --rozie-command-palette-empty-color: rgba(0, 0, 0, 0.5);
+  --rozie-command-palette-loading-color: rgba(0, 0, 0, 0.5);
+  --rozie-command-palette-error-color: #c0392b;
 
   /* footer */
   --rozie-command-palette-footer-padding: 0.5rem 0.75rem;
