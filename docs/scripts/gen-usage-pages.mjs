@@ -14,13 +14,9 @@
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(HERE, '..', '..');
-const UI_DIR = resolve(REPO_ROOT, 'packages', 'ui');
-const COMPONENTS_DIR = resolve(HERE, '..', 'components');
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { COMPONENTS_DIR, UI_DIR, displayNameFor } from './display-name.mjs';
 
 // Emit order + tab labels. Lit's `lang` comes through as `ts` from USAGE.
 const TARGETS = [
@@ -31,18 +27,6 @@ const TARGETS = [
   ['solid', 'Solid'],
   ['lit', 'Lit'],
 ];
-
-/** Derive the component display name (e.g. `DataTable`) from the generated
- * React README's "Idiomatic **react** `Name`" line — a uniform, generated
- * source. Falls back to the slug. */
-function displayNameFor(slug) {
-  const readme = resolve(UI_DIR, slug, 'packages', 'react', 'README.md');
-  if (existsSync(readme)) {
-    const m = readFileSync(readme, 'utf8').match(/Idiomatic \*\*[a-z]+\*\* `([A-Za-z][\w]*)`/);
-    if (m) return m[1];
-  }
-  return slug;
-}
 
 /** A `::: code-group` block from a `{ target: { lang, code } }` map. Only
  * targets present (with non-empty code) are emitted, in TARGETS order. */
@@ -100,6 +84,9 @@ function relatedLinks(slug, name) {
   const links = [
     `- [${name} — showcase & API](/components/${slug}) — the full prop / event / slot / handle reference, ${tail}`,
   ];
+  if (existsSync(resolve(COMPONENTS_DIR, `${slug}-theming.md`))) {
+    links.push(`- [${name} theming](/components/${slug}-theming) — the complete customizable-token table.`);
+  }
   if (existsSync(resolve(COMPONENTS_DIR, `${slug}-comparison.md`))) {
     links.push(`- [${name} comparison](/components/${slug}-comparison) — how it stacks up against the per-framework libraries.`);
   }
