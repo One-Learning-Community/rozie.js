@@ -8,7 +8,7 @@ The full source for `SortableList.rozie` lives in [the canonical example page](/
 
 ## The `@rozie-ui/sortable-list` packages
 
-`SortableList` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no `@rozie/*` runtime dependency:
+`SortableList` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to add. Most builds also pull in a small [tree-shaken `@rozie/runtime-*` helper package](/guide/output-and-runtime):
 
 | Package | Install | README |
 | --- | --- | --- |

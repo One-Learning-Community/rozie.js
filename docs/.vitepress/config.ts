@@ -117,6 +117,7 @@ export default defineConfig({
             },
             { text: 'Creature comforts', link: '/guide/creature-comforts' },
             { text: 'Why Rozie looks this way', link: '/guide/design-rationale' },
+            { text: 'Compiled output & the runtime', link: '/guide/output-and-runtime' },
             { text: 'How Rozie compares (Mitosis, Stencil)', link: '/guide/how-rozie-compares' },
             { text: 'Compatibility', link: '/compatibility' },
             { text: 'Cross-Framework Parity', link: '/parity' },

@@ -2,7 +2,7 @@
 
 The `@rozie-ui` families are pre-compiled component packages for React, Vue, Svelte, Angular, Solid, and Lit: the same component, with the same API, in whichever of the six frameworks you use. Most wrap a battle-tested vanilla-JS engine whose existing framework wrappers are uneven, partial, or entirely missing; thirteen families (**Listbox**, **Slider**, **Combobox**, **CommandPalette**, and friends) are headless, fully-accessible components with no engine at all.
 
-Install only the package for your framework. There is no build step and no `@rozie/*` runtime dependency, just the compiled output for the framework you already use.
+Install only the package for your framework. There is no build step and no Rozie toolchain to add — just the compiled output for the framework you already use, plus a small [tree-shaken `@rozie/runtime-*` helper package](/guide/output-and-runtime) that most (not all) builds pull in.
 
 Every family below ships six packages (`-react`, `-vue`, `-svelte`, `-angular`, `-solid`, `-lit`), a showcase-and-API page, a libraries-comparison page against the incumbents on each framework, and a live demo.
 

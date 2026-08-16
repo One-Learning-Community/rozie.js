@@ -52,7 +52,7 @@ ${unsafeHTML(this.content)}
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 ```
 
-**Practical guidance:** treat `r-html` as a raw sink on **every** target except Angular. Even on Angular, `DomSanitizer` strips scripts/event handlers but is not a substitute for trusting your content source. If the HTML originates from user input, sanitize it yourself (e.g. with DOMPurify) before it reaches an `r-html` binding — Rozie deliberately does not add a runtime sanitizer to the five raw targets, because doing so would diverge from each framework's native behavior and break the "Rozie is invisible at runtime" contract.
+**Practical guidance:** treat `r-html` as a raw sink on **every** target except Angular. Even on Angular, `DomSanitizer` strips scripts/event handlers but is not a substitute for trusting your content source. If the HTML originates from user input, sanitize it yourself (e.g. with DOMPurify) before it reaches an `r-html` binding — Rozie deliberately does not add a runtime sanitizer to the five raw targets, because doing so would diverge from each framework's native behavior and pull a sanitizer into every consumer's bundle. The [runtime helper package](/guide/output-and-runtime) stays deliberately small; a DOM sanitizer does not belong in it.
 
 ## URI-scheme finding (D-09)
 

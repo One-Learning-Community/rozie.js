@@ -10,7 +10,9 @@ A compiler. You write `.rozie` files in a Vue/Alpine-flavored block-based syntax
 
 ## What Rozie is not
 
-A runtime framework. Rozie doesn't try to be a "better React" or own the rendering pipeline. Compiled output uses your target's own renderer — or, for the Lit target, the browser's native custom-element runtime. Rozie is invisible at runtime.
+A rendering framework. Rozie doesn't try to be a "better React" or own the rendering pipeline. Compiled output uses your target's own renderer — or, for the Lit target, the browser's native custom-element runtime.
+
+Rozie is not, however, invisible at runtime. Compiled components import a small helper package (`@rozie/runtime-react` and friends) for controllable state, keyboard navigation, event modifiers, and safe interpolation. It is tree-shaken and feature-gated — Vue and Angular builds often import nothing at all, and five components together cost 2.6–4.8 KB minified and gzipped. See [Compiled output & the runtime](/guide/output-and-runtime) for what it contains and what it costs.
 
 ## Who Rozie is for
 

@@ -87,7 +87,7 @@ Types come from a generated `SearchInput.d.rozie.ts` sidecar the build writes ne
 
 ### Step 4: Decide
 
-If the team likes it, expand. If not, the compiled `.tsx` is a normal React component — delete the `.rozie` source and keep using the output. At runtime it depends only on `react` and a plain sibling `.css` import your bundler already handles; there is no Rozie runtime to keep and nothing locking you in.
+If the team likes it, expand. If not, the compiled `.tsx` is a normal React component — delete the `.rozie` source and keep using the output. At runtime it depends on `react`, a plain sibling `.css` import your bundler already handles, and a handful of helpers from [`@rozie/runtime-react`](/guide/output-and-runtime) — a few hundred gzipped bytes for a typical leaf, MIT, and small enough to vendor if you ever want the dependency gone. Nothing locks you in.
 
 ## When Rozie isn't the right answer for a React team
 

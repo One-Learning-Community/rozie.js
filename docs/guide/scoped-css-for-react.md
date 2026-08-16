@@ -115,7 +115,7 @@ Because the class name renders **literally** in the DOM (no hashing), `el.queryS
 
 ## Try it in five minutes
 
-Add the unplugin to your existing Vite or Next.js build, write one leaf component you've been styling with CSS Modules or Tailwind as a `.rozie` file, and import it like any other component. If the team doesn't like it, the compiled `.tsx` is a normal React component — delete the `.rozie` source and keep the output, with no runtime dependency left behind.
+Add the unplugin to your existing Vite or Next.js build, write one leaf component you've been styling with CSS Modules or Tailwind as a `.rozie` file, and import it like any other component. If the team doesn't like it, the compiled `.tsx` is a normal React component — delete the `.rozie` source and keep the output. What stays behind is the component, its extracted `.css`, and an import from [`@rozie/runtime-react`](/guide/output-and-runtime) — a few hundred bytes of helpers for a typical leaf, minified and gzipped.
 
 - [For React teams](/guide/for-react-teams) — the full React story: statically-computed `useEffect` deps, StrictMode-safe lifecycles, compile-time prop-mutation errors, two-way binding without a state library, and step-by-step Vite / Next.js install.
 - [Adopt incrementally](/guide/adopt-incrementally) — per-stack install (Vite, Next.js, Astro, Webpack, esbuild, Babel-only, CLI).

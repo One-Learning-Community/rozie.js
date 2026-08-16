@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Rozie.js"
   text: "The same component, the same API, in React, Vue, Svelte, Angular, Solid, and Lit."
-  tagline: "Install only your framework's package. Every component compiles to idiomatic native code for its target: no wrappers, no runtime, no Rozie dependency in your app."
+  tagline: "Install only your framework's package. Every component compiles to idiomatic native code for its target: no wrappers, no Rozie toolchain in your app, and a few KB of tree-shaken runtime helpers."
   actions:
     - theme: brand
       text: Quick Start
@@ -29,8 +29,8 @@ features:
     details: The @rozie-ui families. Fifteen engine-backed components (a TanStack-powered DataTable, SortableJS, FullCalendar, CodeMirror, Chart.js, TipTap, Lexical, MapLibre, Cropper, and more), thirteen headless WAI-ARIA families (Listbox, Combobox, Dialog, Toast, DatePicker, Command Palette, and more) built in pure Rozie with no engine at all, and a hosted Captcha. Install only your framework's package.
   - title: Familiar Vue/Alpine syntax
     details: Block-based SFCs with &lt;props&gt;, &lt;data&gt;, &lt;script&gt;, &lt;template&gt;, and &lt;style&gt;. r-* directives, @event modifiers, mustache interpolation. No JSX-isms.
-  - title: Not a runtime framework
-    details: Rozie compiles away. The heavy lifting still happens in your target — React, Vue, Svelte, Angular, Solid, or the browser's native custom-element runtime owns the rendering pipeline.
+  - title: Not a rendering framework
+    details: Rozie never owns the render pipeline — React renders React, Vue renders Vue, the browser renders the custom element. Compiled components do import a small runtime helper package (state, keynav, event modifiers, safe interpolation); it is tree-shaken, and five components cost 2.6–4.8 KB minified and gzipped. Angular imports none of it.
   - title: Built for component-library authors
     details: Write a component once in a .rozie file and Rozie compiles it to six consumer packages. If you maintain manual cross-framework wrappers today, that work goes away.
   - title: Stuck on one framework? Use Rozie for ONE new component this week
@@ -41,7 +41,7 @@ features:
 
 ## Ship-ready components
 
-Every `@rozie-ui` family is the same component with the same API in React, Vue, Svelte, Angular, Solid, and Lit: one docs set, one behavior contract, six packages maintained and released together. Each family is one `.rozie` source compiled to all six targets; consumers install only their framework's package, with no Rozie toolchain or runtime dependency.
+Every `@rozie-ui` family is the same component with the same API in React, Vue, Svelte, Angular, Solid, and Lit: one docs set, one behavior contract, six packages maintained and released together. Each family is one `.rozie` source compiled to all six targets; consumers install only their framework's package, with no Rozie toolchain to add — just the compiled component and a small [tree-shaken runtime helper package](/guide/output-and-runtime).
 
 **Engine-backed** — a battle-tested vanilla-JS engine wrapped once, where the existing per-framework bindings are uneven, community-maintained, or (for Lit) missing entirely:
 

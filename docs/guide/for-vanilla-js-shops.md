@@ -43,8 +43,10 @@ per-framework packages:
 
 Install only your framework's package
 (`@rozie-ui/sortable-list-react`, `-vue`, `-svelte`, `-angular`,
-`-solid`, `-lit`); there is no Rozie toolchain or runtime in your
-dependency tree. If the engine you fight is on that list, you may not
+`-solid`, `-lit`); there is no Rozie toolchain in your dependency tree,
+just the component and a few KB of
+[tree-shaken runtime helpers](/guide/output-and-runtime).
+If the engine you fight is on that list, you may not
 need to write a wrapper at all. **[Browse all components →](/components/)**
 
 Writing your own wrapper is the second path, for engines Rozie hasn't

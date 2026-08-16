@@ -23,7 +23,7 @@ latest stable).
 | Authoring syntax | Vue/Alpine-flavored `.rozie` SFC (`<template>` + `<script>` + `<style>` + `<props>` blocks, `r-*` directives, `{{ }}`) | JSX-like components with hooks (`useStore`, `useState`, `onMount`) | TSX components (decorators + JSX) |
 | Output model | **Native** components per framework | **Native** components per framework | Standards-based **web components** + generated framework wrappers |
 | Framework targets | React, Vue, Svelte, Angular, Solid, Lit (6) | React, Vue, Svelte, Angular, Solid, Qwik + more (Lit, Alpine, React Native, web components) | One web component → React / Vue / Angular wrapper output targets |
-| Runtime cost | None at runtime (the Lit target uses the browser's native custom-element runtime) | None at runtime | A small Stencil runtime ships inside the custom element |
+| Runtime cost | A tree-shaken helper package, not a renderer: 0.3–4.2 KB per component, 2.6–4.8 KB for five, minified and gzipped. Angular imports none of it. [Details](/guide/output-and-runtime) | None at runtime | A small Stencil runtime ships inside the custom element |
 | Maturity | New, v1-track | `0.14.x`, pre-1.0, established with a broad community | `4.x`, mature, very large production footprint (Ionic Framework) |
 | Sweet spot | Component-library authors who want native output across six frameworks, with Vue-style authoring | The widest target matrix, JSX authoring, and the Builder.io / Figma import pipeline | Shipping web components as the unit of distribution, with thin framework wrappers |
 
@@ -32,8 +32,11 @@ latest stable).
 Mitosis and Rozie share a thesis: **a component is mostly declarative, so compile
 it to each framework's native primitives rather than shipping a runtime that
 re-implements rendering.** Both emit per-framework code — a real React
-function component, a real Vue SFC, real Svelte runes — and both are invisible at
-runtime. If you like Rozie's premise, you owe it to yourself to look at Mitosis;
+function component, a real Vue SFC, real Svelte runes — and neither owns the
+render pipeline. Mitosis goes further than Rozie here: its output has no runtime
+dependency at all, where Rozie's compiled components import a small
+[helper package](/guide/output-and-runtime) for state, keynav, and event
+modifiers. If you like Rozie's premise, you owe it to yourself to look at Mitosis;
 it pioneered this space and has the broadest reach in it.
 
 Where they differ:

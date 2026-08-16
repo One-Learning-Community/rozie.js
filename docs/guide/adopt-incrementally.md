@@ -1,9 +1,10 @@
 # Adopt incrementally: drop one `.rozie` file into your existing app
 
-Rozie is a compiler, not a runtime framework. A compiled `.rozie` file is
-indistinguishable from a hand-written component in your target framework — it
-imports the same way, uses the same renderer, and ships through the same
-bundler.
+Rozie is a compiler, not a rendering framework. A compiled `.rozie` file reads
+like a hand-written component in your target framework — it imports the same
+way, uses the same renderer, and ships through the same bundler. The one tell is
+an import from a small [`@rozie/runtime-*` helper package](/guide/output-and-runtime),
+which most compiled components pull in.
 
 That means you can add one Rozie component to your existing app this week
 without rewriting anything. This guide is the recipe per stack.
@@ -22,7 +23,8 @@ The same three things have to be true regardless of bundler:
    `@analogjs/vite-plugin-angular`). For React/Solid/Lit, the emitted code is
    plain `.tsx` / `.ts` and the standard TS pipeline handles it.
 3. **Your existing code imports the compiled component normally**. No
-   wrappers, no codegen step you commit to git, no runtime glue.
+   wrappers, no codegen step you commit to git — just the component and the
+   [tree-shaken runtime helpers](/guide/output-and-runtime) it uses.
 
 The pre-compile escape hatch (`pnpm rozie build`) skips step 1 entirely —
 emit `.tsx` / `.vue` / `.svelte` / `.ts` files to disk and `git add` them
