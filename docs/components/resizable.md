@@ -84,20 +84,9 @@ Every value the component renders is a `--rozie-resizable-*` CSS custom property
 }
 ```
 
-The full token vocabulary — the handle (`handle-size`, `handle-bg`, `handle-hover-bg`, `handle-active-bg`), the default grip (`grip-bg`, `grip-thickness`, `grip-length`), the accent, the focus ring (`focus-ring-width`, `focus-ring-color`), and the disabled state (`disabled-opacity`) — has documented defaults in `themes/base.css`. Only cosmetic values flow through tokens; the structural rules (the flex container, the `--size`-driven first-panel basis, the remainder second panel, the vertical column variant) compile per-leaf and are not consumer-overridable.
+Only cosmetic values flow through tokens; the structural rules (the flex container, the `--size`-driven first-panel basis, the remainder second panel, the vertical column variant) compile per-leaf and are not consumer-overridable.
 
-### Design-system bridges
-
-Each package ships token presets that map the resizable tokens onto a known design system's published CSS variables — so the splitter automatically follows that system's light/dark theme and accent:
-
-```ts
-import '@rozie-ui/resizable-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --primary/--ring/--border…
-import '@rozie-ui/resizable-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
-import '@rozie-ui/resizable-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
-import '@rozie-ui/resizable-react/themes/base.css';      // the documented default token set
-```
-
-The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/src/themes/base.css).
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/resizable-theming).
 
 ## Accessibility
 

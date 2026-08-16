@@ -92,20 +92,9 @@ Every cosmetic value the component renders is a `--rozie-switch-*` CSS custom pr
 }
 ```
 
-The full token vocabulary has documented defaults in `themes/base.css`: the track box model (`width`, `height`, `track-padding`, `radius`), the off/on track colors (`off-bg`, `on-bg`), the thumb (`thumb-size`, `thumb-bg`, `thumb-shadow`, `thumb-travel`), the focus ring (`focus-ring-width`, `focus-ring-color`, `focus-ring-offset`), and the disabled state (`disabled-opacity`). Only cosmetic values flow through tokens; the structural rules (the focusable button, the track/thumb box model, the checked-state transform) compile per-leaf and are not consumer-overridable.
+Only cosmetic values flow through tokens; the structural rules (the focusable button, the track/thumb box model, the checked-state transform) compile per-leaf and are not consumer-overridable.
 
-### Design-system bridges
-
-Each package ships token presets that map the switch tokens onto a known design system's published CSS variables, so the control automatically follows that system's light/dark theme and accent:
-
-```ts
-import '@rozie-ui/switch-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --primary/--input/--background/--ring/--radius
-import '@rozie-ui/switch-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
-import '@rozie-ui/switch-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
-import '@rozie-ui/switch-react/themes/base.css';      // the documented default token set
-```
-
-The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/switch/src/themes/base.css).
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/switch-theming).
 
 ## Accessibility
 

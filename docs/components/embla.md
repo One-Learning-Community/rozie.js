@@ -194,20 +194,7 @@ Every value the component renders is a `--rozie-embla-*` CSS custom property wit
 }
 ```
 
-### Design-system bridges
-
-Each package ships token presets that map the embla tokens onto a known design system's published CSS variables — so the carousel automatically follows that system's light/dark theme and accent:
-
-```ts
-import '@rozie-ui/embla-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --background/--primary/--ring…
-import '@rozie-ui/embla-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
-import '@rozie-ui/embla-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
-import '@rozie-ui/embla-react/themes/base.css';      // the documented default token set
-```
-
-Swap `-react` for your target framework's package. The embla presets are **colors-only** — they remap the color/accent tokens onto each design system's variables and leave the arrow/dot/thumb *sizing* tokens at their component defaults.
-
-The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/embla/src/themes/base.css).
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/embla-theming).
 
 ## See also
 

@@ -105,22 +105,11 @@ Every value the component renders is a `--rozie-slider-*` CSS custom property wi
 }
 ```
 
-Two of the tokens are special. `--rozie-slider-fill-start` and `--rozie-slider-fill-end` are **runtime-inline** custom properties the component writes from `value / min / max` (via the `fillStyle` `$computed`) — they drive the colored fill `<div>` and the bubble positions, so they are *not* theme tokens you set yourself. Everything else (accent, track height/radius/bg, thumb size/bg/border/shadow/offset, disabled opacity, the vertical thickness/length, and the mark/bubble cosmetics) is a token with a documented default in `themes/base.css`.
+Two of the tokens are special. `--rozie-slider-fill-start` and `--rozie-slider-fill-end` are **runtime-inline** custom properties the component writes from `value / min / max` (via the `fillStyle` `$computed`) — they drive the colored fill `<div>` and the bubble positions, so they are *not* theme tokens you set yourself.
 
 The structural rules (the overlapping native inputs, the filled-`<div>` underlay, the rotate-90 vertical wrapper, and the per-vendor pseudo-elements) are behavior-critical and compile per-leaf; they are not consumer-overridable. Only the cosmetic values flow through tokens.
 
-### Design-system bridges
-
-Each package ships token presets that map the slider tokens onto a known design system's published CSS variables — so the slider automatically follows that system's light/dark theme and accent:
-
-```ts
-import '@rozie-ui/slider-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --primary/--ring/--muted…
-import '@rozie-ui/slider-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
-import '@rozie-ui/slider-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
-import '@rozie-ui/slider-react/themes/base.css';      // the documented default token set
-```
-
-The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/src/themes/base.css).
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/slider-theming).
 
 ## Keyboard
 

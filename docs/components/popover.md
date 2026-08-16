@@ -98,18 +98,7 @@ Every value the component renders is a `--rozie-popover-*` CSS custom property w
 }
 ```
 
-### Design-system bridges
-
-Each package ships token presets that map the popover tokens onto a known design system's published CSS variables — so the popover automatically follows that system's light/dark theme and accent:
-
-```ts
-import '@rozie-ui/popover-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --popover/--popover-foreground/--border…
-import '@rozie-ui/popover-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
-import '@rozie-ui/popover-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
-import '@rozie-ui/popover-react/themes/base.css';      // the documented default token set
-```
-
-The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/popover/src/themes/base.css).
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/popover-theming).
 
 ## Accessibility
 

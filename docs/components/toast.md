@@ -133,20 +133,9 @@ Every value the component renders is a `--rozie-toast-*` CSS custom property wit
 }
 ```
 
-The full token vocabulary — the region layout (`z`, `gap`, `region-padding`, `max-width`, `font`), the per-toast box model (`content-gap`, `min-width`, `toast-max-width`, `padding`, `color`, `bg`, `radius`, `shadow`), the per-type accents (`success-bg`, `error-bg`, `warning-bg`, `info-bg`), the message + close button (`font-size`, `close-size`, `close-opacity`), the enter/exit lifecycle (`enter-duration`, `exit-duration`), stacked mode (`stack-offset`, `stack-scale-step`), and the loading spinner (`spinner-size`, `spinner-color`) — has documented defaults in `themes/base.css`. Only cosmetic values flow through tokens; the structural rules (the fixed-corner region, the flex stack, the per-toast box model, the collapsed grid overlay) compile per-leaf and are not consumer-overridable.
+Only cosmetic values flow through tokens; the structural rules (the fixed-corner region, the flex stack, the per-toast box model, the collapsed grid overlay) compile per-leaf and are not consumer-overridable.
 
-### Design-system bridges
-
-Each package ships token presets that map the toast tokens onto a known design system's published CSS variables — so the host automatically follows that system's light/dark theme and accent:
-
-```ts
-import '@rozie-ui/toast-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --background/--foreground/--destructive…
-import '@rozie-ui/toast-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
-import '@rozie-ui/toast-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
-import '@rozie-ui/toast-react/themes/base.css';      // the documented default token set
-```
-
-The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/toast/src/themes/base.css).
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/toast-theming).
 
 ## Accessibility
 

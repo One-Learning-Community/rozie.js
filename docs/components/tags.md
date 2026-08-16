@@ -97,20 +97,9 @@ Every value the component renders is a `--rozie-tags-*` CSS custom property with
 }
 ```
 
-The full token vocabulary — the control box (`gap`, `padding`, `bg`, `color`, `border-width`, `border-color`, `radius`, `min-width`), the accent + focus ring (`accent`, `focus-ring-width`, `focus-ring-color`), the chip (`chip-gap`, `chip-padding`, `chip-font-size`, `chip-color`, `chip-bg`, `chip-radius`), the chip remove button (`remove-size`, `remove-color`, `remove-opacity`, `remove-hover-bg`), the inline input (`input-min`, `input-padding`, `placeholder-color`), and the disabled state (`disabled-opacity`, `disabled-bg`) — has documented defaults in `themes/base.css`. Only cosmetic values flow through tokens; the structural rules compile per-leaf and are not consumer-overridable.
+Only cosmetic values flow through tokens; the structural rules compile per-leaf and are not consumer-overridable.
 
-### Design-system bridges
-
-Each package ships token presets that map the tags tokens onto a known design system's published CSS variables — so the input automatically follows that system's light/dark theme and accent:
-
-```ts
-import '@rozie-ui/tags-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --primary/--secondary/--border/--ring…
-import '@rozie-ui/tags-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
-import '@rozie-ui/tags-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
-import '@rozie-ui/tags-react/themes/base.css';      // the documented default token set
-```
-
-The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/tags/src/themes/base.css).
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/tags-theming).
 
 ## Accessibility
 

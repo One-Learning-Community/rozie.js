@@ -114,18 +114,7 @@ Every value the component renders is a `--rozie-listbox-*` CSS custom property w
 }
 ```
 
-### Design-system bridges
-
-Each package ships token presets that map the listbox tokens onto a known design system's published CSS variables — so the listbox automatically follows that system's light/dark theme and accent:
-
-```ts
-import '@rozie-ui/listbox-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --background/--primary/--ring…
-import '@rozie-ui/listbox-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
-import '@rozie-ui/listbox-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
-import '@rozie-ui/listbox-react/themes/base.css';      // the documented default token set
-```
-
-The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/listbox/src/themes/base.css).
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/listbox-theming).
 
 ## Keyboard
 

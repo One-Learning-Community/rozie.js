@@ -96,20 +96,9 @@ Every cosmetic value the component renders is a `--rozie-number-field-*` CSS cus
 }
 ```
 
-The full token vocabulary has documented defaults in `themes/base.css`: layout and typography (`gap`, `font`, `radius`), the frame (`bg`, `border-width`, `border-color`), the text input (`width`, `padding`, `text-align`, `font-size`, `color`), the focus ring (`focus-ring-width`, `focus-ring-color`), the +/- stepper buttons (`btn-size`, `btn-font-size`, `btn-color`, `btn-bg`, `btn-hover-bg`), and the disabled state (`disabled-opacity`). Only cosmetic values flow through tokens; the structural rules (the inline-flex stepper row, the input box model, the +/- buttons) compile per-leaf and are not consumer-overridable.
+Only cosmetic values flow through tokens; the structural rules (the inline-flex stepper row, the input box model, the +/- buttons) compile per-leaf and are not consumer-overridable.
 
-### Design-system bridges
-
-Each package ships token presets that map the number-field tokens onto a known design system's published CSS variables, so the field automatically follows that system's light/dark theme and accent:
-
-```ts
-import '@rozie-ui/number-field-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --background/--foreground/--border/--ring/--muted
-import '@rozie-ui/number-field-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
-import '@rozie-ui/number-field-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
-import '@rozie-ui/number-field-react/themes/base.css';      // the documented default token set
-```
-
-The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/src/themes/base.css).
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/number-field-theming).
 
 ## Accessibility
 

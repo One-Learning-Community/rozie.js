@@ -266,19 +266,6 @@ Rete ships no stylesheet, and `FlowCanvas` needs **no engine CSS import** — ev
 
 The imperative overlays that draw with SVG attributes (the minimap fills, the connection arrowhead) read these same tokens at draw time, so a token override re-skins them too.
 
-### Design-system bridges + dark mode
-
-Each package ships token presets that map the flow tokens onto a known design system's published CSS variables — so the canvas automatically follows that system's light/dark theme and accent — plus a `base.css` that carries the full token vocabulary **and dark mode**:
-
-```ts
-import '@rozie-ui/rete-react/themes/base.css';      // full token set + dark mode (see below)
-import '@rozie-ui/rete-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --primary/--background/--foreground…
-import '@rozie-ui/rete-react/themes/material.css';  // Material 3 — reads --md-sys-color-*
-import '@rozie-ui/rete-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-*
-```
-
-Swap `-react` for your target framework's package. The bridges are **colors-only** — they remap the color/accent tokens and leave the *sizing* tokens (radii, socket size, stroke widths, grid) at their component defaults.
-
 **Dark mode is a zero-import, OS-driven default.** The component ships an
 `@media (prefers-color-scheme: dark)` block that re-skins the color tokens when the OS
 requests dark — no import, no config (it rides the `:root` engine-DOM
@@ -286,9 +273,9 @@ escape hatch, so it reaches the Lit shadow tree too). The light render is untouc
 query only matches in a dark context), so nothing changes for light-mode consumers.
 
 For apps that toggle theme by a **root class** rather than the OS setting, import
-`themes/base.css` — it adds the `.dark` / `[data-theme="dark"]` strategy (and is the
-explicit full token reference). On the five light-DOM targets a class ancestor drives the
-switch; Lit's shadow boundary blocks a descendant class, so Lit relies on the built-in OS
-default (or a token override on the element).
+`themes/base.css` — it adds the `.dark` / `[data-theme="dark"]` strategy. On the five
+light-DOM targets a class ancestor drives the switch; Lit's shadow boundary blocks a
+descendant class, so Lit relies on the built-in OS default (or a token override on the
+element).
 
-The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/rete/src/themes/base.css).
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/rete-theming).

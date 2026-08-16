@@ -104,20 +104,9 @@ Every cosmetic value the component renders is a `--rozie-dialog-*` CSS custom pr
 }
 ```
 
-The full token vocabulary — box geometry (`width`, `max-width`, `max-height`), box chrome (`border`, `radius`, `bg`, `color`, `shadow`), the scrim (`backdrop-bg`, `backdrop-filter`), the content panel (`padding`, `font`), and the enter/leave `transition` — has documented defaults in `themes/base.css`. Only cosmetic values flow through tokens; the **structural** behaviour (top-layer rendering, the `::backdrop`, UA centering, the focus trap) comes from the native `<dialog>` and is not consumer-overridable.
+Only cosmetic values flow through tokens; the **structural** behaviour (top-layer rendering, the `::backdrop`, UA centering, the focus trap) comes from the native `<dialog>` and is not consumer-overridable.
 
-### Design-system bridges
-
-Each package ships token presets that map the dialog tokens onto a known design system's published CSS variables — so the box and scrim automatically follow that system's light/dark theme:
-
-```ts
-import '@rozie-ui/dialog-react/themes/shadcn.css';    // shadcn/ui (Radix) — reads --background/--foreground/--border/--radius…
-import '@rozie-ui/dialog-react/themes/material.css';  // Material 3 — reads --md-sys-color-* (28dp radius, scrim role)
-import '@rozie-ui/dialog-react/themes/bootstrap.css'; // Bootstrap 5 — reads --bs-* (modal radius, border, backdrop)
-import '@rozie-ui/dialog-react/themes/base.css';      // the documented default token set
-```
-
-The full token vocabulary is in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/src/themes/base.css).
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/dialog-theming).
 
 ## Accessibility
 
