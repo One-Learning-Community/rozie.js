@@ -128,7 +128,34 @@ export const RozieErrorCode = {
   // warning — output is correct on 5/6 targets, so this is collected not thrown.
   STYLE_SCOPED_RULE_TARGETS_PORTAL_CONTENT: 'ROZ088',
 
-  // ---- ROZ090..ROZ099 reserved for late-Phase-1 needs ----
+  // ---- Phase 79 producer-side dynamic slot names (R7/R13) — ROZ090..ROZ095 ----
+  // This range was originally reserved as "late-Phase-1 needs" and never used —
+  // grep-confirmed zero live members before this cluster. Phase 79 claims the
+  // first six codes (ROZ090..ROZ095); ROZ096..ROZ099 remain free (see the HONEST
+  // BAND NOTE below, which this cluster also corrects).
+  //
+  // 79-CONTEXT.md § Claude's Discretion nominated `ROZ948..ROZ959` for this
+  // cluster and asserted "no allocation decision needed" — that nomination was
+  // WRONG, grep-confirmed: the block is fully consumed (Phase 07.2 ROZ948,
+  // Phase 07.3 ROZ949-952, Phase 11 ROZ953-959). The other candidate free block,
+  // `ROZ929..ROZ939`, was rejected too — its own comment above reserves it for
+  // future `<components>` composition (ROZ-COMP) diagnostics, a different
+  // semantic cluster than slot-name diagnostics. `ROZ090..ROZ099` carries only a
+  // stale chronological reservation ("late-Phase-1 needs", long dead), so it is
+  // the genuinely free block.
+  //
+  // R7a-e cover the producer-side `:name` (dynamic slot name) syntax; R13 covers
+  // the reserved slot-record `<props>` property names (`slots`/`snippets`/
+  // `templates`/`rozieSlots`) that the emitted per-target consumer surface would
+  // otherwise collide with. Detected in `validateSlotRecordPropCollision.ts`,
+  // wired into `lowerToIR` (the chokepoint compile() AND @rozie/unplugin share).
+  SLOT_NAME_STATIC_AND_BOUND: 'ROZ090', // error — a <slot> carries both a static name= attribute and a bound :name — the two cannot both define the slot's name (R7a)
+  SLOT_NAME_PARAM_ON_DYNAMIC_SLOT: 'ROZ091', // error — a <slot> with a bound :name also declares a scope param whose key is 'name'; :name is reserved on <slot> as of Phase 79 and can no longer be a scope-param key (R7b)
+  SLOT_DYNAMIC_NAME_ON_PORTAL: 'ROZ092', // error — a bound :name on a portal slot; portalKey() needs a compile-time string for the $portals.<key> closure key (R7c)
+  SLOT_FAMILY_PREFIX_DUPLICATE: 'ROZ093', // error — two producer <slot>s derive an identical namePrefix, so a consumer fill matching that prefix has no unique family to resolve to (R7d)
+  SLOT_DYNAMIC_NAME_NO_PREFIX: 'ROZ094', // warning — a bound :name yields no static leading prefix (bare identifier, call expression, or a template literal with an empty first quasi); legal, but consumer params degrade and no ROZ947 can fire (R7e)
+  SLOT_RECORD_PROP_NAME_RESERVED: 'ROZ095', // error — a <props> key equals its target's slot-record property name (slots/snippets/templates/rozieSlots); the emitted component would declare the identifier twice (R13)
+  // ROZ096..ROZ099 remain free.
 
   // ---- Semantic-binding errors (Phase 2 Plan 02) — ROZ100..ROZ199 ----
   UNKNOWN_PROPS_REF: 'ROZ100', // error — SEM-01: $props.foo where foo not declared
@@ -980,8 +1007,11 @@ export const RozieErrorCode = {
   // verified highest allocated code; ROZ997/ROZ998 are the next two free.
   // HONEST BAND NOTE: ROZ999 is now the LAST free code in the 9xx band — future
   // allocations should continue in the lower bands (e.g. the 100 semantic-
-  // binding cluster's tail, or the reserved ROZ090..ROZ099 / ROZ929..ROZ939 /
-  // ROZ948..ROZ959 gaps), never renumber, and never reuse retired codes.
+  // binding cluster's tail, or the reserved ROZ096..ROZ099 / ROZ929..ROZ939
+  // gaps), never renumber, and never reuse retired codes. (Phase 79 corrected
+  // this note: ROZ090..ROZ095 is no longer free — it took those six codes —
+  // and the Phase 07.2/07.3/11 slot-fill/two-way-binding/match block above is
+  // fully consumed end to end and should never have been listed here as free.)
   //
   // ROZ997 — two (or more) distinct declared `$emit` spellings collapse to the
   // SAME canonical event key under kebab/camel/snake separator equivalence
