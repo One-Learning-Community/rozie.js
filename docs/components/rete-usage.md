@@ -302,5 +302,6 @@ const editor = el.getEditor();
 ## See also
 
 - [FlowCanvas — showcase & API](/components/rete) — the full prop / event / slot / handle reference, and theming.
+- [FlowCanvas theming](/components/rete-theming) — the complete customizable-token table.
 - [FlowCanvas comparison](/components/rete-comparison) — how it stacks up against the per-framework libraries.
 - [FlowCanvas — live demo](/components/rete-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

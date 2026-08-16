@@ -41,7 +41,7 @@ Every cosmetic value `Slider` renders is a `--rozie-slider-*` custom property wi
 | `--rozie-slider-track-radius` | `999px` |
 | `--rozie-slider-track-bg` | `rgba(0, 0, 0, 0.18)` |
 
-### fill (the colored <div> underlay; spans the runtime fill-start→fill-end vars)
+### fill (the colored &lt;div> underlay; spans the runtime fill-start→fill-end vars)
 
 | Token | Default |
 | --- | --- |

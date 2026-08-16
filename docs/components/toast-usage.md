@@ -213,5 +213,6 @@ el.clear();
 ## See also
 
 - [Toaster — showcase & API](/components/toast) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Toaster theming](/components/toast-theming) — the complete customizable-token table.
 - [Toaster comparison](/components/toast-comparison) — how it stacks up against the per-framework libraries.
 - [Toaster — live demo](/components/toast-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

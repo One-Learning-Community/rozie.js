@@ -220,5 +220,6 @@ el.focusControl();
 ## See also
 
 - [Listbox — showcase & API](/components/listbox) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Listbox theming](/components/listbox-theming) — the complete customizable-token table.
 - [Listbox comparison](/components/listbox-comparison) — how it stacks up against the per-framework libraries.
 - [Listbox — live demo](/components/listbox-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

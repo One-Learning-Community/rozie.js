@@ -207,5 +207,6 @@ el.clear();
 ## See also
 
 - [Otp — showcase & API](/components/otp) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Otp theming](/components/otp-theming) — the complete customizable-token table.
 - [Otp comparison](/components/otp-comparison) — how it stacks up against the per-framework libraries.
 - [Otp — live demo](/components/otp-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

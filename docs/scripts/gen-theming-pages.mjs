@@ -112,6 +112,16 @@ function cell(text) {
   return `\`${String(text).replace(/\|/g, '\\|')}\``;
 }
 
+/** Escape a leading `<` in raw (non-backticked) markdown text sourced from a
+ * CSS comment. Group headings are plain H3 text, not code spans — a comment
+ * that names an HTML/JSX tag verbatim (e.g. `<Combobox>`, `<div>`) would
+ * otherwise be parsed as an unterminated element by VitePress's Vue-based
+ * markdown compiler and fail the build. Only `<` is escaped (not `>`) so a
+ * comment merely containing a bare `>` (e.g. "depth>0") stays untouched. */
+function escapeAngles(text) {
+  return String(text).replace(/</g, '&lt;');
+}
+
 function renderPage(slug, name, prefix, groups, undeclared, overrides, selector, bridgeFiles, seeAlso) {
   const parts = [];
   parts.push('---');
@@ -138,7 +148,7 @@ function renderPage(slug, name, prefix, groups, undeclared, overrides, selector,
   parts.push('## Tokens');
   parts.push('');
   for (const [group, entries] of groups) {
-    parts.push(`### ${group}`);
+    parts.push(`### ${escapeAngles(group)}`);
     parts.push('');
     parts.push('| Token | Default |');
     parts.push('| --- | --- |');

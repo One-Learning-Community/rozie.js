@@ -224,5 +224,6 @@ el.hide();
 ## See also
 
 - [Dialog — showcase & API](/components/dialog) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Dialog theming](/components/dialog-theming) — the complete customizable-token table.
 - [Dialog comparison](/components/dialog-comparison) — how it stacks up against the per-framework libraries.
 - [Dialog — live demo](/components/dialog-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

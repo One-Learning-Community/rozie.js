@@ -185,5 +185,6 @@ el.increment();
 ## See also
 
 - [Slider — showcase & API](/components/slider) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Slider theming](/components/slider-theming) — the complete customizable-token table.
 - [Slider comparison](/components/slider-comparison) — how it stacks up against the per-framework libraries.
 - [Slider — live demo](/components/slider-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

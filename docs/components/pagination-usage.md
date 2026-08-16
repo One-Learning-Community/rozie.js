@@ -223,5 +223,6 @@ el.first();
 ## See also
 
 - [Pagination — showcase & API](/components/pagination) — the full prop / event / slot / handle reference, and theming.
+- [Pagination theming](/components/pagination-theming) — the complete customizable-token table.
 - [Pagination comparison](/components/pagination-comparison) — how it stacks up against the per-framework libraries.
 - [Pagination — live demo](/components/pagination-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

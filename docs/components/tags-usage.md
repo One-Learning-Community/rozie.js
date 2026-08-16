@@ -227,5 +227,6 @@ el.clear();
 ## See also
 
 - [Tags — showcase & API](/components/tags) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Tags theming](/components/tags-theming) — the complete customizable-token table.
 - [Tags comparison](/components/tags-comparison) — how it stacks up against the per-framework libraries.
 - [Tags — live demo](/components/tags-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

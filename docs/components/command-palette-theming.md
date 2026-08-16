@@ -45,7 +45,7 @@ Every cosmetic value `CommandPalette` renders is a `--rozie-command-palette-*` c
 | `--rozie-command-palette-divider-color` | `rgba(0, 0, 0, 0.1)` |
 | `--rozie-command-palette-title-weight` | `600` |
 
-### search input — also drives the vendored <Combobox>'s render-neutral tokens (panel-scope aliasing)
+### search input — also drives the vendored &lt;Combobox>'s render-neutral tokens (panel-scope aliasing)
 
 | Token | Default |
 | --- | --- |

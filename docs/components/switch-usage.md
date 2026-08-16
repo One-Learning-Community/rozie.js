@@ -185,5 +185,6 @@ el.toggle();
 ## See also
 
 - [Switch — showcase & API](/components/switch) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Switch theming](/components/switch-theming) — the complete customizable-token table.
 - [Switch comparison](/components/switch-comparison) — how it stacks up against the per-framework libraries.
 - [Switch — live demo](/components/switch-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

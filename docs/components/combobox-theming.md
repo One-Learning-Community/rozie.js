@@ -83,7 +83,7 @@ Every cosmetic value `Combobox` renders is a `--rozie-combobox-*` custom propert
 | `--rozie-combobox-option-disabled-opacity` | `0.45` |
 | `--rozie-combobox-option-color` | `inherit` |
 
-### group heading — the label rendered above a `<optgroup>`-style block of options when the options array is grouped
+### group heading — the label rendered above a `&lt;optgroup>`-style block of options when the options array is grouped
 
 | Token | Default |
 | --- | --- |

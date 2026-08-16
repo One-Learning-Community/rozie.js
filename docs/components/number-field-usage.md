@@ -228,5 +228,6 @@ el.clear();
 ## See also
 
 - [NumberField — showcase & API](/components/number-field) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [NumberField theming](/components/number-field-theming) — the complete customizable-token table.
 - [NumberField comparison](/components/number-field-comparison) — how it stacks up against the per-framework libraries.
 - [NumberField — live demo](/components/number-field-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

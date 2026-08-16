@@ -238,5 +238,6 @@ el.focus();
 ## See also
 
 - [CommandPalette — showcase & API](/components/command-palette) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [CommandPalette theming](/components/command-palette-theming) — the complete customizable-token table.
 - [CommandPalette comparison](/components/command-palette-comparison) — how it stacks up against the per-framework libraries.
 - [CommandPalette — live demo](/components/command-palette-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

@@ -215,5 +215,6 @@ el.reposition();
 ## See also
 
 - [Popover — showcase & API](/components/popover) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Popover theming](/components/popover-theming) — the complete customizable-token table.
 - [Popover comparison](/components/popover-comparison) — how it stacks up against the per-framework libraries.
 - [Popover — live demo](/components/popover-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

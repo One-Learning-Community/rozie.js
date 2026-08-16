@@ -4,9 +4,10 @@
   "type": "module",
   "version": "0.0.0",
   "scripts": {
+    "gen:theming": "node scripts/gen-theming-pages.mjs",
     "gen:usage": "node scripts/gen-usage-pages.mjs",
-    "dev": "node scripts/gen-usage-pages.mjs && vitepress dev .",
-    "build": "node scripts/gen-usage-pages.mjs && vitepress build . && node scripts/check-anchors.mjs",
+    "dev": "node scripts/gen-theming-pages.mjs && node scripts/gen-usage-pages.mjs && vitepress dev .",
+    "build": "node scripts/gen-theming-pages.mjs && node scripts/gen-usage-pages.mjs && vitepress build . && node scripts/check-anchors.mjs",
     "preview": "vitepress preview .",
     "test": "vitest run"
   },

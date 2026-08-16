@@ -262,5 +262,6 @@ el.clear();
 ## See also
 
 - [Combobox — showcase & API](/components/combobox) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Combobox theming](/components/combobox-theming) — the complete customizable-token table.
 - [Combobox comparison](/components/combobox-comparison) — how it stacks up against the per-framework libraries.
 - [Combobox — live demo](/components/combobox-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.

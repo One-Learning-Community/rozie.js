@@ -216,5 +216,6 @@ el.reset();
 ## See also
 
 - [Resizable — showcase & API](/components/resizable) — the full prop / event / slot / handle reference, theming, and accessibility.
+- [Resizable theming](/components/resizable-theming) — the complete customizable-token table.
 - [Resizable comparison](/components/resizable-comparison) — how it stacks up against the per-framework libraries.
 - [Resizable — live demo](/components/resizable-demo) — the real package running in the page, plus the one `.rozie` source and all six generated outputs.
