@@ -178,6 +178,74 @@ describe('validateSlotPropCollision [Phase 28] — direct IR', () => {
     expect(collisions).toHaveLength(1);
     expect(collisions[0]!.message).toContain('title');
   });
+
+  // ── Phase 79 R12/D-03/D-05 — the identifier-shape check is RETIRED ────────
+  // ROZ127 must no longer fire merely because a slot name is not a valid JS
+  // identifier (D-04 makes Vue's defineSlots key conditionally quoted instead).
+  // ROZ127 fires ONLY for its documented single meaning: a genuine slot==prop
+  // name collision.
+
+  it('[R12/AC-23] a non-identifier slot name (`cell-status`) with NO colliding prop yields zero ROZ127 diagnostics', () => {
+    const ir = stubIR(
+      [prop('value', 10)],
+      [slot('cell-status', 400)],
+    );
+    const diagnostics: Diagnostic[] = [];
+    validateSlotPropCollision(ir, diagnostics);
+
+    const collisions = diagnostics.filter(
+      (d) => d.code === SLOT_PROP_NAME_COLLISION,
+    );
+    expect(collisions).toHaveLength(0);
+    // D-05: no replacement diagnostic — the full diagnostics array (any code,
+    // any severity) must contain no error-severity entry at all.
+    expect(diagnostics.filter((d) => d.severity === 'error')).toHaveLength(0);
+  });
+
+  it('[R12/AC-23] a slot name equal to a declared <props> key still fires exactly one ROZ127 error (site 1 survives)', () => {
+    const collidingProp = prop('value', 10);
+    const collidingSlot = slot('value', 400);
+    const ir = stubIR([collidingProp], [collidingSlot]);
+    const diagnostics: Diagnostic[] = [];
+    validateSlotPropCollision(ir, diagnostics);
+
+    const collisions = diagnostics.filter(
+      (d) => d.code === SLOT_PROP_NAME_COLLISION,
+    );
+    expect(collisions).toHaveLength(1);
+  });
+
+  it('[R12] the DOM-footgun / $expose collision path (site 2) still fires for a scoped slot named after a DOM member', () => {
+    // Sibling check to the retired identifier-shape guard — proves removing
+    // the middle push site did not silently take the surviving site 2 with it.
+    const scopedFocus: SlotDecl = {
+      type: 'SlotDecl',
+      name: 'focus',
+      defaultContent: null,
+      params: [
+        { type: 'ParamDecl', name: 'row', valueExpression: null } as unknown,
+      ],
+      presence: 'always',
+      nestedSlots: [],
+      isPortal: false,
+      sourceLoc: { start: 500, end: 505 },
+    } as unknown as SlotDecl;
+    const ir = stubIR([], [scopedFocus]);
+    const diagnostics: Diagnostic[] = [];
+    validateSlotPropCollision(ir, diagnostics);
+    const collisions = diagnostics.filter(
+      (d) => d.code === SLOT_PROP_NAME_COLLISION,
+    );
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0]!.message).toContain('focus');
+  });
+
+  it('[R12/D-05] a non-identifier, non-colliding, non-DOM-footgun slot introduces no diagnostic of any kind', () => {
+    const ir = stubIR([], [slot('2col-header', 400)]);
+    const diagnostics: Diagnostic[] = [];
+    validateSlotPropCollision(ir, diagnostics);
+    expect(diagnostics).toHaveLength(0);
+  });
 });
 
 // A colliding inline `.rozie` source — a prop `panel` AND a portal-slot

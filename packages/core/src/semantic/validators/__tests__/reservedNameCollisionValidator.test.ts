@@ -154,21 +154,26 @@ function b() { $emit('foo-bar') }
     expect(hits.some((h) => h.severity === 'error')).toBe(true);
   });
 
-  // ── Hyphenated slot key (Vue defineSlots TS1005 preempt) ──
+  // ── Hyphenated slot key — RETIRED as a ROZ127 fault (Phase 79 R12/D-04/D-05) ──
+  //
+  // Phase 61 taught ROZ127 to reject any non-identifier slot name because Vue's
+  // `defineSlots<{ ... }>()` minted an unquoted key that failed TS1005. Phase 79
+  // retires that overload: Vue's key-minting (refineSlotTypes.ts) now quotes the
+  // `defineSlots` key when the slot name is not an identifier, so the shape is
+  // representable on every target. Per D-05 there is no replacement diagnostic —
+  // a hyphenated slot name with no colliding prop must compile with ZERO errors.
 
-  it('fires on a hyphenated slot name `header-item` (Vue defineSlots TS1005)', () => {
+  it('does NOT fire on a hyphenated slot name `header-item` — no colliding prop, no replacement diagnostic (Phase 79 D-05)', () => {
     const src = `<rozie name="X">
 <template><div><slot name="header-item"></slot></div></template>
 </rozie>`;
     const diags = compileDiags(src);
-    // Owned by the IR slot validator (ROZ127) — slot-key-shape generalization.
-    // Assert exactly one error fires (no double-fire between IR + semantic).
     const hits = [
       ...roz142(diags),
       ...diags.filter((d) => d.code === RozieErrorCode.SLOT_PROP_NAME_COLLISION),
     ];
-    expect(hits.length, JSON.stringify(diags)).toBe(1);
-    expect(hits[0]!.severity).toBe('error');
+    expect(hits.length, JSON.stringify(diags)).toBe(0);
+    expect(diags.filter((d) => d.severity === 'error'), JSON.stringify(diags)).toHaveLength(0);
   });
 
   // ── ZERO false positives on benign public-contract names ──

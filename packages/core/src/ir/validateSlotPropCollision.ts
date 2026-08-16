@@ -19,6 +19,18 @@
  * the project's "make the unrepresentable a loud compile error" discipline this
  * pass turns it into a hard ERROR (ROZ127 SLOT_PROP_NAME_COLLISION).
  *
+ * ROZ127's SOLE meaning is the slot==prop name collision above. Phase 61 Plan
+ * 61-02 Task 3 had additionally overloaded ROZ127 to reject any slot name that
+ * was not a valid JS/TS identifier, because Vue's `defineSlots<{ ... }>()`
+ * previously minted an unquoted object key that failed to parse (TS1005) for a
+ * hyphenated / leading-digit slot name. Phase 79 (R12/D-04/D-05) retires that
+ * overload: Vue's key-minting (`refineSlotTypes.ts`) now conditionally quotes
+ * the `defineSlots` key when the slot name is not an identifier, so the
+ * non-identifier shape is no longer unrepresentable on Vue and is legal on
+ * every other target already. Per D-05 there is no replacement diagnostic — a
+ * non-identifier slot name is simply a legal, differently-routed shape, not a
+ * fault the author needs to fix.
+ *
  * Diagnostic shape — a DUAL code-frame (mirrors validateTwoWayBindings' ROZ949):
  *   - primary frame at the `<slot>` declaration loc;
  *   - `related[]` secondary frame at the colliding `<props>` declaration loc.
@@ -40,15 +52,6 @@
 import { RozieErrorCode } from '../diagnostics/codes.js';
 import type { Diagnostic } from '../diagnostics/Diagnostic.js';
 import type { IRComponent } from './types.js';
-
-/**
- * Phase 61 Plan 61-02 Task 3 — a valid JS/TS identifier shape. Vue's
- * `defineSlots<{ ... }>()` does NOT quote slot keys, so a hyphenated /
- * leading-digit / otherwise non-identifier slot name emits an unquoted key that
- * fails to parse → TS1005 on the Vue leaf (collision-vue §3.4 set F). Anchored
- * full-string test.
- */
-const VALID_IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 
 /**
  * Phase 61 Plan 61-02 Task 3 — inherited DOM/Object.prototype members a SCOPED
@@ -121,22 +124,7 @@ export function validateSlotPropCollision(
       continue;
     }
 
-    // ── (2) slot-key SHAPE (Vue defineSlots unquoted-key TS1005) ─────────────
-    // Vue's `defineSlots<{ ... }>()` does not quote keys, so a hyphenated /
-    // leading-digit / non-identifier slot name (`header-item`, `2col`) emits an
-    // unquoted key that fails to parse on the Vue leaf. Hard error.
-    if (!VALID_IDENTIFIER.test(slot.name)) {
-      diagnostics.push({
-        code: RozieErrorCode.SLOT_PROP_NAME_COLLISION,
-        severity: 'error',
-        message: `<slot name="${slot.name}"> is not a valid identifier — Vue's defineSlots<{…}>() does not quote slot keys, so a hyphenated / leading-digit / non-identifier slot name emits an unquoted object key that fails to parse on the Vue target (TS1005). Slot names must be valid JS identifiers across all six targets.`,
-        loc: slot.sourceLoc,
-        hint: `Rename the slot to a valid identifier — e.g. camelCase the hyphenated form ('${slot.name}' → '${slot.name.replace(/-([a-z])/g, (_, c) => c.toUpperCase()).replace(/[^A-Za-z0-9_$]/g, '')}').`,
-      });
-      continue;
-    }
-
-    // ── (3) slot == inherited DOM member / $expose verb (Lit collision) ──────
+    // ── (2) slot == inherited DOM member / $expose verb (Lit collision) ──────
     //
     // GATE (Phase 61 Plan 09): this collision is REAL only for a SCOPED or
     // PORTAL slot. On Lit, ONLY a scoped/portal slot lowers to a bare
