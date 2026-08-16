@@ -166,6 +166,11 @@ describe('validateSlotRecordPropCollision (ROZ095) — via lowerToIR', () => {
       expect(corpusFiles.length).toBeGreaterThanOrEqual(50);
     });
 
+    // 30s timeout: this scan parses + lowers the full ~490-file `.rozie` corpus
+    // (examples/ + packages/ui/ + tests/) and takes ~12.5s on a warm machine —
+    // well over vitest's 5s default. Measured, not guessed; the phase-79 Wave 1
+    // post-merge gate caught it timing out at 12571ms. Matches this repo's
+    // existing convention for whole-corpus scans.
     it('every scanned file produces zero ROZ095 diagnostics', () => {
       const offenders: string[] = [];
       const skipped: string[] = [];
@@ -192,6 +197,6 @@ describe('validateSlotRecordPropCollision (ROZ095) — via lowerToIR', () => {
         offenders,
         `Found ${offenders.length} file(s) with a reserved slot-record <props> key (ROZ095): ${offenders.join(', ')}. (${skipped.length} file(s) skipped due to unrelated parse errors: ${skipped.join(', ')})`,
       ).toEqual([]);
-    });
+    }, 30_000);
   });
 });
