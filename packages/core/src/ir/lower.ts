@@ -47,6 +47,7 @@ import { typeNeutralizeScript } from '../codegen/typeNeutralizeScript.js';
 import { lowerRootElementRef } from './lowerers/lowerRootElementRef.js';
 import { validateClassSelector } from './validateClassSelector.js';
 import { validateSlotPropCollision } from './validateSlotPropCollision.js';
+import { validateSlotRecordPropCollision } from './validateSlotRecordPropCollision.js';
 import { validateEmitNameCollision } from './validateEmitNameCollision.js';
 import { validateDefaultPortalCollision } from './validateDefaultPortalCollision.js';
 import { annotateDisplayWrap } from './annotateDisplayWrap.js';
@@ -330,6 +331,17 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // @rozie/unplugin. Local-IR-only (ir.slots vs ir.props) — no resolver/cache.
   // Collected-not-thrown (D-08): pushes ROZ127; never mutates `ir`.
   validateSlotPropCollision(ir, diagnostics);
+
+  // Phase 79 (R13/D-06/D-07) — a `<props>` key exactly equal to one of the
+  // four slot-record property names the compiler synthesizes on a target's
+  // consumer surface (`slots` React/Solid, `snippets` Svelte, `templates`
+  // Angular, `rozieSlots` Lit) is a HARD ERROR (ROZ095): the emitted consumer
+  // surface would declare the identifier twice, and on Svelte the slot lookup
+  // would silently read the author's prop instead of the slot record. Wired
+  // into this SAME lowerToIR chokepoint (not compile()) so it fires for BOTH
+  // compile() AND @rozie/unplugin, regardless of entrypoint. Local-IR-only
+  // (ir.props); collected-not-thrown (D-08): pushes ROZ095; never mutates `ir`.
+  validateSlotRecordPropCollision(ir, diagnostics);
 
   // Quick 260812-i67 — two (or more) declared $emit names collapsing to the
   // same canonical event key by kebab/camel/snake equivalence are a HARD ERROR
