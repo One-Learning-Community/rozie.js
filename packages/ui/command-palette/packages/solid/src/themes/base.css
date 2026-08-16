@@ -22,7 +22,9 @@
   --rozie-command-palette-backdrop-bg: rgba(0, 0, 0, 0.5);
   --rozie-command-palette-backdrop-filter: none;
 
-  /* panel chrome — also the depth>0 header's title weight (shares the panel's chrome semantics) */
+  /* panel chrome */
+  /* Also carries the depth>0 header's title weight, which shares the panel's
+     chrome semantics rather than the header's own. */
   --rozie-command-palette-width: min(40rem, 100%);
   --rozie-command-palette-max-height: 70vh;
   --rozie-command-palette-font: inherit;
@@ -35,7 +37,9 @@
   --rozie-command-palette-divider-color: rgba(0, 0, 0, 0.1);
   --rozie-command-palette-title-weight: 600;
 
-  /* search input — also drives the vendored <Combobox>'s render-neutral tokens (panel-scope aliasing) */
+  /* search input */
+  /* Also drives the vendored Combobox's render-neutral tokens, by aliasing
+     them at panel scope. */
   --rozie-command-palette-search-padding: 0.75rem;
   --rozie-command-palette-input-padding: 0.5rem 0.75rem;
   --rozie-command-palette-input-font-size: 1.05rem;
@@ -71,7 +75,9 @@
   --rozie-command-palette-breadcrumb-separator-color: rgba(0, 0, 0, 0.35);
   --rozie-command-palette-breadcrumb-weight: 400;
 
-  /* list + options — also the option icon, fuzzy-match highlight, trailing slot, and group-heading spacing */
+  /* list + options */
+  /* Also the option icon, the fuzzy-match highlight, the trailing slot, and
+     group-heading spacing. */
   --rozie-command-palette-list-padding: 0.5rem;
   --rozie-command-palette-option-gap: 0.75rem;
   --rozie-command-palette-icon-color: inherit;
@@ -87,7 +93,9 @@
   --rozie-command-palette-group-color: rgba(0, 0, 0, 0.5);
   --rozie-command-palette-group-transform: uppercase;
 
-  /* option actions (the row's right-side hint + the flyout trigger) */
+  /* option actions */
+  /* The row's right-side hint, plus the flyout trigger that hint opens when
+     the option carries more than one action. */
   --rozie-command-palette-actions-color: rgba(0, 0, 0, 0.55);
   --rozie-command-palette-actions-font-size: 0.75rem;
   --rozie-command-palette-actions-gap: 0.375rem;
@@ -100,7 +108,9 @@
   --rozie-command-palette-actions-hover-color: rgba(0, 0, 0, 0.85);
   --rozie-command-palette-actions-radius: 0.25rem;
 
-  /* per-item hotkey teaching badge — each falls back to the matching actions-hint-* token above */
+  /* hotkey badge */
+  /* The per-item teaching badge. Each token here falls back to the matching
+     actions-hint-* token declared above, so setting the hint styles both. */
   --rozie-command-palette-hotkey-bg: var(--rozie-command-palette-actions-hint-bg, rgba(0, 0, 0, 0.06));
   --rozie-command-palette-hotkey-color: var(--rozie-command-palette-actions-hint-color, inherit);
   --rozie-command-palette-hotkey-font-size: var(--rozie-command-palette-actions-hint-font-size, 0.6875rem);
@@ -126,7 +136,9 @@
   --rozie-command-palette-action-shortcut-font-size: 0.75rem;
   --rozie-command-palette-action-z: 10;
 
-  /* panel-internal args surface (chip + fields form, replaces the result list at depth) */
+  /* args surface */
+  /* Panel-internal: a chip plus a fields form, which replaces the result list
+     once the palette descends to an argument-collecting depth. */
   --rozie-command-palette-args-chip-bg: rgba(0, 0, 0, 0.06);
   --rozie-command-palette-args-chip-color: inherit;
   --rozie-command-palette-args-chip-padding: 0.125rem 0.5rem;
@@ -138,7 +150,9 @@
   --rozie-command-palette-args-gap: 0.5rem;
   --rozie-command-palette-args-padding: 0.75rem;
 
-  /* empty state — also the loading and error re-projections into the same #empty region */
+  /* empty state */
+  /* Also the loading and error states, which re-project into this same
+     #empty region. */
   --rozie-command-palette-empty-padding: 1.5rem;
   --rozie-command-palette-empty-color: rgba(0, 0, 0, 0.5);
   --rozie-command-palette-loading-color: rgba(0, 0, 0, 0.5);
