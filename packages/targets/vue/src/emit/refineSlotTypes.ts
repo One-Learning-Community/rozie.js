@@ -16,9 +16,37 @@
  * that lock the literal substring; whole-script snapshot regeneration falls
  * to Plan 04.
  *
+ * Phase 79 Plan 03 (R12/D-04): the key is quoted ONLY when the slot name is
+ * not a valid JS identifier — an identifier-named or default slot keeps the
+ * exact pre-phase unquoted key, byte-identical, while a non-identifier name
+ * (e.g. `cell-status`) becomes representable as a single-quoted string
+ * literal. This is Vue's ONLY change for R12; the shape-check itself is the
+ * shared `isSlotNameIdentifier` predicate every R12 routing plan imports.
+ *
  * @experimental — shape may change before v1.0
  */
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+
+/**
+ * Escape a single-quoted string-literal key body: backslash first (so a
+ * backslash inserted by the quote-escape step is not itself re-escaped),
+ * then single quotes.
+ */
+function escapeSingleQuotedKey(name: string): string {
+  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+/**
+ * Render a slot-block key: bare when `slotName` is a valid identifier
+ * (pre-phase, byte-identical form), single-quoted-and-escaped otherwise
+ * (Phase 79 R12/D-04).
+ */
+function renderSlotKey(slotName: string): string {
+  return isSlotNameIdentifier(slotName)
+    ? slotName
+    : `'${escapeSingleQuotedKey(slotName)}'`;
+}
 
 /**
  * Build the `defineSlots<{ ... }>()` interior block from SlotDecl[].
@@ -35,9 +63,10 @@ export function buildSlotTypeBlock(slots: SlotDecl[]): string {
   const lines: string[] = [];
   for (const s of slots) {
     const slotName = s.name === '' ? 'default' : s.name;
+    const key = renderSlotKey(slotName);
     const paramFields = s.params.map((p) => `${p.name}: any`).join('; ');
     // Match Plan 02 stub format: two-space indent, semicolon-terminated.
-    lines.push(`  ${slotName}(props: { ${paramFields} }): any;`);
+    lines.push(`  ${key}(props: { ${paramFields} }): any;`);
   }
   return lines.join('\n');
 }

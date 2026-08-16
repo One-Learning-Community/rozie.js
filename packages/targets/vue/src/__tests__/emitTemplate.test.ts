@@ -489,6 +489,94 @@ describe('buildSlotTypeBlock — slot type signatures (Plan 03 Task 2 unit)', ()
     ]);
     expect(block).toContain('empty(props: {  }): any;');
   });
+
+  // ── Phase 79 Plan 03 (R12/D-04) — conditional key quoting ─────────────────
+
+  it('[D-04] an identifier-named slot (`header`) still emits an unquoted key, byte-identical to pre-phase', () => {
+    const block = buildSlotTypeBlock([
+      {
+        type: 'SlotDecl',
+        name: 'header',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
+    ]);
+    expect(block).toBe('  header(props: {  }): any;');
+  });
+
+  it('[D-04] the default slot (name === \'\') still emits the unquoted key `default`, byte-identical to pre-phase', () => {
+    const block = buildSlotTypeBlock([
+      {
+        type: 'SlotDecl',
+        name: '',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
+    ]);
+    expect(block).toBe('  default(props: {  }): any;');
+  });
+
+  it('[D-04] a non-identifier slot (`cell-status`) emits a single-quoted string-literal key', () => {
+    const block = buildSlotTypeBlock([
+      {
+        type: 'SlotDecl',
+        name: 'cell-status',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
+    ]);
+    expect(block).toBe("  'cell-status'(props: {  }): any;");
+  });
+
+  it('[D-04/T-79-05] a slot name containing a single quote and a backslash is escaped, not emitted raw', () => {
+    const block = buildSlotTypeBlock([
+      {
+        type: 'SlotDecl',
+        name: "o'\\brien",
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
+    ]);
+    expect(block).toBe("  'o\\'\\\\brien'(props: {  }): any;");
+  });
+
+  it('[D-04] a component mixing identifier and non-identifier slot names emits one quoted and one unquoted key, in IR order', () => {
+    const block = buildSlotTypeBlock([
+      {
+        type: 'SlotDecl',
+        name: 'header',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
+      {
+        type: 'SlotDecl',
+        name: 'cell-status',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
+    ]);
+    expect(block).toBe(
+      '  header(props: {  }): any;\n' + "  'cell-status'(props: {  }): any;",
+    );
+  });
 });
 
 describe('emitTemplate — file snapshot fixtures (D-46)', () => {
