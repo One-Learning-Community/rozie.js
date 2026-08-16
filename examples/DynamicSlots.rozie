@@ -1,0 +1,55 @@
+<rozie name="DynamicSlots">
+
+<props>
+{
+  columns: { type: Array,  default: () => [] },
+  row:     { type: Object, default: () => ({}) },
+  total:   { type: Number, default: 0 },
+  heading: { type: String, default: 'Header' },
+}
+</props>
+
+<data>
+{
+  freeSlotName: 'freeform',
+}
+</data>
+
+<template>
+<div class="dynamic-slots">
+
+  <!-- R12/AC-21: static kebab-named slot. A hard ROZ127 error on 6/6 targets today
+       (pre-79-03/79-04/79-08); after this phase it compiles and routes through the
+       record path on every target. Also doubles as AC-6's "exact name beats family"
+       case, since this exact key also falls inside the family prefix space below. -->
+  <slot name="cell-total" :value="$props.total">
+    <strong>{{ $props.total }}</strong>
+  </slot>
+
+  <!-- R1/AC-2/AC-5: prefixed dynamic family, scoped. The phase's headline shape — the
+       leading quasi must fold to a literal namePrefix and no `name` ParamDecl may be
+       produced. Fallback content makes AC-4's "record miss renders its own fallback"
+       observable. -->
+  <div r-for="col in $props.columns" :key="col.key">
+    <slot :name="`cell-${col.key}`" :row="$props.row" :value="$props.row[col.key]">
+      <span>{{ $props.row[col.key] }}</span>
+    </slot>
+  </div>
+
+  <!-- R1/AC-12: no-static-prefix dynamic slot. The bound expression is a bare member
+       expression, not a template literal, so there is no leading quasi at all — this is
+       the no-static-prefix warning (ROZ094) case, excluded from family matching. -->
+  <slot :name="$data.freeSlotName" :label="$data.freeSlotName">
+    <em>fallback</em>
+  </slot>
+
+  <!-- Byte-identity control. A static identifier-named slot; nothing this phase does
+       may perturb its emitted output on any target. -->
+  <slot name="headerCell" :title="$props.heading">
+    <h2>{{ $props.heading }}</h2>
+  </slot>
+
+</div>
+</template>
+
+</rozie>
