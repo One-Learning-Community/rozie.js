@@ -27,7 +27,7 @@ Every cosmetic value `Combobox` renders is a `--rozie-combobox-*` custom propert
 | `--rozie-combobox-width` | `16rem` |
 | `--rozie-combobox-font` | `inherit` |
 
-### accent — the single color most consumers will set; focus ring + selected option derive from it
+accent — the single color most consumers will set; focus ring + selected option derive from it
 
 | Token | Default |
 | --- | --- |
@@ -83,7 +83,7 @@ Every cosmetic value `Combobox` renders is a `--rozie-combobox-*` custom propert
 | `--rozie-combobox-option-disabled-opacity` | `0.45` |
 | `--rozie-combobox-option-color` | `inherit` |
 
-### group heading — the label rendered above a `&lt;optgroup>`-style block of options when the options array is grouped
+group heading — the label rendered above a `&lt;optgroup>`-style block of options when the options array is grouped
 
 | Token | Default |
 | --- | --- |
@@ -102,14 +102,14 @@ Every cosmetic value `Combobox` renders is a `--rozie-combobox-*` custom propert
 | `--rozie-combobox-empty-color` | `rgba(0, 0, 0, 0.5)` |
 | `--rozie-combobox-empty-padding` | `0.5rem 0.6rem` |
 
-### overflow — the "+N more" affordance shown when the selection exceeds the visible chip count
+overflow — the "+N more" affordance shown when the selection exceeds the visible chip count
 
 | Token | Default |
 | --- | --- |
 | `--rozie-combobox-more-color` | `rgba(0, 0, 0, 0.55)` |
 | `--rozie-combobox-more-size` | `0.875rem` |
 
-### state-dependent — declared `initial` on purpose. The component reads this token with a DIFFERENT local fallback at each read site (resting input falls back through --rozie-combobox-border-color, the :focus rule falls back through --rozie-combobox-focus-border-color), so declaring a single frozen value here would collapse the focus-state transition. `initial` resets the custom property to the guaranteed-invalid value, which makes every var() substitute its OWN local fallback — exactly today's render output, but now discoverable and overridable.
+state-dependent — declared `initial` on purpose. The component reads this token with a DIFFERENT local fallback at each read site (resting input falls back through --rozie-combobox-border-color, the :focus rule falls back through --rozie-combobox-focus-border-color), so declaring a single frozen value here would collapse the focus-state transition. `initial` resets the custom property to the guaranteed-invalid value, which makes every var() substitute its OWN local fallback — exactly today's render output, but now discoverable and overridable.
 
 | Token | Default |
 | --- | --- |

@@ -48,30 +48,86 @@ function walk(dir, out = []) {
   return out;
 }
 
-/** Parse `base.css` into an ordered list of `{ name, value, group }`,
- * keeping only the FIRST occurrence of each declaration name — a
- * multi-block file may declare the same token up to three times (a light
- * root rule, a `.dark`/`[data-theme]` override, and an OS `@media` query)
- * and the first (light) occurrence is the documented default. `group` is
- * the most recently preceding `/* … *​/` block comment, verbatim minus its
- * delimiters, collapsed to one line. */
+/** Longest a comment may be and still read as a section LABEL rather than
+ * prose. Set just above the longest real label in the corpus
+ * (`track colors — off vs on (on is the single accent most consumers set)`)
+ * and well below the shortest explanatory note. */
+const MAX_LABEL_LENGTH = 72;
+
+/** Strip a block comment's delimiters, collapse it to one line, and shed any
+ * box-drawing decoration at the edges. `data-table` rules its section labels
+ * off with them (`/* ── header ─────────… *​/`), which is a ruler in a CSS
+ * file but noise in an H3 — and long enough to push a genuine label past
+ * MAX_LABEL_LENGTH. Interior dashes are untouched. */
+function commentText(raw) {
+  return raw
+    .slice(2, -2)
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s─—–-]+|[\s─—–-]+$/g, '')
+    .trim();
+}
+
+/** A comment reads as a section label when it is a single line, short, and
+ * not a doc block. `base.css` comments were written for CSS readers, not as
+ * headings: some are labels (`focus ring`, `── header ──`), others are
+ * paragraphs explaining WHY a token is declared the way it is. Only the
+ * former belong in an H3 — the latter are real content, rendered as prose
+ * above the group's table. Without this guard `popover`, whose base.css has
+ * no group comments at all, headings its one table with the entire file-head
+ * doc block. */
+function isLabel(raw) {
+  if (raw.includes('\n')) return false;
+  return commentText(raw).length <= MAX_LABEL_LENGTH;
+}
+
+/** Every base.css opens with a `/*\n * @rozie-ui/<family> — base token
+ * reference.\n * … *​/` doc block explaining the file itself. It is neither a
+ * label nor a note about any group — it documents the FILE — so it is dropped
+ * outright. Collapsing such a block leaves its per-line `*` prefixes behind,
+ * which is what identifies it. */
+function isDocBlock(raw) {
+  return commentText(raw).startsWith('*');
+}
+
+/** Parse `base.css` into an ordered list of
+ * `{ name, value, groupKey, label, note }`, keeping only the FIRST occurrence
+ * of each declaration name — a multi-block file may declare the same token up
+ * to three times (a light root rule, a `.dark`/`[data-theme]` override, and an
+ * OS `@media` query) and the first (light) occurrence is the documented
+ * default.
+ *
+ * Each run of `/* … *​/` comments preceding a declaration opens a new group.
+ * The run's last LABEL becomes the heading (so a label followed by a note, and
+ * a note followed by a label, both resolve to the label); every non-label
+ * comment in the run becomes the group's note. A run with no label yields a
+ * headingless group carrying just its note. */
 function parseDeclarations(css) {
   const SCAN = /\/\*[\s\S]*?\*\/|^[ \t]*(--[a-z0-9-]+)\s*:\s*([^;]+);/gm;
-  let currentGroup = '';
+  let current = { groupKey: 0, label: '', note: '' };
+  let groupKey = 0;
+  let run = [];
   const seen = new Set();
   const decls = [];
   for (const m of css.matchAll(SCAN)) {
     if (m[0].startsWith('/*')) {
-      currentGroup = m[0]
-        .slice(2, -2)
-        .replace(/\s+/g, ' ')
-        .trim();
+      run.push(m[0]);
       continue;
+    }
+    if (run.length) {
+      run = run.filter((c) => !isDocBlock(c));
+      const labels = run.filter(isLabel);
+      const notes = run.filter((c) => !isLabel(c));
+      current = {
+        groupKey: ++groupKey,
+        label: labels.length ? commentText(labels[labels.length - 1]) : '',
+        note: notes.map(commentText).join(' '),
+      };
+      run = [];
     }
     const name = m[1];
     if (seen.has(name)) continue;
     seen.add(name);
-    decls.push({ name, value: m[2].trim(), group: currentGroup });
+    decls.push({ name, value: m[2].trim(), ...current });
   }
   return decls;
 }
@@ -147,9 +203,19 @@ function renderPage(slug, name, prefix, groups, undeclared, overrides, selector,
   parts.push('');
   parts.push('## Tokens');
   parts.push('');
-  for (const [group, entries] of groups) {
-    parts.push(`### ${escapeAngles(group)}`);
-    parts.push('');
+  for (const entries of groups.values()) {
+    const { label, note } = entries[0];
+    // A group without a label gets no heading — its tokens simply follow the
+    // previous table. Its note (if any) still renders, so nothing authored in
+    // base.css is lost just because it was written as prose rather than a label.
+    if (label) {
+      parts.push(`### ${escapeAngles(label)}`);
+      parts.push('');
+    }
+    if (note) {
+      parts.push(escapeAngles(note));
+      parts.push('');
+    }
     parts.push('| Token | Default |');
     parts.push('| --- | --- |');
     for (const d of entries) parts.push(`| ${cell(d.name)} | ${cell(d.value)} |`);
@@ -212,10 +278,12 @@ function main() {
       console.warn(`[gen-theming-pages] ${slug}: ${undeclared.length} token(s) read but undeclared in base.css: ${undeclared.join(', ')}`);
     }
 
+    // Keyed by groupKey, not by heading text — two headingless groups would
+    // otherwise collide into one table.
     const groups = new Map();
     for (const d of publicDecls) {
-      if (!groups.has(d.group)) groups.set(d.group, []);
-      groups.get(d.group).push(d);
+      if (!groups.has(d.groupKey)) groups.set(d.groupKey, []);
+      groups.get(d.groupKey).push(d);
     }
     const groupKeys = [...groups.keys()];
     const overrides =

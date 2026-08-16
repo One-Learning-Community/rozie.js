@@ -28,7 +28,7 @@ Every cosmetic value `Pagination` renders is a `--rozie-pagination-*` custom pro
 | `--rozie-pagination-font` | `inherit` |
 | `--rozie-pagination-font-weight` | `500` |
 
-### accent — the single color most consumers will set; the active page + focus ring derive from it
+accent — the single color most consumers will set; the active page + focus ring derive from it
 
 | Token | Default |
 | --- | --- |

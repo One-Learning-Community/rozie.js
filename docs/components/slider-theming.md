@@ -27,7 +27,7 @@ Every cosmetic value `Slider` renders is a `--rozie-slider-*` custom property wi
 | `--rozie-slider-font` | `inherit` |
 | `--rozie-slider-pad` | `0.5rem 0` |
 
-### accent — the single color most consumers will set; thumb + fill derive from it
+accent — the single color most consumers will set; thumb + fill derive from it
 
 | Token | Default |
 | --- | --- |
@@ -41,7 +41,7 @@ Every cosmetic value `Slider` renders is a `--rozie-slider-*` custom property wi
 | `--rozie-slider-track-radius` | `999px` |
 | `--rozie-slider-track-bg` | `rgba(0, 0, 0, 0.18)` |
 
-### fill (the colored &lt;div> underlay; spans the runtime fill-start→fill-end vars)
+fill (the colored &lt;div> underlay; spans the runtime fill-start→fill-end vars)
 
 | Token | Default |
 | --- | --- |
@@ -56,7 +56,7 @@ Every cosmetic value `Slider` renders is a `--rozie-slider-*` custom property wi
 | `--rozie-slider-thumb-border` | `2px solid #fff` |
 | `--rozie-slider-thumb-shadow` | `0 1px 3px rgba(0, 0, 0, 0.3)` |
 
-### WebKit-only: vertical centering of the thumb over the track. Default keeps the thumb centered on the default track height; override if you change the thumb-size / track-height pair.
+WebKit-only: vertical centering of the thumb over the track. Default keeps the thumb centered on the default track height; override if you change the thumb-size / track-height pair.
 
 | Token | Default |
 | --- | --- |
@@ -94,7 +94,7 @@ Every cosmetic value `Slider` renders is a `--rozie-slider-*` custom property wi
 | `--rozie-slider-bubble-bg` | `var(--rozie-slider-accent)` |
 | `--rozie-slider-bubble-radius` | `4px` |
 
-### runtime fill — computed per-render from value/min/max and written as inline custom properties on the root (the `fillStyle` $computed). The inline style always wins over anything declared here. Declared `initial` on purpose: the two read sites disagree on their own local fallback (the fill underlay supplies a `0%` fallback, the bubble read supplies none), so freezing either value would collapse the other. `initial` resets the custom property to the guaranteed-invalid value, which makes each var() substitute its OWN local fallback when the inline value is absent — render-neutral, since the inline style takes priority regardless.
+runtime fill — computed per-render from value/min/max and written as inline custom properties on the root (the `fillStyle` $computed). The inline style always wins over anything declared here. Declared `initial` on purpose: the two read sites disagree on their own local fallback (the fill underlay supplies a `0%` fallback, the bubble read supplies none), so freezing either value would collapse the other. `initial` resets the custom property to the guaranteed-invalid value, which makes each var() substitute its OWN local fallback when the inline value is absent — render-neutral, since the inline style takes priority regardless.
 
 | Token | Default |
 | --- | --- |

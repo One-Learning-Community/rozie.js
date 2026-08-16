@@ -27,7 +27,7 @@ Every cosmetic value `Otp` renders is a `--rozie-otp-*` custom property with a b
 | `--rozie-otp-gap` | `0.5rem` |
 | `--rozie-otp-font` | `inherit` |
 
-### accent — the single color most consumers will set; caret + focus + filled border derive from it
+accent — the single color most consumers will set; caret + focus + filled border derive from it
 
 | Token | Default |
 | --- | --- |

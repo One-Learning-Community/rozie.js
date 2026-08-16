@@ -32,7 +32,7 @@ Every cosmetic value `DatePicker` renders is a `--rozie-datepicker-*` custom pro
 | `--rozie-datepicker-radius` | `10px` |
 | `--rozie-datepicker-padding` | `0.75rem` |
 
-### accent — the single color most consumers will set; selected day, today ring + focus ring all derive from it
+accent — the single color most consumers will set; selected day, today ring + focus ring all derive from it
 
 | Token | Default |
 | --- | --- |
@@ -59,7 +59,7 @@ Every cosmetic value `DatePicker` renders is a `--rozie-datepicker-*` custom pro
 | `--rozie-datepicker-ring-width` | `2px` |
 | `--rozie-datepicker-ring-offset` | `1px` |
 
-### grid — the single-month day grid; also covers the gap between grids when numberOfMonths > 1 renders them side by side
+grid — the single-month day grid; also covers the gap between grids when numberOfMonths > 1 renders them side by side
 
 | Token | Default |
 | --- | --- |
@@ -97,7 +97,7 @@ Every cosmetic value `DatePicker` renders is a `--rozie-datepicker-*` custom pro
 | --- | --- |
 | `--rozie-datepicker-disabled-opacity` | `0.4` |
 
-### drill/zoom — the month-picker and year-picker grids reached via the heading click (calendar drills down/up a level)
+drill/zoom — the month-picker and year-picker grids reached via the heading click (calendar drills down/up a level)
 
 | Token | Default |
 | --- | --- |
@@ -133,7 +133,7 @@ Every cosmetic value `DatePicker` renders is a `--rozie-datepicker-*` custom pro
 | `--rozie-datepicker-presets-gap` | `0.25rem` |
 | `--rozie-datepicker-presets-gap-top` | `0.5rem` |
 
-### range/preview — the range-selection highlight painted between the start and end day cells while dragging or hovering
+range/preview — the range-selection highlight painted between the start and end day cells while dragging or hovering
 
 | Token | Default |
 | --- | --- |

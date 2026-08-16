@@ -29,7 +29,9 @@ Every cosmetic value `CommandPalette` renders is a `--rozie-command-palette-*` c
 | `--rozie-command-palette-backdrop-bg` | `rgba(0, 0, 0, 0.5)` |
 | `--rozie-command-palette-backdrop-filter` | `none` |
 
-### panel chrome — also the depth>0 header's title weight (shares the panel's chrome semantics)
+### panel chrome
+
+Also carries the depth>0 header's title weight, which shares the panel's chrome semantics rather than the header's own.
 
 | Token | Default |
 | --- | --- |
@@ -45,7 +47,9 @@ Every cosmetic value `CommandPalette` renders is a `--rozie-command-palette-*` c
 | `--rozie-command-palette-divider-color` | `rgba(0, 0, 0, 0.1)` |
 | `--rozie-command-palette-title-weight` | `600` |
 
-### search input — also drives the vendored &lt;Combobox>'s render-neutral tokens (panel-scope aliasing)
+### search input
+
+Also drives the vendored Combobox's render-neutral tokens, by aliasing them at panel scope.
 
 | Token | Default |
 | --- | --- |
@@ -93,7 +97,9 @@ Every cosmetic value `CommandPalette` renders is a `--rozie-command-palette-*` c
 | `--rozie-command-palette-breadcrumb-separator-color` | `rgba(0, 0, 0, 0.35)` |
 | `--rozie-command-palette-breadcrumb-weight` | `400` |
 
-### list + options — also the option icon, fuzzy-match highlight, trailing slot, and group-heading spacing
+### list + options
+
+Also the option icon, the fuzzy-match highlight, the trailing slot, and group-heading spacing.
 
 | Token | Default |
 | --- | --- |
@@ -115,7 +121,9 @@ Every cosmetic value `CommandPalette` renders is a `--rozie-command-palette-*` c
 | `--rozie-command-palette-group-color` | `rgba(0, 0, 0, 0.5)` |
 | `--rozie-command-palette-group-transform` | `uppercase` |
 
-### option actions (the row's right-side hint + the flyout trigger)
+### option actions
+
+The row's right-side hint, plus the flyout trigger that hint opens when the option carries more than one action.
 
 | Token | Default |
 | --- | --- |
@@ -131,7 +139,9 @@ Every cosmetic value `CommandPalette` renders is a `--rozie-command-palette-*` c
 | `--rozie-command-palette-actions-hover-color` | `rgba(0, 0, 0, 0.85)` |
 | `--rozie-command-palette-actions-radius` | `0.25rem` |
 
-### per-item hotkey teaching badge — each falls back to the matching actions-hint-* token above
+### hotkey badge
+
+The per-item teaching badge. Each token here falls back to the matching actions-hint-* token declared above, so setting the hint styles both.
 
 | Token | Default |
 | --- | --- |
@@ -163,7 +173,9 @@ Every cosmetic value `CommandPalette` renders is a `--rozie-command-palette-*` c
 | `--rozie-command-palette-action-shortcut-font-size` | `0.75rem` |
 | `--rozie-command-palette-action-z` | `10` |
 
-### panel-internal args surface (chip + fields form, replaces the result list at depth)
+### args surface
+
+Panel-internal: a chip plus a fields form, which replaces the result list once the palette descends to an argument-collecting depth.
 
 | Token | Default |
 | --- | --- |
@@ -178,7 +190,9 @@ Every cosmetic value `CommandPalette` renders is a `--rozie-command-palette-*` c
 | `--rozie-command-palette-args-gap` | `0.5rem` |
 | `--rozie-command-palette-args-padding` | `0.75rem` |
 
-### empty state — also the loading and error re-projections into the same #empty region
+### empty state
+
+Also the loading and error states, which re-project into this same #empty region.
 
 | Token | Default |
 | --- | --- |

@@ -26,7 +26,7 @@ Every cosmetic value `Resizable` renders is a `--rozie-resizable-*` custom prope
 | --- | --- |
 | `--rozie-resizable-font` | `inherit` |
 
-### accent — the single color most consumers will set; the active handle + focus ring derive from it
+accent — the single color most consumers will set; the active handle + focus ring derive from it
 
 | Token | Default |
 | --- | --- |

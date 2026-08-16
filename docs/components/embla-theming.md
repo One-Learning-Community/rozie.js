@@ -20,7 +20,7 @@ Every cosmetic value `Carousel` renders is a `--rozie-embla-*` custom property w
 
 ## Tokens
 
-### accent — the shared selected/active color. Arrow-fg, dot-selected-bg and thumb-selected-border-color all fall back to this ONE token, so overriding just --rozie-embla-accent shifts every "selected" affordance at once.
+accent — the shared selected/active color. Arrow-fg, dot-selected-bg and thumb-selected-border-color all fall back to this ONE token, so overriding just --rozie-embla-accent shifts every "selected" affordance at once.
 
 | Token | Default |
 | --- | --- |

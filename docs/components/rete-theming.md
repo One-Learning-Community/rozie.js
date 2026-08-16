@@ -100,7 +100,7 @@ Every cosmetic value `FlowCanvas` renders is a `--rozie-flow-*` custom property 
 | `--rozie-flow-minimap-border` | `rgba(0, 0, 0, 0.16)` |
 | `--rozie-flow-minimap-shadow` | `0 1px 3px rgba(0, 0, 0, 0.14)` |
 
-### The two tokens below are read from JS via a getComputedStyle-backed flowToken() lookup at render time (canvas paint code, not a CSS var()) — declared here (and correctly base-only per the probe) so the public surface stays discoverable in one place.
+The two tokens below are read from JS via a getComputedStyle-backed flowToken() lookup at render time (canvas paint code, not a CSS var()) — declared here (and correctly base-only per the probe) so the public surface stays discoverable in one place.
 
 | Token | Default |
 | --- | --- |
