@@ -1,7 +1,7 @@
 {
   "name": "@rozie/runtime-react",
   "version": "0.5.3",
-  "description": "React runtime helpers for Rozie.js-compiled components (slot projection and class-merge utilities).",
+  "description": "Tree-shakable React runtime helpers for Rozie.js-compiled components: controllable (model) state, the r-keynav hook, event-modifier wrappers (debounce/throttle/outside-click/key filters), attribute + listener normalizers, crash-safe interpolation, and the $provide/$inject context registry.",
   "type": "module",
   "sideEffects": false,
   "private": false,

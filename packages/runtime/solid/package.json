@@ -1,7 +1,7 @@
 {
   "name": "@rozie/runtime-solid",
   "version": "0.5.3",
-  "description": "Solid runtime helpers for Rozie.js-compiled components (slot projection and class-merge utilities).",
+  "description": "Tree-shakable Solid runtime helpers for Rozie.js-compiled components: the controllable (model) signal, r-keynav primitive, event-modifier wrappers (debounce/throttle/outside-click/key filters), attribute + listener normalizers, scoped-style injection, crash-safe interpolation, and the $provide/$inject context registry.",
   "type": "module",
   "sideEffects": false,
   "private": false,

@@ -1,7 +1,7 @@
 {
   "name": "@rozie/runtime-vue",
   "version": "0.5.3",
-  "description": "Vue runtime helpers for Rozie.js-compiled components (slot projection and class-merge utilities).",
+  "description": "Tree-shakable Vue runtime helpers for Rozie.js-compiled components: the r-keynav composable, event-modifier wrappers (debounce/throttle/outside-click/key filters), a dynamic-listener normalizer, and a proxy-safe deep clone for the $clone sigil.",
   "type": "module",
   "sideEffects": false,
   "private": false,
