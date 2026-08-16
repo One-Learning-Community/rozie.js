@@ -1,0 +1,54 @@
+<rozie name="DynamicSlotsConsumer">
+
+<components>
+{
+  DynamicSlots: './DynamicSlots.rozie',
+}
+</components>
+
+<data>
+{
+  dynamicFillKey: 'freeform',
+}
+</data>
+
+<template>
+<div class="dynamic-slots-consumer">
+  <DynamicSlots
+    :columns="[{ key: 'status' }, { key: 'score' }]"
+    :row="{ status: 'Active', score: 42 }"
+    :total="7"
+  >
+    <!-- R5/AC-6: family-matched fills using ORDINARY static named-fill syntax — NOT the
+         consumer-side dynamic-fill bracket syntax used further below. Family resolution
+         against the producer's cell- family is the compiler's job via matchedFamily. -->
+    <template #cell-status="{ row, value }">
+      <span class="status">{{ value }}</span>
+    </template>
+    <template #cell-score="{ row, value }">
+      <span class="score">{{ value }}</span>
+    </template>
+
+    <!-- AC-6: exact-wins fill — cell-total is a static slot on the producer AND falls
+         inside the cell- family's prefix space; the static slot's types thread and
+         matchedFamily stays unset. -->
+    <template #cell-total="{ value }">
+      <strong>{{ value }}</strong>
+    </template>
+
+    <!-- Byte-identity control fill, against the static identifier slot. -->
+    <template #headerCell="{ title }">
+      <h2>{{ title }}</h2>
+    </template>
+
+    <!-- R1/AC-12: consumer-side dynamic fill (Phase 07.3.2's existing mechanism)
+         targeting the producer's no-prefix dynamic slot, exercised alongside
+         producer-side dynamism in one component. -->
+    <template #[$data.dynamicFillKey]="{ label }">
+      <em>{{ label }}</em>
+    </template>
+  </DynamicSlots>
+</div>
+</template>
+
+</rozie>
