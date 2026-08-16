@@ -10,6 +10,8 @@ npm i @rozie-ui/rete-react
 
 Peer dependencies: the Rete engine (`rete` + `rete-area-plugin` + `rete-connection-plugin` + `rete-render-utils`, all `^2`) + `react + react-dom`. Install them alongside this package.
 
+Also installed: `@rozie/runtime-react` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
+
 Rete ships no stylesheet — all node / socket / connection chrome is styled by this component, so there is no engine CSS to import.
 
 ## Usage

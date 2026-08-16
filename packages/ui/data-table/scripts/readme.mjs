@@ -15,6 +15,7 @@
 
 import { renderPropDescription } from '@rozie/core';
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
+import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 
 // ---------------------------------------------------------------------------
 // IR-derivation helpers (shared by README rendering AND the docs validator).
@@ -2230,6 +2231,14 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('');
   lines.push(`Peer dependencies: \`${peerLabel}\`. Install them alongside this package.`);
   lines.push('');
+
+  // Disclose the @rozie/runtime-* dependency this leaf actually carries.
+  // Derived from its package.json — null when the leaf imports none.
+  const runtimeNote = runtimeDepNote(pkgName);
+  if (runtimeNote) {
+    lines.push(runtimeNote);
+    lines.push('');
+  }
 
   // Usage — one heading per aligned example set.
   lines.push('## Usage');

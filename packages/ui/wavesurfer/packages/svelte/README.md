@@ -10,6 +10,8 @@ npm i @rozie-ui/wavesurfer-svelte
 
 Peer dependencies: the `wavesurfer.js` engine (`^7`) + `svelte`. Install them alongside this package. wavesurfer renders a canvas — no external CSS import is required.
 
+Also installed: `@rozie/runtime-svelte` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
+
 ## Usage
 
 ```svelte

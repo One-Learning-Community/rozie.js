@@ -10,6 +10,8 @@ npm i @rozie-ui/pdf-lit
 
 Peer dependencies: the `pdfjs-dist` engine (`^6`) + `lit + @lit-labs/preact-signals + @preact/signals-core`. Install them alongside this package.
 
+Also installed: `@rozie/runtime-lit` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
+
 No separate engine-CSS import is needed — `PdfViewer` ships the selectable text-layer CSS itself. The PDF.js worker is auto-configured from a version-matched CDN, so the component works with zero config; override the `workerSrc` prop for offline / CSP / bundled-worker setups.
 
 ## Usage

@@ -8,6 +8,7 @@
  */
 
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
+import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 
 const BT = String.fromCharCode(96);
 const NAME = "Captcha";
@@ -517,6 +518,14 @@ export function renderReadme(target, components, eventManifest, pkgName, handleM
       (STYLESHEET_IMPORT ? ' Also import ' + c(STYLESHEET_IMPORT) + ' once in your app.' : ''),
   );
   lines.push('');
+
+  // Disclose the @rozie/runtime-* dependency this leaf actually carries.
+  // Derived from its package.json — null when the leaf imports none.
+  const runtimeNote = runtimeDepNote(pkgName);
+  if (runtimeNote) {
+    lines.push(runtimeNote);
+    lines.push('');
+  }
 
   // One section per component (primary first). For a single-component family the
   // section heading still renders (`## <Name>`) — harmless and self-documenting.

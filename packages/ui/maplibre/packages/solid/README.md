@@ -10,6 +10,8 @@ npm i @rozie-ui/maplibre-solid
 
 Peer dependencies: the `maplibre-gl` engine (`^5`) + `solid-js`. Install them alongside this package.
 
+Also installed: `@rozie/runtime-solid` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
+
 Import the engine CSS once at your app entry (the scoped component `<style>` cannot reach the engine-rendered control/popup/marker DOM):
 
 ```ts

@@ -10,6 +10,8 @@ npm i @rozie-ui/date-picker-angular
 
 Peer dependencies: `@angular/core + @angular/common + @angular/forms`. Install them alongside this package.
 
+Also installed: `@rozie/runtime-keynav-core` — Rozie's small, tree-shaken runtime helper package (the keyboard-navigation state machine behind `r-keynav`). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
+
 ## Usage
 
 ```ts

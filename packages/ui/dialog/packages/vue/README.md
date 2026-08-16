@@ -10,6 +10,8 @@ npm i @rozie-ui/dialog-vue
 
 Peer dependencies: `vue`. Install them alongside this package.
 
+Also installed: `@rozie/runtime-vue` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. This build imports nothing from it today, so it shakes out of your bundle entirely. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
+
 ## Usage
 
 ```vue

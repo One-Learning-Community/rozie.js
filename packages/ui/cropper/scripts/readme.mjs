@@ -14,6 +14,7 @@
  */
 
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
+import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 
 // ---------------------------------------------------------------------------
 // IR-derivation helpers (shared by README rendering AND the docs validator).
@@ -304,6 +305,14 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
       `\`${FRAMEWORK_PEER_LABEL[target]}\`. Install them alongside this package.`,
   );
   lines.push('');
+
+  // Disclose the @rozie/runtime-* dependency this leaf actually carries.
+  // Derived from its package.json — null when the leaf imports none.
+  const runtimeNote = runtimeDepNote(pkgName);
+  if (runtimeNote) {
+    lines.push(runtimeNote);
+    lines.push('');
+  }
   lines.push(
     'Import the engine CSS once at your app entry (the scoped component `<style>` cannot reach the ' +
       'engine-rendered `.cropper-*` crop UI):',

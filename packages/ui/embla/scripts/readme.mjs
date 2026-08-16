@@ -16,6 +16,7 @@
  */
 
 import { litEventName, litEventNamesDiverge } from '../../lit-event-name.mjs';
+import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 
 // ---------------------------------------------------------------------------
 // IR-derivation helpers (shared by README rendering AND the docs validator).
@@ -308,6 +309,14 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}, eventMani
       `engine packages + \`${FRAMEWORK_PEER_LABEL[target]}\`. Install them alongside this package.`,
   );
   lines.push('');
+
+  // Disclose the @rozie/runtime-* dependency this leaf actually carries.
+  // Derived from its package.json — null when the leaf imports none.
+  const runtimeNote = runtimeDepNote(pkgName);
+  if (runtimeNote) {
+    lines.push(runtimeNote);
+    lines.push('');
+  }
   lines.push(
     'No engine CSS to import — the carousel skeleton styles (`overflow: hidden` viewport, ' +
       'flex container, slide sizing) ship scoped inside the component.',

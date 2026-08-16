@@ -12,6 +12,8 @@ npm i @rozie-ui/embla-react
 
 Peer dependencies: the `embla-carousel` (`^8.6`) + `embla-carousel-autoplay` (`^8.6`) engine packages + `react + react-dom`. Install them alongside this package.
 
+Also installed: `@rozie/runtime-react` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
+
 No engine CSS to import — the carousel skeleton styles (`overflow: hidden` viewport, flex container, slide sizing) ship scoped inside the component.
 
 ## Usage

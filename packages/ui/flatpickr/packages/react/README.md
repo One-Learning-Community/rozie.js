@@ -10,6 +10,8 @@ npm i @rozie-ui/flatpickr-react
 
 Peer dependencies: `flatpickr ^4.6` + `react + react-dom`. Install them alongside this package, and import flatpickr's stylesheet (`import 'flatpickr/dist/flatpickr.css'`) once in your app.
 
+Also installed: `@rozie/runtime-react` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
+
 ## Usage
 
 ```tsx

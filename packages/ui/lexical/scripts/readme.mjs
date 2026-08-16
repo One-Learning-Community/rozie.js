@@ -11,6 +11,7 @@
  */
 import { renderPropDescription } from '@rozie/core';
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
+import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 
 const BT = String.fromCharCode(96);
 const SLUG = 'lexical';
@@ -191,6 +192,14 @@ export function renderReadme(target, components, eventManifest, pkgName, handleM
       (STYLESHEET_IMPORT ? ' Also import ' + c(STYLESHEET_IMPORT) + ' once in your app.' : ''),
   );
   lines.push('');
+
+  // Disclose the @rozie/runtime-* dependency this leaf actually carries.
+  // Derived from its package.json — null when the leaf imports none.
+  const runtimeNote = runtimeDepNote(pkgName);
+  if (runtimeNote) {
+    lines.push(runtimeNote);
+    lines.push('');
+  }
   lines.push(
     `All Lexical ${c('$')}-API is authored in the **namespace-import form** ` +
       `(${c("import * as lexical from 'lexical'; lexical.$getRoot()")}) — the one ` +

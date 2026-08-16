@@ -14,6 +14,7 @@
  */
 
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
+import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 
 export function renderPropType(typeAnnotation) {
   if (!typeAnnotation) return 'unknown';
@@ -386,6 +387,14 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
       `Install them alongside this package.`,
   );
   lines.push('');
+
+  // Disclose the @rozie/runtime-* dependency this leaf actually carries.
+  // Derived from its package.json — null when the leaf imports none.
+  const runtimeNote = runtimeDepNote(pkgName);
+  if (runtimeNote) {
+    lines.push(runtimeNote);
+    lines.push('');
+  }
   lines.push(
     'Rete ships no stylesheet — all node / socket / connection chrome is styled by ' +
       'this component, so there is no engine CSS to import.',
