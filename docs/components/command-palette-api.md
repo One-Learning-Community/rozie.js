@@ -200,64 +200,6 @@ The palette also drives several of the vendored `@rozie-ui/combobox` primitive's
 }
 ```
 
-Breadcrumb and composed-input tokens (nested levels + sub-actions):
+Structural rules (the fixed overlay, the non-clipping frame's positioning, the panel's `overflow: hidden`, the flyout's `position: absolute`) compile per-leaf and are not consumer-overridable.
 
-| Token | Fallback | Description |
-| --- | --- | --- |
-| `--rozie-command-palette-breadcrumb-gap` | `0.25rem` | Gap between breadcrumb segments/separators in the default `breadcrumb` fill. |
-| `--rozie-command-palette-breadcrumb-color` | `rgba(0, 0, 0, 0.55)` | Ancestor (non-current) breadcrumb segment color. |
-| `--rozie-command-palette-breadcrumb-weight` | `400` | Ancestor breadcrumb segment font weight. |
-| `--rozie-command-palette-breadcrumb-current-color` | `inherit` | The CURRENT (last) breadcrumb segment's color. |
-| `--rozie-command-palette-breadcrumb-current-weight` | `600` | The current segment's font weight. |
-| `--rozie-command-palette-breadcrumb-separator-color` | `rgba(0, 0, 0, 0.35)` | The `›` separator color between segments. |
-| `--rozie-command-palette-input-radius` | `0` | Forwarded to the composed `<Combobox>`'s `--rozie-combobox-radius` from panel scope — the search input's corner radius. |
-| `--rozie-command-palette-input-border-color` | `transparent` | Forwarded to `--rozie-combobox-border-color` — the input's top/left/right border color (borderless by default inside the palette). |
-| `--rozie-command-palette-input-focus-border-color` | `transparent` | Forwarded to `--rozie-combobox-focus-border-color` — the input's focus border color, decoupled from the combobox's selected-option accent. |
-| `--rozie-command-palette-input-focus-ring-width` | `0` | Forwarded to `--rozie-combobox-focus-ring-width` — no focus ring by default inside the palette (was the combobox's default `3px` blue ring). |
-| `--rozie-command-palette-input-underline` | `var(--rozie-command-palette-border-width, 1px) solid var(--rozie-command-palette-divider-color, rgba(0, 0, 0, 0.1))` | Forwarded to `--rozie-combobox-input-underline` — the input's bottom-border longhand, which survives the combobox's own `:focus` border-color override so the divider stays put whether the input is focused or not. |
-| `--rozie-command-palette-section-gap` | `0.375rem` | Forwarded to `--rozie-combobox-group-heading-margin-top` — top spacing above each group heading, separating the leading ungrouped block from the first labeled section. |
-
-Per-item [hotKey badge](#per-item-hotkey-badge) tokens. Each falls back to the matching `--rozie-command-palette-actions-hint-*` value, so a consumer who already themed the `#actions` hint gets a matching badge for free:
-
-| Token | Fallback | Description |
-| --- | --- | --- |
-| `--rozie-command-palette-hotkey-padding` | `--rozie-command-palette-actions-hint-padding` (`0.0625rem 0.3125rem`) | The badge's padding. |
-| `--rozie-command-palette-hotkey-font-size` | `--rozie-command-palette-actions-hint-font-size` (`0.6875rem`) | The badge's font size. |
-| `--rozie-command-palette-hotkey-color` | `--rozie-command-palette-actions-hint-color` (`inherit`) | The badge's text color. |
-| `--rozie-command-palette-hotkey-bg` | `--rozie-command-palette-actions-hint-bg` (`rgba(0, 0, 0, 0.06)`) | The badge's background. |
-| `--rozie-command-palette-hotkey-radius` | `--rozie-command-palette-actions-hint-radius` (`0.25rem`) | The badge's corner radius. |
-
-Breadcrumb ancestor jump-button tokens ([click-to-jump](#nested-levels)). The jump button inherits the base `--rozie-command-palette-breadcrumb-*` color/weight tokens above; these three additionally style its native-button reset and hover affordance, with the hover color aliasing the existing current-segment color:
-
-| Token | Fallback | Description |
-| --- | --- | --- |
-| `--rozie-command-palette-breadcrumb-jump-radius` | `0.25rem` | The ancestor jump button's corner radius (focus ring follows it). |
-| `--rozie-command-palette-breadcrumb-jump-hover-color` | `--rozie-command-palette-breadcrumb-current-color` (`inherit`) | The ancestor jump button's text color on hover. |
-| `--rozie-command-palette-breadcrumb-jump-hover-decoration` | `underline` | The ancestor jump button's `text-decoration` on hover. |
-
-Inline [command-arguments](#inline-command-arguments) surface tokens. The chip additionally reuses the `--rozie-command-palette-breadcrumb-current-*` color/weight tokens above; the fields alias the existing panel/input tokens:
-
-| Token | Fallback | Description |
-| --- | --- | --- |
-| `--rozie-command-palette-args-padding` | `0.75rem` | Padding around the whole args surface (chip + fields). |
-| `--rozie-command-palette-args-gap` | `0.5rem` | Vertical gap between the chip and each field. |
-| `--rozie-command-palette-args-chip-bg` | `rgba(0, 0, 0, 0.06)` | The pending-command chip's background. |
-| `--rozie-command-palette-args-chip-color` | `inherit` | The chip's text color. |
-| `--rozie-command-palette-args-field-padding` | `--rozie-command-palette-input-padding` (`0.5rem 0.75rem`) | Each field's padding. |
-| `--rozie-command-palette-args-field-border` | `--rozie-command-palette-border-width` solid `--rozie-command-palette-divider-color` | Each field's border. |
-| `--rozie-command-palette-args-field-radius` | `--rozie-command-palette-input-radius` (`0.5rem`) | Each field's corner radius. |
-| `--rozie-command-palette-args-field-bg` | `--rozie-command-palette-input-bg` (`transparent`) | Each field's background. |
-| `--rozie-command-palette-args-dim-opacity` | `0.45` | The result list's opacity while the args surface is active (the list is also `pointer-events: none` + `aria-hidden`). |
-
-The full token vocabulary — overlay/scrim, panel chrome, the flyout, the header/back button, the list/option box model, empty/loading/error states, and the footer — has documented defaults in [`themes/base.css`](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/command-palette/src/themes/base.css). Structural rules (the fixed overlay, the non-clipping frame's positioning, the panel's `overflow: hidden`, the flyout's `position: absolute`) compile per-leaf and are not consumer-overridable.
-
-### Design-system bridges
-
-Each package ships token presets that map the palette's tokens onto a known design system's published CSS variables:
-
-```ts
-import '@rozie-ui/command-palette-react/themes/shadcn.css';    // shadcn/ui (Radix)
-import '@rozie-ui/command-palette-react/themes/material.css';  // Material 3
-import '@rozie-ui/command-palette-react/themes/bootstrap.css'; // Bootstrap 5
-import '@rozie-ui/command-palette-react/themes/base.css';      // the documented default token set
-```
+The complete token table — including the breadcrumb, hotKey badge, ancestor jump-button and inline command-arguments tokens shown above — and the design-system bridges live on the [dedicated theming page](/components/command-palette-theming).

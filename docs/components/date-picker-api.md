@@ -66,3 +66,5 @@ design-system bridge or set the tokens yourself at any ancestor scope:
 ```ts
 import '@rozie-ui/date-picker-react/themes/shadcn.css';   // or material.css, bootstrap.css, base.css
 ```
+
+The complete token table and the design-system bridges live on the [dedicated theming page](/components/date-picker-theming).
