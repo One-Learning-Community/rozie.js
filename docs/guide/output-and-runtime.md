@@ -74,7 +74,7 @@ component crosses it.
 | Svelte | `@rozie/runtime-svelte` (ships source; your build shakes it) |
 | Solid | `@rozie/runtime-solid` |
 | Lit | `@rozie/runtime-lit` |
-| **Angular** | **none** — the emitter inlines its helpers as module-scope functions |
+| **Angular** | **`@rozie/runtime-keynav-core` only** — every other helper is inlined as a module-scope function |
 
 Angular is the exception, and the exception is instructive: it proves inlining
 is possible. The one thing Angular does import is `@rozie/runtime-keynav-core`,

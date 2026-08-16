@@ -23,7 +23,7 @@ latest stable).
 | Authoring syntax | Vue/Alpine-flavored `.rozie` SFC (`<template>` + `<script>` + `<style>` + `<props>` blocks, `r-*` directives, `{{ }}`) | JSX-like components with hooks (`useStore`, `useState`, `onMount`) | TSX components (decorators + JSX) |
 | Output model | **Native** components per framework | **Native** components per framework | Standards-based **web components** + generated framework wrappers |
 | Framework targets | React, Vue, Svelte, Angular, Solid, Lit (6) | React, Vue, Svelte, Angular, Solid, Qwik + more (Lit, Alpine, React Native, web components) | One web component → React / Vue / Angular wrapper output targets |
-| Runtime cost | A tree-shaken helper package, not a renderer: 0.3–4.2 KB per component, 2.6–4.8 KB for five, minified and gzipped. Angular imports none of it. [Details](/guide/output-and-runtime) | None at runtime | A small Stencil runtime ships inside the custom element |
+| Runtime cost | A tree-shaken helper package, not a renderer: 0.3–4.2 KB per component, 2.6–4.8 KB for five, minified and gzipped. Angular imports only the keynav state machine. [Details](/guide/output-and-runtime) | None at runtime | A small Stencil runtime ships inside the custom element |
 | Maturity | New, v1-track | `0.14.x`, pre-1.0, established with a broad community | `4.x`, mature, very large production footprint (Ionic Framework) |
 | Sweet spot | Component-library authors who want native output across six frameworks, with Vue-style authoring | The widest target matrix, JSX authoring, and the Builder.io / Figma import pipeline | Shipping web components as the unit of distribution, with thin framework wrappers |
 

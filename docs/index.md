@@ -30,7 +30,7 @@ features:
   - title: Familiar Vue/Alpine syntax
     details: Block-based SFCs with &lt;props&gt;, &lt;data&gt;, &lt;script&gt;, &lt;template&gt;, and &lt;style&gt;. r-* directives, @event modifiers, mustache interpolation. No JSX-isms.
   - title: Not a rendering framework
-    details: Rozie never owns the render pipeline — React renders React, Vue renders Vue, the browser renders the custom element. Compiled components do import a small runtime helper package (state, keynav, event modifiers, safe interpolation); it is tree-shaken, and five components cost 2.6–4.8 KB minified and gzipped. Angular imports none of it.
+    details: Rozie never owns the render pipeline — React renders React, Vue renders Vue, the browser renders the custom element. Compiled components do import a small runtime helper package (state, keynav, event modifiers, safe interpolation); it is tree-shaken, and five components cost 2.6–4.8 KB minified and gzipped. Angular imports none of it except the keyboard-navigation core.
   - title: Built for component-library authors
     details: Write a component once in a .rozie file and Rozie compiles it to six consumer packages. If you maintain manual cross-framework wrappers today, that work goes away.
   - title: Stuck on one framework? Use Rozie for ONE new component this week
