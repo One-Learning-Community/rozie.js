@@ -1879,10 +1879,21 @@ function emitElementInner(
     // the component's open tag before the final `>` (mirrors emitSlot's
     // eventStr splicing established in Phase 07.4).
     const propertyAttrs: string[] = [];
+    // Phase 79 Plan 09 (R4) — record-path entries accumulate HERE, separate
+    // from `propertyAttrs`, so multiple family-matched/dynamic/non-identifier
+    // fills on ONE element merge into a SINGLE `.rozieSlots=${{ ... }}`
+    // object literal rather than each emitting its own independent binding
+    // (which would silently overwrite, not merge — T-79-20). After the loop,
+    // if non-empty, the joined entries are pushed as ONE string into
+    // `propertyAttrs` so the accumulated literal rides the SAME pre-existing
+    // splice below, unchanged.
+    const rozieSlotsEntries: string[] = [];
     let needsObserveImport = false;
     for (const filler of node.slotFillers) {
       const out = emitSlotFiller(filler, fillerCtx);
-      if (out.propertyAttr !== undefined && out.propertyAttr.length > 0) {
+      if (out.rozieSlotsEntry !== undefined) {
+        rozieSlotsEntries.push(`${out.rozieSlotsEntry.key}: ${out.rozieSlotsEntry.fn}`);
+      } else if (out.propertyAttr !== undefined && out.propertyAttr.length > 0) {
         propertyAttrs.push(out.propertyAttr);
       } else if (out.childTemplate) {
         fillerChildren.push(out.childTemplate);
@@ -1908,6 +1919,16 @@ function emitElementInner(
     }
     if (needsObserveImport) {
       opts.runtime.add('observeRozieSlotCtx');
+    }
+    // Phase 79 Plan 09 (R4) — join every accumulated record entry into ONE
+    // `.rozieSlots=${{ ... }}` object literal and push that SINGLE string
+    // into `propertyAttrs`, so it rides the existing splice below unchanged.
+    // A single, consistently-applied `, ` separator between entries — never
+    // doubled (this project has a recorded defect class where a doubled
+    // separator inside an emitted binding string silently drops the
+    // following declaration).
+    if (rozieSlotsEntries.length > 0) {
+      propertyAttrs.push('.rozieSlots=${{ ' + rozieSlotsEntries.join(', ') + ' }}');
     }
     // Phase 07.5 — splice property attrs into the parent component's open
     // tag before the final `>`. `open` is the component's open tag (e.g.
