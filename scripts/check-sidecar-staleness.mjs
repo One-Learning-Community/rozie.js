@@ -50,7 +50,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -71,6 +71,31 @@ const ANGULAR_FORBIDDEN_SIDECAR_ROOTS = [
   { dir: join(CONSUMERS_DIR, 'angular-analogjs'), skip: [] },
   { dir: join(ROOT, 'tests', 'integration', 'angular-analogjs'), skip: [] },
 ];
+
+// CODEGEN-INPUT EXEMPTION (Phase 79 Plan 12 fallout, 2026-08-17): these trees
+// hold `.rozie` files that are build-time codegen INPUTS, not consumer-app
+// components. `examples/consumers/scripts/` is tooling — its
+// `fixtures-src/*.rozie` is compiled ONLY by gen-dynamicslots-fixture.mjs via
+// @rozie/cli's runBuildMatrix, which writes its output elsewhere. No demo
+// imports these files, so no unplugin `buildStart` ever walks them and NO
+// SIDECAR IS EVER GENERATED for them. Requiring one is unsatisfiable: it fails
+// every CI run forever, no matter how healthy the build is.
+//
+// Scoped DELIBERATELY to the `--require-complete` check only. The staleness and
+// orphan checks still walk this tree, so if a sidecar ever does appear here it
+// is still hash-verified — the exemption removes an impossible REQUIREMENT, it
+// does not create a blind spot.
+const COMPLETENESS_EXEMPT_DIRS = [join(CONSUMERS_DIR, 'scripts')];
+
+/**
+ * True when `roziePath` lives in a codegen-input tree that no build ever emits
+ * a sidecar for, and which `--require-complete` must therefore not demand one
+ * from. Matches on a path-separator boundary so a sibling directory sharing a
+ * name prefix (`scripts-legacy/`) is NOT swept in.
+ */
+function isCompletenessExempt(roziePath) {
+  return COMPLETENESS_EXEMPT_DIRS.some((dir) => roziePath.startsWith(dir + sep));
+}
 
 // The single source of truth for the header — must match
 // packages/unplugin/src/emitSidecar.ts SIDECAR_HEADER_PREFIX exactly.
@@ -191,8 +216,31 @@ function runSelfTest() {
       );
       process.exit(1);
     }
+    // CODEGEN-INPUT EXEMPTION (negative + positive path). The completeness
+    // check must EXEMPT a codegen-input tree (no build ever emits a sidecar
+    // there, so requiring one is unsatisfiable) while still requiring one for
+    // a real consumer app. Both directions are asserted so the exemption can
+    // never silently widen into "nothing is ever required".
+    const exemptPath = join(CONSUMERS_DIR, 'scripts', 'fixtures-src', 'DynamicSlots.rozie');
+    if (!isCompletenessExempt(exemptPath)) {
+      console.error(
+        '✗ self-test FAILED: the completeness check did NOT exempt a codegen-input .rozie',
+      );
+      console.error(`    ${exemptPath}`);
+      process.exit(1);
+    }
+    const requiredPath = join(CONSUMERS_DIR, 'react-ts', 'src', 'Counter.rozie');
+    if (isCompletenessExempt(requiredPath)) {
+      console.error(
+        '✗ self-test FAILED: the completeness check exempted a REAL consumer-app .rozie — the exemption is too broad.',
+      );
+      console.error(`    ${requiredPath}`);
+      process.exit(1);
+    }
+
     console.log('✓ self-test passed — the gate accepted a fresh sidecar and rejected a tampered one:');
     console.log(`    ${reject.reason}`);
+    console.log('✓ self-test passed — completeness exempts codegen-input trees, still requires consumer apps.');
     process.exit(0);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
@@ -262,6 +310,9 @@ function runGate(requireComplete) {
   const missing = [];
   const consumerRozies = walk(CONSUMERS_DIR, (n) => n.endsWith('.rozie'), [], ['angular-analogjs']);
   for (const r of consumerRozies) {
+    // Codegen-input trees can never satisfy this check — see
+    // COMPLETENESS_EXEMPT_DIRS. Skipped here and nowhere else.
+    if (isCompletenessExempt(r)) continue;
     const expected = r.replace(/\.rozie$/, '.d.rozie.ts');
     if (!existsSync(expected)) missing.push(`${r} (expected ${expected})`);
   }
