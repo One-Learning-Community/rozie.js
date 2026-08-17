@@ -138,7 +138,15 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
   solidImports.add('splitProps'); // D-141 universal
 
   // 3. Determine default-slot presence (D-131).
-  const hasDefaultSlot = (ir.slots ?? []).some((s) => s.name === '');
+  // Phase 79 Plan 12 (R6) — a dynamic-name slot shares the '' default-slot
+  // sentinel (79-06 Assumption A1) but is NOT the genuine default slot; it
+  // is reachable only through the `slots?:` record, never via
+  // `local.children`/`children(() => …)`. Excluded here so a producer whose
+  // ONLY ''-named slot is a dynamic-name one does not incorrectly split
+  // 'children' or emit an unused `children()` accessor call.
+  const hasDefaultSlot = (ir.slots ?? []).some(
+    (s) => s.name === '' && s.dynamicNameExpr === undefined,
+  );
   // Phase 36 ($provide) — a Provider-wrapped component with a default slot emits
   // a plain lazy thunk (`const resolved = () => local.children`) instead of the
   // `children(() => …)` memo, so the children instantiate within the
