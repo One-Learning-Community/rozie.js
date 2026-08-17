@@ -73,7 +73,7 @@ import {
   AngularImportCollector,
   collectAngularImports,
 } from '../rewrite/collectAngularImports.js';
-import { buildEligibleSlotDecls, buildNgTemplateContextGuard } from './refineSlotTypes.js';
+import { buildEligibleSlotDecls, buildNgTemplateContextGuard, buildFamilyCtxDecls } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 // Phase 71 Plan 09 (r-keynav, Angular — highest blast radius), extended
@@ -1074,6 +1074,14 @@ export function emitScript(
   for (const rendered of buildEligibleSlotDecls(ir.slots)) {
     interfaceDecls.push(rendered.interfaceDecl);
     slotFieldDecls.push(rendered.fieldDecl);
+  }
+  // Phase 79 Plan 12 (R6) — a PREFIXED dynamic-name family gets its own
+  // synthesized ctx interface (no `@ContentChild` field — the family has no
+  // compile-time selector to attach one to; it is reachable only via the
+  // `templates()` signal-map lookup). `buildNgTemplateContextGuard` below
+  // folds the SAME family names into its union independently.
+  for (const familyCtxDecl of buildFamilyCtxDecls(ir.slots)) {
+    interfaceDecls.push(familyCtxDecl);
   }
 
   // 6. Build field declarations.

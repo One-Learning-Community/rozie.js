@@ -123,7 +123,7 @@ describe('buildNgTemplateContextGuard — family coverage (R6)', () => {
 });
 
 describe('emitAngular — end-to-end family type surface (R6)', () => {
-  it('a component with no dynamic-name slot emits no family ctx interface, byte-identical', () => {
+  it('a component with no dynamic-name slot emits no synthesized FAMILY ctx interface (the pre-existing per-slot HeaderCtx is unaffected)', () => {
     const ir = lowerInline(`
 <rozie name="Header">
 <template>
@@ -132,7 +132,10 @@ describe('emitAngular — end-to-end family type surface (R6)', () => {
 </rozie>
 `);
     const { code } = emitAngular(ir, { filename: 'Header.rozie' });
-    expect(code).not.toContain('Ctx {}');
+    // Pre-existing per-slot ctx interface, unrelated to family type surface.
+    expect(code).toContain('interface HeaderCtx {}');
+    // No family-derived ctx interface was synthesized for this component.
+    expect(buildFamilyCtxDecls(ir.slots)).toEqual([]);
   });
 
   it('a producer with a namePrefix family emits the family Ctx interface and the guard covers it', () => {

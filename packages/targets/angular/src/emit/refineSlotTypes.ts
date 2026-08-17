@@ -31,6 +31,7 @@
  */
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 
 /** Convert default-slot empty string to synthetic ref name `defaultSlot`. */
 export function slotRefName(slotName: string): string {
@@ -131,13 +132,15 @@ export function buildSlotCtx(slot: SlotDecl): SlotCtxRendered {
     };
   }
 
-  // $implicit aggregate.
+  // $implicit aggregate. Phase 79 Plan 12 (D-13) — each param type flows
+  // through the shared `lowerSlotParamType` helper instead of a hardcoded
+  // `any`.
   const implicitProps = slot.params
-    .map((p) => `${p.name}: any`)
+    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])}`)
     .join('; ');
   paramFields.push(`  $implicit: { ${implicitProps} };`);
-  for (const p of slot.params) {
-    paramFields.push(`  ${p.name}: any;`);
+  for (const [i, p] of slot.params.entries()) {
+    paramFields.push(`  ${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`);
   }
 
   const interfaceDecl = `interface ${ctxName} {\n${paramFields.join('\n')}\n}`;
@@ -174,6 +177,79 @@ export function buildEligibleSlotDecls(slots: SlotDecl[]): SlotCtxRendered[] {
 }
 
 /**
+ * PascalCase a raw prefix fragment for use as a ctx interface name —
+ * `'cell-'` -> `'Cell'`, `'user-row-'` -> `'UserRow'`. Mirrors Lit's
+ * `pascalCaseFragment` (`slotIdentityKey.ts`, 79-08) so every target derives
+ * a family identifier the same way.
+ */
+function pascalCaseFragment(raw: string): string {
+  return raw
+    .split(/[^a-zA-Z0-9]+/)
+    .filter((segment) => segment.length > 0)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join('');
+}
+
+/** Family ctx interface name: `'cell-'` -> `'CellCtx'`. */
+function familyCtxName(namePrefix: string): string {
+  return `${pascalCaseFragment(namePrefix)}Ctx`;
+}
+
+/**
+ * Phase 79 Plan 12 (R6) — build a synthesized ctx interface for each
+ * DISTINCT `namePrefix` family among `slots`' dynamic-name slots. A
+ * dynamic-name slot with NO derivable prefix (R6's "degrades to a plain
+ * string index signature" case) contributes no interface — Angular's record
+ * path (`templates()?.[expr]`) has no compile-time hook for such a slot at
+ * all, prefixed or not; only a PREFIXED family gets a synthesized name to
+ * hang an interface on. `buildEligibleSlotDecls` (above) is UNCHANGED — a
+ * family slot still mints no `@ContentChild` field, since `@ContentChild`'s
+ * selector argument cannot represent a runtime-only name either way; this
+ * function ONLY adds the ctx interface DECLARATION (consumed by
+ * `buildNgTemplateContextGuard`'s union below), not a field.
+ */
+export function buildFamilyCtxDecls(slots: SlotDecl[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const slot of slots) {
+    if (slot.dynamicNameExpr === undefined) continue;
+    if (slot.namePrefix === undefined || slot.namePrefix.length === 0) continue;
+    const ctxName = familyCtxName(slot.namePrefix);
+    if (seen.has(ctxName)) continue;
+    seen.add(ctxName);
+    if (slot.params.length === 0) {
+      out.push(`interface ${ctxName} {}`);
+      continue;
+    }
+    const paramFields: string[] = [];
+    const implicitProps = slot.params
+      .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])}`)
+      .join('; ');
+    paramFields.push(`  $implicit: { ${implicitProps} };`);
+    for (const [i, p] of slot.params.entries()) {
+      paramFields.push(`  ${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`);
+    }
+    out.push(`interface ${ctxName} {\n${paramFields.join('\n')}\n}`);
+  }
+  return out;
+}
+
+/** Distinct family ctx names among `slots`' prefixed dynamic-name slots, in declaration order. */
+function collectFamilyCtxNames(slots: SlotDecl[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const slot of slots) {
+    if (slot.dynamicNameExpr === undefined) continue;
+    if (slot.namePrefix === undefined || slot.namePrefix.length === 0) continue;
+    const ctxName = familyCtxName(slot.namePrefix);
+    if (seen.has(ctxName)) continue;
+    seen.add(ctxName);
+    out.push(ctxName);
+  }
+  return out;
+}
+
+/**
  * Build the static ngTemplateContextGuard method for a class with multiple
  * slot context types. Returns the method body string, or null when there are
  * no slots.
@@ -196,7 +272,12 @@ export function buildNgTemplateContextGuard(
   // otherwise silently stand in for (or duplicate) the genuine default slot's
   // `DefaultCtx` union member.
   const eligible = slots.filter((s) => !isRecordOnlySlotDecl(s));
-  if (eligible.length === 0) return null;
+  // Phase 79 Plan 12 (R6) — a PREFIXED dynamic-name family DOES get its own
+  // synthesized ctx interface (`buildFamilyCtxDecls` above), so it belongs
+  // in this union too — "the template context guard covers the family
+  // members" (this plan's own acceptance criterion).
+  const familyCtxNames = collectFamilyCtxNames(slots);
+  if (eligible.length === 0 && familyCtxNames.length === 0) return null;
   // Dedupe by distinct slot name — a slot referenced in multiple template
   // locations appears multiple times in `slots`, but each distinct name has a
   // single ctx type. Without this the union repeats members (`FooCtx | FooCtx`).
@@ -204,6 +285,11 @@ export function buildNgTemplateContextGuard(
   const ctxNames: string[] = [];
   for (const s of eligible) {
     const ctxName = slotCtxName(s.name);
+    if (seenCtxNames.has(ctxName)) continue;
+    seenCtxNames.add(ctxName);
+    ctxNames.push(ctxName);
+  }
+  for (const ctxName of familyCtxNames) {
     if (seenCtxNames.has(ctxName)) continue;
     seenCtxNames.add(ctxName);
     ctxNames.push(ctxName);
