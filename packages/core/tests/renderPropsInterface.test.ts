@@ -377,6 +377,39 @@ describe('renderPropsInterface — Task 1 behavior', () => {
     expect(out).toContain('value: any');
   });
 
+  it("Task 3 (79-12, R6) escape found compiling the real DynamicSlots consumer-ts fixture: a static record-only name that textually matches an overlapping family's prefix gets its OWN named entry", () => {
+    const ir = emptyIR('CellFamilyCoexist');
+    ir.slots = [
+      {
+        type: 'SlotDecl',
+        name: 'cell-total',
+        defaultContent: null,
+        params: [
+          { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: { start: 0, end: 0 } },
+        ],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
+      {
+        type: 'SlotDecl',
+        name: '',
+        defaultContent: null,
+        params: [
+          { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: { start: 0, end: 0 } },
+          { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: { start: 0, end: 0 } },
+        ],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: { start: 0, end: 0 },
+        dynamicNameExpr: t.identifier('__placeholder'),
+        namePrefix: 'cell-',
+      },
+    ];
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    expect(out).toMatch(/'cell-total'\?: \(\(params: \{ value: any \}\) => ReactNode\) \| undefined;/);
+  });
+
   it('Task 3 (79-12, R6): no dynamic-name slot keeps the generic slots? Record byte-identical', () => {
     const ir = emptyIR('Header');
     ir.slots = [
