@@ -56,6 +56,7 @@ import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdent
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
+import { dynamicSlotBindingName } from './dynamicSlotOrdinal.js';
 import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
 
@@ -773,9 +774,16 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
   // When `ir.slots.length === 0` we keep the legacy no-snippets shape — no
   // rename and no `snippets` entry, so non-slotted components are unaffected.
   if (ir.slots.length > 0) {
-    // Dedupe by distinct slot name — a repeated `<slot name="X">` must produce
-    // exactly ONE `X: __XProp` destructure binding (see distinctSlotsByName).
+    // Dedupe by distinct slot IDENTITY — a repeated `<slot name="X">` must
+    // produce exactly ONE `X: __XProp` destructure binding, while every
+    // dynamic-name slot keeps its OWN distinct identity (see
+    // distinctSlotsByName's Phase 79 Plan 10 doc comment).
     for (const s of distinctSlotsByName(ir.slots)) {
+      // Phase 79 Plan 10 (R3/D-09) — a dynamic-name slot has no compile-time
+      // name to destructure at all; it mints NO entry here — reachable only
+      // via the `snippets` record and its own `$derived` binding below
+      // (emitSlotDerivedMerges).
+      if (s.dynamicNameExpr !== undefined) continue;
       const key = s.name === '' ? 'children' : s.name;
       // Phase 79 Plan 05 (R12/D-03) — a record-only (non-identifier) slot
       // name mints NO destructure entry: `cell-status: __cell-statusProp`
@@ -865,6 +873,26 @@ function emitSlotDerivedMerges(ir: IRComponent): string[] {
   // emitPortals.ts / rewriteScript.ts / rewriteTemplateExpression.ts and the
   // emitSlotInvocation.ts render site. Non-colliding slots stay byte-identical.
   for (const s of distinctSlotsByName(ir.slots)) {
+    // Phase 79 Plan 10 (R3/D-09) — a producer `<slot :name="expr">` whose
+    // bound name does NOT constant-fold keeps `s.name === ''` (79-06's
+    // Assumption A1) but is NOT the genuine default slot — it has no
+    // compile-time name to alias at all, so there is no `__<key>Prop` to
+    // merge with. Extends the record-only condition below with an OR on
+    // `dynamicNameExpr` (same output shape, same T-79-24 no-parallel-branch
+    // discipline), keying on the REWRITTEN RUNTIME EXPRESSION instead of a
+    // quoted literal. The local binding identifier is derived from this
+    // slot's OWN declaration ordinal (its index in `ir.slots`, via
+    // `distinctSlotsByName`'s identity-aware dedup) rather than from `key`
+    // (always 'children' for every dynamic-name slot) — otherwise two
+    // independent dynamic-name slots on one producer would mint the SAME
+    // `$derived` identifier and collide.
+    if (s.dynamicNameExpr !== undefined) {
+      const ordinal = ir.slots.indexOf(s);
+      const ident = dynamicSlotBindingName(ordinal);
+      const keyExpr = rewriteTemplateExpression(s.dynamicNameExpr, ir);
+      lines.push(`const ${ident} = $derived(snippets?.[${keyExpr}]);`);
+      continue;
+    }
     const key = s.name === '' ? 'children' : s.name;
     const ident = portalSlotMergeName(key, ir);
     // Phase 79 Plan 05 (R12/D-03) — a record-only (non-identifier) slot name

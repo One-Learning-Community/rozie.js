@@ -45,6 +45,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
+import { dynamicSlotBindingName, findDynamicSlotOrdinal } from './dynamicSlotOrdinal.js';
 
 export interface EmitSlotInvocationCtx {
   ir: IRComponent;
@@ -99,7 +100,27 @@ export function emitSlotInvocation(
   // this render site; Phase 73 fix). Conditional: only colliding slots are
   // renamed, so non-colliding components emit byte-identical Svelte
   // (supersedes the retired ROZ980 warning).
-  const renderName = portalSlotMergeName(slotKey, ctx.ir);
+  //
+  // Phase 79 Plan 10 (R3/D-09) — a producer `<slot :name="expr">` whose bound
+  // name does NOT constant-fold keeps `node.slotName === ''` (79-06's
+  // Assumption A1) but must NOT resolve to the ordinary `children` merge
+  // identifier — it has its OWN dedicated `$derived` binding declared by
+  // emitScript.ts's emitSlotDerivedMerges, keyed on its declaration ordinal.
+  // Locate that SAME ordinal here by matching the INVOCATION node's own
+  // `dynamicNameExpr` against `ir.slots` via rewritten-expression-text
+  // comparison (see dynamicSlotOrdinal.ts's doc comment) — a by-name lookup
+  // would risk resolving to the WRONG dynamic-name slot when a producer
+  // declares more than one, since every one of them shares the identical ''
+  // sentinel. Computed ONCE and reused below for the matching SlotDecl
+  // lookup too, so the two never disagree.
+  const dynamicOrdinal =
+    node.dynamicNameExpr !== undefined
+      ? findDynamicSlotOrdinal(ctx.ir, node.dynamicNameExpr)
+      : -1;
+  const renderName =
+    node.dynamicNameExpr !== undefined
+      ? dynamicSlotBindingName(dynamicOrdinal)
+      : portalSlotMergeName(slotKey, ctx.ir);
 
   // Build object-shape arg payload per Phase 07.3.1 Blocker #2 D-02. Svelte's
   // snippet invocation is positional in syntax but Rozie's cross-target
@@ -118,9 +139,17 @@ export function emitSlotInvocation(
           .join(', ')} }`;
 
   // Find matching SlotDecl to determine presence + defaultContent.
-  const decl: SlotDecl | undefined = ctx.ir.slots.find(
-    (s) => (s.name === '' ? '' : s.name) === node.slotName,
-  );
+  //
+  // Phase 79 Plan 10 (R3/D-09) — for a dynamic-name invocation, a by-name
+  // lookup (`s.name === ''`) is ambiguous when a producer declares more than
+  // one dynamic-name slot (every one shares the '' sentinel), so the FIRST
+  // match could be the WRONG slot's `presence`/`defaultContent`. Reuse the
+  // SAME ordinal already resolved above for `renderName` (a single source of
+  // truth — one lookup, not two independent ones that could disagree).
+  const decl: SlotDecl | undefined =
+    node.dynamicNameExpr !== undefined
+      ? ctx.ir.slots[dynamicOrdinal]
+      : ctx.ir.slots.find((s) => (s.name === '' ? '' : s.name) === node.slotName);
 
   // Determine the fallback content: defaultContent from SlotDecl takes
   // priority; falls back to the inline fallback children on the invocation

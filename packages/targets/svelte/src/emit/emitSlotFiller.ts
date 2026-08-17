@@ -167,6 +167,13 @@ export function emitSlotFiller(
   // the R5 dynamic-name fills already use). Returning '' here is safe: the
   // emitTemplateNode.ts caller joins fillerParts with `''` (Svelte markup
   // concatenation), so an empty entry is inert.
+  // Phase 79 Plan 10 (R5/D-09) — a `matchedFamily` fill has no producer
+  // named-prop path either (its exact name never appeared as a producer
+  // SlotDecl — it only matched a name-PREFIX family), so it must ALSO be
+  // excluded here even when its name happens to be identifier-shaped,
+  // otherwise it would emit BOTH a `{#snippet name(...)}` block AND a
+  // record entry.
+  if (filler.matchedFamily === true) return '';
   if (filler.name !== '' && !isSlotNameIdentifier(filler.name)) return '';
 
   const shadowed = shadowedParams(filler, ctx.enclosingLoopVars ?? new Set());
@@ -241,8 +248,15 @@ export function emitDynamicSnippetsProp(
   enclosingLoopVars: ReadonlySet<string> = new Set(),
 ): { prop: string | null; snippetBlocks: string[] } {
   void ir; // kept in signature for future use (e.g. expression-source diagnostics)
+  // Phase 79 Plan 10 (R5/D-09) — a fill whose name had NO exact producer
+  // SlotDecl match but resolved against a producer name-PREFIX family
+  // instead (`matchedFamily`) merges into this SAME record — reuses Phase
+  // 07.3.2's existing emit verbatim, keyed on the fill's own static name.
   const recordOnly = fillers.filter(
-    (f) => f.isDynamic || (f.name !== '' && !isSlotNameIdentifier(f.name)),
+    (f) =>
+      f.isDynamic ||
+      f.matchedFamily === true ||
+      (f.name !== '' && !isSlotNameIdentifier(f.name)),
   );
   if (recordOnly.length === 0) return { prop: null, snippetBlocks: [] };
 

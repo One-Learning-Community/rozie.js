@@ -267,7 +267,21 @@ function emitSlotInvocation(
   // imperatively into foreign engine containers.
   if (node.isPortal) return '';
   const slotKey = node.slotName === '' ? '' : node.slotName;
-  const nameAttr = slotKey ? ` name="${slotKey}"` : '';
+  // Phase 79 Plan 10 (R3/D-09) — a producer `<slot :name="expr">` whose bound
+  // name does NOT constant-fold keeps `node.slotName === ''` (79-06's
+  // Assumption A1) but is NOT the genuine default slot — without this
+  // branch it would silently fall through to the unnamed-default `<slot>`
+  // below, discarding the author's `:name` binding entirely. Vue's native
+  // `<slot>` element supports a BOUND `:name` attribute directly (unlike
+  // every other target, which has no equivalent native primitive and must
+  // key a `slots` record instead) — bind it to the SAME rewritten expression
+  // used as the record key on every other target.
+  const nameAttr =
+    node.dynamicNameExpr !== undefined
+      ? ` :name="${rewriteTemplateExpression(node.dynamicNameExpr, ctx.ir)}"`
+      : slotKey
+        ? ` name="${slotKey}"`
+        : '';
   const argAttrs = node.args
     .map((a) => ` :${a.name}="${rewriteTemplateExpression(a.expression, ctx.ir)}"`)
     .join('');
