@@ -12,7 +12,7 @@ const props = withDefaults(
 );
 
 defineSlots<{
-  default(props: { name: any }): any;
+  [key: string]: ((props: any) => any) | undefined;
 }>();
 
 function noop(): void {}

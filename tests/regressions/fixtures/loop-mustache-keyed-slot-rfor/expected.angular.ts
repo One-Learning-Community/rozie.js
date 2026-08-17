@@ -1,11 +1,6 @@
 import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 
-interface DefaultCtx {
-  $implicit: { name: any };
-  name: any;
-}
-
 @Component({
   selector: 'rozie-loop-mustache-keyed-slot-rfor',
   standalone: true,
@@ -14,7 +9,7 @@ interface DefaultCtx {
 
 
     <div class="r" #rozieSpread_0 #rozieListenersTarget_1>@for (row of rows(); track row.id) {
-    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { name: row }, name: row }" />
+    <ng-container *ngTemplateOutlet="templates()?.[row]" />
     }</div>
 
   `,
@@ -24,17 +19,9 @@ interface DefaultCtx {
 })
 export class LoopMustacheKeyedSlotRfor {
   rows = input<any[]>((() => [])());
-  @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
 
   noop = (): void => {};
-
-  static ngTemplateContextGuard(
-    _dir: LoopMustacheKeyedSlotRfor,
-    _ctx: unknown,
-  ): _ctx is DefaultCtx {
-    return true;
-  }
 
   private __rozieDestroyRef = inject(DestroyRef);
 

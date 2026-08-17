@@ -4,10 +4,6 @@ import { SignalWatcher } from '@lit-labs/preact-signals';
 import { RozieSlotDistributor, rozieListeners, rozieSpread } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
-interface RozieDefaultSlotCtx {
-  name: any;
-}
-
 @customElement('rozie-loop-mustache-nested-conditional-slot-rfor')
 export default class LoopMustacheNestedConditionalSlotRfor extends SignalWatcher(LitElement) {
   static shadowRootOptions: ShadowRootInit = { ...LitElement.shadowRootOptions, slotAssignment: 'manual' };
@@ -20,9 +16,18 @@ export default class LoopMustacheNestedConditionalSlotRfor extends SignalWatcher
 
   private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
-  @state() private _hasSlotDefault = false;
-  @queryAssignedElements({ flatten: true }) private _slotDefaultElements!: Element[];
-  @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { name: any }) => unknown;
+  @state() private _hasSlotDynamic0 = false;
+  @queryAssignedElements({ flatten: true }) private _slotDynamic0Elements!: Element[];
+  // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for
+  // record-routed slot fills. 79-09's consumer-side emitSlotFiller
+  // accumulates an object literal onto the SAME `.rozieSlots=${{ ... }}`
+  // open-tag binding; the KEY is the fill's authored (possibly
+  // non-identifier) name and the VALUE is a scope-taking render
+  // function. `rozieSlots?.[name]` must be checked BEFORE the legacy
+  // named function-prop / <slot> fallback (AC-9). Attribute
+  // deserialization is disabled — this is a function-valued record,
+  // never reflected to/from an HTML attribute.
+  @property({ attribute: false }) rozieSlots?: Record<string, (scope: any) => unknown>;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -33,7 +38,7 @@ export default class LoopMustacheNestedConditionalSlotRfor extends SignalWatcher
     {
       const slotEl = this.shadowRoot?.querySelector('slot:not([name])');
       if (slotEl !== null && slotEl !== undefined) {
-        const update = () => { this._hasSlotDefault = this._slotDefaultElements.length > 0; };
+        const update = () => { this._hasSlotDynamic0 = this._slotDynamic0Elements.length > 0; };
         slotEl.addEventListener('slotchange', update);
         // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
         this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
@@ -44,7 +49,7 @@ export default class LoopMustacheNestedConditionalSlotRfor extends SignalWatcher
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
-    this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
+    this._hasSlotDynamic0 = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     super.connectedCallback();
     if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
   }
@@ -66,7 +71,7 @@ export default class LoopMustacheNestedConditionalSlotRfor extends SignalWatcher
   render() {
     return html`
 
-<div class="r" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-bc149f2f>${repeat<any>(this.items, (x, _idx) => x, (x, _idx) => html`${x ? html`${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({name: x}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({name: x}); } catch { return '{}'; } })()}></slot>`}` : nothing}`)}</div>
+<div class="r" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-bc149f2f>${repeat<any>(this.items, (x, _idx) => x, (x, _idx) => html`${x ? html`${this.rozieSlots?.[x] !== undefined ? this.rozieSlots?.[x]!({}) : html`<slot name="${x}"></slot>`}` : nothing}`)}</div>
 `;
   }
 

@@ -2,12 +2,9 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
-interface ChildrenCtx { name: any; }
-
 interface LoopMustacheNestedConditionalSlotRforProps {
   items?: any[];
-  children?: ReactNode | ((ctx: ChildrenCtx) => ReactNode);
-  slots?: Record<string, () => import('react').ReactNode>;
+  slots?: { [key: string]: ((...args: any[]) => import('react').ReactNode) | undefined; };
 }
 
 export default function LoopMustacheNestedConditionalSlotRfor(_props: LoopMustacheNestedConditionalSlotRforProps): JSX.Element {
@@ -27,7 +24,7 @@ export default function LoopMustacheNestedConditionalSlotRfor(_props: LoopMustac
   return (
     <>
 
-    <div {...attrs} className={clsx("r", (attrs.className as string | undefined))} data-rozie-s-bc149f2f="">{props.items.map((x) => (!!(x) && (typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ name: x }) : (props.children ?? props.slots?.['']))))}</div>
+    <div {...attrs} className={clsx("r", (attrs.className as string | undefined))} data-rozie-s-bc149f2f="">{props.items.map((x) => (!!(x) && ((typeof props.slots?.[x] === 'function' ? (props.slots?.[x] as Function)() : props.slots?.[x]))))}</div>
     </>
   );
 }
