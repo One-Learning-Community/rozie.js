@@ -229,4 +229,68 @@ describe('renderPropsInterface — Task 1 behavior', () => {
     // The surviving member is the literal prop, not the emit-derived handler.
     expect(out).toContain('  onSelect: (...args: any[]) => any;');
   });
+
+  it('Task 0 (79-12): a non-identifier slot name mints NO invalid render<Name> field', () => {
+    const ir = emptyIR('Table');
+    ir.slots = [
+      {
+        type: 'SlotDecl',
+        name: 'cell-status',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
+    ];
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    // The bug this test guards against: `render${capitalize('cell-status')}`
+    // produces the syntactically-INVALID field name `renderCell-status`.
+    expect(out).not.toMatch(/renderCell-status/);
+    // Stronger, shape-based assertion: every emitted member name (the token
+    // before `?:` or `:`) must itself be a valid identifier — no hyphen, no
+    // leading digit, nothing that would require quoting.
+    const memberNames = out
+      .split('\n')
+      .map((l) => /^\s{2}([^\s?:]+)\??:/.exec(l))
+      .filter((m): m is RegExpExecArray => m !== null)
+      .map((m) => m[1]);
+    for (const name of memberNames) {
+      expect(name).toMatch(/^[A-Za-z_$][A-Za-z0-9_$]*$/);
+    }
+  });
+
+  it('Task 0 (79-12): an identifier-named slot still emits renderHeader byte-identically', () => {
+    const ir = emptyIR('Header');
+    ir.slots = [
+      {
+        type: 'SlotDecl',
+        name: 'header',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
+    ];
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    expect(out).toContain('  renderHeader?: () => ReactNode;');
+  });
+
+  it('Task 0 (79-12): the default slot still emits children? byte-identically', () => {
+    const ir = emptyIR('Def');
+    ir.slots = [
+      {
+        type: 'SlotDecl',
+        name: '',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
+    ];
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    expect(out).toContain('  children?: ReactNode;');
+  });
 });
