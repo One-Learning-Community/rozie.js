@@ -59,6 +59,28 @@ import { createDefaultRegistry } from '../../../../../core/src/modifiers/registe
 import { emitReact } from '../../emitReact.js';
 import type { IRComponent } from '../../../../../core/src/ir/types.js';
 
+/**
+ * Recursive walker collecting the `sourceLoc.start` of every
+ * `TemplateSlotInvocation` node carrying a `dynamicNameExpr`. Modelled on
+ * `findFiller` in
+ * `packages/targets/svelte/src/__tests__/slotDynamicNameRouting.test.ts`.
+ */
+function collectDynamicInvocationLocStarts(node: unknown, out: number[]): void {
+  if (node === null || typeof node !== 'object') return;
+  const n = node as {
+    type?: string;
+    dynamicNameExpr?: unknown;
+    sourceLoc?: { start: number };
+    children?: unknown[];
+  };
+  if (n.type === 'TemplateSlotInvocation' && n.dynamicNameExpr !== undefined && n.sourceLoc) {
+    out.push(n.sourceLoc.start);
+  }
+  if (Array.isArray(n.children)) {
+    for (const c of n.children) collectDynamicInvocationLocStarts(c, out);
+  }
+}
+
 function lowerInline(rozie: string): IRComponent {
   const result = parse(rozie, { filename: 'inline.rozie' });
   if (!result.ast) {
@@ -146,5 +168,73 @@ describe('React .name-keyed identity collision probe — multi-dynamic-slot (Pha
     // The with-params slot ('b')'s OWN param must NOT be silently dropped
     // just because 'a' (the FIRST '' decl in ir.slots) has zero params.
     expect(code).toContain('(props.slots?.[b] as Function)({ value: 1 })');
+  });
+});
+
+// Two independent dynamic-name slots binding the IDENTICAL source expression
+// (`$data.col.key`) — the collision `dynamicNameExpr`-rewritten-TEXT
+// disambiguation cannot resolve (WR-01, phase-79 code-review finding). Models
+// a data table's per-column header/footer slots. With-params declared FIRST.
+const IDENTICAL_EXPR_SRC = `<rozie name="IdenticalExprSlots">
+<data>
+{ col: { key: 'k' } }
+</data>
+<template>
+<div>
+  <slot :name="$data.col.key" :value="1"></slot>
+  <slot :name="$data.col.key"></slot>
+</div>
+</template>
+</rozie>`;
+
+// Reversed order — the zero-param declaration comes FIRST.
+const IDENTICAL_EXPR_REVERSED_SRC = `<rozie name="IdenticalExprSlotsRev">
+<data>
+{ col: { key: 'k' } }
+</data>
+<template>
+<div>
+  <slot :name="$data.col.key"></slot>
+  <slot :name="$data.col.key" :value="1"></slot>
+</div>
+</template>
+</rozie>`;
+
+describe('React sourceLoc identity — IDENTICAL dynamicNameExpr text on two declarations (WR-01)', () => {
+  it('with-params declared first: the second (zero-param) declaration still emits a zero-argument call, not `({})`', () => {
+    const ir = lowerInline(IDENTICAL_EXPR_SRC);
+    const { code } = emitReact(ir, { filename: 'IdenticalExprSlots.rozie' });
+    // Both invocations share the identical runtime key text `col.key` and the
+    // identical `props.slots?.[col.key]` prefix, so distinguish by counting
+    // occurrences of each call SHAPE rather than a bare toContain.
+    const paramCallCount = (code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\{ value: 1 \}\)/g) ?? [])
+      .length;
+    const zeroArgCallCount = (code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\)/g) ?? []).length;
+    expect(paramCallCount).toBe(1);
+    expect(zeroArgCallCount).toBe(1);
+  });
+
+  it('zero-param declared first: the with-params declaration (declared second) still receives its own param object', () => {
+    const ir = lowerInline(IDENTICAL_EXPR_REVERSED_SRC);
+    const { code } = emitReact(ir, { filename: 'IdenticalExprSlotsRev.rozie' });
+    const paramCallCount = (code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\{ value: 1 \}\)/g) ?? [])
+      .length;
+    const zeroArgCallCount = (code.match(/\(props\.slots\?\.\[col\.key\] as Function\)\(\)/g) ?? []).length;
+    expect(paramCallCount).toBe(1);
+    expect(zeroArgCallCount).toBe(1);
+  });
+
+  it('identity precondition: dynamic-name SlotDecl.sourceLoc.start values equal the set of dynamic TemplateSlotInvocation sourceLoc.start values, all distinct', () => {
+    const ir = lowerInline(IDENTICAL_EXPR_SRC);
+    const declLocs = ir.slots
+      .filter((s) => s.dynamicNameExpr !== undefined)
+      .map((s) => s.sourceLoc.start)
+      .sort((a, b) => a - b);
+    const invocationLocs: number[] = [];
+    collectDynamicInvocationLocStarts(ir.template, invocationLocs);
+    invocationLocs.sort((a, b) => a - b);
+    expect(declLocs.length).toBe(2);
+    expect(new Set(declLocs).size).toBe(declLocs.length);
+    expect(invocationLocs).toEqual(declLocs);
   });
 });
