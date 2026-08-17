@@ -76,6 +76,8 @@ import * as t from '@babel/types';
 import _traverse from '@babel/traverse';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { slotScopeTypeObject } from './slotScopeParamType.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { renderRecordKey } from './slotRecordKey.js';
 // @babel/traverse ships CJS default-export; unwrap for ESM consumers.
 type TraverseFn = typeof import('@babel/traverse').default;
 const traverse: TraverseFn =
@@ -122,6 +124,19 @@ export interface LitFillerEmission {
    * (SC2 no-regression invariant).
    */
   propertyAttr?: string;
+  /**
+   * Phase 79 Plan 09 (R4/R12) — populated instead of `propertyAttr` when this
+   * filler routes through the `rozieSlots` record rather than an independent
+   * named `.field=` property assignment. `key` is ready-to-splice object-key
+   * text: a bracketed computed key (`[<rewrittenExpr>]`) for a dynamic name,
+   * or a quoted string literal (`'<name>'`) for a static name (matchedFamily
+   * or a non-identifier-shaped exact match). `fn` is the same
+   * `(scope: <Type>) => html\`…\`` text `propertyAttr` would otherwise wrap.
+   * `emitTemplate.ts` accumulates every filler's entry on one element into a
+   * SINGLE `.rozieSlots=${{ ... }}` object literal (R4: one binding, not N).
+   * Mutually exclusive with both `propertyAttr` and `childTemplate`.
+   */
+  rozieSlotsEntry?: { key: string; fn: string };
 }
 
 /**
@@ -488,36 +503,132 @@ function rewriteExprToScope(
 }
 
 /**
- * Format ONE static-named filler (or default-shorthand) as a Lit
- * consumer-side emission tuple.
+ * Build the `(scope: <Type>) => html\`…\`` render-function text shared by
+ * BOTH the named-property path (`propertyAttr`) and the `rozieSlots` record
+ * path (`rozieSlotsEntry`) — Phase 79 Plan 09's action explicitly requires
+ * reusing this construction rather than duplicating it, so the scope-param
+ * rewrite and the child-template emission stay identical between the two
+ * dispatch shapes.
  *
- * Dynamic-name (R5) is reserved for Wave 2 — emits an empty tuple (skipped)
- * so the static-name path continues to ship clean output.
+ * Rewrites param Identifiers in `filler.body` → `scope.<slotKey>`
+ * MemberExpressions BEFORE rendering (quick 260526-ljo: Map<localBinding,
+ * slotKey> handles rename), then emits the body and wraps it in a bare
+ * `scope` parameter (NOT a destructure pattern — a destructure would shadow
+ * `scope` and break the rewritten body).
  */
+function buildScopeFnText(filler: SlotFillerDecl, ctx: EmitSlotFillerCtx): string {
+  const paramMap = new Map<string, string>(
+    filler.params.map((p) => [p.bindAs ?? p.name, p.name] as const),
+  );
+  rewriteScopedParamRefsToScope(filler.body, paramMap);
+
+  const body = ctx.emitChildren(filler.body);
+
+  // Scope-type TS annotation: `{ p1: any; p2: any; ... }` (or the serialized
+  // TSType per param when the IR carries real paramTypes — quick 260717-uvm).
+  // Uses filler.params.name (producer slot keys) — the scope object is keyed
+  // by slot key, NOT consumer-local rename. threadParamTypes validates the
+  // names against producer.SlotDecl.params for ROZ947.
+  const scopeTypeStr =
+    filler.params.length > 0
+      ? slotScopeTypeObject(filler.params, filler.paramTypes)
+      : 'unknown';
+
+  const paramSig = `scope: ${scopeTypeStr}`;
+  return '(' + paramSig + ') => html`' + body + '`';
+}
+
 export function emitSlotFiller(
   filler: SlotFillerDecl,
   ctx: EmitSlotFillerCtx,
 ): LitFillerEmission {
-  // R5 — dynamic slot name. Per D-04 Lit row: shadow-DOM projection routes
-  // child elements to the matching `<slot name="…">` based on the runtime
-  // value of the child's `slot=` attribute. lit-html supports attribute
-  // interpolation directly via `slot=${expr}`, so we emit the body wrapped
-  // in `<div slot="${rewrittenExpr}">…</div>`. Single-root passthrough
-  // (the static-name optimization) is NOT applied here because the slot
-  // attribute is an interpolated binding rather than a literal — we always
-  // emit a synthetic `<div>` wrapper to carry the dynamic attribute.
+  const isDynamic = filler.isDynamic === true;
+
+  // Phase 79 Plan 09 (R4/R5/R12) — decide the `rozieSlots` RECORD-PATH
+  // question FIRST, before any pre-existing branch runs. Replaces the
+  // unconditional early bail that used to make a scoped-plus-dynamic fill
+  // unreachable (see the removed `if (filler.isDynamic) { ...return... }`
+  // that used to sit here, BEFORE the useFunctionPropPath check).
+  //
+  // A fill wants the record path when:
+  //   - it resolved via 79-07's family-matching pass (`matchedFamily`), OR
+  //   - it is dynamic (`#[expr]`) AND would otherwise qualify for
+  //     function-prop treatment — portal, or the consumer destructures scope
+  //     params. Note: `threadParamTypes.ts` explicitly `continue`s BEFORE
+  //     threading `producerSlotParamCount`/`isPortal` onto any `isDynamic`
+  //     filler (dynamic fills can't be statically matched against a producer
+  //     slot — D-05), so `producerSlotParamCount` is never meaningful here;
+  //     `filler.params.length > 0` alone is the scoped-ness signal for the
+  //     dynamic case, OR
+  //   - its target name fails `isSlotNameIdentifier` — a non-identifier
+  //     STATIC name (matchedFamily or an ordinary exact match) has no legal
+  //     `.field=` property path on this target, so it always routes through
+  //     the record regardless of scoped-ness (mirrors the unconditional
+  //     `isRecordOnly` convention already shipped on React/Solid/Svelte/
+  //     Angular for R12). This check is explicitly gated to `!isDynamic` —
+  //     `lowerSlotFillers.ts`'s own doc comment records that a `#[expr]`
+  //     filler's `.name` is set to the RAW EXPRESSION TEXT (e.g.
+  //     `'$data.slotName'`), not the `''` sentinel; that text routinely
+  //     fails `isSlotNameIdentifier` (dots, `$`-prefixed member access) for
+  //     reasons that have nothing to do with R12's record-routing intent.
+  //     Running the identifier check against it would force EVERY dynamic
+  //     fill into the record path regardless of scoped-ness — silently
+  //     breaking the "dynamic AND NOT scoped keeps the light-DOM wrapper"
+  //     invariant below (caught via `ModalConsumer`'s existing paramless
+  //     `#[$data.slotName]` dist-parity fixture during this plan's own
+  //     verification pass — see SUMMARY Deviations).
+  //
+  // Everything else keeps its pre-Plan-09 branch, byte-identical.
+  const dynamicWantsRecord =
+    isDynamic && (filler.isPortal === true || filler.params.length > 0);
+  const wantsRecordPath =
+    filler.matchedFamily === true ||
+    dynamicWantsRecord ||
+    (!isDynamic && filler.name !== '' && !isSlotNameIdentifier(filler.name));
+
+  if (wantsRecordPath) {
+    if (isDynamic && !filler.dynamicNameExpr) {
+      // ROZ946 was already emitted at lower time — emit nothing.
+      return {
+        childTemplate: '',
+        firstUpdatedLines: [],
+        classFields: [],
+        updatedBodyLines: [],
+        disconnectResetLines: [],
+      };
+    }
+    const fn = buildScopeFnText(filler, ctx);
+    // Dynamic name → bracketed computed key using the rewritten expression;
+    // static name (matchedFamily or non-identifier exact match) → quoted
+    // string literal key (T-79-07 lockstep escaping via slotRecordKey.ts).
+    const key = isDynamic
+      ? '[' + rewriteTemplateExpression(filler.dynamicNameExpr!, ctx.ir) + ']'
+      : renderRecordKey(filler.name);
+    return {
+      childTemplate: '',
+      firstUpdatedLines: [],
+      classFields: [],
+      updatedBodyLines: [],
+      disconnectResetLines: [],
+      rozieSlotsEntry: { key, fn },
+    };
+  }
+
+  // R5 — dynamic slot name, NOT wanting the record path (i.e. dynamic AND
+  // neither portal nor scoped). Per D-04 Lit row: shadow-DOM projection
+  // routes child elements to the matching `<slot name="…">` based on the
+  // runtime value of the child's `slot=` attribute. lit-html supports
+  // attribute interpolation directly via `slot=${expr}`, so we emit the body
+  // wrapped in `<div slot="${rewrittenExpr}">…</div>`. Single-root
+  // passthrough (the static-name optimization) is NOT applied here because
+  // the slot attribute is an interpolated binding rather than a literal — we
+  // always emit a synthetic `<div>` wrapper to carry the dynamic attribute.
   //
   // Silent fallback on runtime miss (D-05) is the native shadow-DOM
   // behavior: when the slot attribute value doesn't match any of the
   // producer's `<slot name="…">` elements, the projection silently no-ops
   // and the producer's `<slot>` defaultContent renders.
-  //
-  // Scoped + dynamic combination is deferred: the IR pre-transform (used
-  // for static-name scoped) requires a stable `_<name>Ctx` field that we
-  // can't synthesise from a dynamic expression at compile time. Most
-  // consumer libraries don't mix scoped + dynamic in practice; documented
-  // in SUMMARY as a known limitation.
-  if (filler.isDynamic) {
+  if (isDynamic) {
     if (!filler.dynamicNameExpr) {
       // ROZ946 was already emitted at lower time — emit nothing.
       return {
@@ -563,32 +674,7 @@ export function emitSlotFiller(
       (filler.producerSlotParamCount ?? 0) > 0);
 
   if (useFunctionPropPath) {
-    // Rewrite param Identifiers in body → `scope.<slotKey>` MemberExpressions
-    // BEFORE rendering, so the recursive emitChildren passes them through
-    // verbatim. Quick 260526-ljo: Map<localBinding, slotKey> handles rename.
-    const paramMap = new Map<string, string>(
-      filler.params.map((p) => [p.bindAs ?? p.name, p.name] as const),
-    );
-    rewriteScopedParamRefsToScope(filler.body, paramMap);
-
-    const body = ctx.emitChildren(filler.body);
-
-    // Scope-type TS annotation: `{ p1: any; p2: any; ... }` (or the serialized
-    // TSType per param when the IR carries real paramTypes — quick 260717-uvm).
-    // Uses filler.params.name (producer slot keys) — the scope object is keyed
-    // by slot key, NOT consumer-local rename. threadParamTypes validates the
-    // names against producer.SlotDecl.params for ROZ947.
-    const scopeTypeStr =
-      filler.params.length > 0
-        ? slotScopeTypeObject(filler.params, filler.paramTypes)
-        : 'unknown';
-
-    // Single-parameter form: `(scope: { close: unknown }) => html\`…body refs scope.close…\``.
-    // `rewriteScopedParamRefsToScope` has already rewritten body param refs
-    // to `scope.<name>` MemberExpressions, so we use a bare `scope` parameter
-    // (NOT a destructure pattern) to keep the body's references valid. Using
-    // a destructure here would shadow `scope` and break the rewritten body.
-    const paramSig = `scope: ${scopeTypeStr}`;
+    const fnText = buildScopeFnText(filler, ctx);
 
     // Property field name on producer: default slot ('') maps to
     // '__rozieDefaultSlot__' per the producer-side mapping in emitSlotDecl.ts
@@ -608,8 +694,7 @@ export function emitSlotFiller(
           ? filler.name + 'Slot'
           : filler.name;
 
-    const propertyAttr =
-      '.' + propertyFieldName + '=${(' + paramSig + ') => html`' + body + '`}';
+    const propertyAttr = '.' + propertyFieldName + '=${' + fnText + '}';
 
     return {
       // IN-03 (Phase 07.5 review): the four arrays below are intentionally
