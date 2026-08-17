@@ -209,7 +209,7 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
     });
   }
 
-  const slots = ast.template ? lowerSlots(ast.template) : [];
+  const slots = ast.template ? lowerSlots(ast.template, diagnostics) : [];
 
   const listenersFromBlock = ast.listeners
     ? lowerListeners(ast.listeners, bindings, depGraph, opts.modifierRegistry, diagnostics)

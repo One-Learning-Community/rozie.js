@@ -11,7 +11,16 @@
  *     `r-if="$slots.<name>"` or `r-if="…$slots.<name>…"`; 'always' otherwise.
  *   - nestedSlots = recursive — slots inside the slot's defaultContent.
  *
- * Per D-08 collected-not-thrown: never throws.
+ * Phase 79 R1/R7 — a `<slot>` may also carry a bound `:name` in place of (or,
+ * erroneously, alongside) the static `name` attribute. A constant `:name`
+ * (StringLiteral, or a zero-interpolation TemplateLiteral) constant-folds to
+ * `name` exactly like a static attribute (AC-3); anything else sets
+ * `SlotDecl.dynamicNameExpr` (and `namePrefix` when derivable) and pushes one
+ * of ROZ090/ROZ091/ROZ092/ROZ094/ROZ096 as appropriate. See
+ * `slotDynamicName.test.ts` for the full behavior matrix.
+ *
+ * Per D-08 collected-not-thrown: never throws. `lowerSlots` now takes a
+ * `diagnostics` accumulator (mutated in place) for the Phase 79 checks above.
  *
  * @experimental — shape may change before v1.0
  */
@@ -21,8 +30,11 @@ import type {
   TemplateAST,
   TemplateNode,
   TemplateElement,
+  TemplateAttr,
 } from '../../ast/blocks/TemplateAST.js';
 import type { SlotDecl, ParamDecl } from '../types.js';
+import type { Diagnostic } from '../../diagnostics/Diagnostic.js';
+import { RozieErrorCode } from '../../diagnostics/codes.js';
 
 /**
  * Determine whether `expr` references `$slots.<targetSlotName>` anywhere
@@ -89,6 +101,14 @@ function collectParamsFromSlotElement(slot: TemplateElement, isPortal: boolean):
   for (const attr of slot.attributes) {
     if (attr.kind !== 'binding') continue;
     if (attr.value === null) continue;
+    // Phase 79 R1 — `:name` is reserved as the producer-side dynamic
+    // slot-name binding (see the main visit() branch below); it must never
+    // reach the scope-param surface as ParamDecl.name === 'name'. Skipping
+    // it here — unconditionally, portal or not — is also what makes ROZ091
+    // (a scope param literally named 'name' on a dynamic slot) unreachable
+    // through normal authoring; see slotDynamicName.test.ts for the
+    // reachability proof this task's Task 2 companion requires.
+    if (attr.name === 'name') continue;
     // Portal slots use `:params="['arg', ...]"` as a TYPE DECLARATION for
     // the scope-key names, not as a normal scoped-slot binding source —
     // strip it here so it doesn't reach the consumer-facing scoped-slot
@@ -166,7 +186,17 @@ function determinePresence(
   ctx: SlotVisitContext,
 ): 'always' | 'conditional' {
   if (ctx.rIfStack.length === 0) return 'always';
-  // Determine target slot name (default '' if no `name` attribute).
+  // Determine target slot name (default '' if no static `name` attribute).
+  //
+  // Phase 79 R1 — this scan is intentionally STATIC-ONLY and left untouched.
+  // A slot whose name comes from a bound `:name` (dynamic, or constant-
+  // folded — the fold happens later, in visit()) falls through to the ''
+  // default here. `expressionReferencesSlot` below can only match a
+  // `$slots.<identifier>` member access, and '' is not a valid identifier
+  // name, so a guard can never reference it — the loop below always returns
+  // 'always' for such a slot. That is exactly the correct result: a runtime
+  // slot name has no compile-time `$slots.<key>` guard-reference to test
+  // against, so presence can never be narrowed to 'conditional'.
   let slotName = '';
   for (const a of slot.attributes) {
     if (a.kind === 'static' && a.name === 'name' && a.value !== null) {
@@ -179,6 +209,41 @@ function determinePresence(
     if (expressionReferencesSlot(guard, slotName)) return 'conditional';
   }
   return 'always';
+}
+
+/**
+ * Find the FIRST `binding`-kind attribute on `slot` whose name is exactly
+ * `attrName` (with a non-null value). Used to locate the `:name` binding
+ * separately from `collectParamsFromSlotElement`'s param-collection pass,
+ * which now skips it entirely (Phase 79 R1).
+ */
+function findBindingAttr(slot: TemplateElement, attrName: string): TemplateAttr | null {
+  for (const a of slot.attributes) {
+    if (a.kind === 'binding' && a.name === attrName && a.value !== null) return a;
+  }
+  return null;
+}
+
+/**
+ * Constant-fold a parsed `:name` expression to a static string when
+ * possible (AC-3): a bare StringLiteral, or a TemplateLiteral with ZERO
+ * interpolations (`` `cell` `` — no `${...}` segments at all).
+ *
+ * Returns `{ folded: false }` for anything else — including a
+ * TemplateLiteral WITH interpolations, a bare identifier/member expression,
+ * and a call expression — all of which set `SlotDecl.dynamicNameExpr`
+ * instead.
+ */
+function foldConstantSlotName(
+  expr: t.Expression,
+): { folded: true; value: string } | { folded: false } {
+  if (t.isStringLiteral(expr)) {
+    return { folded: true, value: expr.value };
+  }
+  if (t.isTemplateLiteral(expr) && expr.expressions.length === 0) {
+    return { folded: true, value: expr.quasis.map((q) => q.value.cooked ?? '').join('') };
+  }
+  return { folded: false };
 }
 
 function getRIfAttr(el: TemplateElement): string | null {
@@ -207,6 +272,7 @@ function visit(
   nodes: readonly TemplateNode[],
   ctx: SlotVisitContext,
   out: SlotDecl[],
+  diagnostics: Diagnostic[],
 ): void {
   for (const node of nodes) {
     if (!isTemplateElement(node)) continue;
@@ -219,14 +285,19 @@ function visit(
         : ctx;
 
     if (node.tagName === 'slot') {
-      // Determine slot name
-      let slotName = '';
+      // Determine the STATIC slot name (name="..." attribute), if any.
+      let staticSlotName = '';
       for (const a of node.attributes) {
         if (a.kind === 'static' && a.name === 'name' && a.value !== null) {
-          slotName = a.value;
+          staticSlotName = a.value;
           break;
         }
       }
+      // Phase 79 R1 — the bound `:name` binding, read separately from the
+      // static scan above (key_links: this is the SECOND static-only read
+      // site the phase's own research flagged; both must move together).
+      const dynamicNameAttr = findBindingAttr(node, 'name');
+
       const isPortal = detectPortal(node);
       const params = collectParamsFromSlotElement(node, isPortal);
       const presence = determinePresence(node, childCtx);
@@ -260,7 +331,58 @@ function visit(
 
       // Recurse for nested slots inside default content.
       const nestedSlots: SlotDecl[] = [];
-      visit(node.children, childCtx, nestedSlots);
+      visit(node.children, childCtx, nestedSlots, diagnostics);
+
+      // Phase 79 R1 — resolve the effective slot name plus the two new
+      // additive IR fields (dynamicNameExpr / namePrefix). Defaults match
+      // pre-phase behavior exactly when no `:name` is present (slotName
+      // stays the static name / '' default; dynamicNameExpr and namePrefix
+      // stay unset) — that is the AC-1 byte-identity guarantee. The
+      // ROZ090/ROZ091/ROZ092/ROZ094 per-slot `:name` AUTHORING diagnostics
+      // are wired separately, in Task 2.
+      let slotName = staticSlotName;
+      let dynamicNameExpr: t.Expression | undefined;
+      let namePrefix: string | undefined;
+
+      if (dynamicNameAttr) {
+        let parsedNameExpr: t.Expression | null = null;
+        try {
+          parsedNameExpr = parseExpression(dynamicNameAttr.value as string, {
+            sourceType: 'module',
+          });
+        } catch {
+          // T-79-12 — never silently fall back to an `undefined` identifier
+          // (that would resolve to the DEFAULT slot at runtime with zero
+          // compile-time signal). Emit a diagnostic instead and leave the
+          // slot's name at its pre-fallback default ('' or the static name).
+          diagnostics.push({
+            code: RozieErrorCode.SLOT_DYNAMIC_NAME_PARSE_ERROR,
+            severity: 'error',
+            message: `<slot :name="${dynamicNameAttr.value}"> failed to parse as a JavaScript expression — the slot's effective name cannot be determined.`,
+            loc: dynamicNameAttr.valueLoc ?? dynamicNameAttr.loc,
+            hint: 'Fix the :name expression syntax — it must be a valid JavaScript expression, e.g. :name="col.key" or a template literal.',
+          });
+        }
+
+        if (parsedNameExpr) {
+          const fold = foldConstantSlotName(parsedNameExpr);
+          if (fold.folded) {
+            // AC-3 — a constant :name is indistinguishable from an
+            // equivalent static name="..." attribute: no dynamicNameExpr,
+            // no namePrefix, byte-identical downstream emit.
+            slotName = fold.value;
+          } else {
+            dynamicNameExpr = parsedNameExpr;
+            if (t.isTemplateLiteral(parsedNameExpr)) {
+              const firstQuasi = parsedNameExpr.quasis[0]?.value.cooked ?? '';
+              if (firstQuasi !== '') {
+                namePrefix = firstQuasi;
+              }
+            }
+            // ROZ094 (no static leading prefix) is wired in Task 2.
+          }
+        }
+      }
 
       const decl: SlotDecl = {
         type: 'SlotDecl',
@@ -271,6 +393,15 @@ function visit(
         nestedSlots,
         sourceLoc: node.loc,
       };
+      // Additive-field discipline (matches inLoop/isPortal/isReactive below):
+      // assigned only when set, never as explicit `undefined`, so a
+      // static-only-name component's SlotDecl carries no new keys (AC-1).
+      if (dynamicNameExpr !== undefined) {
+        decl.dynamicNameExpr = dynamicNameExpr;
+      }
+      if (namePrefix !== undefined) {
+        decl.namePrefix = namePrefix;
+      }
       if (isPortal) {
         decl.isPortal = true;
         decl.portalParamNames = portalParamNames;
@@ -290,7 +421,7 @@ function visit(
     }
 
     // Recurse into element children.
-    visit(node.children, childCtx, out);
+    visit(node.children, childCtx, out, diagnostics);
   }
 }
 
@@ -315,9 +446,9 @@ function flattenNestedSlots(slot: SlotDecl, out: SlotDecl[]): void {
   }
 }
 
-export function lowerSlots(template: TemplateAST): SlotDecl[] {
+export function lowerSlots(template: TemplateAST, diagnostics: Diagnostic[]): SlotDecl[] {
   const out: SlotDecl[] = [];
-  visit(template.children, { rIfStack: [], inLoop: false }, out);
+  visit(template.children, { rIfStack: [], inLoop: false }, out, diagnostics);
 
   // D-SM-01: lift nested slots onto the flat declared slot surface. Iterate a
   // snapshot of the top-level slots (the loop appends to `out`). De-dupe by

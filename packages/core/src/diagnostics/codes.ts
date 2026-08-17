@@ -155,7 +155,16 @@ export const RozieErrorCode = {
   SLOT_FAMILY_PREFIX_DUPLICATE: 'ROZ093', // error — two producer <slot>s derive an identical namePrefix, so a consumer fill matching that prefix has no unique family to resolve to (R7d)
   SLOT_DYNAMIC_NAME_NO_PREFIX: 'ROZ094', // warning — a bound :name yields no static leading prefix (bare identifier, call expression, or a template literal with an empty first quasi); legal, but consumer params degrade and no ROZ947 can fire (R7e)
   SLOT_RECORD_PROP_NAME_RESERVED: 'ROZ095', // error — a <props> key equals its target's slot-record property name (slots/snippets/templates/rozieSlots); the emitted component would declare the identifier twice (R13)
-  // ROZ096..ROZ099 remain free.
+  // Plan 79-06 Task 1 (Rule 2 — mitigates T-79-12): claims the next free code
+  // in this same cluster. A bound `:name` whose value fails to parse as a JS
+  // expression previously fell through to a silent `undefined` identifier
+  // (mirroring collectParamsFromSlotElement's pre-existing catch-and-default
+  // behavior) — that would resolve to the DEFAULT slot at runtime with zero
+  // compile-time signal, exactly the tampering surface T-79-12 flags. No
+  // Phase-79 planning doc pre-allocated a code for this failure mode; ROZ096
+  // is the next genuinely free code in the reserved ROZ090..ROZ099 block.
+  SLOT_DYNAMIC_NAME_PARSE_ERROR: 'ROZ096', // error — a <slot>'s bound :name value failed to parse as a JavaScript expression; never silently falls back to an `undefined` identifier (T-79-12)
+  // ROZ097..ROZ099 remain free.
 
   // ---- Semantic-binding errors (Phase 2 Plan 02) — ROZ100..ROZ199 ----
   UNKNOWN_PROPS_REF: 'ROZ100', // error — SEM-01: $props.foo where foo not declared
@@ -1007,11 +1016,13 @@ export const RozieErrorCode = {
   // verified highest allocated code; ROZ997/ROZ998 are the next two free.
   // HONEST BAND NOTE: ROZ999 is now the LAST free code in the 9xx band — future
   // allocations should continue in the lower bands (e.g. the 100 semantic-
-  // binding cluster's tail, or the reserved ROZ096..ROZ099 / ROZ929..ROZ939
+  // binding cluster's tail, or the reserved ROZ097..ROZ099 / ROZ929..ROZ939
   // gaps), never renumber, and never reuse retired codes. (Phase 79 corrected
   // this note: ROZ090..ROZ095 is no longer free — it took those six codes —
-  // and the Phase 07.2/07.3/11 slot-fill/two-way-binding/match block above is
-  // fully consumed end to end and should never have been listed here as free.)
+  // and Plan 79-06 additionally claimed ROZ096, leaving ROZ097..ROZ099 as the
+  // remainder of that block — and the Phase 07.2/07.3/11 slot-fill/two-way-
+  // binding/match block above is fully consumed end to end and should never
+  // have been listed here as free.)
   //
   // ROZ997 — two (or more) distinct declared `$emit` spellings collapse to the
   // SAME canonical event key under kebab/camel/snake separator equivalence

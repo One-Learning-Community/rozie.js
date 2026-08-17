@@ -398,6 +398,42 @@ export interface SlotDecl {
    * @experimental — added in Quick 260808-iyh (D5)
    */
   inLoop?: boolean;
+  /**
+   * Phase 79 R1 — parsed `:name` expression for a producer `<slot>` whose
+   * name is NOT statically known — i.e. the bound `:name` expression did
+   * NOT constant-fold to a StringLiteral or a zero-interpolation
+   * TemplateLiteral (see `lowerSlots.ts`'s main `visit()` branch). When this
+   * field is set, `name` is the empty-string default-slot sentinel
+   * (RESEARCH.md Assumption A1) — a dynamic-name slot has no compile-time
+   * identity of its own, which is exactly why two dynamic-name slots on one
+   * producer are a Lit-only dedup hazard tracked separately (79-08).
+   *
+   * Additive field — assigned only when the `:name` binding is present AND
+   * does not constant-fold, never as explicit `undefined`, so a component
+   * using only static slot names produces a byte-identical IR snapshot
+   * versus the pre-Phase-79 build (AC-1).
+   *
+   * @experimental — added in Phase 79
+   */
+  dynamicNameExpr?: Expression;
+  /**
+   * Phase 79 R1 — the literal text of a `:name` TemplateLiteral binding's
+   * leading quasi (e.g. `` :name="`cell-${k}`" `` → `namePrefix === 'cell-'`),
+   * consumed by family matching (79-07's `threadParamTypes` /
+   * `matchedFamily`) to group consumer fills under a common static prefix.
+   *
+   * Left unset — NOT set to `''` — whenever no static prefix can be
+   * derived: the `:name` expression constant-folded to a static `name`
+   * already; the expression is not a TemplateLiteral at all (a bare
+   * identifier, member expression, or call expression); or it IS a
+   * TemplateLiteral but its leading quasi is empty (the ROZ094
+   * no-static-prefix warning case).
+   *
+   * Additive field — assigned only when set, never as explicit `undefined`.
+   *
+   * @experimental — added in Phase 79
+   */
+  namePrefix?: string;
 }
 
 /**
