@@ -34,7 +34,7 @@ import type {
 import { collectMethodNamesFromIR } from './methodNames.js';
 import { portalSlotMemberName } from './portalSlotMemberName.js';
 import { slotIdentityKey, slotFieldSuffix } from './slotIdentityKey.js';
-import { slotScopeParamType, slotScopeTypeObject } from './slotScopeParamType.js';
+import { slotScopeParamType, slotScopeTypeObject, buildRozieSlotsRecordType } from './slotScopeParamType.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 
 export interface EmitSlotDeclOpts {
@@ -411,7 +411,7 @@ export function emitSlotDecl(
       '  // named function-prop / <slot> fallback (AC-9). Attribute',
       '  // deserialization is disabled — this is a function-valued record,',
       '  // never reflected to/from an HTML attribute.',
-      '  @property({ attribute: false }) rozieSlots?: Record<string, (scope: any) => unknown>;',
+      `  @property({ attribute: false }) rozieSlots?: ${buildRozieSlotsRecordType(slots)};`,
     ].join('\n');
   }
 
