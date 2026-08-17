@@ -41,7 +41,8 @@
  *
  * This helper is the SINGLE source of truth for the merge identifier; it MUST be
  * used at every site that references it:
- *   - emitScript.ts (emitSlotDerivedMerges) — the `const <name> = $derived(...)` decl
+ *   - emitScript.ts (emitSlotDerivedMerges)  — the `const <name> = $derived(...)` decl
+ *   - emitSlotInvocation.ts                  — the `{@render <name>?.(...)}` render site
  *   - emitPortals.ts (buildSlotMethod)       — the `if (!<name>)` guard + `snippet: <name>`
  *   - rewriteScript.ts                       — the `$slots.<name>` → `<name>` rewrite
  *   - rewriteTemplateExpression.ts           — the same `$slots.<name>` rewrite (template/listeners)
@@ -50,11 +51,38 @@
  * script-side `$portals.<name>(...)` call is rewritten to `portals.<name>(...)`,
  * so the key must match the slot name regardless of the merge-identifier suffix.
  * Only the *reads* of the merged callback use this (possibly suffixed) name.
+ *
+ * Phase 79 Plan 05 (R12/D-03; T-79-10) — a non-identifier slot name (e.g.
+ * `cell-status`) can never reach the collision-detection branches below
+ * as-is: `const cell-status = $derived(...)` doesn't even parse (a hyphen in
+ * binding-name position). Checked FIRST, ahead of every other branch:
+ * `sanitizeRecordSlotIdentifier` strips the punctuation, camel-joins the
+ * remaining segments, and prefixes the result with the `__rozieSlot_` sigil
+ * — the SAME internal-binding convention this target already uses elsewhere
+ * (`__rozieDynSlot_`, `__rozieAttrs`) — so the result can never collide with
+ * an author-declared `<props>`/`<data>`/`$computed`/`<script>`-helper
+ * identifier. No further collision-detection pass is needed for this name;
+ * the prefix alone is the mitigation, unlike the identifier-shape branch
+ * below which needs the r-for / reprojection / widened-collision checks.
  */
 import * as t from '@babel/types';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { findRForSlotNameCollisions } from '../../../../core/src/ir/findRForSlotNameCollisions.js';
 import { findReprojectionSlotNameCollisions } from '../../../../core/src/ir/findReprojectionSlotNameCollisions.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+
+/**
+ * Sanitize a non-identifier slot name into a safe, collision-proof local
+ * identifier: strip every non-word character and camel-join the remaining
+ * segments (`cell-status` -> `cellStatus`), then prefix with `__rozieSlot_`.
+ */
+function sanitizeRecordSlotIdentifier(slotKey: string): string {
+  const parts = slotKey.split(/[^A-Za-z0-9_$]+/).filter(Boolean);
+  const camel = parts
+    .map((p, i) => (i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)))
+    .join('');
+  return `__rozieSlot_${camel}`;
+}
 
 /**
  * Phase 61 Plan 08 — the WIDENED collision set for the slot-merge `Slot` suffix
@@ -105,6 +133,9 @@ export function portalSlotMergeName(slotKey: string, ir: IRComponent): string {
   // (a prop named `children` would be its own pre-existing collision surface
   // outside this concern). Phase 37: a default PORTAL slot reads `children`.
   if (slotKey === '' || slotKey === 'children') return 'children';
+  // Phase 79 Plan 05 — a non-identifier slot name is unconditionally routed
+  // to the sanitized, prefixed form; see the module docstring.
+  if (!isSlotNameIdentifier(slotKey)) return sanitizeRecordSlotIdentifier(slotKey);
   // Class 1 (r-for-loop-var) / Class 2 (script/param-scope shadow, Phase 73
   // item #1) / reprojection collisions take priority and share the `$$slot`
   // suffix already used at the emitSlotInvocation.ts render site + the

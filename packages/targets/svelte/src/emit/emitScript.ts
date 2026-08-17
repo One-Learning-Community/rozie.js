@@ -46,7 +46,13 @@ import { cloneScriptProgram } from '../rewrite/cloneProgram.js';
 import { rewriteRozieIdentifiers, svelteCallbackPropName } from '../rewrite/rewriteScript.js';
 import { collectSvelteImports } from '../rewrite/collectSvelteImports.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { buildSlotTypeFields, distinctSlotsByName } from './refineSlotTypes.js';
+import {
+  buildSlotTypeFields,
+  distinctSlotsByName,
+  buildSnippetsRecordType,
+  renderRecordKey,
+} from './refineSlotTypes.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 import { portalSlotMergeName } from './portalSlotMergeName.js';
@@ -647,7 +653,11 @@ function buildPropsInterfaceFields(ir: IRComponent): string[] {
   // zero-param slots (Card.children, TodoList.empty). Dynamic-name snippets
   // are inherently untyped — the fill expression is computed at runtime.
   if (ir.slots.length > 0) {
-    lines.push('  snippets?: Record<string, any>;');
+    // Phase 79 Plan 05 (R12/D-03) — a record-only (non-identifier) slot gets
+    // a quoted-literal-keyed member on this type; a component with no
+    // record-only slots keeps the pre-phase generic shape byte-identical
+    // (AC-22).
+    lines.push(`  snippets?: ${buildSnippetsRecordType(ir.slots)};`);
   }
 
   // Emit callback-prop declarations: $emit('search', x) was rewritten to
@@ -767,6 +777,11 @@ function buildPropsDestructureEntries(ir: IRComponent): string[] {
     // exactly ONE `X: __XProp` destructure binding (see distinctSlotsByName).
     for (const s of distinctSlotsByName(ir.slots)) {
       const key = s.name === '' ? 'children' : s.name;
+      // Phase 79 Plan 05 (R12/D-03) — a record-only (non-identifier) slot
+      // name mints NO destructure entry: `cell-status: __cell-statusProp`
+      // would be a hard parse error (a hyphen inside a destructure alias).
+      // It is reachable only via the `snippets` record destructured below.
+      if (!isSlotNameIdentifier(key)) continue;
       entries.push(`${key}: __${key}Prop`);
     }
     entries.push('snippets');
@@ -852,6 +867,14 @@ function emitSlotDerivedMerges(ir: IRComponent): string[] {
   for (const s of distinctSlotsByName(ir.slots)) {
     const key = s.name === '' ? 'children' : s.name;
     const ident = portalSlotMergeName(key, ir);
+    // Phase 79 Plan 05 (R12/D-03) — a record-only (non-identifier) slot name
+    // drops the private-prop-alias operand and the `??` merge entirely: the
+    // bracket-keyed `snippets` lookup alone, on a quoted literal key
+    // (T-79-07). The identifier path below stays byte-identical (AC-22).
+    if (!isSlotNameIdentifier(key)) {
+      lines.push(`const ${ident} = $derived(snippets?.[${renderRecordKey(key)}]);`);
+      continue;
+    }
     lines.push(`const ${ident} = $derived(__${key}Prop ?? snippets?.${key});`);
   }
   return lines;

@@ -60,6 +60,8 @@ import {
   rewriteTemplateExpression,
   type ScopeRename,
 } from '../rewrite/rewriteTemplateExpression.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { renderRecordKey } from './refineSlotTypes.js';
 
 /**
  * Phase 61 Plan 08 — RUNTIME-ONLY slot-PARAM shadow auto-fix (collision-svelte
@@ -157,6 +159,16 @@ export function emitSlotFiller(
   filler: SlotFillerDecl,
   ctx: EmitSlotFillerCtx,
 ): string {
+  // Phase 79 Plan 05 (R12/D-03) — a fill targeting a non-identifier,
+  // non-default slot name (e.g. `#cell-status`) has no `{#snippet name(...)}`
+  // path: Svelte's snippet-block name is a bare identifier, so a hyphenated
+  // one wouldn't even parse. It is folded into the merged `snippets={{ ... }}`
+  // record prop by `emitDynamicSnippetsProp` instead (the SAME record path
+  // the R5 dynamic-name fills already use). Returning '' here is safe: the
+  // emitTemplateNode.ts caller joins fillerParts with `''` (Svelte markup
+  // concatenation), so an empty entry is inert.
+  if (filler.name !== '' && !isSlotNameIdentifier(filler.name)) return '';
+
   const shadowed = shadowedParams(filler, ctx.enclosingLoopVars ?? new Set());
   const bodyRenames: ScopeRename[] = [...shadowed].map((name) => ({
     kind: 'slot-param',
@@ -208,6 +220,16 @@ export function emitSlotFiller(
  * Index counter is local to the per-component-tag invocation — synthesised
  * names won't collide across siblings because each component-tag's emit
  * runs the helper independently.
+ *
+ * Phase 79 Plan 05 (R12/D-03) — ALSO collects any STATIC filler whose target
+ * slot name is not a valid JS identifier (e.g. `#cell-status`): `emitSlotFiller`
+ * above already returns `''` for such a filler (no `{#snippet cell-status()}`
+ * path exists), so it is folded into this SAME merged `snippets={{ ... }}`
+ * record instead, keyed on the escaped LITERAL name (`renderRecordKey`,
+ * T-79-07) rather than a computed `[expr]`. A single filter predicate over
+ * the FULL `fillers` array (not two separate filtered passes) preserves true
+ * IR/authoring order when a component mixes a dynamic-name fill with a
+ * non-identifier static fill on the same tag.
  */
 export function emitDynamicSnippetsProp(
   fillers: readonly SlotFillerDecl[],
@@ -219,16 +241,17 @@ export function emitDynamicSnippetsProp(
   enclosingLoopVars: ReadonlySet<string> = new Set(),
 ): { prop: string | null; snippetBlocks: string[] } {
   void ir; // kept in signature for future use (e.g. expression-source diagnostics)
-  const dynamics = fillers.filter((f) => f.isDynamic);
-  if (dynamics.length === 0) return { prop: null, snippetBlocks: [] };
+  const recordOnly = fillers.filter(
+    (f) => f.isDynamic || (f.name !== '' && !isSlotNameIdentifier(f.name)),
+  );
+  if (recordOnly.length === 0) return { prop: null, snippetBlocks: [] };
 
   const entries: string[] = [];
   const snippetBlocks: string[] = [];
   let idx = 0;
-  for (const filler of dynamics) {
-    if (!filler.dynamicNameExpr) continue; // ROZ946 emitted upstream
+  for (const filler of recordOnly) {
+    if (filler.isDynamic && !filler.dynamicNameExpr) continue; // ROZ946 emitted upstream
     const snippetName = `__rozieDynSlot_${idx}`;
-    const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ir);
     const shadowed = shadowedParams(filler, enclosingLoopVars);
     const bodyRenames: ScopeRename[] = [...shadowed].map((name) => ({
       kind: 'slot-param',
@@ -239,6 +262,9 @@ export function emitDynamicSnippetsProp(
     const argList = destructure === '' ? '()' : `(${destructure})`;
     const body = emitChildren(filler.body, bodyRenames);
     snippetBlocks.push(`{#snippet ${snippetName}${argList}}${body}{/snippet}`);
+    const keyExpr = filler.isDynamic
+      ? rewriteTemplateExpression(filler.dynamicNameExpr!, ir)
+      : renderRecordKey(filler.name);
     entries.push(`[${keyExpr}]: ${snippetName}`);
     idx++;
   }

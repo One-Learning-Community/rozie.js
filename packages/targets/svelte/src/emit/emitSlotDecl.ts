@@ -17,6 +17,14 @@
  */
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
 import { buildSlotTypeFields } from './refineSlotTypes.js';
+// Phase 79 Plan 05 (R12/D-03) — re-exported here so any downstream consumer
+// of this "slot-decl-shape" module can gate a record-only slot without a
+// second import of the core predicate. Mirrors the direct-import convention
+// used at every other R12 routing site in this package (grep-detectable
+// per-module import, T-79-08). `buildSlotTypeFields` above already applies
+// this gate internally (a record-only slot mints no field), so this
+// re-export is a convenience surface, not a second gating site.
+export { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 
 /**
  * Convenience re-export — the actual implementation lives in
