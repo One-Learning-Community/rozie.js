@@ -3,17 +3,21 @@
 
   Demonstrates:
     - Slot-driven UI-library table — consumer-provided header / cell / empty renderers
-    - Per-column dispatch inside a single shared `cell` slot (the cross-framework
-      alternative to PrimeVue's per-column-keyed cell slot — Rozie producers
-      only support static slot names)
+    - A per-column dynamic-name cell family, `cell-${column.key}`, so a consumer
+      can override rendering for the specific columns it cares about. A column
+      with no dedicated fill falls through to the family's own fallback
+      content — which IS the pre-existing shared `cell` slot, nested inside it
+      and carrying the same scope params. Per-item override with a generic
+      default is the honest design-system shape, and it exercises the
+      recursive nested-slot composition path.
     - r-if gating on $slots.* for optional footer slots
     - r-for with :key over $props.rows
     - Default slot fallback content for "no data" empty state
 
-  Columns are `{ key: string, label: string }`. Per-column rendering happens
-  CONSUMER-side: the consumer's `#cell` template inspects `column.key` and
-  dispatches accordingly. Producer slot outlets are static-name in Rozie —
-  dynamic slot names live on the consumer (`<template #[expr]>`).
+  Columns are `{ key: string, label: string }`. The cell family's names are
+  kebab-case (`cell-status`, `cell-score`, ...) — a family name is a record
+  key on the five non-Vue targets, and kebab-case is what forces that record
+  path rather than a plain object-literal spread.
 
   Slot naming: footer slots use camelCase (`footerSummary`, `footerPagination`)
   rather than kebab-case so `r-if="$slots.footerSummary"` works — magic
@@ -48,8 +52,10 @@ const getCellValue = (row, column) => row?.[column.key]
   <tbody r-if="$props.rows.length > 0">
     <tr r-for="row, rowIndex in $props.rows" :key="rowIndex">
       <td r-for="column in $props.columns" :key="column.key">
-        <slot name="cell" :column="column" :row="row" :value="getCellValue(row, column)" :rowIndex="rowIndex">
-          {{ getCellValue(row, column) }}
+        <slot :name="`cell-${column.key}`" :column="column" :row="row" :value="getCellValue(row, column)">
+          <slot name="cell" :column="column" :row="row" :value="getCellValue(row, column)" :rowIndex="rowIndex">
+            {{ getCellValue(row, column) }}
+          </slot>
         </slot>
       </td>
     </tr>
