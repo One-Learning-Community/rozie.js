@@ -73,7 +73,7 @@ import {
   AngularImportCollector,
   collectAngularImports,
 } from '../rewrite/collectAngularImports.js';
-import { buildSlotCtx, buildNgTemplateContextGuard } from './refineSlotTypes.js';
+import { buildEligibleSlotDecls, buildNgTemplateContextGuard } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 // Phase 71 Plan 09 (r-keynav, Angular — highest blast radius), extended
@@ -1064,13 +1064,16 @@ export function emitScript(
   // class members ("Duplicate member" esbuild error) and duplicate interface
   // identifiers (TS2300), breaking the Angular build. Mirrors the per-target
   // `seenSlotNames` dedup in Lit/Solid/Svelte/React emitSlotDecl.ts (47-03).
-  const seenSlotNames = new Set<string>();
-  for (const slot of ir.slots) {
-    if (seenSlotNames.has(slot.name)) continue;
-    seenSlotNames.add(slot.name);
-    const ctx = buildSlotCtx(slot);
-    interfaceDecls.push(ctx.interfaceDecl);
-    slotFieldDecls.push(ctx.fieldDecl);
+  //
+  // Phase 79 Plan 05 (R12/D-03) — the dedup AND the record-only
+  // (non-identifier slot name) exclusion both live in
+  // `buildEligibleSlotDecls`: a hyphenated slot name mints NO `@ContentChild`
+  // field / ctx interface (the selector argument is a template-reference
+  // variable, which does not resolve for a hyphenated name) — it's reachable
+  // only via the `templates()` signal-map lookup (6e.bis below).
+  for (const rendered of buildEligibleSlotDecls(ir.slots)) {
+    interfaceDecls.push(rendered.interfaceDecl);
+    slotFieldDecls.push(rendered.fieldDecl);
   }
 
   // 6. Build field declarations.

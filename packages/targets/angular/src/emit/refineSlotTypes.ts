@@ -15,9 +15,22 @@
  * Per RESEARCH Pattern 8 + OQ-typing-guards: ngTemplateContextGuard static
  * method shipped in v1.
  *
+ * Phase 79 Plan 05 (R12/D-03): a slot name that is NOT a valid JS identifier
+ * (e.g. `cell-status`) mints NO `@ContentChild` field / ctx interface —
+ * `@ContentChild`'s string argument is a template-reference-variable
+ * selector, which does not resolve for a hyphenated name. `isRecordOnlySlotName`
+ * below is this file's gate, `renderRecordKey` its escaped-key single source
+ * of truth (T-79-07), and `buildEligibleSlotDecls` is the filtered
+ * producer-decl builder every caller should use in place of a raw
+ * `slots.map(buildSlotCtx)`. The identifier SHAPE check itself is
+ * `isSlotNameIdentifier`, imported from core — every R12 routing site
+ * imports it directly (never redeclares it) so a future edit that forgets
+ * the check in one module is grep-detectable (T-79-08).
+ *
  * @experimental — shape may change before v1.0
  */
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 
 /** Convert default-slot empty string to synthetic ref name `defaultSlot`. */
 export function slotRefName(slotName: string): string {
@@ -45,6 +58,37 @@ export interface SlotCtxRendered {
   interfaceDecl: string;
   /** Field declaration text (e.g., `@ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;`). */
   fieldDecl: string;
+}
+
+/**
+ * Phase 79 Plan 05 (R12/D-03) — whether `name` routes through the
+ * `templates()` signal-map lookup ONLY (no `@ContentChild` field, no ctx
+ * interface). Mirrors the identical helper on every other R12 target. The
+ * default slot (`''`) is excluded explicitly — `isSlotNameIdentifier` does
+ * not special-case the empty string, and the default slot always keeps its
+ * `@ContentChild('defaultSlot', ...)` path regardless of shape.
+ */
+export function isRecordOnlySlotName(name: string): boolean {
+  return name !== '' && !isSlotNameIdentifier(name);
+}
+
+/**
+ * Escape a single-quoted string-literal key body: backslash first (so a
+ * backslash inserted by the quote-escape step is not itself re-escaped), then
+ * single quotes. Mirrors the identical helper in every other R12 target's
+ * `refineSlotTypes.ts` (T-79-07).
+ */
+function escapeSingleQuotedKey(name: string): string {
+  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+/**
+ * Render the bracket-lookup key for a record-only slot name: single-quoted
+ * and escaped, so a quote/backslash in the author's slot name cannot break
+ * out of the emitted string literal (T-79-07).
+ */
+export function renderRecordKey(name: string): string {
+  return `'${escapeSingleQuotedKey(name)}'`;
 }
 
 /**
@@ -87,6 +131,26 @@ export function buildSlotCtx(slot: SlotDecl): SlotCtxRendered {
 }
 
 /**
+ * Build the per-slot ctx interface + `@ContentChild` field declarations for
+ * every DISTINCT, IDENTIFIER-shaped slot name in `slots`. A record-only
+ * (non-identifier) slot name is silently excluded — see `isRecordOnlySlotName`
+ * above. Dedupe-by-distinct-name lives here too (a template may reference the
+ * same named slot in multiple locations; each distinct name backs exactly one
+ * field/interface pair).
+ */
+export function buildEligibleSlotDecls(slots: SlotDecl[]): SlotCtxRendered[] {
+  const seen = new Set<string>();
+  const out: SlotCtxRendered[] = [];
+  for (const slot of slots) {
+    if (seen.has(slot.name)) continue;
+    seen.add(slot.name);
+    if (isRecordOnlySlotName(slot.name)) continue;
+    out.push(buildSlotCtx(slot));
+  }
+  return out;
+}
+
+/**
  * Build the static ngTemplateContextGuard method for a class with multiple
  * slot context types. Returns the method body string, or null when there are
  * no slots.
@@ -98,13 +162,18 @@ export function buildNgTemplateContextGuard(
   componentName: string,
   slots: SlotDecl[],
 ): string | null {
-  if (slots.length === 0) return null;
+  // Phase 79 Plan 05 (R12/D-03) — a record-only (non-identifier) slot has no
+  // ctx interface (see `buildEligibleSlotDecls`), so it must not enter this
+  // union either — `slotCtxName('cell-status')` would produce the invalid
+  // TS identifier `Cell-statusCtx`.
+  const eligible = slots.filter((s) => !isRecordOnlySlotName(s.name));
+  if (eligible.length === 0) return null;
   // Dedupe by distinct slot name — a slot referenced in multiple template
   // locations appears multiple times in `slots`, but each distinct name has a
   // single ctx type. Without this the union repeats members (`FooCtx | FooCtx`).
   const seenCtxNames = new Set<string>();
   const ctxNames: string[] = [];
-  for (const s of slots) {
+  for (const s of eligible) {
     const ctxName = slotCtxName(s.name);
     if (seenCtxNames.has(ctxName)) continue;
     seenCtxNames.add(ctxName);

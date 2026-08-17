@@ -19,6 +19,12 @@
  */
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
 import { buildSlotCtx } from './refineSlotTypes.js';
+// Phase 79 Plan 05 (R12/D-03) — imported directly (per-module grep
+// enforcement, T-79-08) so a record-only (non-identifier) slot name mints
+// NO @ContentChild field / ctx interface here either: `@ContentChild`'s
+// string argument is a template-reference-variable selector, which does not
+// resolve for a hyphenated name.
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 
 /**
  * Convenience re-export — the actual implementation lives in
@@ -34,7 +40,9 @@ export interface SlotDeclEmission {
 }
 
 export function emitSlotDeclEmissions(slots: SlotDecl[]): SlotDeclEmission[] {
-  return slots.map((slot) => buildSlotCtx(slot));
+  return slots
+    .filter((slot) => slot.name === '' || isSlotNameIdentifier(slot.name))
+    .map((slot) => buildSlotCtx(slot));
 }
 
 /**

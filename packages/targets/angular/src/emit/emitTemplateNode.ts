@@ -61,6 +61,11 @@ import {
   emitDynamicSlotFiller,
   type EmitSlotFillerCtx,
 } from './emitSlotFiller.js';
+// Phase 79 Plan 05 (R12/D-03) — a non-identifier, non-default slot name (e.g.
+// `#cell-status`) is routed through the SAME `emitDynamicSlotFiller` /
+// `[templates]`-getter mechanism as an `isDynamic` fill (see the dispatch
+// loop below); this is the per-module direct import (T-79-08).
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 // Phase 71 Plan 09 (r-keynav, Angular — highest blast radius), extended
 // Phase 77 Plan 05 (multi-root) — inline controller emitter wiring (see
 // emitKeynav.ts's module doc comment).
@@ -866,7 +871,14 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     let templatesBinding = '';
     let dynIdx = 0;
     for (const filler of node.slotFillers) {
-      if (filler.isDynamic) {
+      // Phase 79 Plan 05 (R12/D-03) — a non-identifier, non-default STATIC
+      // slot name (e.g. `#cell-status`) cannot use a plain `<ng-template
+      // #cell-status>` + `@ContentChild('cell-status', ...)` pair — a
+      // hyphenated template-reference variable does not resolve. Route it
+      // through the SAME dynamic-dispatch branch as an `isDynamic` fill.
+      const isRecordOnlyStatic =
+        !filler.isDynamic && filler.name !== '' && !isSlotNameIdentifier(filler.name);
+      if (filler.isDynamic || isRecordOnlyStatic) {
         // R5 dynamic-name dispatch (Phase 07.3.2.1-01 closure of F-07.3.2-11-A):
         // emit the body as a synthetic-named `<ng-template #__dynSlot_<N>>`
         // declaration (a child of the producer tag). The CALLER no longer

@@ -67,6 +67,8 @@ import type {
   IRTemplateNode as TemplateNode,
 } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { renderRecordKey } from './refineSlotTypes.js';
 
 /**
  * Context shape this module needs. Mirrors the producer-side
@@ -129,6 +131,18 @@ export function emitSlotFiller(
     return '';
   }
 
+  // Phase 79 Plan 05 (R12/D-03) — a fill targeting a non-identifier,
+  // non-default slot name (e.g. `#cell-status`) cannot use a plain
+  // `<ng-template #cell-status>` + `@ContentChild('cell-status', ...)` pair —
+  // a hyphenated template-reference variable does not resolve. The caller
+  // should route it through `emitDynamicSlotFiller` instead (the SAME
+  // `[templates]` getter path the R5 dynamic-name fills already use).
+  // Emitting empty here is the symmetric fallback when the caller forgot to
+  // branch.
+  if (filler.name !== '' && !isSlotNameIdentifier(filler.name)) {
+    return '';
+  }
+
   const refName = templateRefName(filler.name);
   const lets = letBindings(filler);
   const body = ctx.emitChildren(filler.body);
@@ -159,6 +173,16 @@ export function emitSlotFiller(
  * Silent fallback on runtime miss (D-05): when `templates()?.[expr]` returns
  * `undefined`, the merged @if short-circuits to the bare-static template
  * ref (if any) or the producer's declared default content.
+ *
+ * Phase 79 Plan 05 (R12/D-03) — this function ALSO handles a non-dynamic,
+ * non-identifier-named STATIC filler (e.g. `#cell-status`): `emitSlotFiller`
+ * above returns `''` for such a filler (no `@ContentChild`-capturable
+ * `<ng-template #cell-status>` path exists), so it is captured via this SAME
+ * synthetic-`<ng-template>` + `[templates]`-getter mechanism instead, keyed
+ * on the escaped LITERAL name (`renderRecordKey`, T-79-07) rather than a
+ * computed runtime expression — `keyExpr`/`classBodyKeyExpr` are identical
+ * for a literal key since there is no template-scope-dependent rewriting to
+ * do.
  *
  * History — Phase 07.3.2.1-01 (closes F-07.3.2-11-A): prior to this phase
  * `emitDynamicSlotFiller` was paired with a sibling `dispatch` string of
@@ -194,15 +218,27 @@ export function emitDynamicSlotFiller(
   ctx: EmitSlotFillerCtx,
   index: number,
 ): AngularDynamicSlotFillerEmission | null {
-  if (!filler.isDynamic) return null;
-  if (!filler.dynamicNameExpr) return null; // ROZ946 already emitted upstream
   const refName = `__dynSlot_${index}`;
-  const lets = letBindings(filler);
-  const body = ctx.emitChildren(filler.body);
-  const template = `<ng-template #${refName}${lets}>${body}</ng-template>`;
-  const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir);
-  const classBodyKeyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir, {
-    prefixThis: true,
-  });
-  return { template, refName, keyExpr, classBodyKeyExpr, params: filler.params };
+  if (filler.isDynamic) {
+    if (!filler.dynamicNameExpr) return null; // ROZ946 already emitted upstream
+    const lets = letBindings(filler);
+    const body = ctx.emitChildren(filler.body);
+    const template = `<ng-template #${refName}${lets}>${body}</ng-template>`;
+    const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir);
+    const classBodyKeyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir, {
+      prefixThis: true,
+    });
+    return { template, refName, keyExpr, classBodyKeyExpr, params: filler.params };
+  }
+  // Phase 79 Plan 05 (R12/D-03) — a non-identifier STATIC slot name (e.g.
+  // `#cell-status`): route through this SAME `[templates]`-getter mechanism,
+  // keyed on the escaped literal name rather than a computed expression.
+  if (filler.name !== '' && !isSlotNameIdentifier(filler.name)) {
+    const lets = letBindings(filler);
+    const body = ctx.emitChildren(filler.body);
+    const template = `<ng-template #${refName}${lets}>${body}</ng-template>`;
+    const literalKey = renderRecordKey(filler.name);
+    return { template, refName, keyExpr: literalKey, classBodyKeyExpr: literalKey, params: filler.params };
+  }
+  return null;
 }

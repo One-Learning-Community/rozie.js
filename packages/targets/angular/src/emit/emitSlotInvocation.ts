@@ -62,7 +62,8 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
-import { slotFieldName } from './refineSlotTypes.js';
+import { slotFieldName, renderRecordKey } from './refineSlotTypes.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import type { AngularScriptInjection } from './emitTemplateEvent.js';
 
 export interface EmitSlotInvocationCtx {
@@ -355,7 +356,16 @@ export function emitSlotInvocation(
   // `templates()` is the signal CALL form per RESEARCH A7 (signal-era
   // `input<T>()` idiom, NOT decorator `@Input()`).
   const dynKey = node.slotName === '' ? 'defaultSlot' : node.slotName;
-  const mergedTplRef = `(${tplField} ?? templates()?.['${dynKey}'])`;
+  // Phase 79 Plan 05 (R12/D-03) — a record-only (non-identifier) slot name
+  // drops the `@ContentChild` static-name operand and the `??` merge
+  // entirely: `@ContentChild`'s string argument is a template-reference-
+  // variable selector, which does not resolve for a hyphenated name. The
+  // `templates()` signal-map lookup alone, keyed on the escaped literal name
+  // (T-79-07). The identifier path below stays byte-identical (AC-22).
+  const mergedTplRef =
+    node.slotName !== '' && !isSlotNameIdentifier(node.slotName)
+      ? `templates()?.[${renderRecordKey(node.slotName)}]`
+      : `(${tplField} ?? templates()?.['${dynKey}'])`;
   const outletTag = `<ng-container *ngTemplateOutlet="${mergedTplRef}${ctxSuffix}" />`;
 
   if (!hasFallback && presence === 'always') {
