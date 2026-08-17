@@ -17,9 +17,7 @@ let {
   ...__rozieAttrs
 }: Props = $props();
 
-const __rozieDynSlot0 = $derived(snippets?.[x]);
-
 function noop(): void {}
 </script>
 
-<div {...__rozieAttrs} class={["r", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-caafe4dd>{#each items as x}{@render __rozieDynSlot0?.()}{/each}</div>
+<div {...__rozieAttrs} class={["r", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-caafe4dd>{#each items as x}{@render (snippets?.[x])?.()}{/each}</div>

@@ -887,6 +887,17 @@ function emitSlotDerivedMerges(ir: IRComponent): string[] {
     // independent dynamic-name slots on one producer would mint the SAME
     // `$derived` identifier and collide.
     if (s.dynamicNameExpr !== undefined) {
+      // Phase 79 Plan 15 (bug fix) — when this dynamic-name slot is declared
+      // INSIDE an `r-for` (SlotDecl.inLoop === true, e.g. Table.rozie's
+      // per-column `cell-${column.key}` family), `s.dynamicNameExpr` reads the
+      // LOOP VARIABLE (`column`), which does not exist at this top-level
+      // script scope — only inside the template's `{#each}` block. Hoisting
+      // it into a `$derived` here would emit a `ReferenceError` at runtime
+      // (the loop variable is undefined outside the each-block). Skip the
+      // top-level binding entirely; `emitSlotInvocation.ts` inlines the SAME
+      // record-lookup expression directly at the render site instead, where
+      // the loop variable IS in scope and is re-evaluated every iteration.
+      if (s.inLoop) continue;
       const ordinal = ir.slots.indexOf(s);
       const ident = dynamicSlotBindingName(ordinal);
       const keyExpr = rewriteTemplateExpression(s.dynamicNameExpr, ir);

@@ -90,9 +90,16 @@ describe('Phase 79 Plan 10/11 (R3/R5/D-09) — producer dispatch on React/Solid/
         expect(code).toContain('templates()?.[\\`cell-\\${col.key}\\`]');
         return;
       }
-      // Svelte keys the $derived initializer on the rewritten expression,
-      // then references the ordinal-derived local binding at the render site.
-      expect(code).toMatch(/\$derived\(snippets\?\.\[`cell-\$\{col\.key\}`\]\)/);
+      // Phase 79 Plan 15 (bug fix) — this slot is declared INSIDE the r-for
+      // it's keyed on (`col` is the loop variable), so the record lookup
+      // CANNOT be hoisted into a top-level `$derived` (col doesn't exist at
+      // script scope — that was a ReferenceError at runtime, caught by this
+      // phase's own Docker VR run against examples/Table.rozie, a REAL
+      // consumer this producer-only fixture doesn't have). The lookup is
+      // inlined directly at the render site instead, inside the `{#each}`
+      // block where `col` is in scope.
+      expect(code).not.toMatch(/\$derived\(snippets\?\.\[`cell-\$\{col\.key\}`\]\)/);
+      expect(code).toMatch(/\{#each columns as col[^}]*\}.*\(snippets\?\.\[`cell-\$\{col\.key\}`\]\)/s);
     },
   );
 

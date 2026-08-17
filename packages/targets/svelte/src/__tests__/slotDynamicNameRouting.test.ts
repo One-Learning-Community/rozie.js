@@ -134,6 +134,42 @@ describe('Svelte producer — runtime-keyed dispatch for a dynamic-name slot (R3
     const code = compileSvelte(ir, 'X.rozie');
     expect(code).toContain('{@render __rozieDynSlot0?.()}');
   });
+
+  // Phase 79 Plan 15 (bug fix) — a producer `<slot :name="expr">` declared
+  // INSIDE an `r-for` reads a LOOP VARIABLE in its dynamicNameExpr (mirrors
+  // examples/Table.rozie's real per-column `cell-${column.key}` family,
+  // which crashed at runtime on Svelte with `ReferenceError: column is not
+  // defined` — caught by this phase's own Docker VR run, not by any prior
+  // fixture). The loop variable does not exist at top-level script scope, so
+  // the record lookup must be inlined at the render site (inside the
+  // `{#each}` block) instead of hoisted into a top-level `$derived`.
+  it('a slot inside r-for whose dynamicNameExpr reads the loop variable does NOT hoist a top-level $derived, and inlines the record lookup at the render site', () => {
+    const ir = lowerInline(`
+<rozie name="Grid">
+<props>{ columns: { type: Array, default: () => [] } }</props>
+<template>
+<div>
+  <div r-for="column in $props.columns" :key="column.key">
+    <slot :name="\`cell-\${column.key}\`" :column="column"></slot>
+  </div>
+</div>
+</template>
+</rozie>
+`);
+    const slot = ir.slots.find((s) => s.dynamicNameExpr !== undefined);
+    expect(slot).toBeDefined();
+    expect(slot!.inLoop).toBe(true);
+    const code = compileSvelte(ir, 'Grid.rozie');
+    // The bug: this used to appear as a top-level `const __rozieDynSlot0 =
+    // $derived(snippets?.[`cell-${column.key}`]);` line in <script>, which
+    // ReferenceErrors at runtime because `column` isn't in scope there.
+    expect(code).not.toMatch(/const __rozieDynSlot\d+ = \$derived\(snippets\?\.\[`cell-\$\{column\.key\}`\]\);/);
+    expect(code).not.toContain('__rozieDynSlot0');
+    // The fix: the record lookup is inlined directly at the render site,
+    // inside the {#each} block where `column` IS in scope.
+    expect(code).toContain('{#each columns as column (column.key)}');
+    expect(code).toContain('{@render (snippets?.[`cell-${column.key}`])?.({ column })}');
+  });
 });
 
 describe('Svelte consumer — matchedFamily fill emits the snippets record-object form (R5/D-09)', () => {

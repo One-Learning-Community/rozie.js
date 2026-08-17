@@ -117,9 +117,22 @@ export function emitSlotInvocation(
     node.dynamicNameExpr !== undefined
       ? findDynamicSlotOrdinal(ctx.ir, node.dynamicNameExpr)
       : -1;
+  // Phase 79 Plan 15 (bug fix) — a producer `<slot :name="expr">` declared
+  // INSIDE an `r-for` (SlotDecl.inLoop === true, e.g. Table.rozie's per-column
+  // `cell-${column.key}` family) has a `dynamicNameExpr` that reads the LOOP
+  // VARIABLE (`column`). `emitScript.ts`'s emitSlotDerivedMerges intentionally
+  // does NOT hoist a `$derived` binding for an in-loop dynamic-name slot to
+  // top-level script scope — `column` doesn't exist there, only inside the
+  // `{#each columns as column}` block this invocation renders within. So
+  // instead of referencing that (non-existent) top-level binding by name,
+  // inline the record lookup directly at this render site, where the loop
+  // variable IS in scope and gets re-evaluated correctly on every iteration.
+  const dynamicDecl = node.dynamicNameExpr !== undefined ? ctx.ir.slots[dynamicOrdinal] : undefined;
   const renderName =
     node.dynamicNameExpr !== undefined
-      ? dynamicSlotBindingName(dynamicOrdinal)
+      ? dynamicDecl?.inLoop
+        ? `(snippets?.[${rewriteTemplateExpression(node.dynamicNameExpr, ctx.ir)}])`
+        : dynamicSlotBindingName(dynamicOrdinal)
       : portalSlotMergeName(slotKey, ctx.ir);
 
   // Build object-shape arg payload per Phase 07.3.1 Blocker #2 D-02. Svelte's
@@ -148,7 +161,7 @@ export function emitSlotInvocation(
   // truth — one lookup, not two independent ones that could disagree).
   const decl: SlotDecl | undefined =
     node.dynamicNameExpr !== undefined
-      ? ctx.ir.slots[dynamicOrdinal]
+      ? dynamicDecl
       : ctx.ir.slots.find((s) => (s.name === '' ? '' : s.name) === node.slotName);
 
   // Determine the fallback content: defaultContent from SlotDecl takes

@@ -173,14 +173,28 @@ describe('AC-N2 Layer 1 — dynamic :name-in-r-for record-key invariants (compil
         it(`snippets is bracket-keyed by the loop variable "${loopVar}"`, () => {
           expect(code).toContain(`snippets?.[${loopVar}]`);
         });
-        it('the dynamic-slot binding renders via {@render ...?.()}, not the old fixed `children` snippet call', () => {
-          expect(code).toMatch(/\{@render __rozieDynSlot\d+\?\.\(\)\}/);
+        it('the dynamic-slot binding renders via {@render (snippets?.[...])?.()}, not the old fixed `children` snippet call', () => {
+          expect(code).toMatch(/\{@render \(snippets\?\.\[\w+\]\)\?\.\(\)\}/);
         });
         it(`the each-block iterates ${loopSource} binding ${loopVar} directly`, () => {
           expect(code).toContain(`{#each ${loopSource} as ${loopVar}`);
         });
-        it(`the derived dynamic-slot binding is sourced from snippets?.[${loopVar}] directly`, () => {
-          expect(code).toContain(`$derived(snippets?.[${loopVar}])`);
+        // Phase 79 Plan 15 (bug fix) — the slot is declared INSIDE the
+        // `r-for` this fixture authors, so `loopVar` is a loop variable, not
+        // a top-level script binding. A hoisted `const __rozieDynSlot<N> =
+        // $derived(snippets?.[${loopVar}])` at script scope is a
+        // ReferenceError at runtime (`loopVar` doesn't exist there) — this
+        // is exactly the bug a real six-target runtime proof
+        // (examples/Table.rozie, via this phase's own Docker VR run) caught
+        // that this compile()-only fixture family, having no consumer/filler
+        // wired (see file header), could not. The record lookup must be
+        // inlined at the render site, inside the `{#each}` block, instead.
+        it(`does NOT hoist a top-level $derived(snippets?.[${loopVar}]) binding — ${loopVar} is a loop variable, not in scope at script top-level`, () => {
+          expect(code).not.toContain(`$derived(snippets?.[${loopVar}])`);
+          expect(code).not.toMatch(/__rozieDynSlot\d+/);
+        });
+        it(`the record lookup is inlined directly at the render site, inside the {#each} block where ${loopVar} is in scope`, () => {
+          expect(code).toContain(`(snippets?.[${loopVar}])`);
         });
         it("does NOT still destructure the old fixed 'children' prop out of $props()", () => {
           expect(code).not.toContain('children: __childrenProp,');
