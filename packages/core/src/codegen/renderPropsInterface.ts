@@ -29,9 +29,10 @@
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
-import type { IRComponent, PropTypeAnnotation, ParamDecl } from '../ir/types.js';
+import type { IRComponent, PropTypeAnnotation, ParamDecl, SlotDecl } from '../ir/types.js';
 import { buildPropJsdoc } from './buildPropJsdoc.js';
 import { isSlotNameIdentifier } from './slotNameIdentifier.js';
+import { lowerSlotParamType } from './slotParamTypeLowering.js';
 
 /**
  * Options controlling the shared props-interface body rendering.
@@ -172,6 +173,24 @@ export function renderPropsInterface(
     if (!isDefault && !isSlotNameIdentifier(slot.name)) {
       continue;
     }
+    // Phase 79 Plan 12 (R6) — escape found while generating Task 3's
+    // DynamicSlots consumer-ts fixture: a SlotDecl carrying `dynamicNameExpr`
+    // shares the `''` default-slot sentinel (79-06 Assumption A1) but is NOT
+    // the genuine default slot. The `isDefault` check above alone let it fall
+    // through and mint a `children?:` field — harmless for exactly ONE such
+    // slot (it silently duplicates the real default slot's own line, which
+    // TypeScript tolerates for two IDENTICAL declarations of the SAME
+    // optional member... but does NOT tolerate for TWO DIFFERENT dynamic-name
+    // slots with different param shapes, which mint two DIFFERING `children?:`
+    // lines — TS2300 duplicate identifier in this PUBLIC `.d.ts`/`.d.rozie.ts`
+    // renderer, shared by all six targets' `emitTypes.ts`. Checked BEFORE the
+    // `isDefault` branch is used below — mirrors the "record-only check
+    // before dedup" ordering every per-target `emitSlotDecl.ts`/
+    // `refineSlotTypes.ts` established for this exact sentinel collision
+    // (79-11 Angular, 79-12 Task 1 React/Solid).
+    if (slot.dynamicNameExpr !== undefined) {
+      continue;
+    }
     const renderName = isDefault ? 'children' : `render${capitalize(slot.name)}`;
     if (slot.params.length === 0) {
       if (isDefault) {
@@ -206,11 +225,58 @@ export function renderPropsInterface(
   // invocation form at emitSlotInvocation.ts:302. See the sibling note in
   // emitPropsInterface.ts for the contract rationale.
   if (ir.slots.length > 0) {
-    lines.push(`  slots?: Record<string, () => ${slotChildrenType}>;`);
+    // Phase 79 Plan 12 (R6) — a component with at least one dynamic-name
+    // slot gets a family-aware `slots?:` type instead of the generic
+    // `Record<string, () => X>`; a component with none keeps that exact
+    // pre-Plan-12 text (byte-identical).
+    lines.push(`  slots?: ${buildSlotsRecordType(ir.slots, slotChildrenType)};`);
   }
 
   lines.push(`}`);
   return lines.join('\n');
+}
+
+/**
+ * Build the value type of a family member (Phase 79 Plan 12, R6/AC-10): a
+ * zero-param family types its value as a genuine zero-argument function —
+ * NOT a function accepting an empty params object.
+ */
+function buildFamilyFnType(slot: SlotDecl, slotChildrenType: string): string {
+  if (slot.params.length === 0) return `() => ${slotChildrenType}`;
+  const paramFields = slot.params
+    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])}`)
+    .join('; ');
+  return `(params: { ${paramFields} }) => ${slotChildrenType}`;
+}
+
+/**
+ * Build the TS type text for the `slots?:` record field (Phase 79 Plan 12,
+ * R6) shared by every target's `emitTypes.ts` public `.d.ts`/`.d.rozie.ts`
+ * renderer. Mirrors `packages/targets/react/src/emit/refineSlotTypes.ts`'s
+ * identically-named function (React's INLINE `.tsx` interface uses that
+ * copy; this core copy is the one consumed by the cross-target public
+ * `.d.ts` sidecar every target's `emitTypes.ts` shares). A component with no
+ * dynamic-name slot returns the EXACT pre-Plan-12 generic `Record<string,
+ * () => X>` text — byte-identical.
+ *
+ * @public — consumed by every target's `emitTypes.ts`.
+ */
+export function buildSlotsRecordType(slots: SlotDecl[], slotChildrenType: string): string {
+  const dynamicSlots = slots.filter((s) => s.dynamicNameExpr !== undefined);
+  if (dynamicSlots.length === 0) {
+    return `Record<string, () => ${slotChildrenType}>`;
+  }
+  const members: string[] = [];
+  const seenKeys = new Set<string>();
+  for (const s of dynamicSlots) {
+    if (s.namePrefix === undefined || s.namePrefix.length === 0) continue;
+    const key = `\`${s.namePrefix}\${string}\``;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    members.push(`[key: ${key}]: (${buildFamilyFnType(s, slotChildrenType)}) | undefined;`);
+  }
+  members.push(`[key: string]: ((...args: any[]) => ${slotChildrenType}) | undefined;`);
+  return `{ ${members.join(' ')} }`;
 }
 
 /**
