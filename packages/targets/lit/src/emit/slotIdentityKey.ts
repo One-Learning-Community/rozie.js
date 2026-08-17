@@ -53,6 +53,16 @@
  */
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
 
+// WR-01 (quick task 260817-buk) — React (`findSlotDecl` in
+// packages/targets/react/src/emit/emitSlotInvocation.ts) and Svelte
+// (`findDynamicSlotOrdinal` in
+// packages/targets/svelte/src/emit/dynamicSlotOrdinal.ts) now derive
+// dynamic-name-slot INVOCATION-to-DECLARATION identity from the declaration
+// site's `sourceLoc`, converging conceptually on the same declaration-site
+// identity this module has always used (it solves a different problem —
+// declaration-time class-member dedup, not a per-invocation lookup — so its
+// own priority scheme below is unchanged). No behavior change here.
+
 const DYNAMIC_FAMILY_PREFIX = '\u0000rozie-dyn-family:';
 const DYNAMIC_ORDINAL_PREFIX = '\u0000rozie-dyn-ordinal:';
 

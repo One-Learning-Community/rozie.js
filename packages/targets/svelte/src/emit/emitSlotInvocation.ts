@@ -107,15 +107,18 @@ export function emitSlotInvocation(
   // identifier — it has its OWN dedicated `$derived` binding declared by
   // emitScript.ts's emitSlotDerivedMerges, keyed on its declaration ordinal.
   // Locate that SAME ordinal here by matching the INVOCATION node's own
-  // `dynamicNameExpr` against `ir.slots` via rewritten-expression-text
-  // comparison (see dynamicSlotOrdinal.ts's doc comment) — a by-name lookup
-  // would risk resolving to the WRONG dynamic-name slot when a producer
-  // declares more than one, since every one of them shares the identical ''
-  // sentinel. Computed ONCE and reused below for the matching SlotDecl
-  // lookup too, so the two never disagree.
+  // `sourceLoc` against `ir.slots` via declaration-site identity (WR-01,
+  // quick task 260817-buk — see dynamicSlotOrdinal.ts's doc comment for why
+  // this is unique: the declaration and invocation are lowered from the SAME
+  // `<slot>` element AST node, so their byte offsets are identical by
+  // construction and no two distinct `<slot>` elements can share one) — a
+  // by-name lookup would risk resolving to the WRONG dynamic-name slot when a
+  // producer declares more than one, since every one of them shares the
+  // identical '' sentinel. Computed ONCE and reused below for the matching
+  // SlotDecl lookup too, so the two never disagree.
   const dynamicOrdinal =
     node.dynamicNameExpr !== undefined
-      ? findDynamicSlotOrdinal(ctx.ir, node.dynamicNameExpr)
+      ? findDynamicSlotOrdinal(ctx.ir, node.sourceLoc)
       : -1;
   // Phase 79 Plan 15 (bug fix) — a producer `<slot :name="expr">` declared
   // INSIDE an `r-for` (SlotDecl.inLoop === true, e.g. Table.rozie's per-column

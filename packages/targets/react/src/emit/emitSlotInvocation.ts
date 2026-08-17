@@ -88,23 +88,32 @@ import * as _emitTemplateNodeModule from './emitTemplateNode.js';
  * silently dropping or fabricating an argument object depending on
  * declaration order — CONFIRMED via `slotNameIdentityCollision.test.ts`.
  *
- * When `node.dynamicNameExpr` is set, disambiguate by REWRITTEN EXPRESSION
- * TEXT — mirrors Svelte's `dynamicSlotOrdinal.ts` (79-10), the closer analog
- * of the two existing precedents (Lit's `slotIdentityKey.ts` solves a
- * DIFFERENT problem: declaration-time class-member dedup, not a
- * per-invocation declaration lookup). `rewriteTemplateExpression` is a
- * deterministic pure function of (expression, ir): the declaration and
- * invocation independently parse the SAME source `:name` attribute text, so
- * two rewrites of that text always agree.
+ * When `node.dynamicNameExpr` is set, disambiguate by DECLARATION-SITE
+ * `sourceLoc` identity (WR-01, quick task 260817-buk — replaces the prior
+ * rewritten-expression-TEXT comparison, which collided whenever two
+ * independently-declared dynamic-name `<slot>` sites happened to bind the
+ * IDENTICAL source expression). The declaration and the invocation are
+ * lowered from the SAME `<slot>` element AST node (`node.loc` in
+ * `lowerSlots.ts`, `el.loc` in `lowerTemplate.ts`), so their `sourceLoc` byte
+ * offsets are identical by construction — and because two distinct `<slot>`
+ * elements cannot begin at the same byte offset, this identity is unique
+ * across declaration sites and independent of the order in which either
+ * lowering walk visits the tree. Expression text is NOT unique — that was
+ * the defect. An emitter-re-derived traversal ordinal was rejected because
+ * the two lowering walks resolve `:name` at different points relative to
+ * their children recursion and would not agree.
  *
  * Static (non-dynamic) names are unaffected — the by-name lookup is
  * unambiguous for them and stays byte-identical to pre-Plan-12 behavior.
  */
 function findSlotDecl(node: TemplateSlotInvocationIR, ir: IRComponent): SlotDecl | null {
   if (node.dynamicNameExpr !== undefined) {
-    const text = rewriteTemplateExpression(node.dynamicNameExpr, ir);
     const match = ir.slots.find(
-      (s) => s.dynamicNameExpr !== undefined && rewriteTemplateExpression(s.dynamicNameExpr, ir) === text,
+      (s) =>
+        s.dynamicNameExpr !== undefined &&
+        s.sourceLoc.start === node.sourceLoc.start &&
+        s.sourceLoc.end === node.sourceLoc.end &&
+        s.sourceLoc.filename === node.sourceLoc.filename,
     );
     if (match) return match;
     // Fall through to the by-name lookup below only if no declaration-side
