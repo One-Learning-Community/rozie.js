@@ -33,13 +33,22 @@ describe('SlotFillerDecl shape lock — Phase 07.2 Plan 01 Task 2 (R2 acceptance
       body: [],
       sourceLoc: { start: 100, end: 200 },
       // isDynamic / dynamicNameExpr intentionally omitted (optional)
+      // Phase 79 R2 (Plan 79-07) — matchedFamily is the per-target dispatch
+      // switch every non-Vue emitter (79-08 Lit, 79-09/79-10/79-11
+      // React/Solid/Svelte/Angular) reads to decide between the static-name
+      // merge path and the record-only lookup path. Additive optional field,
+      // assigned only `true` on a family hit — included here, with an
+      // illustrative value, to lock its runtime JSON shape the same
+      // deliberate way `SlotDecl.dynamicNameExpr`/`namePrefix` were locked in
+      // 79-06's amendment to the sibling SlotDecl-shape.snap.
+      matchedFamily: true,
     };
     await expect(JSON.stringify(canonical, null, 2)).toMatchFileSnapshot(
       '../../fixtures/ir/SlotFillerDecl-shape.snap',
     );
   });
 
-  it('SlotFillerDecl type-level lock: required field set is exactly { type, name, params, paramTypes?, body, sourceLoc, isDynamic?, dynamicNameExpr? }', () => {
+  it('SlotFillerDecl type-level lock: required field set is exactly { type, name, params, paramTypes?, body, sourceLoc, isDynamic?, dynamicNameExpr?, matchedFamily? }', () => {
     expectTypeOf<SlotFillerDecl>().toMatchTypeOf<{
       type: 'SlotFillerDecl';
       name: string;
@@ -49,9 +58,33 @@ describe('SlotFillerDecl shape lock — Phase 07.2 Plan 01 Task 2 (R2 acceptance
       sourceLoc: SourceLoc;
       isDynamic?: boolean;
       dynamicNameExpr?: Expression;
+      matchedFamily?: true;
     }>();
     // Discriminator literal lock
     expectTypeOf<SlotFillerDecl['type']>().toEqualTypeOf<'SlotFillerDecl'>();
+  });
+
+  it('Phase 79 R2 (Plan 79-07): matchedFamily is optional and, when present, is the literal type `true` (never `false`/`boolean`) — additive-field discipline', () => {
+    const withoutFamily: SlotFillerDecl = {
+      type: 'SlotFillerDecl',
+      name: 'header',
+      params: [],
+      body: [],
+      sourceLoc: { start: 0, end: 0 },
+      // matchedFamily intentionally omitted (optional)
+    };
+    expect('matchedFamily' in withoutFamily).toBe(false);
+
+    const withFamily: SlotFillerDecl = {
+      type: 'SlotFillerDecl',
+      name: 'cell-status',
+      params: [],
+      body: [],
+      sourceLoc: { start: 0, end: 0 },
+      matchedFamily: true,
+    };
+    expect(withFamily.matchedFamily).toBe(true);
+    expectTypeOf<SlotFillerDecl['matchedFamily']>().toEqualTypeOf<true | undefined>();
   });
 
   it('Default-slot sentinel: name === "" is permitted (mirrors SlotDecl D-18 convention)', () => {

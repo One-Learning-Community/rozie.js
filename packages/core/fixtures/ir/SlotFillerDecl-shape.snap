@@ -6,5 +6,6 @@
   "sourceLoc": {
     "start": 100,
     "end": 200
-  }
+  },
+  "matchedFamily": true
 }
