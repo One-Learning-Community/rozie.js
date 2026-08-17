@@ -352,7 +352,7 @@ export function threadParamTypes(
         ? `<self recursion: ${ir.name}>`
         : (node.componentRef?.importPath ?? '<unresolved producer>');
 
-    // Phase 79-07 Task 1 (R2 / AC-6 / AC-13) — build the family-prefix
+    // Phase 79-07 (R2 / R7d / AC-6 / AC-13) — build the family-prefix
     // candidate list ONCE per producer resolution, not per fill. An empty
     // or absent `namePrefix` is excluded HERE, before selection, never
     // filtered afterward — an empty prefix would match every fill (T-79-14).
@@ -360,17 +360,34 @@ export function threadParamTypes(
     // so every downstream branch below falls straight through to the
     // pre-phase behavior untouched (AC-13).
     //
-    // Duplicate-`namePrefix` DETECTION (ROZ093 / T-79-15) is wired in Task 2
-    // — deliberately not here yet. Task 1 dedupes by first-declaration-wins
-    // so a duplicate can never silently participate twice, but does not yet
-    // diagnose it.
+    // Task 2 — ROZ093 duplicate-prefix detection also happens HERE, once
+    // per producer, rather than being re-triggered by every unmatched fill
+    // in the loop below — two producer <slot>s deriving an identical
+    // `namePrefix` is a hard error so a tie is never silently resolved by
+    // declaration order (T-79-15).
     const dynamicFamilies: SlotDecl[] = [];
-    const seenPrefixes = new Set<string>();
+    const seenPrefixes = new Map<string, SlotDecl>();
     for (const slot of producerSlots) {
       const prefix = slot.namePrefix;
       if (prefix === undefined || prefix.length === 0) continue;
-      if (seenPrefixes.has(prefix)) continue;
-      seenPrefixes.add(prefix);
+      const firstDeclared = seenPrefixes.get(prefix);
+      if (firstDeclared !== undefined) {
+        diagnostics.push({
+          code: RozieErrorCode.SLOT_FAMILY_PREFIX_DUPLICATE,
+          severity: 'error',
+          message: `Two <slot :name> declarations in ${producerLabel} derive the identical family prefix '${prefix}' — a consumer fill matching '${prefix}' would have no unique family to resolve to.`,
+          loc: slot.sourceLoc,
+          hint: `Give one of the two ':name' template literals a distinct leading quasi so their families don't collide.`,
+          related: [
+            {
+              message: `first '${prefix}' family declared here`,
+              loc: firstDeclared.sourceLoc,
+            },
+          ],
+        });
+        continue;
+      }
+      seenPrefixes.set(prefix, slot);
       dynamicFamilies.push(slot);
     }
 
@@ -436,12 +453,14 @@ export function threadParamTypes(
       const exactMatch = producerSlotsByName.get(filler.name);
       let matchingSlot: SlotDecl | undefined = exactMatch;
 
-      // Phase 79-07 Task 1 (R2 / AC-6) — family-matching second pass. Only
-      // runs when the exact-name lookup above missed: an exact match ALWAYS
+      // Phase 79-07 (R2 / AC-6) — family-matching second pass. Only runs
+      // when the exact-name lookup above missed: an exact match ALWAYS
       // short-circuits before this runs at all, so `#cell-total` against a
       // producer declaring both a static `cell-total` slot AND a `cell-`
       // family threads the static slot's types and never sets
-      // `matchedFamily`. Longest-prefix-wins, measured by string length.
+      // `matchedFamily`. Longest-prefix-wins, measured by string length —
+      // ties are impossible because ROZ093 (above) already hard-errors on
+      // any duplicate `namePrefix` before this point is ever reached.
       if (matchingSlot === undefined && dynamicFamilies.length > 0) {
         let bestPrefixLength = -1;
         for (const family of dynamicFamilies) {
@@ -461,14 +480,25 @@ export function threadParamTypes(
       }
 
       if (matchingSlot === undefined) {
-        // ROZ941's tried-prefixes message extension is Task 2's job — this
-        // message stays byte-identical to pre-phase for now.
+        // Task 2 (AC-7) — name every non-empty prefix that was tried, sorted
+        // for a deterministic message. AC-13 — a producer with zero dynamic-
+        // name slots (dynamicFamilies empty) appends NO clause at all, so
+        // the message stays character-for-character identical to pre-phase.
+        const triedPrefixesClause =
+          dynamicFamilies.length > 0
+            ? ` Tried dynamic-name families: ${[
+                ...new Set(dynamicFamilies.map((s) => s.namePrefix as string)),
+              ]
+                .sort()
+                .map((p) => `'${p}'`)
+                .join(', ')}.`
+            : '';
         diagnostics.push({
           code: RozieErrorCode.UNKNOWN_SLOT_NAME,
           severity: 'warning',
           message: `<template #${
             filler.name || 'default'
-          }> does not match any slot declared by ${producerLabel}.`,
+          }> does not match any slot declared by ${producerLabel}.${triedPrefixesClause}`,
           loc: filler.sourceLoc,
         });
         // Phase 07.2 Plan 05 — ROZ944 REPROJECTION_UNDECLARED_INNER_SLOT.

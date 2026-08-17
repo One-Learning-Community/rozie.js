@@ -1,13 +1,11 @@
 /**
- * slotFamilyMatching.test.ts — Phase 79 Plan 79-07 Task 1 (R2 / D-12).
+ * slotFamilyMatching.test.ts — Phase 79 Plan 79-07 (R2 / R7d / D-12).
  *
  * RED-FIRST: at the point this file is authored, `threadParamTypes` has no
- * family-matching second pass and `SlotFillerDecl.matchedFamily` does not
- * exist — every assertion below fails until this task's `threadParamTypes.ts`
- * change lands.
- *
- * Task 2 (ROZ093 duplicate-prefix error + the ROZ941 tried-prefixes message)
- * extends this SAME file with two more `describe` blocks — not a new file.
+ * family-matching second pass, `SlotFillerDecl.matchedFamily` does not
+ * exist, `ROZ093` is unwired, and `ROZ941`'s message never names a tried
+ * prefix — every family-matching assertion below fails until this plan's
+ * `threadParamTypes.ts` change lands.
  *
  * `threadParamTypes` is NOT part of `lowerToIR` — it is a separate
  * `compile()`-time post-pass requiring a real `IRCache` + `ProducerResolver`
@@ -366,5 +364,153 @@ const dynName = 'cell-status';
     const filler = node!.slotFillers![0]!;
     expect(filler.isDynamic).toBe(true);
     expect('matchedFamily' in filler).toBe(false);
+  });
+});
+
+describe('threadParamTypes — ROZ093 SLOT_FAMILY_PREFIX_DUPLICATE (Phase 79 Plan 79-07, R7d / T-79-15)', () => {
+  let tmpRoot: string;
+  let cleanup: () => void;
+  beforeEach(() => {
+    ({ dir: tmpRoot, cleanup } = makeTmpDir());
+  });
+  afterEach(() => cleanup());
+
+  it('fires EXACTLY ONCE, as an error, with a sourceLoc on the SECOND declaration, when two <slot :name> declarations derive an identical namePrefix', () => {
+    writeFileSync(
+      path.join(tmpRoot, 'Producer.rozie'),
+      `<rozie name="Producer">
+<template>
+  <slot :name="\`cell-\${col.key}\`" :row="row">first</slot>
+  <slot :name="\`cell-\${row.key}\`" :value="value">second</slot>
+</template>
+</rozie>
+`,
+      'utf8',
+    );
+    // No fills at all — ROZ093 fires from producer-declaration analysis
+    // alone, independent of whether any consumer fill is ever attempted.
+    const consumerSrc = `<rozie name="Consumer">
+<components>{ Producer: './Producer.rozie' }</components>
+<template>
+<Producer />
+</template>
+</rozie>
+`;
+    const consumerPath = path.join(tmpRoot, 'Consumer.rozie');
+    writeFileSync(consumerPath, consumerSrc, 'utf8');
+
+    const { diagnostics } = compileAndThread(consumerSrc, consumerPath, tmpRoot);
+    const hits = diagnostics.filter((d) => d.code === RozieErrorCode.SLOT_FAMILY_PREFIX_DUPLICATE);
+    expect(hits.length).toBe(1);
+    expect(hits[0]!.severity).toBe('error');
+    expect(hits[0]!.message).toContain('cell-');
+    expect(hits[0]!.loc).toBeDefined();
+    expect(hits[0]!.loc!.start).toBeGreaterThan(0);
+    // The message/related payload names BOTH slot locations, not just one.
+    expect(hits[0]!.related).toBeDefined();
+    expect(hits[0]!.related!.length).toBeGreaterThan(0);
+    expect(hits[0]!.related![0]!.loc.start).toBeLessThan(hits[0]!.loc!.start);
+  });
+
+  it('does NOT fire when two families derive DIFFERENT prefixes', () => {
+    writeFileSync(
+      path.join(tmpRoot, 'Producer.rozie'),
+      `<rozie name="Producer">
+<template>
+  <slot :name="\`cell-\${col.key}\`" :row="row">a</slot>
+  <slot :name="\`row-\${row.key}\`" :value="value">b</slot>
+</template>
+</rozie>
+`,
+      'utf8',
+    );
+    const consumerSrc = `<rozie name="Consumer">
+<components>{ Producer: './Producer.rozie' }</components>
+<template>
+<Producer />
+</template>
+</rozie>
+`;
+    const consumerPath = path.join(tmpRoot, 'Consumer.rozie');
+    writeFileSync(consumerPath, consumerSrc, 'utf8');
+
+    const { diagnostics } = compileAndThread(consumerSrc, consumerPath, tmpRoot);
+    expect(diagnostics.filter((d) => d.code === RozieErrorCode.SLOT_FAMILY_PREFIX_DUPLICATE)).toEqual([]);
+  });
+});
+
+describe('threadParamTypes — ROZ941 tried-prefixes message (Phase 79 Plan 79-07, R7 / AC-7 / AC-13)', () => {
+  let tmpRoot: string;
+  let cleanup: () => void;
+  beforeEach(() => {
+    ({ dir: tmpRoot, cleanup } = makeTmpDir());
+  });
+  afterEach(() => cleanup());
+
+  it('AC-7: a fill matching neither an exact slot nor any family names EVERY tried non-empty prefix in the message, sorted deterministically', () => {
+    writeFileSync(
+      path.join(tmpRoot, 'Producer.rozie'),
+      `<rozie name="Producer">
+<template>
+  <slot :name="\`row-\${row.key}\`" :value="value">a</slot>
+  <slot :name="\`cell-\${col.key}\`" :row="row">b</slot>
+</template>
+</rozie>
+`,
+      'utf8',
+    );
+    const consumerSrc = `<rozie name="Consumer">
+<components>{ Producer: './Producer.rozie' }</components>
+<template>
+<Producer>
+  <template #totally-unmatched>nope</template>
+</Producer>
+</template>
+</rozie>
+`;
+    const consumerPath = path.join(tmpRoot, 'Consumer.rozie');
+    writeFileSync(consumerPath, consumerSrc, 'utf8');
+
+    const { diagnostics } = compileAndThread(consumerSrc, consumerPath, tmpRoot);
+    const roz941 = diagnostics.find((d) => d.code === RozieErrorCode.UNKNOWN_SLOT_NAME);
+    expect(roz941).toBeDefined();
+    expect(roz941!.message).toContain("'cell-'");
+    expect(roz941!.message).toContain("'row-'");
+    // Deterministic ordering: sorted lexicographically ('cell-' < 'row-').
+    expect(roz941!.message.indexOf("'cell-'")).toBeLessThan(roz941!.message.indexOf("'row-'"));
+  });
+
+  it('AC-13: a producer with ZERO dynamic-name slots emits a ROZ941 message character-for-character identical to the pre-phase literal — no tried-prefixes clause appended', () => {
+    writeFileSync(
+      path.join(tmpRoot, 'Producer.rozie'),
+      `<rozie name="Producer">
+<template>
+  <slot name="header">default header</slot>
+</template>
+</rozie>
+`,
+      'utf8',
+    );
+    const consumerSrc = `<rozie name="Consumer">
+<components>{ Producer: './Producer.rozie' }</components>
+<template>
+<Producer>
+  <template #nope>nope</template>
+</Producer>
+</template>
+</rozie>
+`;
+    const consumerPath = path.join(tmpRoot, 'Consumer.rozie');
+    writeFileSync(consumerPath, consumerSrc, 'utf8');
+
+    const { diagnostics } = compileAndThread(consumerSrc, consumerPath, tmpRoot);
+    const roz941 = diagnostics.find((d) => d.code === RozieErrorCode.UNKNOWN_SLOT_NAME);
+    expect(roz941).toBeDefined();
+    // Hardcoded pre-phase literal (captured verbatim, not derived) — per the
+    // plan's own instruction, so a future edit to the base message fails
+    // loudly instead of silently drifting.
+    expect(roz941!.message).toBe(
+      '<template #nope> does not match any slot declared by ./Producer.rozie.',
+    );
   });
 });
