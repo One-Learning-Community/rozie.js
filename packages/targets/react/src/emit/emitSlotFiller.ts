@@ -118,6 +118,14 @@ export function emitSlotFiller(
   // emitDynamicSlotsProp instead (same code path the R5 dynamic-name fills
   // already use). Returning '' here is safe: the emitTemplateNode.ts caller
   // pushes this into an array joined with spaces, so an empty entry is inert.
+  //
+  // Phase 79 Plan 10 (R5/D-09) — a `matchedFamily` fill has no producer
+  // named-prop field either (its exact name never appeared as a producer
+  // SlotDecl — it only matched a name-PREFIX family), so it must ALSO be
+  // excluded here even when its name happens to be identifier-shaped (e.g. a
+  // family fill named `cellStatus`), otherwise it would emit BOTH a named
+  // prop assignment AND a record entry.
+  if (filler.matchedFamily === true) return '';
   if (filler.name !== '' && !isSlotNameIdentifier(filler.name)) return '';
 
   const fieldName = propFieldName(filler.name);
@@ -157,8 +165,18 @@ export function emitDynamicSlotsProp(
   // merges into this SAME record alongside genuinely dynamic (`#[expr]`)
   // fills. A single pass over `fillers` (rather than two separate filters)
   // preserves true IR/authoring order across the two categories.
+  //
+  // Phase 79 Plan 10 (R5/D-09) — a fill whose name had NO exact producer
+  // SlotDecl match but resolved against a producer name-PREFIX family
+  // instead (`matchedFamily`) has the same problem: there is no producer
+  // named-prop field for a family match, only the record. Routes into the
+  // SAME merged record, keyed on the fill's own static name — this reuses
+  // Phase 07.3.2's existing emit verbatim (no new consumer-side emit code).
   const recordFillers = fillers.filter(
-    (f) => f.isDynamic || (f.name !== '' && !isSlotNameIdentifier(f.name)),
+    (f) =>
+      f.isDynamic ||
+      f.matchedFamily === true ||
+      (f.name !== '' && !isSlotNameIdentifier(f.name)),
   );
   if (recordFillers.length === 0) return null;
 

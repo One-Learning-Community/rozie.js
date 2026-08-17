@@ -142,6 +142,43 @@ export function emitSlotInvocation(
   // Switch to invoking the raw children prop directly with the scope obj,
   // mirroring how named-with-params slots emit below.
   if (slotName === '') {
+    // Phase 79 Plan 10 (R3/D-09) — a producer `<slot :name="expr">` whose
+    // bound name does NOT constant-fold keeps `slotName === ''` (the
+    // default-slot sentinel — lowerTemplate.ts / lowerSlots.ts's documented
+    // Assumption A1) but is NOT the genuine default slot. It must route
+    // through the `slots` record keyed on its OWN runtime expression,
+    // BEFORE falling into the `resolved()`/`local.children` default-slot
+    // machinery below (which has no concept of a record lookup at all — a
+    // dynamic-name producer slot must never reach it). Drop straight to the
+    // record form with no `??` merge and no static field operand, mirroring
+    // the non-identifier record-only branch below.
+    //
+    // The KEY source is the INVOCATION node's own `dynamicNameExpr` (not a
+    // by-name SlotDecl lookup) — a producer may declare more than one
+    // runtime-named slot, and every one of them shares the identical ''
+    // sentinel, so resolving the key via `findSlotDecl('')` would risk
+    // sourcing the WRONG slot's expression. `node.args` (not `slot.params`)
+    // is the params source for the same reason — it is always scoped to
+    // THIS invocation, never to whichever '' decl `findSlotDecl` happened to
+    // match first.
+    if (node.dynamicNameExpr !== undefined) {
+      const dynKeyExpr = rewriteTemplateExpression(node.dynamicNameExpr, ctx.ir, {
+        invokeAccessors: ctx.invokeAccessors,
+        loopValueBindings: ctx.loopValueBindings,
+      });
+      const dynFieldRef = `_props.slots?.[${dynKeyExpr}]`;
+      if (node.args.length > 0) {
+        const paramObj = buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);
+        if (hasInvocationFallback) {
+          return `{${dynFieldRef}?.(${paramObj}) ?? ${invocationFallback}}`;
+        }
+        return `{${dynFieldRef}?.(${paramObj})}`;
+      }
+      if (hasInvocationFallback) {
+        return `{${dynFieldRef}?.() ?? ${invocationFallback}}`;
+      }
+      return `{${dynFieldRef}?.()}`;
+    }
     const slotHasParams = slot ? slot.params.length > 0 : false;
     if (slotHasParams) {
       const paramObj = buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings);

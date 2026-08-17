@@ -240,9 +240,26 @@ export function emitSlotInvocation(
   // point at all. Drop the left operand and the `??` entirely, keying the
   // record lookup on the escaped literal alone. Identifier names keep the
   // EXACT pre-phase merged form above, byte-identical (AC-22).
-  const isRecordOnly = slot.name !== '' && !isSlotNameIdentifier(slot.name);
+  //
+  // Phase 79 Plan 10 (R3/D-09) — a producer `<slot :name="expr">` whose bound
+  // name does NOT constant-fold has no compile-time name at all (it keeps the
+  // '' default-slot sentinel per lowerTemplate.ts/lowerSlots.ts's documented
+  // Assumption A1) — there is no static field to merge with, exactly like the
+  // non-identifier case above. OR the two triggers into the SAME isRecordOnly
+  // decision so both share one output shape and can never drift (T-79-24).
+  // The KEY source is the INVOCATION node's own `dynamicNameExpr` (not the
+  // SlotDecl's) — a producer may declare more than one runtime-named slot,
+  // and every one of them shares the identical '' sentinel, so resolving the
+  // key via a by-name SlotDecl lookup would risk sourcing the WRONG slot's
+  // expression. The invocation node always carries its own expression.
+  const isRecordOnly =
+    node.dynamicNameExpr !== undefined ||
+    (slot.name !== '' && !isSlotNameIdentifier(slot.name));
+  const recordKeyText = node.dynamicNameExpr
+    ? rewriteTemplateExpression(node.dynamicNameExpr, ctx.ir)
+    : renderRecordKey(slot.name);
   const fieldRef = isRecordOnly
-    ? `props.slots?.[${renderRecordKey(slot.name)}]`
+    ? `props.slots?.[${recordKeyText}]`
     : `(props.${refined.propFieldName} ?? props.slots?.[${dynKey}])`;
   const hasParams = slot.params.length > 0;
   const paramObj = buildParamObj(node.args, ctx.ir);
