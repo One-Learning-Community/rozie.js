@@ -54,6 +54,7 @@ export default defineConfig({
       'regressions.test.ts',
       'runtime-side-effects.test.ts',
       'collision/**/*.test.ts',
+      'dynamic-slot-name-rfor.test.ts',
       '**/*.test.tsx',
     ],
     testTimeout: 30000,
