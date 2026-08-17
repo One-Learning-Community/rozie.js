@@ -352,4 +352,45 @@ describe('renderPropsInterface — Task 1 behavior', () => {
     const childrenLines = out.split('\n').filter((l) => l.includes('children?:'));
     expect(childrenLines).toHaveLength(1);
   });
+
+  it('Task 3 (79-12, R6): the public slots?: field types a family member with real params, not just the generic Record', () => {
+    const ir = emptyIR('CellFamily');
+    ir.slots = [
+      {
+        type: 'SlotDecl',
+        name: '',
+        defaultContent: null,
+        params: [
+          { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: { start: 0, end: 0 } },
+          { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: { start: 0, end: 0 } },
+        ],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: { start: 0, end: 0 },
+        dynamicNameExpr: t.identifier('__placeholder'),
+        namePrefix: 'cell-',
+      },
+    ];
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    expect(out).toContain('[key: `cell-${string}`]:');
+    expect(out).toContain('row: any');
+    expect(out).toContain('value: any');
+  });
+
+  it('Task 3 (79-12, R6): no dynamic-name slot keeps the generic slots? Record byte-identical', () => {
+    const ir = emptyIR('Header');
+    ir.slots = [
+      {
+        type: 'SlotDecl',
+        name: 'header',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
+    ];
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    expect(out).toContain('  slots?: Record<string, () => ReactNode>;');
+  });
 });
