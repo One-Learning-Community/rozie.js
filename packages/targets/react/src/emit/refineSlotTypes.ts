@@ -42,6 +42,7 @@
  */
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 
 /**
  * Escape a single-quoted string-literal key body: backslash first (so a
@@ -62,6 +63,75 @@ function escapeSingleQuotedKey(name: string): string {
  */
 export function isRecordOnlySlotName(name: string): boolean {
   return name !== '' && !isSlotNameIdentifier(name);
+}
+
+/**
+ * Whether `slot` is dynamic-name-only — routed through the bracket-keyed
+ * `slots?:` record exclusively, never through a named `render<Name>?:`
+ * field/ctx-interface (Phase 79 Plan 12, R6). A dynamic-name slot shares the
+ * `''` default-slot sentinel (79-06 Assumption A1), so this check must be
+ * consulted BEFORE any `slot.name === ''` branch treats it as the genuine
+ * default slot — the exact "record-only check before dedup" ordering
+ * Angular's `refineSlotTypes.ts` established in 79-11 for the same hazard.
+ */
+export function isDynamicOnlySlot(slot: SlotDecl): boolean {
+  return slot.dynamicNameExpr !== undefined;
+}
+
+/**
+ * Build the value type of a family member (R6/AC-10): a zero-param family
+ * types its value as a genuine zero-argument function (`() => ${type}`) —
+ * NOT a function accepting an empty params object, which is the (unrelated,
+ * pre-existing) shape a zero-param NAMED slot keeps via `propFieldType`.
+ */
+function buildFamilyFnType(slot: SlotDecl, slotChildrenType: string): string {
+  if (slot.params.length === 0) return `() => ${slotChildrenType}`;
+  const paramFields = slot.params
+    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])}`)
+    .join('; ');
+  return `(params: { ${paramFields} }) => ${slotChildrenType}`;
+}
+
+/**
+ * Build the TS type text for the `slots?:` record field (Phase 79 Plan 12,
+ * R6). A component with no dynamic-name slot returns the EXACT pre-Plan-12
+ * generic `Record<string, () => X>` text — byte-identical (AC — "no-
+ * dynamic-slot case").
+ *
+ * Otherwise the type is an object literal:
+ *   - one template-literal-keyed index signature per DISTINCT `namePrefix`
+ *     among the component's dynamic-name slots, naming every family param
+ *     via the shared `lowerSlotParamType` (D-13) — TypeScript resolves a
+ *     LITERAL-keyed access (`slots['cell-status']`) to this narrower
+ *     signature over the broad catch-all below (verified: TS4.4+ template-
+ *     literal index signatures coexist with a broader `string` index
+ *     signature when the narrower value type is assignable to the broader
+ *     one — see the catch-all's `(...args: any[]) => X` shape below).
+ *   - ALWAYS a trailing broad `[key: string]: ((...args: any[]) => X) |
+ *     undefined` catch-all — required both for R6's "no static prefix
+ *     degrades to a plain string index signature" case AND because every
+ *     dynamic-name record lookup at the invocation site
+ *     (`props.slots?.[<runtime expr>]`) indexes with a non-literal `string`-
+ *     typed expression, which only a broad string index signature satisfies.
+ *     It also remains the catch-all for R12/D-03's pre-existing
+ *     non-identifier STATIC record entries, unaffected by this plan.
+ */
+export function buildSlotsRecordType(slots: SlotDecl[], slotChildrenType: string): string {
+  const dynamicSlots = slots.filter((s) => isDynamicOnlySlot(s));
+  if (dynamicSlots.length === 0) {
+    return `Record<string, () => ${slotChildrenType}>`;
+  }
+  const members: string[] = [];
+  const seenKeys = new Set<string>();
+  for (const s of dynamicSlots) {
+    if (s.namePrefix === undefined || s.namePrefix.length === 0) continue;
+    const key = `\`${s.namePrefix}\${string}\``;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    members.push(`[key: ${key}]: (${buildFamilyFnType(s, slotChildrenType)}) | undefined;`);
+  }
+  members.push(`[key: string]: ((...args: any[]) => ${slotChildrenType}) | undefined;`);
+  return `{ ${members.join(' ')} }`;
 }
 
 /**
@@ -131,7 +201,7 @@ export function refineSlotTypes(slot: SlotDecl): RefinedSlotType {
     // Default slot WITH params — union shape per dropdown-react-default-slot
     // bugfix. Function-type notation in a union MUST be parenthesised
     // (TS1385: `ReactNode | (ctx: X) => ReactNode` is a parse error).
-    const paramFields = slot.params.map((p) => `${p.name}: any;`).join(' ');
+    const paramFields = slot.params.map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`).join(' ');
     const ctxInterface = `interface ChildrenCtx { ${paramFields} }`;
     return {
       propFieldName: 'children',
@@ -167,7 +237,7 @@ export function refineSlotTypes(slot: SlotDecl): RefinedSlotType {
       defaultFnName: lifting === 'function-const' ? `__default${pascal}` : null,
     };
   }
-  const paramFields = slot.params.map((p) => `${p.name}: any;`).join(' ');
+  const paramFields = slot.params.map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`).join(' ');
   const ctxName = pascal + 'Ctx';
   const ctxInterface = `interface ${ctxName} { ${paramFields} }`;
   return {

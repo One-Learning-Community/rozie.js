@@ -22,7 +22,7 @@
  * @experimental — shape may change before v1.0
  */
 import type { IRComponent } from '../../../../core/src/ir/types.js';
-import { refineSlotTypes } from './refineSlotTypes.js';
+import { refineSlotTypes, isDynamicOnlySlot } from './refineSlotTypes.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 
 export interface EmitSlotDeclResult {
@@ -44,6 +44,14 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
   const seenPropFields = new Set<string>();
 
   for (const slot of ir.slots) {
+    // Phase 79 Plan 12 (R6) — a dynamic-name slot shares the '' default-slot
+    // sentinel (79-06 Assumption A1) but is NOT the genuine default slot; it
+    // is reachable only through the `slots?:` record (emitSlotInvocation.ts
+    // never reads `props.children` for it). Checked BEFORE the non-identifier
+    // check below (that check would not fire for it anyway, since its name
+    // IS '' — but ordering matches the "record-only check before dedup"
+    // precedent Angular's refineSlotTypes.ts established in 79-11).
+    if (isDynamicOnlySlot(slot)) continue;
     // D-03 — a non-identifier, non-default slot name has no named prop path;
     // it is reachable only through the record (emitSlotInvocation.ts). Skip
     // minting a field/ctx-interface for it entirely.

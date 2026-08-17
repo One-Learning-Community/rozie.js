@@ -23,6 +23,7 @@
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation } from '../../../../core/src/ir/types.js';
 import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
+import { buildSlotsRecordType } from './refineSlotTypes.js';
 
 /**
  * Render a PropTypeAnnotation as a TypeScript type string.
@@ -200,7 +201,10 @@ export function emitPropsInterface(
   // declared type with the actual call site closes the contract gap
   // surfaced by REVIEW.md CR-01.
   if (ir.slots.length > 0) {
-    fields.push(`  slots?: Record<string, () => import('react').ReactNode>;`);
+    // Phase 79 Plan 12 (R6) — the generic Record degrades to a family-aware
+    // object type when the component declares any dynamic-name slot; a
+    // component with none stays on the EXACT pre-Plan-12 generic Record text.
+    fields.push(`  slots?: ${buildSlotsRecordType(ir.slots, "import('react').ReactNode")};`);
   }
 
   if (fields.length === 0) {
