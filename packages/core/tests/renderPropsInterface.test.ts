@@ -293,4 +293,63 @@ describe('renderPropsInterface — Task 1 behavior', () => {
     const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
     expect(out).toContain('  children?: ReactNode;');
   });
+
+  it('Task 3 (79-12) escape found via DynamicSlots fixture: two dynamic-name slots must NOT both mint a `children?:` field — that is a duplicate-member (TS2300) bug in a PUBLIC .d.ts', () => {
+    const ir = emptyIR('TwoDynamic');
+    const dynamicSlot = (over: Record<string, unknown>) => ({
+      type: 'SlotDecl' as const,
+      name: '',
+      defaultContent: null,
+      params: [],
+      presence: 'always' as const,
+      nestedSlots: [],
+      sourceLoc: { start: 0, end: 0 },
+      dynamicNameExpr: t.identifier('__placeholder'),
+      ...over,
+    });
+    ir.slots = [
+      dynamicSlot({
+        namePrefix: 'cell-',
+        params: [
+          { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: { start: 0, end: 0 } },
+        ],
+      }),
+      dynamicSlot({
+        params: [
+          { type: 'ParamDecl', name: 'label', valueExpression: t.identifier('label'), sourceLoc: { start: 0, end: 0 } },
+        ],
+      }),
+    ];
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const childrenLines = out.split('\n').filter((l) => l.includes('children?:'));
+    expect(childrenLines).toHaveLength(0);
+  });
+
+  it('Task 3 (79-12): a dynamic-name slot alongside a genuine default slot mints the field for the REAL default slot only', () => {
+    const ir = emptyIR('DynamicPlusDefault');
+    ir.slots = [
+      {
+        type: 'SlotDecl',
+        name: '',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: { start: 0, end: 0 },
+        dynamicNameExpr: t.identifier('__placeholder'),
+      },
+      {
+        type: 'SlotDecl',
+        name: '',
+        defaultContent: null,
+        params: [],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: { start: 0, end: 0 },
+      },
+    ];
+    const out = renderPropsInterface(ir, { slotChildrenType: 'ReactNode' });
+    const childrenLines = out.split('\n').filter((l) => l.includes('children?:'));
+    expect(childrenLines).toHaveLength(1);
+  });
 });
