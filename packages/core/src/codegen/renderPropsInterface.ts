@@ -31,6 +31,7 @@
 import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation, ParamDecl } from '../ir/types.js';
 import { buildPropJsdoc } from './buildPropJsdoc.js';
+import { isSlotNameIdentifier } from './slotNameIdentifier.js';
 
 /**
  * Options controlling the shared props-interface body rendering.
@@ -156,6 +157,21 @@ export function renderPropsInterface(
   // parameter (`opts.slotChildrenType`); everything else is framework-agnostic.
   for (const slot of ir.slots) {
     const isDefault = slot.name === ''; // D-18 default-slot sentinel
+    // Task 0 (79-12, R12 escape found during 79-04) — `render${capitalize(name)}`
+    // only uppercases the first character; it does NOT split on `-`/`_` the way
+    // `toPascalCase` does, so a non-identifier name like `cell-status` used to
+    // mint the syntactically-INVALID field `renderCell-status?: ...` in this
+    // PUBLIC `@rozie/core` .d.ts renderer. Mirror 79-04's policy for React's
+    // inline interface exactly: a non-identifier, non-default slot name gets NO
+    // `render<Name>` field at all — it is reachable only through the bracket-
+    // keyed `slots` record below. Do NOT mangle the name into a sanitized
+    // identifier (e.g. `renderCellStatus`) — that would silently collide with a
+    // genuinely-named `cellStatus` slot and re-introduce the ROZ127-shaped
+    // ambiguity 79-03 retired. Identifier-named slots and the default slot are
+    // completely unaffected — this branch is a pure additive guard.
+    if (!isDefault && !isSlotNameIdentifier(slot.name)) {
+      continue;
+    }
     const renderName = isDefault ? 'children' : `render${capitalize(slot.name)}`;
     if (slot.params.length === 0) {
       if (isDefault) {
