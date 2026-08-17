@@ -126,6 +126,15 @@ A first-paint smoke check
 verifies the observed ctx is wired correctly on the first paint — no flicker,
 no `undefined` reference in the body's `this._headerCtx?.close` access.
 
+This attribute-based mechanism remains the path for an ordinary statically-named
+scoped slot (the shape above) and for a paramless dynamically-named fill. For a
+scoped fill that is **also** dynamically named, or matched against a producer's
+dynamic-name family, or targets a non-identifier static name, the direct
+`rozieSlots` record property is the mechanism instead — no JSON serialization, no
+attribute observer. See
+[Lit — rozieSlots record dispatch](#lit-—-rozieslots-record-dispatch-for-scoped-dynamic-name-and-family-matched-fills)
+for the dispatch order and the third-party direct-binding form.
+
 ### Consumer-side two-way binding
 
 A producer prop declared `model: true` emits the per-target two-way machinery
@@ -215,16 +224,72 @@ each target. The wrapper's `useControllableState` (React) /
 instance becomes the bridge between the parent's two-way bind and the inner
 Modal's matching machinery.
 
-### Lit — scoped + dynamic slot names (unsupported combination)
+### Lit — rozieSlots record dispatch for scoped, dynamic-name, and family-matched fills
 
-The Lit static-name scoped fill IR pre-transform requires a stable
-`_<name>Ctx` class field name derived from the slot's name. For a dynamic
-name (only known at runtime), there's no stable name to synthesise the field
-from. Mixing scoped + dynamic in Lit (e.g.,
-`<template #[someName]="{ ctx }">…</template>`) is therefore a documented v1
-limitation. If real-world usage surfaces a need, the resolution path is a
-Map-keyed ctx observer + class-body Map field instead of the per-name field
-shape — slated as a future enhancement.
+Lit's static-name scoped-fill mechanism (a per-slot `_<name>Ctx` class field,
+[described above](#lit-—-scoped-slot-params-arrive-via-a-data-attribute)) needs a
+stable name known at compile time. That broke down for a dynamic name (only known at
+runtime) — there was no stable field name to synthesise it from, so mixing a scoped
+fill with a dynamic name (e.g. `<template #[someName]="{ ctx }">…</template>`) did
+not work on Lit — the only one of the six targets where this pairing fell through.
+
+Lit now gains the same **`rozieSlots` record property** the other five record-capable
+targets (`slots?:` / `snippets?:` / `templates?:` — React / Solid / Svelte / Angular)
+already had:
+
+```ts
+@property({ attribute: false })
+rozieSlots?: Record<string, (scope: any) => unknown>;
+```
+
+Every qualifying slot fill — scoped, dynamically named, or matched against a
+producer's dynamic-name family (`SlotDecl.dynamicNameExpr` / `namePrefix`, see
+[Producer-side dynamic slot names](#dynamic-slot-names-r5-—-per-target-consumer-side-divergences))
+— now contributes one entry to a single <span v-pre>`.rozieSlots=${{ ... }}`</span> object literal on
+the producer's tag, collected in source order. The producer's own dispatch tries,
+in order:
+
+1. **Record lookup** — `this.rozieSlots?.[key]?.(scope)`, tried first.
+2. **Named function property** — the pre-existing per-slot `@property` receiver, for
+   an ordinary statically-named scoped slot that never needed the record.
+3. **Native `<slot>` fallback** — for a fill with no scope and no dynamic name, or
+   when a consumer left a family member unfilled.
+
+The **legacy `data-rozie-params` + `observeRozieSlotCtx` light-DOM path is retained
+unchanged** — a *paramless* dynamic fill (a runtime name with no scoped context to
+carry) keeps its original attribute-projection wrapper rather than being forced
+through the record. Nothing that worked before this feature landed changed shape.
+
+Backed by `packages/targets/lit/src/emit/__tests__/rozieSlots.test.ts` (19 cases:
+record-path routing, dispatch ordering, and a regression guard proving the legacy
+paramless-dynamic-fill path is untouched) and
+`packages/core/tests/79-09-r12-six-target-compile.test.ts`.
+
+#### Third-party (non-Rozie) Lit consumers — direct record binding
+
+A plain Lit (or any custom-elements) consumer that imports a compiled Rozie
+component directly, without going through the Rozie compiler, can now set the
+record property directly instead of round-tripping scope data through a
+JSON-serialized `data-rozie-params` attribute and an `observeRozieSlotCtx` observer:
+
+```ts
+// External Lit consumer (NOT a .rozie file) — direct record binding
+import { html, render } from 'lit';
+import '@my-design-system/table';
+
+const el = document.querySelector('my-table')!;
+(el as any).rozieSlots = {
+  'cell-status': (scope: { row: Row; value: unknown }) =>
+    html`<span class="badge">${scope.value}</span>`,
+  'cell-score': (scope: { row: Row; value: unknown }) =>
+    html`<strong>${scope.value}</strong>`,
+};
+```
+
+Each key is a scope-taking function — no serialization, no attribute observer, no
+JSON round-trip. This is the direct form of the `slots`/`snippets`/`templates` props
+that third-party React/Solid/Svelte consumers already had; Lit was the one target
+still missing a settable record property, and this closes that gap.
 
 ## Target-framework lifecycle semantics
 

@@ -88,7 +88,31 @@ Producer + consumer emit shapes per target are documented in
 | Scoped slot params (`<slot :ctx="x">` + `#name="{ ctx }"`) | [⚠︎](/parity#react-—-scoped-slots-are-render-prop-function-props) | ✅ | ✅ | ✅ | ✅ | [⚠︎](/parity#lit-—-scoped-slot-params-arrive-via-a-data-attribute) |
 | Third-party (non-Rozie) consumer slot fill | [⚠︎](/parity#consumer-side-slot-fill-—-third-party-react-consumers-of-compiled-rozie-components) | ✅ | ✅ | ✅ | ✅ | [⚠︎](/parity#lit-—-scoped-slot-params-arrive-via-a-data-attribute) |
 | Dynamic slot names (`#[expr]`) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | ✅ | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | ✅ |
-| Scoped + dynamic slot name combination | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | ✅ | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [❌](/parity#lit-—-scoped-dynamic-slot-names-unsupported-combination) |
+| Scoped + dynamic slot name combination (consumer-side) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | ✅ | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [⚠︎](/parity#dynamic-slot-names-r5-—-per-target-consumer-side-divergences) | [✅ ¹](/parity#lit-—-rozieslots-record-dispatch-for-scoped-dynamic-name-and-family-matched-fills) |
+| Producer-side dynamic slot names (`<slot :name="...">`) | ✅ ² | ✅ ² | ✅ ² | ✅ ² | ✅ ² | ✅ ² |
+
+¹ **Lit — scoped + dynamic slot name, consumer-side.** A *consumer* fills a slot with
+both a runtime-chosen name (`#[someName]`) and a scoped destructure (`="{ ctx }"`)
+together. Previously unsupported on Lit alone — there was no stable class-field name
+to synthesize for a name only known at runtime. Now dispatches through the
+`rozieSlots` record property (see [Lit — `rozieSlots` record dispatch](/parity#lit-—-rozieslots-record-dispatch-for-scoped-dynamic-name-and-family-matched-fills))
+instead of a per-name class field. Backed by `packages/targets/lit/src/emit/__tests__/rozieSlots.test.ts`
+(19 cases, including the dynamic-and-scoped fill) and `packages/core/tests/79-09-r12-six-target-compile.test.ts`.
+
+² **Producer-side dynamic slot names.** This is a *different* capability from the
+"Dynamic slot names" / "Scoped + dynamic slot name combination" rows above, which are
+about a *consumer* choosing a runtime slot name against a producer's ordinary static
+`<slot>`. Here the *producer* itself declares the slot's name dynamically —
+`<slot :name="`cell-${column.key}`">` — and consumers fill the resulting family with
+plain static named fills (`#cell-status="{ row, value }"`) that the compiler routes
+via family matching (`SlotFillerDecl.matchedFamily`). Backed by the
+`DynamicSlots` / `DynamicSlotsConsumer` dist-parity fixture pair (byte-identity at 6
+targets by 4 entrypoints — `tests/dist-parity/fixtures/DynamicSlots*`), the `Table`
+Docker VR cell (`tests/visual-regression/specs/matrix.spec.ts`, six-target
+per-column render proof, exercised by `examples/Table.rozie`'s per-column
+`cell-${column.key}` family), and
+`tests/regressions/dynamic-slot-name-rfor.test.ts` (24 positive + 24 negative
+emitted-record-key invariants across the four `loop-mustache-*-slot-rfor` fixtures).
 
 ## Tooling
 
@@ -106,8 +130,9 @@ The pattern across them is consistent:
 - **Lifecycle ⚠︎** — the hooks fire; the *timing* differs on conditionally-rendered component roots (Lit / Solid keep the instance alive across the toggle).
 - **`r-model` modifiers ⚠︎ (React only)** — `.number`/`.trim`/custom value transforms behave identically across all six targets. The one divergence is React's `.lazy`: React has no true `change` event, so `r-model.lazy` emits an **uncontrolled `defaultValue` + `onBlur`** input (the idiomatic React deferred-commit pattern) instead of a controlled `value` + `onChange`. The trade-off — programmatic writes to the bound state mid-edit are not reflected by the uncontrolled input — is a documented parity gap, consistent with the render-prop-slot precedent. See [`r-model` modifiers](/guide/props-and-two-way#r-model-modifiers-—-lazy-number-trim).
 
-The only `❌` in the matrix is the Lit-specific scoped + dynamic slot name
-combination — a documented v1 limitation.
+There are no `❌` cells left in the matrix — the last one (Lit's scoped + dynamic
+slot name combination) closed when Lit gained the `rozieSlots` record property; see
+the footnotes under the Slots table above for what backs the flip.
 
 Every feature not flagged above behaves identically across all six targets;
 [Cross-Framework Parity](/parity) carries the complete narrative, including the
