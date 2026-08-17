@@ -15,6 +15,7 @@
  */
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 
 export interface EmitSlotDeclResult {
   /** Interface field lines for each slot. */
@@ -55,6 +56,12 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
       // Comment per plan instruction Step H.
       fields.push(`  // D-131: default slot resolved via children() at body top`);
       fields.push(`  children?: JSX.Element;`);
+    } else if (!isSlotNameIdentifier(slot.name)) {
+      // Phase 79 Plan 04 (R12/D-03) — a non-identifier slot name (e.g.
+      // `cell-status`) has no named prop path at all: `_props.cell-statusSlot`
+      // would not even PARSE as a member expression. It is reachable only
+      // through the bracket-keyed record built in emitSlotInvocation.ts.
+      continue;
     } else {
       const hasCtx = slot.params && slot.params.length > 0;
       const slotFieldName = slot.name + 'Slot';

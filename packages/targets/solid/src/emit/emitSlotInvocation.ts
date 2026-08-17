@@ -44,8 +44,20 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 // Late-import to avoid circular reference; both modules initialize independently.
 import * as _emitTemplateNodeModule from './emitTemplateNode.js';
+
+/**
+ * Escape a single-quoted string-literal key body: backslash first (so a
+ * backslash inserted by the quote-escape step is not itself re-escaped),
+ * then single quotes. Mirrors Vue's/React's refineSlotTypes.ts escape helper
+ * (Phase 79 Plans 03/04) so every target's record-key emission escapes the
+ * same way (T-79-07).
+ */
+function escapeSingleQuotedKey(name: string): string {
+  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
 
 function findSlotDecl(name: string, ir: IRComponent): SlotDecl | null {
   for (const s of ir.slots) {
@@ -170,8 +182,24 @@ export function emitSlotInvocation(
   // (TS2322). The fix invokes the dynamic-side function with an empty scope
   // for no-context slots so both sides resolve to `JSX.Element | undefined`.
   const slotKey = `'${slotName}'`;
-  const mergedFnForm = `(_props.${slotFieldName} ?? _props.slots?.[${slotKey}])`;
-  const mergedDirectForm = `(_props.${slotFieldName} ?? _props.slots?.[${slotKey}]?.({}))`;
+  // Phase 79 Plan 04 (R12/D-03) — a non-identifier slot name (e.g.
+  // `cell-status`) cannot even PARSE as `_props.${slotFieldName}`
+  // (`_props.cell-statusSlot` reads as subtraction). ROZ127's identifier
+  // check retired in 79-03 is what lets such a name reach this point at all.
+  // Drop the left operand and the `??` in BOTH the function form and the
+  // direct-call form, keying the record lookup on the escaped literal alone.
+  // The direct-call form's zero-arg backstop (`?.()` not `?.({})`) matches
+  // because a record-only slot has no static field to type-align with.
+  // Identifier names keep the EXACT pre-phase merged forms, byte-identical
+  // (AC-22).
+  const isRecordOnly = !isSlotNameIdentifier(slotName);
+  const recordKey = isRecordOnly ? `'${escapeSingleQuotedKey(slotName)}'` : slotKey;
+  const mergedFnForm = isRecordOnly
+    ? `_props.slots?.[${recordKey}]`
+    : `(_props.${slotFieldName} ?? _props.slots?.[${slotKey}])`;
+  const mergedDirectForm = isRecordOnly
+    ? `_props.slots?.[${recordKey}]?.()`
+    : `(_props.${slotFieldName} ?? _props.slots?.[${slotKey}]?.({}))`;
 
   // No SlotDecl found — best-effort fallback using naming convention. Treat as
   // no-context (direct form) so the rendered JSX type checks.

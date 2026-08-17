@@ -55,6 +55,7 @@
  */
 import type { SlotFillerDecl } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 // Late-import to avoid a circular module-init dependency — emitTemplateNode
 // imports this file via emitElement's component-tag branch; this file needs
@@ -73,6 +74,16 @@ import * as _emitTemplateNodeModule from './emitTemplateNode.js';
 function propFieldName(slotName: string): string {
   if (slotName === '') return 'children';
   return slotName + 'Slot';
+}
+
+/**
+ * Escape a single-quoted string-literal key body: backslash first (so a
+ * backslash inserted by the quote-escape step is not itself re-escaped),
+ * then single quotes. Mirrors emitSlotInvocation.ts's escape helper (Phase 79
+ * Plan 04) so both sides of a record entry agree on the exact key (T-79-07).
+ */
+function escapeSingleQuotedKey(name: string): string {
+  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 /**
@@ -172,6 +183,16 @@ export function emitSlotFiller(
   filler: SlotFillerDecl,
   ctx: EmitNodeCtx,
 ): SolidFillerEmission {
+  // Phase 79 Plan 04 (R12/D-03) — a fill targeting a non-identifier,
+  // non-default slot name (e.g. `#cell-status`) has no named-prop path; it is
+  // folded into the merged `slots={{ ... }}` record prop by
+  // emitDynamicSlotsProp instead (same code path the R5 dynamic-name fills
+  // already use). The empty 'prop' emission is inert at the call site, which
+  // pushes `out.text` into an array joined with spaces.
+  if (filler.name !== '' && !isSlotNameIdentifier(filler.name)) {
+    return { kind: 'prop', text: '' };
+  }
+
   const fieldName = propFieldName(filler.name);
   const bodyJsx = renderFillerBody(filler, ctx);
 
@@ -226,17 +247,29 @@ export function emitDynamicSlotsProp(
   fillers: readonly SlotFillerDecl[],
   ctx: EmitNodeCtx,
 ): string | null {
-  const dynamics = fillers.filter((f) => f.isDynamic);
-  if (dynamics.length === 0) return null;
+  // Phase 79 Plan 04 (R12/D-03) — a static fill whose target name is not a
+  // valid JS identifier (e.g. `#cell-status`) has no named-prop path, so it
+  // merges into this SAME record alongside genuinely dynamic (`#[expr]`)
+  // fills. A single pass over `fillers` (rather than two separate filters)
+  // preserves true IR/authoring order across the two categories.
+  const recordFillers = fillers.filter(
+    (f) => f.isDynamic || (f.name !== '' && !isSlotNameIdentifier(f.name)),
+  );
+  if (recordFillers.length === 0) return null;
 
   const entries: string[] = [];
-  for (const filler of dynamics) {
-    if (!filler.dynamicNameExpr) continue; // ROZ946 was already emitted upstream
-    const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings });
+  for (const filler of recordFillers) {
     const destructure = paramsDestructure(filler);
     const argList = destructure === '' ? '()' : `(${destructure})`;
     const bodyJsx = renderFillerBody(filler, ctx);
-    entries.push(`[${keyExpr}]: ${argList} => (${bodyJsx})`);
+    if (filler.isDynamic) {
+      if (!filler.dynamicNameExpr) continue; // ROZ946 was already emitted upstream
+      const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings });
+      entries.push(`[${keyExpr}]: ${argList} => (${bodyJsx})`);
+    } else {
+      const keyLiteral = `'${escapeSingleQuotedKey(filler.name)}'`;
+      entries.push(`${keyLiteral}: ${argList} => (${bodyJsx})`);
+    }
   }
   if (entries.length === 0) return null;
   return `slots={{ ${entries.join(', ')} }}`;
