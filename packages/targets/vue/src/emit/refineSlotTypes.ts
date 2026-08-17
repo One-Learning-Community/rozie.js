@@ -98,19 +98,31 @@ export function buildSlotTypeBlock(slots: SlotDecl[]): string {
     // resolution below; a dynamic-name slot never falls through to the
     // `'default'` branch even though it shares the '' sentinel.
     if (s.dynamicNameExpr !== undefined) {
-      const familyKey =
-        s.namePrefix !== undefined && s.namePrefix.length > 0
-          ? `\`${s.namePrefix}\${string}\``
-          : 'string';
-      // Two dynamic-name slots deriving the SAME family key (identical
-      // namePrefix, or both no-prefix) would otherwise mint a duplicate
-      // index signature — invalid TS. ROZ093 (79-07) already hard-errors on
-      // a duplicate namePrefix at the diagnostic layer; this dedup is a
-      // defensive backstop so the TYPE SURFACE never emits the duplicate
-      // even for an IR that reaches this function directly (unit tests).
-      if (emittedFamilyKeys.has(familyKey)) continue;
-      emittedFamilyKeys.add(familyKey);
-      lines.push(`  [key: ${familyKey}]: (${buildFamilyValueType(s)}) | undefined;`);
+      if (s.namePrefix !== undefined && s.namePrefix.length > 0) {
+        const familyKey = `\`${s.namePrefix}\${string}\``;
+        // Two dynamic-name slots deriving the SAME namePrefix would
+        // otherwise mint a duplicate index signature — invalid TS. ROZ093
+        // (79-07) already hard-errors on a duplicate namePrefix at the
+        // diagnostic layer; this dedup is a defensive backstop so the TYPE
+        // SURFACE never emits the duplicate even for an IR that reaches
+        // this function directly (unit tests).
+        if (emittedFamilyKeys.has(familyKey)) continue;
+        emittedFamilyKeys.add(familyKey);
+        lines.push(`  [key: ${familyKey}]: (${buildFamilyValueType(s)}) | undefined;`);
+        continue;
+      }
+      // No derivable prefix (R6's "degrades to a plain string index
+      // signature" case) — GENERIC, never tied to THIS slot's own param
+      // shape. Using a specific slot's params here would be actively WRONG:
+      // a `[key: string]` index signature applies to EVERY key that doesn't
+      // match a narrower signature, including an unrelated future no-prefix
+      // slot with different params, or a coexisting static/family member
+      // whose own type must remain assignable to this broad signature
+      // (TS2413 if it is not). At most ONE generic catch-all is ever
+      // emitted, regardless of how many no-prefix dynamic slots exist.
+      if (emittedFamilyKeys.has('string')) continue;
+      emittedFamilyKeys.add('string');
+      lines.push(`  [key: string]: ((props: any) => any) | undefined;`);
       continue;
     }
     const slotName = s.name === '' ? 'default' : s.name;
