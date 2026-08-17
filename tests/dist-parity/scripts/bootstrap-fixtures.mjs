@@ -523,6 +523,20 @@ const EXAMPLES = [
   // const with NO per-target $memo code. Single-file; no sibling .rozie
   // producers — stays OUT of RESOLVER_ROOT.
   'MemoBasic',
+  // Phase 79 (producer-side dynamic slot names) — the phase's dist-parity
+  // proof surface. DynamicSlots is the producer: a static kebab-named slot
+  // (post-ROZ127-retirement), a prefixed dynamic family (`cell-${col.key}`),
+  // a no-static-prefix dynamic slot, and a byte-identity control static
+  // identifier-named slot, all in one component. DynamicSlotsConsumer
+  // imports it via <components> and fills every shape (family-matched
+  // static fills, the exact-wins static/family collision, and a
+  // consumer-side #[expr] dynamic fill). Registering it here makes the
+  // bootstrap compile() the pair across all six targets — the dist-parity
+  // byte-identity proof for R1/R5/R6/D-09/D-10. Was parked at
+  // tests/fixtures/pending-79/ until 79-11 proved 6/6 compile; see
+  // 79-13-PLAN.md.
+  'DynamicSlots',
+  'DynamicSlotsConsumer',
 ];
 
 // Phase 23 (angular-cva-forms-integration) — per-fixture Angular CVA opt-out.
@@ -635,6 +649,12 @@ const EXAMPLES_NEEDING_RESOLVER_ROOT = new Set([
   // source consumed only via inline — NOT an EXAMPLES entry and OUT of RESOLVER_ROOT. The
   // single-file InlineEquivHostM oracle also stays OUT.
   'PartialInlineHostM',
+  // Phase 79 — DynamicSlotsConsumer references ./DynamicSlots.rozie via
+  // <components>; needs resolver root so the IR cache + ProducerResolver
+  // locate the sibling producer at compile time (same ModalConsumer/Modal
+  // asymmetry: the leaf producer DynamicSlots itself has no sibling
+  // imports and stays OUT of RESOLVER_ROOT).
+  'DynamicSlotsConsumer',
 ]);
 // Phase 06.4 P3 (D-LIT-22): TARGETS extended with 'lit' — additive only.
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'];
