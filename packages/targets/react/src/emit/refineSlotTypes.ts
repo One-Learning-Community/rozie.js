@@ -123,6 +123,23 @@ export function buildSlotsRecordType(slots: SlotDecl[], slotChildrenType: string
   }
   const members: string[] = [];
   const seenKeys = new Set<string>();
+  // Phase 79 Plan 12 Task 3 escape (R6) — a STATIC record-only name (e.g.
+  // `cell-total`, R12/D-03) that textually matches a coexisting family's
+  // template-literal pattern (e.g. `` `cell-${string}` ``) is NOT itself a
+  // member of that family — but without a dedicated NAMED entry for it,
+  // TypeScript resolves `slots['cell-total']` against the family's index
+  // signature (since 'cell-total' matches the pattern), corrupting AC-10's
+  // "exact key wins" coexistence guarantee with the family's WRONG param
+  // shape. A named property always wins over an overlapping index signature
+  // for a literal-keyed access, so giving every static record-only name its
+  // OWN entry (with ITS OWN param shape) here fixes this regardless of
+  // whether its text happens to overlap any family's prefix. Discovered
+  // compiling the real DynamicSlots consumer-ts fixture under `tsc --strict`.
+  for (const s of slots) {
+    if (isDynamicOnlySlot(s)) continue;
+    if (!isRecordOnlySlotName(s.name)) continue;
+    members.push(`${renderRecordKey(s.name)}?: (${buildFamilyFnType(s, slotChildrenType)}) | undefined;`);
+  }
   for (const s of dynamicSlots) {
     if (s.namePrefix === undefined || s.namePrefix.length === 0) continue;
     const key = `\`${s.namePrefix}\${string}\``;

@@ -261,6 +261,16 @@ function buildFamilyFnType(slot: SlotDecl, slotChildrenType: string): string {
  *
  * @public — consumed by every target's `emitTypes.ts`.
  */
+/** Escape a single-quoted string-literal key body (T-79-07 — mirrors every per-target copy). */
+function escapeSingleQuotedKey(name: string): string {
+  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+/** Render the bracket-lookup key for a record-only slot name: single-quoted and escaped. */
+function renderRecordKey(name: string): string {
+  return `'${escapeSingleQuotedKey(name)}'`;
+}
+
 export function buildSlotsRecordType(slots: SlotDecl[], slotChildrenType: string): string {
   const dynamicSlots = slots.filter((s) => s.dynamicNameExpr !== undefined);
   if (dynamicSlots.length === 0) {
@@ -268,6 +278,18 @@ export function buildSlotsRecordType(slots: SlotDecl[], slotChildrenType: string
   }
   const members: string[] = [];
   const seenKeys = new Set<string>();
+  // Phase 79 Plan 12 Task 3 escape (R6) — a STATIC record-only name (e.g.
+  // `cell-total`, R12/D-03) that textually matches a coexisting family's
+  // template-literal pattern is NOT itself a member of that family, but
+  // without a dedicated NAMED entry TypeScript resolves it against the
+  // family's index signature instead — see the identical fix + full
+  // rationale in `packages/targets/react/src/emit/refineSlotTypes.ts`'s
+  // `buildSlotsRecordType` (the two copies must stay in lockstep).
+  for (const s of slots) {
+    if (s.dynamicNameExpr !== undefined) continue;
+    if (s.name === '' || isSlotNameIdentifier(s.name)) continue;
+    members.push(`${renderRecordKey(s.name)}?: (${buildFamilyFnType(s, slotChildrenType)}) | undefined;`);
+  }
   for (const s of dynamicSlots) {
     if (s.namePrefix === undefined || s.namePrefix.length === 0) continue;
     const key = `\`${s.namePrefix}\${string}\``;
