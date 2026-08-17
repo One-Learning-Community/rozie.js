@@ -62,6 +62,7 @@ import type { EmitNodeCtx } from './emitTemplateNode.js';
 // emitNode to recurse the body. The cycle is benign at runtime because both
 // modules complete top-level evaluation before any export is called.
 import * as _emitTemplateNodeModule from './emitTemplateNode.js';
+import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 
 /**
  * Producer-mirrored field-name convention.
@@ -82,10 +83,6 @@ function propFieldName(slotName: string): string {
  * then single quotes. Mirrors emitSlotInvocation.ts's escape helper (Phase 79
  * Plan 04) so both sides of a record entry agree on the exact key (T-79-07).
  */
-function escapeSingleQuotedKey(name: string): string {
-  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
 /**
  * Render the destructure-args list for a scoped fill.
  *   - []                                 → ''

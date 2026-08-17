@@ -47,6 +47,7 @@ import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 // Late-import to avoid circular reference; both modules initialize independently.
 import * as _emitTemplateNodeModule from './emitTemplateNode.js';
+import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 
 /**
  * Escape a single-quoted string-literal key body: backslash first (so a
@@ -55,10 +56,6 @@ import * as _emitTemplateNodeModule from './emitTemplateNode.js';
  * (Phase 79 Plans 03/04) so every target's record-key emission escapes the
  * same way (T-79-07).
  */
-function escapeSingleQuotedKey(name: string): string {
-  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
 function findSlotDecl(name: string, ir: IRComponent): SlotDecl | null {
   for (const s of ir.slots) {
     if (s.name === name) return s;

@@ -40,6 +40,7 @@ import type { TSType } from '@babel/types';
 import type { ParamDecl, SlotDecl } from '../../../../core/src/ir/types.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 
 /**
  * Synthesize the TS type token for ONE scope param — delegates to the
@@ -85,10 +86,6 @@ export function slotScopeTypeObject(
  * rationale exactly).
  */
 /** Escape a single-quoted string-literal key body (T-79-07 — mirrors every per-target copy). */
-function escapeSingleQuotedKey(name: string): string {
-  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
 export function buildRozieSlotsRecordType(slots: SlotDecl[]): string {
   const GENERIC = 'Record<string, (scope: any) => unknown>';
   const dynamicSlots = slots.filter((s) => s.dynamicNameExpr !== undefined);
