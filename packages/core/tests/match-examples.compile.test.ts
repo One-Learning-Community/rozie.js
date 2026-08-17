@@ -97,13 +97,19 @@ describe('r-match R8 — real-element host + multi-root branch survive emission'
 });
 
 // R11 dogfood anchor — `examples/demos/TableDemo.rozie`'s `#cell` slot was
-// converted from an `r-if`/`r-else-if`/`r-else` ladder to `r-match` (D-08).
-// TableDemo was previously in NO compile-matrix array (RESEARCH Open Question
-// 3); this DOGFOOD block gives the motivating-example conversion a CI anchor.
-// TableDemo imports `Table` via a <components> block, so compilation needs
-// `resolverRoot: EXAMPLES_DIR` — exactly as the engine-examples VR_DEMOS block.
+// originally converted from an `r-if`/`r-else-if`/`r-else` ladder to
+// `r-match` (D-08). Phase 79-14 reworked that fill away from `r-match` onto
+// per-column dynamic-name slots (D-01/D-02) — the r-match ladder's own Phase
+// 11 coverage now lives in `examples/match/` (MATCH_EXAMPLES above),
+// `examples/typed/MatchUnion.rozie`, and `examples/demos/DataTableSuperDemo.rozie`'s
+// `#filter`/`#editor` fills. This block stays as a plain compile-matrix
+// anchor for TableDemo itself (RESEARCH Open Question 3 — it was previously
+// in NO compile-matrix array), independent of which template construct its
+// cell fill happens to use. TableDemo imports `Table` via a <components>
+// block, so compilation needs `resolverRoot: EXAMPLES_DIR` — exactly as the
+// engine-examples VR_DEMOS block.
 const DOGFOOD = ['demos/TableDemo.rozie'] as const;
-describe('r-match R11 dogfood — TableDemo #cell slot uses r-match', () => {
+describe('TableDemo compile-matrix anchor (formerly r-match R11 dogfood)', () => {
   describe.each(DOGFOOD)('%s', (file) => {
     const path = resolve(EXAMPLES_DIR, file);
     const source = readFileSync(path, 'utf8');

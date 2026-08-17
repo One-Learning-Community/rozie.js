@@ -1,20 +1,31 @@
 <!--
   Demo wrapper for Table — used by the live demo on docs/examples/table.md.
 
-  Demonstrates custom #header (default — the producer's fallback row), per-column
-  dispatch inside a single shared #cell slot, and the marquee showcase: a
+  Demonstrates custom #header (default — the producer's fallback row),
+  per-column overrides against Table's `cell-${column.key}` dynamic-name
+  family — the status and score columns get dedicated fills, the "name"
+  column is left unfilled and falls through to the family's own fallback,
+  the shared generic cell renderer — and the marquee showcase: a
   dynamic-slot footer fill via `<template #[\`footer${$data.footerMode}\`]>`
   that swaps which static-name producer slot the consumer fills.
 
-  Not registered with tests/visual-regression — Table is demo/dogfood only.
-  No VR baselines, no expected.*.{tsx,vue,svelte,ts} snapshot files. The docs
-  site live-compiles this through @rozie/core's rozie-codegen plugin on every
+  Registered with tests/visual-regression as the six-target VR cell `Table`
+  (tests/visual-regression/specs/matrix.spec.ts); its Linux-rendered baseline
+  (tests/visual-regression/__screenshots__/Table.png) is produced via the
+  Docker VR run and was committed in bbd4e193. The docs site ALSO
+  live-compiles this through @rozie/core's rozie-codegen plugin on every
   build, so the per-target outputs on /examples/table are always current.
 
-  Slot-name nuance: footer slots on the producer are camelCase (footerSummary,
-  footerPagination) because Rozie's $slots magic accessor requires static dot
-  keys — kebab-case would force `$slots['footer-summary']` which is a computed
-  access (ROZ106). The consumer's dynamic fill follows the same convention.
+  Two slot-naming conventions coexist here, deliberately, one per mechanism:
+  the new per-column cell family is kebab-case (`cell-status`, `cell-score`)
+  because a family name is a record key on the five non-Vue targets, and
+  kebab-case is what forces that record path (matchedFamily) rather than a
+  plain object-literal spread. The producer's footer slots — footerSummary
+  and footerPagination — stay camelCase because they are static-name slots
+  gated through Rozie's $slots magic accessor, whose dot-key access cannot
+  express a hyphen — kebab-case there would force `$slots['footer-summary']`,
+  a computed access (ROZ106). Each convention is correct for its own
+  mechanism; neither is a stray inconsistency.
 -->
 <rozie name="TableDemo">
 
@@ -53,12 +64,15 @@ const total = $computed(() => $data.rows.reduce((s, r) => s + r.score, 0))
   <button @click="toggleFooter">Toggle footer (current: {{ $data.footerMode }})</button>
 
   <Table :rows="$data.rows" :columns="$data.columns" :striped="true" caption="Members">
-    <template #cell="{ column, row, value }">
-      <template r-match="column.key">
-        <span r-case="'status'" :class="`badge badge-${value}`">{{ value }}</span>
-        <strong r-case="'score'">{{ value }}</strong>
-        <span r-default>{{ value }}</span>
-      </template>
+    <!-- Family-matched fills, ordinary static named-fill syntax. The "name"
+         column has no dedicated fill and falls through to the cell family's
+         own fallback — Table's shared generic `cell` slot — which is the
+         D-01 fallthrough this demo exists to exercise visibly. -->
+    <template #cell-status="{ value }">
+      <span :class="`badge badge-${value}`">{{ value }}</span>
+    </template>
+    <template #cell-score="{ value }">
+      <strong>{{ value }}</strong>
     </template>
 
     <template #[`footer${$data.footerMode}`]>

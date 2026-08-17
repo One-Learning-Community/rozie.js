@@ -6,7 +6,7 @@
  *   The Lit consumer-side slot-filler emit (`emitSlotFiller.ts`) routes
  *   destructured scoped fills through a `.<slot>=${(scope) => html`…`}`
  *   function-prop. Because the closure parameter is a bare `scope` (not a
- *   destructure pattern), the fill body's bare param references — `column`,
+ *   destructure pattern), the fill body's bare param references — `columnId`,
  *   `value`, … — must be pre-rewritten to `scope.<name>` MemberExpressions
  *   by `rewriteScopedParamRefsToScope`, a `switch (node.type)` walk over the
  *   IR.
@@ -14,14 +14,18 @@
  *   That walk had a `case` for every TemplateNode kind EXCEPT the Phase 11
  *   `TemplateMatch` node (`r-match` / `r-case` / `r-default`). The switch
  *   has no `default`, so an `r-match`-bodied filler fell through silently:
- *   the branch tests + bodies kept bare `column` / `value` identifiers,
+ *   the branch tests + bodies kept bare `columnId` / `value` identifiers,
  *   which throw `ReferenceError` at runtime — the whole Lit component fails
- *   to render. It regressed when `TableDemo`'s `#cell` slot was converted to
- *   `r-match`; the cross-target VR matrix caught it as `Table · lit`.
+ *   to render. It originally regressed when `TableDemo`'s `#cell` slot was
+ *   converted to `r-match`, and the cross-target VR matrix caught it as
+ *   `Table · lit`.
  *
- *   This spec compiles the real `TableDemo.rozie` (whose `#cell` fill is an
- *   `r-match` switching on the scoped `column.key`) to Lit and asserts the
- *   param references reached `scope.<name>`.
+ *   Phase 79-14 reworked `TableDemo.rozie`'s `#cell` fill away from the
+ *   `r-match` ladder onto per-column dynamic-name slots (D-01/D-02), so this
+ *   spec was repointed at `DataTableSuperDemo.rozie`'s `#filter` scoped
+ *   slot — a real, already-shipped fixture whose `<template r-match="columnId">`
+ *   discriminates on a destructured scope param (`columnId`) and interpolates
+ *   another (`value`) inside the branches, exercising the identical code path.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -33,9 +37,9 @@ import { compile } from '../../../../core/src/index.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../../..');
 
-function compileTableDemoLit(): string {
-  // Absolute filename so the `<components>` import `../Table.rozie` resolves.
-  const filename = resolve(ROOT, 'examples/demos/TableDemo.rozie');
+function compileDataTableSuperDemoLit(): string {
+  // Absolute filename so the fixture's `<components>` imports resolve.
+  const filename = resolve(ROOT, 'examples/demos/DataTableSuperDemo.rozie');
   const source = readFileSync(filename, 'utf8');
   const result = compile(source, { target: 'lit', filename });
   const errors = result.diagnostics.filter((d) => d.severity === 'error');
@@ -45,30 +49,30 @@ function compileTableDemoLit(): string {
 
 describe('r-match inside a Lit scoped slot filler — scope-param rewrite', () => {
   it('rewrites r-match branch-test param refs to `scope.<name>`', () => {
-    const code = compileTableDemoLit();
-    // The `#cell` fill is `<template r-match="column.key">`; `column` is a
-    // destructured scope param, so the discriminant folded into each branch
-    // test must read `scope.column.key`.
-    expect(code).toMatch(/scope\.column\.key/);
+    const code = compileDataTableSuperDemoLit();
+    // The `#filter` fill is `<template r-match="columnId">`; `columnId` is a
+    // destructured scope param, so each branch test's discriminant must
+    // read `scope.columnId`.
+    expect(code).toMatch(/scope\.columnId === /);
   });
 
   it('rewrites r-match branch-body param refs to `scope.<name>`', () => {
-    const code = compileTableDemoLit();
-    // The branch bodies interpolate `{{ value }}` — another scope param.
-    expect(code).toMatch(/scope\.value/);
+    const code = compileDataTableSuperDemoLit();
+    // The branch bodies bind `:value="value"` — another scope param.
+    expect(code).toMatch(/\.value=\$\{scope\.value\}/);
   });
 
-  it('leaves no bare scope-param identifier in the cell filler', () => {
-    const code = compileTableDemoLit();
-    // Pre-fix the filler emitted `${column.key === …}` / `${value}` — bare
-    // identifiers with no binding. The closure parameter is `scope`, so a
-    // bare `column`/`value` reference is the bug signature.
-    expect(code).not.toMatch(/\$\{column\b/);
-    expect(code).not.toMatch(/`badge badge-\$\{value\}`/);
+  it('leaves no bare scope-param identifier in the filter filler', () => {
+    const code = compileDataTableSuperDemoLit();
+    // Pre-fix the filler emitted `${columnId === …}` / `.value=${value}` —
+    // bare identifiers with no binding. The closure parameter is `scope`,
+    // so a bare `columnId`/`value` reference is the bug signature.
+    expect(code).not.toMatch(/\$\{columnId\b/);
+    expect(code).not.toMatch(/\.value=\$\{value\}/);
   });
 
   it('emits a Lit module that parses cleanly via @babel/parser', () => {
-    const code = compileTableDemoLit();
+    const code = compileDataTableSuperDemoLit();
     expect(() =>
       babelParse(code, {
         sourceType: 'module',
