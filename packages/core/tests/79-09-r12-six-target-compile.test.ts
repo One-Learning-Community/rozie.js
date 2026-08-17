@@ -11,7 +11,7 @@
  * five targets' green.
  *
  * Scope note (why the FIVE_TARGETS block below is still a TRIMMED fixture,
- * not the literal `tests/fixtures/pending-79/DynamicSlots.rozie` pair):
+ * not the literal `examples/DynamicSlots.rozie` pair):
  * `DynamicSlots.rozie` ALSO exercises R1's dynamic `:name="..."` slot-name
  * binding (the `cell-${col.key}` family slot and the `$data.freeSlotName`
  * free-dynamic slot). Family-matched / dynamic-name PRODUCER DISPATCH on
@@ -24,12 +24,18 @@
  * dynamic-name dispatch wiring those other five targets don't have yet.
  *
  * The SIX_TARGET_R12_AND_DYNAMIC block further down separately proves the
- * full `tests/fixtures/pending-79/DynamicSlots.rozie` PRODUCER (which also
- * carries the two dynamic-name slots) compiles with zero error diagnostics
- * on all six targets standalone (no consumer needed for a compile-cleanliness
- * claim — D-05 makes a non-constant-fold `:name` binding legal with no
- * diagnostic on every target, whether or not that target's producer-side
- * dispatch is fully wired yet).
+ * full `examples/DynamicSlots.rozie` PRODUCER (which also carries the two
+ * dynamic-name slots) compiles with zero error diagnostics on all six
+ * targets standalone (no consumer needed for a compile-cleanliness claim —
+ * D-05 makes a non-constant-fold `:name` binding legal with no diagnostic
+ * on every target, whether or not that target's producer-side dispatch is
+ * fully wired yet).
+ *
+ * Path note (79-13): `DynamicSlots.rozie`/`DynamicSlotsConsumer.rozie` were
+ * `git mv`'d from `tests/fixtures/pending-79/` into `examples/` by 79-13
+ * Task 1 (D-10's final home, now that all six targets compile it) — this
+ * file's fixture-path constant was updated in the SAME commit as that move
+ * to avoid an ENOENT regression.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -38,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 import { compile, type CompileTarget } from '../src/index.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PENDING_79 = resolve(HERE, '../../../tests/fixtures/pending-79');
+const DYNAMIC_SLOTS_DIR = resolve(HERE, '../../../examples');
 
 const SIX_TARGETS: CompileTarget[] = ['react', 'vue', 'solid', 'svelte', 'angular', 'lit'];
 
@@ -93,13 +99,13 @@ describe('Phase 79 R12/D-03 — non-identifier slot name compiles clean on ALL S
 });
 
 describe('Phase 79 Plan 09 Task 3 — full DynamicSlots.rozie producer compiles clean on all six targets', () => {
-  const source = readFileSync(resolve(PENDING_79, 'DynamicSlots.rozie'), 'utf8');
+  const source = readFileSync(resolve(DYNAMIC_SLOTS_DIR, 'DynamicSlots.rozie'), 'utf8');
 
   it.each(SIX_TARGETS)('%s compiles DynamicSlots.rozie (static + dynamic-name slots) with zero error-severity diagnostics', (target) => {
     const result = compile(source, {
       target,
-      filename: resolve(PENDING_79, 'DynamicSlots.rozie'),
-      resolverRoot: PENDING_79,
+      filename: resolve(DYNAMIC_SLOTS_DIR, 'DynamicSlots.rozie'),
+      resolverRoot: DYNAMIC_SLOTS_DIR,
     });
     const errors = result.diagnostics.filter((d) => d.severity === 'error');
     expect(errors, `${target} compile errors: ${JSON.stringify(errors)}`).toHaveLength(0);

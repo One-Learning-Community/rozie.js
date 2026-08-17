@@ -17,9 +17,11 @@
  * never got threaded).
  *
  * The `DynamicSlots` / `DynamicSlotsConsumer` fixture pair (parked at
- * `tests/fixtures/pending-79/` per this plan's PATH CORRECTION — the pair
- * moves to `examples/` in 79-13) exercises all four record-path shapes at
- * once: a non-identifier exact-match static slot (`cell-total`), a prefixed
+ * `tests/fixtures/pending-79/` at this plan's authoring time; 79-13 Task 1
+ * `git mv`'d the pair into `examples/` — D-10's final home, now that all six
+ * targets compile it — and updated this file's fixture-path constant in the
+ * SAME commit to avoid an ENOENT regression) exercises all four record-path
+ * shapes at once: a non-identifier exact-match static slot (`cell-total`), a prefixed
  * dynamic family (`` `cell-${col.key}` ``, matched by `#cell-status` /
  * `#cell-score`), a no-prefix dynamic slot (`$data.freeSlotName`, matched by
  * the consumer's own dynamic fill `#[$data.dynamicFillKey]`), and a plain
@@ -38,7 +40,7 @@ import { fileURLToPath } from 'node:url';
 import { compile } from '../../../../../core/src/compile.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PENDING_79 = resolve(HERE, '../../../../../../tests/fixtures/pending-79');
+const DYNAMIC_SLOTS_DIR = resolve(HERE, '../../../../../../examples');
 const LOCAL_FIXTURES = resolve(HERE, 'fixtures');
 
 function compileFixture(dir: string, name: string): string {
@@ -62,8 +64,8 @@ let plainScopedConsumerCode: string;
 let modalConsumerCode: string;
 
 beforeAll(() => {
-  consumerCode = compileFixture(PENDING_79, 'DynamicSlotsConsumer');
-  producerCode = compileFixture(PENDING_79, 'DynamicSlots');
+  consumerCode = compileFixture(DYNAMIC_SLOTS_DIR, 'DynamicSlotsConsumer');
+  producerCode = compileFixture(DYNAMIC_SLOTS_DIR, 'DynamicSlots');
   plainScopedConsumerCode = compileFixture(LOCAL_FIXTURES, 'PlainScopedConsumer');
   modalConsumerCode = compileFixture(EXAMPLES, 'ModalConsumer');
 });

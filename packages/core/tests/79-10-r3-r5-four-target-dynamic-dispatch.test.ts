@@ -11,11 +11,18 @@
  * than here; between this file (five targets) and Lit's own, all SIX targets
  * now have a real-fixture, real-compile-pipeline dispatch proof.
  *
- * `DynamicSlots.rozie` / `DynamicSlotsConsumer.rozie` remain parked at
- * `tests/fixtures/pending-79/` (per 79-10/79-11's PATH CORRECTION — 79-13
- * `git mv`s the pair into `examples/`) and are deliberately NOT registered in
- * `tests/dist-parity/scripts/bootstrap-fixtures.mjs`, so the positive proof
- * for this plan is this direct `compile()` assertion rather than dist-parity.
+ * `DynamicSlots.rozie` / `DynamicSlotsConsumer.rozie` were, at this file's
+ * authoring time, parked at `tests/fixtures/pending-79/` and deliberately
+ * NOT registered in `tests/dist-parity/scripts/bootstrap-fixtures.mjs`, so
+ * the positive proof for this plan was this direct `compile()` assertion
+ * rather than dist-parity. 79-13 Task 1 `git mv`'d the pair into
+ * `examples/` (D-10's final home, now that all six targets compile it) AND
+ * registered it in dist-parity — this file's fixture-path constant was
+ * updated in the SAME 79-13 commit as that move to avoid an ENOENT
+ * regression; this file's OWN direct-compile() assertion is retained
+ * unchanged (dist-parity registration doesn't replace it — this file
+ * proves the underlying compile() diagnostics directly, dist-parity proves
+ * byte-identity across entrypoints).
  *
  * Drives the REAL public `compile()` entrypoint (not a bare
  * `parse`/`lowerToIR` triple) so `threadParamTypes`'s cross-file
@@ -29,14 +36,14 @@ import { fileURLToPath } from 'node:url';
 import { compile, type CompileTarget } from '../src/index.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PENDING_79 = resolve(HERE, '../../../tests/fixtures/pending-79');
+const DYNAMIC_SLOTS_DIR = resolve(HERE, '../../../examples');
 
 const FOUR_TARGETS: CompileTarget[] = ['react', 'solid', 'svelte', 'vue', 'angular'];
 
 function compileFixture(target: CompileTarget, name: string): string {
-  const filename = resolve(PENDING_79, `${name}.rozie`);
+  const filename = resolve(DYNAMIC_SLOTS_DIR, `${name}.rozie`);
   const source = readFileSync(filename, 'utf8');
-  const result = compile(source, { target, filename, resolverRoot: PENDING_79 });
+  const result = compile(source, { target, filename, resolverRoot: DYNAMIC_SLOTS_DIR });
   const errors = result.diagnostics.filter((d) => d.severity === 'error');
   if (errors.length > 0) {
     throw new Error(
