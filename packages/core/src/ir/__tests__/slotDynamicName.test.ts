@@ -152,6 +152,37 @@ describe('lowerSlots — :name reservation IR fields (Phase 79 R1, Plan 79-06 Ta
     expect(slot.presence).toBe('always');
   });
 
+  it('WR-02 regression (79-REVIEW-FIX): a constant-folded :name (AC-3) inside a matching r-if="$slots.<name>" resolves to "conditional", not "always"', () => {
+    const { ir } = lower(`
+<rozie name="DynName">
+<template>
+  <div r-if="$slots.header">
+    <slot :name="'header'" />
+  </div>
+</template>
+</rozie>`);
+    const slot = firstSlot(ir);
+    // AC-3: a constant-folded :name is byte-identical to a static name="..."
+    // attribute — including for presence purposes.
+    expect(slot.name).toBe('header');
+    expect('dynamicNameExpr' in slot).toBe(false);
+    expect(slot.presence).toBe('conditional');
+  });
+
+  it('WR-02 regression (79-REVIEW-FIX): a template-literal constant-folded :name inside a matching r-if resolves to "conditional"', () => {
+    const { ir } = lower(`
+<rozie name="DynName">
+<template>
+  <div r-if="$slots.header">
+    <slot :name="\`header\`" />
+  </div>
+</template>
+</rozie>`);
+    const slot = firstSlot(ir);
+    expect(slot.name).toBe('header');
+    expect(slot.presence).toBe('conditional');
+  });
+
   it('every pre-existing core IR fixture with only static slot names is unaffected — a component with two static slots produces two SlotDecls with no dynamic-name keys', () => {
     const { ir } = lower(`
 <rozie name="DynName">

@@ -182,31 +182,29 @@ function extractPortalParamNames(slot: TemplateElement): string[] {
 }
 
 function determinePresence(
-  slot: TemplateElement,
+  resolvedSlotName: string,
   ctx: SlotVisitContext,
 ): 'always' | 'conditional' {
   if (ctx.rIfStack.length === 0) return 'always';
-  // Determine target slot name (default '' if no static `name` attribute).
-  //
-  // Phase 79 R1 — this scan is intentionally STATIC-ONLY and left untouched.
-  // A slot whose name comes from a bound `:name` (dynamic, or constant-
-  // folded — the fold happens later, in visit()) falls through to the ''
-  // default here. `expressionReferencesSlot` below can only match a
+  // WR-02 fix (79-REVIEW-FIX) — `resolvedSlotName` is the FINAL effective
+  // name: the static `name` attribute, OR a constant-folded `:name` (AC-3),
+  // OR '' for a genuinely dynamic (non-foldable) `:name`/default slot. The
+  // caller now resolves constant-folding BEFORE calling this function, so a
+  // `:name="'header'"` / `` :name="`header`" `` slot is checked against its
+  // folded value here — matching a wrapping `r-if="$slots.header"` guard
+  // exactly like an equivalent static `name="header"` attribute would
+  // (AC-3's "indistinguishable from a static name" guarantee, extended to
+  // presence). `expressionReferencesSlot` below can only match a
   // `$slots.<identifier>` member access, and '' is not a valid identifier
   // name, so a guard can never reference it — the loop below always returns
-  // 'always' for such a slot. That is exactly the correct result: a runtime
-  // slot name has no compile-time `$slots.<key>` guard-reference to test
-  // against, so presence can never be narrowed to 'conditional'.
-  let slotName = '';
-  for (const a of slot.attributes) {
-    if (a.kind === 'static' && a.name === 'name' && a.value !== null) {
-      slotName = a.value;
-      break;
-    }
-  }
-  // Conditional if any wrapping r-if references $slots.<slotName>.
+  // 'always' for a genuinely dynamic slot. That is exactly the correct
+  // result: a runtime slot name has no compile-time `$slots.<key>`
+  // guard-reference to test against, so presence can never be narrowed to
+  // 'conditional' in that case.
+  //
+  // Conditional if any wrapping r-if references $slots.<resolvedSlotName>.
   for (const guard of ctx.rIfStack) {
-    if (expressionReferencesSlot(guard, slotName)) return 'conditional';
+    if (expressionReferencesSlot(guard, resolvedSlotName)) return 'conditional';
   }
   return 'always';
 }
@@ -311,7 +309,6 @@ function visit(
 
       const isPortal = detectPortal(node);
       const params = collectParamsFromSlotElement(node, isPortal);
-      const presence = determinePresence(node, childCtx);
       const portalParamNames = isPortal ? extractPortalParamNames(node) : [];
       // Portal slots are never invoked from the template, but the per-target
       // slot-type emitters (refineSlotTypes etc.) build the ctx type from
@@ -447,6 +444,13 @@ function visit(
           }
         }
       }
+
+      // WR-02 fix (79-REVIEW-FIX) — compute presence AFTER `slotName` is
+      // fully resolved (including the constant-fold above), not before, so
+      // a constant-folded `:name` is checked against a wrapping r-if guard
+      // using its FOLDED value rather than always falling through to the
+      // '' dynamic-slot default.
+      const presence = determinePresence(slotName, childCtx);
 
       const decl: SlotDecl = {
         type: 'SlotDecl',
