@@ -97,6 +97,28 @@ describe('buildSlotsRecordType — family type surface (R6, Solid)', () => {
     ]);
     expect(type).toContain('toggle: (...args: any[]) => any');
   });
+
+  it("a static record-only name that textually matches an overlapping family's prefix gets its OWN named entry (Task 3 escape found compiling the real DynamicSlots consumer-ts fixture)", () => {
+    const type = buildSlotsRecordType([
+      {
+        type: 'SlotDecl',
+        name: 'cell-total',
+        defaultContent: null,
+        params: [{ type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC }],
+        presence: 'always',
+        nestedSlots: [],
+        sourceLoc: LOC,
+      },
+      dynamicSlot({
+        namePrefix: 'cell-',
+        params: [
+          { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: LOC },
+          { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC },
+        ],
+      }),
+    ]);
+    expect(type).toMatch(/'cell-total'\?: \(\(ctx: \{ value: any \}\) => JSX\.Element\) \| undefined;/);
+  });
 });
 
 describe('emitSlotDecl (Solid) — a dynamic-name slot mints NO named field/ctx-interface', () => {
