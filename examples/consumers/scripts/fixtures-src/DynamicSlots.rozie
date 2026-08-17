@@ -1,0 +1,62 @@
+<rozie name="DynamicSlots">
+
+<!--
+  Phase 79 Plan 12 Task 3 — strict-TS consumer-fixture source (R6/AC-10).
+
+  Deliberately a SEPARATE, self-owned source from
+  `tests/fixtures/pending-79/DynamicSlots.rozie` — that fixture is a
+  DIFFERENT plan's fixture (79-13 owns moving it into `examples/` and
+  registering it with dist-parity's `bootstrap-fixtures.mjs`), and this file
+  needs a shape ADDITION (a genuine ZERO-PARAM dynamic-name family, for
+  AC-10's "zero-param family types its value as a zero-argument function"
+  case) that the shared fixture does not have. Modifying the shared fixture
+  risks perturbing other plans' exact-count assertions
+  (79-09/79-10/79-11/Lit's `rozieSlots.test.ts`); this file avoids that risk
+  entirely by not touching it. Compiled ONLY by
+  `examples/consumers/scripts/gen-dynamicslots-fixture.mjs` into each
+  `examples/consumers/{target}-ts/fixtures/DynamicSlots.*` — never registered
+  with dist-parity.
+-->
+
+<props>
+{
+  columns: { type: Array,  default: () => [] },
+  row:     { type: Object, default: () => ({}) },
+  total:   { type: Number, default: 0 },
+}
+</props>
+
+<data>
+{
+  freeSlotName: 'freeform',
+}
+</data>
+
+<template>
+<div class="dynamic-slots">
+
+  <!-- Static kebab-named slot, non-empty params. Coexists with the 'cell-'
+       family below — AC-10's "exact key wins at typecheck" case. -->
+  <slot name="cell-total" :value="$props.total">
+    <strong>{{ $props.total }}</strong>
+  </slot>
+
+  <!-- Prefixed dynamic family, scoped with two params (row/value) — the
+       phase's headline shape and this task's positive/negative cases. -->
+  <div r-for="col in $props.columns" :key="col.key">
+    <slot :name="`cell-${col.key}`" :row="$props.row" :value="$props.row[col.key]">
+      <span>{{ $props.row[col.key] }}</span>
+    </slot>
+  </div>
+
+  <!-- Prefixed dynamic family, ZERO params — AC-10's "zero-param family
+       types its value as a zero-argument function" case. Distinct prefix
+       ('row-') from the 'cell-' family above. -->
+  <slot :name="`row-${$data.freeSlotName}`">
+    <em>fallback</em>
+  </slot>
+
+</div>
+</template>
+
+</rozie>

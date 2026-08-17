@@ -132,6 +132,37 @@ describe('buildSlotsRecordType — family type surface (R6)', () => {
     const type = buildSlotsRecordType([dynamicSlot({ namePrefix: 'row-' })], 'ReactNode');
     expect(type).toMatch(/\[key: `row-\$\{string\}`\]: \(\(\) => ReactNode\) \| undefined;/);
   });
+
+  it("a static record-only name that textually matches an overlapping family's prefix gets its OWN named entry, so its distinct param shape is not swallowed by the family's (T-79-style prefix-collision)", () => {
+    // 'cell-total' textually matches the template-literal pattern
+    // `cell-${string}` too — without a dedicated named entry, TypeScript
+    // resolves `slots['cell-total']` against the FAMILY's signature
+    // (`{ row, value }`), not this slot's OWN one-param shape, corrupting
+    // AC-10's "exact key wins" coexistence case. Escape found compiling the
+    // real DynamicSlots consumer-ts fixture under `tsc --strict`.
+    const type = buildSlotsRecordType(
+      [
+        {
+          type: 'SlotDecl',
+          name: 'cell-total',
+          defaultContent: null,
+          params: [{ type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC }],
+          presence: 'always',
+          nestedSlots: [],
+          sourceLoc: LOC,
+        },
+        dynamicSlot({
+          namePrefix: 'cell-',
+          params: [
+            { type: 'ParamDecl', name: 'row', valueExpression: t.identifier('row'), sourceLoc: LOC },
+            { type: 'ParamDecl', name: 'value', valueExpression: t.identifier('value'), sourceLoc: LOC },
+          ],
+        }),
+      ],
+      'ReactNode',
+    );
+    expect(type).toMatch(/'cell-total'\?: \(\(params: \{ value: any \}\) => ReactNode\) \| undefined;/);
+  });
 });
 
 describe('emitSlotDecl — a dynamic-name slot mints NO named field/ctx-interface (it is record-only)', () => {
