@@ -42,6 +42,7 @@ import { Dropdown } from './fixtures/Dropdown';
 import { Modal } from './fixtures/Modal';
 import { SearchInput } from './fixtures/SearchInput';
 import { TodoList } from './fixtures/TodoList';
+import DynamicSlots from './fixtures/DynamicSlots';
 
 // ---- Counter: model:true via model<T>() (TYPES-02) --------------------
 // Angular 17 signals: `model<number>(0)` returns a `ModelSignal<number>`
@@ -56,5 +57,31 @@ const minValue: number = counterInst.min();
 const maxValue: number = counterInst.max();
 void [stepValue, minValue, maxValue];
 
+// ---- DynamicSlots: R6 family ctx interfaces + guard coverage (AC-10) ----
+// A consumer template would fill the family with e.g.
+// `<ng-template #cell-status let-row="row" let-value="value">`; per this
+// file's OWN documented limitation above ("Full Angular
+// component-template type-checking requires the Angular Compiler — out of
+// scope for tsc --noEmit"), a `#cell-status="{ row, value }"` destructure
+// inside an actual `<ng-template>` cannot be strict-typechecked by plain
+// `tsc` — Angular's `templates()` record intake is necessarily typed
+// `Record<string, TemplateRef<unknown>>` (type-erased per-key), and the
+// per-family `CellCtx`/`RowCtx` interfaces this plan synthesizes exist to
+// satisfy the STATIC `ngTemplateContextGuard` union (verified by
+// `packages/targets/angular/src/emit/__tests__/slotFamilyTypeSurface.test.ts`,
+// which DOES assert on those interfaces directly since they are internal to
+// the emitted class file, not exported). This block's job — matching the
+// pre-existing Counter/Dropdown/etc. coverage pattern — is confirming the
+// generated class (including its two new ctx interfaces and its guard
+// method) is valid strict TS end-to-end via module resolution + basic
+// signal-input shape checks.
+type DynamicSlotsShape = InstanceType<typeof DynamicSlots>;
+declare const dynamicSlotsInst: DynamicSlotsShape;
+const cellKeyValue: string = dynamicSlotsInst.cellKey();
+const freeSlotNameValue: string = dynamicSlotsInst.freeSlotName();
+// @ts-expect-error — cellKey() returns a string-typed InputSignal, not a number
+const wrongCellKeyType: number = dynamicSlotsInst.cellKey();
+void [cellKeyValue, freeSlotNameValue, wrongCellKeyType];
+
 // Suppress "declared but never read" for shape-pin locals.
-void [Counter, Dropdown, Modal, SearchInput, TodoList];
+void [Counter, Dropdown, Modal, SearchInput, TodoList, DynamicSlots];

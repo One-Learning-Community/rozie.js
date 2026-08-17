@@ -35,6 +35,7 @@ import SearchInput from './fixtures/SearchInput.svelte';
 import Dropdown from './fixtures/Dropdown.svelte';
 import TodoList from './fixtures/TodoList.svelte';
 import Modal from './fixtures/Modal.svelte';
+import DynamicSlots from './fixtures/DynamicSlots.svelte';
 
 // ---- Counter: model:true via $bindable() (TYPES-02) -------------------
 // Svelte 5's `$bindable()` exposes the prop as a two-way bind point at the
@@ -71,6 +72,20 @@ const modal: ModalProps = {
 // // @ts-expect-error — type-mismatch
 // const selectBad: SelectProps<number> = { selected: 'bad' };
 
+// ---- DynamicSlots: R6 template-literal-keyed family type surface (AC-10) -
+// The FULL positive/negative/zero-param/coexistence proof (a real
+// `{#snippet cellStatusSnippet({ row, value })}` block passed via
+// `snippets={{ 'cell-status': cellStatusSnippet }}`, plus a `@ts-expect-error`
+// misspelled-param negative, the `row-*` zero-param family, and the
+// `cell-total` static-coexistence case) lives in
+// `fixtures-support/DynamicSlotsWrapper.svelte` /
+// `DynamicSlotsMismatchWrapper.svelte` — a real Snippet value can only be
+// constructed via an actual `{#snippet}` block (Svelte's `Snippet` type is
+// an opaque/branded function type, not a plain arrow function literal), so
+// the proof lives in a `.svelte` file rather than this plain `.ts` module.
+type DynamicSlotsProps = ComponentProps<typeof DynamicSlots>;
+const dynamicSlots: DynamicSlotsProps = { row: { status: 'ok' }, total: 3 };
+
 // Suppress "declared but never read" for shape-pin locals.
 void [
   Counter,
@@ -78,8 +93,10 @@ void [
   Dropdown,
   TodoList,
   Modal,
+  DynamicSlots,
   counterCtrl,
   counterUnc,
   counterBadType,
   modal,
+  dynamicSlots,
 ];

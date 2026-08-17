@@ -11,5 +11,5 @@
     "verbatimModuleSyntax": true,
     "types": ["svelte"]
   },
-  "include": ["test.ts", "fixtures/**/*.svelte", "fixtures/**/*.ts"]
+  "include": ["test.ts", "fixtures/**/*.svelte", "fixtures/**/*.ts", "fixtures-support/**/*.svelte"]
 }
