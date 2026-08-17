@@ -878,7 +878,19 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       // through the SAME dynamic-dispatch branch as an `isDynamic` fill.
       const isRecordOnlyStatic =
         !filler.isDynamic && filler.name !== '' && !isSlotNameIdentifier(filler.name);
-      if (filler.isDynamic || isRecordOnlyStatic) {
+      // Phase 79 Plan 11 (R5/D-09) — a `matchedFamily` fill (79-07's
+      // cross-file family-matching pass: an identifier-shaped static name
+      // that matched a producer name-PREFIX family rather than an exact
+      // SlotDecl) has no `@ContentChild`-capturable slot either, so it MUST
+      // route through the SAME dynamic-dispatch branch even though it is
+      // neither `isDynamic` nor non-identifier-shaped. Without this OR-term,
+      // `emitSlotFiller`'s new matchedFamily exclusion would return '' for
+      // it and the fill would be silently dropped from the emitted output
+      // entirely (this dead-file trap is exactly what 79-05 hit and this
+      // plan's DEAD-FILE WARNING calls out by name). `emitDynamicSlotFiller`
+      // itself dispatches on `filler.matchedFamily` (checked before its
+      // non-identifier branch) to key on the literal static name.
+      if (filler.isDynamic || isRecordOnlyStatic || filler.matchedFamily === true) {
         // R5 dynamic-name dispatch (Phase 07.3.2.1-01 closure of F-07.3.2-11-A):
         // emit the body as a synthetic-named `<ng-template #__dynSlot_<N>>`
         // declaration (a child of the producer tag). The CALLER no longer

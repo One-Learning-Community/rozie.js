@@ -143,6 +143,17 @@ export function emitSlotFiller(
     return '';
   }
 
+  // Phase 79 Plan 11 (R5/D-09) — a `matchedFamily` fill has no producer
+  // `@ContentChild`-capturable slot either (its exact name never appeared as
+  // a producer SlotDecl — it only matched a name-PREFIX family), so it must
+  // ALSO be excluded here even when its name happens to be identifier-shaped
+  // (e.g. a family fill named `cellStatus`), otherwise it would emit BOTH an
+  // `<ng-template #cellStatus>` AND a `[templates]`-getter entry. Mirrors
+  // React/Solid's 79-10 `matchedFamily` exclusion verbatim.
+  if (filler.matchedFamily === true) {
+    return '';
+  }
+
   const refName = templateRefName(filler.name);
   const lets = letBindings(filler);
   const body = ctx.emitChildren(filler.body);
@@ -229,6 +240,23 @@ export function emitDynamicSlotFiller(
       prefixThis: true,
     });
     return { template, refName, keyExpr, classBodyKeyExpr, params: filler.params };
+  }
+  // Phase 79 Plan 11 (R5/D-09) — a `matchedFamily` fill has a static,
+  // IDENTIFIER-shaped name (its exact name never appeared as a producer
+  // SlotDecl — it only matched a name-PREFIX family, 79-07), so it routes
+  // through this SAME `[templates]`-getter mechanism, keyed on its OWN name
+  // as a quoted string literal (a compile-time-known key, not a rewritten
+  // runtime expression — unlike the `isDynamic` branch above). Checked BEFORE
+  // the non-identifier branch below so a family fill whose name happens to
+  // also be non-identifier-shaped (e.g. the real fixture's `#cell-status`)
+  // still keys correctly either way (both branches key on the escaped
+  // literal name identically for a static name).
+  if (filler.matchedFamily === true) {
+    const lets = letBindings(filler);
+    const body = ctx.emitChildren(filler.body);
+    const template = `<ng-template #${refName}${lets}>${body}</ng-template>`;
+    const literalKey = renderRecordKey(filler.name);
+    return { template, refName, keyExpr: literalKey, classBodyKeyExpr: literalKey, params: filler.params };
   }
   // Phase 79 Plan 05 (R12/D-03) — a non-identifier STATIC slot name (e.g.
   // `#cell-status`): route through this SAME `[templates]`-getter mechanism,
