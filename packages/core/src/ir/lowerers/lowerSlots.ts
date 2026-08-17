@@ -234,7 +234,16 @@ function findBindingAttr(slot: TemplateElement, attrName: string): TemplateAttr 
  * and a call expression — all of which set `SlotDecl.dynamicNameExpr`
  * instead.
  */
-function foldConstantSlotName(
+/**
+ * Exported so `lowerTemplate.ts`'s `<slot>` invocation branch — a SEPARATE
+ * tree walk over the same template AST that builds `TemplateSlotInvocationIR`
+ * — can apply the SAME constant-folding rule to a bound `:name` (AC-3
+ * byte-identity requires the invocation site's effective slot name to match
+ * the declaration side's, not just SlotDecl.name). See that call site's
+ * comment for why it does NOT also push the ROZ09x authoring diagnostics —
+ * `lowerSlots` already visits the same `<slot>` element and pushes them once.
+ */
+export function foldConstantSlotName(
   expr: t.Expression,
 ): { folded: true; value: string } | { folded: false } {
   if (t.isStringLiteral(expr)) {

@@ -41,6 +41,7 @@ import { isPascalCase } from '../utils/isPascalCase.js';
 import { didYouMean } from '../../diagnostics/didYouMean.js';
 import { RozieErrorCode } from '../../diagnostics/codes.js';
 import { extractSlotFillers } from './lowerSlotFillers.js';
+import { foldConstantSlotName } from './lowerSlots.js';
 import type {
   TemplateNode as IRTemplateNode,
   TemplateElementIR,
@@ -1038,6 +1039,25 @@ function lowerBareElement(
           loc: attr.loc,
           hint: 'Use <slot portal /> (no r-, boolean form) to portal slot content into an engine-owned container; r-portal="<expr>" portals an ordinary element out to a container.',
         });
+      } else if (attr.kind === 'binding' && attr.name === 'name' && attr.value !== null) {
+        // Phase 79 R1 — a bound `:name` is a slot-NAME binding, never a
+        // scope arg (mirrors lowerSlots.ts's collectParamsFromSlotElement
+        // skip — without it, `:name` would also leak into `args` as a bogus
+        // scope prop literally named 'name'). Constant-fold it here too so
+        // the INVOCATION side's effective slot name matches the declaration
+        // side's SlotDecl.name exactly (AC-3 byte-identity requires both
+        // sites to agree, not just the declaration). A non-constant :name is
+        // a genuine dynamic/family slot — `slotName` intentionally stays at
+        // the '' default sentinel for that case; family-matched consumer
+        // dispatch is wired in 79-07/79-08, not here. No diagnostic is
+        // pushed on a parse failure — `lowerSlots` already visits this same
+        // <slot> element and reports ROZ096 exactly once; duplicating it
+        // here would double-report the same source location.
+        const expr = tryParseExpression(attr.value);
+        if (expr) {
+          const fold = foldConstantSlotName(expr);
+          if (fold.folded) slotName = fold.value;
+        }
       } else if (attr.kind === 'binding' && attr.value !== null) {
         // Portal slots use `:params="['arg']"` as a TYPE DECLARATION (consumed
         // by lowerSlots into SlotDecl.portalParamNames) — strip it here so it

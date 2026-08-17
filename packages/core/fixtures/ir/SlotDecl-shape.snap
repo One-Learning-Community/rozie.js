@@ -8,5 +8,10 @@
   "sourceLoc": {
     "start": 100,
     "end": 200
-  }
+  },
+  "dynamicNameExpr": {
+    "type": "Identifier",
+    "name": "col"
+  },
+  "namePrefix": "cell-"
 }
