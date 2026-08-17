@@ -352,6 +352,28 @@ export function threadParamTypes(
         ? `<self recursion: ${ir.name}>`
         : (node.componentRef?.importPath ?? '<unresolved producer>');
 
+    // Phase 79-07 Task 1 (R2 / AC-6 / AC-13) — build the family-prefix
+    // candidate list ONCE per producer resolution, not per fill. An empty
+    // or absent `namePrefix` is excluded HERE, before selection, never
+    // filtered afterward — an empty prefix would match every fill (T-79-14).
+    // A producer with zero dynamic-name slots leaves `dynamicFamilies` empty,
+    // so every downstream branch below falls straight through to the
+    // pre-phase behavior untouched (AC-13).
+    //
+    // Duplicate-`namePrefix` DETECTION (ROZ093 / T-79-15) is wired in Task 2
+    // — deliberately not here yet. Task 1 dedupes by first-declaration-wins
+    // so a duplicate can never silently participate twice, but does not yet
+    // diagnose it.
+    const dynamicFamilies: SlotDecl[] = [];
+    const seenPrefixes = new Set<string>();
+    for (const slot of producerSlots) {
+      const prefix = slot.namePrefix;
+      if (prefix === undefined || prefix.length === 0) continue;
+      if (seenPrefixes.has(prefix)) continue;
+      seenPrefixes.add(prefix);
+      dynamicFamilies.push(slot);
+    }
+
     // Quick task 260811-trz (D-01) — thread the callee's raw declared emit
     // names onto this component/self tag when non-empty (absent, not `[]`,
     // otherwise — keeps IR for every non-emitting producer byte-identical).
@@ -411,8 +433,36 @@ export function threadParamTypes(
       // defaultContent).
       if (filler.isDynamic) continue;
 
-      const matchingSlot = producerSlotsByName.get(filler.name);
+      const exactMatch = producerSlotsByName.get(filler.name);
+      let matchingSlot: SlotDecl | undefined = exactMatch;
+
+      // Phase 79-07 Task 1 (R2 / AC-6) — family-matching second pass. Only
+      // runs when the exact-name lookup above missed: an exact match ALWAYS
+      // short-circuits before this runs at all, so `#cell-total` against a
+      // producer declaring both a static `cell-total` slot AND a `cell-`
+      // family threads the static slot's types and never sets
+      // `matchedFamily`. Longest-prefix-wins, measured by string length.
+      if (matchingSlot === undefined && dynamicFamilies.length > 0) {
+        let bestPrefixLength = -1;
+        for (const family of dynamicFamilies) {
+          const prefix = family.namePrefix as string;
+          if (!filler.name.startsWith(prefix)) continue;
+          if (prefix.length > bestPrefixLength) {
+            matchingSlot = family;
+            bestPrefixLength = prefix.length;
+          }
+        }
+        // Additive-field discipline (matches dynamicNameExpr/namePrefix
+        // precedent) — assigned only on a hit, never as explicit `false` or
+        // `undefined`.
+        if (matchingSlot !== undefined) {
+          filler.matchedFamily = true;
+        }
+      }
+
       if (matchingSlot === undefined) {
+        // ROZ941's tried-prefixes message extension is Task 2's job — this
+        // message stays byte-identical to pre-phase for now.
         diagnostics.push({
           code: RozieErrorCode.UNKNOWN_SLOT_NAME,
           severity: 'warning',

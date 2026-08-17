@@ -547,6 +547,26 @@ export interface SlotFillerDecl {
    * undefined === false (back-compat).
    */
   isReactive?: boolean;
+  /**
+   * Phase 79 R2 — set by `threadParamTypes`'s family-matching pass when this
+   * filler's name had NO exact producer `SlotDecl.name` match but resolved
+   * against a producer name-prefix family instead (the longest matching
+   * `SlotDecl.namePrefix`). This is the per-target DISPATCH SWITCH every
+   * non-Vue emitter (79-08 Lit, 79-09/79-10/79-11 React/Solid/Svelte/Angular)
+   * reads to decide between the static-name merge path and the record-only
+   * lookup path — load-bearing, not descriptive metadata.
+   *
+   * An exact-name match ALWAYS short-circuits before family matching runs,
+   * so a fill that matches a static producer slot never carries this key,
+   * even when the SAME producer also declares an overlapping family.
+   *
+   * Additive field — assigned only `true` on a family hit, never as explicit
+   * `false` or `undefined`, so an existing fill with no family match is
+   * byte-identical to its pre-Phase-79 IR (AC-1).
+   *
+   * @experimental — added in Phase 79
+   */
+  matchedFamily?: true;
 }
 
 /**
