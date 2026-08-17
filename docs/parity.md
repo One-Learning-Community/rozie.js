@@ -295,32 +295,61 @@ still missing a settable record property, and this closes that gap.
 
 ### Lit / Solid — lifecycle hooks colocated with an always-rendered component
 
-When a component's **root** element is conditionally rendered
-(`r-if="$props.open"`) and the component also declares `$onMount` / `$onUnmount`
-hooks, the timing differs by target:
+**`$onMount` is connect-once on every target.** It fires when the component
+*instance* mounts — not when a root-level `r-if` flips. That is true of all six
+emitters, and it is deliberate:
 
-- **React, Vue, Svelte** — the conditional unmount collapses the whole
-  component subtree, so `$onMount` / `$onUnmount` effectively fire with the
-  condition.
-- **Lit, Solid** — the compiled custom element / component instance stays
-  alive across the condition toggle (only its rendered output changes), so
-  `$onMount` fires once when the element/component first connects, not each
-  time the root condition flips.
+| Target | `$onMount` lowers to | Root `r-if` lowers to |
+| --- | --- | --- |
+| React | `useEffect(…, [])` | `open && <div>` inside the same component function |
+| Vue | `onMounted(…)` | `v-if` in the template |
+| Svelte | `onMount(…)` at instance scope | `{#if}` in the markup |
+| Angular | `ngAfterViewInit()` | `@if` in the template |
+| Solid | `onMount(…)` at component-body scope | `<Show>` inside the returned JSX |
+| Lit | `firstUpdated()` | a `nothing` ternary inside `render()` |
 
-The cleanup itself is always symmetric (no leaks, no double-fire). If a
-lifecycle side effect must track a *prop* rather than component connect, gate
-it on the prop inside the hook:
+In every case the hook sits *outside* the conditional. Hold the component
+mounted and toggle the condition, and React's `useEffect(…, [])` re-fires no
+more than Lit's `firstUpdated()`.
+
+**Where you may still observe a difference is the consumer side**, and it is a
+property of the host application's template rather than of the emitted
+component. A React, Vue, Svelte, or Angular consumer typically writes the
+condition *around the component* — `open && <Modal />`, `<Modal v-if="open" />` —
+which destroys and recreates the instance, so the hook runs again. A Lit
+consumer drives a connected custom element by property (`<rz-modal .open=…>`);
+there is no idiomatic way to "unmount" it, so the element stays connected and
+the hook does not re-run. Solid behaves the same way whenever the consumer keeps
+the component mounted (note that Solid's `open() && <Modal />` does *not*
+unmount — `<Show>` is required). Rozie compiles the component, not the page that
+hosts it, so it cannot influence this.
+
+The cleanup itself is always symmetric (no leaks, no double-fire).
+
+**For prop-coupled effects, use `$watch` — not `$onMount`.** `$watch` is
+supported on all six targets, fires post-flush everywhere (so its callback may
+safely read `$refs`), and accepts `{ immediate: true }` when the effect must
+also run on the initial value:
 
 ```js
-const lockScroll = () => {
-  if (!$props.open) return   // prop-coupled, not connect-coupled
-  document.body.style.overflow = 'hidden'
-}
-$onMount(lockScroll)
+$watch(() => $props.open, (isOpen) => {
+  if (isOpen) lockScroll()
+  else unlockScroll()
+})
 ```
 
-The reference `Modal.rozie` already follows this pattern for its
+The two primitives are complementary by design: `$onMount` anchors
+connect-time setup and its symmetric teardown, `$watch` tracks prop
+transitions. The reference `Modal.rozie` pairs them exactly this way for its
 `lockBodyScroll` prop.
+
+::: warning Do not rely on `$onMount` re-firing
+Because `$onMount` and `$watch` are frequently paired, an effect invoked from
+*both* must be idempotent. `Modal.rozie`'s `lockScroll` saves the previous
+`document.body.style.overflow` before overwriting it — running it twice for one
+open would save the already-locked value and leave the page permanently
+unscrollable. Gate such effects so they run once per transition.
+:::
 
 ---
 
