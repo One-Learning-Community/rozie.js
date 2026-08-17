@@ -43,6 +43,7 @@ import SearchInput from './fixtures/SearchInput.vue';
 // import TodoList from './fixtures/TodoList.vue';   // see NOTE above (deferred)
 import Modal from './fixtures/Modal.vue';
 import Select from './fixtures/Select.vue';
+import DynamicSlots from './fixtures/DynamicSlots.vue';
 
 // ---- Counter: model:true triplet (TYPES-02) ---------------------------
 // Vue's defineModel<T>('value') exposes the prop as `value?: T` and emits
@@ -99,12 +100,26 @@ const selectEmpty = h(Select, {});
 const selectStr = h(Select, { selected: 'a' });
 const selectNum = h(Select, { selected: 1 });
 
+// ---- DynamicSlots: R6 template-literal-keyed family type surface (AC-10) -
+// The FULL positive/negative/zero-param/coexistence proof (destructuring
+// `{ row, value }` from a `#cell-status` fill — see DynamicSlotsWrapper.vue
+// `<template #cell-status="{ row, value }">` — plus a `@vue-expect-error`
+// misspelled-param negative, the `row-*` zero-param family, and the
+// `cell-total` static-coexistence case) lives in `DynamicSlotsWrapper.vue` /
+// `DynamicSlotsMismatchWrapper.vue` — Vue's own strongest slot-type
+// narrowing happens at the TEMPLATE consumption site (mirrors
+// SelectStringWrapper.vue's identical h()-vs-template split, documented in
+// this file's own header NOTE above). This h() call is a lightweight
+// module-resolution + basic-props smoke check for the SAME fixture.
+const dynamicSlots = h(DynamicSlots, { row: { status: 'ok' }, total: 3 });
+
 // Suppress "declared but never read" for shape-pin locals.
 void [
   Counter,
   SearchInput,
   Modal,
   Select,
+  DynamicSlots,
   counterCtrl,
   counterUnc,
   counterBadType,
@@ -114,4 +129,5 @@ void [
   selectEmpty,
   selectStr,
   selectNum,
+  dynamicSlots,
 ];

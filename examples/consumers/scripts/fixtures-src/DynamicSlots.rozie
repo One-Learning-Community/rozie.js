@@ -16,21 +16,25 @@
   `examples/consumers/scripts/gen-dynamicslots-fixture.mjs` into each
   `examples/consumers/{target}-ts/fixtures/DynamicSlots.*` — never registered
   with dist-parity.
+
+  DELIBERATELY NOT nested in `r-for` — a `<slot :name="...">` inside `r-for`
+  is the EXACT, CONFIRMED-BROKEN scenario `79-KNOWN-RED-BASELINE.md` tracks
+  (the four `loop-mustache-*-slot-rfor` regression fixtures, 21 known-failing
+  assertions) and the phase's own Boundaries section carves out permanently
+  ("the loop-renders-nothing defect is not fixed here"). This file's job is
+  proving the TYPE SURFACE (R6/D-13), not re-litigating that separate,
+  explicitly out-of-scope bug — so every dynamic-name slot here is a
+  standalone, non-looped `<slot :name="...">` declaration.
 -->
 
 <props>
 {
-  columns: { type: Array,  default: () => [] },
-  row:     { type: Object, default: () => ({}) },
-  total:   { type: Number, default: 0 },
+  row:          { type: Object, default: () => ({}) },
+  total:        { type: Number, default: 0 },
+  cellKey:      { type: String, default: 'status' },
+  freeSlotName: { type: String, default: 'freeform' },
 }
 </props>
-
-<data>
-{
-  freeSlotName: 'freeform',
-}
-</data>
 
 <template>
 <div class="dynamic-slots">
@@ -42,17 +46,24 @@
   </slot>
 
   <!-- Prefixed dynamic family, scoped with two params (row/value) — the
-       phase's headline shape and this task's positive/negative cases. -->
-  <div r-for="col in $props.columns" :key="col.key">
-    <slot :name="`cell-${col.key}`" :row="$props.row" :value="$props.row[col.key]">
-      <span>{{ $props.row[col.key] }}</span>
-    </slot>
-  </div>
+       phase's headline shape and this task's positive/negative cases.
+       Standalone (not r-for-nested) — see file header. Bound to a PROP
+       (not `<data>`) so every target's dynamic-name binding is destructured
+       from the SAME statement as the family record intake itself (Svelte's
+       `let { ..., snippets } = $props();`), sidestepping an unrelated
+       pre-existing Svelte emitter ordering quirk where a `<data>`-sourced
+       `$state()` declaration is hoisted AFTER the `$derived()` slot bindings
+       that reference it (a `let`-before-declaration flag under
+       `svelte-check`'s strict analysis) — out of scope for this plan, which
+       owns the TYPE SURFACE, not general script-statement ordering. -->
+  <slot :name="`cell-${$props.cellKey}`" :row="$props.row" :value="$props.row[$props.cellKey]">
+    <span>{{ $props.row[$props.cellKey] }}</span>
+  </slot>
 
   <!-- Prefixed dynamic family, ZERO params — AC-10's "zero-param family
        types its value as a zero-argument function" case. Distinct prefix
        ('row-') from the 'cell-' family above. -->
-  <slot :name="`row-${$data.freeSlotName}`">
+  <slot :name="`row-${$props.freeSlotName}`">
     <em>fallback</em>
   </slot>
 

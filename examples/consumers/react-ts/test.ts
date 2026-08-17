@@ -28,6 +28,8 @@ import Modal from './fixtures/Modal';
 import type { ModalProps } from './fixtures/Modal';
 import Select from './fixtures/Select';
 import type { SelectProps } from './fixtures/Select';
+import DynamicSlots from './fixtures/DynamicSlots';
+import type { DynamicSlotsProps } from './fixtures/DynamicSlots';
 
 // ---- Counter: model:true triplet (TYPES-02) ---------------------------
 // Controlled (value + onValueChange).
@@ -143,6 +145,50 @@ const selectGenericMismatch: SelectProps<number> = {
   selected: 'a',
 };
 
+// ---- DynamicSlots: R6 template-literal-keyed family type surface (AC-10) -
+// The `cell-` family's `slots?:` member types the fill's scope with the
+// family's REAL params — proven by assigning to concretely-typed locals
+// (mirrors `renderTrigger`'s `const _o: boolean = open;` pattern above).
+const dynamicSlotsFamily: DynamicSlotsProps = {
+  row: { status: 'ok' },
+  total: 3,
+  slots: {
+    'cell-status': ({ row, value }) => {
+      const _row: unknown = row;
+      const _value: unknown = value;
+      void _row;
+      void _value;
+      return null;
+    },
+  },
+};
+const dynamicSlotsFamilyBad: DynamicSlotsProps = {
+  slots: {
+    // @ts-expect-error — misspelled param destructure inside the cell- family shape
+    'cell-status': ({ rowx, value }: { rowx: unknown; value: unknown }) => {
+      void rowx;
+      void value;
+      return null;
+    },
+  },
+};
+// Zero-param family ('row-') types its value as a zero-argument function.
+const dynamicSlotsZeroParamFamily: DynamicSlotsProps = {
+  slots: {
+    'row-anything': () => null,
+  },
+};
+// Coexistence — the static `cell-total` slot typechecks against ITS OWN
+// one-param shape, not the overlapping `cell-` family's two-param shape.
+const dynamicSlotsCoexist: DynamicSlotsProps = {
+  slots: {
+    'cell-total': ({ value }) => {
+      void value;
+      return null;
+    },
+  },
+};
+
 // Suppress all "declared but never read" — these locals exist purely to
 // pin down the typed shape of each fixture under tsc --strict --noEmit.
 void [
@@ -152,6 +198,7 @@ void [
   TodoList,
   Modal,
   Select,
+  DynamicSlots,
   counterCtrl,
   counterUnc,
   counterBoth,
@@ -165,4 +212,8 @@ void [
   selectStr,
   selectNum,
   selectGenericMismatch,
+  dynamicSlotsFamily,
+  dynamicSlotsFamilyBad,
+  dynamicSlotsZeroParamFamily,
+  dynamicSlotsCoexist,
 ];

@@ -7,6 +7,9 @@
     "typecheck": "svelte-check --tsconfig ./tsconfig.strict.json",
     "refresh:fixtures": "node ../scripts/refresh-consumer-fixtures.mjs"
   },
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:*"
+  },
   "devDependencies": {
     "@tsconfig/svelte": "^5",
     "svelte": "^5.0.0",

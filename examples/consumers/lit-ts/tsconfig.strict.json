@@ -36,5 +36,5 @@
     "emitDecoratorMetadata": false,
     "useDefineForClassFields": false
   },
-  "include": ["lit-ts.test.ts"]
+  "include": ["lit-ts.test.ts", "test.ts", "fixtures/DynamicSlots.ts"]
 }
