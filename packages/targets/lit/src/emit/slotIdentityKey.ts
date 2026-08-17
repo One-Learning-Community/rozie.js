@@ -61,6 +61,20 @@ const DYNAMIC_ORDINAL_PREFIX = '\u0000rozie-dyn-ordinal:';
  * position `index` within the caller's `ir.slots` traversal), used by BOTH
  * `emitSlotDecl.ts`'s per-slot dedup and `shouldDistributeSlots.ts`'s
  * duplicate-identity gate.
+ *
+ * WR-04 (79-REVIEW-FIX): `index` is CALLER-SCOPED — it is only ever compared
+ * for equality against other keys computed within the SAME caller's single
+ * traversal (a `Set<string>` built up over one loop). The two current
+ * callers derive `index` from different bases (`emitSlotDecl.ts` indexes the
+ * FULL `ir.slots` array including portal slots; `shouldDistributeSlots.ts`
+ * first filters out portal slots, then indexes the FILTERED array), so the
+ * same `SlotDecl` can receive a different ordinal-based key from each
+ * caller. That is safe ONLY because neither caller ever compares its own
+ * keys against the other caller's keys — each does an internal
+ * self-consistency check (dedup within one pass) and nothing more. Do NOT
+ * persist a key across calls, compare keys computed by different callers, or
+ * assume the ordinal component is stable across `ir.slots` filtering
+ * choices — it is not, by design; only same-caller equality is guaranteed.
  */
 export function slotIdentityKey(slot: SlotDecl, index: number): string {
   if (slot.dynamicNameExpr === undefined) return slot.name;
