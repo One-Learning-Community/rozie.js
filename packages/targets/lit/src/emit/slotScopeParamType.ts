@@ -39,6 +39,7 @@
 import type { TSType } from '@babel/types';
 import type { ParamDecl, SlotDecl } from '../../../../core/src/ir/types.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 
 /**
  * Synthesize the TS type token for ONE scope param — delegates to the
@@ -83,12 +84,28 @@ export function slotScopeTypeObject(
  * satisfies (mirrors React's `refineSlotTypes.ts#buildSlotsRecordType`
  * rationale exactly).
  */
+/** Escape a single-quoted string-literal key body (T-79-07 — mirrors every per-target copy). */
+function escapeSingleQuotedKey(name: string): string {
+  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 export function buildRozieSlotsRecordType(slots: SlotDecl[]): string {
   const GENERIC = 'Record<string, (scope: any) => unknown>';
   const dynamicSlots = slots.filter((s) => s.dynamicNameExpr !== undefined);
   if (dynamicSlots.length === 0) return GENERIC;
   const members: string[] = [];
   const seenKeys = new Set<string>();
+  // Phase 79 Plan 12 Task 3 escape (R6) — a STATIC record-only name that
+  // textually matches a coexisting family's template-literal pattern is NOT
+  // itself a family member, but without a dedicated NAMED entry TypeScript
+  // resolves it against the family's index signature instead. Mirrors
+  // React's `refineSlotTypes.ts#buildSlotsRecordType` identical fix.
+  for (const s of slots) {
+    if (s.dynamicNameExpr !== undefined) continue;
+    if (s.name === '' || isSlotNameIdentifier(s.name)) continue;
+    const scopeType = slotScopeTypeObject(s.params, s.paramTypes);
+    members.push(`'${escapeSingleQuotedKey(s.name)}'?: (scope: ${scopeType}) => unknown;`);
+  }
   for (const s of dynamicSlots) {
     if (s.namePrefix === undefined || s.namePrefix.length === 0) continue;
     const key = `\`${s.namePrefix}\${string}\``;
