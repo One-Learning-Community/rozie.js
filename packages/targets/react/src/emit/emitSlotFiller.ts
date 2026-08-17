@@ -51,6 +51,8 @@
  */
 import type { SlotFillerDecl } from '@rozie/core';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { renderRecordKey } from './refineSlotTypes.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 // Late-import to avoid a circular module-init dependency — emitTemplateNode
 // imports this file via emitElement's component-tag branch; this file needs
@@ -110,6 +112,14 @@ export function emitSlotFiller(
   filler: SlotFillerDecl,
   ctx: EmitNodeCtx,
 ): string {
+  // Phase 79 Plan 04 (R12/D-03) — a fill targeting a non-identifier,
+  // non-default slot name (e.g. `#cell-status`) has no named-prop path; it is
+  // folded into the merged `slots={{ ... }}` record prop by
+  // emitDynamicSlotsProp instead (same code path the R5 dynamic-name fills
+  // already use). Returning '' here is safe: the emitTemplateNode.ts caller
+  // pushes this into an array joined with spaces, so an empty entry is inert.
+  if (filler.name !== '' && !isSlotNameIdentifier(filler.name)) return '';
+
   const fieldName = propFieldName(filler.name);
   const bodyJsx = renderFillerBody(filler, ctx);
   const destructure = paramsDestructure(filler);
@@ -142,17 +152,28 @@ export function emitDynamicSlotsProp(
   fillers: readonly SlotFillerDecl[],
   ctx: EmitNodeCtx,
 ): string | null {
-  const dynamics = fillers.filter((f) => f.isDynamic);
-  if (dynamics.length === 0) return null;
+  // Phase 79 Plan 04 (R12/D-03) — a static fill whose target name is not a
+  // valid JS identifier (e.g. `#cell-status`) has no named-prop path, so it
+  // merges into this SAME record alongside genuinely dynamic (`#[expr]`)
+  // fills. A single pass over `fillers` (rather than two separate filters)
+  // preserves true IR/authoring order across the two categories.
+  const recordFillers = fillers.filter(
+    (f) => f.isDynamic || (f.name !== '' && !isSlotNameIdentifier(f.name)),
+  );
+  if (recordFillers.length === 0) return null;
 
   const entries: string[] = [];
-  for (const filler of dynamics) {
-    if (!filler.dynamicNameExpr) continue; // ROZ946 was already emitted upstream
-    const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir);
+  for (const filler of recordFillers) {
     const destructure = paramsDestructure(filler);
     const argList = destructure === '' ? '()' : `(${destructure})`;
     const bodyJsx = renderFillerBody(filler, ctx);
-    entries.push(`[${keyExpr}]: ${argList} => (${bodyJsx})`);
+    if (filler.isDynamic) {
+      if (!filler.dynamicNameExpr) continue; // ROZ946 was already emitted upstream
+      const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir);
+      entries.push(`[${keyExpr}]: ${argList} => (${bodyJsx})`);
+    } else {
+      entries.push(`${renderRecordKey(filler.name)}: ${argList} => (${bodyJsx})`);
+    }
   }
   if (entries.length === 0) return null;
   return `slots={{ ${entries.join(', ')} }}`;

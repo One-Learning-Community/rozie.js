@@ -13,10 +13,17 @@
  * (interface FooProps gets render-prop slot fields), and CONTEXT D-67
  * (default slot called 'children'; named slot called 'renderName').
  *
+ * Phase 79 Plan 04 (R12/D-03): a slot name that is not a valid JS identifier
+ * (e.g. `cell-status`) mints NO named field or ctx interface here at all — it
+ * is reachable only through the bracket-keyed record built in
+ * emitSlotInvocation.ts. Gated directly on the shared `isSlotNameIdentifier`
+ * predicate (imported from core, never redeclared).
+ *
  * @experimental — shape may change before v1.0
  */
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { refineSlotTypes } from './refineSlotTypes.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 
 export interface EmitSlotDeclResult {
   slotPropFields: string[];
@@ -37,6 +44,10 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
   const seenPropFields = new Set<string>();
 
   for (const slot of ir.slots) {
+    // D-03 — a non-identifier, non-default slot name has no named prop path;
+    // it is reachable only through the record (emitSlotInvocation.ts). Skip
+    // minting a field/ctx-interface for it entirely.
+    if (slot.name !== '' && !isSlotNameIdentifier(slot.name)) continue;
     const refined = refineSlotTypes(slot);
     if (!seenPropFields.has(refined.propFieldName)) {
       slotPropFields.push(`  ${refined.propFieldName}?: ${refined.propFieldType};`);

@@ -26,9 +26,52 @@
  * their respective runtime layers; React needs the explicit emit-side
  * accommodation.
  *
+ * Phase 79 Plan 04 (R12/D-03): a slot name that is NOT a valid JS identifier
+ * (e.g. `cell-status`) has no named-prop path at all — `emitSlotDecl.ts` skips
+ * minting its `render<Pascal>` field/ctx-interface entirely and
+ * `emitSlotInvocation.ts` drops the merge's left operand, routing through the
+ * bracket-keyed record alone. `renderRecordKey` below is this file's single
+ * source of truth for the escaped record-key text, reused by
+ * `emitSlotInvocation.ts` and `emitSlotFiller.ts` so both sides of a
+ * non-identifier record entry always agree on the exact key. The identifier
+ * SHAPE check itself is `isSlotNameIdentifier`, imported from core — every
+ * R12 routing site imports it directly (never redeclares it) so a future
+ * edit that forgets the check in one module is grep-detectable.
+ *
  * @experimental — shape may change before v1.0
  */
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+
+/**
+ * Escape a single-quoted string-literal key body: backslash first (so a
+ * backslash inserted by the quote-escape step is not itself re-escaped),
+ * then single quotes. Mirrors Vue's `refineSlotTypes.ts` escape helper
+ * (Phase 79 Plan 03) so every target's record-key emission escapes the same
+ * way (T-79-07).
+ */
+function escapeSingleQuotedKey(name: string): string {
+  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+/**
+ * Whether `name` routes through the bracket-keyed record ONLY (D-03). The
+ * default slot (`''`) is excluded explicitly — `isSlotNameIdentifier` does
+ * not special-case the empty string, and the default slot always keeps its
+ * `children` merge path regardless of shape.
+ */
+export function isRecordOnlySlotName(name: string): boolean {
+  return name !== '' && !isSlotNameIdentifier(name);
+}
+
+/**
+ * Render the bracket-lookup key for a record-only slot name: single-quoted
+ * and escaped, so a quote/backslash in the author's slot name cannot break
+ * out of the emitted string literal (T-79-07).
+ */
+export function renderRecordKey(name: string): string {
+  return `'${escapeSingleQuotedKey(name)}'`;
+}
 
 function capitalize(name: string): string {
   if (name.length === 0) return name;

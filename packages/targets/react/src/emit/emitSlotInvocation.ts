@@ -65,7 +65,8 @@ import type {
   SlotDecl,
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import { refineSlotTypes } from './refineSlotTypes.js';
+import { refineSlotTypes, renderRecordKey } from './refineSlotTypes.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 // Late-import via a getter to avoid circular import errors during ES module
 // initialization. emitTemplateNode imports this module at top-level; we need
@@ -233,7 +234,16 @@ export function emitSlotInvocation(
   // intact when wrapped in `{...}` / `?.(...)` / `?? fallback` downstream.
   // D-18 empty-string sentinel: default slot keys as `''` in the slots map.
   const dynKey = slot.name === '' ? "''" : `'${slot.name}'`;
-  const fieldRef = `(props.${refined.propFieldName} ?? props.slots?.[${dynKey}])`;
+  // Phase 79 Plan 04 (R12/D-03) — a non-identifier, non-default slot name
+  // (e.g. `cell-status`) has no named-prop half to merge with; ROZ127's
+  // identifier check retired in 79-03 is what lets such a name reach this
+  // point at all. Drop the left operand and the `??` entirely, keying the
+  // record lookup on the escaped literal alone. Identifier names keep the
+  // EXACT pre-phase merged form above, byte-identical (AC-22).
+  const isRecordOnly = slot.name !== '' && !isSlotNameIdentifier(slot.name);
+  const fieldRef = isRecordOnly
+    ? `props.slots?.[${renderRecordKey(slot.name)}]`
+    : `(props.${refined.propFieldName} ?? props.slots?.[${dynKey}])`;
   const hasParams = slot.params.length > 0;
   const paramObj = buildParamObj(node.args, ctx.ir);
 
