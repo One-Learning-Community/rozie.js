@@ -287,9 +287,11 @@ function visit(
     if (node.tagName === 'slot') {
       // Determine the STATIC slot name (name="..." attribute), if any.
       let staticSlotName = '';
+      let hasStaticNameAttr = false;
       for (const a of node.attributes) {
         if (a.kind === 'static' && a.name === 'name' && a.value !== null) {
           staticSlotName = a.value;
+          hasStaticNameAttr = true;
           break;
         }
       }
@@ -333,18 +335,57 @@ function visit(
       const nestedSlots: SlotDecl[] = [];
       visit(node.children, childCtx, nestedSlots, diagnostics);
 
-      // Phase 79 R1 — resolve the effective slot name plus the two new
-      // additive IR fields (dynamicNameExpr / namePrefix). Defaults match
-      // pre-phase behavior exactly when no `:name` is present (slotName
-      // stays the static name / '' default; dynamicNameExpr and namePrefix
-      // stay unset) — that is the AC-1 byte-identity guarantee. The
-      // ROZ090/ROZ091/ROZ092/ROZ094 per-slot `:name` AUTHORING diagnostics
-      // are wired separately, in Task 2.
+      // Phase 79 R1/R7 — resolve the effective slot name plus the two new
+      // additive fields, and fire the four per-slot `:name` diagnostics.
+      // Defaults match pre-phase behavior exactly when no `:name` is present
+      // (slotName stays the static name / '' default; dynamicNameExpr and
+      // namePrefix stay unset) — that is the AC-1 byte-identity guarantee.
       let slotName = staticSlotName;
       let dynamicNameExpr: t.Expression | undefined;
       let namePrefix: string | undefined;
 
       if (dynamicNameAttr) {
+        // ROZ090 — a <slot> cannot declare BOTH a static name= and a bound
+        // :name; the two would define conflicting identities.
+        if (hasStaticNameAttr) {
+          diagnostics.push({
+            code: RozieErrorCode.SLOT_NAME_STATIC_AND_BOUND,
+            severity: 'error',
+            message: `<slot name="${staticSlotName}"> also declares a bound :name — a slot's name cannot be defined twice. Remove the static name="${staticSlotName}" attribute or the bound :name binding.`,
+            loc: node.loc,
+            hint: `Keep exactly one of name="..." or :name="..." on this <slot>.`,
+          });
+        }
+        // ROZ092 — :name on a portal slot. portalKey() (types.ts) needs a
+        // compile-time string for the $portals.<key> closure key; a bound
+        // :name has no compile-time value to give it.
+        if (isPortal) {
+          diagnostics.push({
+            code: RozieErrorCode.SLOT_DYNAMIC_NAME_ON_PORTAL,
+            severity: 'error',
+            message: `<slot portal :name="..."> is not supported — portal slots are addressed by a compile-time $portals.<key> closure key, and a bound :name has no value until runtime.`,
+            loc: node.loc,
+            hint: `Give the portal slot a static name="..." attribute instead of a bound :name.`,
+          });
+        }
+        // ROZ091 — a scope param literally named 'name' on a dynamic slot.
+        // `params` was built by collectParamsFromSlotElement ABOVE, which
+        // (as of Task 1) unconditionally skips every binding attr named
+        // 'name' before it can become a ParamDecl — so this condition is
+        // UNREACHABLE through normal authoring; see slotDynamicName.test.ts
+        // for the explicit reachability proof. Kept as a defensive check
+        // (never deleted, never renumbered) in case a future authoring form
+        // reintroduces a 'name'-keyed ParamDecl.
+        if (params.some((p) => p.name === 'name')) {
+          diagnostics.push({
+            code: RozieErrorCode.SLOT_NAME_PARAM_ON_DYNAMIC_SLOT,
+            severity: 'error',
+            message: `<slot :name="..."> also declares a scope param named 'name' — 'name' is reserved on <slot> as of Phase 79 and can no longer be used as a scope-param key.`,
+            loc: node.loc,
+            hint: `Rename the scope param to something other than 'name'.`,
+          });
+        }
+
         let parsedNameExpr: t.Expression | null = null;
         try {
           parsedNameExpr = parseExpression(dynamicNameAttr.value as string, {
@@ -379,7 +420,21 @@ function visit(
                 namePrefix = firstQuasi;
               }
             }
-            // ROZ094 (no static leading prefix) is wired in Task 2.
+            // ROZ094 — no static leading prefix could be derived: a bare
+            // identifier / member expression / call expression (no
+            // TemplateLiteral at all), or a TemplateLiteral whose leading
+            // quasi is empty. Legal — lowering continues normally — but
+            // consumer param typing degrades and family matching (79-07)
+            // has nothing to key on for this slot.
+            if (namePrefix === undefined) {
+              diagnostics.push({
+                code: RozieErrorCode.SLOT_DYNAMIC_NAME_NO_PREFIX,
+                severity: 'warning',
+                message: `<slot :name="${dynamicNameAttr.value}"> has no static leading prefix, so consumer fills for it cannot be typed by family matching (ROZ947 cannot fire).`,
+                loc: node.loc,
+                hint: `Bind :name to a template literal with a non-empty leading segment (e.g. \`cell-\${k}\`) to enable typed family matching.`,
+              });
+            }
           }
         }
       }
