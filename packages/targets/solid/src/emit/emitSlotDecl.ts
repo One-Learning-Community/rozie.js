@@ -16,6 +16,7 @@
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 
 export interface EmitSlotDeclResult {
   /** Interface field lines for each slot. */
@@ -49,6 +50,16 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
   const seenSlotNames = new Set<string>();
 
   for (const slot of ir.slots) {
+    // Phase 79 Plan 12 (R6) — a dynamic-name slot shares the '' default-slot
+    // sentinel (79-06 Assumption A1) but is NOT the genuine default slot; it
+    // is reachable only through the `slots?:` record (emitSlotInvocation.ts
+    // never resolves it via `resolved()`/`local.children`). Checked BEFORE
+    // the `seenSlotNames` dedup add below — otherwise a dynamic-name slot
+    // appearing before a genuine default slot would claim the '' dedup key
+    // first and silently suppress the real default slot's `children?` field
+    // (the exact ordering hazard Angular's `refineSlotTypes.ts` documented
+    // and fixed in 79-11 for the identical '' sentinel collision).
+    if (slot.dynamicNameExpr !== undefined) continue;
     if (seenSlotNames.has(slot.name)) continue;
     seenSlotNames.add(slot.name);
     if (slot.name === '') {
@@ -85,7 +96,7 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
         // Emit a standalone interface for the ctx (deduplicated).
         if (!seenInterfaces.has(ctxName)) {
           const paramFields = slot.params
-            .map((p) => `${p.name}: any;`)
+            .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])};`)
             .join(' ');
           ctxInterfaces.push(`interface ${ctxName} { ${paramFields} }`);
           seenInterfaces.add(ctxName);

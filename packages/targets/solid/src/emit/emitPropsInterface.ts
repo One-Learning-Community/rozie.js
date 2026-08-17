@@ -15,8 +15,9 @@
  * @experimental — shape may change before v1.0
  */
 import * as t from '@babel/types';
-import type { IRComponent, PropTypeAnnotation } from '../../../../core/src/ir/types.js';
+import type { IRComponent, PropTypeAnnotation, SlotDecl } from '../../../../core/src/ir/types.js';
 import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
+import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 
 export function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
@@ -123,6 +124,46 @@ export function toPascalCase(eventName: string): string {
   return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
 }
 
+/**
+ * Build the value type of a family member (Phase 79 Plan 12, R6/AC-10): a
+ * zero-param family types its value as a genuine zero-argument function —
+ * NOT a function accepting an empty context object.
+ */
+function buildFamilyFnType(slot: SlotDecl): string {
+  if (slot.params.length === 0) return '() => JSX.Element';
+  const paramFields = slot.params
+    .map((p, i) => `${p.name}: ${lowerSlotParamType(slot.paramTypes?.[i])}`)
+    .join('; ');
+  return `(ctx: { ${paramFields} }) => JSX.Element`;
+}
+
+/**
+ * Build the TS type text for the `slots?:` record field (Phase 79 Plan 12,
+ * R6). A component with no dynamic-name slot returns the EXACT pre-Plan-12
+ * generic `Record<string, (ctx: any) => JSX.Element>` text — byte-identical.
+ * Mirrors React's `refineSlotTypes.ts#buildSlotsRecordType` (same rationale
+ * for the trailing broad catch-all: literal-key narrowing for consumer
+ * fills, and satisfying the invocation site's non-literal runtime-string
+ * index access).
+ */
+export function buildSlotsRecordType(slots: SlotDecl[]): string {
+  const dynamicSlots = slots.filter((s) => s.dynamicNameExpr !== undefined);
+  if (dynamicSlots.length === 0) {
+    return 'Record<string, (ctx: any) => JSX.Element>';
+  }
+  const members: string[] = [];
+  const seenKeys = new Set<string>();
+  for (const s of dynamicSlots) {
+    if (s.namePrefix === undefined || s.namePrefix.length === 0) continue;
+    const key = `\`${s.namePrefix}\${string}\``;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    members.push(`[key: ${key}]: (${buildFamilyFnType(s)}) | undefined;`);
+  }
+  members.push('[key: string]: ((...args: any[]) => JSX.Element) | undefined;');
+  return `{ ${members.join(' ')} }`;
+}
+
 export function emitPropsInterface(
   ir: IRComponent,
   slotPropFields?: string[],
@@ -199,7 +240,7 @@ export function emitPropsInterface(
   // Gated on `ir.slots.length > 0` so non-slotted components stay byte-identical
   // (D-05). Per-slot merge happens in emitSlotInvocation.ts.
   if (ir.slots.length > 0) {
-    fields.push(`  slots?: Record<string, (ctx: any) => JSX.Element>;`);
+    fields.push(`  slots?: ${buildSlotsRecordType(ir.slots)};`);
   }
 
   // Phase 21 ($expose, D-05) — the typed callback `ref` prop, emitted last.
