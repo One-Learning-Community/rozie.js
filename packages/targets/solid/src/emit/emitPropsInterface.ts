@@ -19,6 +19,10 @@ import type { IRComponent, PropTypeAnnotation, SlotDecl } from '../../../../core
 import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+// WR-05 fix (79-REVIEW-FIX): was a local copy of this exact one-line
+// escaping predicate — consolidated into core; see that module's doc
+// comment for why (drift risk on shared, security-relevant escaping logic).
+import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 
 export function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
@@ -148,10 +152,6 @@ function buildFamilyFnType(slot: SlotDecl): string {
  * index access).
  */
 /** Escape a single-quoted string-literal key body (T-79-07 — mirrors every per-target copy). */
-function escapeSingleQuotedKey(name: string): string {
-  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
 export function buildSlotsRecordType(slots: SlotDecl[]): string {
   const dynamicSlots = slots.filter((s) => s.dynamicNameExpr !== undefined);
   if (dynamicSlots.length === 0) {

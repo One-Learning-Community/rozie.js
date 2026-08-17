@@ -30,8 +30,8 @@
  * (e.g. `cell-status`) has no named-prop path at all — `emitSlotDecl.ts` skips
  * minting its `render<Pascal>` field/ctx-interface entirely and
  * `emitSlotInvocation.ts` drops the merge's left operand, routing through the
- * bracket-keyed record alone. `renderRecordKey` below is this file's single
- * source of truth for the escaped record-key text, reused by
+ * bracket-keyed record alone. `renderRecordKey` (re-exported here from core
+ * — see WR-05, 79-REVIEW-FIX) is the escaped record-key text, reused by
  * `emitSlotInvocation.ts` and `emitSlotFiller.ts` so both sides of a
  * non-identifier record entry always agree on the exact key. The identifier
  * SHAPE check itself is `isSlotNameIdentifier`, imported from core — every
@@ -43,17 +43,13 @@
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
+import { renderRecordKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 
-/**
- * Escape a single-quoted string-literal key body: backslash first (so a
- * backslash inserted by the quote-escape step is not itself re-escaped),
- * then single quotes. Mirrors Vue's `refineSlotTypes.ts` escape helper
- * (Phase 79 Plan 03) so every target's record-key emission escapes the same
- * way (T-79-07).
- */
-function escapeSingleQuotedKey(name: string): string {
-  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
+// WR-05 fix (79-REVIEW-FIX): re-export so existing `import { renderRecordKey }
+// from './refineSlotTypes.js'` call sites (emitSlotInvocation.ts,
+// emitSlotFiller.ts) keep working unchanged. `escapeSingleQuotedKey` and
+// `renderRecordKey` now live in core — see that module's doc comment.
+export { renderRecordKey };
 
 /**
  * Whether `name` routes through the bracket-keyed record ONLY (D-03). The
@@ -149,15 +145,6 @@ export function buildSlotsRecordType(slots: SlotDecl[], slotChildrenType: string
   }
   members.push(`[key: string]: ((...args: any[]) => ${slotChildrenType}) | undefined;`);
   return `{ ${members.join(' ')} }`;
-}
-
-/**
- * Render the bracket-lookup key for a record-only slot name: single-quoted
- * and escaped, so a quote/backslash in the author's slot name cannot break
- * out of the emitted string literal (T-79-07).
- */
-export function renderRecordKey(name: string): string {
-  return `'${escapeSingleQuotedKey(name)}'`;
 }
 
 function capitalize(name: string): string {

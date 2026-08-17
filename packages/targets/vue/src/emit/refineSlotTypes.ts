@@ -42,15 +42,10 @@
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
-
-/**
- * Escape a single-quoted string-literal key body: backslash first (so a
- * backslash inserted by the quote-escape step is not itself re-escaped),
- * then single quotes.
- */
-function escapeSingleQuotedKey(name: string): string {
-  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
+// WR-05 fix (79-REVIEW-FIX): was a local copy of this exact one-line
+// escaping predicate — consolidated into core; see that module's doc
+// comment for why (drift risk on shared, security-relevant escaping logic).
+import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 
 /**
  * Render a slot-block key: bare when `slotName` is a valid identifier

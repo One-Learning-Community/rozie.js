@@ -19,8 +19,9 @@
  * (e.g. `cell-status`) mints NO `@ContentChild` field / ctx interface —
  * `@ContentChild`'s string argument is a template-reference-variable
  * selector, which does not resolve for a hyphenated name. `isRecordOnlySlotName`
- * below is this file's gate, `renderRecordKey` its escaped-key single source
- * of truth (T-79-07), and `buildEligibleSlotDecls` is the filtered
+ * below is this file's gate, `renderRecordKey` (re-exported here from core —
+ * see WR-05, 79-REVIEW-FIX) its escaped-key text (T-79-07), and
+ * `buildEligibleSlotDecls` is the filtered
  * producer-decl builder every caller should use in place of a raw
  * `slots.map(buildSlotCtx)`. The identifier SHAPE check itself is
  * `isSlotNameIdentifier`, imported from core — every R12 routing site
@@ -32,6 +33,13 @@
 import type { SlotDecl } from '../../../../core/src/ir/types.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
+import { renderRecordKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
+
+// WR-05 fix (79-REVIEW-FIX): re-export so existing `import { renderRecordKey }
+// from './refineSlotTypes.js'` call sites (emitSlotFiller.ts,
+// emitSlotInvocation.ts) keep working unchanged. `escapeSingleQuotedKey` and
+// `renderRecordKey` now live in core — see that module's doc comment.
+export { renderRecordKey };
 
 /** Convert default-slot empty string to synthetic ref name `defaultSlot`. */
 export function slotRefName(slotName: string): string {
@@ -89,24 +97,6 @@ export function isRecordOnlySlotDecl(slot: SlotDecl): boolean {
   return isRecordOnlySlotName(slot.name) || slot.dynamicNameExpr !== undefined;
 }
 
-/**
- * Escape a single-quoted string-literal key body: backslash first (so a
- * backslash inserted by the quote-escape step is not itself re-escaped), then
- * single quotes. Mirrors the identical helper in every other R12 target's
- * `refineSlotTypes.ts` (T-79-07).
- */
-function escapeSingleQuotedKey(name: string): string {
-  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
-/**
- * Render the bracket-lookup key for a record-only slot name: single-quoted
- * and escaped, so a quote/backslash in the author's slot name cannot break
- * out of the emitted string literal (T-79-07).
- */
-export function renderRecordKey(name: string): string {
-  return `'${escapeSingleQuotedKey(name)}'`;
-}
 
 /**
  * Build the per-slot interface + @ContentChild field declarations.

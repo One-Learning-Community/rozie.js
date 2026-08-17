@@ -33,6 +33,7 @@ import type { IRComponent, PropTypeAnnotation, ParamDecl, SlotDecl } from '../ir
 import { buildPropJsdoc } from './buildPropJsdoc.js';
 import { isSlotNameIdentifier } from './slotNameIdentifier.js';
 import { lowerSlotParamType } from './slotParamTypeLowering.js';
+import { renderRecordKey } from './escapeSingleQuotedKey.js';
 
 /**
  * Options controlling the shared props-interface body rendering.
@@ -262,15 +263,6 @@ function buildFamilyFnType(slot: SlotDecl, slotChildrenType: string): string {
  * @public — consumed by every target's `emitTypes.ts`.
  */
 /** Escape a single-quoted string-literal key body (T-79-07 — mirrors every per-target copy). */
-function escapeSingleQuotedKey(name: string): string {
-  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
-/** Render the bracket-lookup key for a record-only slot name: single-quoted and escaped. */
-function renderRecordKey(name: string): string {
-  return `'${escapeSingleQuotedKey(name)}'`;
-}
-
 export function buildSlotsRecordType(slots: SlotDecl[], slotChildrenType: string): string {
   const dynamicSlots = slots.filter((s) => s.dynamicNameExpr !== undefined);
   if (dynamicSlots.length === 0) {
