@@ -74,9 +74,46 @@ import type { EmitNodeCtx } from './emitTemplateNode.js';
 // fully initialized).
 import * as _emitTemplateNodeModule from './emitTemplateNode.js';
 
-function findSlotDecl(name: string, ir: IRComponent): SlotDecl | null {
+/**
+ * Locate the `SlotDecl` matching `node` — the invocation actually being
+ * emitted, not just "some slot with this name".
+ *
+ * Phase 79 Plan 12 Task 0b (R3, 79-10 Known Gap closed) — every dynamic-name
+ * slot on a producer shares the identical `''` sentinel (79-06 Assumption
+ * A1), so a plain by-name lookup for `node.slotName === ''` is ambiguous the
+ * moment a producer declares more than one dynamic-name slot: it always
+ * resolves to the FIRST `''`-named `SlotDecl` in `ir.slots`, regardless of
+ * which invocation is being emitted. That wrong pick is consulted for
+ * `hasParams` (which call SHAPE to emit — zero-arg vs. with a param object),
+ * silently dropping or fabricating an argument object depending on
+ * declaration order — CONFIRMED via `slotNameIdentityCollision.test.ts`.
+ *
+ * When `node.dynamicNameExpr` is set, disambiguate by REWRITTEN EXPRESSION
+ * TEXT — mirrors Svelte's `dynamicSlotOrdinal.ts` (79-10), the closer analog
+ * of the two existing precedents (Lit's `slotIdentityKey.ts` solves a
+ * DIFFERENT problem: declaration-time class-member dedup, not a
+ * per-invocation declaration lookup). `rewriteTemplateExpression` is a
+ * deterministic pure function of (expression, ir): the declaration and
+ * invocation independently parse the SAME source `:name` attribute text, so
+ * two rewrites of that text always agree.
+ *
+ * Static (non-dynamic) names are unaffected — the by-name lookup is
+ * unambiguous for them and stays byte-identical to pre-Plan-12 behavior.
+ */
+function findSlotDecl(node: TemplateSlotInvocationIR, ir: IRComponent): SlotDecl | null {
+  if (node.dynamicNameExpr !== undefined) {
+    const text = rewriteTemplateExpression(node.dynamicNameExpr, ir);
+    const match = ir.slots.find(
+      (s) => s.dynamicNameExpr !== undefined && rewriteTemplateExpression(s.dynamicNameExpr, ir) === text,
+    );
+    if (match) return match;
+    // Fall through to the by-name lookup below only if no declaration-side
+    // match was found — should not happen for a well-formed IR (every
+    // dynamic invocation node has a corresponding declaration produced from
+    // the same <slot> element), but keeps this function total.
+  }
   for (const s of ir.slots) {
-    if (s.name === name) return s;
+    if (s.name === node.slotName) return s;
   }
   return null;
 }
@@ -206,7 +243,7 @@ export function emitSlotInvocation(
   // appears on the props interface; the engine wrapper consumes it imperatively.
   if (node.isPortal) return '';
   const slotName = node.slotName;
-  const slot = findSlotDecl(slotName, ctx.ir);
+  const slot = findSlotDecl(node, ctx.ir);
   // Build the invocation-site fallback once. Used when SlotDecl.defaultContent
   // is null but the <slot> element wraps inline fallback children.
   const invocationFallback = renderInvocationFallback(node.fallback, ctx);
