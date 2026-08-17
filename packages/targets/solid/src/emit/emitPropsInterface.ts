@@ -18,6 +18,7 @@ import * as t from '@babel/types';
 import type { IRComponent, PropTypeAnnotation, SlotDecl } from '../../../../core/src/ir/types.js';
 import { buildPropJsdoc } from '../../../../core/src/codegen/buildPropJsdoc.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 
 export function renderType(ann: PropTypeAnnotation): string {
   if (ann.kind === 'identifier') {
@@ -146,6 +147,11 @@ function buildFamilyFnType(slot: SlotDecl): string {
  * fills, and satisfying the invocation site's non-literal runtime-string
  * index access).
  */
+/** Escape a single-quoted string-literal key body (T-79-07 — mirrors every per-target copy). */
+function escapeSingleQuotedKey(name: string): string {
+  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 export function buildSlotsRecordType(slots: SlotDecl[]): string {
   const dynamicSlots = slots.filter((s) => s.dynamicNameExpr !== undefined);
   if (dynamicSlots.length === 0) {
@@ -153,6 +159,16 @@ export function buildSlotsRecordType(slots: SlotDecl[]): string {
   }
   const members: string[] = [];
   const seenKeys = new Set<string>();
+  // Phase 79 Plan 12 Task 3 escape (R6) — a STATIC record-only name that
+  // textually matches a coexisting family's template-literal pattern is NOT
+  // itself a family member, but without a dedicated NAMED entry TypeScript
+  // resolves it against the family's index signature instead. Mirrors
+  // React's `refineSlotTypes.ts#buildSlotsRecordType` identical fix.
+  for (const s of slots) {
+    if (s.dynamicNameExpr !== undefined) continue;
+    if (s.name === '' || isSlotNameIdentifier(s.name)) continue;
+    members.push(`'${escapeSingleQuotedKey(s.name)}'?: (${buildFamilyFnType(s)}) | undefined;`);
+  }
   for (const s of dynamicSlots) {
     if (s.namePrefix === undefined || s.namePrefix.length === 0) continue;
     const key = `\`${s.namePrefix}\${string}\``;
