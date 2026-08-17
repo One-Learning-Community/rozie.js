@@ -40,8 +40,19 @@ export interface SlotDeclEmission {
 }
 
 export function emitSlotDeclEmissions(slots: SlotDecl[]): SlotDeclEmission[] {
+  // Phase 79 Plan 11 (R3/D-09) — a slot carrying `dynamicNameExpr` shares the
+  // '' default-slot sentinel (79-06 Assumption A1) but has no compile-time
+  // identity to mint a `@ContentChild` field for; excluded here too so this
+  // dead-file's own filter stays in lockstep with the LIVE
+  // `isRecordOnlySlotDecl` gate in refineSlotTypes.ts (this file has zero
+  // production importers — see refineSlotTypes.ts / emitScript.ts for the
+  // real ContentChild-minting path).
   return slots
-    .filter((slot) => slot.name === '' || isSlotNameIdentifier(slot.name))
+    .filter(
+      (slot) =>
+        slot.dynamicNameExpr === undefined &&
+        (slot.name === '' || isSlotNameIdentifier(slot.name)),
+    )
     .map((slot) => buildSlotCtx(slot));
 }
 

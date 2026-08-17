@@ -362,10 +362,37 @@ export function emitSlotInvocation(
   // variable selector, which does not resolve for a hyphenated name. The
   // `templates()` signal-map lookup alone, keyed on the escaped literal name
   // (T-79-07). The identifier path below stays byte-identical (AC-22).
-  const mergedTplRef =
-    node.slotName !== '' && !isSlotNameIdentifier(node.slotName)
-      ? `templates()?.[${renderRecordKey(node.slotName)}]`
-      : `(${tplField} ?? templates()?.['${dynKey}'])`;
+  //
+  // Phase 79 Plan 11 (R3/D-09) — a producer `<slot :name="expr">` whose bound
+  // name does NOT constant-fold has no compile-time name at all (it keeps the
+  // '' default-slot sentinel per lowerTemplate.ts/lowerSlots.ts's documented
+  // Assumption A1) — there is no static @ContentChild field to merge with,
+  // exactly like the non-identifier case above. OR the two triggers into the
+  // SAME isRecordOnly decision so both share one output shape and can never
+  // drift (T-79-24, mirrors React/Solid's 79-10 OR-extension verbatim). The
+  // KEY source is the INVOCATION node's own `dynamicNameExpr` (not a by-name
+  // SlotDecl lookup via `node.slotName`, which is the CONSUMER-fill-shaped
+  // dynKey fallback above and would be the wrong source for a producer-
+  // declared dynamic name — T-79-26) — a producer may declare more than one
+  // runtime-named slot, and every one of them shares the identical ''
+  // sentinel, so resolving the key via a by-name lookup would risk sourcing
+  // the WRONG slot's expression. The invocation node always carries its own
+  // expression. Threaded through the SAME collisionRenames/loopBindings the
+  // slot's own :args already use (renderContextLiteral above) so a
+  // dynamicNameExpr referencing an r-for loop variable (`` `cell-${col.key}` ``)
+  // resolves correctly.
+  const isRecordOnly =
+    node.dynamicNameExpr !== undefined ||
+    (node.slotName !== '' && !isSlotNameIdentifier(node.slotName));
+  const recordKeyText = node.dynamicNameExpr
+    ? rewriteTemplateExpression(node.dynamicNameExpr, ctx.ir, {
+        collisionRenames: ctx.collisionRenames,
+        loopBindings: ctx.loopBindings,
+      })
+    : renderRecordKey(node.slotName);
+  const mergedTplRef = isRecordOnly
+    ? `templates()?.[${recordKeyText}]`
+    : `(${tplField} ?? templates()?.['${dynKey}'])`;
   const outletTag = `<ng-container *ngTemplateOutlet="${mergedTplRef}${ctxSuffix}" />`;
 
   if (!hasFallback && presence === 'always') {

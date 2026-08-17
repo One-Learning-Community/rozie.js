@@ -73,6 +73,22 @@ export function isRecordOnlySlotName(name: string): boolean {
 }
 
 /**
+ * Phase 79 Plan 11 (R3/D-09) — whether `slot` routes through the
+ * `templates()` signal-map lookup ONLY, extending `isRecordOnlySlotName`
+ * with a SECOND trigger: `dynamicNameExpr !== undefined` (a producer
+ * `<slot :name="expr">` whose bound name does NOT constant-fold). Such a
+ * slot keeps `name === ''` — the SAME sentinel the genuine default slot
+ * uses (79-06 Assumption A1) — so `isRecordOnlySlotName('')` alone would
+ * return `false` and this slot would wrongly mint a `@ContentChild('defaultSlot',
+ * ...)` field colliding with the real default slot's own field/interface.
+ * Mirrors Lit's identical `slot.dynamicNameExpr === undefined` gate on its
+ * per-slot property predicate (`emitSlotDecl.ts:268`, 79-08/79-09).
+ */
+export function isRecordOnlySlotDecl(slot: SlotDecl): boolean {
+  return isRecordOnlySlotName(slot.name) || slot.dynamicNameExpr !== undefined;
+}
+
+/**
  * Escape a single-quoted string-literal key body: backslash first (so a
  * backslash inserted by the quote-escape step is not itself re-escaped), then
  * single quotes. Mirrors the identical helper in every other R12 target's
@@ -142,9 +158,16 @@ export function buildEligibleSlotDecls(slots: SlotDecl[]): SlotCtxRendered[] {
   const seen = new Set<string>();
   const out: SlotCtxRendered[] = [];
   for (const slot of slots) {
+    // Phase 79 Plan 11 — the record-only check MUST run BEFORE the `seen`
+    // dedup add. A dynamicNameExpr slot shares the '' default-slot sentinel
+    // (79-06 Assumption A1); if it were marked `seen` first, a LATER genuine
+    // default slot (`<slot>` with no name) in the same component would be
+    // silently skipped by the dedup, losing its real `@ContentChild` field.
+    // Record-only slots never claim a `seen` key at all, so a real default
+    // slot's '' key stays available regardless of declaration order.
+    if (isRecordOnlySlotDecl(slot)) continue;
     if (seen.has(slot.name)) continue;
     seen.add(slot.name);
-    if (isRecordOnlySlotName(slot.name)) continue;
     out.push(buildSlotCtx(slot));
   }
   return out;
@@ -166,7 +189,13 @@ export function buildNgTemplateContextGuard(
   // ctx interface (see `buildEligibleSlotDecls`), so it must not enter this
   // union either — `slotCtxName('cell-status')` would produce the invalid
   // TS identifier `Cell-statusCtx`.
-  const eligible = slots.filter((s) => !isRecordOnlySlotName(s.name));
+  //
+  // Phase 79 Plan 11 (R3/D-09) — a dynamicNameExpr slot (shares the ''
+  // default-slot sentinel per 79-06 Assumption A1) is excluded the SAME way
+  // via `isRecordOnlySlotDecl` — it has no ctx interface either, and would
+  // otherwise silently stand in for (or duplicate) the genuine default slot's
+  // `DefaultCtx` union member.
+  const eligible = slots.filter((s) => !isRecordOnlySlotDecl(s));
   if (eligible.length === 0) return null;
   // Dedupe by distinct slot name — a slot referenced in multiple template
   // locations appears multiple times in `slots`, but each distinct name has a
