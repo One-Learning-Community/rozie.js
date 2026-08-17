@@ -93,10 +93,19 @@ function pascalCaseFragment(raw: string): string {
  * The identity-key Set (`slotIdentityKey`, gated on the NUL-prefixed
  * namespace) is what actually PREVENTS a duplicate class-member identifier
  * from ever being emitted; this suffix is a human-readable PascalCase
- * projection of that same identity for naming purposes only. Matches the
- * pre-existing static-slot behaviour exactly (no new sanitization is
- * introduced for static names — non-identifier/kebab static slot names
- * remain the R12 record-routing gap this plan does not touch).
+ * projection of that same identity for naming purposes only.
+ *
+ * Phase 79 Plan 09 (R12 — closing the gap this file's own doc comment used
+ * to flag): a non-identifier/kebab STATIC slot name (e.g. `cell-total`) is
+ * routed through `pascalCaseFragment` too, so its class-member suffix is a
+ * legal identifier (`CellTotal`) instead of the raw hyphenated text, which
+ * would otherwise emit an invalid `_hasSlotCell-total` class field (parses
+ * as subtraction, not an identifier — a hard syntax error). For every
+ * PRE-EXISTING identifier-shaped static name, `pascalCaseFragment` produces
+ * the byte-identical result the old `charAt(0).toUpperCase() + slice(1)`
+ * formula did (a single non-alphanumeric-free segment, first letter
+ * capitalized) — AC-1 byte-identity is preserved for every fixture that
+ * predates this plan.
  */
 export function slotFieldSuffix(slot: SlotDecl, index: number): string {
   if (slot.dynamicNameExpr !== undefined) {
@@ -107,7 +116,5 @@ export function slotFieldSuffix(slot: SlotDecl, index: number): string {
   }
   // Default slot: name === ''. Use 'Default' as the field suffix.
   if (slot.name === '') return 'Default';
-  // PascalCase the slot name (e.g. 'header' -> 'Header') — unchanged from
-  // pre-Phase-79 behaviour.
-  return slot.name.charAt(0).toUpperCase() + slot.name.slice(1);
+  return pascalCaseFragment(slot.name);
 }

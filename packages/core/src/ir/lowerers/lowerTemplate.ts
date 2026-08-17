@@ -1019,6 +1019,7 @@ function lowerBareElement(
   if (el.tagName === 'slot') {
     let slotName = '';
     let isPortal = false;
+    let dynamicNameExpr: t.Expression | undefined;
     const args: TemplateSlotInvocationIR['args'] = [];
     for (const attr of el.attributes) {
       if (attr.kind === 'static' && attr.name === 'name' && attr.value !== null) {
@@ -1048,15 +1049,26 @@ function lowerBareElement(
         // side's SlotDecl.name exactly (AC-3 byte-identity requires both
         // sites to agree, not just the declaration). A non-constant :name is
         // a genuine dynamic/family slot — `slotName` intentionally stays at
-        // the '' default sentinel for that case; family-matched consumer
-        // dispatch is wired in 79-07/79-08, not here. No diagnostic is
-        // pushed on a parse failure — `lowerSlots` already visits this same
-        // <slot> element and reports ROZ096 exactly once; duplicating it
-        // here would double-report the same source location.
+        // the '' default sentinel for that case. No diagnostic is pushed on
+        // a parse failure — `lowerSlots` already visits this same <slot>
+        // element and reports ROZ096 exactly once; duplicating it here would
+        // double-report the same source location.
+        //
+        // Phase 79 Plan 09 — when the expression does NOT constant-fold,
+        // stash the parsed expression itself on the invocation node
+        // (`dynamicNameExpr`) so Lit's producer-side template emitter can
+        // render the SAME runtime expression both as the `rozieSlots`
+        // record-lookup key and as the fallback `<slot name="${expr}">`
+        // element's own name binding. Mirrors `lowerSlots.ts`'s declaration-
+        // side field of the identical name; every other target ignores it.
         const expr = tryParseExpression(attr.value);
         if (expr) {
           const fold = foldConstantSlotName(expr);
-          if (fold.folded) slotName = fold.value;
+          if (fold.folded) {
+            slotName = fold.value;
+          } else {
+            dynamicNameExpr = expr;
+          }
         }
       } else if (attr.kind === 'binding' && attr.value !== null) {
         // Portal slots use `:params="['arg']"` as a TYPE DECLARATION (consumed
@@ -1105,6 +1117,7 @@ function lowerBareElement(
       context: lowerInFillBody ? 'fill-body' : 'declaration',
     };
     if (isPortal) inv.isPortal = true;
+    if (dynamicNameExpr !== undefined) inv.dynamicNameExpr = dynamicNameExpr;
     return inv;
   }
 

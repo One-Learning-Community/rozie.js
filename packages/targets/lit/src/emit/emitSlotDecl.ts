@@ -35,6 +35,7 @@ import { collectMethodNamesFromIR } from './methodNames.js';
 import { portalSlotMemberName } from './portalSlotMemberName.js';
 import { slotIdentityKey, slotFieldSuffix } from './slotIdentityKey.js';
 import { slotScopeParamType, slotScopeTypeObject } from './slotScopeParamType.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 
 export interface EmitSlotDeclOpts {
   decorators: LitDecoratorImportCollector;
@@ -254,9 +255,18 @@ function emitOneSlot(
   // through the `rozieSlots` record (Task 3 declares the class-field TYPE;
   // 79-09 supplies the runtime VALUE and the consumer-side accumulator) —
   // it does not get an individual named receiver.
+  //
+  // Phase 79 Plan 09 (R12) — ALSO excluded for a non-identifier STATIC name
+  // (e.g. `cell-total`, no `dynamicNameExpr`). `portalSlotMemberName` mints
+  // the property's class-member identifier directly off `slot.name` with no
+  // sanitization, so a kebab-case name would emit a syntactically invalid
+  // `@property ... cell-total?: ...` field. Every fill targeting such a slot
+  // routes through the `rozieSlots` record instead (`emitSlotFiller.ts`'s
+  // `wantsRecordPath`), so no named receiver is needed for it here either.
   const isScopedOrPortal =
     (slot.isPortal === true || slot.params.length > 0) &&
-    slot.dynamicNameExpr === undefined;
+    slot.dynamicNameExpr === undefined &&
+    (slot.name === '' || isSlotNameIdentifier(slot.name));
   let propertyField = '';
   if (isScopedOrPortal) {
     // Default slot ('') collides with the JS reserved word 'default'; use a

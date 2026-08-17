@@ -1389,6 +1389,29 @@ export interface TemplateSlotInvocationIR {
    * @experimental — added in Spike 003
    */
   isPortal?: boolean;
+  /**
+   * Phase 79 Plan 09 — the parsed `:name` expression for a producer `<slot>`
+   * invocation whose bound name does NOT constant-fold, mirroring
+   * `SlotDecl.dynamicNameExpr` (`lowerSlots.ts`) but on the INVOCATION side
+   * (`lowerTemplate.ts`) — the node actually walked by each target's
+   * template emitter. Prior to this field, `lowerTemplate.ts` intentionally
+   * left `slotName` at its `''` default sentinel for a non-constant `:name`
+   * and dropped the parsed expression entirely (see its own comment:
+   * "family-matched consumer dispatch is wired in 79-07/79-08, not here"),
+   * because no per-target emitter needed the invocation-side expression
+   * until Lit's producer dispatch (this plan) needed to render the SAME
+   * runtime name both as the record-lookup key AND as the fallback
+   * `<slot>` element's own `name="${expr}"` attribute — something a
+   * declaration-side-only field cannot supply to the template walk.
+   *
+   * Additive field — assigned only when the `:name` binding is present AND
+   * does not constant-fold, never as explicit `undefined`, so a component
+   * using only static slot names produces a byte-identical IR snapshot
+   * (AC-1). Every other target ignores this field entirely.
+   *
+   * @experimental — added in Phase 79 Plan 09
+   */
+  dynamicNameExpr?: Expression;
 }
 
 /**

@@ -1,0 +1,17 @@
+<rozie name="PlainScopedConsumer">
+
+<components>
+{ PlainScoped: './PlainScoped.rozie' }
+</components>
+
+<template>
+<div>
+  <PlainScoped>
+    <template #header="{ title }">
+      <span>{{ title }}</span>
+    </template>
+  </PlainScoped>
+</div>
+</template>
+
+</rozie>

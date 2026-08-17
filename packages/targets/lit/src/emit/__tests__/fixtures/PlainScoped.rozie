@@ -1,0 +1,11 @@
+<rozie name="PlainScoped">
+
+<template>
+<div>
+  <slot name="header" :title="'hi'">
+    <h2>fallback</h2>
+  </slot>
+</div>
+</template>
+
+</rozie>

@@ -55,6 +55,8 @@ import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.
 import { toKebabCase } from './emitDecorator.js';
 import { eventTypeFor } from './emitListeners.js';
 import { domElementType } from '../../../../core/src/codegen/domElementType.js';
+import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
+import { renderRecordKey } from './slotRecordKey.js';
 // Phase 07.2 Plan 03 — consumer-side slot-fill emit for component-tag elements.
 import { emitSlotFiller, findTagClose, type EmitSlotFillerCtx } from './emitSlotFiller.js';
 // Phase 07.3 Plan 09 — consumer-side `r-model:propName=` two-way binding.
@@ -2273,7 +2275,47 @@ function emitSlot(
     }
   }
 
-  const slotName = name.length > 0 ? ` name="${name}"` : '';
+  // Phase 79 Plan 09 (R4/R5/R12/AC-9) — this slot's `rozieSlots` record
+  // routing, decided BEFORE building the rendered `name=` attribute so the
+  // SAME rewritten expression feeds both the record-lookup key and the
+  // fallback `<slot name="${expr}">` element (both sides must evaluate the
+  // identical runtime string). Portal slots never reach this dispatch at
+  // all — they're invoked from script (`$portals.<X>`), never from template
+  // render — so `recordAccessKey` stays null for them regardless of shape.
+  //
+  //   - a dynamic name (`node.dynamicNameExpr !== undefined`, i.e. a bound
+  //     `:name` that did not constant-fold) → bracketed computed access
+  //     keyed on the rewritten expression. `emitSlotDecl.ts`'s
+  //     `isScopedOrPortal` mints NO named function property for a dynamic
+  //     slot, so this slot's dispatch chain is record → slot-element only.
+  //   - a non-identifier static name (e.g. `cell-total`) → keyed on the
+  //     quoted literal (T-79-07 lockstep escaping via `slotRecordKey.ts`).
+  //     `emitSlotDecl.ts` mints no named property for this shape either, so
+  //     this chain is ALSO record → slot-element only.
+  //   - an identifier-named or default slot never sets `recordAccessKey` —
+  //     its dispatch stays the pre-Plan-09 named-property ternary,
+  //     byte-identical (AC-9's "record wins" only matters where a record
+  //     entry can actually exist, which family-matching + R12 restrict to
+  //     the two shapes above).
+  const isDynamicSlot = node.dynamicNameExpr !== undefined;
+  const isNonIdentifierStatic = name !== '' && !isSlotNameIdentifier(name);
+  let dynamicNameAttrExpr: string | null = null;
+  let recordAccessKey: string | null = null;
+  if (node.isPortal !== true) {
+    if (isDynamicSlot) {
+      dynamicNameAttrExpr = rewriteTemplateExpression(node.dynamicNameExpr!, ir);
+      recordAccessKey = dynamicNameAttrExpr;
+    } else if (isNonIdentifierStatic) {
+      recordAccessKey = renderRecordKey(name);
+    }
+  }
+
+  const slotName =
+    dynamicNameAttrExpr !== null
+      ? ` name="\${${dynamicNameAttrExpr}}"`
+      : name.length > 0
+        ? ` name="${name}"`
+        : '';
   const dataStr = dataAttrs.length > 0 ? ' ' + dataAttrs.join(' ') : '';
   const eventStr = eventAttrs.length > 0 ? ' ' + eventAttrs.join(' ') : '';
 
@@ -2281,6 +2323,18 @@ function emitSlot(
     fallbackChildren.trim().length > 0
       ? `<slot${slotName}${dataStr}${eventStr}>${fallbackChildren}</slot>`
       : `<slot${slotName}${dataStr}${eventStr}></slot>`;
+
+  // Phase 79 Plan 09 (AC-9) — record-routed dispatch. Evaluated BEFORE the
+  // pre-existing named-property ternary below so the record lookup is
+  // ALWAYS checked first when it can possibly apply (an ordering assertion,
+  // not a presence assertion — `this.rozieSlots?.[` appears earlier in the
+  // emitted string than any subsequent property test).
+  if (recordAccessKey !== null) {
+    const scopeEntries = node.args
+      .map((a) => `${a.name}: ${rewriteTemplateExpression(a.expression, ir)}`)
+      .join(', ');
+    return `\${this.rozieSlots?.[${recordAccessKey}] !== undefined ? this.rozieSlots?.[${recordAccessKey}]!({${scopeEntries}}) : html\`${slotElement}\`}`;
+  }
 
   // Phase 07.5 CR-01 — producer-side function-prop invocation for scoped
   // slots. When this <slot> declaration has scope-params, the consumer's
