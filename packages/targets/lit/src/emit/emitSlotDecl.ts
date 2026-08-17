@@ -33,6 +33,7 @@ import type {
 } from '../rewrite/collectLitImports.js';
 import { collectMethodNamesFromIR } from './methodNames.js';
 import { portalSlotMemberName } from './portalSlotMemberName.js';
+import { slotIdentityKey, slotFieldSuffix } from './slotIdentityKey.js';
 import { slotScopeParamType, slotScopeTypeObject } from './slotScopeParamType.js';
 
 export interface EmitSlotDeclOpts {
@@ -103,15 +104,9 @@ export interface EmitSlotDeclResult {
   diagnostics: Diagnostic[];
 }
 
-function slotFieldSuffix(name: string): string {
-  // Default slot: name === ''. Use 'Default' as the field suffix.
-  if (name === '') return 'Default';
-  // PascalCase the slot name (e.g. 'header' → 'Header').
-  return name.charAt(0).toUpperCase() + name.slice(1);
-}
-
 function emitOneSlot(
   slot: SlotDecl,
+  index: number,
   ir: IRComponent,
   ctxInterfaces: string[],
   hostListenerWiring: string[],
@@ -121,7 +116,12 @@ function emitOneSlot(
   slottedReads: ReadonlySet<string>,
   signals: PreactSignalsImportCollector | undefined,
 ): string {
-  const suffix = slotFieldSuffix(slot.name);
+  // Phase 79 Plan 08 (T-79-17): the suffix is derived from the slot's
+  // slotIdentityKey.ts-owned identity, not from bare `slot.name` — two
+  // dynamic-name slots sharing the `name === ''` sentinel get DISTINCT
+  // suffixes (`DynamicCell`/`DynamicRow`/`Dynamic0`/…) instead of both
+  // folding to `Default` and colliding under the dedup below.
+  const suffix = slotFieldSuffix(slot, index);
   const stateField = `  @state() private _hasSlot${suffix} = false;`;
 
   // @queryAssignedElements decorator — D-LIT-14 correction.
@@ -242,7 +242,21 @@ function emitOneSlot(
   // fills. Without this typed receiver, `this.<slotName>` resolves to implicit
   // any inside emitPortals.ts:30 — fine at runtime but flagged by stricter
   // consumer tsconfigs.
-  const isScopedOrPortal = slot.isPortal === true || slot.params.length > 0;
+  //
+  // Phase 79 Plan 08 (T-79-17): EXCLUDED for a dynamic-name slot
+  // (`dynamicNameExpr !== undefined`). This per-slot property is named off
+  // bare `slot.name` (below), which is the SAME `''` sentinel every
+  // dynamic-name slot shares — before this exclusion, two dynamic families
+  // both needing a scope-taking receiver would emit the identical
+  // `__rozieDefaultSlot__` @property twice, a duplicate-identifier compile
+  // error the pre-Task-2 dedup happened to mask by dropping every dynamic
+  // slot but the first. A dynamic slot's function-prop value is delivered
+  // through the `rozieSlots` record (Task 3 declares the class-field TYPE;
+  // 79-09 supplies the runtime VALUE and the consumer-side accumulator) —
+  // it does not get an individual named receiver.
+  const isScopedOrPortal =
+    (slot.isPortal === true || slot.params.length > 0) &&
+    slot.dynamicNameExpr === undefined;
   let propertyField = '';
   if (isScopedOrPortal) {
     // Default slot ('') collides with the JS reserved word 'default'; use a
@@ -295,8 +309,16 @@ export function emitSlotDecl(
   opts.decorators.add('queryAssignedElements');
   // Phase 07.5 — add `property` decorator import only when at least one slot
   // needs the function-prop receiver (scoped or portal). Avoids unused-import
-  // noise for components with paramless static slots only.
-  if (slots.some((s) => s.isPortal === true || s.params.length > 0)) {
+  // noise for components with paramless static slots only. Phase 79 Plan 08:
+  // mirrors emitOneSlot's `isScopedOrPortal` exclusion of dynamic-name slots
+  // — a component whose only scoped/portal-shaped slots are ALL dynamic-name
+  // needs no `property` import from this predicate (Task 3's `rozieSlots`
+  // property has its own, separate import-gating).
+  if (
+    slots.some(
+      (s) => (s.isPortal === true || s.params.length > 0) && s.dynamicNameExpr === undefined,
+    )
+  ) {
     opts.decorators.add('property');
   }
 
@@ -306,31 +328,43 @@ export function emitSlotDecl(
   const preSeedLinesArr: string[] = [];
   const methodNameSet = collectMethodNamesFromIR(ir);
 
-  // Dedupe by DISTINCT slot name before emitting the class-field declarations,
-  // slotchange wiring, pre-seed lines and ctx interfaces. A template may
-  // legitimately declare the same `<slot name="X">` more than once (e.g. one
-  // value-bubble per thumb in a range slider), in which case `ir.slots` carries
-  // one SlotDecl entry per OCCURRENCE. The render-time `<slot name="X">` markup
-  // is emitted per-occurrence by emitTemplate (Lit supports multiple `<slot
-  // name="X">` projecting the same assigned nodes) — but the backing
-  // `@state _hasSlot<X>` / `@queryAssignedElements _slot<X>Elements` /
-  // `@property <X>` class members and their slotchange listener registration
-  // must be emitted EXACTLY ONCE per distinct slot name, otherwise the emitted
-  // class has duplicate identifier declarations and fails to compile.
+  // Dedupe by DISTINCT slot identity before emitting the class-field
+  // declarations, slotchange wiring, pre-seed lines and ctx interfaces. A
+  // template may legitimately declare the same `<slot name="X">` more than
+  // once (e.g. one value-bubble per thumb in a range slider), in which case
+  // `ir.slots` carries one SlotDecl entry per OCCURRENCE. The render-time
+  // `<slot name="X">` markup is emitted per-occurrence by emitTemplate (Lit
+  // supports multiple `<slot name="X">` projecting the same assigned
+  // nodes) — but the backing `@state _hasSlot<X>` / `@queryAssignedElements
+  // _slot<X>Elements` / `@property <X>` class members and their slotchange
+  // listener registration must be emitted EXACTLY ONCE per distinct slot
+  // identity, otherwise the emitted class has duplicate identifier
+  // declarations and fails to compile.
   // The first occurrence wins (slot params/portal-ness are identical across
   // same-named occurrences in practice; first-wins is deterministic and matches
   // the other five targets' single-declaration behavior).
-  const seenSlotNames = new Set<string>();
-  const distinctSlots = slots.filter((slot) => {
-    if (seenSlotNames.has(slot.name)) return false;
-    seenSlotNames.add(slot.name);
-    return true;
+  //
+  // Phase 79 Plan 08 (T-79-17): identity is `slotIdentityKey(slot, index)`,
+  // NOT bare `slot.name` — two dynamic-name slots both carrying the
+  // `name === ''` sentinel (79-06's confirmed A1 resolution) are DISTINCT
+  // identities (keyed on `namePrefix`, or declaration ordinal when no
+  // prefix is derivable) and both survive this dedup, while two genuinely
+  // same-named STATIC slots still key identically and still dedupe to one
+  // (pre-existing behaviour, preserved exactly).
+  const seenSlotKeys = new Set<string>();
+  const distinctSlots: Array<{ slot: SlotDecl; index: number }> = [];
+  slots.forEach((slot, index) => {
+    const key = slotIdentityKey(slot, index);
+    if (seenSlotKeys.has(key)) return;
+    seenSlotKeys.add(key);
+    distinctSlots.push({ slot, index });
   });
 
   const fields = distinctSlots
-    .map((slot) =>
+    .map(({ slot, index }) =>
       emitOneSlot(
         slot,
+        index,
         ir,
         ctxInterfaces,
         hostListenerWiring,
