@@ -199,3 +199,85 @@ describe('Lit .name-keyed identity collision — compile probe + fix (Phase 79 P
     expect(code).not.toContain('RozieSlotDistributor');
   });
 });
+
+// ============================================================================
+// Task 3: the `rozieSlots` record property — emitted EXACTLY ONCE per
+// component, when any slot is scoped, portal, or dynamically named.
+// ============================================================================
+
+const SCOPED_SLOT_ONLY_SRC = `<rozie name="ScopedSlotOnly">
+<template>
+<div>
+  <slot :value="1">
+    <span>fallback</span>
+  </slot>
+</div>
+</template>
+</rozie>`;
+
+const PORTAL_SLOT_ONLY_SRC = `<rozie name="PortalSlotOnly">
+<template>
+<div>
+  <slot name="row" portal :params="['item']" />
+</div>
+</template>
+</rozie>`;
+
+const SEVERAL_SLOT_KINDS_SRC = `<rozie name="SeveralSlotKinds">
+<props>
+{ a: { type: String, default: '' } }
+</props>
+<template>
+<div>
+  <slot :value="1"><span>scoped fallback</span></slot>
+  <slot name="row" portal :params="['item']" />
+  <slot :name="\`cell-\${$props.a}\`" :value="$props.a"><span>{{ $props.a }}</span></slot>
+</div>
+</template>
+</rozie>`;
+
+function countRozieSlotsDeclarations(code: string): number {
+  return (code.match(/@property\(\{ attribute: false \}\) rozieSlots\?:/g) ?? []).length;
+}
+
+describe('Lit rozieSlots record property — exactly once per qualifying component (Phase 79 Plan 08 Task 3)', () => {
+  it('a component with at least one SCOPED slot emits exactly one rozieSlots declaration', () => {
+    const code = compileToLit(SCOPED_SLOT_ONLY_SRC, 'ScopedSlotOnly.rozie');
+    expect(countRozieSlotsDeclarations(code)).toBe(1);
+  });
+
+  it('a component with at least one PORTAL slot emits exactly one rozieSlots declaration', () => {
+    const code = compileToLit(PORTAL_SLOT_ONLY_SRC, 'PortalSlotOnly.rozie');
+    expect(countRozieSlotsDeclarations(code)).toBe(1);
+  });
+
+  it('a component with at least one DYNAMICALLY-NAMED slot emits exactly one rozieSlots declaration', () => {
+    const code = compileToLit(DYNAMIC_PLUS_DEFAULT_SRC, 'DynamicPlusDefault.rozie');
+    expect(countRozieSlotsDeclarations(code)).toBe(1);
+  });
+
+  it('a component with SEVERAL qualifying slots at once still emits exactly one rozieSlots declaration (per-component, not per-slot)', () => {
+    const code = compileToLit(SEVERAL_SLOT_KINDS_SRC, 'SeveralSlotKinds.rozie');
+    expect(countRozieSlotsDeclarations(code)).toBe(1);
+  });
+
+  it('a component with NONE of those (only static, paramless, non-portal slots) emits ZERO rozieSlots declarations, and its full output is byte-identical to pre-phase', () => {
+    const code = compileExample('Card');
+    expect(countRozieSlotsDeclarations(code)).toBe(0);
+    expect(code).not.toContain('rozieSlots');
+    // Full string equality against the checked-in pre-Phase-79 dist-parity
+    // fixture — the actual byte-identical baseline, not an approximation.
+    const expected = readFileSync(
+      resolve(HERE, '../../../../../../tests/dist-parity/fixtures/Card.lit.ts'),
+      'utf8',
+    );
+    expect(code).toBe(expected);
+  });
+
+  it('the declaration disables attribute deserialization and types the field as an optional record from string to a scope-taking function returning unknown', () => {
+    const code = compileToLit(SCOPED_SLOT_ONLY_SRC, 'ScopedSlotOnly.rozie');
+    expect(code).toContain(
+      '@property({ attribute: false }) rozieSlots?: Record<string, (scope: any) => unknown>;',
+    );
+  });
+});

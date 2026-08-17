@@ -44,6 +44,16 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   @property({ attribute: false }) __rozieDefaultSlot__?: (scope: { item: any; toggle: any; remove: any }) => unknown;
   @state() private _hasSlotEmpty = false;
   @queryAssignedElements({ slot: 'empty', flatten: true }) private _slotEmptyElements!: Element[];
+  // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for
+  // record-routed slot fills. 79-09's consumer-side emitSlotFiller
+  // accumulates an object literal onto the SAME `.rozieSlots=${{ ... }}`
+  // open-tag binding; the KEY is the fill's authored (possibly
+  // non-identifier) name and the VALUE is a scope-taking render
+  // function. `rozieSlots?.[name]` must be checked BEFORE the legacy
+  // named function-prop / <slot> fallback (AC-9). Attribute
+  // deserialization is disabled — this is a function-valued record,
+  // never reflected to/from an HTML attribute.
+  @property({ attribute: false }) rozieSlots?: Record<string, (scope: any) => unknown>;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually

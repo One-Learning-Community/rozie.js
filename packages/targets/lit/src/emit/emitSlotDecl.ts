@@ -360,7 +360,7 @@ export function emitSlotDecl(
     distinctSlots.push({ slot, index });
   });
 
-  const fields = distinctSlots
+  const perSlotFields = distinctSlots
     .map(({ slot, index }) =>
       emitOneSlot(
         slot,
@@ -376,6 +376,36 @@ export function emitSlotDecl(
       ),
     )
     .join('\n');
+
+  // Phase 79 Plan 08 (R4) — the `rozieSlots` record property, emitted EXACTLY
+  // ONCE per component (not per-slot), guarded on the ORIGINAL `slots` array
+  // (every occurrence, not the identity-deduped `distinctSlots`) so a
+  // component qualifies the instant ANY slot is scoped (has scope params),
+  // is a portal slot, or carries a dynamic name — matching Task 3's own
+  // behaviour spec. A component with none of those emits nothing here, which
+  // is what preserves AC-1's byte-identity for every component the feature
+  // does not touch.
+  const needsRozieSlots = slots.some(
+    (s) => s.isPortal === true || s.params.length > 0 || s.dynamicNameExpr !== undefined,
+  );
+  let rozieSlotsField = '';
+  if (needsRozieSlots) {
+    opts.decorators.add('property');
+    rozieSlotsField = [
+      '  // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for',
+      "  // record-routed slot fills. 79-09's consumer-side emitSlotFiller",
+      '  // accumulates an object literal onto the SAME `.rozieSlots=${{ ... }}`',
+      "  // open-tag binding; the KEY is the fill's authored (possibly",
+      '  // non-identifier) name and the VALUE is a scope-taking render',
+      '  // function. `rozieSlots?.[name]` must be checked BEFORE the legacy',
+      '  // named function-prop / <slot> fallback (AC-9). Attribute',
+      '  // deserialization is disabled — this is a function-valued record,',
+      '  // never reflected to/from an HTML attribute.',
+      '  @property({ attribute: false }) rozieSlots?: Record<string, (scope: any) => unknown>;',
+    ].join('\n');
+  }
+
+  const fields = [perSlotFields, rozieSlotsField].filter((s) => s.length > 0).join('\n');
 
   return {
     fields,
