@@ -214,6 +214,18 @@ describe('lowerSlots — ROZ090/ROZ091/ROZ092/ROZ094/ROZ096 diagnostics (Phase 7
     expect(hits[0]!.message).toContain('cell');
   });
 
+  it('WR-03 regression (79-REVIEW-FIX): <slot name="cell" :name="k"> (ROZ090 error case) still resets SlotDecl.name to the \'\' sentinel, preserving the "every dynamic-name slot has name === \'\'" invariant', () => {
+    const { ir } = lower(`
+<rozie name="DynName">
+<template>
+  <slot name="cell" :name="k" />
+</template>
+</rozie>`);
+    const slot = firstSlot(ir);
+    expect(slot.name).toBe('');
+    expect(slot.dynamicNameExpr).toBeDefined();
+  });
+
   it('ROZ092: <slot portal :name="k"> — a bound :name on a portal slot is an error (portalKey() needs a compile-time string)', () => {
     const { diagnostics } = lower(`
 <rozie name="DynName">

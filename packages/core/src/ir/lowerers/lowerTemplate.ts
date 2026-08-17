@@ -1067,6 +1067,14 @@ function lowerBareElement(
           if (fold.folded) {
             slotName = fold.value;
           } else {
+            // WR-03 fix (79-REVIEW-FIX) — mirror lowerSlots.ts's
+            // declaration-side reset: unconditionally reset slotName to ''
+            // when the fold fails, even on the already-erroring ROZ090
+            // double-name path (a preceding static `name="..."` attribute
+            // may have set `slotName` above). Keeps the invocation node's
+            // "dynamic-name slot has name === ''" invariant true in every
+            // case, matching the declaration side.
+            slotName = '';
             dynamicNameExpr = expr;
           }
         }

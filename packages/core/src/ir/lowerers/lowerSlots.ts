@@ -419,6 +419,16 @@ function visit(
             // no namePrefix, byte-identical downstream emit.
             slotName = fold.value;
           } else {
+            // WR-03 fix (79-REVIEW-FIX) — unconditionally reset slotName to
+            // the '' sentinel when the fold fails, even on the already-
+            // erroring ROZ090 double-name path (`<slot name="cell"
+            // :name="k">`, hasStaticNameAttr true above). Without this, a
+            // SlotDecl could carry BOTH a non-'' `name` AND a
+            // `dynamicNameExpr`, breaking the invariant every per-target
+            // routing site relies on ("every dynamic-name slot has name ===
+            // ''"). This path is reachable only via input that already
+            // hard-errors on ROZ090, so it never changes shipped behavior.
+            slotName = '';
             dynamicNameExpr = parsedNameExpr;
             if (t.isTemplateLiteral(parsedNameExpr)) {
               const firstQuasi = parsedNameExpr.quasis[0]?.value.cooked ?? '';
