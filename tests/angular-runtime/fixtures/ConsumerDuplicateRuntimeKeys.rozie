@@ -1,0 +1,34 @@
+<rozie name="ConsumerDuplicateRuntimeKeys">
+
+<!-- Phase 80 Plan 07 (Task 2) — two fills on ONE producer instance whose
+     keys are RUNTIME EXPRESSIONS (not static literals) that both evaluate
+     to the same string. Static-literal duplicate keys are a compile-time
+     ROZ724 error (Plan 05) and never reach this runtime path — these two
+     keys must be genuine expressions so the collision is only detectable
+     at runtime, which is exactly the ROZ750 dev-mode warning's job (R6).
+     Document order: DUP-FIRST is declared before DUP-SECOND, so "last
+     fill in content-query order wins" predicts DUP-SECOND renders. -->
+
+<components>
+{
+  ProducerRecordPath: './ProducerRecordPath.rozie',
+}
+</components>
+
+<data>
+{
+  keyA: 'alpha',
+  keyB: 'alpha',
+}
+</data>
+
+<template>
+<div class="consumer-duplicate-runtime-keys">
+  <ProducerRecordPath :slotKey="$data.keyA">
+    <template #[$data.keyA]="{ label }">DUP-FIRST</template>
+    <template #[$data.keyB]="{ label }">DUP-SECOND</template>
+  </ProducerRecordPath>
+</div>
+</template>
+
+</rozie>

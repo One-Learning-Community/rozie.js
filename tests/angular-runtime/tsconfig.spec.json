@@ -5,7 +5,7 @@
     "noEmit": false,
     "types": ["vitest/globals", "node"]
   },
-  "include": ["*.ts", "probe/**/*.ts", "fixtures/**/*.ts"],
+  "include": ["*.ts", "probe/**/*.ts", "fixtures/**/*.ts", "hosts/**/*.ts"],
   "angularCompilerOptions": {
     "strictTemplates": false,
     "compilationMode": "full"

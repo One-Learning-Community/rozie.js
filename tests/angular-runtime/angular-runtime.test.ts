@@ -25,6 +25,47 @@ import { ConsumerInsideFor } from './fixtures/ConsumerInsideFor.rozie';
 import { ConsumerSiblingProducers } from './fixtures/ConsumerSiblingProducers.rozie';
 import { ConsumerEmptyKeyFill } from './fixtures/ConsumerEmptyKeyFill.rozie';
 
+// Phase 80 Plan 07 (Task 2) additions — precedence, key-domain, prototype
+// guard, dev-vs-production warning behavior, and the bare-attribute
+// contract.
+import { ConsumerPrecedence } from './fixtures/ConsumerPrecedence.rozie';
+import { ConsumerNullishKeyFill } from './fixtures/ConsumerNullishKeyFill.rozie';
+import { ConsumerDuplicateRuntimeKeys } from './fixtures/ConsumerDuplicateRuntimeKeys.rozie';
+import {
+  PrecedenceHostContentChildWins,
+  PrecedenceHostDirectiveWins,
+  PrecedenceHostTemplatesWins,
+  PrecedenceHostDefaultWins,
+} from './hosts/PrecedenceHosts';
+import { PrototypeGuardHost } from './hosts/PrototypeGuardHost';
+import { EmptyFillMapHost } from './hosts/EmptyFillMapHost';
+import { BareAttributeHost } from './hosts/BareAttributeHost';
+
+/**
+ * Save/restore the ngDevMode global around a test so it never leaks.
+ *
+ * Angular's OWN internals read+mutate `globalThis.ngDevMode` as an OBJECT of
+ * performance counters (`ngDevMode.tView++`, etc.) whenever dev mode is
+ * active — NOT a bare boolean. Setting it to the boolean literal `true`
+ * clobbers that object and crashes Angular's own `createTView` with
+ * "Cannot create property 'tView' on boolean 'true'" the moment ANY
+ * component is created, unrelated to RozieSlot or NG0203 (discovered
+ * empirically while authoring this test). An empty object `{}` is truthy
+ * (satisfies the emitted `if (!(globalThis...).ngDevMode || ...)` guard
+ * exactly like a boolean `true` would) AND accepts arbitrary counter
+ * properties without throwing, so it is used here instead of a boolean.
+ */
+function withDevMode<T>(on: boolean, fn: () => T): T {
+  const g = globalThis as { ngDevMode?: unknown };
+  const prev = g.ngDevMode;
+  g.ngDevMode = on ? {} : false;
+  try {
+    return fn();
+  } finally {
+    g.ngDevMode = prev;
+  }
+}
+
 describe('angular-runtime — R7 fail-first record-path slot-fill proof (pre-fix emitter)', () => {
   it('1. top-level fill — baseline, must pass BOTH pre-fix and post-fix', () => {
     ensureTestBedInit();
@@ -137,5 +178,229 @@ describe('angular-runtime — R7 fail-first record-path slot-fill proof (pre-fix
     expect(text).not.toContain('[DEFAULT-FALLBACK]');
 
     fixture.destroy();
+  });
+});
+
+// Phase 80 Plan 07 (Task 2) — the precedence chain, key-domain edges,
+// prototype-pollution guard, and dev-vs-production warning behavior.
+//
+// OPEN RISK R-80-NG0203 (80-CONTEXT.md, explicitly Plan 08's job, NOT this
+// plan's) means every test below that projects a REAL `[rozieSlot]` marker
+// (constructing an actual `RozieSlot` instance imported from
+// `@rozie/runtime-angular`) currently throws NG0203 at `detectChanges()`,
+// the same way the six tests above do. Those assertions are left as the
+// DESIRED POST-FIX behavior — unreachable today, becoming the GREEN
+// observation once Plan 08 lands — per the same convention
+// RED-EVIDENCE.md records for test 3 above. Sub-cases that never construct
+// a `RozieSlot` instance (no `[rozieSlot]` marker anywhere in the projected
+// content) are NOT blocked by NG0203 and are asserted as passing NOW.
+describe('angular-runtime — precedence, key-domain, prototype guard, dev/prod warnings (Phase 80 Plan 07)', () => {
+  it('precedence tier 4->1: templates-only input wins over the producer default (NOT blocked by NG0203 — no RozieSlot instance)', () => {
+    ensureTestBedInit();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [PrecedenceHostTemplatesWins] });
+    const fixture = TestBed.createComponent(PrecedenceHostTemplatesWins);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('PREC-TEMPLATES');
+    expect(text).not.toContain('[DEFAULT-FALLBACK]');
+
+    fixture.destroy();
+  });
+
+  it('precedence tier 4: nothing supplied, the producer default wins (NOT blocked by NG0203 — no RozieSlot instance)', () => {
+    ensureTestBedInit();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [PrecedenceHostDefaultWins] });
+    const fixture = TestBed.createComponent(PrecedenceHostDefaultWins);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('[DEFAULT-FALLBACK]');
+    expect(text).not.toContain('PREC-TEMPLATES');
+
+    fixture.destroy();
+  });
+
+  it('precedence tier 2: directive-only fill wins over templates (DESIRED post-fix — blocked by NG0203 today)', () => {
+    ensureTestBedInit();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [ConsumerPrecedence] });
+    const fixture = TestBed.createComponent(ConsumerPrecedence);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('PREC-DIRECTIVE');
+    expect(text).not.toContain('[DEFAULT-FALLBACK]');
+
+    fixture.destroy();
+  });
+
+  it('precedence tier 2 beats tier 3: directive fill wins over a templates binding on the SAME slot (DESIRED post-fix — blocked by NG0203 today)', () => {
+    ensureTestBedInit();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [PrecedenceHostDirectiveWins] });
+    const fixture = TestBed.createComponent(PrecedenceHostDirectiveWins);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('PREC-DIRECTIVE');
+    expect(text).not.toContain('PREC-TEMPLATES');
+
+    fixture.destroy();
+  });
+
+  it('precedence tier 1 beats tiers 2 and 3: a static @ContentChild fill wins over BOTH a directive fill AND a templates binding on the SAME slot (DESIRED post-fix — blocked by NG0203 today)', () => {
+    ensureTestBedInit();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [PrecedenceHostContentChildWins] });
+    const fixture = TestBed.createComponent(PrecedenceHostContentChildWins);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('PREC-CONTENTCHILD');
+    expect(text).not.toContain('PREC-DIRECTIVE');
+    expect(text).not.toContain('PREC-TEMPLATES');
+
+    fixture.destroy();
+  });
+
+  it('a fill bound to an undefined key contributes no map entry and the producer falls through to its default (R5 — DESIRED post-fix, blocked by NG0203 today)', () => {
+    ensureTestBedInit();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [ConsumerNullishKeyFill] });
+    const fixture = TestBed.createComponent(ConsumerNullishKeyFill);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('[DYN-FALLBACK]');
+    expect(text).not.toContain('NULLISH-FILL');
+
+    fixture.destroy();
+  });
+
+  it.each(['__proto__', 'constructor', 'prototype'])(
+    'a %s-keyed fill never reaches the map and never mutates Object.prototype (T-80-01 — DESIRED post-fix, blocked by NG0203 today)',
+    (dangerKey) => {
+      ensureTestBedInit();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ imports: [PrototypeGuardHost] });
+      const fixture = TestBed.createComponent(PrototypeGuardHost);
+      fixture.componentRef.setInput('dangerKey', dangerKey);
+      fixture.detectChanges();
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('[DYN-FALLBACK]');
+      expect(text).not.toContain('DANGER-FILL');
+
+      // The guard's whole point: reading the same property off a FRESH empty
+      // object must still yield the built-in value — nothing leaked onto
+      // Object.prototype.
+      expect(({} as Record<string, unknown>)[dangerKey]).toBe(
+        (Object.prototype as unknown as Record<string, unknown>)[dangerKey],
+      );
+
+      fixture.destroy();
+    },
+  );
+
+  it('two fills whose keys evaluate equal at runtime warn exactly once with dev mode on, and the LAST fill (content-query order) renders (R6 — DESIRED post-fix, blocked by NG0203 today)', () => {
+    withDevMode(true, () => {
+      ensureTestBedInit();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ imports: [ConsumerDuplicateRuntimeKeys] });
+      const fixture = TestBed.createComponent(ConsumerDuplicateRuntimeKeys);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      fixture.detectChanges();
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('DUP-SECOND');
+      expect(text).not.toContain('DUP-FIRST');
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0]?.[0]).toContain('ROZ750');
+
+      warnSpy.mockRestore();
+      fixture.destroy();
+    });
+  });
+
+  it('the SAME duplicate-runtime-key case produces zero console output with dev mode off (R6 prod-silence — DESIRED post-fix, blocked by NG0203 today)', () => {
+    withDevMode(false, () => {
+      ensureTestBedInit();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ imports: [ConsumerDuplicateRuntimeKeys] });
+      const fixture = TestBed.createComponent(ConsumerDuplicateRuntimeKeys);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      fixture.detectChanges();
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(logSpy).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+      logSpy.mockRestore();
+      fixture.destroy();
+    });
+  });
+
+  it('a producer receiving projected template content with zero collected keyed fills warns once with dev mode on (NOT blocked by NG0203 — no RozieSlot instance)', () => {
+    withDevMode(true, () => {
+      ensureTestBedInit();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ imports: [EmptyFillMapHost] });
+      const fixture = TestBed.createComponent(EmptyFillMapHost);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      fixture.detectChanges();
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0]?.[0]).toContain('ROZ750');
+
+      warnSpy.mockRestore();
+      fixture.destroy();
+    });
+  });
+
+  it('the SAME empty-fill-map case is silent with dev mode off (NOT blocked by NG0203 — no RozieSlot instance)', () => {
+    withDevMode(false, () => {
+      ensureTestBedInit();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ imports: [EmptyFillMapHost] });
+      const fixture = TestBed.createComponent(EmptyFillMapHost);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      fixture.detectChanges();
+
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+      fixture.destroy();
+    });
+  });
+
+  it('a bare `rozieSlot` attribute with no bound value throws NG0950 (the required-input error) at first read — R2 (DESIRED post-fix, blocked by NG0203 today)', () => {
+    ensureTestBedInit();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [BareAttributeHost] });
+
+    // Both createComponent and detectChanges are wrapped: today the crash is
+    // NG0203, thrown eagerly while the RozieSlot instance is constructed
+    // during createComponent (before detectChanges ever runs). Post-fix, the
+    // required-input read that produces NG0950 happens at first CD pass
+    // instead — wrapping both keeps this assertion correct in both states.
+    let caught: unknown;
+    try {
+      const fixture = TestBed.createComponent(BareAttributeHost);
+      fixture.detectChanges();
+      fixture.destroy();
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(caught).toBeDefined();
+    expect(String((caught as Error)?.message ?? caught)).toContain('NG0950');
   });
 });

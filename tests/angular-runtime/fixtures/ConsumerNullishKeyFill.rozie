@@ -1,0 +1,31 @@
+<rozie name="ConsumerNullishKeyFill">
+
+<!-- Phase 80 Plan 07 (Task 2) — a fill keyed on a data value that evaluates
+     to `undefined` at runtime (NOT the empty-string case, which is
+     ConsumerEmptyKeyFill / D-06's real-key contract; this fixture proves
+     the OTHER half of R5: a nullish key contributes NO map entry at all).
+     Correct output falls through every tier past the fill map straight to
+     the producer's own declared `[DYN-FALLBACK]` default and never renders
+     `NULLISH-FILL`. -->
+
+<components>
+{
+  ProducerRecordPath: './ProducerRecordPath.rozie',
+}
+</components>
+
+<data>
+{
+  nullishKey: undefined,
+}
+</data>
+
+<template>
+<div class="consumer-nullish-key-fill">
+  <ProducerRecordPath>
+    <template #[$data.nullishKey]="{ label }">NULLISH-FILL</template>
+  </ProducerRecordPath>
+</div>
+</template>
+
+</rozie>

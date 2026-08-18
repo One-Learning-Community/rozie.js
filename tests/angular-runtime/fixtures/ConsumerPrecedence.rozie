@@ -1,0 +1,41 @@
+<rozie name="ConsumerPrecedence">
+
+<!-- Phase 80 Plan 07 (Task 2) — the DIRECTIVE-fill tier of the four-tier
+     precedence chain. Targets ProducerRecordPath's DEFAULT slot via an
+     empty-string key (D-06 normalizes '' -> 'defaultSlot'), which is the
+     only slot on ProducerRecordPath that carries all four tiers at once:
+     static `@ContentChild('defaultSlot', ...)`, the content-collected
+     `__rozieFillMap()['defaultSlot']`, the `templates` input, and the
+     producer's own declared `[DEFAULT-FALLBACK]` default content. The
+     runtime-NAMED dynamic slot (`:name="$props.slotKey"`) never mints a
+     static @ContentChild — there is no valid identifier to key it on — so
+     it cannot exercise all four tiers on its own.
+
+     angular-runtime.test.ts's precedence walk mounts THIS consumer alone
+     for the directive-only (tier-2) assertion, then drives the other three
+     tier combinations from hand-written Angular hosts that additionally
+     bind `templates` programmatically and/or supply a static
+     `<ng-template #defaultSlot>` content-child fill — neither of which can
+     be authored from `.rozie` source. -->
+
+<components>
+{
+  ProducerRecordPath: './ProducerRecordPath.rozie',
+}
+</components>
+
+<data>
+{
+  emptyKey: '',
+}
+</data>
+
+<template>
+<div class="consumer-precedence">
+  <ProducerRecordPath>
+    <template #[$data.emptyKey]="{ label }">PREC-DIRECTIVE</template>
+  </ProducerRecordPath>
+</div>
+</template>
+
+</rozie>

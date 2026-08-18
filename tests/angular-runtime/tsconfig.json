@@ -12,7 +12,7 @@
     "lib": ["ES2022", "DOM"],
     "types": ["vitest/globals", "node"]
   },
-  "include": ["*.ts", "probe/**/*.ts"],
+  "include": ["*.ts", "probe/**/*.ts", "hosts/**/*.ts"],
   "angularCompilerOptions": {
     "strictTemplates": false
   }
