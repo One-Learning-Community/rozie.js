@@ -1,0 +1,42 @@
+<rozie name="ConsumerStaticProducerInsideIf">
+
+<!-- Phase 80 Plan 09 (Task 1) — mirrors ConsumerInsideIf.rozie's structure
+     exactly (producer element wrapped in `r-if`, `show` prop defaulting to
+     false), swapped to target ProducerIdentifierOnly instead of
+     ProducerRecordPath, with the `:slotKey` prop and scoped-slot binding
+     dropped (this producer takes no slot-name prop and its slots take no
+     params). Covers the embedded-view shape the marquee table demo
+     actually ships: a dynamic fill landing inside an Angular embedded view
+     AND targeting a static-identifier-only producer at the same time — two
+     independently-confirmed-broken shapes (deferred-items.md #3) stacked
+     in one fixture. -->
+
+<components>
+{
+  ProducerIdentifierOnly: './ProducerIdentifierOnly.rozie',
+}
+</components>
+
+<props>
+{
+  show: { type: Boolean, default: false },
+}
+</props>
+
+<data>
+{
+  fillKey: 'header',
+}
+</data>
+
+<template>
+<div class="consumer-static-producer-inside-if">
+  <div r-if="$props.show">
+    <ProducerIdentifierOnly>
+      <template #[$data.fillKey]>IF-STATIC-FILL</template>
+    </ProducerIdentifierOnly>
+  </div>
+</div>
+</template>
+
+</rozie>

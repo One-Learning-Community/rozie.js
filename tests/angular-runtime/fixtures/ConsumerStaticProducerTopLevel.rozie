@@ -1,0 +1,36 @@
+<rozie name="ConsumerStaticProducerTopLevel">
+
+<!-- Phase 80 Plan 09 (Task 1) — reproduces the ModalConsumer real-world
+     shape (examples/ModalConsumer.rozie's second Modal element, the
+     "Dynamic header via slotName" fill): one dynamic `#[expr]` fill,
+     top-level, no conditional, targeting a producer whose OWN slots are
+     ALL static identifier names (ProducerIdentifierOnly declares only
+     `header`/`footer`, no `:name`-bound or non-identifier slot anywhere).
+     `hasRecordOnlySlot` is FALSE for this producer, so per Bug C
+     (deferred-items.md #3 / D-09) the producer never collects
+     `[rozieSlot]` fills at all — this fill has no path to the producer.
+     Correct (post-fix) rendering: the marker text appears where the
+     `header` slot's fallback would otherwise be, and the UNFILLED `footer`
+     slot still shows its own fallback text. -->
+
+<components>
+{
+  ProducerIdentifierOnly: './ProducerIdentifierOnly.rozie',
+}
+</components>
+
+<data>
+{
+  fillKey: 'header',
+}
+</data>
+
+<template>
+<div class="consumer-static-producer-top-level">
+  <ProducerIdentifierOnly>
+    <template #[$data.fillKey]>TOPLEVEL-STATIC-FILL</template>
+  </ProducerIdentifierOnly>
+</div>
+</template>
+
+</rozie>

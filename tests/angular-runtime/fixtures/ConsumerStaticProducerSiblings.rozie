@@ -1,0 +1,37 @@
+<rozie name="ConsumerStaticProducerSiblings">
+
+<!-- Phase 80 Plan 09 (Task 1) — mirrors ConsumerSiblingProducers.rozie: two
+     producer elements as literal siblings, each carrying its own dynamic
+     fill keyed off its own data field, targeting DIFFERENT static slot
+     names (`header` on the first producer, `footer` on the second) so a
+     cross-producer content leak is observable as the wrong marker
+     appearing under the wrong producer (see T-80-09-01 in 80-09-PLAN.md's
+     threat model). Both producer instances are the SAME
+     static-identifier-only producer, so per Bug C (deferred-items.md #3 /
+     D-09) NEITHER should ever collect its fill, pre-fix. -->
+
+<components>
+{
+  ProducerIdentifierOnly: './ProducerIdentifierOnly.rozie',
+}
+</components>
+
+<data>
+{
+  keyA: 'header',
+  keyB: 'footer',
+}
+</data>
+
+<template>
+<div class="consumer-static-producer-siblings">
+  <ProducerIdentifierOnly>
+    <template #[$data.keyA]>SIB-STATIC-A</template>
+  </ProducerIdentifierOnly>
+  <ProducerIdentifierOnly>
+    <template #[$data.keyB]>SIB-STATIC-B</template>
+  </ProducerIdentifierOnly>
+</div>
+</template>
+
+</rozie>

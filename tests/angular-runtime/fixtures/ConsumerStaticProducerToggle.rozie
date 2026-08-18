@@ -1,0 +1,46 @@
+<rozie name="ConsumerStaticProducerToggle">
+
+<!-- Phase 80 Plan 09 (Task 1) — reduces the dynamic-slot-name demo
+     (examples/demos/DynamicSlotNameDemo.rozie) and the TableDemo footer
+     toggle (examples/demos/TableDemo.rozie's `#[\`footer${$data.footerMode}\`]`)
+     to their common core: the SAME dynamic fill moves between the SAME
+     producer's two static-named slots (`header` and `footer`, both
+     identifier-named on ProducerIdentifierOnly) at runtime. Per Bug C
+     (deferred-items.md #3 / D-09) the producer's `hasRecordOnlySlot` gate
+     is FALSE (all-static-identifier slots), so this fill never collects
+     regardless of which slot name it currently targets — neither slot
+     should ever show the marker text, pre-fix. -->
+
+<components>
+{
+  ProducerIdentifierOnly: './ProducerIdentifierOnly.rozie',
+}
+</components>
+
+<data>
+{
+  slotName: 'header',
+}
+</data>
+
+<script>
+function toggleSlotName() {
+  $data.slotName = $data.slotName === 'header' ? 'footer' : 'header'
+}
+</script>
+
+<template>
+<div class="consumer-static-producer-toggle">
+  <button
+    type="button"
+    data-testid="toggle-static-slot-name"
+    @click="toggleSlotName()"
+  >Toggle slotName (now: {{ $data.slotName }})</button>
+
+  <ProducerIdentifierOnly>
+    <template #[$data.slotName]>TOGGLE-STATIC-FILL</template>
+  </ProducerIdentifierOnly>
+</div>
+</template>
+
+</rozie>
