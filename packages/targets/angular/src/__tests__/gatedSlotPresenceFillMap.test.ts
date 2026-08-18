@@ -132,7 +132,7 @@ describe('Angular producer — structural slot-presence gate must resolve throug
   it("cross-chain agreement: the structural gate's fill-map term for 'header' is IDENTICAL text to the outlet chain's fill-map term for 'header' — pinned by comparison, not by a duplicated literal", () => {
     const code = compileGatedProducer();
     const gateMatch = code.match(
-      /@if \(title\(\) \|\| \((headerTpl \?\? __rozieFillMap\(\)\['header'\] \?\? templates\(\)\?\.\['header'\])\)\) \{/,
+      /@if \(title\(\) \|\| (\(headerTpl \?\? __rozieFillMap\(\)\['header'\] \?\? templates\(\)\?\.\['header'\]\))\) \{/,
     );
     const outletMatch = code.match(
       /\*ngTemplateOutlet="(\(headerTpl \?\? __rozieFillMap\(\)\['header'\] \?\? templates\(\)\?\.\['header'\]\))/,

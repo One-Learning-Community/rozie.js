@@ -35,6 +35,8 @@ import { sanitizeEventName } from './sanitizeEventName.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { collectUserMethodNames } from './rewriteScript.js';
 import { collectComponentRefTypes } from './componentRefs.js';
+import { buildSlotsMerge } from './buildSlotsMerge.js';
+import { hasKeyedFillIntake } from '../emit/refineSlotTypes.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type GenerateFn = typeof import('@babel/generator').default;
@@ -55,44 +57,11 @@ function flattenInlineCode(code: string): string {
   return code.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim();
 }
 
-/**
- * Phase 07.3.2 Plan 10 — build the dynamic-name fallback merge for `$slots.X`.
- *
- * Returns `(tplName ?? templates()?.['dynKey'])` (or, with `prefixThis: true`,
- * `(this.tplName ?? this.templates()?.['dynKey'])`). Both operands flow through
- * `mkRef()` so the prefixThis discipline (d46f597) is honored end-to-end —
- * static path AND templates() callee.
- *
- * Uses `t.parenthesizedExpression` for the outer parens. Single quotes on the
- * computed-key StringLiteral are applied via `extra.raw` / `extra.rawValue`
- * so @babel/generator emits `'header'` not `"header"` — matching the existing
- * emitSlotInvocation.ts:326 string-concat shape so dist-parity diffs stay
- * limited to the planned outer-guard merge.
- */
-function buildSlotsMerge(
-  mkRef: (name: string) => t.Expression,
-  tplName: string,
-  dynKey: string,
-): t.Expression {
-  const dynKeyLit = t.stringLiteral(dynKey);
-  // Force single-quote output for the computed key — matches emitSlotInvocation
-  // template-string convention and existing dist-parity baseline.
-  (dynKeyLit as t.StringLiteral & { extra?: { raw?: string; rawValue?: string } }).extra = {
-    raw: `'${dynKey}'`,
-    rawValue: dynKey,
-  };
-  const merge = t.logicalExpression(
-    '??',
-    mkRef(tplName),
-    t.optionalMemberExpression(
-      t.callExpression(mkRef('templates'), []),
-      dynKeyLit,
-      true,
-      true,
-    ),
-  );
-  return t.parenthesizedExpression(merge);
-}
+// Phase 80 Plan 14 (D-10) — the local two-tier `buildSlotsMerge` that used
+// to live here is DELETED. The shared, three-tier-capable builder now lives
+// in `./buildSlotsMerge.js` and is imported above; see its doc comment for
+// the full tier-order contract and why extraction (not a fourth in-place
+// widening) was required.
 
 /**
  * Build `name.set(rhs)` for a plain `=`, or `name.set(name() OP rhs)` for
@@ -470,9 +439,24 @@ export function rewriteTemplateExpression(
         // Phase 07.3.2 Plan 10 — guard must merge with dynamic-name fallback
         // so r-if="$slots.foo" evaluates truthy when ONLY dynamic-name fills
         // exist. mkRef() respects prefixThis (d46f597) for class-body callsites.
+        // Phase 80 Plan 14 (D-10) — the merge now carries a THIRD tier, the
+        // content-collected fill map, gated on the SAME `hasKeyedFillIntake`
+        // predicate the outlet chain (emitSlotInvocation.ts) and the intake
+        // emission (emitScript.ts) both gate on. `prop.name` is only reached
+        // here because it is a member of `slotNames`, itself derived from
+        // `ir.slots` — this producer therefore always declares the slot
+        // being read, so the predicate is provably true; see the throw below.
         const tplName = prop.name === '' ? 'defaultTpl' : `${prop.name}Tpl`;
         const dynKey = prop.name === '' ? 'defaultSlot' : prop.name;
-        path.replaceWith(buildSlotsMerge(mkRef, tplName, dynKey));
+        if (!hasKeyedFillIntake(ir.slots)) {
+          throw new Error(
+            'unreachable: rewriteTemplateExpression lowered $slots.' +
+              prop.name +
+              " against a producer with no slot declarations — every '$slots.X' " +
+              'presence read implies its own producer declares slot X (Phase 80 Plan 14, D-10)',
+          );
+        }
+        path.replaceWith(buildSlotsMerge(mkRef, tplName, dynKey, true));
         path.skip();
         return;
       }
@@ -515,9 +499,19 @@ export function rewriteTemplateExpression(
       }
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
         // Phase 07.3.2 Plan 10 — same merge as MemberExpression branch.
+        // Phase 80 Plan 14 (D-10) — same three-tier widening and gate as the
+        // MemberExpression branch above; see that branch's comment.
         const tplName = prop.name === '' ? 'defaultTpl' : `${prop.name}Tpl`;
         const dynKey = prop.name === '' ? 'defaultSlot' : prop.name;
-        path.replaceWith(buildSlotsMerge(mkRef, tplName, dynKey));
+        if (!hasKeyedFillIntake(ir.slots)) {
+          throw new Error(
+            'unreachable: rewriteTemplateExpression lowered $slots?.' +
+              prop.name +
+              " against a producer with no slot declarations — every '$slots?.X' " +
+              'presence read implies its own producer declares slot X (Phase 80 Plan 14, D-10)',
+          );
+        }
+        path.replaceWith(buildSlotsMerge(mkRef, tplName, dynKey, true));
         path.skip();
         return;
       }

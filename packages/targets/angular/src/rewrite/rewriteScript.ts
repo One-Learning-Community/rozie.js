@@ -56,6 +56,8 @@ import { sanitizeEventName } from './sanitizeEventName.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 import { hasBooleanDisabledProp } from '../cvaDiagnostics.js';
 import { collectComponentRefTypes } from './componentRefs.js';
+import { buildSlotsMerge } from './buildSlotsMerge.js';
+import { hasKeyedFillIntake } from '../emit/refineSlotTypes.js';
 
 // CJS interop normalization (Phase 2 D-T-2-01-04 pattern).
 type TraverseFn = typeof import('@babel/traverse').default;
@@ -169,37 +171,10 @@ const COMPOUND_OP_MAP: Record<string, t.BinaryExpression['operator']> = {
   '^=': '^',
 };
 
-/**
- * Phase 07.3.2 Plan 10 — script-context `$slots.X` merge with dynamic-name
- * fallback. Produces `(this.<X>Tpl ?? this.templates()?.['<x>'])` so the
- * outer-r-if-guard semantics survive lowering through the class-body context.
- *
- * Single quotes on the computed-key string applied via `extra.raw` to match
- * emitSlotInvocation.ts:326 convention and minimize dist-parity diff.
- */
-function buildScriptSlotsMerge(
-  tplName: string,
-  dynKey: string,
-): t.Expression {
-  const staticRef = t.memberExpression(t.thisExpression(), t.identifier(tplName));
-  const templatesCall = t.callExpression(
-    t.memberExpression(t.thisExpression(), t.identifier('templates')),
-    [],
-  );
-  const dynKeyLit = t.stringLiteral(dynKey);
-  (dynKeyLit as t.StringLiteral & { extra?: { raw?: string; rawValue?: string } }).extra = {
-    raw: `'${dynKey}'`,
-    rawValue: dynKey,
-  };
-  const dynamicRef = t.optionalMemberExpression(
-    templatesCall,
-    dynKeyLit,
-    true,
-    true,
-  );
-  const merge = t.logicalExpression('??', staticRef, dynamicRef);
-  return t.parenthesizedExpression(merge);
-}
+// Phase 80 Plan 14 (D-10) — the local `buildScriptSlotsMerge` that used to
+// live here is DELETED. The shared, three-tier-capable builder now lives in
+// `./buildSlotsMerge.js` (imported above), called with a class-scope
+// reference factory at this file's own call site below.
 
 /**
  * Phase 23 (angular-cva-forms-integration) — build the resolved NEW-VALUE
@@ -1348,9 +1323,29 @@ export function rewriteRozieIdentifiers(
         // Phase 07.3.2 Plan 10 — merge with dynamic-name fallback so script
         // expressions referencing $slots.X also benefit from the consumer-side
         // templates() input map. Script context always uses `this.` prefix.
+        // Phase 80 Plan 14 (D-10) — three-tier chain via the shared builder,
+        // gated on the same `hasKeyedFillIntake` predicate the outlet chain
+        // and the intake emission both gate on. `prop.name` is only reached
+        // here because it is a member of `slotNames` (derived from
+        // `ir.slots`), so this producer always declares slot X.
         const tplName = prop.name === '' ? 'defaultTpl' : `${prop.name}Tpl`;
         const dynKey = prop.name === '' ? 'defaultSlot' : prop.name;
-        path.replaceWith(buildScriptSlotsMerge(tplName, dynKey));
+        if (!hasKeyedFillIntake(ir.slots)) {
+          throw new Error(
+            'unreachable: rewriteRozieIdentifiers lowered $slots.' +
+              prop.name +
+              " against a producer with no slot declarations — every '$slots.X' " +
+              'presence read implies its own producer declares slot X (Phase 80 Plan 14, D-10)',
+          );
+        }
+        path.replaceWith(
+          buildSlotsMerge(
+            (name) => t.memberExpression(t.thisExpression(), t.identifier(name)),
+            tplName,
+            dynKey,
+            true,
+          ),
+        );
         return;
       }
       if (obj.name === '$portals' && portalSlotNames.has(prop.name)) {

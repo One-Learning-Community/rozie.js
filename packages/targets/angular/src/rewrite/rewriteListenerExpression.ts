@@ -20,6 +20,8 @@ import type { GeneratorOptions } from '@babel/generator';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 import { sanitizeEventName } from './sanitizeEventName.js';
 import { collectComponentRefTypes } from './componentRefs.js';
+import { buildSlotsMerge } from './buildSlotsMerge.js';
+import { hasKeyedFillIntake } from '../emit/refineSlotTypes.js';
 
 // CJS interop normalization.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -125,37 +127,10 @@ function buildListenerCvaOnChange(newValue: t.Expression): t.CallExpression {
   );
 }
 
-/**
- * Phase 07.3.2 Plan 10 — listener-context `$slots.X` merge with dynamic-name
- * fallback. Produces `(this.<X>Tpl ?? this.templates()?.['<x>'])`. Listener
- * bodies run in class context so both operands carry the `this.` prefix.
- *
- * Single quotes on the computed-key string applied via `extra.raw` to match
- * emitSlotInvocation.ts:326 convention and minimize dist-parity diff.
- */
-function buildListenerSlotsMerge(
-  tplName: string,
-  dynKey: string,
-): t.Expression {
-  const staticRef = t.memberExpression(t.thisExpression(), t.identifier(tplName));
-  const templatesCall = t.callExpression(
-    t.memberExpression(t.thisExpression(), t.identifier('templates')),
-    [],
-  );
-  const dynKeyLit = t.stringLiteral(dynKey);
-  (dynKeyLit as t.StringLiteral & { extra?: { raw?: string; rawValue?: string } }).extra = {
-    raw: `'${dynKey}'`,
-    rawValue: dynKey,
-  };
-  const dynamicRef = t.optionalMemberExpression(
-    templatesCall,
-    dynKeyLit,
-    true,
-    true,
-  );
-  const merge = t.logicalExpression('??', staticRef, dynamicRef);
-  return t.parenthesizedExpression(merge);
-}
+// Phase 80 Plan 14 (D-10) — the local `buildListenerSlotsMerge` that used to
+// live here is DELETED. The shared, three-tier-capable builder now lives in
+// `./buildSlotsMerge.js` (imported above), called with a class-scope
+// reference factory at this file's own call site below.
 
 export interface RewriteListenerOpts {
   collisionRenames?: ReadonlyMap<string, string> | undefined;
@@ -427,9 +402,29 @@ export function rewriteListenerExpression(
       if (obj.name === '$slots' && slotNames.has(prop.name)) {
         // Phase 07.3.2 Plan 10 — listener-context $slots.X also merges with
         // the dynamic-name fallback (class-body context, `this.` prefix).
+        // Phase 80 Plan 14 (D-10) — three-tier chain via the shared builder,
+        // gated on the same `hasKeyedFillIntake` predicate the outlet chain
+        // and the intake emission both gate on. `prop.name` is only reached
+        // here because it is a member of `slotNames` (derived from
+        // `ir.slots`), so this producer always declares slot X.
         const tplName = prop.name === '' ? 'defaultTpl' : `${prop.name}Tpl`;
         const dynKey = prop.name === '' ? 'defaultSlot' : prop.name;
-        path.replaceWith(buildListenerSlotsMerge(tplName, dynKey));
+        if (!hasKeyedFillIntake(ir.slots)) {
+          throw new Error(
+            'unreachable: rewriteListenerExpression lowered $slots.' +
+              prop.name +
+              " against a producer with no slot declarations — every '$slots.X' " +
+              'presence read implies its own producer declares slot X (Phase 80 Plan 14, D-10)',
+          );
+        }
+        path.replaceWith(
+          buildSlotsMerge(
+            (name) => t.memberExpression(t.thisExpression(), t.identifier(name)),
+            tplName,
+            dynKey,
+            true,
+          ),
+        );
         path.skip();
         return;
       }

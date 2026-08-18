@@ -122,10 +122,10 @@ describe('rewriteListenerExpression — MemberExpression sigil rewrites', () => 
     expect(rw('$refs.unknown', ir)).toBe('$refs.unknown');
   });
 
-  it('$slots.X (static name) → merged form with this. prefix', () => {
+  it('$slots.X (static name) → class-scoped three-tier merged form (Phase 80 Plan 14, D-10 — the two-tier form pinned here pre-fix is now the fill-map-tier-omitted PRE-fix shape)', () => {
     const ir = buildIR({ slots: [mkSlot('footer')] });
     expect(rw('$slots.footer', ir)).toBe(
-      "(this.footerTpl ?? this.templates()?.['footer'])",
+      "(this.footerTpl ?? this.__rozieFillMap()['footer'] ?? this.templates()?.['footer'])",
     );
   });
 
@@ -138,8 +138,10 @@ describe('rewriteListenerExpression — MemberExpression sigil rewrites', () => 
       property: { type: 'Identifier', name: '' },
       computed: false,
     } as unknown as t.Expression;
+    // Phase 80 Plan 14, D-10 — the two-tier form pinned here pre-fix is now
+    // the fill-map-tier-omitted PRE-fix shape; class-scoped three-tier chain.
     expect(rewriteListenerExpression(expr, ir)).toBe(
-      "(this.defaultTpl ?? this.templates()?.['defaultSlot'])",
+      "(this.defaultTpl ?? this.__rozieFillMap()['defaultSlot'] ?? this.templates()?.['defaultSlot'])",
     );
   });
 

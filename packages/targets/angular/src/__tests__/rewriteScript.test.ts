@@ -269,10 +269,10 @@ describe('rewriteRozieIdentifiers — $refs on a CHILD COMPONENT (refs-lowering-
 });
 
 describe('rewriteRozieIdentifiers — $slots / $portals handlers', () => {
-  it('$slots.X (static name) → merged form with this. prefix', () => {
+  it('$slots.X (static name) → class-scoped three-tier merged form (Phase 80 Plan 14, D-10 — the two-tier form pinned here pre-fix is now the fill-map-tier-omitted PRE-fix shape)', () => {
     const ir = buildIR({ slots: [mkSlot('footer')] });
     expect(rewrite('if ($slots.footer) {}', ir).code).toContain(
-      "(this.footerTpl ?? this.templates()?.['footer'])",
+      "(this.footerTpl ?? this.__rozieFillMap()['footer'] ?? this.templates()?.['footer'])",
     );
   });
 
@@ -297,8 +297,10 @@ describe('rewriteRozieIdentifiers — $slots / $portals handlers', () => {
       retainLines: false,
       compact: false,
     }).code;
+    // Phase 80 Plan 14, D-10 — the two-tier form pinned here pre-fix is now
+    // the fill-map-tier-omitted PRE-fix shape; class-scoped three-tier chain.
     expect(code).toContain(
-      "(this.defaultTpl ?? this.templates()?.['defaultSlot'])",
+      "(this.defaultTpl ?? this.__rozieFillMap()['defaultSlot'] ?? this.templates()?.['defaultSlot'])",
     );
   });
 

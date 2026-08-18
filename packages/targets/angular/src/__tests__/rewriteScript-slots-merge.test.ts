@@ -51,7 +51,7 @@ function makeIR(slots: SlotDecl[]): IRComponent {
 }
 
 describe('§slots-X-merge-script — $slots.X in <script> context', () => {
-  it('it #6: script statement `if ($slots.header) { ... }` rewrites to merged form with this. prefix', () => {
+  it('it #6: script statement `if ($slots.header) { ... }` rewrites to the class-scoped three-tier merged form (Phase 80 Plan 14, D-10 — the two-tier form pinned here pre-fix is now the fill-map-tier-omitted PRE-fix shape)', () => {
     const ir = makeIR([makeSlot('header')]);
     const program = parse('if ($slots.header) { foo(); }', {
       sourceType: 'module',
@@ -59,6 +59,8 @@ describe('§slots-X-merge-script — $slots.X in <script> context', () => {
     });
     const { rewrittenProgram } = rewriteRozieIdentifiers(program, ir);
     const out = generate(rewrittenProgram, { retainLines: false, compact: false }).code;
-    expect(out).toContain("(this.headerTpl ?? this.templates()?.['header'])");
+    expect(out).toContain(
+      "(this.headerTpl ?? this.__rozieFillMap()['header'] ?? this.templates()?.['header'])",
+    );
   });
 });

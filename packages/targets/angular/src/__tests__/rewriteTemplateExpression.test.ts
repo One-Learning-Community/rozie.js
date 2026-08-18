@@ -47,31 +47,33 @@ function makeIR(opts: { slots?: SlotDecl[]; props?: IRComponent['props']; state?
 }
 
 describe('§slots-X-merge — $slots.X rewrites to merged dynamic-fallback form', () => {
-  it('it #1: template context — $slots.header rewrites to (headerTpl ?? templates()?.[\'header\'])', () => {
+  it('it #1: template context — $slots.header rewrites to the three-tier chain (Phase 80 Plan 14, D-10 — the two-tier form pinned here pre-fix is now the fill-map-tier-omitted PRE-fix shape)', () => {
     const ir = makeIR({ slots: [makeSlot('header')] });
     const expr = parseExpression('$slots.header');
     const out = rewriteTemplateExpression(expr, ir);
-    expect(out).toBe("(headerTpl ?? templates()?.['header'])");
+    expect(out).toBe("(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])");
   });
 
-  it('it #2: r-if guard context — $props.title || $slots.header contains merged form (not bare headerTpl)', () => {
+  it('it #2: r-if guard context — $props.title || $slots.header contains the three-tier merged form (not bare headerTpl) (Phase 80 Plan 14, D-10)', () => {
     const ir = makeIR({
       slots: [makeSlot('header'), makeSlot('footer')],
       props: [{ name: 'title', isModel: false } as any],
     });
     const expr = parseExpression('$props.title || $slots.header');
     const out = rewriteTemplateExpression(expr, ir);
-    expect(out).toContain("(headerTpl ?? templates()?.['header'])");
+    expect(out).toContain("(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])");
     // Make sure the rewriter did NOT keep a bare `headerTpl` alone (as a non-call,
     // non-member-of-merge identifier).
     expect(out).not.toMatch(/\|\| headerTpl(?!\s*\?\?)/);
   });
 
-  it('it #3: prefixThis: true class-body context — produces (this.headerTpl ?? this.templates()?.[\'header\'])', () => {
+  it('it #3: prefixThis: true class-body context — produces the class-scoped three-tier chain (Phase 80 Plan 14, D-10)', () => {
     const ir = makeIR({ slots: [makeSlot('header')] });
     const expr = parseExpression('$slots.header');
     const out = rewriteTemplateExpression(expr, ir, { prefixThis: true });
-    expect(out).toBe("(this.headerTpl ?? this.templates()?.['header'])");
+    expect(out).toBe(
+      "(this.headerTpl ?? this.__rozieFillMap()['header'] ?? this.templates()?.['header'])",
+    );
   });
 
   it('it #4: non-regression — $slots.nonexistent is left unchanged when not in ir.slots', () => {
@@ -109,11 +111,11 @@ describe('§slots-X-merge — $slots.X rewrites to merged dynamic-fallback form'
 });
 
 describe('§slots-X-merge — optional-member-expression branch', () => {
-  it('$slots?.header (optional) rewrites to (headerTpl ?? templates()?.[\'header\'])', () => {
+  it('$slots?.header (optional) rewrites to the SAME three-tier chain as the plain member branch (Phase 80 Plan 14, D-10)', () => {
     const ir = makeIR({ slots: [makeSlot('header')] });
     const expr = parseExpression('$slots?.header');
     const out = rewriteTemplateExpression(expr, ir);
-    expect(out).toBe("(headerTpl ?? templates()?.['header'])");
+    expect(out).toBe("(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])");
   });
 });
 

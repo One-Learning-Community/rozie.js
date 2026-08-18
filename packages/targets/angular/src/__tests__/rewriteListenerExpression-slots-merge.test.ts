@@ -45,10 +45,12 @@ function makeIR(slots: SlotDecl[]): IRComponent {
 }
 
 describe('§slots-X-merge-listener — $slots.X in <listeners> context', () => {
-  it('it #7: listener expression `$slots.header && open` rewrites to merged form with this. prefix', () => {
+  it('it #7: listener expression `$slots.header && open` rewrites to the class-scoped three-tier merged form (Phase 80 Plan 14, D-10 — the two-tier form pinned here pre-fix is now the fill-map-tier-omitted PRE-fix shape)', () => {
     const ir = makeIR([makeSlot('header')]);
     const expr = parseExpression('$slots.header');
     const out = rewriteListenerExpression(expr, ir);
-    expect(out).toBe("(this.headerTpl ?? this.templates()?.['header'])");
+    expect(out).toBe(
+      "(this.headerTpl ?? this.__rozieFillMap()['header'] ?? this.templates()?.['header'])",
+    );
   });
 });
