@@ -62,7 +62,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
-import { slotFieldName, renderRecordKey, isRecordOnlySlotDecl } from './refineSlotTypes.js';
+import { slotFieldName, renderRecordKey, hasKeyedFillIntake } from './refineSlotTypes.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import type { AngularScriptInjection } from './emitTemplateEvent.js';
 
@@ -390,29 +390,52 @@ export function emitSlotInvocation(
         loopBindings: ctx.loopBindings,
       })
     : renderRecordKey(node.slotName);
-  // Phase 80 Plan 04 Task 3 (R3/R5/R6) — splice the content-collected fill
-  // map into the resolution chain as its own precedence tier, but ONLY on a
-  // producer that actually declared a record-only slot and therefore
-  // emitted `__rozieFillMap` (emitScript.ts, SAME `isRecordOnlySlotDecl`
-  // gate). Referencing `__rozieFillMap` on a producer that never declared it
-  // would be a hard compile error, and would also break byte-identity for
-  // the out-of-scope identifier-only `@ContentChild` path (SPEC prohibition
-  // #4) — so when the gate is false, both branches below stay EXACTLY their
-  // pre-Phase-80 text.
+  // Phase 80 Plan 04 Task 3 (R3/R5/R6), gate WIDENED by Plan 10 (D-09) —
+  // splice the content-collected fill map into the resolution chain as its
+  // own precedence tier. Before Plan 10 this gate was `ctx.ir.slots.some
+  // (isRecordOnlySlotDecl)` — a producer with only identifier-named static
+  // slots (e.g. `header`) never emitted `__rozieFillMap` (emitScript.ts's
+  // matching pre-Plan-10 gate), so a consumer's dynamic `#[expr]` fill
+  // targeting such a producer had no path to it at all (deferred-items.md
+  // #3, D-09). The gate is now `hasKeyedFillIntake(ctx.ir.slots)`
+  // (refineSlotTypes.ts), the SAME predicate emitScript.ts's intake block
+  // gates on — one predicate, no drift.
+  //
+  // Every `TemplateSlotInvocationIR` this function runs against belongs to
+  // a producer that owns at least one slot declaration — its own — so
+  // `hasKeyedFillIntake` is provably `true` at every reachable call site.
+  // The "no fill map" arm each branch used to carry (for the pre-Plan-10
+  // narrow-gate case) is therefore unreachable and has been removed rather
+  // than kept as dead code; the check below is a documented runtime
+  // invariant, not a live branch, so a future change to slot-invocation
+  // dispatch that violates it fails loudly instead of silently
+  // reintroducing the D-09 regression class.
+  //
+  // The guarantee that replaced the old byte-identity prohibition (SPEC
+  // prohibition #4b, amended by this plan): the insertion is strictly
+  // additive over the pre-fix text, and applying the documented inverse
+  // transform — deleting the `__rozieFillMap()[...] ?? ` segment from each
+  // resolution expression — reproduces the pre-fix bytes exactly. Plan 12
+  // owns the machine check for this across the whole re-blessed fixture
+  // corpus. Prohibition #4a (static content-child keeps first precedence,
+  // the `@ContentChild` declaration path is untouched) is unaffected —
+  // `tplField`/`isRecordOnly`/`recordKeyText` above are unchanged.
   //
   // A MIXED producer (both an identifier-named slot and a key-fillable one)
   // gains the fill-map tier on its identifier slot too — the precedence
   // contract is stated per SLOT, not per slot kind (static content-child,
   // then content-collected fill map, then `templates` input, then declared
   // default content). This is intended, not a leak.
-  const hasFillMap = ctx.ir.slots.some(isRecordOnlySlotDecl);
+  if (!hasKeyedFillIntake(ctx.ir.slots)) {
+    throw new Error(
+      'unreachable: emitSlotInvocation ran against a producer with no slot ' +
+        'declarations — every TemplateSlotInvocationIR node implies its own ' +
+        'producer declares at least one slot (see comment above)',
+    );
+  }
   const mergedTplRef = isRecordOnly
-    ? hasFillMap
-      ? `(__rozieFillMap()[${recordKeyText}] ?? templates()?.[${recordKeyText}])`
-      : `templates()?.[${recordKeyText}]`
-    : hasFillMap
-      ? `(${tplField} ?? __rozieFillMap()['${dynKey}'] ?? templates()?.['${dynKey}'])`
-      : `(${tplField} ?? templates()?.['${dynKey}'])`;
+    ? `(__rozieFillMap()[${recordKeyText}] ?? templates()?.[${recordKeyText}])`
+    : `(${tplField} ?? __rozieFillMap()['${dynKey}'] ?? templates()?.['${dynKey}'])`;
   const outletTag = `<ng-container *ngTemplateOutlet="${mergedTplRef}${ctxSuffix}" />`;
 
   if (!hasFallback && presence === 'always') {
