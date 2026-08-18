@@ -1,0 +1,57 @@
+{
+  "name": "@rozie/runtime-angular",
+  "version": "0.5.3",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "The RozieSlot marker directive for keyed slot fills — collects hand-authored <ng-template [rozieSlot]=\"key\"> content via contentChildren into the record-path fill map an emitted Angular producer resolves against.",
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/runtime/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/fesm2022/rozie-runtime-angular.mjs"
+    }
+  },
+  "module": "./dist/fesm2022/rozie-runtime-angular.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "tslib": "^2"
+  },
+  "peerDependencies": {
+    "@angular/core": "^19 || ^20 || ^21"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@angular/compiler": "^19",
+    "@angular/compiler-cli": "^19",
+    "@angular/core": "^19",
+    "ng-packagr": "^19",
+    "typescript": "~5.6.0"
+  },
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "biome lint src"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

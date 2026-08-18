@@ -13,7 +13,8 @@
       "@rozie/runtime-vue",
       "@rozie/runtime-svelte",
       "@rozie/runtime-solid",
-      "@rozie/runtime-lit"
+      "@rozie/runtime-lit",
+      "@rozie/runtime-angular"
     ]
   ],
   "linked": [],
