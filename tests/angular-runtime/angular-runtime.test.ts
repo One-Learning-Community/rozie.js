@@ -184,16 +184,19 @@ describe('angular-runtime — R7 fail-first record-path slot-fill proof (pre-fix
 // Phase 80 Plan 07 (Task 2) — the precedence chain, key-domain edges,
 // prototype-pollution guard, and dev-vs-production warning behavior.
 //
-// OPEN RISK R-80-NG0203 (80-CONTEXT.md, explicitly Plan 08's job, NOT this
-// plan's) means every test below that projects a REAL `[rozieSlot]` marker
-// (constructing an actual `RozieSlot` instance imported from
-// `@rozie/runtime-angular`) currently throws NG0203 at `detectChanges()`,
-// the same way the six tests above do. Those assertions are left as the
-// DESIRED POST-FIX behavior — unreachable today, becoming the GREEN
-// observation once Plan 08 lands — per the same convention
-// RED-EVIDENCE.md records for test 3 above. Sub-cases that never construct
-// a `RozieSlot` instance (no `[rozieSlot]` marker anywhere in the projected
-// content) are NOT blocked by NG0203 and are asserted as passing NOW.
+// RESOLVED by Plan 08: every test below that projects a REAL `[rozieSlot]`
+// marker (constructing an actual `RozieSlot` instance imported from
+// `@rozie/runtime-angular`) previously threw NG0203 at `detectChanges()`
+// — OPEN RISK R-80-NG0203, closed in Plan 08 by
+// `angularPartialIvyLinkerPlugin()` (links the package's partial-Ivy
+// declarations) plus `resolve.dedupe` in vitest.config.ts (collapses the
+// dual-package-hazard duplicate `@angular/core` instance the linker fix
+// alone did not address — see that file for both root causes). Test
+// titles below still say "blocked by NG0203 today" / "DESIRED post-fix" —
+// left as-is deliberately: they are the literal RED-EVIDENCE.md-style
+// historical record of what Plan 07 could and could not prove, and now
+// serve as the GREEN observation for the SAME assertions, per the
+// convention RED-EVIDENCE.md already establishes for test 3 above.
 describe('angular-runtime — precedence, key-domain, prototype guard, dev/prod warnings (Phase 80 Plan 07)', () => {
   it('precedence tier 4->1: templates-only input wins over the producer default (NOT blocked by NG0203 — no RozieSlot instance)', () => {
     ensureTestBedInit();
@@ -281,8 +284,28 @@ describe('angular-runtime — precedence, key-domain, prototype guard, dev/prod 
   });
 
   it.each(['__proto__', 'constructor', 'prototype'])(
-    'a %s-keyed fill never reaches the map and never mutates Object.prototype (T-80-01 — DESIRED post-fix, blocked by NG0203 today)',
+    'a %s-keyed fill never reaches the map and never mutates Object.prototype (T-80-01)',
     (dangerKey) => {
+      // Snapshot BEFORE mounting, via the reflective API rather than
+      // property access. `({})[dangerKey]` looked correct for `'constructor'`
+      // and `'prototype'` (ordinary own-property lookups) but is WRONG for
+      // `'__proto__'`: bracket/dot access on that literal name invokes
+      // `Object.prototype`'s own legacy `__proto__` ACCESSOR (Annex B),
+      // which always returns the prototype chain link — `Object.prototype`
+      // itself on a fresh `{}`, and `null` when read off `Object.prototype`
+      // — regardless of whether the guard leaked anything. That made the
+      // original per-case assertion compare `Object.prototype` to `null`
+      // unconditionally for the `__proto__` case, independent of the
+      // guard's real behavior. `Object.getOwnPropertyDescriptor` is a
+      // reflective call: it treats `__proto__` as an ordinary string key,
+      // not the special accessor syntax, so a before/after descriptor
+      // comparison is the key-agnostic way to assert "nothing was added,
+      // removed, or altered on Object.prototype" across all three
+      // dangerous keys. Found empirically: NG0203 (fixed in Plan 08) had
+      // masked this pre-existing test bug by crashing before this
+      // assertion was ever reached.
+      const before = Object.getOwnPropertyDescriptor(Object.prototype, dangerKey);
+
       ensureTestBedInit();
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({ imports: [PrototypeGuardHost] });
@@ -294,12 +317,11 @@ describe('angular-runtime — precedence, key-domain, prototype guard, dev/prod 
       expect(text).toContain('[DYN-FALLBACK]');
       expect(text).not.toContain('DANGER-FILL');
 
-      // The guard's whole point: reading the same property off a FRESH empty
-      // object must still yield the built-in value — nothing leaked onto
-      // Object.prototype.
-      expect(({} as Record<string, unknown>)[dangerKey]).toBe(
-        (Object.prototype as unknown as Record<string, unknown>)[dangerKey],
-      );
+      // The guard's whole point: Object.prototype must be byte-for-byte
+      // unchanged by mounting a component whose fill key is one of the
+      // three dangerous names.
+      const after = Object.getOwnPropertyDescriptor(Object.prototype, dangerKey);
+      expect(after).toEqual(before);
 
       fixture.destroy();
     },
@@ -381,26 +403,42 @@ describe('angular-runtime — precedence, key-domain, prototype guard, dev/prod 
     });
   });
 
-  it('a bare `rozieSlot` attribute with no bound value throws NG0950 (the required-input error) at first read — R2 (DESIRED post-fix, blocked by NG0203 today)', () => {
+  it("a bare `rozieSlot` attribute with no bound value resolves to the empty string and folds to the producer's DEFAULT slot, per D-06 — R2 (Plan 08 correction)", () => {
+    // Plan 08 empirically falsified this test's original assumption (SPEC.md
+    // line 38 / the edge-probe table: "a bare `<ng-template rozieSlot>` with
+    // no bound value throws Angular's NG0950 at first read"). That assumption
+    // was written before any fixture existed and was never actually
+    // reachable pre-fix — OPEN RISK R-80-NG0203 crashed BEFORE this
+    // assertion could ever run, masking the gap. Once NG0203 was fixed
+    // (this plan), mounting `BareAttributeHost` revealed the real Angular
+    // template-binder contract: a value-less HTML attribute matching a
+    // directive's input name (`<ng-template rozieSlot>`, no `=`, no `[...]`)
+    // is NOT "the input left unset" — it is a STATIC binding of the empty
+    // string, identical in effect to `rozieSlot=""`. `input.required<string>()`
+    // is fully satisfied by `''`, so no NG0950 is possible for this specific
+    // shape; the directive's selector (`ng-template[rozieSlot]`) requires
+    // the attribute to be present in the first place, so "present but truly
+    // unset" is not a reachable state through this syntax at all.
+    //
+    // What DOES happen is the D-06 fold this phase already implements and
+    // already proves elsewhere (test 6, `ConsumerEmptyKeyFill`): the
+    // producer's `__rozieFillMap` normalizes an empty-string key to
+    // `'defaultSlot'`, so the bare-attribute fill resolves to the
+    // producer's DEFAULT slot exactly like an explicit `[rozieSlot]="''"`
+    // would. This is the CORRECT, coherent behavior — not a rough edge to
+    // paper over — and per 80-CONTEXT.md's standing instruction, contrary
+    // evidence is documented here rather than silently complied with.
     ensureTestBedInit();
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ imports: [BareAttributeHost] });
 
-    // Both createComponent and detectChanges are wrapped: today the crash is
-    // NG0203, thrown eagerly while the RozieSlot instance is constructed
-    // during createComponent (before detectChanges ever runs). Post-fix, the
-    // required-input read that produces NG0950 happens at first CD pass
-    // instead — wrapping both keeps this assertion correct in both states.
-    let caught: unknown;
-    try {
-      const fixture = TestBed.createComponent(BareAttributeHost);
-      fixture.detectChanges();
-      fixture.destroy();
-    } catch (e) {
-      caught = e;
-    }
+    const fixture = TestBed.createComponent(BareAttributeHost);
+    fixture.detectChanges();
 
-    expect(caught).toBeDefined();
-    expect(String((caught as Error)?.message ?? caught)).toContain('NG0950');
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('BARE-FILL');
+    expect(text).not.toContain('[DEFAULT-FALLBACK]');
+
+    fixture.destroy();
   });
 });

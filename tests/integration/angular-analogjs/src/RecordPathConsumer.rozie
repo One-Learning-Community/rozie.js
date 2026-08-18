@@ -1,0 +1,25 @@
+<rozie name="RecordPathConsumer">
+
+<!-- Phase 80 Plan 08 — Task 1 step 2. Fills RecordPathProducer's
+     dynamically-named slot, which the Angular emitter routes through the
+     `[rozieSlot]` marker directive + `@rozie/runtime-angular`'s
+     `RozieSlot`. Compiling and building THIS component under real
+     ahead-of-time compilation, consuming the BUILT partial-Ivy runtime
+     package at the Angular 19 floor, is R1's real acceptance check —
+     stronger than the package's own build script succeeding. -->
+
+<components>
+{
+  RecordPathProducer: './RecordPathProducer.rozie',
+}
+</components>
+
+<template>
+<div class="record-path-consumer">
+  <RecordPathProducer slotKey="body">
+    <template #body>RECORD-PATH-FILL</template>
+  </RecordPathProducer>
+</div>
+</template>
+
+</rozie>

@@ -1,0 +1,23 @@
+<rozie name="RecordPathProducer">
+
+<!-- Phase 80 Plan 08 — Task 1 step 2's AOT-consumability proof needs a REAL
+     record-path fixture in THIS floor-pinned (Angular ^19.0.0) harness, not
+     just a build script that happens to succeed with nothing exercising
+     `@rozie/runtime-angular`. Minimal single-slot producer: a runtime-NAMED
+     slot bound to a prop, which is what routes an Angular consumer's fill
+     down the `[rozieSlot]` marker-directive path (Plan 05) instead of the
+     untouched `@ContentChild` static-identifier path. -->
+
+<props>
+{
+  slotKey: { type: String, default: 'body' },
+}
+</props>
+
+<template>
+<div class="record-path-producer">
+  <slot :name="$props.slotKey">[FALLBACK]</slot>
+</div>
+</template>
+
+</rozie>

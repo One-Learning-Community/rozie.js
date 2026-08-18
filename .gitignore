@@ -61,6 +61,16 @@ examples/consumers/react-vite/src/Modal.ts
 examples/consumers/react-vite/src/WrapperModal.ts
 examples/consumers/svelte-vite/src/Modal.ts
 examples/consumers/svelte-vite/src/WrapperModal.ts
+# Phase 80 Plan 08 — tests/integration/angular-analogjs/src/ gained its first
+# cross-rozie composition (RecordPathConsumer.rozie composes
+# RecordPathProducer.rozie via a <components> block, added to genuinely
+# exercise @rozie/runtime-angular under real AOT — a bare `pnpm build` with
+# no record-path fixture would prove nothing about R1's AOT-consumability
+# claim). The Angular prebuild emits a transient `// @rozie-cross-rozie-shim`
+# re-export `RecordPathProducer.ts` next to the .rozie source. Per-file entry
+# (not a dir-wide glob) because this src/ dir also has legitimately tracked
+# hand-authored `.ts` files (main.ts, VtProbe.component.ts, rozie-shim.d.ts).
+tests/integration/angular-analogjs/src/RecordPathProducer.ts
 # Phase 80 Plan 03 — tests/angular-runtime/fixtures/ is compiled by
 # @rozie/unplugin's Angular-target D-70 disk-cache prebuild (Rozie({ target:
 # 'angular' }) in vitest.config.ts). Both generated artifact shapes land

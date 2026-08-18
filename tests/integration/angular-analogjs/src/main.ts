@@ -51,11 +51,17 @@ import Counter from './Counter.rozie';
 import ArrowProbe from './ArrowProbe.rozie';
 import GlobalProbe from './GlobalProbe.rozie';
 import { VtProbe } from './VtProbe.component';
+// Phase 80 Plan 08 (Task 1 step 2) — a record-path slot-fill consumer,
+// genuinely exercising `@rozie/runtime-angular`'s `RozieSlot` directive
+// under real ahead-of-time compilation at this harness's Angular ^19.0.0
+// floor pin. Without this, `pnpm build` succeeding would prove nothing
+// about R1's AOT-consumability claim — see RecordPathConsumer.rozie.
+import RecordPathConsumer from './RecordPathConsumer.rozie';
 
 @Component({
   selector: 'rozie-integration-app',
   standalone: true,
-  imports: [Counter, ArrowProbe, GlobalProbe, VtProbe],
+  imports: [Counter, ArrowProbe, GlobalProbe, VtProbe, RecordPathConsumer],
   template: `
     <h1>Rozie Angular Integration</h1>
     <rozie-counter
@@ -68,6 +74,7 @@ import { VtProbe } from './VtProbe.component';
     <rozie-arrow-probe />
     <rozie-global-probe />
     <rozie-vt-probe />
+    <rozie-record-path-consumer />
   `,
 })
 export class IntegrationApp {

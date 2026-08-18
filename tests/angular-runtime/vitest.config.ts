@@ -6,6 +6,7 @@ import angular from '@analogjs/vite-plugin-angular';
 import Rozie from '@rozie/unplugin/vite';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+import { angularPartialIvyLinkerPlugin } from './angularPartialIvyLinker';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -35,7 +36,32 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // JIT dead end D-07b exists to route around, just one layer further from the
 // symptom. MUST NOT be removed or defaulted.
 export default defineConfig({
-  plugins: [Rozie({ target: 'angular' }), angular({ jit: false })],
+  plugins: [angularPartialIvyLinkerPlugin(), Rozie({ target: 'angular' }), angular({ jit: false })],
+  resolve: {
+    // pnpm's peer-dependency-aware store gives `@angular/core` a DIFFERENT
+    // physical copy per distinct `zone.js` peer resolution context — this
+    // package (packages/runtime/angular) and this harness resolve to two
+    // separate `@angular/core@19.2.22` instances on disk (verified via
+    // `require.resolve` with each package's own resolution root), which is
+    // a genuine dual-package hazard: `@angular/core`'s DI internals
+    // (`getCurrentInjector`/`enterDI`) are module-scoped closures, so an
+    // injection context entered by ONE copy is invisible to `inject()` /
+    // `input.required()` calls running inside the OTHER copy — surfacing as
+    // NG0203 even though the directive is genuinely linked and genuinely
+    // instantiated inside Angular's own directive-instantiation flow. A
+    // real npm-installed consumer app has exactly one `@angular/core` for
+    // its whole tree and never hits this; `dedupe` reproduces that
+    // single-instance guarantee for this monorepo test harness.
+    dedupe: [
+      '@angular/core',
+      '@angular/common',
+      '@angular/compiler',
+      '@angular/platform-browser',
+      '@angular/platform-browser-dynamic',
+      'rxjs',
+      'zone.js',
+    ],
+  },
   test: {
     root: __dirname,
     environment: 'jsdom',
@@ -55,35 +81,27 @@ export default defineConfig({
         // knob for a different package — Svelte — this is the same
         // mechanism, not a new one).
         //
-        // KNOWN GAP (discovered standing up this harness, does not block
-        // this plan — see probe/ProbeProducer.ts): `@rozie/runtime-angular`
-        // ships partial-Ivy declarations (`ɵɵngDeclareFactory` /
-        // `ɵɵngDeclareDirective`, correct per D-03/SPEC R1). A real Angular
-        // CLI / esbuild build links every `node_modules` dependency
-        // automatically via `@angular/build`'s dependency-optimizer;
-        // `@analogjs/vite-plugin-angular` does not run that linker at all
-        // (grep its source — there is no "linker" anywhere in it), and its
-        // OWN dep-optimizer-scoped Angular-file heuristic
-        // (`/(Component|Directive|Pipe|Injectable|NgModule)\(/`) false-
-        // positive-matches `ɵɵngDeclareDirective(`'s trailing substring and
-        // mangles the file into a broken ad-hoc factory if routed through
-        // `optimizeDeps.include`. Importing `@rozie/runtime-angular`'s
-        // BUILT dist under this harness currently crashes with NG0203 the
-        // moment a `RozieSlot` instance is constructed inside an embedded
-        // view (signal `input.required()`/`inject()` field initializers
-        // running outside an injection context). Whichever later plan
-        // (04/05/08) first mounts the POST-FIX emitted output — which
-        // genuinely imports `{ RozieSlot } from '@rozie/runtime-angular'`
-        // — must solve this properly (most likely: apply
-        // `@angular/compiler-cli/linker/babel`'s documented Babel plugin to
-        // the dist file via a small custom `transform` hook keyed off
-        // `code.includes('ɵɵngDeclare')`, NOT via `optimizeDeps.include`).
-        // Task 1's probe and Task 3's fixtures in THIS plan do not import
-        // `@rozie/runtime-angular` at all: the probe consumes the directive
-        // from its plain-decorator SOURCE (compiled fresh by this
-        // package's own ngtsc Program), and Task 3 exercises the CURRENT
-        // pre-fix emitter, which has no runtime-package import yet (see
-        // 80-02-SUMMARY.md) — so this gap does not weaken R7.
+        // RESOLVED 2026-08-18 (Phase 80 Plan 08, OPEN RISK R-80-NG0203):
+        // `@rozie/runtime-angular` ships partial-Ivy declarations
+        // (`ɵɵngDeclareFactory` / `ɵɵngDeclareDirective`, correct per
+        // D-03/SPEC R1). A real Angular CLI / esbuild build links every
+        // `node_modules` dependency automatically via `@angular/build`'s own
+        // linker invocation; `@analogjs/vite-plugin-angular` does not run
+        // that linker at all (grep its source — there is no "linker"
+        // anywhere in it), so importing `@rozie/runtime-angular`'s BUILT
+        // dist under this harness used to crash with NG0203 the moment a
+        // `RozieSlot` instance was constructed inside an embedded view
+        // (signal `input.required()`/`inject()` field initializers running
+        // outside an injection context). `angularPartialIvyLinkerPlugin()`
+        // above closes this gap directly: it runs
+        // `@angular/compiler-cli/linker/babel`'s own linker plugin (the
+        // exact recipe `@angular/build`'s javascript-transformer-worker
+        // uses) over any module whose code contains an unlinked
+        // `ɵɵngDeclare*` call, keyed off `code.includes('ɵɵngDeclare')`
+        // rather than `optimizeDeps.include` (whose Angular-file heuristic
+        // false-positive-matches `ɵɵngDeclareDirective(`'s trailing
+        // substring and mangles the file). See that file for the full
+        // recipe and citation.
         inline: [/@rozie\//],
       },
     },

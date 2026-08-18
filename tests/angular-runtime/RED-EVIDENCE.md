@@ -78,3 +78,97 @@ on a proven API, not an assumed one.
 
 `pnpm install --frozen-lockfile` succeeds at the commit this file is committed in (verified before
 committing) — the RED state trades away test-greenness, not lockfile installability.
+
+## GREEN — Phase 80 Plan 08 (Task 1), OPEN RISK R-80-NG0203 closed
+
+**Pre-fix (RED) commit, for reference:** `2f9444f5`
+**Post-fix (GREEN) commit:** this commit (Phase 80 Plan 08, Task 1) — `git log -1 -- tests/angular-runtime/RED-EVIDENCE.md` resolves it precisely; recorded as prose rather than a hash literal to avoid the self-referential-hash problem of a commit naming its own SHA inside its own diff.
+
+Command: `pnpm exec vitest run --root tests/angular-runtime`
+
+```
+Test Files  5 passed (5)
+     Tests  165 passed (165)
+```
+
+All 165 tests pass, including the six R7 record-path tests from Plan 03 and every Plan 07 addition
+(precedence, key-domain, prototype-pollution guard, dev/prod warning, prohibitions, misapplication).
+Every test mounts REAL emitted output importing `{ RozieSlot } from '@rozie/runtime-angular'` — no
+local copy of the directive, per the standing instruction in 80-CONTEXT.md's OPEN RISK
+R-80-NG0203 note that a green proof against a copy would prove nothing about the shipped package.
+
+| # | Test | Status |
+|---|------|--------|
+| 1 | top-level fill (baseline) | **PASSED** (unchanged — passed pre-fix too) |
+| 2 | fill inside `r-if` | **PASSED** |
+| 3 | fill inside `r-for` | **PASSED** |
+| 4 | two sibling producers | **PASSED** |
+| 5 | late-arriving fill (`r-if` false→true) | **PASSED** |
+| 6 | empty-string key → default slot (D-06) | **PASSED** |
+
+Plus the 17 tests Plan 07 landed RED against the SAME NG0203 crash (precedence tiers 1–3,
+nullish/duplicate/`__proto__`/`constructor`/`prototype` key-domain edges, dev-vs-production
+console-output silence, and the bare-`rozieSlot`-attribute case) — all now GREEN, and the
+`prohibitions.test.ts` behavioral sub-case of prohibition 1. **17 failed → 0 failed.**
+
+### Root cause (two compounding issues, both closed in `tests/angular-runtime/vitest.config.ts`
+### and the new `angularPartialIvyLinker.ts`)
+
+1. **Unlinked partial-Ivy.** `@rozie/runtime-angular` ships partial-Ivy declarations
+   (`ɵɵngDeclareFactory` / `ɵɵngDeclareDirective`, correct per D-03/SPEC R1). A real Angular
+   CLI/esbuild build links every dependency automatically via `@angular/build`'s own linker
+   invocation; `@analogjs/vite-plugin-angular` (this harness's compiler) does not run that linker
+   at all. Fixed with `angularPartialIvyLinkerPlugin()`, a Vite `transform` hook that runs
+   `@angular/compiler-cli/linker/babel`'s own `createEs2015LinkerPlugin` — the exact recipe
+   `@angular/build`'s `javascript-transformer-worker.js` uses — over any module whose source
+   contains an unlinked `ɵɵngDeclare*` call.
+2. **Dual-package hazard (the actual proximate cause of the NG0203 crash — linking alone did NOT
+   fix it).** pnpm's peer-dependency-aware store gives `@angular/core@19.2.22` a DIFFERENT physical
+   copy per distinct `zone.js` peer-resolution context. `packages/runtime/angular` and
+   `tests/angular-runtime` resolved to two separate `@angular/core` instances on disk (confirmed via
+   `require.resolve` from each package's own root: one under
+   `@angular+core@19.2.22_..._zone.js@0.15.1`, the other under `..._zone.js@0.14.10`). `@angular/core`'s
+   DI internals (`getCurrentInjector`/`enterDI`) are module-scoped closures — an injection context
+   entered by ONE copy during `getNodeInjectable`'s directive instantiation is invisible to
+   `inject()`/`input.required()` calls running inside the OTHER copy, which is exactly what
+   `assertInInjectionContext` reports as NG0203, even though the directive was genuinely linked and
+   genuinely instantiated inside Angular's own directive-instantiation flow. Fixed with
+   `resolve.dedupe` in `vitest.config.ts`, forcing Vite to resolve every `@angular/*`/`rxjs`/`zone.js`
+   import to a single canonical instance — reproducing the single-`@angular/core`-per-app guarantee
+   a real npm-installed consumer already has by construction.
+
+Diagnosed empirically: applying fix (1) alone left the SAME NG0203 crash (confirmed by inspecting
+the actually-executed transformed code, which showed real linked `ɵɵdefineDirective` output, not the
+unlinked declare form); only adding fix (2) resolved it. Both fixes are necessary; neither is
+sufficient alone.
+
+### Two Plan 07 test-authoring bugs surfaced once NG0203 stopped masking them
+
+NG0203 fired unconditionally on `RozieSlot` construction, so two assertions Plan 07 authored against
+an incorrect assumption were never actually reached pre-fix. Both are corrected in this plan's
+commit, per 80-CONTEXT.md's standing instruction that contrary evidence be documented rather than
+silently complied with — see the inline comments at each site for the full account:
+
+- **The `__proto__` case of the prototype-pollution guard test** compared `({})['__proto__']` to
+  `Object.prototype['__proto__']` — but bracket access on the literal name `'__proto__'` invokes
+  `Object.prototype`'s own legacy accessor (Annex B), which always returns the prototype-chain link
+  regardless of the guard's real behavior, making the original assertion compare `Object.prototype`
+  to `null` unconditionally. Fixed by snapshotting `Object.getOwnPropertyDescriptor(Object.prototype,
+  dangerKey)` before and after mounting — a reflective, key-agnostic check immune to the accessor
+  special-case.
+- **The bare-`rozieSlot`-attribute test** assumed (per SPEC.md's edge-probe table, written before any
+  fixture existed) that `<ng-template rozieSlot>` with no bound value throws Angular's NG0950
+  required-input error. Empirically false: Angular's template binder treats a value-less attribute
+  matching a directive input name as a STATIC binding of the empty string (`rozieSlot=""`), which
+  fully satisfies `input.required<string>()`. The directive's own selector
+  (`ng-template[rozieSlot]`) requires the attribute to be present at all, so "present but genuinely
+  unset" is not reachable through this syntax. The real, correct, and now-asserted behavior is the
+  D-06 fold: the empty-string key normalizes to `'defaultSlot'`, and the bare-attribute fill renders
+  in the producer's default slot — the same outcome as test 6 (`ConsumerEmptyKeyFill`), reached
+  through a different syntactic path.
+
+### CI wiring (already in place, verified still green)
+
+`tests/angular-runtime` was already added to `.github/workflows/angular-matrix.yml`'s hand-maintained
+unit-test `--root` list in Plan 06 (commit `9bd43c2f`). No new CI wiring was needed in this plan;
+confirmed still present and correct.
