@@ -73,7 +73,12 @@ import {
   AngularImportCollector,
   collectAngularImports,
 } from '../rewrite/collectAngularImports.js';
-import { buildEligibleSlotDecls, buildNgTemplateContextGuard, buildFamilyCtxDecls } from './refineSlotTypes.js';
+import {
+  buildEligibleSlotDecls,
+  buildNgTemplateContextGuard,
+  buildFamilyCtxDecls,
+  isRecordOnlySlotDecl,
+} from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
 // Phase 71 Plan 09 (r-keynav, Angular — highest blast radius), extended
@@ -1269,6 +1274,67 @@ export function emitScript(
     // with no props (or only model props) would miss it. collectAngularImports
     // already adds `TemplateRef` for `ir.slots.length > 0` at L181-184.
     imports.add('input');
+  }
+
+  // 6e.ter Phase 80 Plan 04 (R3/R5/R6) — content-collected fill map for
+  // KEY-FILLABLE (record-only) slots. This gate is NARROWER than the
+  // `ir.slots.length > 0` gate above: an identifier-only-slot producer
+  // (e.g. `header`) emits `templates` but NOT these three members. The
+  // gate predicate — `ir.slots.some(isRecordOnlySlotDecl)` — is shared
+  // verbatim with Task 3's resolution-chain splice in emitSlotInvocation.ts
+  // and with `AngularImportCollector.addRuntime` below: one predicate, three
+  // consumers in this file plus emitSlotInvocation.ts, no drift.
+  //
+  // `__rozieFills` is a SIGNAL content query (`contentChildren`, not the
+  // decorator `@ContentChildren` form) over the `[rozieSlot]` marker
+  // directive, `descendants: true` so a fill inside `@if`/`@for` (an
+  // embedded view) is still collected — this is the fix for the sibling-
+  // collision and embedded-view silent-drop bugs this phase exists to close
+  // (see RED-EVIDENCE.md tests 2-4). `__rozieFillMap` folds the query into a
+  // plain `Record<string, TemplateRef<unknown>>` via a PURE `computed()`.
+  //
+  // The fold, in fixed order (T-80-01 + D-06):
+  //   1. Seed with `Object.create(null)` — the chosen prototype-pollution
+  //      mitigation (a null-prototype object has no `__proto__` setter and
+  //      no inherited `constructor`).
+  //   2. Skip a nullish key — contributes NO entry, so the producer falls
+  //      through to the next precedence tier (`templates` input).
+  //   3. Skip the three-key blocklist, mirroring
+  //      `LISTENERS_FORBIDDEN_KEYS_GUARD` in emitTemplateAttribute.ts,
+  //      emitted IN ADDITION to the null-prototype accumulator (defence in
+  //      depth, per SPEC's canon note on R3).
+  //   4. Normalize an empty-string key to the producer's synthetic
+  //      default-slot key (`'defaultSlot'`, the same sentinel
+  //      `emitSlotInvocation.ts`'s `dynKey` and `refineSlotTypes.ts`'s
+  //      `slotRefName` already use) — without this, a fill keyed on `''`
+  //      would land under `''` while every lookup asks for `'defaultSlot'`,
+  //      silently never rendering (D-06).
+  //   5. Assign — a later entry overwrites an earlier one with the same key,
+  //      so last-in-content-query-(document)-order wins, by specification.
+  // Keys compare by exact JS string identity throughout — no trimming,
+  // casing, or Unicode normalization.
+  if (ir.slots.some(isRecordOnlySlotDecl)) {
+    fieldLines.push(
+      '__rozieFills = contentChildren(RozieSlot, { descendants: true });',
+    );
+    fieldLines.push(
+      [
+        '__rozieFillMap = computed(() => {',
+        '  const map = Object.create(null) as Record<string, TemplateRef<unknown>>;',
+        '  for (const f of this.__rozieFills()) {',
+        '    const k = f.rozieSlot();',
+        '    if (k == null) continue;',
+        "    if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;",
+        "    map[k === '' ? 'defaultSlot' : k] = f.templateRef;",
+        '  }',
+        '  return map;',
+        '});',
+      ].join('\n'),
+    );
+    imports.add('contentChildren');
+    imports.add('computed');
+    imports.add('TemplateRef');
+    imports.addRuntime('RozieSlot');
   }
 
   // 7. Build computed properties.

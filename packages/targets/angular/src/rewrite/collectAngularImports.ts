@@ -50,6 +50,14 @@ export type AngularCoreImport =
   | 'ContentChild'
   | 'TemplateRef'
   /**
+   * Phase 80 Plan 04 (R3/R5): `contentChildren` — the SIGNAL content-query
+   * form (not the decorator `@ContentChildren`) that collects `[rozieSlot]`
+   * marker-directive fills on a producer declaring at least one key-fillable
+   * (record-only) slot. Added by emitScript alongside `computed` and
+   * `TemplateRef` whenever `ir.slots.some(isRecordOnlySlotDecl)` is true.
+   */
+  | 'contentChildren'
+  /**
    * Bug B fix (260519 linechart-watch-recreate): `untracked` — wraps the
    * $watch callback invocation inside the watcher `effect()` so the
    * callback's reactive reads (and transitive helper reads) don't join the
