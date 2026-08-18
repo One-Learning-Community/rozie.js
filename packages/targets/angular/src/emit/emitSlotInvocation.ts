@@ -62,7 +62,7 @@ import type {
 } from '../../../../core/src/ir/types.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import { sanitizeEventName } from '../rewrite/sanitizeEventName.js';
-import { slotFieldName, renderRecordKey } from './refineSlotTypes.js';
+import { slotFieldName, renderRecordKey, isRecordOnlySlotDecl } from './refineSlotTypes.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import type { AngularScriptInjection } from './emitTemplateEvent.js';
 
@@ -390,9 +390,29 @@ export function emitSlotInvocation(
         loopBindings: ctx.loopBindings,
       })
     : renderRecordKey(node.slotName);
+  // Phase 80 Plan 04 Task 3 (R3/R5/R6) — splice the content-collected fill
+  // map into the resolution chain as its own precedence tier, but ONLY on a
+  // producer that actually declared a record-only slot and therefore
+  // emitted `__rozieFillMap` (emitScript.ts, SAME `isRecordOnlySlotDecl`
+  // gate). Referencing `__rozieFillMap` on a producer that never declared it
+  // would be a hard compile error, and would also break byte-identity for
+  // the out-of-scope identifier-only `@ContentChild` path (SPEC prohibition
+  // #4) — so when the gate is false, both branches below stay EXACTLY their
+  // pre-Phase-80 text.
+  //
+  // A MIXED producer (both an identifier-named slot and a key-fillable one)
+  // gains the fill-map tier on its identifier slot too — the precedence
+  // contract is stated per SLOT, not per slot kind (static content-child,
+  // then content-collected fill map, then `templates` input, then declared
+  // default content). This is intended, not a leak.
+  const hasFillMap = ctx.ir.slots.some(isRecordOnlySlotDecl);
   const mergedTplRef = isRecordOnly
-    ? `templates()?.[${recordKeyText}]`
-    : `(${tplField} ?? templates()?.['${dynKey}'])`;
+    ? hasFillMap
+      ? `(__rozieFillMap()[${recordKeyText}] ?? templates()?.[${recordKeyText}])`
+      : `templates()?.[${recordKeyText}]`
+    : hasFillMap
+      ? `(${tplField} ?? __rozieFillMap()['${dynKey}'] ?? templates()?.['${dynKey}'])`
+      : `(${tplField} ?? templates()?.['${dynKey}'])`;
   const outletTag = `<ng-container *ngTemplateOutlet="${mergedTplRef}${ctxSuffix}" />`;
 
   if (!hasFallback && presence === 'always') {

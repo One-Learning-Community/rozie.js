@@ -167,3 +167,60 @@ describe('Angular producer — dev-mode-only diagnostics effect (Task 2)', () =>
     expect(code).toContain('Cell');
   });
 });
+
+describe('Angular producer — fill map spliced into the resolution chain (Task 3)', () => {
+  it('on a fill-map-bearing producer, a record-only slot resolves as fill map, then templates input', () => {
+    const code = compileAngular(RECORD_ONLY_PRODUCER, 'Cell.rozie');
+    expect(code).toContain(
+      "*ngTemplateOutlet=\"(__rozieFillMap()['cell-status'] ?? templates()?.['cell-status'])",
+    );
+  });
+
+  it('on a fill-map-bearing producer, an identifier-named slot resolves as static content-child, then fill map, then templates input', () => {
+    const code = compileAngular(
+      `
+<rozie name="Mixed">
+<props>{ value: { type: String, default: '' } }</props>
+<template>
+<div>
+  <slot name="cell-status" :value="value()"></slot>
+  <slot name="header"></slot>
+</div>
+</template>
+</rozie>
+`,
+      'Mixed.rozie',
+    );
+    expect(code).toContain(
+      "*ngTemplateOutlet=\"(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])\"",
+    );
+  });
+
+  it('on a producer that emits NO fill map, both resolution expressions are byte-identical to their pre-change form', () => {
+    const code = compileAngular(IDENTIFIER_ONLY_PRODUCER, 'X.rozie');
+    expect(code).toContain(
+      "*ngTemplateOutlet=\"(headerTpl ?? templates()?.['header'])\"",
+    );
+    expect(code).not.toContain('__rozieFillMap()');
+  });
+
+  it('the synthetic default-slot key used on the identifier path is the same key the fold normalizes the empty string to', () => {
+    const code = compileAngular(
+      `
+<rozie name="Def">
+<props>{ value: { type: String, default: '' } }</props>
+<template>
+<div>
+  <slot name="cell-status" :value="value()"></slot>
+  <slot></slot>
+</div>
+</template>
+</rozie>
+`,
+      'Def.rozie',
+    );
+    expect(code).toContain(
+      "*ngTemplateOutlet=\"(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])\"",
+    );
+  });
+});
