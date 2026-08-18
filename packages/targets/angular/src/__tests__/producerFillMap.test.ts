@@ -123,18 +123,36 @@ describe('Angular producer — content-collected fill map (Task 1)', () => {
     expect(code).toContain("import { RozieSlot } from '@rozie/runtime-angular';");
   });
 
-  it('a producer with only identifier-named static slots emits none of the three new members and stays byte-identical otherwise', () => {
+  // AMENDED — Phase 80 Plan 10 (R3/D-09). Before this plan, an
+  // identifier-only producer emitted NONE of the three intake members
+  // (that was this test's original assertion). D-09 proved that contract
+  // wrong: a consumer elsewhere in the compilation can still send this
+  // producer a dynamic `#[expr]` fill, and with the old narrower gate that
+  // fill was silently dropped. The intake gate is now `hasKeyedFillIntake`
+  // (`ir.slots.length > 0`), the same width as the `templates` input gate
+  // below it — so an identifier-only producer now emits the SAME intake
+  // members a record-only producer does. This case is inverted, not
+  // deleted, to keep the boundary (no slots at all) visible one test down.
+  it('a producer with only identifier-named static slots ALSO emits __rozieFills, __rozieFillMap, and the RozieSlot runtime import (D-09 widened gate)', () => {
     const code = compileAngular(IDENTIFIER_ONLY_PRODUCER, 'X.rozie');
-    expect(code).not.toContain('__rozieFills');
-    expect(code).not.toContain('__rozieFillMap');
-    expect(code).not.toContain('@rozie/runtime-angular');
-    // The `templates` input is still present and unchanged — the broad gate
-    // (`ir.slots.length > 0`) is untouched by the narrow gate.
+    expect(code).toContain(
+      '__rozieFills = contentChildren(RozieSlot, { descendants: true });',
+    );
+    expect(code).toContain('__rozieFillMap = computed(() => {');
+    expect(code).toContain("import { RozieSlot } from '@rozie/runtime-angular';");
+    // The `templates` input is still present and unchanged.
     expect(code).toContain(
       'templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);',
     );
   });
 
+  // AMENDED — Phase 80 Plan 10 (R3/D-09). This case stays negative, but its
+  // meaning changed: it is now the SOLE boundary for the amended dependency
+  // prohibition (was: "no record-path slots" → now: "no slots at all",
+  // this plan's `must_haves.prohibitions` first entry). Every producer that
+  // declares ANY slot — identifier-named, record-only, or default — now
+  // reaches the wide gate above; only a genuinely slotless component stays
+  // import-free.
   it('a producer with no slots at all emits none of the three new members and no templates input', () => {
     const code = compileAngular(NO_SLOT_PRODUCER, 'Plain.rozie');
     expect(code).not.toContain('__rozieFills');
@@ -199,6 +217,13 @@ describe('Angular producer — dev-mode-only diagnostics effect (Task 2)', () =>
     expect(code).not.toContain('declare global');
   });
 
+  // AMENDED — Phase 80 Plan 10 (R3/D-09). This case's NAME still says
+  // "no key-fillable slot" but its meaning narrowed with the split gate:
+  // it now proves the DIAGNOSTICS half stays on the narrow
+  // `isRecordOnlySlotDecl` gate even though the identifier-only producer's
+  // INTAKE half widened (see the inverted case above). It intentionally
+  // carries no `__rozieFills`/`__rozieFillMap` assertion — those now belong
+  // to the widened-gate case above, not here.
   it('a producer with no key-fillable slot emits no diagnostics effect and no second content query', () => {
     const identifierCode = compileAngular(IDENTIFIER_ONLY_PRODUCER, 'X.rozie');
     expect(identifierCode).not.toContain('__rozieProjectedTpls');
