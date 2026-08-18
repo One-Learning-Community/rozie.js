@@ -94,44 +94,76 @@ output at `tests/dist-parity/fixtures/ModalConsumer.*`.
 ### Dynamic slot names (R5) — per-target consumer-side divergences
 
 A Rozie consumer using `<template #[expr]>` (dynamic slot name, where `expr`
-evaluates at runtime to the slot name) dispatches differently per target:
+evaluates at runtime to the slot name) compiles to a different dispatch shape on
+each target.
+
+**Between two `.rozie` files this is transparent.** The compiler synthesizes both
+halves of the hand-off, so the author writes the bracketed template and nothing
+else:
+
+- The **producer** automatically gains the matching `slots?` / `snippets?` /
+  `templates?` input, fully typed — including a template-literal index signature
+  for each dynamic-name family. It is never declared in `<props>`.
+- The **consumer** automatically emits the keyed record, with any scoped params
+  threaded onto the callback signature.
+
+The per-target shapes the compiler emits:
 
 <!-- VitePress's Vue runtime parses `{{ ... }}` in markdown as interpolation. The HTML-entity escape (`&#123;`) does NOT work inside markdown code spans because markdown-it HTML-escapes `&` to `&amp;`, leaving a literal `&#123;` on the page. The correct workaround is `<span v-pre>…</span>` around the backticked code, which tells Vue to skip interpolation parsing for that subtree. The React/Solid/Svelte rows below need it because their cells contain `{{ }}`. This comment MUST live outside the table — a mid-table HTML comment breaks markdown table containment. -->
 
-| Target  | Consumer-side dispatch                                                                                       | Producer-side acceptance needed?            |
+| Target  | Consumer-side dispatch the compiler emits                                                                    | Native to the framework?                    |
 | ------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| Vue     | `<template #[<expr>]>body</template>` — Vue 3.4+ native scoped-slot bracketed form                            | No — native scoped-slot dispatch handles it |
-| Lit     | `<div slot="${<expr>}">body</div>` — shadow-DOM native projection routes on the runtime `slot=` value         | No — shadow DOM native projection           |
-| React   | <span v-pre>`<Producer slots={{ [<expr>]: () => <>body</> }} />`</span> — additive `slots` prop with object dispatch | Yes — producer must accept `slots?: Record<string, (ctx: Ctx) => ReactNode>` |
-| Solid   | <span v-pre>`<Producer slots={{ [<expr>()]: () => <>body</> }} />`</span> — signal-auto-called key | Yes — producer must accept `slots?: ...` |
-| Svelte  | <span v-pre>`<Producer snippets={{ [<expr>]: __rozieDynSlot_N }}>{#snippet __rozieDynSlot_N()}body{/snippet}</Producer>`</span> | Yes — producer must accept `snippets?: Record<string, Snippet<[Ctx]>>` |
-| Angular | `<Producer><ng-template #__dynSlot_N>body</ng-template><ng-container *ngTemplateOutlet="templates[<expr>]" /></Producer>` + class-body `@ViewChild` + `templates` getter | Yes — producer must accept `@Input() templates?: Record<string, TemplateRef<Ctx>>` |
+| Vue     | `<template #[<expr>]>body</template>` — Vue 3.4+ native scoped-slot bracketed form                            | Yes — native |
+| Lit     | `<div slot="${<expr>}">body</div>` — shadow-DOM native projection routes on the runtime `slot=` value         | Yes — native |
+| React   | <span v-pre>`<Producer slots={{ [<expr>]: () => <>body</> }} />`</span> — additive `slots` prop with object dispatch | No — but object dispatch *is* the idiomatic React form |
+| Solid   | <span v-pre>`<Producer slots={{ [<expr>()]: () => <>body</> }} />`</span> — signal-auto-called key | No — same shape; the key is a signal read |
+| Svelte  | <span v-pre>`<Producer snippets={{ [<expr>]: __rozieDynSlot_N }}>{#snippet __rozieDynSlot_N()}body{/snippet}</Producer>`</span> | No — `snippets` + `{#snippet}` is the idiomatic Svelte 5 form |
+| Angular | `<Producer><ng-template #__dynSlot_N>body</ng-template><ng-container *ngTemplateOutlet="templates[<expr>]" /></Producer>` + class-body `@ViewChild` + `templates` getter | No — and the most ceremony of the six |
 
-For Vue + Lit a Rozie author writing `<template #[name]>` will get correct
-runtime dispatch out of the box. For React / Solid / Svelte / Angular, the
-**producer-side acceptance of the slots/snippets/templates input prop** is the
-hand-off contract; the recommended runtime dispatch order is
+Where the divergence is actually felt is a **hand-written, non-Rozie consumer**
+importing a compiled Rozie producer — the same asymmetry described for
+[third-party React consumers](#consumer-side-slot-fill-—-third-party-react-consumers-of-compiled-rozie-components)
+above. A Vue or Lit consumer writes the framework-native form and it works. A
+React, Solid, Svelte, or Angular consumer builds the record by hand:
+
+```tsx
+// External React consumer (NOT a .rozie file)
+import DynamicSlots from '@my-design-system/dynamic-slots';
+
+<DynamicSlots slots={{ [columnKey]: ({ row, value }) => <Cell row={row} value={value} /> }} />
+```
+
+That is the idiomatic shape in those frameworks rather than a Rozie-specific
+concession — none of them has a template-slot syntax for Vue's bracketed form to
+be more native than. The producer's emitted `.d.ts` types the record for the
+consumer, family index signatures included, so the keys are checked and
+completed. The runtime dispatch order is
 `slots?.[name]?.(ctx) ?? renderNamed?.(ctx) ?? defaultContent`.
 
 ### Lit — scoped slot params arrive via a data attribute
 
-Web Components have no native scoped-slot mechanism. For the Lit target, scoped
-slot params are exposed on the projected `<slot>` element via a
-`data-rozie-params` attribute (a JSON-serialized context object), readable from
-the consumer side with the small `observeRozieSlotCtx` helper. Default and
-named slots without params use native `<slot>` projection unchanged.
+Web Components have no native scoped-slot mechanism, so the Lit target dispatches
+a scoped fill through **three tiers, in this order**:
+
+1. **The `rozieSlots` record property** — a direct object of callbacks. No JSON
+   serialization, no attribute observer. This is the primary path.
+2. **A named function prop** — `this.headerCell?.(ctx)`, the render-prop analog.
+3. **Native `<slot>` projection carrying `data-rozie-params`** — a JSON-serialized
+   context object on the projected element, readable with the small
+   `observeRozieSlotCtx` helper.
+
+Tier 3 is the fallback, and it is what an ordinary statically-named scoped slot
+resolves to when neither of the first two is supplied. Default and named slots
+without params use native `<slot>` projection unchanged.
 
 A first-paint smoke check
 (`tests/visual-regression/specs/lit-scoped-fill-firstpaint.spec.ts`)
 verifies the observed ctx is wired correctly on the first paint — no flicker,
 no `undefined` reference in the body's `this._headerCtx?.close` access.
 
-This attribute-based mechanism remains the path for an ordinary statically-named
-scoped slot (the shape above) and for a paramless dynamically-named fill. For a
-scoped fill that is **also** dynamically named, or matched against a producer's
-dynamic-name family, or targets a non-identifier static name, the direct
-`rozieSlots` record property is the mechanism instead — no JSON serialization, no
-attribute observer. See
+A scoped fill that is **also** dynamically named, or matched against a producer's
+dynamic-name family, or targeting a non-identifier static name, always takes tier
+1 — the attribute path cannot express those. See
 [Lit — rozieSlots record dispatch](#lit-—-rozieslots-record-dispatch-for-scoped-dynamic-name-and-family-matched-fills)
 for the dispatch order and the third-party direct-binding form.
 
