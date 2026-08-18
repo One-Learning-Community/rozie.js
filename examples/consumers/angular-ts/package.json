@@ -7,6 +7,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.strict.json",
     "refresh:fixtures": "node ../scripts/refresh-consumer-fixtures.mjs"
   },
+  "dependencies": {
+    "@rozie/runtime-angular": "workspace:*"
+  },
   "devDependencies": {
     "@angular/common": "^19",
     "@angular/core": "^19",

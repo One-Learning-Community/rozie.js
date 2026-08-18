@@ -323,6 +323,9 @@ importers:
       '@preact/signals-core':
         specifier: ^1.3.0
         version: 1.14.2
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../packages/runtime/angular
       '@rozie/runtime-lit':
         specifier: workspace:*
         version: link:../../../packages/runtime/lit
@@ -368,6 +371,10 @@ importers:
         version: 6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.4.2)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.2)
 
   examples/consumers/angular-ts:
+    dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../packages/runtime/angular
     devDependencies:
       '@angular/common':
         specifier: ^19
@@ -6863,6 +6870,9 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../packages/runtime/angular
       '@rozie/target-angular':
         specifier: workspace:*
         version: link:../../packages/targets/angular
@@ -6928,6 +6938,9 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../packages/runtime/angular
       '@rozie/target-angular':
         specifier: workspace:*
         version: link:../../packages/targets/angular
@@ -6989,6 +7002,9 @@ importers:
       '@angular/platform-browser':
         specifier: ^19.0.0
         version: 19.2.22(@angular/common@19.2.22(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.14.10))(rxjs@7.8.2))(@angular/core@19.2.22(rxjs@7.8.2)(zone.js@0.14.10))
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../packages/runtime/angular
       '@rozie/unplugin':
         specifier: workspace:*
         version: link:../../../packages/unplugin
@@ -7258,6 +7274,9 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../packages/runtime/angular
       '@rozie/target-angular':
         specifier: workspace:*
         version: link:../../packages/targets/angular
@@ -7593,6 +7612,9 @@ importers:
       '@rozie/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../packages/runtime/angular
       '@rozie/runtime-lit':
         specifier: workspace:*
         version: link:../../packages/runtime/lit
