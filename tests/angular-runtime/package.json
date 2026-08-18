@@ -1,0 +1,35 @@
+{
+  "name": "rozie-angular-runtime-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "//": "D-07b (2026-08-18) supersedes D-07's original tests/timing JIT-TestBed precedent — JIT cannot discover signal contentChildren() queries at all (verified against @angular/core@21.2.13 source). This harness instead compiles fixtures through REAL ngtsc AOT via @analogjs/vite-plugin-angular + @rozie/unplugin, mirroring tests/integration/angular-analogjs and tests/visual-regression (both already depend on @analogjs/vite-plugin-angular). Pinned to Angular ^19.0.0 to match those two precedents and @rozie/runtime-angular's own build floor — the old ^21 pin existed only to match tests/timing, which is no longer the analog for this harness.",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@analogjs/vite-plugin-angular": "~2.5.1",
+    "@angular/common": "^19.0.0",
+    "@angular/compiler": "^19.0.0",
+    "@angular/core": "^19.0.0",
+    "@angular/forms": "^19.0.0",
+    "@angular/platform-browser": "^19.0.0",
+    "@rozie/core": "workspace:*",
+    "@rozie/runtime-angular": "workspace:*",
+    "@rozie/target-angular": "workspace:*",
+    "@rozie/unplugin": "workspace:*",
+    "rxjs": "^7.8",
+    "tslib": "^2.6",
+    "zone.js": "^0.14"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^19.0.0",
+    "@angular/build": "^19.0.0",
+    "@angular/compiler-cli": "^19.0.0",
+    "jsdom": "^25",
+    "typescript": "~5.6.0",
+    "vite": "^6.0.0",
+    "vitest": "^4.1.5"
+  }
+}

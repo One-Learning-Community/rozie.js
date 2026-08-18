@@ -18,6 +18,7 @@ packages:
   - "tests/lit-lint"
   - "tests/svelte-typecheck"
   - "tests/angular-typecheck"
+  - "tests/angular-runtime"
   - "tests/vue-typecheck"
   - "tests/react-typecheck"
   - "tests/strict-conformance"

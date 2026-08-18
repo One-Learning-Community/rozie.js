@@ -1,0 +1,13 @@
+{
+  "//": "@analogjs/vite-plugin-angular's getTsConfigPath() resolves to ./tsconfig.spec.json whenever isTest is true (process.env.VITEST set) and no explicit `tsconfig` plugin option overrides it — see angular-vite-plugin.js's `jit`/isTest branching this package's vitest.config.ts comment documents. This is the config the real ngtsc AOT Program compiles against; it MUST include every .ts file this harness's tests import (probe components, and the fixtures/*.rozie.ts D-70 disk-cache sidecars @rozie/unplugin writes at configResolved time, BEFORE this Program is constructed).",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "types": ["vitest/globals", "node"]
+  },
+  "include": ["*.ts", "probe/**/*.ts", "fixtures/**/*.ts"],
+  "angularCompilerOptions": {
+    "strictTemplates": false,
+    "compilationMode": "full"
+  }
+}
