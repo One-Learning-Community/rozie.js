@@ -11,7 +11,7 @@ interface AsideCtx {}
   template: `
 
     <div class="presence-check-fixture" #rozieSpread_0 #rozieListenersTarget_1>
-      @if ((asideTpl ?? templates()?.['aside'])) {
+      @if ((asideTpl ?? __rozieFillMap()['aside'] ?? templates()?.['aside'])) {
     <aside>
         @if ((asideTpl ?? __rozieFillMap()['aside'] ?? templates()?.['aside'])) {
     <ng-container *ngTemplateOutlet="(asideTpl ?? __rozieFillMap()['aside'] ?? templates()?.['aside'])" />

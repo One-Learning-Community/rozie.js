@@ -1307,7 +1307,7 @@ export class FlowCanvas {
         entry.bodyMoved = true;
         return;
       }
-      if ((this.nodeTpl ?? this.templates()?.['node'])) {
+      if ((this.nodeTpl ?? this.__rozieFillMap()['node'] ?? this.templates()?.['node'])) {
         // reactive multi-instance portal — one handle per node, re-rendered in
         // place on meta change (the MapLibre marker discipline). Low-level escape
         // hatch: the consumer switches on node.type inside the single `#node` slot.
@@ -2618,7 +2618,7 @@ export class FlowCanvas {
         return;
       }
       this.toolbarSelectedId = id;
-      if ((this.toolbarTpl ?? this.templates()?.['toolbar']) && id != null) {
+      if ((this.toolbarTpl ?? this.__rozieFillMap()['toolbar'] ?? this.templates()?.['toolbar']) && id != null) {
         const meta = this.nodeMeta.get(id) || {
           id,
           type: undefined,
@@ -2655,7 +2655,7 @@ export class FlowCanvas {
     if (this.nodeToolbar() && this.toolbarEl()?.nativeElement) {
       this.toolbarHost = this.toolbarEl()?.nativeElement;
       this.toolbarHost.style.display = 'none';
-      if (!(this.toolbarTpl ?? this.templates()?.['toolbar'])) {
+      if (!(this.toolbarTpl ?? this.__rozieFillMap()['toolbar'] ?? this.templates()?.['toolbar'])) {
         // default chrome: delete + duplicate buttons. Static literal labels (Threat
         // T-44-06-1: no node-derived text rendered via innerHTML — these are fixed strings
         // set via textContent). Both fire @node-action on the tracked node.

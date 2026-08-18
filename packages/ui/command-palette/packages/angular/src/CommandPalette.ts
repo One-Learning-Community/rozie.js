@@ -159,7 +159,7 @@ function __rozieAttr(v: unknown): string | null {
     } @else {
 
               <div class="rozie-command-palette-option">
-                @if ((iconTpl ?? templates()?.['icon'])) {
+                @if ((iconTpl ?? __rozieFillMap()['icon'] ?? templates()?.['icon'])) {
     <span class="rozie-command-palette-option-icon">
                   @if ((iconTpl ?? __rozieFillMap()['icon'] ?? templates()?.['icon'])) {
     <ng-container *ngTemplateOutlet="(iconTpl ?? __rozieFillMap()['icon'] ?? templates()?.['icon']); context: { $implicit: { option: option }, option: option }" />
@@ -177,7 +177,7 @@ function __rozieAttr(v: unknown): string | null {
                 
                 @if (hotKeyOf(option)) {
     <span class="rozie-command-palette-option-hotkey" aria-hidden="true">{{ rozieDisplay(formatKeyToken(hotKeyOf(option), platformIsApple())) }}</span>
-    }@if ((actionsTpl ?? templates()?.['actions']) || actionsList(option).length > 0) {
+    }@if ((actionsTpl ?? __rozieFillMap()['actions'] ?? templates()?.['actions']) || actionsList(option).length > 0) {
     <span class="rozie-command-palette-option-actions" data-testid="command-palette-actions-affordance" (mousedown)="$event.stopPropagation(); openActionMenu(option)">
                   @if ((actionsTpl ?? __rozieFillMap()['actions'] ?? templates()?.['actions'])) {
     <ng-container *ngTemplateOutlet="(actionsTpl ?? __rozieFillMap()['actions'] ?? templates()?.['actions']); context: { $implicit: { option: option, actions: actionsList(option) }, option: option, actions: actionsList(option) }" />
@@ -188,7 +188,7 @@ function __rozieAttr(v: unknown): string | null {
     }
     }
                 </span>
-    }@if ((trailingTpl ?? templates()?.['trailing'])) {
+    }@if ((trailingTpl ?? __rozieFillMap()['trailing'] ?? templates()?.['trailing'])) {
     <span class="rozie-command-palette-option-trailing">
                   @if ((trailingTpl ?? __rozieFillMap()['trailing'] ?? templates()?.['trailing'])) {
     <ng-container *ngTemplateOutlet="(trailingTpl ?? __rozieFillMap()['trailing'] ?? templates()?.['trailing']); context: { $implicit: { option: option }, option: option }" />
@@ -242,7 +242,7 @@ function __rozieAttr(v: unknown): string | null {
     <div class="rozie-command-palette-error">
           <ng-container *ngTemplateOutlet="(errorTpl ?? __rozieFillMap()['error'] ?? templates()?.['error']); context: { $implicit: { query: query(), error: currentError(), retry: retryCurrentLevel }, query: query(), error: currentError(), retry: retryCurrentLevel }" />
         </div>
-    }@if ((footerTpl ?? templates()?.['footer'])) {
+    }@if ((footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])) {
     <div class="rozie-command-palette-footer">
           @if ((footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])) {
     <ng-container *ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])" />

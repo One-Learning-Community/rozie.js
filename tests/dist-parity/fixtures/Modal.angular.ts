@@ -47,7 +47,7 @@ function __rozieAttr(v: unknown): string | null {
     @if (open()) {
     <div class="modal-backdrop" #backdropEl (click)="_guardedHandler0($event)">
       <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [attr.aria-label]="rozieAttr(title() || undefined)" tabindex="-1">
-        @if (title() || (headerTpl ?? templates()?.['header'])) {
+        @if (title() || (headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {
     <header>
           @if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {
     <ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header']); context: { $implicit: { close: _close }, close: _close }" />
@@ -62,7 +62,7 @@ function __rozieAttr(v: unknown): string | null {
           <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: { $implicit: { close: _close }, close: _close }" />
         </div>
 
-        @if ((footerTpl ?? templates()?.['footer'])) {
+        @if ((footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])) {
     <footer>
           @if ((footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])) {
     <ng-container *ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer']); context: { $implicit: { close: _close }, close: _close }" />

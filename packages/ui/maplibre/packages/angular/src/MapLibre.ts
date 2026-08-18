@@ -553,7 +553,7 @@ export class MapLibre {
     // on prop change. Built here so $portals.marker is in the mount scope; bridged
     // to the top-level $watch via reconcileMarkers (CM rebuildGutterExt discipline).
     this.reconcileMarkers = (list: any) => {
-      if (!(this.markerTpl ?? this.templates()?.['marker'])) return;
+      if (!(this.markerTpl ?? this.__rozieFillMap()['marker'] ?? this.templates()?.['marker'])) return;
       const arr = Array.isArray(list) ? list : [];
       const seen = new Set();
       arr.forEach((m: any, index: any) => {
@@ -597,7 +597,7 @@ export class MapLibre {
     // ─── REACTIVE MULTI-INSTANCE popup portal slot ──────────────────────────
     // ─── REACTIVE MULTI-INSTANCE popup portal slot ──────────────────────────
     this.reconcilePopups = (list: any) => {
-      if (!(this.popupTpl ?? this.templates()?.['popup'])) return;
+      if (!(this.popupTpl ?? this.__rozieFillMap()['popup'] ?? this.templates()?.['popup'])) return;
       const arr = Array.isArray(list) ? list : [];
       const seen = new Set();
       arr.forEach((p: any, index: any) => {
@@ -664,7 +664,7 @@ export class MapLibre {
 
     // ─── mount-once custom CONTROL portal slot ──────────────────────────────
     // ─── mount-once custom CONTROL portal slot ──────────────────────────────
-    if ((this.controlTpl ?? this.templates()?.['control'])) {
+    if ((this.controlTpl ?? this.__rozieFillMap()['control'] ?? this.templates()?.['control'])) {
       const host = document.createElement('div');
       host.className = 'maplibregl-ctrl rozie-maplibre-control';
       this.customControl = {

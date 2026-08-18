@@ -73,11 +73,12 @@ function listAngularFixtureFiles(): string[] {
 
 /**
  * The documented inverse transform for AMENDED SPEC prohibition 4b (Phase 80
- * Plan 12). Applying this function to a POST-D-09-fix Angular fixture's
- * emitted text must reproduce the PRE-fix bytes recorded at
- * `BASELINE_COMMIT` exactly — proving every byte the widened intake gate
- * (`hasKeyedFillIntake`, `refineSlotTypes.ts`) inserted is strictly
- * additive. Five permitted differences, undone in this fixed order:
+ * Plan 12; extended by Plan 14/D-10). Applying this function to a
+ * POST-D-09-AND-D-10-fix Angular fixture's emitted text must reproduce the
+ * PRE-fix bytes recorded at `BASELINE_COMMIT` exactly — proving every byte
+ * the widened intake gate (`hasKeyedFillIntake`, `refineSlotTypes.ts`) and
+ * the widened structural presence chain (`buildSlotsMerge.ts`) inserted is
+ * strictly additive. Five permitted differences, undone in this fixed order:
  *
  *   1. `computed` and `contentChildren` — the only two `@angular/core`
  *      symbols the amended intake block (emitScript.ts:1328-1351) can add —
@@ -90,12 +91,27 @@ function listAngularFixtureFiles(): string[] {
  *      (emitScript.ts:1328-1351, fixed known text) is removed in full, from
  *      its opening `__rozieFills = contentChildren(...)` line through its
  *      closing `});` line.
- *   5. The `__rozieFillMap()[<key>] ?? ` segment (emitSlotInvocation.ts:436-438)
- *      is removed from every outlet resolution expression and inner `@if`
- *      guard it was spliced into — one regex covers both the record-only
- *      form (`(__rozieFillMap()[key] ?? templates()?.[key])`) and the
- *      identifier form (`(tpl ?? __rozieFillMap()['key'] ?? templates()?.['key'])`)
- *      because the removed substring is byte-identical in both shapes.
+ *   5. The `__rozieFillMap()[<key>] ?? ` segment — from BOTH the outlet
+ *      resolution chain (emitSlotInvocation.ts:436-438) AND, as of Plan 14
+ *      (D-10), the structural slot-presence gate (`buildSlotsMerge.ts`) — is
+ *      removed from every outlet expression, inner `@if` guard, and OUTER
+ *      structural `@if`/`if (...)` wrapper gate it was spliced into. ONE
+ *      regex covers all shapes: the record-only outlet form
+ *      (`(__rozieFillMap()[key] ?? templates()?.[key])`), the identifier
+ *      outlet/gate form (`(tpl ?? __rozieFillMap()['key'] ?? templates()?.['key'])`),
+ *      and — new for D-10 — the CLASS-SCOPED gate form emitted by the
+ *      script and listener rewrite contexts
+ *      (`(this.tpl ?? this.__rozieFillMap()['key'] ?? this.templates()?.['key'])`).
+ *      The `this.` qualifier is OPTIONAL in the pattern specifically for
+ *      this last shape — without it, stripping only the bare
+ *      `__rozieFillMap()['key'] ?? ` segment from a `this.`-qualified chain
+ *      would leave a dangling, syntactically-broken `this.this.templates()`
+ *      behind. Matching `(?:this\.)?` consumes the qualifier together with
+ *      the term it belongs to, reproducing the pre-fix
+ *      `(this.tpl ?? this.templates()?.['key'])` shape exactly. This does
+ *      NOT loosen the transform's bound: the pattern still requires the
+ *      literal `__rozieFillMap()[...] ?? ` text to be present — it merely
+ *      also consumes an immediately-preceding `this.` when there is one.
  *
  * Nothing outside this enumerated set is touched — a fixture whose drift
  * from baseline is NOT fully explained by these five differences fails the
@@ -150,8 +166,12 @@ function applyInverseTransform(current: string, baseline: string): string {
   out = out.split(FILL_MAP_MEMBER_BLOCK).join('');
 
   // 5. The fill-map resolution-chain term removed from every outlet
-  //    resolution expression and inner conditional guard.
-  out = out.replace(/__rozieFillMap\(\)\[[^\]]*\] \?\? /g, '');
+  //    resolution expression, inner conditional guard, and (Plan 14, D-10)
+  //    outer structural presence gate — including the class-scoped
+  //    `this.__rozieFillMap()[...] ?? ` form the script/listener rewrite
+  //    contexts emit. The optional `(?:this\.)?` prefix is consumed WITH
+  //    the term so no dangling qualifier is left behind (see doc comment).
+  out = out.replace(/(?:this\.)?__rozieFillMap\(\)\[[^\]]*\] \?\? /g, '');
 
   return out;
 }

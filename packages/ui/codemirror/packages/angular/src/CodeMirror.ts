@@ -365,7 +365,7 @@ export class CodeMirror {
     // const resolves correctly on every target. CM6 calls `panel.mount()` /
     // `panel.destroy()` either way.
     const panelExt = () => {
-      if (!(this.panelTpl ?? this.templates()?.['panel'])) return [];
+      if (!(this.panelTpl ?? this.__rozieFillMap()['panel'] ?? this.templates()?.['panel'])) return [];
       return showPanel.of((panelView: any) => {
         const dom = document.createElement('div');
         dom.className = 'rozie-cm-panel';
@@ -398,7 +398,7 @@ export class CodeMirror {
     // panelExt above applies identically), differing ONLY in `top: true` and the
     // `.rozie-cm-panel-top` host class. Empty ([]) when the slot is unfilled.
     const topPanelExt = () => {
-      if (!(this.topPanelTpl ?? this.templates()?.['topPanel'])) return [];
+      if (!(this.topPanelTpl ?? this.__rozieFillMap()['topPanel'] ?? this.templates()?.['topPanel'])) return [];
       return showPanel.of((panelView: any) => {
         const dom = document.createElement('div');
         dom.className = 'rozie-cm-panel-top';
@@ -455,7 +455,7 @@ export class CodeMirror {
     // every caret move flows through TooltipView.update → handle.update(scope) —
     // re-rendering the fragment IN PLACE, never remounting it.
     const tooltipField = () => {
-      if (!(this.tooltipTpl ?? this.templates()?.['tooltip'])) return [];
+      if (!(this.tooltipTpl ?? this.__rozieFillMap()['tooltip'] ?? this.templates()?.['tooltip'])) return [];
       // The reactive portal handle for the SINGLE live tooltip view. Hoisted to
       // the field's closure so create()/update()/destroy() share it across the
       // tooltip's lifetime.
@@ -574,7 +574,7 @@ export class CodeMirror {
     // into a method body and rewrites a bare `view` token (matching the top-level
     // `let view`) to `this.view`; `mView` is collision-free. (The panelExt lesson.)
     const makeGutterExt = (gv: any) => {
-      if (!(this.gutterTpl ?? this.templates()?.['gutter'])) return [];
+      if (!(this.gutterTpl ?? this.__rozieFillMap()['gutter'] ?? this.templates()?.['gutter'])) return [];
       const makeGutterMarker = (line: any) => {
         let handle: any = null;
         return new class extends GutterMarker {
@@ -632,7 +632,7 @@ export class CodeMirror {
       // in the extensions array (via `decorationCompartment.of(...)`) makes
       // EditorState.create throw at runtime — the editor never mounts. Only the
       // browser surfaces this (CM's facet types are loose, so build/typecheck pass).
-      if (!(this.decorationTpl ?? this.templates()?.['decoration'])) return [];
+      if (!(this.decorationTpl ?? this.__rozieFillMap()['decoration'] ?? this.templates()?.['decoration'])) return [];
       // The WidgetType subclass is declared inline (WidgetType REQUIRES subclassing)
       // but its per-widget state (`from`/`to`, the live portal handle) lives in
       // CLOSURE — `makeWidget(from, to)` captures them — NOT in `this` fields, for

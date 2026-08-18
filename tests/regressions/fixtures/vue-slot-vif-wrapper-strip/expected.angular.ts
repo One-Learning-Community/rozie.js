@@ -13,7 +13,7 @@ interface DefaultCtx {}
   template: `
 
     <section class="panel" #rozieSpread_0 #rozieListenersTarget_1>
-      @if ((headerTpl ?? templates()?.['header']) || title()) {
+      @if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header']) || title()) {
     <header>
         
         @if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {

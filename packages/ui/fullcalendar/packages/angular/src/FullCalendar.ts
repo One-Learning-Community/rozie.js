@@ -541,7 +541,7 @@ export class FullCalendar {
     // handle is returned to FullCalendar so it cleans up the mounted tree when
     // the cell is removed. Consumers that don't fill the slot get FullCalendar's
     // default rendering (title text) — guarded by `$slots.event`.
-    if ((this.eventTpl ?? this.templates()?.['event'])) {
+    if ((this.eventTpl ?? this.__rozieFillMap()['event'] ?? this.templates()?.['event'])) {
       opts.eventContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.event(node, {
@@ -577,7 +577,7 @@ export class FullCalendar {
     // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
     // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
     // unifies snippets and props into one `$props` namespace.
-    if ((this.dayCellTpl ?? this.templates()?.['dayCell'])) {
+    if ((this.dayCellTpl ?? this.__rozieFillMap()['dayCell'] ?? this.templates()?.['dayCell'])) {
       opts.dayCellContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.dayCell(node, {
@@ -589,7 +589,7 @@ export class FullCalendar {
         };
       };
     }
-    if ((this.dayHeaderTpl ?? this.templates()?.['dayHeader'])) {
+    if ((this.dayHeaderTpl ?? this.__rozieFillMap()['dayHeader'] ?? this.templates()?.['dayHeader'])) {
       opts.dayHeaderContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.dayHeader(node, {
@@ -601,7 +601,7 @@ export class FullCalendar {
         };
       };
     }
-    if ((this.slotLabelTpl ?? this.templates()?.['slotLabel'])) {
+    if ((this.slotLabelTpl ?? this.__rozieFillMap()['slotLabel'] ?? this.templates()?.['slotLabel'])) {
       opts.slotLabelContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.slotLabel(node, {
@@ -613,7 +613,7 @@ export class FullCalendar {
         };
       };
     }
-    if ((this.weekNumberTpl ?? this.templates()?.['weekNumber'])) {
+    if ((this.weekNumberTpl ?? this.__rozieFillMap()['weekNumber'] ?? this.templates()?.['weekNumber'])) {
       opts.weekNumberContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.weekNumber(node, {
@@ -625,7 +625,7 @@ export class FullCalendar {
         };
       };
     }
-    if ((this.nowIndicatorContentTpl ?? this.templates()?.['nowIndicatorContent'])) {
+    if ((this.nowIndicatorContentTpl ?? this.__rozieFillMap()['nowIndicatorContent'] ?? this.templates()?.['nowIndicatorContent'])) {
       opts.nowIndicatorContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.nowIndicatorContent(node, {
@@ -637,7 +637,7 @@ export class FullCalendar {
         };
       };
     }
-    if ((this.moreLinkTpl ?? this.templates()?.['moreLink'])) {
+    if ((this.moreLinkTpl ?? this.__rozieFillMap()['moreLink'] ?? this.templates()?.['moreLink'])) {
       opts.moreLinkContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.moreLink(node, {
@@ -649,7 +649,7 @@ export class FullCalendar {
         };
       };
     }
-    if ((this.allDayContentTpl ?? this.templates()?.['allDayContent'])) {
+    if ((this.allDayContentTpl ?? this.__rozieFillMap()['allDayContent'] ?? this.templates()?.['allDayContent'])) {
       opts.allDayContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.allDayContent(node, {
@@ -661,7 +661,7 @@ export class FullCalendar {
         };
       };
     }
-    if ((this.slotLaneContentTpl ?? this.templates()?.['slotLaneContent'])) {
+    if ((this.slotLaneContentTpl ?? this.__rozieFillMap()['slotLaneContent'] ?? this.templates()?.['slotLaneContent'])) {
       opts.slotLaneContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.slotLaneContent(node, {
@@ -685,7 +685,7 @@ export class FullCalendar {
     // (b) shows a list view (listWeek/listDay/listMonth) with ZERO events. With
     // the bundled-only plugin set there is no list view, so this hook never fires
     // — by design, documented, zero bundle cost.
-    if ((this.noEventsContentTpl ?? this.templates()?.['noEventsContent'])) {
+    if ((this.noEventsContentTpl ?? this.__rozieFillMap()['noEventsContent'] ?? this.templates()?.['noEventsContent'])) {
       opts.noEventsContent = (arg: any) => {
         const node = document.createElement('div');
         const dispose = portals.noEventsContent(node, {

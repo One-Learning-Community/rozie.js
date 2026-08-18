@@ -103,7 +103,7 @@ function __rozieAttr(v: unknown): string | null {
 
     <div class="rozie-tiptap" [ngClass]="{ 'is-readonly': !editable() }">
       
-      @if (editable() && !(toolbarTpl ?? templates()?.['toolbar'])) {
+      @if (editable() && !(toolbarTpl ?? __rozieFillMap()['toolbar'] ?? templates()?.['toolbar'])) {
     <div class="rozie-tiptap-toolbar">
         <button type="button" [class]="{ active: active().bold }" aria-label="Bold" (click)="toggleBold()"><strong>B</strong></button>
         <button type="button" [class]="{ active: active().italic }" aria-label="Italic" (click)="toggleItalic()"><em>I</em></button>
@@ -120,11 +120,11 @@ function __rozieAttr(v: unknown): string | null {
         <button type="button" aria-label="Undo" (click)="undo()">↺</button>
         <button type="button" aria-label="Redo" (click)="redo()">↻</button>
       </div>
-    }@if (editable() && (toolbarTpl ?? templates()?.['toolbar'])) {
+    }@if (editable() && (toolbarTpl ?? __rozieFillMap()['toolbar'] ?? templates()?.['toolbar'])) {
     <div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" #toolbarEl></div>
     }<div #editorEl class="rozie-tiptap-content" [attr.data-placeholder]="placeholder()"></div>
       
-      @if (maxLength() != null || (countTpl ?? templates()?.['count'])) {
+      @if (maxLength() != null || (countTpl ?? __rozieFillMap()['count'] ?? templates()?.['count'])) {
     <div class="rozie-tiptap-count">
         @if ((countTpl ?? __rozieFillMap()['count'] ?? templates()?.['count'])) {
     <ng-container *ngTemplateOutlet="(countTpl ?? __rozieFillMap()['count'] ?? templates()?.['count']); context: { $implicit: { characters: count().characters, words: count().words, maxLength: maxLength(), over: maxLength() != null && count().characters > maxLength() }, characters: count().characters, words: count().words, maxLength: maxLength(), over: maxLength() != null && count().characters > maxLength() }" />
@@ -520,7 +520,7 @@ export class TipTap {
     // read ONCE here (setup-once — NOT a $watch); $portals.nodeView is captured
     // here inside the mount body and passed into the node factory, keeping the
     // reference scoped to the mount lifecycle (the toolbar-slot discipline).
-    const nodeViewExtensions = (this.nodeViewTpl ?? this.templates()?.['nodeView']) && __nodeSpecs.length ? this.makeNodeViewExtensions(portals.nodeView, __nodeSpecs) : [];
+    const nodeViewExtensions = (this.nodeViewTpl ?? this.__rozieFillMap()['nodeView'] ?? this.templates()?.['nodeView']) && __nodeSpecs.length ? this.makeNodeViewExtensions(portals.nodeView, __nodeSpecs) : [];
 
     // Placeholder ghost-text (G3). Read $props.placeholder ONCE at construction
     // (setup-once, like content/editable/autofocus — no reactivity required). The
@@ -562,11 +562,11 @@ export class TipTap {
     // `const x = []; x.push(…)`), which under the strict-typecheck'd bundled leaves
     // infers `any[]` — a bare `const x = []` would infer `never[]` and reject
     // `.push(Extension)` (the placeholderExtensions/nodeViewExtensions discipline).
-    if ((this.bubbleMenuTpl ?? this.templates()?.['bubbleMenu'])) {
+    if ((this.bubbleMenuTpl ?? this.__rozieFillMap()['bubbleMenu'] ?? this.templates()?.['bubbleMenu'])) {
       this.bubbleMenuEl = document.createElement('div');
       this.bubbleMenuEl.className = 'rozie-tiptap-bubble-menu';
     }
-    if ((this.floatingMenuTpl ?? this.templates()?.['floatingMenu'])) {
+    if ((this.floatingMenuTpl ?? this.__rozieFillMap()['floatingMenu'] ?? this.templates()?.['floatingMenu'])) {
       this.floatingMenuEl = document.createElement('div');
       this.floatingMenuEl.className = 'rozie-tiptap-floating-menu';
     }
@@ -651,7 +651,7 @@ export class TipTap {
     // allowed, surfaced via the `over` state). Setup-once, read here (NOT a
     // $watch). Conditional SPREAD (not `const x = []; x.push`) for the same
     // never[]-inference reason as placeholderExtensions/imageExtensions.
-    const needsCount = __maxLength != null || (this.countTpl ?? this.templates()?.['count']);
+    const needsCount = __maxLength != null || (this.countTpl ?? this.__rozieFillMap()['count'] ?? this.templates()?.['count']);
     const characterCountExtensions = needsCount ? [CharacterCount.configure(this.enforceMaxLength() && __maxLength != null ? {
       limit: __maxLength
     } : {})] : [];
@@ -751,7 +751,7 @@ export class TipTap {
     // to the mount lifecycle — a top-level reference would fail the bundled-leaf
     // strict typecheck, the FullCalendar/CodeMirror pattern). The host div is
     // r-if-gated on $slots.toolbar so $refs.toolbarEl exists exactly when filled.
-    if ((this.toolbarTpl ?? this.templates()?.['toolbar']) && this.toolbarEl()?.nativeElement) {
+    if ((this.toolbarTpl ?? this.__rozieFillMap()['toolbar'] ?? this.templates()?.['toolbar']) && this.toolbarEl()?.nativeElement) {
       this.toolbarDispose = portals.toolbar(this.toolbarEl()!.nativeElement, {
         editor: this.editor
       });
@@ -795,7 +795,7 @@ export class TipTap {
     // component's own default form is built imperatively into the same host.
     // $portals.linkEditor is referenced ONLY here inside $onMount (portal discipline).
     if (this.linkEditorEl) {
-      if ((this.linkEditorTpl ?? this.templates()?.['linkEditor'])) {
+      if ((this.linkEditorTpl ?? this.__rozieFillMap()['linkEditor'] ?? this.templates()?.['linkEditor'])) {
         // Read the initial link attrs straight off the live editor (NOT
         // `$data.linkState`, written by the refreshLink() call above in this
         // same tick) — the same React stale-read avoidance as buildLinkScope's

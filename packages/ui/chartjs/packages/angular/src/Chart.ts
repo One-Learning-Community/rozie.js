@@ -348,7 +348,7 @@ export class Chart {
     // descriptors on whatever object it is handed.
     this.buildConfig = () => {
       const userOpts = this.options() || {};
-      const tooltipOpt = (this.tooltipTpl ?? this.templates()?.['tooltip']) ? {
+      const tooltipOpt = (this.tooltipTpl ?? this.__rozieFillMap()['tooltip'] ?? this.templates()?.['tooltip']) ? {
         ...(userOpts.plugins?.tooltip || {}),
         enabled: false,
         external: tooltipExternal

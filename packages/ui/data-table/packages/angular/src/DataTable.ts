@@ -2224,8 +2224,8 @@ export class DataTable {
     const m = this.editMetaOf(colId);
     return m && m.editorOptions != null ? m.editorOptions : [];
   };
-  hasEditorSlot = (colId: any) => this.editorTypeOf(colId) === 'custom' && !!(this.editorTpl ?? this.templates()?.['editor']);
-  hasFilterSlot = () => !!(this.filterTpl ?? this.templates()?.['filter']);
+  hasEditorSlot = (colId: any) => this.editorTypeOf(colId) === 'custom' && !!(this.editorTpl ?? this.__rozieFillMap()['editor'] ?? this.templates()?.['editor']);
+  hasFilterSlot = () => !!(this.filterTpl ?? this.__rozieFillMap()['filter'] ?? this.templates()?.['filter']);
   columnIsFilterable = (colId: any) => {
     const d = this.defFor(colId);
     return !!(d && d.filterable);
