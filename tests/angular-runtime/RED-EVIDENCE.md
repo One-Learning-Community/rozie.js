@@ -677,3 +677,28 @@ ELEMENT renders at all, distinct from the outlet chain Plan 10 already widened �
 source-emission, runtime-harness, and Docker-VR levels. Plan 13's Task 2 (the Docker visual-regression
 union run) is discharged by this task; when Plan 13 resumes execution, it begins at its Task 3, citing
 this record for the union-run evidence and the two SPEC-prohibition-amendment acceptance material.
+
+## PHASE 80 CLOSES (D-11) — this file's full red-to-green record, in one place
+
+This file now carries three complete red-to-green pairs, in the order they closed:
+
+1. **OPEN RISK R-80-NG0203** (a harness cross-package-import integration gap, Plan 03 RED → Plan 08
+   GREEN) — resolved by running the runtime-harness output through the Angular Linker.
+2. **D-09's Bug C** (the outlet resolution chain silently dropping a dynamic consumer fill against a
+   static-only-slot producer, Plan 09 RED → Plan 10 fix, propagated and Docker-VR-confirmed by Plans
+   11-13) — resolved by `hasKeyedFillIntake`, the widened producer keyed-fill intake predicate.
+3. **D-10's second incomplete widening** (the structural slot-presence gate one layer above the outlet
+   chain, sharing the same root cause but never widened by the D-09 fix, Plan 14 Task 1 RED → Plan 14
+   Task 4 GREEN, immediately above) — resolved by `buildSlotsMerge`, the single shared presence-chain
+   builder replacing three near-verbatim copies.
+
+**D-11 (user decision, 2026-08-18) closes Phase 80 on this evidence.** All six D-09/D-10-relevant Docker
+VR cells (`dynamic-slot-name [angular]`, `ModalConsumer · angular` — screenshot and all three
+`modal-consumer-close.spec.ts` functional assertions, `Table · angular`) pass against baselines that
+were never touched at any point in the phase — the two D-09 SPEC-prohibition amendments and both
+red-to-green loops above are the closing evidence D-11 accepts. The residual Docker VR "1px×1px
+empty-mount" class observed alongside this run is filed separately as
+`deferred-items.md` items 5 and 7 (framed as "not caused by Phase 80 — four untouched targets
+affected", explicitly not as "pre-existing", since establishing provenance was not attempted) — it is
+not absorbed into this phase's closing scope. See `80-13-SUMMARY.md` and `80-14-SUMMARY.md` for the
+full closing record.
