@@ -271,12 +271,23 @@ describe('Angular producer — fill map spliced into the resolution chain (Task 
     );
   });
 
-  it('on a producer that emits NO fill map, both resolution expressions are byte-identical to their pre-change form', () => {
+  // AMENDED — Phase 80 Plan 10 (R3/D-09). The case this replaces asserted
+  // "on a producer that emits NO fill map, both resolution expressions are
+  // byte-identical to their pre-change form" — a state that, after Plan 10,
+  // can no longer occur: because a slot invocation only ever reaches this
+  // code from a producer that owns at least one slot declaration (itself),
+  // and `hasKeyedFillIntake` is now unconditional over slot-declaring
+  // producers, EVERY producer this function can run against now emits a
+  // fill map. Rather than delete the coverage, this case pins the amended
+  // invariant on the SAME identifier-only producer the old case used: its
+  // chain is static content-child, then fill map, then `templates`, in that
+  // order, with the static content-child operand still leftmost (SPEC
+  // prohibition 4a — static content-child keeps first precedence).
+  it('on a static-identifier-only producer, the fill map is now part of the chain — static content-child, then fill map, then templates (D-09 widened gate)', () => {
     const code = compileAngular(IDENTIFIER_ONLY_PRODUCER, 'X.rozie');
     expect(code).toContain(
-      "*ngTemplateOutlet=\"(headerTpl ?? templates()?.['header'])\"",
+      "*ngTemplateOutlet=\"(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])\"",
     );
-    expect(code).not.toContain('__rozieFillMap()');
   });
 
   it('the synthetic default-slot key used on the identifier path is the same key the fold normalizes the empty string to', () => {
