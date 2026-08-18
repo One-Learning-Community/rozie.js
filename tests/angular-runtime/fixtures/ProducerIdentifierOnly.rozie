@@ -1,0 +1,22 @@
+<rozie name="ProducerIdentifierOnly">
+
+<!-- Phase 80 Plan 07 (Task 3) — prohibition 2's boundary fixture. A producer
+     with identifier-named STATIC slots only, and NO key-fillable (record-
+     only) slot anywhere. This is deliberately distinct from a zero-slot
+     component: the producer's `hasRecordOnlySlot` gate
+     (`ir.slots.some(isRecordOnlySlotDecl)`) and the import collector's
+     broader "does this component reference the runtime at all" gate share
+     the SAME false result here for two DIFFERENT reasons — a zero-slot
+     component never enters the slot machinery at all, while this producer
+     enters it but every slot resolves false on the record-only predicate.
+     Only THIS fixture sits on the actual boundary between the two gates;
+     testing the zero-slot case alone would leave it uncovered. -->
+
+<template>
+<div class="producer-identifier-only">
+  <slot name="header">[HEADER-FALLBACK]</slot>
+  <slot name="footer">[FOOTER-FALLBACK]</slot>
+</div>
+</template>
+
+</rozie>
