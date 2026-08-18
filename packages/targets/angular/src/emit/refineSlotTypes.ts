@@ -97,6 +97,41 @@ export function isRecordOnlySlotDecl(slot: SlotDecl): boolean {
   return isRecordOnlySlotName(slot.name) || slot.dynamicNameExpr !== undefined;
 }
 
+/**
+ * Phase 80 Plan 10 (R3/D-09) — the keyed-fill INTAKE predicate: can a
+ * consumer send this producer a keyed `[rozieSlot]` fill at all? The answer
+ * is yes for every producer that declares at least one slot — default,
+ * identifier-named, non-identifier, and dynamically-named alike — because
+ * every slot invocation resolves through a keyed lookup
+ * (`emitSlotInvocation.ts`'s `dynKey` / `recordKeyText`).
+ *
+ * THIS PREDICATE MUST STAY EXACTLY AS WIDE AS THE `templates` INPUT GATE in
+ * `emitScript.ts` §6e.bis (`ir.slots.length > 0`). Narrowing one without the
+ * other is precisely what silently dropped consumer fills and produced the
+ * D-09 regression (Phase 80 Plans 09/10, `deferred-items.md` #3): a
+ * static-identifier-only producer's OWN slot naming has no bearing on
+ * whether some consumer, elsewhere in the compilation, sends it a dynamic
+ * `#[expr]` fill — the consumer emits its `[rozieSlot]` marker
+ * unconditionally, a property of the CONSUMER's fill syntax, not the
+ * producer's declaration shape — so the producer's intake must be
+ * unconditional over slot-declaring producers too.
+ *
+ * Contrast with `isRecordOnlySlotDecl` above: that predicate keeps its
+ * narrower, per-SLOT meaning and keeps governing `@ContentChild` field
+ * generation, per-slot context interfaces, and the dev-mode diagnostics
+ * (the empty-fill-map warning) — those stay narrow deliberately, because
+ * they describe what a slot's OWN declared shape needs, not what some
+ * consumer might someday send it. Do not merge the two predicates.
+ *
+ * Widening is safe by construction: the fill map this predicate gates is
+ * empty unless a `[rozieSlot]` marker directive is actually projected into
+ * the producer, so a slot-declaring producer nobody ever dynamically fills
+ * gains only dead-but-harmless intake, never a rendered-output change.
+ */
+export function hasKeyedFillIntake(slots: SlotDecl[]): boolean {
+  return slots.length > 0;
+}
+
 
 /**
  * Build the per-slot interface + @ContentChild field declarations.
