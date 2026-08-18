@@ -1,8 +1,8 @@
 
 <div class="todo-list" #rozieSpread_0 #rozieListenersTarget_1>
   <header>
-    @if ((headerTpl ?? templates()?.['header'])) {
-<ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
+    @if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {
+<ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header']); context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
 } @else {
 
       
@@ -21,8 +21,8 @@
     @for (item of items(); track item.id) {
 <li [class]="{ done: item.done }">
       
-      @if ((defaultTpl ?? templates()?.['defaultSlot'])) {
-<ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_2(item)" />
+      @if ((defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])) {
+<ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_2(item)" />
 } @else {
 
         <label><input type="checkbox" [checked]="item.done" (change)="toggle(item.id)" /><span>{{ rozieDisplay(item.text) }}</span></label>
@@ -34,8 +34,8 @@
   </ul>
 } @else {
 <p class="empty">
-    @if ((emptyTpl ?? templates()?.['empty'])) {
-<ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty'])" />
+    @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
+<ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])" />
 } @else {
 Nothing to do. ✨
 }

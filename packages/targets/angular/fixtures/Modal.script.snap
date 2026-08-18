@@ -1,4 +1,5 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, inject, input, model, output, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, inject, input, model, output, untracked, viewChild } from '@angular/core';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 
 interface HeaderCtx {
@@ -28,6 +29,17 @@ close = output<void>();
 @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
 @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
 templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+__rozieFills = contentChildren(RozieSlot, { descendants: true });
+__rozieFillMap = computed(() => {
+  const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+  for (const f of this.__rozieFills()) {
+    const k = f.rozieSlot();
+    if (k == null) continue;
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+    map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+  }
+  return map;
+});
 private __rozieDestroyRef = inject(DestroyRef);
 private __rozieWatchInitial_0 = true;
 

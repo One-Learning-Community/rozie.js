@@ -53,14 +53,19 @@ describe('emitTemplate — TodoList @for + slots + ngTemplateContextGuard', () =
     expect(template).toContain('@for (item of items(); track item.id)');
   });
 
-  it('TodoList emits *ngTemplateOutlet for slot invocations (Phase 07.3.2 — merged with dynamic `templates()?.[name]` signal lookup; @ContentChild static-name path on LEFT of `??` per D-02)', () => {
+  it('TodoList emits *ngTemplateOutlet for slot invocations (Phase 07.3.2 — merged with dynamic `templates()?.[name]` signal lookup; @ContentChild static-name path on LEFT of `??`; amended Plan 12 with the additive `__rozieFillMap()` middle tier per D-02)', () => {
     const ir = loadIR('TodoList');
     const { template } = emitTemplate(ir, createDefaultRegistry());
-    // Phase 07.3.2 — each *ngTemplateOutlet binding is now the merged form
+    // Phase 07.3.2 — each *ngTemplateOutlet binding is the merged form
     // `(<X>Tpl ?? templates()?.['<x>'])` (D-02 static-wins; A7 signal call).
-    expect(template).toContain(`*ngTemplateOutlet="(headerTpl ?? templates()?.['header'])`);
-    expect(template).toContain(`*ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])`);
-    expect(template).toContain(`*ngTemplateOutlet="(emptyTpl ?? templates()?.['empty'])`);
+    // Phase 80 Plan 12 (amended prohibition 4b, D-09 fix): the chain gains
+    // an additive `__rozieFillMap()['<x>'] ?? ` middle tier between the
+    // static ContentChild ref and the `templates()` fallback — nothing
+    // deleted; see the inverse-transform gate in
+    // tests/angular-runtime/prohibitions.test.ts.
+    expect(template).toContain(`*ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])`);
+    expect(template).toContain(`*ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])`);
+    expect(template).toContain(`*ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])`);
   });
 
   it('TodoList template is parseable Angular block-syntax template (no *ngIf/*ngFor)', () => {

@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, model, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface ItemCtx {
   $implicit: { item: any; remaining: any };
@@ -38,8 +39,8 @@ function __rozieAttr(v: unknown): string | null {
       
       @for (item of items(); track item.id) {
     <li>
-        @if ((itemTpl ?? templates()?.['item'])) {
-    <ng-container *ngTemplateOutlet="(itemTpl ?? templates()?.['item']); context: { $implicit: { item: item, remaining: remaining() }, item: item, remaining: remaining() }" />
+        @if ((itemTpl ?? __rozieFillMap()['item'] ?? templates()?.['item'])) {
+    <ng-container *ngTemplateOutlet="(itemTpl ?? __rozieFillMap()['item'] ?? templates()?.['item']); context: { $implicit: { item: item, remaining: remaining() }, item: item, remaining: remaining() }" />
     } @else {
 
           {{ rozieDisplay(item.label) }}
@@ -67,6 +68,17 @@ export class ScopedSlotContext {
   items = model<any[]>((() => [])());
   @ContentChild('item', { read: TemplateRef }) itemTpl?: TemplateRef<ItemCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
 
   remaining = computed(() => this.items().filter((i: any) => !i.done).length);
 

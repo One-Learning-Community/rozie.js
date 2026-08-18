@@ -415,44 +415,58 @@ describe('emitSlotInvocation — §templates-merge binding (Phase 07.3.2 D-02 st
     };
   }
 
-  it('Modal header-slot binding merges `(headerTpl ?? templates()?.[\'header\'])` at *ngTemplateOutlet (inline form per A7 signal call)', () => {
+  // Phase 80 Plan 12 (amended prohibition 4b, per Plan 10's D-09 fix): the
+  // two-tier `(staticTpl ?? templates()?.[key])` chain gained an additive
+  // middle tier — `__rozieFillMap()[key]` — spliced between the static
+  // ContentChild ref and the `templates()` fallback. Old form:
+  // `(headerTpl ?? templates()?.['header'])`. New form:
+  // `(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])`.
+  // Nothing was deleted; the inverse transform (removing the
+  // `__rozieFillMap()[...] ?? ` segment) reproduces the old bytes exactly —
+  // see tests/angular-runtime/prohibitions.test.ts's inverse-transform gate.
+  it('Modal header-slot binding merges `(headerTpl ?? __rozieFillMap()[\'header\'] ?? templates()?.[\'header\'])` at *ngTemplateOutlet (inline form per A7 signal call)', () => {
     const ir = loadIR('Modal');
     const out = emitSlotInvocation(makeSlotInvocation('header'), makeCtx(ir));
     // Inline form (Pitfall 3 not triggered) — matches the canonical D-SV-16
-    // shape adapted for Angular's signal-call `templates()` read.
+    // shape adapted for Angular's signal-call `templates()` read, now with
+    // the amended (Plan 10/12) fill-map tier spliced in the middle.
     expect(out).toContain(
-      `*ngTemplateOutlet="(headerTpl ?? templates()?.['header'])"`,
+      `*ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])"`,
     );
   });
 
-  it('Modal footer-slot binding merges `(footerTpl ?? templates()?.[\'footer\'])` at *ngTemplateOutlet', () => {
+  it('Modal footer-slot binding merges `(footerTpl ?? __rozieFillMap()[\'footer\'] ?? templates()?.[\'footer\'])` at *ngTemplateOutlet', () => {
     const ir = loadIR('Modal');
     const out = emitSlotInvocation(makeSlotInvocation('footer'), makeCtx(ir));
     expect(out).toContain(
-      `*ngTemplateOutlet="(footerTpl ?? templates()?.['footer'])"`,
+      `*ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])"`,
     );
   });
 
-  it('Modal default-slot binding uses synthetic `defaultSlot` key (refineSlotTypes.ts:24): `(defaultTpl ?? templates()?.[\'defaultSlot\'])`', () => {
+  it('Modal default-slot binding uses synthetic `defaultSlot` key (refineSlotTypes.ts:24): `(defaultTpl ?? __rozieFillMap()[\'defaultSlot\'] ?? templates()?.[\'defaultSlot\'])`', () => {
     const ir = loadIR('Modal');
     const out = emitSlotInvocation(makeSlotInvocation(''), makeCtx(ir));
     // tplField for default slot is `defaultTpl` (slotFieldName('') === 'defaultTpl');
     // dynKey is the synthetic `defaultSlot` ref name.
     expect(out).toContain(
-      `*ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])"`,
+      `*ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])"`,
     );
   });
 
-  it('Modal header-slot binding still emits @ContentChild static-name path on LEFT of `??` (D-02 invariant)', () => {
+  it('Modal header-slot binding still emits @ContentChild static-name path on LEFT of the chain, __rozieFillMap in the middle, templates() last (amended D-02 invariant)', () => {
     const ir = loadIR('Modal');
     const out = emitSlotInvocation(makeSlotInvocation('header'), makeCtx(ir));
-    // Static ref MUST appear before `??`; dynamic templates() MUST appear after.
+    // Static ref MUST appear first; the fill-map tier second; dynamic
+    // templates() MUST appear last. Prohibition 4a (leftmost static-wins
+    // precedence) is unaffected by the 4b amendment — only a new middle
+    // tier was inserted.
     const match = out.match(
-      /\*ngTemplateOutlet="\((\w+Tpl)\s*\?\?\s*templates\(\)\?\.\['([^']+)'\]\)/,
+      /\*ngTemplateOutlet="\((\w+Tpl)\s*\?\?\s*__rozieFillMap\(\)\['([^']+)'\]\s*\?\?\s*templates\(\)\?\.\['([^']+)'\]\)/,
     );
     expect(match).not.toBeNull();
     expect(match![1]).toBe('headerTpl');
     expect(match![2]).toBe('header');
+    expect(match![3]).toBe('header');
   });
 });
 

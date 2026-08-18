@@ -1,6 +1,7 @@
-import { Component, ContentChild, TemplateRef, ViewEncapsulation, forwardRef, input, model, signal } from '@angular/core';
+import { Component, ContentChild, TemplateRef, ViewEncapsulation, computed, contentChildren, forwardRef, input, model, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 import { Modal } from './Modal';
 
@@ -17,16 +18,16 @@ interface ActionsCtx {}
   template: `
 
     <rozie-modal [open]="open()" (openChange)="open.set($event); __rozieCvaOnChange($event)" [title]="title()"><ng-template #header>
-        @if ((brandTpl ?? templates()?.['brand'])) {
-    <ng-container *ngTemplateOutlet="(brandTpl ?? templates()?.['brand'])" />
+        @if ((brandTpl ?? __rozieFillMap()['brand'] ?? templates()?.['brand'])) {
+    <ng-container *ngTemplateOutlet="(brandTpl ?? __rozieFillMap()['brand'] ?? templates()?.['brand'])" />
     } @else {
 
           <h2>{{ title() }}</h2>
         
     }
       </ng-template><ng-template #footer>
-        <ng-container *ngTemplateOutlet="(actionsTpl ?? templates()?.['actions'])" />
-      </ng-template><ng-template #defaultSlot><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></ng-template></rozie-modal>
+        <ng-container *ngTemplateOutlet="(actionsTpl ?? __rozieFillMap()['actions'] ?? templates()?.['actions'])" />
+      </ng-template><ng-template #defaultSlot><ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" /></ng-template></rozie-modal>
 
   `,
   styles: [`
@@ -48,6 +49,17 @@ export class WrapperModal {
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('actions', { read: TemplateRef }) actionsTpl?: TemplateRef<ActionsCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
 
   private __rozieCvaOnChange: (v: boolean) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};

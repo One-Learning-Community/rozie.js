@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface HeaderCtx {
   $implicit: { remaining: any; total: any };
@@ -45,8 +46,8 @@ function __rozieAttr(v: unknown): string | null {
 
     <div class="todo-list" #rozieSpread_0 #rozieListenersTarget_1>
       <header>
-        @if ((headerTpl ?? templates()?.['header'])) {
-    <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
+        @if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {
+    <ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header']); context: { $implicit: { remaining: remaining(), total: items().length }, remaining: remaining(), total: items().length }" />
     } @else {
 
           
@@ -65,8 +66,8 @@ function __rozieAttr(v: unknown): string | null {
         @for (item of items(); track item.id) {
     <li [class]="{ done: item.done }">
           
-          @if ((defaultTpl ?? templates()?.['defaultSlot'])) {
-    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_2(item)" />
+          @if ((defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])) {
+    <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: _defaultSlot_ctx_2(item)" />
     } @else {
 
             <label><input type="checkbox" [checked]="item.done" (change)="_toggle(item.id)" /><span>{{ rozieDisplay(item.text) }}</span></label>
@@ -78,8 +79,8 @@ function __rozieAttr(v: unknown): string | null {
       </ul>
     } @else {
     <p class="empty">
-        @if ((emptyTpl ?? templates()?.['empty'])) {
-    <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty'])" />
+        @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
+    <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])" />
     } @else {
     Nothing to do. ✨
     }
@@ -116,6 +117,17 @@ export class TodoList {
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
 
   remaining = computed(() => this.items().filter((i: any) => !i.done).length);
 

@@ -77,7 +77,18 @@ describe('Angular producer — non-identifier slot name record-only routing (R12
     expect(code).not.toMatch(/cell-statusTpl/);
   });
 
-  it('an identifier-named slot (header) stays byte-identical to the pre-phase merged form', () => {
+  // Phase 80 Plan 12 (amended prohibition 4b, D-09 fix): retitled from
+  // "stays byte-identical to the pre-phase merged form". Before the D-09
+  // fix, an identifier-only producer's slot never gained the fill-map tier
+  // (hasRecordOnlySlot was false for an all-identifier producer). The
+  // widened hasKeyedFillIntake gate (slots.length > 0) now applies to EVERY
+  // slot-declaring producer, so this single-identifier-slot producer gains
+  // the same additive `__rozieFillMap()['header'] ?? ` middle tier as a
+  // record-only producer. Prohibition 4a (the @ContentChild declaration
+  // path itself, and static-content-child-leftmost precedence) is what
+  // stays byte-identical — proven by the second assertion below and by
+  // producerFillMap.test.ts's "diagnostics-negative" case (Plan 10 Task 2).
+  it('an identifier-named slot (header) keeps @ContentChild leftmost and gains the amended fill-map middle tier (was byte-identical pre-Plan-10, D-09 widening)', () => {
     const code = compileAngular(
       `
 <rozie name="X">
@@ -88,7 +99,7 @@ describe('Angular producer — non-identifier slot name record-only routing (R12
 `,
       'X.rozie',
     );
-    expect(code).toContain("*ngTemplateOutlet=\"(headerTpl ?? templates()?.['header'])\"");
+    expect(code).toContain("*ngTemplateOutlet=\"(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])\"");
     expect(code).toContain("@ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;");
   });
 

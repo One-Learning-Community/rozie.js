@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface HeaderCtx {
   $implicit: { close: any };
@@ -48,8 +49,8 @@ function __rozieAttr(v: unknown): string | null {
       <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [attr.aria-label]="rozieAttr(title() || undefined)" tabindex="-1">
         @if (title() || (headerTpl ?? templates()?.['header'])) {
     <header>
-          @if ((headerTpl ?? templates()?.['header'])) {
-    <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { close: _close }, close: _close }" />
+          @if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {
+    <ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header']); context: { $implicit: { close: _close }, close: _close }" />
     } @else {
 
             <h2>{{ title() }}</h2>
@@ -58,13 +59,13 @@ function __rozieAttr(v: unknown): string | null {
           <button class="close-btn" aria-label="Close" (click)="_close()">×</button>
         </header>
     }<div class="modal-body">
-          <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { close: _close }, close: _close }" />
+          <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: { $implicit: { close: _close }, close: _close }" />
         </div>
 
         @if ((footerTpl ?? templates()?.['footer'])) {
     <footer>
-          @if ((footerTpl ?? templates()?.['footer'])) {
-    <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer']); context: { $implicit: { close: _close }, close: _close }" />
+          @if ((footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])) {
+    <ng-container *ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer']); context: { $implicit: { close: _close }, close: _close }" />
     }
         </footer>
     }</div>
@@ -122,6 +123,17 @@ export class Modal {
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
 

@@ -68,7 +68,16 @@ function makeInvocation(slotName: string): TemplateSlotInvocationIR {
   };
 }
 
-describe('§inner-guard-merged — @if guard uses mergedTplRef (Plan 10 F-07.3.2-05-A)', () => {
+// Phase 80 Plan 12 (amended prohibition 4b, per Plan 10's D-09 fix): every
+// producer IR with at least one slot now has hasKeyedFillIntake(ir.slots)
+// === true (the widened gate), so the merged resolution form these three
+// cases assert on gains the additive `__rozieFillMap()['header'] ?? ` middle
+// tier between the static ContentChild ref and the `templates()` fallback.
+// Old form: `(headerTpl ?? templates()?.['header'])`. New form:
+// `(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])`.
+// Nothing deleted — see the inverse-transform gate in
+// tests/angular-runtime/prohibitions.test.ts.
+describe('§inner-guard-merged — @if guard uses mergedTplRef (Plan 10 F-07.3.2-05-A, amended Plan 12)', () => {
   it('it #1: presence=conditional, no fallback — @if uses merged form', () => {
     const ir = makeIR([makeSlot('header', 'conditional')]);
     const inv = makeInvocation('header');
@@ -76,7 +85,9 @@ describe('§inner-guard-merged — @if guard uses mergedTplRef (Plan 10 F-07.3.2
       ir,
       emitChildren: () => '',
     });
-    expect(out).toMatch(/^@if \(\(headerTpl \?\? templates\(\)\?\.\['header'\]\)\)/);
+    expect(out).toMatch(
+      /^@if \(\(headerTpl \?\? __rozieFillMap\(\)\['header'\] \?\? templates\(\)\?\.\['header'\]\)\)/,
+    );
     // Make sure no bare-tplField @if leaked through.
     expect(out).not.toMatch(/@if \(headerTpl\) \{/);
   });
@@ -94,7 +105,9 @@ describe('§inner-guard-merged — @if guard uses mergedTplRef (Plan 10 F-07.3.2
       ir,
       emitChildren: () => 'Fallback',
     });
-    expect(out).toContain("@if ((headerTpl ?? templates()?.['header'])) {");
+    expect(out).toContain(
+      "@if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {",
+    );
     expect(out).toContain('@else {');
     expect(out).not.toMatch(/@if \(headerTpl\) \{/);
   });
@@ -109,7 +122,10 @@ describe('§inner-guard-merged — @if guard uses mergedTplRef (Plan 10 F-07.3.2
     // No @if wrapper — bare outlet tag.
     expect(out).not.toContain('@if (');
     expect(out).toContain('*ngTemplateOutlet');
-    // Outlet binding still uses the merged form (Plan 03).
-    expect(out).toContain("(headerTpl ?? templates()?.['header'])");
+    // Outlet binding still uses the merged form (Plan 03), now with the
+    // amended (Plan 10/12) fill-map tier spliced in the middle.
+    expect(out).toContain(
+      "(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])",
+    );
   });
 });

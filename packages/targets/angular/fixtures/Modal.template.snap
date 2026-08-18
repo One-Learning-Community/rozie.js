@@ -4,8 +4,8 @@
   <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [attr.aria-label]="rozieAttr(title() || undefined)" tabindex="-1">
     @if (title() || (headerTpl ?? templates()?.['header'])) {
 <header>
-      @if ((headerTpl ?? templates()?.['header'])) {
-<ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { close: close }, close: close }" />
+      @if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {
+<ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header']); context: { $implicit: { close: close }, close: close }" />
 } @else {
 
         <h2>{{ title() }}</h2>
@@ -14,13 +14,13 @@
       <button class="close-btn" aria-label="Close" (click)="close($event)">×</button>
     </header>
 }<div class="modal-body">
-      <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { close: close }, close: close }" />
+      <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: { $implicit: { close: close }, close: close }" />
     </div>
 
     @if ((footerTpl ?? templates()?.['footer'])) {
 <footer>
-      @if ((footerTpl ?? templates()?.['footer'])) {
-<ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer']); context: { $implicit: { close: close }, close: close }" />
+      @if ((footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])) {
+<ng-container *ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer']); context: { $implicit: { close: close }, close: close }" />
 }
     </footer>
 }</div>

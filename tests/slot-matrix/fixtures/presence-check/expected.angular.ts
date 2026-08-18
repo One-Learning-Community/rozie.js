@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, inject, input, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface AsideCtx {}
 
@@ -12,8 +13,8 @@ interface AsideCtx {}
     <div class="presence-check-fixture" #rozieSpread_0 #rozieListenersTarget_1>
       @if ((asideTpl ?? templates()?.['aside'])) {
     <aside>
-        @if ((asideTpl ?? templates()?.['aside'])) {
-    <ng-container *ngTemplateOutlet="(asideTpl ?? templates()?.['aside'])" />
+        @if ((asideTpl ?? __rozieFillMap()['aside'] ?? templates()?.['aside'])) {
+    <ng-container *ngTemplateOutlet="(asideTpl ?? __rozieFillMap()['aside'] ?? templates()?.['aside'])" />
     }
       </aside>
     }</div>
@@ -26,6 +27,17 @@ interface AsideCtx {}
 export class PresenceCheckFixture {
   @ContentChild('aside', { read: TemplateRef }) asideTpl?: TemplateRef<AsideCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
 
   static ngTemplateContextGuard(
     _dir: PresenceCheckFixture,
