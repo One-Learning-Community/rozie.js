@@ -19,9 +19,10 @@ import { parse } from '../../../../core/src/parse.js';
 import { lowerToIR } from '../../../../core/src/ir/lower.js';
 import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
 import { emitAngular } from '../emitAngular.js';
+import { hasKeyedFillIntake } from '../emit/refineSlotTypes.js';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 
-function compileAngular(src: string, filename: string): string {
+function lowerAngular(src: string, filename: string): IRComponent {
   const result = parse(src, { filename });
   if (!result.ast) {
     throw new Error(
@@ -32,7 +33,11 @@ function compileAngular(src: string, filename: string): string {
   if (!lowered.ir) {
     throw new Error(`lowerToIR() returned null IR for ${filename}`);
   }
-  const ir: IRComponent = lowered.ir;
+  return lowered.ir;
+}
+
+function compileAngular(src: string, filename: string): string {
+  const ir = lowerAngular(src, filename);
   const { code } = emitAngular(ir, { filename, source: src });
   return code;
 }
@@ -62,6 +67,51 @@ const NO_SLOT_PRODUCER = `
 </template>
 </rozie>
 `;
+
+const DEFAULT_SLOT_ONLY_PRODUCER = `
+<rozie name="Def2">
+<template>
+<div><slot></slot></div>
+</template>
+</rozie>
+`;
+
+// Phase 80 Plan 10 (R3/D-09) — the keyed-fill intake predicate's own
+// behavior contract, written and observed RED (missing export) before
+// `hasKeyedFillIntake` existed in refineSlotTypes.ts.
+describe('Angular producer — keyed-fill intake predicate (Task 1, D-09)', () => {
+  it('returns true for a producer declaring one identifier-named static slot', () => {
+    const ir = lowerAngular(IDENTIFIER_ONLY_PRODUCER, 'X.rozie');
+    expect(hasKeyedFillIntake(ir.slots)).toBe(true);
+  });
+
+  it('returns true for a producer declaring only a record-only slot', () => {
+    const ir = lowerAngular(RECORD_ONLY_PRODUCER, 'Cell.rozie');
+    expect(hasKeyedFillIntake(ir.slots)).toBe(true);
+  });
+
+  it('returns true for a producer declaring only the default slot', () => {
+    const ir = lowerAngular(DEFAULT_SLOT_ONLY_PRODUCER, 'Def2.rozie');
+    expect(hasKeyedFillIntake(ir.slots)).toBe(true);
+  });
+
+  it('returns false for a component declaring no slots', () => {
+    const ir = lowerAngular(NO_SLOT_PRODUCER, 'Plain.rozie');
+    expect(hasKeyedFillIntake(ir.slots)).toBe(false);
+  });
+
+  it('equals the condition that governs the templates input (`ir.slots.length > 0`) for every one of the above cases', () => {
+    for (const [src, filename] of [
+      [IDENTIFIER_ONLY_PRODUCER, 'X.rozie'],
+      [RECORD_ONLY_PRODUCER, 'Cell.rozie'],
+      [DEFAULT_SLOT_ONLY_PRODUCER, 'Def2.rozie'],
+      [NO_SLOT_PRODUCER, 'Plain.rozie'],
+    ] as const) {
+      const ir = lowerAngular(src, filename);
+      expect(hasKeyedFillIntake(ir.slots)).toBe(ir.slots.length > 0);
+    }
+  });
+});
 
 describe('Angular producer — content-collected fill map (Task 1)', () => {
   it('a producer with at least one key-fillable slot emits __rozieFills, __rozieFillMap, and the RozieSlot runtime import', () => {
