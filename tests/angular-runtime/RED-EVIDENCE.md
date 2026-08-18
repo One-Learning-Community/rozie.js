@@ -518,3 +518,162 @@ duplicate builders); once it lands, these same two new files — unmodified — 
 observation for D-10's second incomplete-widening bug, mirroring the convention the two red-to-green
 pairs above already established in this same file. **Do not "fix" these tests by loosening or removing
 an assertion; the fix belongs in the emitter, not the test.**
+
+## GREEN — Phase 80 Plan 14 (Task 4), D-10's SECOND incomplete-widening bug closed
+
+**This section is the third red-to-green pair in this file.** It closes the RED section immediately
+above (Plan 14 Task 1). Do not confuse this GREEN with either section above it — the first closed OPEN
+RISK R-80-NG0203 (a harness integration gap); the second closed D-09's Bug C (the outlet resolution
+chain, `emitSlotInvocation.ts`, fixed by Plan 10); this one closes D-10's second, distinct bug — the
+structural slot-presence gate (`buildSlotsMerge`/`buildScriptSlotsMerge`/`buildListenerSlotsMerge`,
+now unified into `packages/targets/angular/src/rewrite/buildSlotsMerge.ts`).
+
+**Pre-fix (RED) commit, for reference:** `a8efcc3c` (Plan 14 Task 1's fixture-and-tests-only commit;
+zero files under `packages/targets/angular/src/rewrite` touched).
+**Fix commits:** `7985edbf` (Task 2 — the shared `buildSlotsMerge.ts` module and all four call sites),
+`c9a9345b` (Task 3 — cold rebuild, propagation, and evidence-cited rebless).
+**Post-fix (GREEN) commit:** this commit (Phase 80 Plan 14, Task 4).
+
+### What changed in the emitter, and why it fixes each case
+
+Three near-verbatim two-tier presence-chain builders — one per rewrite context (inline template,
+class-body script, listener body) — were replaced by a single shared `buildSlotsMerge` function. All
+four call sites now splice the content-collected `__rozieFillMap()[key]` term into the presence chain,
+gated on the same `hasKeyedFillIntake` predicate the outlet chain already used, with an
+unreachable-invariant throw guarding the (never-taken-in-practice) false branch. The tier text is
+byte-identical in shape to the outlet chain's own term — non-optional computed member access, single-
+quoted key — pinned by a cross-chain comparison assertion (Task 1) rather than a duplicated literal.
+The result: a wrapper element gated on `$slots.foo` now renders whenever EITHER a static content-child
+fill OR a content-collected dynamic fill OR the `templates` input satisfies the slot — matching exactly
+what the outlet immediately inside that wrapper already required to render its content.
+
+### Case-by-case: Task 1's RED mapped to this task's GREEN
+
+| # | Test | Task 1 (RED, commit `a8efcc3c`) | Task 4 (GREEN, this commit) |
+|---|------|-----------------------------------|-------------------------------|
+| 1 | prop-OR-slot gate (Modal shape) carries the fill-map tier for `header` | FAILED — outer gate was `(headerTpl ?? templates()?.['header'])`, no fill-map tier | **PASSED** |
+| 2 | slot-OR-slot gate (Table shape) carries the fill-map tier for both slots | FAILED — same shape, both operands | **PASSED** |
+| 3 | cross-chain agreement (gate vs. outlet) for `header` | FAILED — no fill-map term to find | **PASSED** — gate and outlet chains are byte-identical |
+| 4 | template-context unit: `$slots.header` → three-tier chain | FAILED | **PASSED** |
+| 5 | template-context unit: `prefixThis: true` → class-scoped three-tier chain | FAILED | **PASSED** |
+| 6 | script-context unit: `rewriteRozieIdentifiers` → class-scoped three-tier chain | FAILED | **PASSED** |
+| 7 | listener-context unit: `rewriteListenerExpression` → class-scoped three-tier chain | FAILED | **PASSED** |
+| 8 | optional-member branch === plain-member branch | PASSED (unchanged — an internal-consistency check, correct pre- and post-fix) | **PASSED** |
+
+**Command:** `pnpm exec vitest run --root packages/targets/angular gatedSlotPresenceFillMap`
+
+```
+Test Files  1 passed (1)
+     Tests  8 passed (8)
+```
+
+| # | Test | Task 1 (RED) | Task 4 (GREEN) |
+|---|------|----------------|-------------------|
+| 1 | prop-OR-slot gate (Modal shape) — gated header wrapper renders with the fill inside it | FAILED — `expected null not to be null` — `[data-testid="gated-header-wrapper"]` was `null`; the wrapper ELEMENT never mounted | **PASSED** — wrapper renders, fill text present, own fallback absent |
+| 2 | slot-OR-slot gate (Table shape) — gated footer wrapper renders, filled + unfilled slots both correct | FAILED — same shape, `[data-testid="gated-footer-wrapper"]` was `null` | **PASSED** — wrapper renders; filled slot shows its fill; unfilled sibling shows its own fallback |
+
+**Command:** `pnpm exec vitest run --root tests/angular-runtime gatedProducerKeyedFill`
+
+```
+Test Files  1 passed (1)
+     Tests  2 passed (2)
+```
+
+### No assertion weakened
+
+`git diff a8efcc3c -- tests/angular-runtime/gatedProducerKeyedFill.test.ts` is **empty** — this file has
+not been touched by any commit since it landed RED. `git diff a8efcc3c -- packages/targets/angular/src/__tests__/gatedSlotPresenceFillMap.test.ts`
+shows exactly **one** change: a regex capture-group boundary correction in the cross-chain-agreement
+test (moving the outer parenthesis inside the capture group so both sides of the comparison capture the
+same substring shape) — a mechanical fix to the test's OWN regex authoring, not a weakening of what it
+asserts; the comparison still requires the gate's chain text and the outlet's chain text to be
+byte-identical.
+
+### The one authorized Docker visual-regression union run
+
+**Command:** `bash tools/ci-repro/vr.sh` (full matrix, Linux-rendered, Playwright container). This is the
+single run D-10 authorizes across Plans 13 and 14 combined — Plan 13's Task 2 is discharged by this run
+and must not be re-run when Plan 13 resumes at its Task 3.
+
+**Result:** `2161 passed`, `7 failed`, `15 flaky` (recovered on retry), `7 skipped` (pre-existing
+`test.fixme` baseline-pending gates, unrelated to this plan), total runtime 20.0 minutes.
+
+**The two D-10 cells — both pass on the FIRST attempt, no retries, against baselines that were never
+touched:**
+
+```
+✓ specs/matrix.spec.ts:1405:5 › ModalConsumer · angular (1.2s)
+✓ specs/matrix.spec.ts:1405:5 › Table · angular (523ms)
+✓ specs/modal-consumer-close.spec.ts:98:3 › ModalConsumer · angular: clicking close button in header fill fires the scoped close callback (1.7s)
+✓ specs/modal-consumer-close.spec.ts:144:3 › ModalConsumer · angular: Modal 2 dynamic-fill text "Dynamic header via slotName" is visible (979ms)
+✓ specs/modal-consumer-close.spec.ts:177:3 › ModalConsumer · angular: Modal 3 WrapperModal re-projects #brand to inner header and #actions to inner footer (979ms)
+✓ specs/dynamic-slot-name.spec.ts:113:3 › dynamic-slot-name [angular]: runtime toggle of slotName swaps the projected fill (1.5s) — control, re-verified green
+```
+
+**DOM-level evidence, independent of the screenshot comparison**, captured via a local (non-Docker)
+Playwright script against the same built `tests/visual-regression` host bundle, navigating the real
+`ModalConsumer` and `Table` example routes at `target=angular` and querying the live DOM directly:
+
+- **ModalConsumer, Modal 2** (the prop-OR-slot gate, `$props.title || $slots.header`, no `title` prop
+  passed — the gate depends ENTIRELY on `$slots.header` resolving through the widened chain): 3 dialogs
+  present; Modal 2's `<header>` element count = **1** (the wrapper renders — pre-fix this element did
+  not exist in the DOM at all); observed text: `"Dynamic header via slotName\n×"` — the dynamic fill
+  text plus the producer's own close button, both present inside the now-rendered wrapper.
+- **Table footer** (the slot-OR-slot gate, `$slots.footerSummary || $slots.footerPagination`, no prop
+  operand): `<tfoot>` element count = **1** (the wrapper renders — pre-fix this element did not exist);
+  observed text before toggle: `"Total score: 200"` (the `footerSummary` dynamic fill, matching the sum
+  of the three seeded rows' scores: 92+67+41); after clicking "Toggle footer": `"Page 1 of 1 — 3 rows"`
+  (the `footerPagination` dynamic fill) — proving the SAME wrapper correctly re-resolves for BOTH
+  operands of the slot-OR-slot gate, not just whichever happened to be present at mount.
+
+### Triage — every other failure classified as flake (named, unchanged) or real (root-caused)
+
+**The four cells D-10 named as suspected contention flakes** (from Plan 13's run) all reproduced again
+in this run, still showing the identical symptom — `Dropdown · angular`, `Card · angular`,
+`ThemedButtonConsumer · angular`, `ThemedButtonConsumer · solid`. This run additionally surfaced the
+SAME symptom on three more cells not previously named — `TodoList · angular`, `Modal · angular`,
+`ThemedButtonAllManual · angular` — plus, among the 15 flaky (recovered-on-retry) cells: `Counter ·
+angular`, `Modal · lit`, `TreeNode · angular`, `TreeNode · lit`, `Card · solid`, `CardHeader · angular`,
+`CardHeader · solid`, `FullCalendarSlots · solid`, `ThemedButtonListenersManual · angular`,
+`ThemedButtonListenersManual · solid`, `RHtml · lit`, `KeynavCombobox · angular`.
+
+Every one of these — all 7 deterministic failures and all 13 matrix-cell flakes — fails with the
+IDENTICAL signature: `Expected an image <W>px by <H>px, received 1px by 1px` — a total empty-mount
+screenshot (the `[data-testid="rozie-mount"]` element painted nothing at all), never a partial content
+diff. This is diagnostic: a real regression in the widened presence chain would produce a PARTIAL image
+missing exactly the gated region (e.g. `Modal.png`'s expected height minus the header/footer strip),
+not a total 1×1px non-render. None of the 20 affected cells shows that shape. The failure spans
+components (Dropdown, TodoList, Card, ThemedButtonConsumer/AllManual/ListenersManual, Counter,
+TreeNode, CardHeader, FullCalendarSlots, RHtml, KeynavCombobox) that have NOTHING to do with a
+slot-presence gate — several declare no slots at all — and spans three different targets (angular,
+solid, lit), which further supports whole-page mount failure under container resource contention (this
+run's matrix + full spec suite is materially heavier than Plan 13's narrower run) rather than a
+target-specific or slot-specific code defect. **Classified as flake, named above, not dismissed and not
+re-baselined** — consistent with, and an extension of, D-10's own "unproven contention flake" hypothesis,
+now observed at higher concurrency. `Modal · angular` in particular — the direct flagship demo for this
+plan's own fix — shows the SAME 1×1px empty-mount signature, not a content-specific diff, and its own
+`ModalConsumer · angular` cell (which mounts the identical `Modal` component three times, including
+through the exact gated-header shape) passed cleanly on the first attempt in the SAME run — inconsistent
+with a real content regression in `Modal`'s own gate, consistent with a one-off mount-timing flake on
+that specific cell's own page load.
+
+**The two non-Angular, non-screenshot flakes** — `command-palette-default-items [react]`/`[lit]`
+(`command-palette.spec.ts`) and `data-table-dropins editor [vue]` (`data-table-dropins.spec.ts`) — are
+pre-existing, timing-sensitive functional specs unrelated to Angular, unrelated to slots, and unrelated
+to this plan's changes; both recovered on retry. Named, unchanged.
+
+**No baseline image or `.png` file was modified anywhere in this run** — `git status --porcelain`
+confirms zero image-file entries after the run.
+
+### Frozen-lockfile constraint
+
+`pnpm install --frozen-lockfile` exits zero at this commit (no `package.json`/lockfile changes in this
+task).
+
+### Closing the loop
+
+D-10's second incomplete-widening bug — the structural slot-presence gate that decides whether a wrapper
+ELEMENT renders at all, distinct from the outlet chain Plan 10 already widened — is closed at the
+source-emission, runtime-harness, and Docker-VR levels. Plan 13's Task 2 (the Docker visual-regression
+union run) is discharged by this task; when Plan 13 resumes execution, it begins at its Task 3, citing
+this record for the union-run evidence and the two SPEC-prohibition-amendment acceptance material.
