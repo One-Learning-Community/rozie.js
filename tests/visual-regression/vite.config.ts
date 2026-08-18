@@ -690,7 +690,38 @@ export default defineConfig(async () => {
     // plugin-react 6 + Vite 8 (Rolldown) no longer auto-dedupes React; without
     // this the react target's cells double-bundle React and crash on a null
     // dispatcher (`useRef` of null). Mirrors the consumer demos' vite.config.
-    dedupe: ['react', 'react-dom'],
+    //
+    // Phase 80 Plan 08 — same dual-package-hazard class as the react entry
+    // above, discovered while diagnosing "JIT compiler unavailable" on the
+    // three record-path Angular VR cells (ModalConsumer, Table,
+    // DynamicSlotName). pnpm's peer-dependency-aware store gives
+    // `@angular/core@19.2.22` a DIFFERENT physical copy per distinct
+    // `zone.js` peer-resolution context: `packages/runtime/angular`
+    // resolves against `zone.js@0.15.1`, `tests/visual-regression` against
+    // `zone.js@0.14.10` (verified via `require.resolve` from each
+    // package's own root). Without dedupe, Rollup bundles TWO separate
+    // `@angular/core` copies into the SAME Angular sub-build output —
+    // `entry.angular.ts`'s dynamic `createComponent()` call (from one
+    // copy) instantiating `ModalConsumer`, whose `imports: [RozieSlot]`
+    // was compiled against the OTHER copy, fails Angular's internal
+    // component/directive-definition identity checks and falls back to a
+    // JIT path that doesn't exist in a pure-AOT bundle — surfacing as
+    // "JIT compiler unavailable" at runtime despite every file involved
+    // being genuinely, individually AOT-linked (see the standalone
+    // `angularPartialIvyLinkerPlugin` investigation in
+    // tests/angular-runtime/vitest.config.ts for the sibling diagnosis of
+    // the SAME underlying pnpm resolution split, in a different harness).
+    dedupe: [
+      'react',
+      'react-dom',
+      '@angular/core',
+      '@angular/common',
+      '@angular/compiler',
+      '@angular/platform-browser',
+      '@angular/platform-browser-dynamic',
+      'rxjs',
+      'zone.js',
+    ],
     alias: [
       { find: /^@fullcalendar\/list$/, replacement: fullCalendarListEsm },
       // Option-A cross-family composition (P75 + data-table 260713-iiy):
