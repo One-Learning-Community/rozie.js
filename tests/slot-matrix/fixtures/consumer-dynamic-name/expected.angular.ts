@@ -1,15 +1,15 @@
-import { Component, TemplateRef, ViewChild, ViewEncapsulation, signal } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import { Component, ViewEncapsulation, signal } from '@angular/core';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 import { Producer } from './producer';
 
 @Component({
   selector: 'rozie-consumer',
   standalone: true,
-  imports: [NgTemplateOutlet, Producer],
+  imports: [RozieSlot, Producer],
   template: `
 
-    <rozie-producer [templates]="templates"><ng-template #__dynSlot_0>Dynamic fill</ng-template></rozie-producer>
+    <rozie-producer><ng-template [rozieSlot]="slotName()">Dynamic fill</ng-template></rozie-producer>
 
   `,
   styles: [`
@@ -18,12 +18,6 @@ import { Producer } from './producer';
 })
 export class Consumer {
   slotName = signal('a');
-
-  @ViewChild('__dynSlot_0', { static: true }) __dynSlot_0?: TemplateRef<unknown>;
-
-  get templates(): Record<string, TemplateRef<unknown>> {
-      return { [this.slotName()]: this.__dynSlot_0! };
-    }
 }
 
 export default Consumer;

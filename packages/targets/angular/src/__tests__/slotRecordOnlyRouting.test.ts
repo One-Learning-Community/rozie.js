@@ -36,7 +36,7 @@ function compileAngular(src: string, filename: string): string {
 }
 
 describe('Angular producer — non-identifier slot name record-only routing (R12/D-03)', () => {
-  it('a non-identifier slot name (cell-status) emits a templates() signal-map lookup with NO `??` merge', () => {
+  it('a non-identifier slot name (cell-status) emits a __rozieFillMap()/templates() signal-map lookup chain (Phase 80 rebless)', () => {
     const code = compileAngular(
       `
 <rozie name="Cell">
@@ -48,10 +48,14 @@ describe('Angular producer — non-identifier slot name record-only routing (R12
 `,
       'Cell.rozie',
     );
-    expect(code).toContain("templates()?.['cell-status']");
-    const invocation = code.match(/\*ngTemplateOutlet="templates\(\)\?\.\['cell-status'\][^"]*"/);
+    // Phase 80 rebless: a record-only slot's lookup gained the fill-map
+    // precedence tier (proven by producerFillMap.test.ts, Plan 04 Task 3) —
+    // this test no longer asserts the ABSENCE of `??`.
+    expect(code).toContain("__rozieFillMap()['cell-status'] ?? templates()?.['cell-status']");
+    const invocation = code.match(
+      /\*ngTemplateOutlet="\(__rozieFillMap\(\)\['cell-status'\] \?\? templates\(\)\?\.\['cell-status'\]\)[^"]*"/,
+    );
     expect(invocation).not.toBeNull();
-    expect(invocation![0]).not.toContain('??');
   });
 
   it('a non-identifier slot name mints NO @ContentChild whose argument contains a hyphen', () => {
@@ -88,7 +92,7 @@ describe('Angular producer — non-identifier slot name record-only routing (R12
     expect(code).toContain("@ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;");
   });
 
-  it('a component declaring BOTH cell-status and header emits record-only for the first and merge for the second, in IR order', () => {
+  it('a component declaring BOTH cell-status and header emits record-only for the first and a three-tier merge for the second, in IR order (Phase 80 rebless)', () => {
     const code = compileAngular(
       `
 <rozie name="Mixed">
@@ -103,8 +107,15 @@ describe('Angular producer — non-identifier slot name record-only routing (R12
 `,
       'Mixed.rozie',
     );
-    const cellIdx = code.indexOf("templates()?.['cell-status']");
-    const headerIdx = code.indexOf("(headerTpl ?? templates()?.['header'])");
+    // Phase 80 rebless: the MIXED producer's identifier-named `header` slot
+    // deliberately gains the fill-map tier too (per-slot, not per-slot-kind
+    // precedence — Plan 04 summary), so the pre-phase two-tier
+    // `(headerTpl ?? templates()?.['header'])` form is now three-tier. Proven
+    // by producerFillMap.test.ts (Plan 04 Task 3) and confirmed byte-for-byte
+    // against tests/dist-parity/fixtures/DynamicSlots.angular.ts's
+    // `headerCellTpl` chain in this same rebless pass.
+    const cellIdx = code.indexOf("__rozieFillMap()['cell-status'] ?? templates()?.['cell-status']");
+    const headerIdx = code.indexOf("(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])");
     expect(cellIdx).toBeGreaterThan(-1);
     expect(headerIdx).toBeGreaterThan(-1);
     expect(cellIdx).toBeLessThan(headerIdx);
@@ -150,8 +161,8 @@ describe('Angular producer — non-identifier slot name record-only routing (R12
   });
 });
 
-describe('Angular consumer — non-identifier slot fill routes into the [templates] getter path (R12/D-03)', () => {
-  it('a fill targeting a non-identifier slot name (#cell-status) routes through the [templates] getter, not @ContentChild', () => {
+describe('Angular consumer — non-identifier slot fill routes into the [rozieSlot] marker path (R12/D-03, Phase 80 rebless)', () => {
+  it('a fill targeting a non-identifier slot name (#cell-status) routes through a [rozieSlot] marker, not @ContentChild', () => {
     const code = compileAngular(
       `
 <rozie name="ConsumerX">
@@ -169,9 +180,14 @@ describe('Angular consumer — non-identifier slot fill routes into the [templat
 `,
       'ConsumerX.rozie',
     );
-    expect(code).toMatch(/\[templates\]="templates"/);
-    expect(code).toMatch(/get templates\(\): Record<string, TemplateRef<unknown>>/);
-    expect(code).toMatch(/\['cell-status'\]: this\.__dynSlot_\d+!/);
+    // Phase 80 rebless: the `[templates]`-getter mechanism this test used to
+    // assert is a net deletion (SPEC R4) — the fill is now a marker directive
+    // bound to the quoted string literal. New shape proven by
+    // consumerRozieSlotFill.test.ts (Phase 80 Plan 05, Task 1, 4/4 pass).
+    expect(code).toContain('<ng-template [rozieSlot]="\'cell-status\'" let-value="value">');
+    expect(code).not.toMatch(/\[templates\]="templates"/);
+    expect(code).not.toMatch(/get templates\(\): Record<string, TemplateRef<unknown>>/);
+    expect(code).not.toMatch(/__dynSlot_\d+/);
     expect(code).not.toMatch(/#cell-status/);
   });
 });

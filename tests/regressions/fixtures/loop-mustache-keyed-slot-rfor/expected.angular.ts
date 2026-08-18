@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, inject, input, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-loop-mustache-keyed-slot-rfor',
@@ -9,7 +10,7 @@ import { NgTemplateOutlet } from '@angular/common';
 
 
     <div class="r" #rozieSpread_0 #rozieListenersTarget_1>@for (row of rows(); track row.id) {
-    <ng-container *ngTemplateOutlet="templates()?.[row]" />
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[row] ?? templates()?.[row])" />
     }</div>
 
   `,
@@ -20,6 +21,41 @@ import { NgTemplateOutlet } from '@angular/common';
 export class LoopMustacheKeyedSlotRfor {
   rows = input<any[]>((() => [])());
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
+  __rozieProjectedTpls = contentChildren(TemplateRef, { descendants: true });
+  __rozieSlotWarned = false;
+
+  constructor() {
+    effect(() => {
+      if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;
+      const fills = this.__rozieFills();
+      const seen = new Set<string>();
+      for (const f of fills) {
+        const k = f.rozieSlot();
+        if (k == null) continue;
+        if (seen.has(k)) {
+          this.__rozieSlotWarned = true;
+          console.warn('[ROZ750] LoopMustacheKeyedSlotRfor: duplicate keyed fill "' + k + '" — the last fill (in content-query order) wins.');
+          return;
+        }
+        seen.add(k);
+      }
+      if (fills.length === 0 && this.__rozieProjectedTpls().length > 0) {
+        this.__rozieSlotWarned = true;
+        console.warn('[ROZ750] LoopMustacheKeyedSlotRfor: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\'s imports: array?');
+      }
+    });
+  }
 
   noop = (): void => {};
 

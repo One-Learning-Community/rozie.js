@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, inject, input, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface HeaderCellCtx {
   $implicit: { title: any };
@@ -41,8 +42,8 @@ function __rozieAttr(v: unknown): string | null {
     <div class="dynamic-slots" #rozieSpread_0 #rozieListenersTarget_1>
 
       
-      @if (templates()?.['cell-total']) {
-    <ng-container *ngTemplateOutlet="templates()?.['cell-total']; context: { $implicit: { value: total() }, value: total() }" />
+      @if ((__rozieFillMap()['cell-total'] ?? templates()?.['cell-total'])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()['cell-total'] ?? templates()?.['cell-total']); context: { $implicit: { value: total() }, value: total() }" />
     } @else {
 
         <strong>{{ total() }}</strong>
@@ -52,8 +53,8 @@ function __rozieAttr(v: unknown): string | null {
       
       @for (col of columns(); track col.key) {
     <div>
-        @if (templates()?.[\`cell-\${col.key}\`]) {
-    <ng-container *ngTemplateOutlet="templates()?.[\`cell-\${col.key}\`]; context: { $implicit: { row: row(), value: row()[col.key] }, row: row(), value: row()[col.key] }" />
+        @if ((__rozieFillMap()[\`cell-\${col.key}\`] ?? templates()?.[\`cell-\${col.key}\`])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`cell-\${col.key}\`] ?? templates()?.[\`cell-\${col.key}\`]); context: { $implicit: { row: row(), value: row()[col.key] }, row: row(), value: row()[col.key] }" />
     } @else {
 
           <span>{{ rozieDisplay(row()[col.key]) }}</span>
@@ -63,8 +64,8 @@ function __rozieAttr(v: unknown): string | null {
     }
 
       
-      @if (templates()?.[freeSlotName()]) {
-    <ng-container *ngTemplateOutlet="templates()?.[freeSlotName()]; context: { $implicit: { label: freeSlotName() }, label: freeSlotName() }" />
+      @if ((__rozieFillMap()[freeSlotName()] ?? templates()?.[freeSlotName()])) {
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[freeSlotName()] ?? templates()?.[freeSlotName()]); context: { $implicit: { label: freeSlotName() }, label: freeSlotName() }" />
     } @else {
 
         <em>fallback</em>
@@ -72,8 +73,8 @@ function __rozieAttr(v: unknown): string | null {
     }
 
       
-      @if ((headerCellTpl ?? templates()?.['headerCell'])) {
-    <ng-container *ngTemplateOutlet="(headerCellTpl ?? templates()?.['headerCell']); context: { $implicit: { title: heading() }, title: heading() }" />
+      @if ((headerCellTpl ?? __rozieFillMap()['headerCell'] ?? templates()?.['headerCell'])) {
+    <ng-container *ngTemplateOutlet="(headerCellTpl ?? __rozieFillMap()['headerCell'] ?? templates()?.['headerCell']); context: { $implicit: { title: heading() }, title: heading() }" />
     } @else {
 
         <h2>{{ heading() }}</h2>
@@ -95,6 +96,41 @@ export class DynamicSlots {
   freeSlotName = signal('freeform');
   @ContentChild('headerCell', { read: TemplateRef }) headerCellTpl?: TemplateRef<HeaderCellCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
+  __rozieProjectedTpls = contentChildren(TemplateRef, { descendants: true });
+  __rozieSlotWarned = false;
+
+  constructor() {
+    effect(() => {
+      if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;
+      const fills = this.__rozieFills();
+      const seen = new Set<string>();
+      for (const f of fills) {
+        const k = f.rozieSlot();
+        if (k == null) continue;
+        if (seen.has(k)) {
+          this.__rozieSlotWarned = true;
+          console.warn('[ROZ750] DynamicSlots: duplicate keyed fill "' + k + '" — the last fill (in content-query order) wins.');
+          return;
+        }
+        seen.add(k);
+      }
+      if (fills.length === 0 && this.__rozieProjectedTpls().length > 0) {
+        this.__rozieSlotWarned = true;
+        console.warn('[ROZ750] DynamicSlots: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\'s imports: array?');
+      }
+    });
+  }
 
   static ngTemplateContextGuard(
     _dir: DynamicSlots,

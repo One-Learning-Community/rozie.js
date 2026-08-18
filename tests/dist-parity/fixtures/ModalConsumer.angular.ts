@@ -1,5 +1,5 @@
-import { Component, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewChild, ViewEncapsulation, afterRenderEffect, effect, inject, input, signal, viewChild } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, signal, viewChild } from '@angular/core';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 import { Modal } from './Modal';
 import { WrapperModal } from './WrapperModal';
@@ -7,7 +7,7 @@ import { WrapperModal } from './WrapperModal';
 @Component({
   selector: 'rozie-modal-consumer',
   standalone: true,
-  imports: [NgTemplateOutlet, Modal, WrapperModal],
+  imports: [RozieSlot, Modal, WrapperModal],
   template: `
 
     <div class="modal-consumer" #rozieSpread_0 #rozieListenersTarget_1>
@@ -21,7 +21,7 @@ import { WrapperModal } from './WrapperModal';
         Are you sure you want to proceed?
         </ng-template></rozie-modal>
 
-      <rozie-modal [open]="open2()" (openChange)="open2.set($event)" [templates]="templates"><ng-template #__dynSlot_0>
+      <rozie-modal [open]="open2()" (openChange)="open2.set($event)"><ng-template [rozieSlot]="slotName()">
           <span class="dynamic-fill">Dynamic header via slotName</span>
         </ng-template><ng-template #defaultSlot>
         Dynamic-name demo body
@@ -178,12 +178,6 @@ export class ModalConsumer {
       });
     }
   });
-
-  @ViewChild('__dynSlot_0', { static: true }) __dynSlot_0?: TemplateRef<unknown>;
-
-  get templates(): Record<string, TemplateRef<unknown>> {
-      return { [this.slotName()]: this.__dynSlot_0! };
-    }
 }
 
 export default ModalConsumer;

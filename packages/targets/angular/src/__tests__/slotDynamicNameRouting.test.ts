@@ -46,7 +46,14 @@ function compileAngular(ir: IRComponent, filename = 'inline.rozie'): string {
 }
 
 describe('Angular producer — runtime-keyed dispatch for a dynamic-name slot (R3/D-09)', () => {
-  it('a SlotDecl carrying dynamicNameExpr emits a templates() record lookup keyed on the rewritten expression, with no static field operand and no `??`', () => {
+  // Phase 80 rebless (Plan 07): a record-only slot's resolution chain gained a
+  // new precedence tier — `__rozieFillMap()[key] ?? templates()?.[key]` — so
+  // this test no longer asserts the ABSENCE of `??`; it asserts the new
+  // two-tier chain, still with no static field (@ContentChild) operand. New
+  // shape proven by packages/targets/angular/src/__tests__/producerFillMap.test.ts
+  // (Phase 80 Plan 04, Task 3 describe block) and emitSlotInvocation.ts's
+  // isRecordOnlySlotDecl-gated splice.
+  it('a SlotDecl carrying dynamicNameExpr emits a __rozieFillMap()/templates() record lookup chain keyed on the rewritten expression, with no static field operand', () => {
     const ir = lowerInline(`
 <rozie name="Cell">
 <data>{ dynName: 'cell-total' }</data>
@@ -59,10 +66,11 @@ describe('Angular producer — runtime-keyed dispatch for a dynamic-name slot (R
     // `dynName` is a `<data>`-declared state signal; the template-context
     // rewrite calls it (`dynName()`), matching every other signal read in
     // this file's emitted template markup.
-    expect(code).toContain('templates()?.[dynName()]');
-    const invocation = code.match(/\*ngTemplateOutlet="templates\(\)\?\.\[dynName\(\)\][^"]*"/);
+    expect(code).toContain('__rozieFillMap()[dynName()] ?? templates()?.[dynName()]');
+    const invocation = code.match(
+      /\*ngTemplateOutlet="\(__rozieFillMap\(\)\[dynName\(\)\] \?\? templates\(\)\?\.\[dynName\(\)\]\)[^"]*"/,
+    );
     expect(invocation).not.toBeNull();
-    expect(invocation![0]).not.toContain('??');
     expect(code).not.toMatch(/@ContentChild\('defaultSlot'/);
   });
 
@@ -104,11 +112,15 @@ describe('Angular producer — runtime-keyed dispatch for a dynamic-name slot (R
     // escaped at the SOURCE level to keep the outer literal syntactically
     // valid — the real emitted `.ts` text contains a literal backslash
     // before each backtick and `${`.
-    expect(code).toContain('templates()?.[\\`cell-\\${col.key}\\`]');
-    expect(code).not.toContain('??');
+    // Phase 80 rebless: the fill-map tier now precedes the `templates` tier
+    // (proven by producerFillMap.test.ts, Plan 04 Task 3); the `??` this test
+    // used to forbid is now a required part of the two-tier chain.
+    expect(code).toContain(
+      '__rozieFillMap()[\\`cell-\\${col.key}\\`] ?? templates()?.[\\`cell-\\${col.key}\\`]',
+    );
   });
 
-  it('a static-name SlotDecl in the same component emits its merged form character-for-character pre-phase', () => {
+  it('a static-name SlotDecl in the same component emits its merged three-tier form (Phase 80 rebless)', () => {
     const ir = lowerInline(`
 <rozie name="Mixed">
 <data>{ dynName: 'cell-total' }</data>
@@ -121,8 +133,14 @@ describe('Angular producer — runtime-keyed dispatch for a dynamic-name slot (R
 </rozie>
 `);
     const code = compileAngular(ir);
+    // Phase 80: a MIXED producer's identifier-named slot deliberately gains
+    // the fill-map tier too (per-slot, not per-slot-kind precedence, Plan 04
+    // summary) — the pre-phase two-tier `(headerTpl ?? templates()?.['header'])`
+    // form is now three-tier. Proven by producerFillMap.test.ts (Plan 04 Task
+    // 3) and confirmed byte-for-byte against tests/dist-parity/fixtures/
+    // DynamicSlots.angular.ts's `headerCellTpl` chain in this same rebless pass.
     expect(code).toContain(
-      "*ngTemplateOutlet=\"(headerTpl ?? templates()?.['header'])\"",
+      "*ngTemplateOutlet=\"(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])\"",
     );
     expect(code).toContain(
       "@ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;",

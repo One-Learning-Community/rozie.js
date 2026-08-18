@@ -1,5 +1,5 @@
-import { Component, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewChild, ViewEncapsulation, afterRenderEffect, effect, inject, signal, viewChild } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, signal, viewChild } from '@angular/core';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 import { DynamicSlots } from './DynamicSlots';
 
@@ -26,19 +26,19 @@ function __rozieAttr(v: unknown): string | null {
 @Component({
   selector: 'rozie-dynamic-slots-consumer',
   standalone: true,
-  imports: [NgTemplateOutlet, DynamicSlots],
+  imports: [RozieSlot, DynamicSlots],
   template: `
 
     <div class="dynamic-slots-consumer" #rozieSpread_0 #rozieListenersTarget_1>
-      <rozie-dynamic-slots [columns]="[{ key: 'status' }, { key: 'score' }]" [row]="{ status: 'Active', score: 42 }" [total]="7" [templates]="templates"><ng-template #__dynSlot_0 let-row="row" let-value="value">
+      <rozie-dynamic-slots [columns]="[{ key: 'status' }, { key: 'score' }]" [row]="{ status: 'Active', score: 42 }" [total]="7"><ng-template [rozieSlot]="'cell-status'" let-row="row" let-value="value">
           <span class="status">{{ rozieDisplay(value) }}</span>
-        </ng-template><ng-template #__dynSlot_1 let-row="row" let-value="value">
+        </ng-template><ng-template [rozieSlot]="'cell-score'" let-row="row" let-value="value">
           <span class="score">{{ rozieDisplay(value) }}</span>
-        </ng-template><ng-template #__dynSlot_2 let-value="value">
+        </ng-template><ng-template [rozieSlot]="'cell-total'" let-value="value">
           <strong>{{ rozieDisplay(value) }}</strong>
         </ng-template><ng-template #headerCell let-title="title">
           <h2>{{ rozieDisplay(title) }}</h2>
-        </ng-template><ng-template #__dynSlot_3 let-label="label">
+        </ng-template><ng-template [rozieSlot]="dynamicFillKey()" let-label="label">
           <em>{{ rozieDisplay(label) }}</em>
         </ng-template></rozie-dynamic-slots>
     </div>
@@ -174,18 +174,6 @@ export class DynamicSlotsConsumer {
       });
     }
   });
-
-  @ViewChild('__dynSlot_0', { static: true }) __dynSlot_0?: TemplateRef<unknown>;
-
-  @ViewChild('__dynSlot_1', { static: true }) __dynSlot_1?: TemplateRef<unknown>;
-
-  @ViewChild('__dynSlot_2', { static: true }) __dynSlot_2?: TemplateRef<unknown>;
-
-  @ViewChild('__dynSlot_3', { static: true }) __dynSlot_3?: TemplateRef<unknown>;
-
-  get templates(): Record<string, TemplateRef<unknown>> {
-      return { ['cell-status']: this.__dynSlot_0!, ['cell-score']: this.__dynSlot_1!, ['cell-total']: this.__dynSlot_2!, [this.dynamicFillKey()]: this.__dynSlot_3! };
-    }
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 

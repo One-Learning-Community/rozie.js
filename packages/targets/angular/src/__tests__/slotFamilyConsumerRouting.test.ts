@@ -64,8 +64,8 @@ function findFiller(node: unknown, targetName: string): SlotFillerDecl | null {
   return null;
 }
 
-describe('Angular consumer — matchedFamily fill routes into the existing [templates] getter path (R5/D-09)', () => {
-  it('a matchedFamily fill (identifier-shaped name) emits into the [templates] getter, not @ContentChild, keyed on a quoted string literal', () => {
+describe('Angular consumer — matchedFamily fill routes into the [rozieSlot] marker path (R5/D-09, Phase 80 rebless)', () => {
+  it('a matchedFamily fill (identifier-shaped name) emits a [rozieSlot] marker, not @ContentChild, keyed on a quoted string literal', () => {
     const ir = lowerInline(`
 <rozie name="ConsumerX">
 <components>{ Cell: "./Cell.rozie" }</components>
@@ -84,9 +84,16 @@ describe('Angular consumer — matchedFamily fill routes into the existing [temp
     expect(filler).not.toBeNull();
     filler!.matchedFamily = true;
     const code = compileAngular(ir);
-    expect(code).toMatch(/\[templates\]="templates"/);
-    expect(code).toMatch(/get templates\(\): Record<string, TemplateRef<unknown>>/);
-    expect(code).toMatch(/\['cellStatus'\]: this\.__dynSlot_\d+!/);
+    // Phase 80 rebless: the `[templates]`-getter mechanism this test used to
+    // assert is a net deletion (SPEC R4). The fill is now a marker directive
+    // bound directly to the quoted string literal, collected by the
+    // producer's own contentChildren query — no class-body getter, no
+    // synthetic `__dynSlot_N` ref. New shape proven by
+    // consumerRozieSlotFill.test.ts (Phase 80 Plan 05, Task 1, 4/4 pass).
+    expect(code).toContain('<ng-template [rozieSlot]="\'cellStatus\'" let-value="value">');
+    expect(code).not.toMatch(/\[templates\]="templates"/);
+    expect(code).not.toMatch(/get templates\(\): Record<string, TemplateRef<unknown>>/);
+    expect(code).not.toMatch(/__dynSlot_\d+/);
     expect(code).not.toMatch(/#cellStatus/);
     expect(code).not.toMatch(/@ContentChild\('cellStatus'/);
   });
@@ -108,10 +115,10 @@ describe('Angular consumer — matchedFamily fill routes into the existing [temp
 `);
     const code = compileAngular(ir);
     expect(code).toContain('<ng-template #cellStatus let-value="value">');
-    expect(code).not.toMatch(/\[templates\]="templates"/);
+    expect(code).not.toMatch(/\[rozieSlot\]=/);
   });
 
-  it('two matchedFamily fills on one element BOTH appear in the emitted getter map, neither dropped', () => {
+  it('two matchedFamily fills on one element BOTH emit their own [rozieSlot] marker, neither dropped', () => {
     const ir = lowerInline(`
 <rozie name="ConsumerZ">
 <components>{ Cell: "./Cell.rozie" }</components>
@@ -136,15 +143,18 @@ describe('Angular consumer — matchedFamily fill routes into the existing [temp
     statusFiller!.matchedFamily = true;
     scoreFiller!.matchedFamily = true;
     const code = compileAngular(ir);
-    expect(code).toMatch(/\['cellStatus'\]: this\.__dynSlot_\d+!/);
-    expect(code).toMatch(/\['cellScore'\]: this\.__dynSlot_\d+!/);
-    // Exactly one [templates] binding on the element — both fills merge into
-    // ONE getter/map rather than one binding per fill overwriting the other.
-    const templatesBindingCount = (code.match(/\[templates\]="templates"/g) ?? []).length;
-    expect(templatesBindingCount).toBe(1);
+    // Phase 80 rebless: each fill mints its own marker declaration rather
+    // than merging into one class-body getter map — the producer's own
+    // contentChildren query is what merges them (see
+    // producerFillMap.test.ts's fold tests, Plan 04). Exactly two markers,
+    // one per fill.
+    expect(code).toContain('<ng-template [rozieSlot]="\'cellStatus\'" let-value="value">');
+    expect(code).toContain('<ng-template [rozieSlot]="\'cellScore\'" let-value="value">');
+    const markerCount = (code.match(/\[rozieSlot\]=/g) ?? []).length;
+    expect(markerCount).toBe(2);
   });
 
-  it('the [templates] getter is emitted as a component-class member, never as an inline arrow inside the template', () => {
+  it('the marker is a plain child of the producer tag, never an inline arrow or class-body getter', () => {
     const ir = lowerInline(`
 <rozie name="ConsumerX">
 <components>{ Cell: "./Cell.rozie" }</components>
@@ -162,9 +172,9 @@ describe('Angular consumer — matchedFamily fill routes into the existing [temp
     const filler = findFiller(ir.template, 'cellStatus');
     filler!.matchedFamily = true;
     const code = compileAngular(ir);
-    expect(code).toMatch(/get templates\(\): Record<string, TemplateRef<unknown>> \{/);
-    // The template-side binding is a bare identifier reference, not an arrow.
-    const bindingMatch = code.match(/\[templates\]="[^"]*"/);
+    expect(code).not.toMatch(/get templates\(\): Record<string, TemplateRef<unknown>> \{/);
+    // The marker's bound value is a quoted string literal, not an arrow.
+    const bindingMatch = code.match(/\[rozieSlot\]="[^"]*"/);
     expect(bindingMatch).not.toBeNull();
     expect(bindingMatch![0]).not.toContain('=>');
   });

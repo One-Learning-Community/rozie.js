@@ -158,17 +158,21 @@ describe('Phase 79 Plan 10/11 (R5/D-09) — matchedFamily consumer routing on Re
       return;
     }
     if (target === 'angular') {
-      // cell-status/cell-score are hyphenated (non-identifier) names, so
-      // they route through 79-05's pre-existing record-only STATIC path
-      // (matchedFamily stays a no-op trigger here — it's already
-      // non-identifier-shaped) into the SAME [templates]-getter mechanism
-      // this plan's matchedFamily branch also uses for an identifier-shaped
-      // family name. Both merge into ONE getter alongside the other two
-      // record-path fills (cell-total, the consumer dynamic fill below).
-      expect(code).toMatch(/\[templates\]="templates"/);
-      expect(code).toMatch(/get templates\(\): Record<string, TemplateRef<unknown>>/);
-      expect(code).toMatch(/\['cell-status'\]: this\.__dynSlot_\d+!/);
-      expect(code).toMatch(/\['cell-score'\]: this\.__dynSlot_\d+!/);
+      // Phase 80 rebless: cell-status/cell-score are hyphenated
+      // (non-identifier) names, so they route through the pre-existing
+      // record-only STATIC path (matchedFamily stays a no-op trigger here —
+      // it's already non-identifier-shaped) into the SAME [rozieSlot] marker
+      // mechanism this plan's matchedFamily branch also uses for an
+      // identifier-shaped family name. Each fill mints its OWN marker
+      // declaration — the producer's own contentChildren query (Plan 04) is
+      // what merges them, not a consumer-side getter. New shape proven by
+      // consumerRozieSlotFill.test.ts (Phase 80 Plan 05, Task 1, 4/4 pass)
+      // and confirmed byte-for-byte against tests/dist-parity/fixtures/
+      // DynamicSlotsConsumer.angular.ts in this same rebless pass.
+      expect(code).not.toMatch(/\[templates\]="templates"/);
+      expect(code).not.toMatch(/get templates\(\): Record<string, TemplateRef<unknown>>/);
+      expect(code).toContain('<ng-template [rozieSlot]="\'cell-status\'" let-row="row" let-value="value">');
+      expect(code).toContain('<ng-template [rozieSlot]="\'cell-score\'" let-row="row" let-value="value">');
       return;
     }
     // Svelte: bracket-computed literal-key form (its established convention
@@ -188,25 +192,34 @@ describe('Phase 79 Plan 10/11 (R5/D-09) — matchedFamily consumer routing on Re
       return;
     }
     if (target === 'angular') {
-      // Class-body key form (prefixThis:true) — the dynamic fill's own
-      // isDynamic branch (79-05/07.3.2.1, pre-existing), merged into the
-      // SAME getter as the matchedFamily/record-only fills above.
-      expect(code).toMatch(/\[this\.dynamicFillKey\(\)\]: this\.__dynSlot_\d+!/);
+      // Phase 80 rebless: the class-body-getter key form (prefixThis:true)
+      // is a net deletion (SPEC R4). The dynamic fill's own isDynamic branch
+      // now emits a marker directive bound directly to the TEMPLATE-scope
+      // key expression (`dynamicFillKey()`, no `this.` prefix — the
+      // producer's own contentChildren query reads it, not a class member).
+      expect(code).not.toMatch(/\[this\.dynamicFillKey\(\)\]: this\.__dynSlot_\d+!/);
+      expect(code).toContain('<ng-template [rozieSlot]="dynamicFillKey()" let-label="label">');
       return;
     }
     expect(code).toMatch(/slots=\{\{|snippets=\{\{/);
   });
 
-  it('angular: exactly ONE [templates] binding on the DynamicSlots consumer tag — all four record-path fills merge into one getter, none dropped', () => {
+  it('angular: zero [templates] binding on the DynamicSlots consumer tag — all four record-path fills emit their own [rozieSlot] marker, none dropped (Phase 80 rebless)', () => {
+    // Phase 80 rebless: the consumer-side [templates]="templates" binding
+    // and its class-body getter are a net deletion (SPEC R4) — the producer's
+    // own contentChildren query (Plan 04) is what merges the four fills now,
+    // not a consumer-authored getter map. New shape proven by
+    // consumerRozieSlotFill.test.ts (Phase 80 Plan 05, Tasks 1-3, 12/12 pass)
+    // and confirmed byte-for-byte against tests/dist-parity/fixtures/
+    // DynamicSlotsConsumer.angular.ts in this same rebless pass.
     const code = consumerCode.angular!;
-    const bindingCount = (code.match(/\[templates\]="templates"/g) ?? []).length;
-    expect(bindingCount).toBe(1);
-    const getterMatch = code.match(/get templates\(\): Record<string, TemplateRef<unknown>> \{[\s\S]*?\}/);
-    expect(getterMatch).not.toBeNull();
-    const getterBody = getterMatch![0];
-    expect(getterBody).toContain("['cell-status']:");
-    expect(getterBody).toContain("['cell-score']:");
-    expect(getterBody).toContain("['cell-total']:");
-    expect(getterBody).toContain('[this.dynamicFillKey()]:');
+    expect(code).not.toMatch(/\[templates\]="templates"/);
+    expect(code).not.toMatch(/get templates\(\): Record<string, TemplateRef<unknown>>/);
+    const markerCount = (code.match(/\[rozieSlot\]=/g) ?? []).length;
+    expect(markerCount).toBe(4);
+    expect(code).toContain('<ng-template [rozieSlot]="\'cell-status\'" let-row="row" let-value="value">');
+    expect(code).toContain('<ng-template [rozieSlot]="\'cell-score\'" let-row="row" let-value="value">');
+    expect(code).toContain('<ng-template [rozieSlot]="\'cell-total\'" let-value="value">');
+    expect(code).toContain('<ng-template [rozieSlot]="dynamicFillKey()" let-label="label">');
   });
 });

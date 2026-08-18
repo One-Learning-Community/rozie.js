@@ -3,6 +3,7 @@
   "version": "0.5.3",
   "type": "module",
   "private": false,
+  "sideEffects": false,
   "license": "MIT",
   "description": "The RozieSlot marker directive for keyed slot fills — collects hand-authored <ng-template [rozieSlot]=\"key\"> content via contentChildren into the record-path fill map an emitted Angular producer resolves against.",
   "author": "One Learning Community (https://github.com/One-Learning-Community)",
