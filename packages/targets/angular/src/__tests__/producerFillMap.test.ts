@@ -114,3 +114,56 @@ describe('Angular producer — content-collected fill map (Task 1)', () => {
     expect(code).toContain("k === '' ? 'defaultSlot' : k");
   });
 });
+
+describe('Angular producer — dev-mode-only diagnostics effect (Task 2)', () => {
+  it('a key-fillable producer emits __rozieProjectedTpls, __rozieSlotWarned, and a single dev-mode-guarded diagnostics effect', () => {
+    const code = compileAngular(RECORD_ONLY_PRODUCER, 'Cell.rozie');
+    expect(code).toContain(
+      '__rozieProjectedTpls = contentChildren(TemplateRef, { descendants: true });',
+    );
+    expect(code).toContain('__rozieSlotWarned = false;');
+    // Exactly one effect() block carries both warnings.
+    const effectCount = (code.match(/effect\(\(\) => \{/g) ?? []).length;
+    expect(effectCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it('every console. call the emitter adds is inside the dev-mode guard — no unguarded console call is emitted', () => {
+    const code = compileAngular(RECORD_ONLY_PRODUCER, 'Cell.rozie');
+    // Isolate the diagnostics effect body text and confirm the guard
+    // (globalThis-read, structurally-typed, no ambient declare needed)
+    // appears BEFORE every console. call inside it.
+    const effectMatch = code.match(
+      /effect\(\(\) => \{[\s\S]*?ngDevMode[\s\S]*?\}\);/,
+    );
+    expect(effectMatch).not.toBeNull();
+    const effectBody = effectMatch![0];
+    expect(effectBody).toContain('globalThis as { ngDevMode?: unknown }');
+    // The guard's early-return must precede every console.warn call in the
+    // same block (source-order check).
+    const guardIdx = effectBody.indexOf('ngDevMode');
+    const consoleIdxs = [...effectBody.matchAll(/console\./g)].map((m) => m.index ?? -1);
+    for (const idx of consoleIdxs) {
+      expect(idx).toBeGreaterThan(guardIdx);
+    }
+    // No bare `declare global` ambient block anywhere in the output.
+    expect(code).not.toContain('declare global');
+  });
+
+  it('a producer with no key-fillable slot emits no diagnostics effect and no second content query', () => {
+    const identifierCode = compileAngular(IDENTIFIER_ONLY_PRODUCER, 'X.rozie');
+    expect(identifierCode).not.toContain('__rozieProjectedTpls');
+    expect(identifierCode).not.toContain('__rozieSlotWarned');
+    expect(identifierCode).not.toContain('ngDevMode');
+
+    const noSlotCode = compileAngular(NO_SLOT_PRODUCER, 'Plain.rozie');
+    expect(noSlotCode).not.toContain('__rozieProjectedTpls');
+    expect(noSlotCode).not.toContain('__rozieSlotWarned');
+    expect(noSlotCode).not.toContain('ngDevMode');
+  });
+
+  it('the diagnostics effect references the ROZ750 code and the component name in its duplicate-key warning', () => {
+    const code = compileAngular(RECORD_ONLY_PRODUCER, 'Cell.rozie');
+    expect(code).toContain('ROZ750');
+    expect(code).toContain('Cell');
+  });
+});

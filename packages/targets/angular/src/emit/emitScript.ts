@@ -86,6 +86,7 @@ import { emitContext } from './emitContext.js';
 // emitKeynav.ts's module doc comment).
 import { buildKeynavClassEmission, type KeynavEmitPlan } from './emitKeynav.js';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
+import { RozieErrorCode } from '../../../../core/src/diagnostics/codes.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -1313,7 +1314,13 @@ export function emitScript(
   //      so last-in-content-query-(document)-order wins, by specification.
   // Keys compare by exact JS string identity throughout — no trimming,
   // casing, or Unicode normalization.
-  if (ir.slots.some(isRecordOnlySlotDecl)) {
+  //
+  // This same `hasRecordOnlySlot` boolean also gates Task 2's diagnostics
+  // members below (`__rozieProjectedTpls` / `__rozieSlotWarned` / the
+  // dev-mode-only effect) and, further down, the dev-mode-only diagnostics
+  // effect pushed once `lifecycleConstructorLines` exists.
+  const hasRecordOnlySlot = ir.slots.some(isRecordOnlySlotDecl);
+  if (hasRecordOnlySlot) {
     fieldLines.push(
       '__rozieFills = contentChildren(RozieSlot, { descendants: true });',
     );
@@ -1335,6 +1342,19 @@ export function emitScript(
     imports.add('computed');
     imports.add('TemplateRef');
     imports.addRuntime('RozieSlot');
+
+    // Phase 80 Plan 04 Task 2 (D-08) — dev-mode-only diagnostics. A SECOND
+    // content query over bare `TemplateRef` (not the `RozieSlot` directive)
+    // is the chosen detection mechanism for "consumer projected content but
+    // forgot to add RozieSlot to imports:" — a producer cannot otherwise
+    // distinguish "nothing projected" from "something projected, but not
+    // collected". `__rozieSlotWarned` is the one-shot guard so a dev-mode
+    // console keeps quiet after the first warning, mirroring the repo's
+    // other one-shot-warn fields.
+    fieldLines.push(
+      '__rozieProjectedTpls = contentChildren(TemplateRef, { descendants: true });',
+    );
+    fieldLines.push('__rozieSlotWarned = false;');
   }
 
   // 7. Build computed properties.
@@ -1366,6 +1386,66 @@ export function emitScript(
       lifecycleConstructorLines.push(rendered.code);
     }
     if (rendered.needsDestroyRefField) lifecycleNeedsDestroyRefField = true;
+  }
+
+  // Phase 80 Plan 04 Task 2 (D-08) — the single dev-mode-only diagnostics
+  // effect for a key-fillable producer. An `effect()`, not the `computed()`
+  // fold above, is where these warnings belong — a `console.warn` inside a
+  // computed makes it impure.
+  //
+  // Dev-mode guard form is load-bearing (verified against installed
+  // typings): Angular's public `@angular/core` typings for this repo's
+  // floor version do NOT declare a global `ngDevMode` (only `ngHmrMode` /
+  // `ngJitMode` / `ngServerMode` are declared), so a bare `ngDevMode`
+  // reference would be TS2304 in every strict consumer typecheck. Reading it
+  // as a `globalThis` property with an inline structural type keeping it
+  // `unknown | undefined` needs no ambient `declare global` block, is silent
+  // in a production build (the flag is `false`), and is truthy under TestBed
+  // and a dev server.
+  //
+  // Effect body, in order:
+  //   1. Return immediately unless dev mode is on AND `__rozieSlotWarned` is
+  //      still false — this is what makes the warning fire once.
+  //   2. Walk `__rozieFills()` in order tracking seen keys (skipping
+  //      nullish ones); on the first repeated key, set the one-shot flag and
+  //      warn, naming the duplicate key, the component, and stating the
+  //      last fill wins. Prefixed with ROZ750 (Plan 02) so the message is
+  //      grep-able.
+  //   3. If no duplicate fired, and the fill query is empty while the
+  //      projected-template query is not, set the flag and warn that
+  //      projected content was found but no keyed fills were collected —
+  //      pointing at the likely cause (RozieSlot missing from the
+  //      consumer's `imports:` array).
+  if (hasRecordOnlySlot) {
+    // `effect` may not otherwise be on the import list — a key-fillable
+    // producer with no <listeners>/lifecycle/watcher still needs this
+    // diagnostics effect, so add unconditionally (Set dedupes).
+    imports.add('effect');
+    const dupCode = RozieErrorCode.RUNTIME_ANGULAR_DUPLICATE_SLOT_KEY_WARNING;
+    const compName = ir.name;
+    lifecycleConstructorLines.push(
+      [
+        'effect(() => {',
+        '  if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;',
+        '  const fills = this.__rozieFills();',
+        '  const seen = new Set<string>();',
+        '  for (const f of fills) {',
+        '    const k = f.rozieSlot();',
+        '    if (k == null) continue;',
+        '    if (seen.has(k)) {',
+        '      this.__rozieSlotWarned = true;',
+        `      console.warn('[${dupCode}] ${compName}: duplicate keyed fill "' + k + '" — the last fill (in content-query order) wins.');`,
+        '      return;',
+        '    }',
+        '    seen.add(k);',
+        '  }',
+        '  if (fills.length === 0 && this.__rozieProjectedTpls().length > 0) {',
+        '    this.__rozieSlotWarned = true;',
+        `    console.warn('[${dupCode}] ${compName}: projected template content was found but no keyed fills were collected — did you forget to add RozieSlot to the consumer\\'s imports: array?');`,
+        '  }',
+        '});',
+      ].join('\n'),
+    );
   }
 
   // Portal-slot primitive (Spike 003) — synthesize portal scaffolding before
