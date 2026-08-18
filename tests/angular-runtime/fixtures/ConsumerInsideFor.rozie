@@ -1,0 +1,30 @@
+<rozie name="ConsumerInsideFor">
+
+<!-- Phase 80 Plan 03 (Task 2) — renders the producer under `r-for`, one
+     producer instance per column, each with its own dynamic fill keyed on
+     the loop-scoped column key. Correct output contains both `FOR:alpha`
+     and `FOR:beta`. -->
+
+<components>
+{
+  ProducerRecordPath: './ProducerRecordPath.rozie',
+}
+</components>
+
+<data>
+{
+  columns: [{ key: 'alpha' }, { key: 'beta' }],
+}
+</data>
+
+<template>
+<div class="consumer-inside-for">
+  <div r-for="col in $data.columns" :key="col.key">
+    <ProducerRecordPath :slotKey="col.key">
+      <template #[col.key]="{ label }">FOR:{{ label }}</template>
+    </ProducerRecordPath>
+  </div>
+</div>
+</template>
+
+</rozie>

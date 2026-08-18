@@ -1,0 +1,31 @@
+<rozie name="ConsumerEmptyKeyFill">
+
+<!-- Phase 80 Plan 03 (Task 2) — a fill keyed on a value that evaluates to
+     the empty string. Under D-06 the fold normalizes `'' -> 'defaultSlot'`
+     so the fill resolves to the producer's DEFAULT slot (the producer's
+     dynamic-named slot resolves under its own `slotKey` prop, 'alpha' by
+     default, and is untouched by this fill). Correct post-fix output
+     renders `EMPTY-FILL` in the DEFAULT slot position and does not render
+     `[DEFAULT-FALLBACK]`. -->
+
+<components>
+{
+  ProducerRecordPath: './ProducerRecordPath.rozie',
+}
+</components>
+
+<data>
+{
+  emptyKey: '',
+}
+</data>
+
+<template>
+<div class="consumer-empty-key-fill">
+  <ProducerRecordPath>
+    <template #[$data.emptyKey]="{ label }">EMPTY-FILL</template>
+  </ProducerRecordPath>
+</div>
+</template>
+
+</rozie>

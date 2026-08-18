@@ -61,6 +61,17 @@ examples/consumers/react-vite/src/Modal.ts
 examples/consumers/react-vite/src/WrapperModal.ts
 examples/consumers/svelte-vite/src/Modal.ts
 examples/consumers/svelte-vite/src/WrapperModal.ts
+# Phase 80 Plan 03 — tests/angular-runtime/fixtures/ is compiled by
+# @rozie/unplugin's Angular-target D-70 disk-cache prebuild (Rozie({ target:
+# 'angular' }) in vitest.config.ts). Both generated artifact shapes land
+# here: `<Name>.rozie.ts` (covered by the global `*.rozie.ts` rule below)
+# AND the cross-rozie composition re-export shim `<Name>.ts` (marked
+# `// @rozie-cross-rozie-shim`, emitted because ProducerRecordPath.rozie is
+# referenced via a `<components>` block by five sibling consumer fixtures).
+# Glob is safe — only `.rozie` source lives in this directory; every
+# `.test.ts` in this package lives at the package root, not inside
+# `fixtures/`.
+tests/angular-runtime/fixtures/*.ts
 # Quick task 260515-1y4: when the visual-regression rig builds the angular
 # target, `prebuildExtraRoots: [<repo>/examples]` extends the disk-cache
 # walker to the top-level `examples/` directory, which causes shims for any

@@ -1,0 +1,32 @@
+<rozie name="ConsumerSiblingProducers">
+
+<!-- Phase 80 Plan 03 (Task 2) — two producer elements as literal siblings.
+     Correct output contains `SIB-A` exactly once and `SIB-B` exactly once;
+     the known pre-fix failure renders the first producer's body twice
+     (`dynIdx` resets per component tag — sibling-collision bug). -->
+
+<components>
+{
+  ProducerRecordPath: './ProducerRecordPath.rozie',
+}
+</components>
+
+<data>
+{
+  keyA: 'alpha',
+  keyB: 'beta',
+}
+</data>
+
+<template>
+<div class="consumer-sibling-producers">
+  <ProducerRecordPath :slotKey="$data.keyA">
+    <template #[$data.keyA]="{ label }">SIB-A</template>
+  </ProducerRecordPath>
+  <ProducerRecordPath :slotKey="$data.keyB">
+    <template #[$data.keyB]="{ label }">SIB-B</template>
+  </ProducerRecordPath>
+</div>
+</template>
+
+</rozie>

@@ -1,0 +1,26 @@
+<rozie name="ConsumerTopLevel">
+
+<!-- Phase 80 Plan 03 (Task 2) — the baseline case. Must render correctly
+     BOTH before and after the emitter fix (angular-runtime.test.ts test 1). -->
+
+<components>
+{
+  ProducerRecordPath: './ProducerRecordPath.rozie',
+}
+</components>
+
+<data>
+{
+  fillKey: 'alpha',
+}
+</data>
+
+<template>
+<div class="consumer-top-level">
+  <ProducerRecordPath :slotKey="$data.fillKey">
+    <template #[$data.fillKey]="{ label }">TOP:{{ label }}</template>
+  </ProducerRecordPath>
+</div>
+</template>
+
+</rozie>

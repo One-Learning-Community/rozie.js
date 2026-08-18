@@ -1,0 +1,26 @@
+<rozie name="ProducerRecordPath">
+
+<!-- Phase 80 Plan 03 (Task 2) — the single producer all five consumer
+     fixtures target. Two slots:
+       1. a runtime-NAMED slot whose name is BOUND to the `slotKey` prop.
+          Binding the name is what makes this a RECORD-PATH slot — the
+          bound name does not constant-fold, so the compiler's record-path
+          predicate fires (vs. an identifier-named static slot, which stays
+          on the untouched @ContentChild path).
+       2. a plain default slot, which is what the empty-string-key case
+          (ConsumerEmptyKeyFill) resolves into under D-06. -->
+
+<props>
+{
+  slotKey: { type: String, default: 'alpha' },
+}
+</props>
+
+<template>
+<div class="producer-record-path">
+  <slot :name="$props.slotKey" :label="$props.slotKey">[DYN-FALLBACK]</slot>
+  <slot>[DEFAULT-FALLBACK]</slot>
+</div>
+</template>
+
+</rozie>

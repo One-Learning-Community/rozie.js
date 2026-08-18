@@ -1,0 +1,38 @@
+<rozie name="ConsumerInsideIf">
+
+<!-- Phase 80 Plan 03 (Task 2) — wraps the PRODUCER (not the fill) in an
+     `r-if` element. This is the locked shape: it places the synthetic fill
+     `<ng-template>` inside an Angular embedded view, which is precisely the
+     condition a static view query can never resolve. Serves TWO
+     angular-runtime.test.ts tests: mounted with `show` true, and mounted
+     with `show` false then flipped true. -->
+
+<components>
+{
+  ProducerRecordPath: './ProducerRecordPath.rozie',
+}
+</components>
+
+<props>
+{
+  show: { type: Boolean, default: false },
+}
+</props>
+
+<data>
+{
+  fillKey: 'alpha',
+}
+</data>
+
+<template>
+<div class="consumer-inside-if">
+  <div r-if="$props.show">
+    <ProducerRecordPath :slotKey="$data.fillKey">
+      <template #[$data.fillKey]="{ label }">IF-FILL</template>
+    </ProducerRecordPath>
+  </div>
+</div>
+</template>
+
+</rozie>
