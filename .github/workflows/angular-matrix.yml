@@ -91,6 +91,11 @@ jobs:
           pnpm exec vitest run --root packages/runtime/vue
           pnpm exec vitest run --root packages/runtime/react
           pnpm exec vitest run --root packages/unplugin
+          # Added with the Angular runtime harness (Phase 80) -- deliberate,
+          # not incidental. Closes the exact "no hosted-CI coverage" gap
+          # that let both target bugs this phase fixes survive undetected.
+          pnpm exec vitest run --root tests/angular-runtime
+          pnpm exec vitest run --root packages/runtime/angular --passWithNoTests
 
       - name: Override Angular + Vite versions for the demo
         working-directory: examples/consumers/angular-analogjs
