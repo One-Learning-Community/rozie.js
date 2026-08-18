@@ -151,6 +151,12 @@ Rozie quietly does the Angular ceremony you'd otherwise hand-roll:
 | `output<T>()` + emitting | `$emit('eventname', payload)` |
 | `*ngTemplateOutlet` + context-guard ceremony | `<slot name="x" :value="…" />` — typed scoped slots with one declaration. |
 | `:host` + `::ng-deep` for global rules | `:root { … }` inside `<style>`. |
+| `@ViewChild` capture + a record getter + a `[templates]` binding | `<ng-template [rozieSlot]="expr" let-row="row">` — a single marker directive a `contentChildren` query collects, for dynamic and non-identifier-named keyed slot fills. |
+
+A hand-written `<ng-template let-x>` binds Angular's `$implicit` context key —
+and a Rozie producer sets `$implicit` to the **whole** context object, not a
+single named value. If you want just one named value out of the context, use
+the explicit form: `let-x="x"`, not the shorthand `let-x`.
 
 The rest of the ceremony delta is cataloged row by row in the
 [creature-comforts matrix](/guide/creature-comforts#per-target-pain-points-rozie-hides):
