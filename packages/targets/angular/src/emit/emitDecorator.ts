@@ -140,10 +140,15 @@ export function registerDecoratorImports(
  * empty string when no imports needed.
  *
  * Order:
- *   1. NgTemplateOutlet (slot support)
- *   2. FormsModule (r-model on form-input)
- *   3. User component classes from `<components>` (Phase 06.2 P2 D-115)
- *   4. forwardRef(() => Self) — self-reference per Pitfall 5
+ *   1. NgTemplateOutlet (slot support — hasSlots only; a pure consumer with
+ *      no producer-side slots of its own no longer needs it for its own
+ *      dynamic-name dispatch, since Phase 80 replaced that dispatch with a
+ *      plain declared `<ng-template [rozieSlot]="...">` marker)
+ *   2. RozieSlot (Phase 80 R4 — the `[rozieSlot]` marker directive, emitted
+ *      whenever the consumer's template has at least one record-path fill)
+ *   3. FormsModule (r-model on form-input)
+ *   4. User component classes from `<components>` (Phase 06.2 P2 D-115)
+ *   5. forwardRef(() => Self) — self-reference per Pitfall 5
  */
 function buildDecoratorImportsList(opts: {
   hasSlots: boolean;
@@ -156,10 +161,17 @@ function buildDecoratorImportsList(opts: {
   componentName: string;
 }): string {
   const items: string[] = [];
-  // Phase 07.2 Plan 04 (R5): NgTemplateOutlet is also required for the
-  // consumer-side dynamic-name dispatch via `*ngTemplateOutlet`. Folded
-  // into the same item so duplicate registrations don't surface.
-  if (opts.hasSlots || opts.hasDynamicSlotFiller) items.push('NgTemplateOutlet');
+  // Phase 80 (R4): NgTemplateOutlet is now narrowed to `hasSlots` alone — the
+  // consumer's own record-path fills no longer dispatch via
+  // `*ngTemplateOutlet`, they emit a plain declared `<ng-template
+  // [rozieSlot]="...">` marker (see RozieSlot below). A pure consumer with no
+  // producer-side slots of its own genuinely no longer needs this directive.
+  if (opts.hasSlots) items.push('NgTemplateOutlet');
+  // Phase 80 (R4): RozieSlot — the marker directive collected by the
+  // producer's `contentChildren(RozieSlot, { descendants: true })` content
+  // query. Emitted whenever the consumer's template has at least one
+  // record-path fill (`hasDynamicSlotFiller`).
+  if (opts.hasDynamicSlotFiller) items.push('RozieSlot');
   // Debug fix(33-04): the multi-source class/style merge emits `[ngClass]` /
   // `[ngStyle]`, which require these directives in `imports: [...]`. Placed
   // after NgTemplateOutlet so the @angular/common items group together and

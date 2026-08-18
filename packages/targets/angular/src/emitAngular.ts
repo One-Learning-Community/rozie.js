@@ -15,8 +15,11 @@
  *   8. buildShell composes the .ts file via magic-string
  *   9. composeSourceMap produces a real SourceMap referencing the .rozie source.
  *
- * Per RESEARCH OQ A8/A9 RESOLVED: NO `@rozie/runtime-angular` imports —
- * debounce/throttle/outsideClick all inline.
+ * Per RESEARCH OQ A8/A9 RESOLVED: debounce/throttle/outsideClick stay
+ * inline. Phase 80 reverses the narrower "NO `@rozie/runtime-angular`
+ * imports" half of that decision specifically for the `[rozieSlot]` marker
+ * directive — see the `hasDynamicSlotFiller` block below and
+ * `collectAngularImports.ts`'s `runtimeSymbols` bucket.
  *
  * Per RESEARCH Pitfall 8: all `inject(Renderer2)` / `inject(DestroyRef)` calls
  * are constructor-body or field initializers — never inside arrow methods.
@@ -684,17 +687,22 @@ export function emitAngular(
     imports.addForms('NG_VALUE_ACCESSOR');
   }
 
-  // Phase 07.2 Plan 04 (R5 dynamic-name): when the consumer's template emits
-  // at least one dynamic-name slot filler (`<template #[expr]>`), the
-  // dispatcher needs `ViewChild` + `TemplateRef` from @angular/core and
-  // `NgTemplateOutlet` from @angular/common (the decorator emitter already
-  // adds NgTemplateOutlet when hasSlots is true — for the consumer-side
-  // case we add it explicitly here since the IR.slots list is empty on a
-  // pure consumer with no producer-side slots of its own).
+  // Phase 80 Plan 05 (R4): when the consumer's template emits at least one
+  // record-path slot fill (dynamic-name `<template #[expr]>`, a
+  // non-identifier static name, or a matchedFamily fill), it declares a
+  // `<ng-template [rozieSlot]="...">` marker — the producer's own
+  // `contentChildren(RozieSlot, { descendants: true })` content query
+  // collects it, so the consumer itself needs only the `RozieSlot` directive
+  // imported from `@rozie/runtime-angular`. This replaces the prior
+  // `ViewChild` + `TemplateRef` + `NgTemplateOutlet` trio, which existed only
+  // to serve the deleted class-body capture/getter/binding path.
+  //
+  // Fallback note: if `tests/angular-typecheck` or `tests/strict-conformance`
+  // later reports an unresolved reference naming one of the three removed
+  // symbols, re-add only that one symbol and record why — do not restore the
+  // block wholesale on suspicion.
   if (tmplResult.hasDynamicSlotFiller) {
-    imports.add('ViewChild');
-    imports.add('TemplateRef');
-    imports.addCommon('NgTemplateOutlet');
+    imports.addRuntime('RozieSlot');
   }
 
   // Debug fix(33-04) (tiptap-nodeview): the multi-source class/style merge path

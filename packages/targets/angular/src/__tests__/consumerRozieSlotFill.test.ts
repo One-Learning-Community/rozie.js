@@ -295,3 +295,59 @@ describe('Task 2 — consumer emits record-path fills as plain children, no View
     expect(dupes.length).toBe(0);
   });
 });
+
+describe('Task 3 — RozieSlot wired into imports: array and the top-of-file import line, gated on record-path presence (Phase 80 R4)', () => {
+  it('a consumer emitting a record-path fill lists RozieSlot in imports: and imports it from @rozie/runtime-angular', () => {
+    const ir = lowerInline(`
+<rozie name="ConsumerX">
+<components>{ Cell: "./Cell.rozie" }</components>
+<data>{ dynName: 'header' }</data>
+<template>
+<div>
+  <Cell>
+    <template #[$data.dynName]>
+      <span>fallback</span>
+    </template>
+  </Cell>
+</div>
+</template>
+</rozie>
+`);
+    const code = compileAngular(ir);
+    expect(code).toMatch(/import \{ RozieSlot \} from '@rozie\/runtime-angular';/);
+    expect(code).toMatch(/imports:\s*\[[^\]]*\bRozieSlot\b[^\]]*\]/);
+  });
+
+  it('a zero-slot component imports nothing from @rozie/runtime-angular and has an unchanged imports: array', () => {
+    const ir = lowerInline(`
+<rozie name="Plain">
+<template>
+<div>Hello</div>
+</template>
+</rozie>
+`);
+    const code = compileAngular(ir);
+    expect(code).not.toMatch(/@rozie\/runtime-angular/);
+    expect(code).not.toMatch(/RozieSlot/);
+  });
+
+  it('a component with only identifier-named static slots imports nothing from @rozie/runtime-angular either', () => {
+    const ir = lowerInline(`
+<rozie name="ConsumerY">
+<components>{ Cell: "./Cell.rozie" }</components>
+<template>
+<div>
+  <Cell>
+    <template #header>
+      <span>Header</span>
+    </template>
+  </Cell>
+</div>
+</template>
+</rozie>
+`);
+    const code = compileAngular(ir);
+    expect(code).not.toMatch(/@rozie\/runtime-angular/);
+    expect(code).not.toMatch(/\bRozieSlot\b/);
+  });
+});
