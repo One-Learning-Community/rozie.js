@@ -30,13 +30,11 @@
  *     → `<ng-template #defaultSlot let-item="item">…body…</ng-template>`
  *
  *   { isDynamic: true, dynamicNameExpr } — R5 dynamic name
- *     → `<ng-template #__dynSlot_<N>>…body…</ng-template>` PLUS a
- *       `[templates]="templates"` property-input binding on the producer tag
- *       (composed in `emitTemplateNode.ts`). The consumer-side class getter
- *       `templates` maps the user's runtime-key expression to each captured
- *       `__dynSlot_<N>` ViewChild; the producer's `templates()` input signal
- *       (Plan 07.3.2-03) consumes that map at runtime. F-07.3.2-11-A closure
- *       — see Phase 07.3.2.1 Plan 01 SUMMARY.
+ *     → `<ng-template [rozieSlot]="<keyExpr>">…body…</ng-template>` — a
+ *       self-declaring keyed marker (Phase 80 R4). The producer's per-instance
+ *       `contentChildren(RozieSlot, { descendants: true })` content query
+ *       collects it directly, so no consumer-side ViewChild/getter/binding
+ *       plumbing is needed any more — see the history note below.
  *
  * Arrow-function-in-context caveat (Pitfall 4): when a fill body's event
  * handler contains arrow expressions, the same arrow-function-rejection
@@ -115,10 +113,10 @@ function letBindings(filler: SlotFillerDecl): string {
  * `<ng-template #ref let-…>…</ng-template>` markup string suitable for
  * inclusion as a CHILD of the component tag.
  *
- * Dynamic-name branch (R5) — call `emitDynamicSlotFiller` instead, which
- * returns the multi-part shape (ng-template declaration + class-field
- * declarations); the producer-tag `[templates]="templates"` property-input
- * binding is composed by the caller in `emitTemplateNode.ts` (F-07.3.2-11-A).
+ * Dynamic-name / record-path branch (R5, R12, matchedFamily) — call
+ * `emitDynamicSlotFiller` instead, which returns the keyed-marker shape
+ * (Phase 80 R4); no companion class-field or producer-tag binding is
+ * composed by the caller any more.
  */
 export function emitSlotFiller(
   filler: SlotFillerDecl,
@@ -162,111 +160,87 @@ export function emitSlotFiller(
 }
 
 /**
- * R5 dynamic-name dispatch tuple per D-04 Angular row.
+ * R5/R12/matchedFamily record-path filler emission (Phase 80 R4).
  *
- * Each dynamic filler emits:
- *   - `template`: `<ng-template #__dynSlot_<N>${lets}>${body}</ng-template>`
- *     a synthetic-named `<ng-template>` declaration capturing the fill body.
- *     The CALLER (emitTemplateNode) is responsible for:
- *       (a) appending `[templates]="<getterName>"` as a property input on the
- *           producer tag, where <getterName> is the deterministic class-body
- *           getter that maps user-runtime-key-exprs to captured refs;
- *       (b) registering the @ViewChild capture + getter via scriptInjections.
+ * Each record-path filler (dynamic-name `<template #[expr]>`, a non-identifier
+ * static name like `#cell-status`, or a `matchedFamily` fill) emits a single
+ * `<ng-template [rozieSlot]="<key>"${lets}>${body}</ng-template>` — a
+ * self-declaring keyed marker directive. There is no companion class field,
+ * getter, or producer-tag binding: the producer's own per-instance
+ * `contentChildren(RozieSlot, { descendants: true })` content query
+ * (`@rozie/runtime-angular`'s `RozieSlot`, Plan 01/04) collects the marker
+ * directly out of the projected content, including from inside an `@if` or
+ * `@for` embedded view — which a static `@ViewChild(..., { static: true })`
+ * could never see, and which is the whole reason this shape replaces that
+ * one (SPEC R4).
  *
- * Implementation note: Angular's static content-projection (`@ContentChild`)
- * does not natively support a dynamic name. The producer-side acceptance of
- * a `templates` input signal (Phase 07.3.2 Plan 03) is the documented Angular
- * divergence — the consumer wires its dynamic-name fills as a property-INPUT
- * map rather than as projected `<ng-content>` children. The producer's
- * merged guard `@if ((headerTpl ?? templates()?.['header']))` (Phase 07.3.2
- * Plan 10) then resolves the runtime dispatch.
+ * The bound key is the TEMPLATE-scope rewritten expression for the dynamic
+ * branch (Angular auto-resolves identifiers against the component instance
+ * inside a template binding — a `this.`-prefixed expression there either
+ * fails `strictTemplates` or silently resolves nothing), and the single-quoted
+ * escaped literal (`renderRecordKey`, T-79-07) for the two static branches.
  *
- * Silent fallback on runtime miss (D-05): when `templates()?.[expr]` returns
- * `undefined`, the merged @if short-circuits to the bare-static template
- * ref (if any) or the producer's declared default content.
- *
- * Phase 79 Plan 05 (R12/D-03) — this function ALSO handles a non-dynamic,
- * non-identifier-named STATIC filler (e.g. `#cell-status`): `emitSlotFiller`
- * above returns `''` for such a filler (no `@ContentChild`-capturable
- * `<ng-template #cell-status>` path exists), so it is captured via this SAME
- * synthetic-`<ng-template>` + `[templates]`-getter mechanism instead, keyed
- * on the escaped LITERAL name (`renderRecordKey`, T-79-07) rather than a
- * computed runtime expression — `keyExpr`/`classBodyKeyExpr` are identical
- * for a literal key since there is no template-scope-dependent rewriting to
- * do.
- *
- * History — Phase 07.3.2.1-01 (closes F-07.3.2-11-A): prior to this phase
- * `emitDynamicSlotFiller` was paired with a sibling `dispatch` string of
- * shape `<ng-container *ngTemplateOutlet="templates[<expr>]">` emitted as
- * a projected child of the producer tag. That shape was silently dropped
- * by Angular (no `<ng-content>` slot in the consumed component's view),
- * so the dynamic-name fill never rendered. The property-input contract
- * documented above replaces it; the broken projection emission has been
- * deleted from `emitTemplateNode.ts` (the previous `dispatchParts.push`
- * call site).
+ * History — this function's prior shape (pre-Phase-80) captured each fill
+ * behind a synthetic `#__dynSlot_<N>` template-ref name plus a class-body
+ * `@ViewChild(..., { static: true })` and a `templates` getter, bound onto
+ * the producer tag as a `[templates]="templates"` property input. That
+ * shape had two silent-wrong-render bugs the marker-directive shape fixes:
+ * a static view query cannot see into an embedded view (`@if`/`@for`), and
+ * the constant getter name meant two sibling producer tags on one consumer
+ * shared a single map, silently dropping one producer's fills. (An even
+ * earlier shape — Phase 07.3.2.1-01 — tried a projected
+ * `<ng-container *ngTemplateOutlet="templates[<expr>]">` dispatcher, which
+ * Angular silently dropped outright since the consumed component declared no
+ * matching `<ng-content>`. Re-adding a projected-outlet dispatcher of any
+ * kind here would reintroduce that same failure mode.)
  */
 export interface AngularDynamicSlotFillerEmission {
-  /** `<ng-template #__dynSlot_<N>…>body</ng-template>` markup (child of component tag) */
+  /** `<ng-template [rozieSlot]="<key>"…>body</ng-template>` markup (child of component tag) */
   template: string;
-  /** Synthetic template-ref name `__dynSlot_<N>` */
-  refName: string;
-  /** The rewritten dynamic-name expression — TEMPLATE context (Angular auto-scopes class members). */
+  /** The rewritten key expression (dynamic branch) or single-quoted escaped literal (static branches) — TEMPLATE-scope, the same value bound in `template`. Read by the duplicate-static-key check. */
   keyExpr: string;
-  /**
-   * The rewritten dynamic-name expression — CLASS-BODY context (`this.X()` per
-   * identifier reference). Used by the consumer-side `templates` getter where
-   * Angular's template-scope auto-resolution does not apply. Distinct from
-   * `keyExpr` because template-literal shapes like `` `footer${footerMode()}` ``
-   * cannot tolerate a naive outer `this.` prefix.
-   */
-  classBodyKeyExpr: string;
-  /** The fill's params (used to build let-bindings on the dispatcher's context) */
+  /** The fill's params (used to build let-bindings on the marker's context) */
   params: readonly { name: string }[];
 }
 
 export function emitDynamicSlotFiller(
   filler: SlotFillerDecl,
   ctx: EmitSlotFillerCtx,
-  index: number,
 ): AngularDynamicSlotFillerEmission | null {
-  const refName = `__dynSlot_${index}`;
   if (filler.isDynamic) {
     if (!filler.dynamicNameExpr) return null; // ROZ946 already emitted upstream
     const lets = letBindings(filler);
     const body = ctx.emitChildren(filler.body);
-    const template = `<ng-template #${refName}${lets}>${body}</ng-template>`;
     const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir);
-    const classBodyKeyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir, {
-      prefixThis: true,
-    });
-    return { template, refName, keyExpr, classBodyKeyExpr, params: filler.params };
+    const template = `<ng-template [rozieSlot]="${keyExpr}"${lets}>${body}</ng-template>`;
+    return { template, keyExpr, params: filler.params };
   }
   // Phase 79 Plan 11 (R5/D-09) — a `matchedFamily` fill has a static,
   // IDENTIFIER-shaped name (its exact name never appeared as a producer
   // SlotDecl — it only matched a name-PREFIX family, 79-07), so it routes
-  // through this SAME `[templates]`-getter mechanism, keyed on its OWN name
-  // as a quoted string literal (a compile-time-known key, not a rewritten
-  // runtime expression — unlike the `isDynamic` branch above). Checked BEFORE
-  // the non-identifier branch below so a family fill whose name happens to
-  // also be non-identifier-shaped (e.g. the real fixture's `#cell-status`)
-  // still keys correctly either way (both branches key on the escaped
-  // literal name identically for a static name).
+  // through this SAME marker mechanism, keyed on its OWN name as a quoted
+  // string literal (a compile-time-known key, not a rewritten runtime
+  // expression — unlike the `isDynamic` branch above). Checked BEFORE the
+  // non-identifier branch below so a family fill whose name happens to also
+  // be non-identifier-shaped (e.g. the real fixture's `#cell-status`) still
+  // keys correctly either way (both branches key on the escaped literal name
+  // identically for a static name).
   if (filler.matchedFamily === true) {
     const lets = letBindings(filler);
     const body = ctx.emitChildren(filler.body);
-    const template = `<ng-template #${refName}${lets}>${body}</ng-template>`;
     const literalKey = renderRecordKey(filler.name);
-    return { template, refName, keyExpr: literalKey, classBodyKeyExpr: literalKey, params: filler.params };
+    const template = `<ng-template [rozieSlot]="${literalKey}"${lets}>${body}</ng-template>`;
+    return { template, keyExpr: literalKey, params: filler.params };
   }
   // Phase 79 Plan 05 (R12/D-03) — a non-identifier STATIC slot name (e.g.
-  // `#cell-status`): route through this SAME `[templates]`-getter mechanism,
-  // keyed on the escaped literal name rather than a computed expression.
+  // `#cell-status`): route through this SAME marker mechanism, keyed on the
+  // escaped literal name rather than a computed expression.
   if (filler.name !== '' && !isSlotNameIdentifier(filler.name)) {
     const lets = letBindings(filler);
     const body = ctx.emitChildren(filler.body);
-    const template = `<ng-template #${refName}${lets}>${body}</ng-template>`;
     const literalKey = renderRecordKey(filler.name);
-    return { template, refName, keyExpr: literalKey, classBodyKeyExpr: literalKey, params: filler.params };
+    const template = `<ng-template [rozieSlot]="${literalKey}"${lets}>${body}</ng-template>`;
+    return { template, keyExpr: literalKey, params: filler.params };
   }
   return null;
 }
