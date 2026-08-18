@@ -21,8 +21,13 @@
  *   - SlotDecl present → `ContentChild`, `TemplateRef`
  *   - $emit calls → `output`
  *
- * Per RESEARCH OQ A8/A9 RESOLVED: NO `@rozie/runtime-angular` imports —
- * debounce/throttle/outsideClick all inline.
+ * Per RESEARCH OQ A8/A9 (Phase 5): debounce/throttle/outsideClick stay
+ * inlined — that decision is unchanged. Phase 80 reverses the narrower
+ * "NO `@rozie/runtime-angular` imports" half of that decision specifically
+ * for the `[rozieSlot]` marker directive: the `runtimeSymbols` bucket below
+ * emits a conditional `import { ... } from '@rozie/runtime-angular';` line
+ * gated on `runtimeSymbols.size > 0`, so a component with no record-path
+ * slots still emits no runtime-package import at all.
  *
  * @experimental — shape may change before v1.0
  */
@@ -115,10 +120,23 @@ export type AngularFormsImport = 'FormsModule' | 'NG_VALUE_ACCESSOR';
  */
 export type AngularCommonImport = 'NgTemplateOutlet' | 'NgClass' | 'NgStyle';
 
+/**
+ * Third-party npm runtime-package import kind — separate import line from
+ * `@rozie/runtime-angular` (Phase 80).
+ *
+ * `RozieSlot` is the `[rozieSlot]` marker directive that `contentChildren`
+ * collects on the producer side to build the content-collected fill map for
+ * record-path (dynamic / non-identifier-static) slot fills. Added by the
+ * emitter via `imports.addRuntime('RozieSlot')` when the component declares
+ * at least one record-path slot fill.
+ */
+export type AngularRuntimeImport = 'RozieSlot';
+
 export class AngularImportCollector {
   private coreSymbols = new Set<AngularCoreImport>();
   private formsSymbols = new Set<AngularFormsImport>();
   private commonSymbols = new Set<AngularCommonImport>();
+  private runtimeSymbols = new Set<AngularRuntimeImport>();
 
   add(name: AngularCoreImport): void {
     this.coreSymbols.add(name);
@@ -129,6 +147,9 @@ export class AngularImportCollector {
   addCommon(name: AngularCommonImport): void {
     this.commonSymbols.add(name);
   }
+  addRuntime(name: AngularRuntimeImport): void {
+    this.runtimeSymbols.add(name);
+  }
 
   has(name: AngularCoreImport): boolean {
     return this.coreSymbols.has(name);
@@ -138,6 +159,9 @@ export class AngularImportCollector {
   }
   hasCommon(name: AngularCommonImport): boolean {
     return this.commonSymbols.has(name);
+  }
+  hasRuntime(name: AngularRuntimeImport): boolean {
+    return this.runtimeSymbols.has(name);
   }
 
   coreNames(): readonly string[] {
@@ -161,6 +185,14 @@ export class AngularImportCollector {
     if (this.formsSymbols.size > 0) {
       const sorted = [...this.formsSymbols].sort();
       lines.push(`import { ${sorted.join(', ')} } from '@angular/forms';`);
+    }
+    // The `.size > 0` gate is load-bearing, not incidental style: it is the
+    // structural mechanism satisfying "a component with no record-path slots
+    // emits no runtime-package import at all" (SPEC boundary #2). No other
+    // detection pass re-checks that condition.
+    if (this.runtimeSymbols.size > 0) {
+      const sorted = [...this.runtimeSymbols].sort();
+      lines.push(`import { ${sorted.join(', ')} } from '@rozie/runtime-angular';`);
     }
     if (lines.length === 0) return '';
     return lines.join('\n') + '\n';
