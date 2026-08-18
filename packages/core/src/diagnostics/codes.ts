@@ -731,8 +731,10 @@ export const RozieErrorCode = {
   TARGET_ANGULAR_RHTML_WITH_CHILDREN: 'ROZ721', // error — r-html via [innerHTML] cannot coexist with children
   TARGET_ANGULAR_RESERVED: 'ROZ722', // error — internal-invariant placeholder (one reuse site — the $el-listener fallback — emits at warning severity)
   TARGET_ANGULAR_LOOP_GUARD_HOIST: 'ROZ723', // error — an early-return event modifier (.self / key-filter) inside an r-for loop references the loop variable — Angular hoists the guard to a class-field arrow that cannot capture loop-scoped bindings
+  TARGET_ANGULAR_DUPLICATE_STATIC_SLOT_KEY: 'ROZ724', // error — two static-literal slot fills on one producer tag resolve to the same key (Phase 80 D-08; Angular-emitter-local, not a core IR validation — the object/snippet fill shape used by React/Solid/Svelte/Vue/Lit makes this construct legal and unimplicated on those targets)
 
-  // ---- @rozie/runtime-angular warnings (Phase 5) — ROZ750..ROZ799 (RESERVED for v2 helpers) ----
+  // ---- @rozie/runtime-angular warnings (Phase 80, opening the band reserved by Phase 5) — ROZ750..ROZ799 ----
+  RUNTIME_ANGULAR_DUPLICATE_SLOT_KEY_WARNING: 'ROZ750', // warning — ngDevMode-guarded dev-mode runtime duplicate keyed-fill collision; last fill (in content-query/document order) wins (Phase 80 D-08)
 
   // ---- Phase 6 (ROZ800..ROZ899) — D-96 sub-ranges =====
   //   ROZ800..ROZ819 — @rozie/core compile() public-API errors
