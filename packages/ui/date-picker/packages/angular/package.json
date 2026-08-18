@@ -69,6 +69,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@rozie/runtime-angular": "workspace:*",
     "@rozie/runtime-keynav-core": "workspace:*",
     "tslib": "^2"
   },

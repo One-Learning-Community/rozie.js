@@ -1830,6 +1830,9 @@ importers:
 
   packages/ui/chartjs/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       chart.js:
         specifier: ^4
         version: 4.5.1
@@ -2061,6 +2064,9 @@ importers:
       '@codemirror/view':
         specifier: ^6
         version: 6.43.0
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       codemirror:
         specifier: ^6
         version: 6.0.2
@@ -2442,6 +2448,9 @@ importers:
 
   packages/ui/combobox/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       '@tanstack/virtual-core':
         specifier: ^3
         version: 3.17.1
@@ -2646,6 +2655,9 @@ importers:
       '@rozie-ui/combobox-angular':
         specifier: ^0.4.0
         version: link:../../../combobox/packages/angular
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -2988,6 +3000,9 @@ importers:
       '@rozie-ui/popover-angular':
         specifier: ^0.1.0
         version: link:../../../popover/packages/angular
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       '@tanstack/table-core':
         specifier: ^8.21
         version: 8.21.3
@@ -3172,6 +3187,9 @@ importers:
 
   packages/ui/date-picker/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       '@rozie/runtime-keynav-core':
         specifier: workspace:*
         version: link:../../../../runtime/keynav-core
@@ -3305,6 +3323,9 @@ importers:
 
   packages/ui/dialog/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -3438,6 +3459,9 @@ importers:
 
   packages/ui/embla/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       embla-carousel:
         specifier: ^8.6
         version: 8.6.0
@@ -3768,6 +3792,9 @@ importers:
       '@fullcalendar/timegrid':
         specifier: ^6.1
         version: 6.1.20(@fullcalendar/core@6.1.20)
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -4002,6 +4029,9 @@ importers:
       '@lexical/utils':
         specifier: ^0.48.0
         version: 0.48.0(typescript@5.6.3)
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       lexical:
         specifier: ^0.48.0
         version: 0.48.0(typescript@5.6.3)
@@ -4245,6 +4275,9 @@ importers:
 
   packages/ui/listbox/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       '@tanstack/virtual-core':
         specifier: ^3
         version: 3.17.1
@@ -4396,6 +4429,9 @@ importers:
 
   packages/ui/maplibre/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       maplibre-gl:
         specifier: ^5
         version: 5.24.0
@@ -4797,6 +4833,9 @@ importers:
 
   packages/ui/pagination/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -5071,6 +5110,9 @@ importers:
 
   packages/ui/popover/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -5218,6 +5260,9 @@ importers:
 
   packages/ui/resizable/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -5366,6 +5411,9 @@ importers:
 
   packages/ui/rete/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       elkjs:
         specifier: ^0.8.2
         version: 0.8.2
@@ -5619,6 +5667,9 @@ importers:
 
   packages/ui/slider/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -5761,6 +5812,9 @@ importers:
 
   packages/ui/sortable-list/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       sortablejs:
         specifier: ^1.15
         version: 1.15.7
@@ -5905,6 +5959,9 @@ importers:
 
   packages/ui/switch/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -6032,6 +6089,9 @@ importers:
 
   packages/ui/tags/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -6441,6 +6501,9 @@ importers:
 
   packages/ui/toast/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       tslib:
         specifier: ^2
         version: 2.8.1
@@ -23177,7 +23240,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@6.4.2(@types/node@22.19.17)(jiti@2.7.0)(less@4.2.2)(lightningcss@1.32.0)(sass@1.85.0)(terser@5.46.2))
+      vitest: 4.1.5(@types/node@22.19.17)(@vitest/coverage-v8@4.1.5)(happy-dom@15.11.7)(jsdom@25.0.1)(vite@8.1.0(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))
 
   '@vitest/expect@4.1.5':
     dependencies:

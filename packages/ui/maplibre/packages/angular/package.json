@@ -69,6 +69,7 @@
   "module": "./dist/fesm2022/rozie-ui-maplibre-angular.mjs",
   "types": "./dist/index.d.ts",
   "dependencies": {
+    "@rozie/runtime-angular": "workspace:*",
     "tslib": "^2"
   },
   "devDependencies": {

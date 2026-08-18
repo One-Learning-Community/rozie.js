@@ -70,6 +70,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@rozie/runtime-angular": "workspace:*",
     "tslib": "^2"
   },
   "devDependencies": {
