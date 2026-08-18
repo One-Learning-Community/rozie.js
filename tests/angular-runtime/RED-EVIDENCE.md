@@ -172,3 +172,110 @@ silently complied with — see the inline comments at each site for the full acc
 `tests/angular-runtime` was already added to `.github/workflows/angular-matrix.yml`'s hand-maintained
 unit-test `--root` list in Plan 06 (commit `9bd43c2f`). No new CI wiring was needed in this plan;
 confirmed still present and correct.
+
+## RED — Phase 80 Plan 09 (Task 2), D-09's Bug C reproduced (NOT the same defect as above)
+
+**This section is a SECOND, distinct fail-first record.** Everything above this heading proved and
+then closed OPEN RISK R-80-NG0203 (a test-harness integration gap). This section proves a real
+**emitter** bug the phase itself introduced — deferred-items.md item #3, formalized as decision D-09
+in `80-CONTEXT.md`: *"Phase 80 does NOT close until the Bug-C regression is fixed inside this
+phase."* Do not confuse this RED state with the one above — that one is closed and green; this one
+is deliberately still open and will stay red until Plan 10 lands.
+
+**Pre-fix (this plan's) emitter commit:** `7ec36c962716aad39611fdb354ca4e7a13ebf18d` (this plan's
+Task 1 commit — the four new consumer fixtures, zero emitter files touched). No file under
+`packages/targets/angular/src/emit` has changed anywhere in Plan 09; the Angular emitter at this
+commit is byte-identical to the emitter Plan 08 left behind.
+
+### The bug being reproduced
+
+`emitScript.ts:1322`'s `hasRecordOnlySlot = ir.slots.some(isRecordOnlySlotDecl)` gate decides whether
+a PRODUCER emits `contentChildren(RozieSlot)` + `__rozieFillMap` — keyed ENTIRELY on the producer's
+OWN slot declarations. `emitSlotFiller.ts:215` emits a `[rozieSlot]="expr"` marker for ANY consumer
+`#[expr]` fill unconditionally, regardless of what the target producer's own slots look like. A
+producer whose slots are ALL static identifier names (like `tests/angular-runtime/fixtures/
+ProducerIdentifierOnly.rozie`, declaring only `header`/`footer`) never satisfies `hasRecordOnlySlot`,
+so it never collects `[rozieSlot]` fills at all — a dynamic consumer fill targeting it has no path to
+the producer whatsoever. The plan's own `staticSlotProducerFillMap.test.ts` file docstring and
+`80-CONTEXT.md`'s D-09 both give the full root-cause narrative.
+
+### Observed at commit `7ec36c96`
+
+**Command:** `pnpm exec vitest run --root packages/targets/angular staticSlotProducerFillMap`
+
+```
+Test Files  1 failed (1)
+     Tests  6 failed (6)
+```
+
+| # | Test | Status | Observed failure |
+|---|------|--------|-------------------|
+| 1 | emits `__rozieFills` content query | **FAILED** | `expected 'import { Component, ContentChild, Des…' to contain '__rozieFills = contentChildren(RozieS…'` |
+| 2 | emits `__rozieFillMap` computed member | **FAILED** | `expected 'import { Component, ContentChild, Des…' to contain '__rozieFillMap = computed(() => {'` |
+| 3 | emits `RozieSlot` runtime import | **FAILED** | `expected 'import { Component, ContentChild, Des…' to contain 'import { RozieSlot } from \'@rozie/ru…'` |
+| 4 | `header` slot resolution carries the fill-map tier | **FAILED** | `expected '...' to contain '*ngTemplateOutlet="(headerTpl ?? __ro…'` — actual emitted expression is `(headerTpl ?? templates()?.['header'])`, no fill-map tier at all |
+| 5 | `footer` slot resolution carries the fill-map tier | **FAILED** | same shape as #4, for `footerTpl` |
+| 6 | keyed-fill gate is the same width as the `templates` gate | **FAILED** | `hasTemplatesInput` is `true` (the producer DOES emit `templates()`) but `expect(code).toContain('__rozieFillMap')` fails — proves the two gates are NOT the same width today, which is the precise shape of the bug |
+
+**Command:** `pnpm exec vitest run --root tests/angular-runtime staticProducerKeyedFill`
+
+```
+Test Files  1 failed (1)
+     Tests  5 failed (5)
+```
+
+| # | Test | Status | Observed failure |
+|---|------|--------|-------------------|
+| 1 | top-level fill (ModalConsumer shape) | **FAILED** | `expected ' [HEADER-FALLBACK]  [FOOTER-FALLBACK] ' to contain 'TOPLEVEL-STATIC-FILL'` — the fill never renders, both slots show their own fallback |
+| 2 | toggle fill (dynamic-slot-name / TableDemo-footer shape) | **FAILED** | `expected 'Toggle slotName (now: header) [HEADER…' to contain 'TOGGLE-STATIC-FILL'` — the fill never renders in EITHER slot, before or after the toggle click |
+| 3 | fill inside `r-if` (true at mount) | **FAILED** | `expected ' [HEADER-FALLBACK]  [FOOTER-FALLBACK] ' to contain 'IF-STATIC-FILL'` |
+| 4 | fill inside `r-if` (false→true after mount) | **FAILED** | same shape as #3 — the fill never arrives even after the conditional flips true and `detectChanges()` runs again |
+| 5 | two sibling static-only producers, each with its own fill | **FAILED** | `expected +0 to be 1` — BOTH siblings' fill counts are zero (unlike the record-path sibling bug RED-EVIDENCE recorded earlier in this file, where one sibling rendered and the other silently dropped; here NEITHER static-only producer ever collects anything, so both markers are simply absent) |
+
+Both suites fail exactly as this plan requires: the runtime DOM proof shows the content is genuinely
+missing (not a screenshot artifact — verified the same way deferred-items.md #3 verified it, via
+direct text-content assertions), and the source-level proof pins the precise emitter gate that causes
+it, including the explicit gate-width relationship (test 6) that Plan 10's fix must satisfy.
+
+### Additivity check — the previously-green suites are untouched
+
+`pnpm exec vitest run --root tests/angular-runtime` (full package):
+
+```
+Test Files  1 failed | 5 passed (6)
+     Tests  5 failed | 165 passed (170)
+```
+
+The 165 tests this file's earlier GREEN section recorded are still 165 green — the new 5 red tests
+are purely additive (170 = 165 + 5), not a regression of any existing coverage.
+
+`pnpm exec vitest run --root packages/targets/angular` (full package):
+
+```
+Test Files  1 failed | 58 passed (59)
+     Tests  6 failed | 641 passed | 1 todo (648)
+```
+
+Same additivity shape: 641 previously-passing tests (plus 1 pre-existing `todo`) are unaffected; only
+the 6 new `staticSlotProducerFillMap.test.ts` cases are red.
+
+### Scope check — nothing outside the new files changed
+
+`git show --stat` for this plan's two task commits lists only the four new fixtures (Task 1) and the
+two new test files plus this evidence file (Task 2) — no file under `packages/targets/angular/src/emit`,
+no existing test file, no fixture snapshot, no `.png` visual-regression baseline.
+
+### Frozen-lockfile constraint
+
+`pnpm install --frozen-lockfile` succeeds at the commit this section is committed in (verified before
+committing, no `package.json`/lockfile changes in this plan at all) — the RED state trades away
+test-greenness for these two new suites only, not lockfile installability, and not the greenness of
+any suite that was already passing.
+
+### What happens next
+
+This red state stays in git history unresolved by this plan, by design. Plan 10 is the emitter fix
+(`emitScript.ts` / `emitSlotFiller.ts`); once it lands, these same two files — unmodified — become the
+GREEN observation for D-09's Bug C, mirroring the convention the Plan 03 → Plan 08 pair already
+established above in this same file. **Do not "fix" these tests by loosening or removing an
+assertion; the fix belongs in the emitter, not the test.**
