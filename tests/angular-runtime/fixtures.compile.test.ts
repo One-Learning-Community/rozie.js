@@ -19,6 +19,10 @@ const CONSUMER_FIXTURES = [
   'ConsumerInsideFor',
   'ConsumerSiblingProducers',
   'ConsumerEmptyKeyFill',
+  // Phase 80 Plan 14 (D-10) — dynamic fills against a producer whose
+  // wrapper element is itself structurally gated on slot presence.
+  'ConsumerGatedProducerHeader',
+  'ConsumerGatedProducerTableFooter',
 ];
 
 function readFixture(name: string): string {

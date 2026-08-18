@@ -1,0 +1,37 @@
+<rozie name="ConsumerGatedProducerTableFooter">
+
+<!-- Phase 80 Plan 14 (D-10) — reproduces the Table footer real-world shape:
+     a wrapper gated on TWO slot-presence reads with NO prop operand
+     (`$slots.footerSummary || $slots.footerPagination`). This consumer
+     fills ONLY `footerSummary` through a runtime-computed key expression;
+     the sibling `footerPagination` slot is left unfilled so it must show
+     its OWN fallback text once the wrapper renders — proving the wrapper
+     decision and the per-slot outlet resolution are independently correct,
+     not merely "something rendered." Correct (post-fix) rendering: the
+     gated footer wrapper element is present in the DOM (by its
+     `data-testid`), the dynamic fill text is present for `footerSummary`,
+     and `footerPagination`'s own fallback text is present alongside it.
+     Pre-fix: the wrapper element does not render at all — Table's `<tfoot>`
+     exact confirmed symptom (D-10). -->
+
+<components>
+{
+  ProducerGatedStaticSlots: './ProducerGatedStaticSlots.rozie',
+}
+</components>
+
+<data>
+{
+  fillKey: 'footerSummary',
+}
+</data>
+
+<template>
+<div class="consumer-gated-producer-table-footer">
+  <ProducerGatedStaticSlots>
+    <template #[$data.fillKey]>GATED-FOOTER-SUMMARY-DYNAMIC-FILL</template>
+  </ProducerGatedStaticSlots>
+</div>
+</template>
+
+</rozie>

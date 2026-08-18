@@ -1,0 +1,37 @@
+<rozie name="ConsumerGatedProducerHeader">
+
+<!-- Phase 80 Plan 14 (D-10) — reproduces the ModalConsumer real-world shape
+     against a producer whose gate wrapper is a STRUCTURAL presence check
+     (`$props.title || $slots.header`), not an unconditional render. No
+     `title` prop is passed (ProducerGatedStaticSlots.rozie's `title`
+     default is `''`, falsy), so the header wrapper's gate depends ENTIRELY
+     on `$slots.header` resolving truthy through the widened three-tier
+     chain — the fill is a runtime-computed key expression, never a static
+     identifier fill (a static fill would resolve through the content-child
+     operand alone and prove nothing about the new fill-map tier). Correct
+     (post-fix) rendering: the gated header wrapper element itself is
+     present in the DOM (by its `data-testid`) AND the dynamic fill text is
+     present inside it. Pre-fix: the wrapper element does not render at
+     all — Modal 2's exact confirmed symptom (D-10). -->
+
+<components>
+{
+  ProducerGatedStaticSlots: './ProducerGatedStaticSlots.rozie',
+}
+</components>
+
+<data>
+{
+  fillKey: 'header',
+}
+</data>
+
+<template>
+<div class="consumer-gated-producer-header">
+  <ProducerGatedStaticSlots>
+    <template #[$data.fillKey]>GATED-HEADER-DYNAMIC-FILL</template>
+  </ProducerGatedStaticSlots>
+</div>
+</template>
+
+</rozie>

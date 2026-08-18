@@ -1,0 +1,39 @@
+<rozie name="ProducerGatedStaticSlots">
+
+<!-- Phase 80 Plan 14 (D-10) — the producer shape ProducerIdentifierOnly.rozie
+     (Plan 07) deliberately does NOT cover: identifier-named STATIC slots
+     wrapped in a STRUCTURAL presence gate on the WRAPPER ELEMENT itself,
+     mirroring the two real dogfood shapes that stayed red through Plans
+     09-13's Docker VR run —
+       examples/Modal.rozie:       <header r-if="$props.title || $slots.header">
+       examples/Table.rozie:       <tfoot r-if="$slots.footerSummary || $slots.footerPagination">
+     ProducerIdentifierOnly's own slots render UNCONDITIONALLY (fallback-or-
+     fill, the wrapper always mounts) — the outlet-only Plan 10 fix was
+     sufficient for it. THIS producer's wrapper elements never even MOUNT
+     unless their own gate resolves truthy, so a consumer's dynamic fill has
+     nowhere to land until the gate itself resolves through the SAME
+     three-tier chain (static content-child, then content-collected fill
+     map, then templates input) the outlet immediately inside it already
+     uses. This is exactly why Plans 09-13 went fully green at the source
+     and runtime-harness level while ModalConsumer/Table's Docker VR cells
+     stayed red (D-10). -->
+
+<props>
+{
+  title: { type: String, default: '' },
+}
+</props>
+
+<template>
+<div class="producer-gated-static-slots">
+  <header r-if="$props.title || $slots.header" data-testid="gated-header-wrapper">
+    <slot name="header">[HEADER-GATE-FALLBACK]</slot>
+  </header>
+  <footer r-if="$slots.footerSummary || $slots.footerPagination" data-testid="gated-footer-wrapper">
+    <slot name="footerSummary">[FOOTER-SUMMARY-GATE-FALLBACK]</slot>
+    <slot name="footerPagination">[FOOTER-PAGINATION-GATE-FALLBACK]</slot>
+  </footer>
+</div>
+</template>
+
+</rozie>

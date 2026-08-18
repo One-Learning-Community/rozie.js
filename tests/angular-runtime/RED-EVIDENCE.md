@@ -395,3 +395,126 @@ D-09's Bug C — the regression Plan 08's Docker VR run found and this file has 
 source-emission levels. Task 2 of this plan is the independent Docker visual-regression check against
 the four cells that were left honestly red since Plan 08, on baselines that predate the regression and
 were never touched.
+
+## RED — Phase 80 Plan 14 (Task 1), D-10's SECOND incomplete-widening bug reproduced (NOT the same defect as either section above)
+
+**This section is a THIRD, distinct fail-first record.** The two sections above proved and closed, in
+order: OPEN RISK R-80-NG0203 (a test-harness integration gap) and D-09's Bug C (the OUTLET resolution
+chain in `emitSlotInvocation.ts`, fixed by Plan 10's `hasKeyedFillIntake` widening). This section proves
+a SECOND, DISTINCT real emitter bug that Plan 13's own Docker VR union run surfaced and D-10 formalized:
+Plan 10 widened the chain that supplies the `TemplateRef` once a wrapper element has already decided to
+render. It did NOT widen the STRUCTURAL PRESENCE check that decides whether the wrapper renders AT ALL.
+Do not confuse this RED state with either section above — those are closed and green; this one is
+deliberately still open and will stay red until this plan's Task 2 lands.
+
+### The bug being reproduced
+
+Three near-verbatim two-tier presence-chain builders — `buildSlotsMerge` (`rewriteTemplateExpression.ts:72`,
+call sites `:475`/`:520`), `buildScriptSlotsMerge` (`rewriteScript.ts:180`, call site `:1353`), and
+`buildListenerSlotsMerge` (`rewriteListenerExpression.ts:136`, call site `:432`) — all carry the same
+Phase 07.3.2 Plan 10 doc comment and all lower `$slots.X` to `(fooTpl ?? templates()?.['foo'])`, with
+zero `__rozieFillMap` references anywhere in any of the three files. A producer that gates a WRAPPER
+ELEMENT on `$slots.foo` (Modal's `<header r-if="$props.title || $slots.header">`, Table's `<tfoot
+r-if="$slots.footerSummary || $slots.footerPagination">`) never renders the wrapper for a consumer's
+dynamic `#[expr]` fill — the fill has nowhere to land, even though the OUTLET chain immediately inside
+that same wrapper already resolves through three tiers (Plan 10's fix). `80-CONTEXT.md`'s D-10 gives
+the full root-cause narrative, including the correction that the defect has three copies, not one.
+
+### Observed at commit `64180635` (pre-Task-1, HEAD before this plan's fixtures/tests landed)
+
+**Command:** `pnpm exec vitest run --root packages/targets/angular gatedSlotPresenceFillMap`
+
+```
+Test Files  1 failed (1)
+     Tests  7 failed | 1 passed (8)
+```
+
+| # | Test | Status | Observed failure |
+|---|------|--------|-------------------|
+| 1 | prop-OR-slot gate (Modal shape) carries the fill-map tier for `header` | **FAILED** | actual outer gate is `@if (title() \|\| (headerTpl ?? templates()?.['header']))` — no fill-map tier |
+| 2 | slot-OR-slot gate (Table shape) carries the fill-map tier for both slots | **FAILED** | actual outer gate is `@if ((footerSummaryTpl ?? templates()?.['footerSummary']) \|\| (footerPaginationTpl ?? templates()?.['footerPagination']))` — no fill-map tier on either operand |
+| 3 | cross-chain agreement (gate vs. outlet) for `header` | **FAILED** | the gate-chain regex never matches (no fill-map term to find) |
+| 4 | template-context unit: `$slots.header` → three-tier chain | **FAILED** | `expected '(headerTpl ?? templates()?.[\'header\'])' to be '(headerTpl ?? __rozieFillMap()[\'header\'] ?? templates()?.[\'header\'])'` |
+| 5 | template-context unit: `prefixThis: true` → class-scoped three-tier chain | **FAILED** | same shape as #4, `this.`-qualified |
+| 6 | script-context unit: `rewriteRozieIdentifiers` → class-scoped three-tier chain | **FAILED** | emitted `if ((this.headerTpl ?? this.templates()?.['header'])) { foo(); }` — no fill-map tier |
+| 7 | listener-context unit: `rewriteListenerExpression` → class-scoped three-tier chain | **FAILED** | same shape as #4/#5, `this.`-qualified |
+| 8 | optional-member branch produces the SAME chain as the plain-member branch | **PASSED** | both branches agree with each other (both still two-tier pre-fix) — an internal-consistency check, not a fill-map-presence check, so passing here is correct and expected, not a wrong-reason pass |
+
+**Command:** `pnpm exec vitest run --root tests/angular-runtime gatedProducerKeyedFill`
+
+```
+Test Files  1 failed (1)
+     Tests  2 failed (2)
+```
+
+| # | Test | Status | Observed failure |
+|---|------|--------|-------------------|
+| 1 | prop-OR-slot gate (Modal shape) — gated header wrapper renders with the fill inside it | **FAILED** | `expected null not to be null` — `document.querySelector('[data-testid="gated-header-wrapper"]')` returns `null`; the wrapper ELEMENT itself never mounts, not merely missing text |
+| 2 | slot-OR-slot gate (Table shape) — gated footer wrapper renders, filled + unfilled slots both correct | **FAILED** | same shape as #1 — `[data-testid="gated-footer-wrapper"]` is `null` |
+
+Both suites fail exactly as this plan requires: the source-level proof pins the precise two-tier text
+at all four call sites (three rewrite contexts, both real-world gate shapes), and the runtime proof
+shows the wrapper ELEMENT is absent from the DOM — not merely its text — matching the D-10 confirmed
+symptom exactly (Modal 2 emits no `<header>` element at all; Table's `<tfoot>` never appears).
+
+**Command:** `pnpm exec vitest run --root tests/angular-runtime fixtures.compile`
+
+```
+Test Files  1 passed (1)
+     Tests  8 passed (8)
+```
+
+The two new consumer fixtures (`ConsumerGatedProducerHeader`, `ConsumerGatedProducerTableFooter`) were
+added to the hand-maintained consumer list and compile cleanly with no `ContentChild` capture for the
+dynamic fill name — this suite does not assert fill-map-tier presence, so its pass here is expected and
+does not weaken the RED proof above.
+
+### Additivity check — the previously-green suites are untouched
+
+`pnpm exec vitest run --root tests/angular-runtime` (full package, this commit):
+
+```
+Test Files  2 failed | 5 passed (7)
+     Tests  2 failed | 177 passed (179)
+```
+
+The 177 tests the Plan 13 GREEN section recorded are still 177 green — the 2 new red tests
+(`gatedProducerKeyedFill.test.ts`) are purely additive; `fixtures.compile.test.ts`'s 2 new cases (8
+total, was 6) are green and additive too (179 = 177 + 2).
+
+`pnpm exec vitest run --root packages/targets/angular` (full package, this commit):
+
+```
+Test Files  1 failed | 59 passed (60)
+     Tests  7 failed | 653 passed | 1 todo (661)
+```
+
+Same additivity shape: 653 previously-passing tests (plus 1 pre-existing `todo`) are unaffected; only
+the 7 new red `gatedSlotPresenceFillMap.test.ts` cases (of 8 total — 1 passes correctly, see table
+above) are red.
+
+### Scope check — nothing outside the new files changed
+
+This plan's Task 1 commit contains only the three new fixtures
+(`ProducerGatedStaticSlots.rozie`, `ConsumerGatedProducerHeader.rozie`,
+`ConsumerGatedProducerTableFooter.rozie`), the two new test files
+(`gatedSlotPresenceFillMap.test.ts`, `gatedProducerKeyedFill.test.ts`), the two-line addition to
+`fixtures.compile.test.ts`'s hand-maintained consumer list, and this evidence section — no file under
+`packages/targets/angular/src/rewrite`, no existing test file's assertions, no fixture snapshot, no
+`.png` visual-regression baseline.
+
+### Frozen-lockfile constraint
+
+`pnpm install --frozen-lockfile` exits zero at this commit (verified before committing, no
+`package.json`/lockfile changes in this plan at all) — the RED state trades away test-greenness for
+these two new suites (plus the 2 additive cases in `fixtures.compile.test.ts`, which are green), not
+lockfile installability, and not the greenness of any suite that was already passing.
+
+### What happens next
+
+This red state stays in git history unresolved by this task, by design. Task 2 is the emitter fix (a
+new shared module, `packages/targets/angular/src/rewrite/buildSlotsMerge.ts`, replacing the three
+duplicate builders); once it lands, these same two new files — unmodified — become the GREEN
+observation for D-10's second incomplete-widening bug, mirroring the convention the two red-to-green
+pairs above already established in this same file. **Do not "fix" these tests by loosening or removing
+an assertion; the fix belongs in the emitter, not the test.**
