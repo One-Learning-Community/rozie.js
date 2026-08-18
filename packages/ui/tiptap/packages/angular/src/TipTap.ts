@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, computed, contentChild, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 import { Editor, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -125,8 +126,8 @@ function __rozieAttr(v: unknown): string | null {
       
       @if (maxLength() != null || (countTpl ?? templates()?.['count'])) {
     <div class="rozie-tiptap-count">
-        @if ((countTpl ?? templates()?.['count'])) {
-    <ng-container *ngTemplateOutlet="(countTpl ?? templates()?.['count']); context: { $implicit: { characters: count().characters, words: count().words, maxLength: maxLength(), over: maxLength() != null && count().characters > maxLength() }, characters: count().characters, words: count().words, maxLength: maxLength(), over: maxLength() != null && count().characters > maxLength() }" />
+        @if ((countTpl ?? __rozieFillMap()['count'] ?? templates()?.['count'])) {
+    <ng-container *ngTemplateOutlet="(countTpl ?? __rozieFillMap()['count'] ?? templates()?.['count']); context: { $implicit: { characters: count().characters, words: count().words, maxLength: maxLength(), over: maxLength() != null && count().characters > maxLength() }, characters: count().characters, words: count().words, maxLength: maxLength(), over: maxLength() != null && count().characters > maxLength() }" />
     } @else {
 
           <span class="rozie-tiptap-count-value" [ngClass]="{ over: maxLength() != null && count().characters > maxLength() }">{{ rozieDisplay(count().characters) }} / {{ maxLength() }}</span>
@@ -363,6 +364,17 @@ export class TipTap {
   @ContentChild('linkEditor', { read: TemplateRef }) linkEditorTpl?: TemplateRef<LinkEditorCtx>;
   @ContentChild('nodeView', { read: TemplateRef }) nodeViewTpl?: TemplateRef<NodeViewCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _toolbarTpl = contentChild('toolbar', { read: TemplateRef });

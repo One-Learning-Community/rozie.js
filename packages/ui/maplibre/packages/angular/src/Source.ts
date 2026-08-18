@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, InjectionToken, TemplateRef, ViewEncapsulation, effect, forwardRef, inject, input, untracked } from '@angular/core';
+import { Component, ContentChild, DestroyRef, InjectionToken, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, forwardRef, inject, input, untracked } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface DefaultCtx {}
 
@@ -23,7 +24,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
   imports: [NgTemplateOutlet],
   template: `
 
-    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
+    <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" />
 
   `,
   styles: [`
@@ -53,6 +54,17 @@ export class Source {
   spec = input<unknown>(undefined);
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   sources = inject(rozieToken('maplibre:sources'));
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;

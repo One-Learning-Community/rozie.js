@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, TemplateRef, ViewEncapsulation, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 import { Popover } from '@rozie-ui/popover-angular';
 
@@ -138,7 +139,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
     <div class="rozie-data-table-wrap" #__rozieRoot>
 
-    <div class="rdt-column-defs" style="display:none" aria-hidden="true"><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></div>
+    <div class="rdt-column-defs" style="display:none" aria-hidden="true"><ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" /></div>
 
     @if (!!invalidMsg()) {
     <div class="rdt-sr-live" role="status" aria-live="polite" aria-atomic="true">{{ invalidMsg() }}</div>
@@ -166,8 +167,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
     @if (groupable()) {
     <div class="rdt-group-bar-host">
-      @if ((groupBarTpl ?? templates()?.['groupBar'])) {
-    <ng-container *ngTemplateOutlet="(groupBarTpl ?? templates()?.['groupBar']); context: { $implicit: { grouping: groupingKeys(), groupableColumns: groupableColumns(), applyGrouping: applyGrouping, clearGrouping: clearGrouping }, grouping: groupingKeys(), groupableColumns: groupableColumns(), applyGrouping: applyGrouping, clearGrouping: clearGrouping }" />
+      @if ((groupBarTpl ?? __rozieFillMap()['groupBar'] ?? templates()?.['groupBar'])) {
+    <ng-container *ngTemplateOutlet="(groupBarTpl ?? __rozieFillMap()['groupBar'] ?? templates()?.['groupBar']); context: { $implicit: { grouping: groupingKeys(), groupableColumns: groupableColumns(), applyGrouping: applyGrouping, clearGrouping: clearGrouping }, grouping: groupingKeys(), groupableColumns: groupableColumns(), applyGrouping: applyGrouping, clearGrouping: clearGrouping }" />
     } @else {
 
         @for (gk of groupingKeys(); track gk) {
@@ -186,8 +187,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <th class="rdt-th" [ngClass]="{ 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }" role="columnheader" [attr.data-col]="rozieAttr(header.column.id)" data-grid-cell="" data-row="__header" [attr.data-header-level]="rozieAttr(hgLevel)" [attr.colspan]="rozieAttr(header.colSpan > 1 ? header.colSpan : null)" [attr.data-col-index]="rozieAttr(headerColIndexOf(hg, header))" [attr.tabindex]="rozieAttr(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel))" [attr.aria-sort]="rozieAttr(ariaSortFor(header.column.id))" [style]="thStyle(header.column.id)">
             @if (isSelectColumn(header.column.id)) {
     <span style="display:contents">
-              @if ((selectAllTpl ?? templates()?.['selectAll'])) {
-    <ng-container *ngTemplateOutlet="(selectAllTpl ?? templates()?.['selectAll']); context: { $implicit: { checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }, checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }" />
+              @if ((selectAllTpl ?? __rozieFillMap()['selectAll'] ?? templates()?.['selectAll'])) {
+    <ng-container *ngTemplateOutlet="(selectAllTpl ?? __rozieFillMap()['selectAll'] ?? templates()?.['selectAll']); context: { $implicit: { checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }, checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }" />
     } @else {
 
                 @if (selectionMode() === 'multiple') {
@@ -202,8 +203,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
               @if (header.column.getCanSort && header.column.getCanSort()) {
     <button type="button" class="rdt-sort-btn" (click)="onHeaderSort(header.column.id, $event)">
                 <span class="rdt-header-label">
-                  @if ((colHeaderTpl ?? templates()?.['colHeader'])) {
-    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
+                  @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
+    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
     } @else {
     {{ rozieDisplay(headerLabel(header.column.id)) }}
     }
@@ -213,8 +214,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     } @else {
     <span style="display:contents">
                 <span class="rdt-header-label">
-                  @if ((colHeaderTpl ?? templates()?.['colHeader'])) {
-    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
+                  @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
+    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
     } @else {
     {{ rozieDisplay(headerLabel(header.column.id)) }}
     }
@@ -250,7 +251,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
     }@if (columnIsFilterable(header.column.id)) {
     <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(filterTpl ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
+                <ng-container *ngTemplateOutlet="(filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
               </span>
     }</span>
     }</th>
@@ -277,8 +278,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }</span>
     } @else if (isSelectColumn(cell.column.id)) {
     <span style="display:contents">
-              @if ((selectCellTpl ?? templates()?.['selectCell'])) {
-    <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx(wr, cell)" />
+              @if ((selectCellTpl ?? __rozieFillMap()['selectCell'] ?? templates()?.['selectCell'])) {
+    <ng-container *ngTemplateOutlet="(selectCellTpl ?? __rozieFillMap()['selectCell'] ?? templates()?.['selectCell']); context: _selectCell_ctx(wr, cell)" />
     } @else {
 
                 <input class="rdt-select-row" type="checkbox" aria-label="Select row" [checked]="rowIsSelected(wr.row)" (change)="onToggleRow(wr.row, $event)" />
@@ -289,8 +290,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <span style="display:contents">
               <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(wr.row)" [attr.aria-label]="rozieAttr(rowIsExpanded(wr.row) ? 'Collapse group' : 'Expand group')" (click)="onToggleExpand(wr.row, $event)">{{ rozieDisplay(rowIsExpanded(wr.row) ? '▾' : '▸') }}</button>
               <span class="rdt-group-value">
-                @if ((cellTpl ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }" />
+                @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
+    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
     }
@@ -301,7 +302,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <span style="display:contents">
               @if (hasEditorSlot(cell.column.id)) {
     <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(editorTpl ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
+                <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
               </span>
     } @else if (editorTypeOf(cell.column.id) === 'number') {
     <input class="rdt-cell-editor" type="number" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
@@ -320,8 +321,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <span style="display:contents"></span>
     } @else {
     <span class="rdt-cell-value">
-              @if ((cellTpl ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }" />
+              @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
+    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: wr.row.original, value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
     }
@@ -335,7 +336,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         @if (rowShowsDetail(wr.row)) {
     <tr class="rdt-detail-row" role="row" [attr.data-detail-row]="rozieAttr(wr.row.id)">
           <td class="rdt-detail-cell" [attr.colspan]="rozieAttr(visibleColCount())">
-            <ng-container *ngTemplateOutlet="(detailTpl ?? templates()?.['detail']); context: { $implicit: { row: wr.row.original }, row: wr.row.original }" />
+            <ng-container *ngTemplateOutlet="(detailTpl ?? __rozieFillMap()['detail'] ?? templates()?.['detail']); context: { $implicit: { row: wr.row.original }, row: wr.row.original }" />
           </td>
         </tr>
     }
@@ -358,8 +359,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
             
             @if (isSelectColumn(header.column.id)) {
     <span style="display:contents">
-              @if ((selectAllTpl ?? templates()?.['selectAll'])) {
-    <ng-container *ngTemplateOutlet="(selectAllTpl ?? templates()?.['selectAll']); context: { $implicit: { checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }, checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }" />
+              @if ((selectAllTpl ?? __rozieFillMap()['selectAll'] ?? templates()?.['selectAll'])) {
+    <ng-container *ngTemplateOutlet="(selectAllTpl ?? __rozieFillMap()['selectAll'] ?? templates()?.['selectAll']); context: { $implicit: { checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }, checked: isAllRowsSelected(), indeterminate: isSomeRowsSelected(), toggle: onToggleAllRows }" />
     } @else {
 
                 
@@ -377,8 +378,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <button type="button" class="rdt-sort-btn" (click)="onHeaderSort(header.column.id, $event)">
                 
                 <span class="rdt-header-label">
-                  @if ((colHeaderTpl ?? templates()?.['colHeader'])) {
-    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
+                  @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
+    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
     } @else {
     {{ rozieDisplay(headerLabel(header.column.id)) }}
     }
@@ -388,8 +389,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     } @else {
     <span style="display:contents">
                 <span class="rdt-header-label">
-                  @if ((colHeaderTpl ?? templates()?.['colHeader'])) {
-    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
+                  @if ((colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader'])) {
+    <ng-container *ngTemplateOutlet="(colHeaderTpl ?? __rozieFillMap()['colHeader'] ?? templates()?.['colHeader']); context: { $implicit: { columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }, columnId: header.column.id, column: header.column, label: headerLabel(header.column.id) }" />
     } @else {
     {{ rozieDisplay(headerLabel(header.column.id)) }}
     }
@@ -426,7 +427,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <input class="rdt-col-filter" type="text" [attr.aria-label]="rozieAttr('Filter ' + headerLabel(header.column.id))" [value]="columnFilterValue(header.column.id)" (input)="onColumnFilterInput(header.column.id, $event)" (click)="stopEvent($event)" />
     }@if (columnIsFilterable(header.column.id)) {
     <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(filterTpl ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
+                <ng-container *ngTemplateOutlet="(filterTpl ?? __rozieFillMap()['filter'] ?? templates()?.['filter']); context: { $implicit: { columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }, columnId: header.column.id, value: columnFilterValue(header.column.id), uniqueValues: getFacetedUniqueValues(header.column.id), minMax: getFacetedMinMaxValues(header.column.id), setFilter: setColumnFilter }" />
               </span>
     }</span>
     }</th>
@@ -449,8 +450,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     }</span>
     } @else if (isSelectColumn(cell.column.id)) {
     <span style="display:contents">
-              @if ((selectCellTpl ?? templates()?.['selectCell'])) {
-    <ng-container *ngTemplateOutlet="(selectCellTpl ?? templates()?.['selectCell']); context: _selectCell_ctx_1(row, cell)" />
+              @if ((selectCellTpl ?? __rozieFillMap()['selectCell'] ?? templates()?.['selectCell'])) {
+    <ng-container *ngTemplateOutlet="(selectCellTpl ?? __rozieFillMap()['selectCell'] ?? templates()?.['selectCell']); context: _selectCell_ctx_1(row, cell)" />
     } @else {
 
                 <input class="rdt-select-row" type="checkbox" aria-label="Select row" [checked]="rowIsSelected(row)" (change)="onToggleRow(row, $event)" />
@@ -461,8 +462,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <span style="display:contents">
               <button type="button" class="rdt-expander rdt-group-toggle" data-expander="" [attr.aria-expanded]="!!rowIsExpanded(row)" [attr.aria-label]="rozieAttr(rowIsExpanded(row) ? 'Collapse group' : 'Expand group')" (click)="onToggleExpand(row, $event)">{{ rozieDisplay(rowIsExpanded(row) ? '▾' : '▸') }}</button>
               <span class="rdt-group-value">
-                @if ((cellTpl ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }" />
+                @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
+    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
     }
@@ -473,7 +474,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <span style="display:contents">
               @if (hasEditorSlot(cell.column.id)) {
     <span style="display:contents">
-                <ng-container *ngTemplateOutlet="(editorTpl ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
+                <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: row.original, value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
               </span>
     } @else if (editorTypeOf(cell.column.id) === 'number') {
     <input class="rdt-cell-editor" type="number" data-editing-cell="" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
@@ -492,8 +493,8 @@ function rozieToken(key: string): InjectionToken<unknown> {
     <span style="display:contents"></span>
     } @else {
     <span class="rdt-cell-value">
-              @if ((cellTpl ?? templates()?.['cell'])) {
-    <ng-container *ngTemplateOutlet="(cellTpl ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }" />
+              @if ((cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell'])) {
+    <ng-container *ngTemplateOutlet="(cellTpl ?? __rozieFillMap()['cell'] ?? templates()?.['cell']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }, columnId: cell.column.id, column: cell.column, row: row.original, value: cell.getValue() }" />
     } @else {
     {{ rozieDisplay(cell.getValue()) }}
     }
@@ -507,7 +508,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
         @if (rowShowsDetail(row)) {
     <tr class="rdt-detail-row" role="row" [attr.data-detail-row]="rozieAttr(row.id)">
           <td class="rdt-detail-cell" [attr.colspan]="rozieAttr(visibleColCount())">
-            <ng-container *ngTemplateOutlet="(detailTpl ?? templates()?.['detail']); context: { $implicit: { row: row.original }, row: row.original }" />
+            <ng-container *ngTemplateOutlet="(detailTpl ?? __rozieFillMap()['detail'] ?? templates()?.['detail']); context: { $implicit: { row: row.original }, row: row.original }" />
           </td>
         </tr>
     }
@@ -1060,6 +1061,17 @@ export class DataTable {
   @ContentChild('editor', { read: TemplateRef }) editorTpl?: TemplateRef<EditorCtx>;
   @ContentChild('detail', { read: TemplateRef }) detailTpl?: TemplateRef<DetailCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
 

@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, forwardRef, inject, input, model, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, computed, contentChild, contentChildren, effect, forwardRef, inject, input, model, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 import { EditorState, Compartment, EditorSelection, StateField, RangeSet } from '@codemirror/state';
 // `gutter` is imported under an alias: the `gutter` SLOT (G5 wave 2) lowers into
@@ -190,6 +191,17 @@ export class CodeMirror {
   @ContentChild('gutter', { read: TemplateRef }) gutterTpl?: TemplateRef<GutterCtx>;
   @ContentChild('decoration', { read: TemplateRef }) decorationTpl?: TemplateRef<DecorationCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _panelTpl = contentChild('panel', { read: TemplateRef });

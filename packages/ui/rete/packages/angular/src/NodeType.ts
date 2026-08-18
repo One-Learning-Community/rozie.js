@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, EmbeddedViewRef, InjectionToken, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, forwardRef, inject, input, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, EmbeddedViewRef, InjectionToken, TemplateRef, ViewContainerRef, ViewEncapsulation, computed, contentChild, contentChildren, effect, forwardRef, inject, input, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface BodyCtx {
   $implicit: { node: any; selected: any; emit: any };
@@ -33,7 +34,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
 
 
 
-    <div class="rozie-node-type-children" style="display:none"><ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" /></div>
+    <div class="rozie-node-type-children" style="display:none"><ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" /></div>
     <ng-container #rozie_portalAnchor></ng-container>
   `,
   styles: [`
@@ -83,6 +84,17 @@ export class NodeType {
   @ContentChild('body', { read: TemplateRef }) bodyTpl?: TemplateRef<BodyCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _bodyTpl = contentChild('body', { read: TemplateRef });

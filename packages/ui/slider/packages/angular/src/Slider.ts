@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface MarkCtx {
   $implicit: { value: any; label: any; position: any };
@@ -52,8 +53,8 @@ function __rozieAttr(v: unknown): string | null {
         
         @for (mark of normalizedMarks(); track mark.value) {
     <div class="rozie-slider-mark" [style]="{ left: pct(mark.value) + '%' }">
-          @if ((markTpl ?? templates()?.['mark'])) {
-    <ng-container *ngTemplateOutlet="(markTpl ?? templates()?.['mark']); context: { $implicit: { value: mark.value, label: mark.label, position: pct(mark.value) }, value: mark.value, label: mark.label, position: pct(mark.value) }" />
+          @if ((markTpl ?? __rozieFillMap()['mark'] ?? templates()?.['mark'])) {
+    <ng-container *ngTemplateOutlet="(markTpl ?? __rozieFillMap()['mark'] ?? templates()?.['mark']); context: { $implicit: { value: mark.value, label: mark.label, position: pct(mark.value) }, value: mark.value, label: mark.label, position: pct(mark.value) }" />
     } @else {
 
             <span class="rozie-slider-mark-label">{{ rozieDisplay(mark.label) }}</span>
@@ -65,8 +66,8 @@ function __rozieAttr(v: unknown): string | null {
     }@if (showValue() && !range()) {
     <div class="rozie-slider-bubbles" aria-hidden="true">
         <div class="rozie-slider-bubble" [style]="{ left: 'var(--rozie-slider-fill-end)' }">
-          @if ((bubbleTpl ?? templates()?.['bubble'])) {
-    <ng-container *ngTemplateOutlet="(bubbleTpl ?? templates()?.['bubble']); context: { $implicit: { value: singleValue() }, value: singleValue() }" />
+          @if ((bubbleTpl ?? __rozieFillMap()['bubble'] ?? templates()?.['bubble'])) {
+    <ng-container *ngTemplateOutlet="(bubbleTpl ?? __rozieFillMap()['bubble'] ?? templates()?.['bubble']); context: { $implicit: { value: singleValue() }, value: singleValue() }" />
     } @else {
 
             <span class="rozie-slider-bubble-text">{{ rozieDisplay(display(singleValue())) }}</span>
@@ -77,8 +78,8 @@ function __rozieAttr(v: unknown): string | null {
     }@if (showValue() && range()) {
     <div class="rozie-slider-bubbles" aria-hidden="true">
         <div class="rozie-slider-bubble" [style]="{ left: 'var(--rozie-slider-fill-start)' }">
-          @if ((bubbleTpl ?? templates()?.['bubble'])) {
-    <ng-container *ngTemplateOutlet="(bubbleTpl ?? templates()?.['bubble']); context: { $implicit: { value: rangePair()[0] }, value: rangePair()[0] }" />
+          @if ((bubbleTpl ?? __rozieFillMap()['bubble'] ?? templates()?.['bubble'])) {
+    <ng-container *ngTemplateOutlet="(bubbleTpl ?? __rozieFillMap()['bubble'] ?? templates()?.['bubble']); context: { $implicit: { value: rangePair()[0] }, value: rangePair()[0] }" />
     } @else {
 
             <span class="rozie-slider-bubble-text">{{ rozieDisplay(display(rangePair()[0])) }}</span>
@@ -86,8 +87,8 @@ function __rozieAttr(v: unknown): string | null {
     }
         </div>
         <div class="rozie-slider-bubble" [style]="{ left: 'var(--rozie-slider-fill-end)' }">
-          @if ((bubbleTpl ?? templates()?.['bubble'])) {
-    <ng-container *ngTemplateOutlet="(bubbleTpl ?? templates()?.['bubble']); context: { $implicit: { value: rangePair()[1] }, value: rangePair()[1] }" />
+          @if ((bubbleTpl ?? __rozieFillMap()['bubble'] ?? templates()?.['bubble'])) {
+    <ng-container *ngTemplateOutlet="(bubbleTpl ?? __rozieFillMap()['bubble'] ?? templates()?.['bubble']); context: { $implicit: { value: rangePair()[1] }, value: rangePair()[1] }" />
     } @else {
 
             <span class="rozie-slider-bubble-text">{{ rozieDisplay(display(rangePair()[1])) }}</span>
@@ -323,6 +324,17 @@ export class Slider {
   @ContentChild('mark', { read: TemplateRef }) markTpl?: TemplateRef<MarkCtx>;
   @ContentChild('bubble', { read: TemplateRef }) bubbleTpl?: TemplateRef<BubbleCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
 
   fillStyle = computed(() => {
     const __value = this.value();

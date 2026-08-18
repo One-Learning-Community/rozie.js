@@ -10,6 +10,8 @@ npm i @rozie-ui/data-table-angular
 
 Peer dependencies: `@angular/core + @angular/common + @angular/forms + @tanstack/table-core + @tanstack/virtual-core + @rozie-ui/popover-angular`. Install them alongside this package.
 
+Also installed: `@rozie/runtime-angular` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
+
 ## Usage
 
 Columns may be declared as a `:columns` config array **or** as `<Column>` children (or both — an id-keyed last-write-wins union). Per-cell rendering is one parent `#cell` / `#colHeader` renderer on `<DataTable>`, dispatched by `columnId`, so it works the same with either column form.

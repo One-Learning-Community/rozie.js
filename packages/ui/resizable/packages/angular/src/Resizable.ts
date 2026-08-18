@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 import { clampPercent, percentFromPointer, nudge } from './internal/resizeMath';
 
@@ -44,13 +45,13 @@ function __rozieAttr(v: unknown): string | null {
     <div class="rozie-resizable" [ngClass]="{ 'rozie-resizable--vertical': isVertical(), 'rozie-resizable--horizontal': !isVertical(), 'rozie-resizable--dragging': dragging(), 'rozie-resizable--disabled': (disabled() || this.__rozieCvaDisabled()) }" #root [style]="sizeStyle()" #rozieSpread_0 #rozieListenersTarget_1>
       
       <div class="rozie-resizable-panel rozie-resizable-panel--start">
-        <ng-container *ngTemplateOutlet="(startTpl ?? templates()?.['start'])" />
+        <ng-container *ngTemplateOutlet="(startTpl ?? __rozieFillMap()['start'] ?? templates()?.['start'])" />
       </div>
 
       
       <div class="rozie-resizable-handle" role="separator" tabindex="0" [attr.aria-orientation]="rozieAttr(isVertical() ? 'horizontal' : 'vertical')" [attr.aria-valuenow]="size()" [attr.aria-valuemin]="min()" [attr.aria-valuemax]="max()" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (pointerdown)="onPointerDown($event)" (pointermove)="onPointerMove($event)" (pointerup)="onPointerUp($event)" (keydown)="onKeydown($event)">
-        @if ((handleTpl ?? templates()?.['handle'])) {
-    <ng-container *ngTemplateOutlet="(handleTpl ?? templates()?.['handle'])" />
+        @if ((handleTpl ?? __rozieFillMap()['handle'] ?? templates()?.['handle'])) {
+    <ng-container *ngTemplateOutlet="(handleTpl ?? __rozieFillMap()['handle'] ?? templates()?.['handle'])" />
     } @else {
 
           <span class="rozie-resizable-grip" aria-hidden="true"></span>
@@ -60,7 +61,7 @@ function __rozieAttr(v: unknown): string | null {
 
       
       <div class="rozie-resizable-panel rozie-resizable-panel--end">
-        <ng-container *ngTemplateOutlet="(endTpl ?? templates()?.['end'])" />
+        <ng-container *ngTemplateOutlet="(endTpl ?? __rozieFillMap()['end'] ?? templates()?.['end'])" />
       </div>
     </div>
 
@@ -187,6 +188,17 @@ export class Resizable {
   @ContentChild('handle', { read: TemplateRef }) handleTpl?: TemplateRef<HandleCtx>;
   @ContentChild('end', { read: TemplateRef }) endTpl?: TemplateRef<EndCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
 
   currentSize = () => {
     const __size = this.size();

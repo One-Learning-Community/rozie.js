@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 import EmblaCarousel from 'embla-carousel';
 import Autoplay from 'embla-carousel-autoplay';
@@ -58,15 +59,15 @@ function __rozieAttr(v: unknown): string | null {
             
             @for (slide of slides(); track keyFor(slide, i); let i = $index) {
     <div class="rozie-embla__slide">
-              @if ((slideTpl ?? templates()?.['slide'])) {
-    <ng-container *ngTemplateOutlet="(slideTpl ?? templates()?.['slide']); context: { $implicit: { slide: slide, index: i }, slide: slide, index: i }" />
+              @if ((slideTpl ?? __rozieFillMap()['slide'] ?? templates()?.['slide'])) {
+    <ng-container *ngTemplateOutlet="(slideTpl ?? __rozieFillMap()['slide'] ?? templates()?.['slide']); context: { $implicit: { slide: slide, index: i }, slide: slide, index: i }" />
     } @else {
     {{ rozieDisplay(slide) }}
     }
             </div>
     }
             
-            <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
+            <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" />
           </div>
         </div>
         @if (arrows()) {
@@ -86,8 +87,8 @@ function __rozieAttr(v: unknown): string | null {
           <div class="rozie-embla__thumbs-container">
             @for (item of slides(); track keyFor(item, i); let i = $index) {
     <div class="rozie-embla__thumb" [ngClass]="{ 'is-selected': i === selected() }" (click)="selectThumb(i)">
-              @if ((thumbTpl ?? templates()?.['thumb'])) {
-    <ng-container *ngTemplateOutlet="(thumbTpl ?? templates()?.['thumb']); context: { $implicit: { slide: item, index: i }, slide: item, index: i }" />
+              @if ((thumbTpl ?? __rozieFillMap()['thumb'] ?? templates()?.['thumb'])) {
+    <ng-container *ngTemplateOutlet="(thumbTpl ?? __rozieFillMap()['thumb'] ?? templates()?.['thumb']); context: { $implicit: { slide: item, index: i }, slide: item, index: i }" />
     } @else {
     {{ rozieDisplay(item) }}
     }
@@ -280,6 +281,17 @@ export class Carousel {
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('thumb', { read: TemplateRef }) thumbTpl?: TemplateRef<ThumbCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;

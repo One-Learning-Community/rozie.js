@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface DefaultCtx {
   $implicit: { checked: any; toggle: any };
@@ -35,8 +36,8 @@ function __rozieAttr(v: unknown): string | null {
   template: `
 
     <button #control type="button" class="rozie-switch" [ngClass]="{ 'rozie-switch--checked': isChecked(), 'rozie-switch--disabled': (disabled() || this.__rozieCvaDisabled()) }" role="switch" [attr.tabindex]="rozieAttr(controlTabindex())" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-checked]="!!modelValue()" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-readonly]="!!readonly()" [attr.aria-label]="rozieAttr(ariaLabel())" #rozieSpread_0 (click)="onClick()" (keydown)="onKeydown($event)" #rozieListenersTarget_1>
-      @if ((defaultTpl ?? templates()?.['defaultSlot'])) {
-    <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { checked: isChecked(), toggle: toggle }, checked: isChecked(), toggle: toggle }" />
+      @if ((defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])) {
+    <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: { $implicit: { checked: isChecked(), toggle: toggle }, checked: isChecked(), toggle: toggle }" />
     } @else {
 
         <span class="rozie-switch-track">
@@ -130,6 +131,17 @@ export class Switch {
   change = output<unknown>();
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
 
   isChecked = () => this.modelValue() === true;
   commitValue = (next: any) => {

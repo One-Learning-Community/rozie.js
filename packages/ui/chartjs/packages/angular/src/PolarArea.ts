@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, contentChild, effect, inject, input, output, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, computed, contentChild, contentChildren, effect, inject, input, output, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 import { Chart as ChartJS, PolarAreaController, ArcElement, RadialLinearScale, Legend, Tooltip, Colors } from 'chart.js';
 // PolarArea registers only its own Chart.js controller/element/scale set
@@ -20,7 +21,7 @@ interface TooltipCtx {
 
     <div class="rozie-chart" [style]="__style">
       
-      <canvas #canvasElRef role="img" [attr.aria-label]="ariaLabel()"><ng-container *ngTemplateOutlet="(fallbackTpl ?? templates()?.['fallback'])" /></canvas>
+      <canvas #canvasElRef role="img" [attr.aria-label]="ariaLabel()"><ng-container *ngTemplateOutlet="(fallbackTpl ?? __rozieFillMap()['fallback'] ?? templates()?.['fallback'])" /></canvas>
     </div>
 
 
@@ -102,6 +103,17 @@ export class PolarArea {
   @ContentChild('fallback', { read: TemplateRef }) fallbackTpl?: TemplateRef<FallbackCtx>;
   @ContentChild('tooltip', { read: TemplateRef }) tooltipTpl?: TemplateRef<TooltipCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private _portalViews = new Set<EmbeddedViewRef<unknown>>();
   private _portalAnchor = viewChild('rozie_portalAnchor', { read: ViewContainerRef });
   private _tooltipTpl = contentChild('tooltip', { read: TemplateRef });

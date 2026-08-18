@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 import { createKeynavStateMachine, type KeynavStateMachine, focusIsWithinScope } from '@rozie/runtime-keynav-core';
 
 import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, dayLabel, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, rangeSpansDisabled, resolveLabel, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
@@ -62,8 +63,8 @@ function __rozieAttr(v: unknown): string | null {
 
     <div class="rozie-datepicker" [ngClass]="{ 'rozie-datepicker--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-datepicker--multi': numberOfMonths() > 1 }" #root role="group" [attr.aria-label]="rozieAttr(labelFor('root'))" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" #rozieSpread_0 #rozieListenersTarget_1>
       
-      @if ((headerTpl ?? templates()?.['header'])) {
-    <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled(), openMonths: enterMonthsView, openYears: enterYearsView, closeDrill: exitToDaysView, viewMode: viewMode() }, label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled(), openMonths: enterMonthsView, openYears: enterYearsView, closeDrill: exitToDaysView, viewMode: viewMode() }" />
+      @if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {
+    <ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header']); context: { $implicit: { label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled(), openMonths: enterMonthsView, openYears: enterYearsView, closeDrill: exitToDaysView, viewMode: viewMode() }, label: monthHeading(), prev: goPrevMonth, next: goNextMonth, disabled: !!disabled(), openMonths: enterMonthsView, openYears: enterYearsView, closeDrill: exitToDaysView, viewMode: viewMode() }" />
     } @else {
 
         <div class="rozie-datepicker-header">
@@ -124,8 +125,8 @@ function __rozieAttr(v: unknown): string | null {
     }
         </div>
       </div>
-    }@if ((footerTpl ?? templates()?.['footer'])) {
-    <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer']); context: { $implicit: { today: selectToday, clear: clear, todayIso: todayIso() }, today: selectToday, clear: clear, todayIso: todayIso() }" />
+    }@if ((footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])) {
+    <ng-container *ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer']); context: { $implicit: { today: selectToday, clear: clear, todayIso: todayIso() }, today: selectToday, clear: clear, todayIso: todayIso() }" />
     } @else {
 
         @if (showsFooter()) {
@@ -137,8 +138,8 @@ function __rozieAttr(v: unknown): string | null {
     }
 
       
-      @if ((presetsTpl ?? templates()?.['presets'])) {
-    <ng-container *ngTemplateOutlet="(presetsTpl ?? templates()?.['presets']); context: { $implicit: { presets: resolvedPresets(), apply: applyPreset }, presets: resolvedPresets(), apply: applyPreset }" />
+      @if ((presetsTpl ?? __rozieFillMap()['presets'] ?? templates()?.['presets'])) {
+    <ng-container *ngTemplateOutlet="(presetsTpl ?? __rozieFillMap()['presets'] ?? templates()?.['presets']); context: { $implicit: { presets: resolvedPresets(), apply: applyPreset }, presets: resolvedPresets(), apply: applyPreset }" />
     } @else {
 
         @if (hasPresets()) {
@@ -548,6 +549,17 @@ export class DatePicker {
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
   @ContentChild('presets', { read: TemplateRef }) presetsTpl?: TemplateRef<PresetsCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private __rozieKeynavGroupId = 'rozie-keynav-' + Math.random().toString(36).slice(2);
   private __rozieKeynavRootRef = viewChild<ElementRef<HTMLElement>>('__rozieKeynavRootRef');
   private __rozieKeynavRenderer = inject(Renderer2);

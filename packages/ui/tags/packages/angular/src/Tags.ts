@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface TagCtx {
   $implicit: { tag: any; index: any; remove: any };
@@ -39,8 +40,8 @@ function __rozieAttr(v: unknown): string | null {
       <ul class="rozie-tags-list">
         @for (t of tokens(); track t + ':' + tokens().indexOf(t)) {
     <li class="rozie-tags-chip">
-          @if ((tagTpl ?? templates()?.['tag'])) {
-    <ng-container *ngTemplateOutlet="(tagTpl ?? templates()?.['tag']); context: _tag_ctx_2(t)" />
+          @if ((tagTpl ?? __rozieFillMap()['tag'] ?? templates()?.['tag'])) {
+    <ng-container *ngTemplateOutlet="(tagTpl ?? __rozieFillMap()['tag'] ?? templates()?.['tag']); context: _tag_ctx_2(t)" />
     } @else {
 
             <span class="rozie-tags-chip__label">{{ rozieDisplay(t) }}</span>
@@ -208,6 +209,17 @@ export class Tags {
   remove = output<unknown>();
   @ContentChild('tag', { read: TemplateRef }) tagTpl?: TemplateRef<TagCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
 
   tokens = () => Array.isArray(this.modelValue()) ? this.modelValue() : [];
   commitKeys = () => Array.isArray(this.delimiters()) ? this.delimiters() : [',', 'Enter'];

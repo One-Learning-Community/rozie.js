@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 import { paginationItems } from './internal/paginationItems';
 
@@ -65,8 +66,8 @@ function __rozieAttr(v: unknown): string | null {
 
     <nav class="rozie-pagination" [ngClass]="{ 'rozie-pagination--disabled': (disabled() || this.__rozieCvaDisabled()) }" #nav [attr.aria-label]="ariaLabel()" #rozieSpread_0 (keydown)="onControlKeydown($event)" #rozieListenersTarget_1>
       
-      @if ((prevControlTpl ?? templates()?.['prevControl'])) {
-    <ng-container *ngTemplateOutlet="(prevControlTpl ?? templates()?.['prevControl']); context: { $implicit: { disabled: !canPrev() || disabled(), goto: goPrev, page: currentPage() - 1 }, disabled: !canPrev() || disabled(), goto: goPrev, page: currentPage() - 1 }" />
+      @if ((prevControlTpl ?? __rozieFillMap()['prevControl'] ?? templates()?.['prevControl'])) {
+    <ng-container *ngTemplateOutlet="(prevControlTpl ?? __rozieFillMap()['prevControl'] ?? templates()?.['prevControl']); context: { $implicit: { disabled: !canPrev() || disabled(), goto: goPrev, page: currentPage() - 1 }, disabled: !canPrev() || disabled(), goto: goPrev, page: currentPage() - 1 }" />
     } @else {
 
         <button type="button" class="rozie-pagination-control rozie-pagination-prev" data-page-control="" [attr.tabindex]="rozieAttr(tabIndexFor(true))" [disabled]="!canPrev() || (disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(!canPrev() || (disabled() || this.__rozieCvaDisabled()))" aria-label="Previous page" (click)="goPrev()">‹</button>
@@ -78,16 +79,16 @@ function __rozieAttr(v: unknown): string | null {
 
         @if (item === 'ellipsis') {
     <span class="rozie-pagination-ellipsis" aria-hidden="true">
-          @if ((ellipsisTpl ?? templates()?.['ellipsis'])) {
-    <ng-container *ngTemplateOutlet="(ellipsisTpl ?? templates()?.['ellipsis']); context: { $implicit: { index: index }, index: index }" />
+          @if ((ellipsisTpl ?? __rozieFillMap()['ellipsis'] ?? templates()?.['ellipsis'])) {
+    <ng-container *ngTemplateOutlet="(ellipsisTpl ?? __rozieFillMap()['ellipsis'] ?? templates()?.['ellipsis']); context: { $implicit: { index: index }, index: index }" />
     } @else {
     …
     }
         </span>
     }@if (item !== 'ellipsis') {
     <span class="rozie-pagination-item">
-          @if ((itemTpl ?? templates()?.['item'])) {
-    <ng-container *ngTemplateOutlet="(itemTpl ?? templates()?.['item']); context: _item_ctx_2(item, index)" />
+          @if ((itemTpl ?? __rozieFillMap()['item'] ?? templates()?.['item'])) {
+    <ng-container *ngTemplateOutlet="(itemTpl ?? __rozieFillMap()['item'] ?? templates()?.['item']); context: _item_ctx_2(item, index)" />
     } @else {
 
             <button type="button" class="rozie-pagination-page" [ngClass]="{ 'is-active': isActive(item) }" data-page-control="" [attr.tabindex]="rozieAttr(tabIndexFor(isActive(item)))" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-current]="rozieAttr(isActive(item) ? 'page' : null)" [attr.aria-label]="rozieAttr('Go to page ' + item)" (click)="goToPage(item)">{{ rozieDisplay(item) }}</button>
@@ -98,8 +99,8 @@ function __rozieAttr(v: unknown): string | null {
     }
 
       
-      @if ((nextControlTpl ?? templates()?.['nextControl'])) {
-    <ng-container *ngTemplateOutlet="(nextControlTpl ?? templates()?.['nextControl']); context: { $implicit: { disabled: !canNext() || disabled(), goto: goNext, page: currentPage() + 1 }, disabled: !canNext() || disabled(), goto: goNext, page: currentPage() + 1 }" />
+      @if ((nextControlTpl ?? __rozieFillMap()['nextControl'] ?? templates()?.['nextControl'])) {
+    <ng-container *ngTemplateOutlet="(nextControlTpl ?? __rozieFillMap()['nextControl'] ?? templates()?.['nextControl']); context: { $implicit: { disabled: !canNext() || disabled(), goto: goNext, page: currentPage() + 1 }, disabled: !canNext() || disabled(), goto: goNext, page: currentPage() + 1 }" />
     } @else {
 
         <button type="button" class="rozie-pagination-control rozie-pagination-next" data-page-control="" [attr.tabindex]="rozieAttr(tabIndexFor(true))" [disabled]="!canNext() || (disabled() || this.__rozieCvaDisabled())" [attr.aria-disabled]="!!(!canNext() || (disabled() || this.__rozieCvaDisabled()))" aria-label="Next page" (click)="goNext()">›</button>
@@ -219,6 +220,17 @@ export class Pagination {
   @ContentChild('item', { read: TemplateRef }) itemTpl?: TemplateRef<ItemCtx>;
   @ContentChild('nextControl', { read: TemplateRef }) nextControlTpl?: TemplateRef<NextControlCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
 
   model = () => paginationItems({
     page: this.modelValue(),

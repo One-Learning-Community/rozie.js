@@ -6243,6 +6243,9 @@ importers:
 
   packages/ui/tiptap/packages/angular:
     dependencies:
+      '@rozie/runtime-angular':
+        specifier: workspace:*
+        version: link:../../../../runtime/angular
       '@tiptap/core':
         specifier: ^3
         version: 3.23.5(@tiptap/pm@3.23.5)

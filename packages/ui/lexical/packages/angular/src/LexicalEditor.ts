@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, InjectionToken, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 // D-05 / REQ-37: the namespace-import form is the ONLY cross-target-safe way to
 // use Lexical's `$`-prefixed API. Every `$`-call below is `lexical.$…` (a property
@@ -73,7 +74,7 @@ function rozieToken(key: string): InjectionToken<unknown> {
       
       <div #rootEl class="rozie-lexical-content" [contentEditable]="true" [attr.aria-label]="rozieAttr(ariaLabel())"></div>
       
-      <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
+      <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" />
     </div>
 
   `,
@@ -154,6 +155,17 @@ export class LexicalEditor {
   rootEl = viewChild<ElementRef<HTMLDivElement>>('rootEl');
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private __rozieDestroyRef = inject(DestroyRef);
 
   ngAfterViewInit() {

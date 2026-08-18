@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 // The `offset` AND `arrow` middleware factories are ALIASED on import: both are
 // ALSO author PROP names (`offset`, `arrow`). A bare `offset`/`arrow` shorthand in
@@ -71,7 +72,7 @@ function __rozieAttr(v: unknown): string | null {
 
       
       <div class="rozie-popover-anchor" #anchorEl aria-haspopup="dialog" [attr.aria-expanded]="!!open()" [attr.aria-describedby]="rozieAttr(isTooltip() && open() ? 'rozie-popover-floating' : null)" (click)="trigger() === 'click' && onAnchorClick()" (pointerenter)="trigger() === 'hover' && onAnchorPointerEnter()" (pointerleave)="trigger() === 'hover' && onAnchorPointerLeave()" (focusin)="trigger() === 'focus' && onAnchorFocus()" (focusout)="trigger() === 'focus' && onAnchorBlur()">
-        <ng-container *ngTemplateOutlet="(anchorTpl ?? templates()?.['anchor']); context: { $implicit: { open: open(), toggle: toggle, show: show, hide: hide }, open: open(), toggle: toggle, show: show, hide: hide }" />
+        <ng-container *ngTemplateOutlet="(anchorTpl ?? __rozieFillMap()['anchor'] ?? templates()?.['anchor']); context: { $implicit: { open: open(), toggle: toggle, show: show, hide: hide }, open: open(), toggle: toggle, show: show, hide: hide }" />
       </div>
 
       
@@ -79,7 +80,7 @@ function __rozieAttr(v: unknown): string | null {
     <div class="rozie-popover-floating" #floatingEl id="rozie-popover-floating" [attr.role]="rozieAttr(floatingRole())" [attr.aria-modal]="!!(floatingRole() === 'dialog')">
         @if (arrow()) {
     <div class="rozie-popover-arrow" #arrowEl></div>
-    }<ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot'])" />
+    }<ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" />
       </div>
     }</div>
 
@@ -172,6 +173,17 @@ export class Popover {
   @ContentChild('anchor', { read: TemplateRef }) anchorTpl?: TemplateRef<AnchorCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;

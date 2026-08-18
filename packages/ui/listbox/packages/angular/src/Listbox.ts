@@ -1,6 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally
@@ -65,8 +66,8 @@ function __rozieAttr(v: unknown): string | null {
       
       <div class="rozie-listbox-control" #controlEl>
         <button #triggerEl type="button" class="rozie-listbox-trigger" role="combobox" aria-haspopup="listbox" [attr.aria-expanded]="open$local()" [attr.aria-controls]="rozieAttr(id() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="rozieAttr(ariaLabel())" [disabled]="(disabled() || this.__rozieCvaDisabled())" (click)="toggle()" (keydown)="onControlKeyDown($event)">
-          @if ((selectedTpl ?? templates()?.['selected'])) {
-    <ng-container *ngTemplateOutlet="(selectedTpl ?? templates()?.['selected']); context: { $implicit: { selected: selectedLabel(), value: value() }, selected: selectedLabel(), value: value() }" />
+          @if ((selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected'])) {
+    <ng-container *ngTemplateOutlet="(selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected']); context: { $implicit: { selected: selectedLabel(), value: value() }, selected: selectedLabel(), value: value() }" />
     } @else {
 
             @if (selectedLabel()) {
@@ -84,8 +85,8 @@ function __rozieAttr(v: unknown): string | null {
     <div #listEl class="rozie-listbox-list" role="listbox" [attr.id]="rozieAttr(id() + '-list')" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-multiselectable]="multiple()">
         @for (opt of visibleOptions(); track optionId(index); let index = $index) {
     <div [attr.id]="rozieAttr(optionId(index))" class="rozie-listbox-option" [ngClass]="{ 'is-active': activeIndex() === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }" role="option" [attr.aria-selected]="!!isSelected(opt)" [attr.aria-disabled]="!!disabledOf(opt)" (click)="select(opt)" (mousemove)="onOptionPointerMove(index)">
-          @if ((optionTpl ?? templates()?.['option'])) {
-    <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: opt, index: index, active: activeIndex() === index, selected: isSelected(opt), disabled: disabledOf(opt) }, option: opt, index: index, active: activeIndex() === index, selected: isSelected(opt), disabled: disabledOf(opt) }" />
+          @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
+    <ng-container *ngTemplateOutlet="(optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option']); context: { $implicit: { option: opt, index: index, active: activeIndex() === index, selected: isSelected(opt), disabled: disabledOf(opt) }, option: opt, index: index, active: activeIndex() === index, selected: isSelected(opt), disabled: disabledOf(opt) }" />
     } @else {
 
             {{ rozieDisplay(labelOf(opt)) }}
@@ -96,8 +97,8 @@ function __rozieAttr(v: unknown): string | null {
 
         @if (visibleOptions().length === 0) {
     <div class="rozie-listbox-empty" role="presentation">
-          @if ((emptyTpl ?? templates()?.['empty'])) {
-    <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
+          @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
+    <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No options
     }
@@ -109,8 +110,8 @@ function __rozieAttr(v: unknown): string | null {
 
         @for (wr of windowedRows(); track wr.row.id) {
     <div [attr.id]="rozieAttr(optionId(wr.vi.index))" [attr.data-index]="rozieAttr(wr.vi.index)" class="rozie-listbox-option" [ngClass]="{ 'is-active': activeIndex() === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }" role="option" [attr.aria-selected]="!!isSelected(wr.row._opt)" [attr.aria-disabled]="!!disabledOf(wr.row._opt)" (click)="select(wr.row._opt)" (mousemove)="onOptionPointerMove(wr.vi.index)">
-          @if ((optionTpl ?? templates()?.['option'])) {
-    <ng-container *ngTemplateOutlet="(optionTpl ?? templates()?.['option']); context: { $implicit: { option: wr.row._opt, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }, option: wr.row._opt, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }" />
+          @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
+    <ng-container *ngTemplateOutlet="(optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option']); context: { $implicit: { option: wr.row._opt, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }, option: wr.row._opt, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }" />
     } @else {
 
             {{ rozieDisplay(labelOf(wr.row._opt)) }}
@@ -123,8 +124,8 @@ function __rozieAttr(v: unknown): string | null {
 
         @if (windowSource().length === 0) {
     <div class="rozie-listbox-empty" role="presentation">
-          @if ((emptyTpl ?? templates()?.['empty'])) {
-    <ng-container *ngTemplateOutlet="(emptyTpl ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
+          @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
+    <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No options
     }
@@ -318,6 +319,17 @@ export class Listbox {
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private __rozieWatchInitial_0 = true;
 
   constructor() {

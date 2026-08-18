@@ -1,5 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, effect, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface ToastCtx {
   $implicit: { toast: any; dismiss: any };
@@ -37,8 +38,8 @@ function __rozieAttr(v: unknown): string | null {
       
       @for (t of toasts(); track t.id; let ti = $index) {
     <div class="rozie-toast" [ngClass]="'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')" [style]="toastStyle(t, ti)" role="status" [attr.aria-live]="rozieAttr(liveFor(t.type))" (animationend)="t.exiting && removeToast(t.id)" (pointerdown)="onToastPointerDown(t, $event)" (pointermove)="onToastPointerMove(t, $event)" (pointerup)="onToastPointerUp(t, $event)" (pointercancel)="onToastPointerCancel(t)">
-        @if ((toastTpl ?? templates()?.['toast'])) {
-    <ng-container *ngTemplateOutlet="(toastTpl ?? templates()?.['toast']); context: { $implicit: { toast: t, dismiss: dismiss }, toast: t, dismiss: dismiss }" />
+        @if ((toastTpl ?? __rozieFillMap()['toast'] ?? templates()?.['toast'])) {
+    <ng-container *ngTemplateOutlet="(toastTpl ?? __rozieFillMap()['toast'] ?? templates()?.['toast']); context: { $implicit: { toast: t, dismiss: dismiss }, toast: t, dismiss: dismiss }" />
     } @else {
 
           @if (t.type === 'loading') {
@@ -240,6 +241,17 @@ export class Toaster {
   dismissed = output<unknown>();
   @ContentChild('toast', { read: TemplateRef }) toastTpl?: TemplateRef<ToastCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
