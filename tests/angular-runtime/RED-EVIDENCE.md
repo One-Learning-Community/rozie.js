@@ -279,3 +279,119 @@ This red state stays in git history unresolved by this plan, by design. Plan 10 
 GREEN observation for D-09's Bug C, mirroring the convention the Plan 03 → Plan 08 pair already
 established above in this same file. **Do not "fix" these tests by loosening or removing an
 assertion; the fix belongs in the emitter, not the test.**
+
+## GREEN — Phase 80 Plan 13 (Task 1), D-09's Bug C closed
+
+**This section is the second red-to-green pair in this file.** It closes the RED section immediately
+above (Plan 09), mirroring the convention the Plan 03 → Plan 08 pair already established higher up.
+Do not confuse this GREEN with the one above it — that one closed OPEN RISK R-80-NG0203 (a harness
+integration gap); this one closes D-09's Bug C (a real emitter bug the phase itself introduced).
+
+**Pre-fix (RED) commit, for reference:** `7ec36c96` (Plan 09's fixture-only commit; the RED
+observations above were recorded against `7ec36c96`, one commit before the two RED test files
+themselves landed at `bb776004`).
+**Fix commits:** `4246f7a3` / `6792c7cb` / `fc34a592` (Plan 10 — `hasKeyedFillIntake`, the widened
+keyed-fill intake predicate).
+**Post-fix (GREEN) commit:** this commit (Phase 80 Plan 13, Task 1) — `git log -1 -- tests/angular-runtime/RED-EVIDENCE.md`
+resolves it precisely, recorded as prose rather than a hash literal for the same self-referential-hash
+reason the section above states.
+
+### What changed in the emitter, and why it fixes each case
+
+`refineSlotTypes.ts` gained one new exported predicate, `hasKeyedFillIntake(slots) = slots.length > 0`
+— exactly as wide as the gate that already governed the producer's `templates` input. `emitScript.ts`
+now gates the `__rozieFills` content query, the `__rozieFillMap` computed fold, and the `RozieSlot`
+runtime import on this wide predicate (diagnostics stay on the original narrow
+`ir.slots.some(isRecordOnlySlotDecl)` gate, deliberately, so the pre-existing mixed-producer
+false-positive warning class is not worsened). `emitSlotInvocation.ts`'s resolution-chain splice moved
+onto the same wide predicate. The result: **every Angular producer that declares at least one slot —
+identifier-named or record-path — now collects `[rozieSlot]` marker-directive fills by content query**,
+closing the exact gap D-09 named: a producer whose own slots are all static identifier names used to
+never collect anything, so a consumer's dynamic `#[expr]` fill had no path to it at all. Widening the
+intake gate to match the `templates`-input gate's width gives that path back, for every producer shape,
+without reintroducing the two behaviors Plans 04/05 deliberately removed (the `[templates]="templates"`
+consumer binding, the class-body `templates` getter).
+
+### Command: `pnpm exec vitest run --root tests/angular-runtime staticProducerKeyedFill`
+
+```
+Test Files  1 passed (1)
+     Tests  5 passed (5)
+```
+
+### Case-by-case: Plan 09's RED mapped to this plan's GREEN
+
+| # | Test | Plan 09 (RED, commit `7ec36c96`) | Plan 13 (GREEN, this commit) |
+|---|------|-----------------------------------|-------------------------------|
+| 1 | top-level fill (ModalConsumer shape) | FAILED — fill never rendered, both slots showed their own fallback | **PASSED** — the marker renders in the filled slot; the other slot keeps its own fallback |
+| 2 | toggle fill (dynamic-slot-name / TableDemo-footer shape) | FAILED — fill never rendered in either slot, before or after toggle | **PASSED** — the same fill moves between the producer's two static-named slots at runtime |
+| 3 | fill inside `r-if` (true at mount) | FAILED — fill never arrived | **PASSED** — fill inside an embedded view (r-if true at mount), the marquee table-demo shape |
+| 4 | fill inside `r-if` (false→true after mount) | FAILED — fill never arrived even after the conditional flipped true | **PASSED** — fill inside an embedded view that flips false→true after mount |
+| 5 | two sibling static-only producers | FAILED — both siblings' fill counts were zero | **PASSED** — neither sibling leaks into the other |
+
+### Command: `pnpm exec vitest run --root packages/targets/angular staticSlotProducerFillMap`
+
+```
+Test Files  1 passed (1)
+     Tests  6 passed (6)
+```
+
+| # | Test | Plan 09 (RED) | Plan 13 (GREEN) |
+|---|------|----------------|-------------------|
+| 1 | emits `__rozieFills` content query | FAILED — no content query at all | **PASSED** |
+| 2 | emits `__rozieFillMap` computed member | FAILED — no fill-map fold at all | **PASSED** |
+| 3 | emits `RozieSlot` runtime import | FAILED — no runtime import at all | **PASSED** |
+| 4 | `header` slot resolution carries the fill-map tier | FAILED — emitted `(headerTpl ?? templates()?.['header'])`, no fill-map tier | **PASSED** |
+| 5 | `footer` slot resolution carries the fill-map tier | FAILED — same shape as #4 | **PASSED** |
+| 6 | keyed-fill gate is the same width as the `templates` gate | FAILED — producer emitted `templates()` but not `__rozieFillMap()` | **PASSED** — the two gates are now provably the same width |
+
+### No assertion weakened
+
+`git diff bb776004 -- tests/angular-runtime/staticProducerKeyedFill.test.ts` and
+`git diff bb776004 -- packages/targets/angular/src/__tests__/staticSlotProducerFillMap.test.ts` are
+**both empty** — neither Plan 09 test file has been touched by any commit since it landed RED. The
+fix that turned all 11 of these cases green lived entirely in the emitter (`refineSlotTypes.ts`,
+`emitScript.ts`, `emitSlotInvocation.ts`, `collectAngularImports.ts`), never in the tests that prove it.
+
+### Additivity and full-suite confirmation
+
+`pnpm exec vitest run --root tests/angular-runtime` (full package, this commit):
+
+```
+Test Files  6 passed (6)
+     Tests  177 passed (177)
+```
+
+`pnpm exec vitest run --root packages/targets/angular` (full package, this commit):
+
+```
+Test Files  59 passed (59)
+     Tests  652 passed | 1 todo (653)
+```
+
+No previously-passing test regressed. The growth beyond Plan 09's own recorded totals (170 in
+`tests/angular-runtime`, 648 in `packages/targets/angular`) is accounted for entirely by Plan 12's own
+additive changes to `prohibitions.test.ts` (the two amended-prohibition standing tests, with their
+non-vacuity and no-deletion counter-cases) landing on top of Plan 09's fixtures in the same window —
+not by any weakening of Plan 09's own two test files, confirmed empty-diff above.
+
+### CI coverage confirmation
+
+Both new test files are covered by `.github/workflows/angular-matrix.yml`'s existing hand-maintained
+unit-test `--root` list, added in this same file's Plan 08 GREEN section:
+`pnpm exec vitest run --root tests/angular-runtime` covers `staticProducerKeyedFill.test.ts`;
+`pnpm exec vitest run --root packages/targets/angular` covers `staticSlotProducerFillMap.test.ts`
+(that root entry pre-dates Phase 80 — it is the existing Angular target unit-test line). No new CI
+line was needed.
+
+### Frozen-lockfile constraint
+
+`pnpm install --frozen-lockfile` exits zero at this commit (verified before committing).
+
+### Closing the loop
+
+D-09's Bug C — the regression Plan 08's Docker VR run found and this file has now tracked from RED
+(Plan 09) through fix (Plan 10) to GREEN (this section) — is closed at the runtime-harness and
+source-emission levels. Task 2 of this plan is the independent Docker visual-regression check against
+the four cells that were left honestly red since Plan 08, on baselines that predate the regression and
+were never touched.
