@@ -78,6 +78,7 @@ import {
   buildNgTemplateContextGuard,
   buildFamilyCtxDecls,
   isRecordOnlySlotDecl,
+  hasKeyedFillIntake,
 } from './refineSlotTypes.js';
 import { emitPortals } from './emitPortals.js';
 import { emitContext } from './emitContext.js';
@@ -1277,14 +1278,22 @@ export function emitScript(
     imports.add('input');
   }
 
-  // 6e.ter Phase 80 Plan 04 (R3/R5/R6) — content-collected fill map for
-  // KEY-FILLABLE (record-only) slots. This gate is NARROWER than the
-  // `ir.slots.length > 0` gate above: an identifier-only-slot producer
-  // (e.g. `header`) emits `templates` but NOT these three members. The
-  // gate predicate — `ir.slots.some(isRecordOnlySlotDecl)` — is shared
-  // verbatim with Task 3's resolution-chain splice in emitSlotInvocation.ts
-  // and with `AngularImportCollector.addRuntime` below: one predicate, three
-  // consumers in this file plus emitSlotInvocation.ts, no drift.
+  // 6e.ter Phase 80 Plan 04 (R3/R5/R6), gate WIDENED by Plan 10 (D-09) —
+  // content-collected fill map for every KEYED-FILLABLE producer. Before
+  // Plan 10 this gate was narrower than the `ir.slots.length > 0` gate
+  // above: an identifier-only-slot producer (e.g. `header`) emitted
+  // `templates` but NOT these three members, which silently dropped a
+  // consumer's dynamic `#[expr]` fill whenever the target producer's OWN
+  // slots happened to be static identifier names (deferred-items.md #3,
+  // 80-CONTEXT.md D-09). The intake gate below is now `hasKeyedFillIntake`
+  // (refineSlotTypes.ts), whose doc comment is the single source of truth
+  // for why it must stay exactly as wide as the `templates` gate — shared
+  // verbatim with Task 3's resolution-chain splice in
+  // emitSlotInvocation.ts and with `AngularImportCollector.addRuntime`
+  // below: one predicate, three consumers in this file plus
+  // emitSlotInvocation.ts, no drift. The DIAGNOSTICS members just below
+  // this block deliberately did NOT widen — see the split point comment
+  // ahead of them.
   //
   // `__rozieFills` is a SIGNAL content query (`contentChildren`, not the
   // decorator `@ContentChildren` form) over the `[rozieSlot]` marker
@@ -1313,14 +1322,11 @@ export function emitScript(
   //   5. Assign — a later entry overwrites an earlier one with the same key,
   //      so last-in-content-query-(document)-order wins, by specification.
   // Keys compare by exact JS string identity throughout — no trimming,
-  // casing, or Unicode normalization.
-  //
-  // This same `hasRecordOnlySlot` boolean also gates Task 2's diagnostics
-  // members below (`__rozieProjectedTpls` / `__rozieSlotWarned` / the
-  // dev-mode-only effect) and, further down, the dev-mode-only diagnostics
-  // effect pushed once `lifecycleConstructorLines` exists.
-  const hasRecordOnlySlot = ir.slots.some(isRecordOnlySlotDecl);
-  if (hasRecordOnlySlot) {
+  // casing, or Unicode normalization. This fold text is moved onto the
+  // wider gate byte-for-byte — Plan 10 does not reformat, reorder, or
+  // otherwise touch a single line inside it.
+  const acceptsKeyedFill = hasKeyedFillIntake(ir.slots);
+  if (acceptsKeyedFill) {
     fieldLines.push(
       '__rozieFills = contentChildren(RozieSlot, { descendants: true });',
     );
@@ -1342,15 +1348,33 @@ export function emitScript(
     imports.add('computed');
     imports.add('TemplateRef');
     imports.addRuntime('RozieSlot');
+  }
 
-    // Phase 80 Plan 04 Task 2 (D-08) — dev-mode-only diagnostics. A SECOND
-    // content query over bare `TemplateRef` (not the `RozieSlot` directive)
-    // is the chosen detection mechanism for "consumer projected content but
-    // forgot to add RozieSlot to imports:" — a producer cannot otherwise
-    // distinguish "nothing projected" from "something projected, but not
-    // collected". `__rozieSlotWarned` is the one-shot guard so a dev-mode
-    // console keeps quiet after the first warning, mirroring the repo's
-    // other one-shot-warn fields.
+  // Phase 80 Plan 04 Task 2 (D-08), gate DELIBERATELY LEFT NARROW by
+  // Plan 10 (D-09) — dev-mode-only diagnostics stay on `isRecordOnlySlotDecl`
+  // (the SAME predicate that still governs `@ContentChild` field generation
+  // and per-slot context interfaces), NOT on the widened intake gate above.
+  //
+  // The asymmetry, in one sentence: intake must be universal so no fill is
+  // ever silently dropped, while the empty-fill-map warning is only
+  // meaningful for a producer whose slots can ONLY be filled through the
+  // map — firing it on a producer receiving ordinary static
+  // `@ContentChild`-satisfied fills would be noise, not a diagnostic (this
+  // is also a pre-existing false-positive class on MIXED producers, tracked
+  // separately in deferred-items.md and deliberately not widened further by
+  // this plan).
+  //
+  // A SECOND content query over bare `TemplateRef` (not the `RozieSlot`
+  // directive) is the chosen detection mechanism for "consumer projected
+  // content but forgot to add RozieSlot to imports:" — a producer cannot
+  // otherwise distinguish "nothing projected" from "something projected,
+  // but not collected". `__rozieSlotWarned` is the one-shot guard so a
+  // dev-mode console keeps quiet after the first warning, mirroring the
+  // repo's other one-shot-warn fields. This same `hasRecordOnlySlot`
+  // boolean also gates the dev-mode-only diagnostics effect pushed further
+  // down once `lifecycleConstructorLines` exists.
+  const hasRecordOnlySlot = ir.slots.some(isRecordOnlySlotDecl);
+  if (hasRecordOnlySlot) {
     fieldLines.push(
       '__rozieProjectedTpls = contentChildren(TemplateRef, { descendants: true });',
     );

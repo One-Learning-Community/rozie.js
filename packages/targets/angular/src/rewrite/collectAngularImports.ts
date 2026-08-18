@@ -27,7 +27,12 @@
  * for the `[rozieSlot]` marker directive: the `runtimeSymbols` bucket below
  * emits a conditional `import { ... } from '@rozie/runtime-angular';` line
  * gated on `runtimeSymbols.size > 0`, so a component with no record-path
- * slots still emits no runtime-package import at all.
+ * slots still emits no runtime-package import at all. Phase 80 Plan 10
+ * (R3/D-09) widened the gate that decides WHEN `addRuntime('RozieSlot')`
+ * fires — from "declares a record-only slot" to "declares any slot at
+ * all" (`hasKeyedFillIntake`, refineSlotTypes.ts) — so read "record-path
+ * slots" in the sentence above as "any slot" going forward: a component
+ * declaring NO slots is the only case that still stays import-free.
  *
  * @experimental — shape may change before v1.0
  */
@@ -134,9 +139,12 @@ export type AngularCommonImport = 'NgTemplateOutlet' | 'NgClass' | 'NgStyle';
  *
  * `RozieSlot` is the `[rozieSlot]` marker directive that `contentChildren`
  * collects on the producer side to build the content-collected fill map for
- * record-path (dynamic / non-identifier-static) slot fills. Added by the
- * emitter via `imports.addRuntime('RozieSlot')` when the component declares
- * at least one record-path slot fill.
+ * keyed slot fills. Added by the emitter via `imports.addRuntime('RozieSlot')`
+ * when the component declares at least one slot (`hasKeyedFillIntake`,
+ * refineSlotTypes.ts) — widened by Phase 80 Plan 10 (R3/D-09) from the
+ * original narrower "at least one record-path slot" gate, which left a
+ * static-identifier-only producer unable to collect a dynamic consumer
+ * fill at all. A component declaring NO slots still emits no import.
  */
 export type AngularRuntimeImport = 'RozieSlot';
 
