@@ -30,6 +30,7 @@ import type {
   Listener,
   ListenerSpreadIR,
   AttributeBinding,
+  SlotFillerDecl,
 } from '../../../../core/src/ir/types.js';
 import type { ModifierRegistry } from '@rozie/core';
 import type { Diagnostic } from '../../../../core/src/diagnostics/Diagnostic.js';
@@ -843,14 +844,21 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     return `<${tagOut}${head}></${tagOut}>`;
   }
 
-  // Phase 07.2 Plan 03 — Angular consumer-side slot-fill emit (R3 + R4).
+  // Phase 07.2 Plan 03 — Angular consumer-side slot-fill emit (R3 + R4),
+  // reworked by Phase 80 Plan 05 (R4/R6) into a net deletion: a record-path
+  // fill (dynamic-name, non-identifier static, or matchedFamily) now emits
+  // ONLY a self-declaring `<ng-template [rozieSlot]="<key>">` marker as a
+  // plain child of the producer tag — no class-body ViewChild, no getter, no
+  // property-input binding on the tag. The producer's own per-instance
+  // `contentChildren(RozieSlot, { descendants: true })` content query
+  // (Plan 04) collects the marker directly, including from inside an `@if`
+  // or `@for` embedded view where the deleted static `@ViewChild(...,
+  // { static: true })` path could never see it.
   //
-  // When this element is a component-tag with structured `slotFillers`, emit
-  // each filler as an `<ng-template #ref let-…>…</ng-template>` child of the
-  // component tag. This TAKES PRECEDENCE over the D-LIT-ANG-DEFAULT-SLOT
-  // wrap path below — when slotFillers populated, the lowerer has already
-  // captured the default-slot body as a synthetic `{ name: '' }` filler, so
-  // we own the synthesis here.
+  // This TAKES PRECEDENCE over the D-LIT-ANG-DEFAULT-SLOT wrap path below —
+  // when slotFillers populated, the lowerer has already captured the
+  // default-slot body as a synthetic `{ name: '' }` filler, so we own the
+  // synthesis here.
   //
   // The parallel-array lowering invariant (lowerSlotFillers.ts L186-310)
   // means node.children and node.slotFillers reference the SAME body content;
@@ -861,119 +869,80 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       emitChildren: (children) => children.map((c) => emitNode(c, ctx)).join(''),
     };
     const fillerParts: string[] = [];
-    const dispatchParts: string[] = [];
-    const dynRefs: { refName: string; keyExpr: string; classBodyKeyExpr: string }[] = [];
-    // Phase 07.3.2.1-01: consumer-side dynamic-name slot dispatch — bound as
-    // an Angular property INPUT on the producer tag (NOT a projected
-    // `<ng-container *ngTemplateOutlet>` child). Composed inside the
-    // `if (dynRefs.length > 0)` block below; empty-string default preserves
-    // D-04 byte-identity for static-only consumers (Pattern A / Pitfall #1).
-    let templatesBinding = '';
-    let dynIdx = 0;
+    // The duplicate-static-key check (ROZ724, below) needs only the fill's
+    // key expression, whether that key is a compile-time static literal,
+    // and the fill's source location — not the deleted per-ref plumbing.
+    const recordPathFills: {
+      keyExpr: string;
+      isStaticLiteral: boolean;
+      sourceLoc: SlotFillerDecl['sourceLoc'];
+    }[] = [];
     for (const filler of node.slotFillers) {
       // Phase 79 Plan 05 (R12/D-03) — a non-identifier, non-default STATIC
       // slot name (e.g. `#cell-status`) cannot use a plain `<ng-template
       // #cell-status>` + `@ContentChild('cell-status', ...)` pair — a
       // hyphenated template-reference variable does not resolve. Route it
-      // through the SAME dynamic-dispatch branch as an `isDynamic` fill.
+      // through the SAME record-path branch as an `isDynamic` fill.
       const isRecordOnlyStatic =
         !filler.isDynamic && filler.name !== '' && !isSlotNameIdentifier(filler.name);
       // Phase 79 Plan 11 (R5/D-09) — a `matchedFamily` fill (79-07's
       // cross-file family-matching pass: an identifier-shaped static name
       // that matched a producer name-PREFIX family rather than an exact
       // SlotDecl) has no `@ContentChild`-capturable slot either, so it MUST
-      // route through the SAME dynamic-dispatch branch even though it is
-      // neither `isDynamic` nor non-identifier-shaped. Without this OR-term,
-      // `emitSlotFiller`'s new matchedFamily exclusion would return '' for
-      // it and the fill would be silently dropped from the emitted output
+      // route through the SAME record-path branch even though it is neither
+      // `isDynamic` nor non-identifier-shaped. Without this OR-term,
+      // `emitSlotFiller`'s matchedFamily exclusion would return '' for it
+      // and the fill would be silently dropped from the emitted output
       // entirely (this dead-file trap is exactly what 79-05 hit and this
       // plan's DEAD-FILE WARNING calls out by name). `emitDynamicSlotFiller`
       // itself dispatches on `filler.matchedFamily` (checked before its
       // non-identifier branch) to key on the literal static name.
       if (filler.isDynamic || isRecordOnlyStatic || filler.matchedFamily === true) {
-        // R5 dynamic-name dispatch (Phase 07.3.2.1-01 closure of F-07.3.2-11-A):
-        // emit the body as a synthetic-named `<ng-template #__dynSlot_<N>>`
-        // declaration (a child of the producer tag). The CALLER no longer
-        // emits an inline projected `<ng-container *ngTemplateOutlet>`
-        // dispatcher — Angular components don't render projected children
-        // unless they declare `<ng-content>`, so the dispatcher would have
-        // been silently dropped. Instead the producer tag is annotated
-        // (below, in the `dynRefs.length > 0` block) with a `[templates]=
-        // "<getterName>"` property input. The producer's already-correct
-        // `templates = input<Record<string, TemplateRef<unknown>> |
-        // undefined>(undefined)` signal (Phase 07.3.2 Plan 03) receives the
-        // consumer's class-body `templates` getter; its merged guard
-        // `@if ((headerTpl ?? templates()?.['header']))` (Plan 10) then
-        // resolves the runtime dispatch.
-        //
-        // Each ViewChild captures one `__dynSlot_<N>` ref so the consumer's
-        // getter can compose `{ [<keyExpr>]: this.__dynSlot_<N>! }`.
-        const dyn = emitDynamicSlotFiller(filler, fillerCtx, dynIdx);
+        const dyn = emitDynamicSlotFiller(filler, fillerCtx);
         if (dyn !== null) {
           fillerParts.push(dyn.template);
-          dynRefs.push({
-            refName: dyn.refName,
+          recordPathFills.push({
             keyExpr: dyn.keyExpr,
-            classBodyKeyExpr: dyn.classBodyKeyExpr,
+            // A runtime-expression key (the isDynamic branch) is unknowable
+            // at compile time and deliberately NOT diagnosed here — it is
+            // covered instead by the producer's dev-mode runtime warning
+            // (ROZ750, Plan 04). Only the two static branches (non-identifier
+            // static, matchedFamily) carry a compile-time-known key.
+            isStaticLiteral: !filler.isDynamic,
+            sourceLoc: filler.sourceLoc,
           });
-          dynIdx++;
         }
       } else {
         const text = emitSlotFiller(filler, fillerCtx);
         if (text.length > 0) fillerParts.push(text);
       }
     }
-    // For any dynamic-name fillers, register the consumer-side templates
-    // getter + per-ref ViewChild fields via scriptInjections. The class
-    // body composer in emitAngular appends these as class fields.
-    if (dynRefs.length > 0) {
-      if (ctx.hasDynamicSlotFiller) ctx.hasDynamicSlotFiller.value = true;
-      for (const { refName } of dynRefs) {
-        const fieldDecl = `@ViewChild('${refName}', { static: true }) ${refName}?: TemplateRef<unknown>;`;
-        // Only inject each per-ref ViewChild once per component (siblings
-        // of the same component tag share the same parent class body).
-        if (!ctx.scriptInjections.some((s) => s.name === refName)) {
-          ctx.scriptInjections.push({ name: refName, decl: fieldDecl });
-        }
-      }
-      // Append a `templates` getter that maps the user's runtime-key
-      // expression to each captured ref. Compose the map entries
-      // deterministically from the collected dynRefs (one entry per
-      // dynamic filler). The class-body getter consumes classBodyKeyExpr
-      // (produced by rewriteTemplateExpression with prefixThis:true) so
-      // each identifier reference is correctly scoped via `this.` —
-      // including template-literal shapes like `` `footer${footerMode()}` ``
-      // where a naive outer prefix would be a syntax error.
-      const classScopedEntries = dynRefs
-        .map((r) => `[${r.classBodyKeyExpr}]: this.${r.refName}!`)
-        .join(', ');
-      const getterName = 'templates';
-      const getterDecl = `get ${getterName}(): Record<string, TemplateRef<unknown>> {\n    return { ${classScopedEntries} };\n  }`;
-      // Use a deterministic name so duplicate sibling-component dispatch
-      // collapses into a single getter. The map entries from the FIRST
-      // appearance win — sibling dynamic fillers must reuse the same
-      // getter scope. For Wave 1 (one component tag per dynamic-name
-      // fixture), this collapses cleanly; multi-sibling cases land in
-      // Plan 07.2-05/06.
-      if (!ctx.scriptInjections.some((s) => s.name === getterName)) {
-        ctx.scriptInjections.push({ name: getterName, decl: getterDecl });
-      }
-      // Phase 07.3.2.1-01 — bind the deterministic class-body getter as a
-      // property INPUT on the producer tag. Leading-space prefix matches
-      // the `head`-composition invariant from L337 (tokenizer-safe append).
-      // Reuses `getterName` so a future multi-sibling lift (Plan 07.2-05/06)
-      // that promotes the name to `templates_<N>` auto-follows here. The
-      // RHS is the bare identifier — Angular's template parser resolves it
-      // against the component class, hitting the getter at runtime.
-      templatesBinding = ` [${getterName}]="${getterName}"`;
+    if (recordPathFills.length > 0 && ctx.hasDynamicSlotFiller) {
+      ctx.hasDynamicSlotFiller.value = true;
     }
-    // `dispatchParts` is intentionally retained as a vestigial declaration
-    // above to minimise diff churn (the non-dynamic branch never populated
-    // it either; the dynamic branch no longer pushes to it post-Phase
-    // 07.3.2.1-01). Future cleanup may delete it once the surrounding
-    // shape stabilises.
+    // ROZ724 — two static-literal fills on this producer tag resolve to the
+    // same key (SPEC R6/D-08). Angular-emitter-local, not a core IR
+    // validation pass: a core-wide validator would fire for all six targets,
+    // where the object/snippet fill shape used by React/Solid/Svelte/Vue/Lit
+    // makes two fills sharing a key legal and unimplicated, breaking
+    // existing non-Angular fixtures. Diagnosed at the SECOND (and any later)
+    // fill sharing an already-seen key, in source order.
+    const seenStaticKeys = new Set<string>();
+    for (const fill of recordPathFills) {
+      if (!fill.isStaticLiteral) continue;
+      if (seenStaticKeys.has(fill.keyExpr)) {
+        ctx.diagnostics.push({
+          code: RozieErrorCode.TARGET_ANGULAR_DUPLICATE_STATIC_SLOT_KEY, // ROZ724
+          severity: 'error',
+          message: `Duplicate slot fill key ${fill.keyExpr} on this producer — two fills on one producer cannot resolve to the same key.`,
+          loc: fill.sourceLoc,
+        });
+      } else {
+        seenStaticKeys.add(fill.keyExpr);
+      }
+    }
     const innerFills = fillerParts.join('');
-    return `<${tagOut}${head}${templatesBinding}>${innerFills}</${tagOut}>`;
+    return `<${tagOut}${head}>${innerFills}</${tagOut}>`;
   }
 
   const inner = node.children.map((c) => emitNode(c, ctx)).join('');

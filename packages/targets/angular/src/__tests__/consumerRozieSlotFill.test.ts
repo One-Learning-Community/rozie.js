@@ -20,6 +20,7 @@ import { describe, it, expect } from 'vitest';
 import { parse } from '../../../../core/src/parse.js';
 import { lowerToIR } from '../../../../core/src/ir/lower.js';
 import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
+import { emitAngular } from '../emitAngular.js';
 import { emitDynamicSlotFiller, type EmitSlotFillerCtx } from '../emit/emitSlotFiller.js';
 import { emitNode, type EmitNodeCtx } from '../emit/emitTemplateNode.js';
 import type { IRComponent, SlotFillerDecl } from '../../../../core/src/ir/types.js';
@@ -34,6 +35,11 @@ function lowerInline(rozie: string): IRComponent {
     throw new Error(`lower failed: ${JSON.stringify(lowered.diagnostics)}`);
   }
   return lowered.ir;
+}
+
+function compileAngular(ir: IRComponent, filename = 'inline.rozie'): string {
+  const { code } = emitAngular(ir, { filename });
+  return code;
 }
 
 /** Recursively locate the first SlotFillerDecl named `targetName` anywhere in the IR template tree. */
@@ -167,5 +173,125 @@ describe('Task 1 — emitDynamicSlotFiller emits a keyed [rozieSlot] marker decl
     const filler = findFiller(ir.template, '$data.dynName');
     const emission = emitDynamicSlotFiller(filler!, fillerCtxFor(ir));
     expect(emission!.template).not.toMatch(/__dynSlot_/);
+  });
+});
+
+describe('Task 2 — consumer emits record-path fills as plain children, no ViewChild/getter/binding (Phase 80 R4/R6)', () => {
+  it('a consumer with a record-path fill emits it as a direct child of the producer tag, with no attribute binding added to that tag', () => {
+    const ir = lowerInline(`
+<rozie name="ConsumerX">
+<components>{ Cell: "./Cell.rozie" }</components>
+<data>{ dynName: 'header' }</data>
+<template>
+<div>
+  <Cell>
+    <template #[$data.dynName]>
+      <span>fallback</span>
+    </template>
+  </Cell>
+</div>
+</template>
+</rozie>
+`);
+    const code = compileAngular(ir);
+    expect(code).toMatch(/<rozie-cell><ng-template \[rozieSlot\]="dynName\(\)">/);
+    expect(code).not.toMatch(/<rozie-cell[^>]*\[templates\]/);
+  });
+
+  it('emitted output contains no synthetic ref, no view-query field, no record getter, and no record-input binding', () => {
+    const ir = lowerInline(`
+<rozie name="ConsumerX">
+<components>{ Cell: "./Cell.rozie" }</components>
+<data>{ dynName: 'header' }</data>
+<template>
+<div>
+  <Cell>
+    <template #[$data.dynName]>
+      <span>fallback</span>
+    </template>
+  </Cell>
+</div>
+</template>
+</rozie>
+`);
+    const code = compileAngular(ir);
+    expect(code).not.toMatch(/__dynSlot_/);
+    expect(code).not.toMatch(/@ViewChild\(/);
+    expect(code).not.toMatch(/get templates\(\)/);
+    expect(code).not.toMatch(/\[templates\]="templates"/);
+  });
+
+  it('the dynamic-slot-filler flag still fires — the producer tag`s marker fill still emits when at least one record-path fill is present', () => {
+    const ir = lowerInline(`
+<rozie name="ConsumerX">
+<components>{ Cell: "./Cell.rozie" }</components>
+<data>{ dynName: 'header' }</data>
+<template>
+<div>
+  <Cell>
+    <template #[$data.dynName]>
+      <span>fallback</span>
+    </template>
+  </Cell>
+</div>
+</template>
+</rozie>
+`);
+    const code = compileAngular(ir);
+    expect(code).toContain('[rozieSlot]="dynName()"');
+  });
+
+  it('two fills on one producer tag with equal static-literal keys produce ROZ724, located at the second fill', () => {
+    const ir = lowerInline(`
+<rozie name="ConsumerX">
+<components>{ Cell: "./Cell.rozie" }</components>
+<template>
+<div>
+  <Cell>
+    <template #cell-status="{ value }">
+      <span>{{ value }}</span>
+    </template>
+    <template #cell-status2="{ value }">
+      <strong>{{ value }}</strong>
+    </template>
+  </Cell>
+</div>
+</template>
+</rozie>
+`);
+    // Force a genuine key collision by giving the second filler the same
+    // static name as the first, post-lowering (mirrors slotFamilyConsumerRouting's
+    // hand-set-flag pattern for isolating the emit function's own dispatch).
+    const second = findFiller(ir.template, 'cell-status2');
+    expect(second).not.toBeNull();
+    second!.name = 'cell-status';
+    const { diagnostics } = emitAngular(ir, { filename: 'inline.rozie' });
+    const dupes = diagnostics.filter((d) => d.code === 'ROZ724');
+    expect(dupes.length).toBe(1);
+    expect(dupes[0].loc).toEqual(second!.sourceLoc);
+  });
+
+  it('two fills whose keys are runtime expressions produce no ROZ724, even though they would collide at runtime', () => {
+    const ir = lowerInline(`
+<rozie name="ConsumerX">
+<components>{ Cell: "./Cell.rozie" }</components>
+<data>{ keyA: 'x', keyB: 'x' }</data>
+<template>
+<div>
+  <Cell>
+    <template #[$data.keyA]>
+      <span>a</span>
+    </template>
+    <template #[$data.keyB]>
+      <span>b</span>
+    </template>
+  </Cell>
+</div>
+</template>
+</rozie>
+`);
+    const { diagnostics } = emitAngular(ir, { filename: 'inline.rozie' });
+    const dupes = diagnostics.filter((d) => d.code === 'ROZ724');
+    expect(dupes.length).toBe(0);
   });
 });
