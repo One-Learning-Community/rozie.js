@@ -158,6 +158,11 @@ and a Rozie producer sets `$implicit` to the **whole** context object, not a
 single named value. If you want just one named value out of the context, use
 the explicit form: `let-x="x"`, not the shorthand `let-x`.
 
+A keyed `[rozieSlot]` fill works against **any** Rozie producer that declares a
+slot — including one whose slots are all plain static names (`<slot
+name="header">`). You never have to reason about how the target producer named
+its own slots to know whether a keyed fill will land.
+
 The rest of the ceremony delta is cataloged row by row in the
 [creature-comforts matrix](/guide/creature-comforts#per-target-pain-points-rozie-hides):
 signals lowering (`<data>` to `signal()`, `$computed` to `computed()`,
