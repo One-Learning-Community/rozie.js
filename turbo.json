@@ -60,6 +60,10 @@
       "dependsOn": ["build", "^build", "sync"],
       "outputs": []
     },
+    "rozie-angular-runtime-tests#typecheck": {
+      "dependsOn": ["test", "^build", "sync"],
+      "outputs": []
+    },
     "dev": {
       "dependsOn": ["^build", "sync"],
       "cache": false,
