@@ -39,7 +39,7 @@ jobs:
         platform: ['2024.2.5', '2025.3']
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup JDK 21 (Temurin)
         uses: actions/setup-java@v5
@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup JDK 21 (Temurin)
         uses: actions/setup-java@v5
@@ -118,7 +118,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup JDK 21 (Temurin)
         uses: actions/setup-java@v5

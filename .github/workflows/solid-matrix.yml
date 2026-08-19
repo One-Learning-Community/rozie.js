@@ -43,7 +43,7 @@ jobs:
       matrix:
         solid-version: ['1.8', '1.9']
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6
 

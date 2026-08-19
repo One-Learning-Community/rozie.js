@@ -48,7 +48,7 @@ jobs:
       # does not exist, so every one of those gates fails with
       # "Command failed: git show …" — 134 of 144 tests in one cascade.
       # Do not drop this without first removing the test's git-history dependency.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -212,7 +212,7 @@ jobs:
       matrix:
         angular-version: ['19', '21']
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6
 
