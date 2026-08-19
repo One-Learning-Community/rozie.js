@@ -1,7 +1,7 @@
 package js.rozie.intellij.completion
 
 /**
- * Single source of truth for the 20 canonical Rozie `$`-prefixed magic
+ * Single source of truth for the 21 canonical Rozie `$`-prefixed magic
  * identifiers + their one-line type-text doc hints (surfaced by
  * `LookupElementBuilder.withTypeText` in the completion popup per the
  * P1-UAT-09 acceptance prose).
@@ -75,6 +75,10 @@ package js.rozie.intellij.completion
  *                      mutates its DOM, so lit-html's repeat cache disposes
  *                      stale DOM instead of desyncing (no-op on the other 5
  *                      targets; shipped 2026-05-24 pre-Phase-16 cleanup)
+ *  - `$slotted`     — Lit-only assigned-elements member sigil, parallel to
+ *                      `$slots`: `$slotted.default` / `$slotted.<name>` yields
+ *                      the assigned Element[] (quick 260807-cor D4; a
+ *                      compile-time constant `[]` on the other 5 targets)
  *
  * Pattern note: each entry is a `(name, typeText)` pair; the contributor
  * destructures the pair into `LookupElementBuilder.create(name).bold()
@@ -82,7 +86,7 @@ package js.rozie.intellij.completion
  */
 object RozieMagicIdentifiers {
     /**
-     * Ordered (name, typeText) pairs for the 20 canonical Rozie magic
+     * Ordered (name, typeText) pairs for the 21 canonical Rozie magic
      * identifiers. Order mirrors the TextMate grammar's `magic-identifier`
      * regex so the two artifacts diff trivially; the lookup popup does its
      * own alphabetical sort, so source order is purely for readability.
@@ -108,6 +112,7 @@ object RozieMagicIdentifiers {
         "\$model" to "(magic) producer-side two-way write — keys are the model:true props (\$model.x = … lowers like the old \$props.x write)",
         "\$expose" to "(magic) expose imperative methods to the consumer — \$expose({ reset, focus })",
         "\$reconcileAfterDomMutation" to "(magic) Lit-only: re-key an r-external container after engine DOM mutation (no-op on other targets)",
+        "\$slotted" to "(magic) Lit-only: assigned elements per slot — \$slotted.default / \$slotted.<name> (compile-time constant [] on other targets)",
     )
 
     /**
