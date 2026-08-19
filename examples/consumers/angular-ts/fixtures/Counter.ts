@@ -1,24 +1,36 @@
-import { Component, ViewEncapsulation, computed, input, model, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, model, signal, viewChild } from '@angular/core';
+import { NgClass } from '@angular/common';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
 
 @Component({
   selector: 'rozie-counter',
   standalone: true,
+  imports: [NgClass],
   template: `
 
-    <div class="counter" [ngClass]="{ hovering: hovering() }" (mouseenter)="hovering.set(true)" (mouseleave)="hovering.set(false)">
-      <button [disabled]="!canDecrement()" aria-label="Decrement" (click)="decrement($event)">−</button>
+    <div class="counter" [ngClass]="{ hovering: hovering() }" #rozieSpread_0 (mouseenter)="hovering.set(true)" (mouseleave)="hovering.set(false)" #rozieListenersTarget_1>
+      <button [disabled]="!canDecrement()" aria-label="Decrement" (click)="decrement()">−</button>
       <span class="value">{{ value() }}</span>
-      <button [disabled]="!canIncrement()" aria-label="Increment" (click)="increment($event)">+</button>
+      <button [disabled]="!canIncrement()" aria-label="Increment" (click)="increment()">+</button>
     </div>
 
   `,
   styles: [`
+    :host(rozie-counter) { display: contents; }
     .counter { display: inline-flex; gap: 0.5rem; align-items: center; }
     .counter.hovering { background: rgba(0, 0, 0, 0.04); }
     .value { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: center; }
     button { padding: 0.25rem 0.5rem; }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => Counter),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Counter {
   value = model<number>(0);
@@ -35,11 +47,155 @@ export class Counter {
   canDecrement = computed(() => this.value() - this.step() >= this.min());
 
   increment = () => {
-    if (this.canIncrement()) this.value.set(this.value() + this.step());
+    if (this.canIncrement()) this.value.set(this.value() + this.step()), this.__rozieCvaOnChange(this.value() + this.step());
   };
   decrement = () => {
-    if (this.canDecrement()) this.value.set(this.value() - this.step());
+    if (this.canDecrement()) this.value.set(this.value() - this.step()), this.__rozieCvaOnChange(this.value() - this.step());
   };
+
+  private __rozieCvaOnChange: (v: number) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  protected __rozieCvaDisabled = signal(false);
+
+  writeValue(v: number | null): void {
+    this.value.set(v ?? 0);
+  }
+  registerOnChange(fn: (v: number) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
+
+  private __rozieDestroyRef = inject(DestroyRef);
+
+  private rozieSpread_0 = viewChild<ElementRef>('rozieSpread_0');
+
+  private __rozieApplyAttrs = (() => {
+    const renderer = inject(Renderer2);
+    const prevKeysByElement = new WeakMap<HTMLElement, string[]>();
+    const prevClassTokensByElement = new WeakMap<HTMLElement, string[]>();
+    const prevStylePropsByElement = new WeakMap<HTMLElement, string[]>();
+    const parseClassTokens = (value: unknown): string[] => {
+      if (typeof value !== 'string') return [];
+      const out: string[] = [];
+      for (const tok of value.split(/\s+/)) {
+        if (tok.length > 0) out.push(tok);
+      }
+      return out;
+    };
+    const parseStyleDecls = (value: unknown): Array<[string, string]> => {
+      if (typeof value !== 'string') return [];
+      const out: Array<[string, string]> = [];
+      for (const decl of value.split(';')) {
+        const colon = decl.indexOf(':');
+        if (colon < 0) continue;
+        const prop = decl.slice(0, colon).trim();
+        const val = decl.slice(colon + 1).trim();
+        if (prop.length > 0) out.push([prop, val]);
+      }
+      return out;
+    };
+    const applyClassMerge = (el: HTMLElement, value: unknown) => {
+      const next = parseClassTokens(value);
+      const prev = prevClassTokensByElement.get(el) ?? [];
+      const nextSet = new Set(next);
+      for (const tok of prev) {
+        if (!nextSet.has(tok)) el.classList.remove(tok);
+      }
+      for (const tok of next) el.classList.add(tok);
+      prevClassTokensByElement.set(el, next);
+    };
+    const applyStyleMerge = (el: HTMLElement, value: unknown) => {
+      const next = parseStyleDecls(value);
+      const prev = prevStylePropsByElement.get(el) ?? [];
+      const nextProps = next.map(([p]) => p);
+      const nextSet = new Set(nextProps);
+      for (const prop of prev) {
+        if (!nextSet.has(prop)) el.style.removeProperty(prop);
+      }
+      for (const [prop, val] of next) el.style.setProperty(prop, val, 'important');
+      prevStylePropsByElement.set(el, nextProps);
+    };
+    return (el: HTMLElement, obj: Record<string, unknown> | null | undefined) => {
+      const safeObj: Record<string, unknown> = obj ?? {};
+      const prevKeys = prevKeysByElement.get(el) ?? [];
+      for (const k of prevKeys) {
+        if (k === 'class' || k === 'style') continue;
+        if (!(k in safeObj)) renderer.removeAttribute(el, k);
+      }
+      if (!('class' in safeObj) && prevClassTokensByElement.has(el)) {
+        applyClassMerge(el, '');
+      }
+      if (!('style' in safeObj) && prevStylePropsByElement.has(el)) {
+        applyStyleMerge(el, '');
+      }
+      for (const [k, v] of Object.entries(safeObj)) {
+        if (k === 'class') {
+          applyClassMerge(el, v);
+        } else if (k === 'style') {
+          applyStyleMerge(el, v);
+        } else if (v === null || v === false) {
+          renderer.removeAttribute(el, k);
+        } else {
+          renderer.setAttribute(el, k, String(v));
+        }
+      }
+      prevKeysByElement.set(el, Object.keys(safeObj));
+    };
+  })();
+
+  private __rozieGetHostAttrs = (() => {
+    const host = inject(ElementRef);
+    return () => {
+      const el = host.nativeElement as HTMLElement;
+      const out: Record<string, unknown> = {};
+      for (const a of Array.from(el.attributes)) out[a.name] = a.value;
+      return out;
+    };
+  })();
+
+  private __rozieSpread_0_effect = afterRenderEffect(() => {
+    const el = this.rozieSpread_0()?.nativeElement;
+    if (!el) return;
+    this.__rozieApplyAttrs(el, this.__rozieGetHostAttrs());
+  });
+
+  private rozieListenersTarget_1 = viewChild<ElementRef>('rozieListenersTarget_1');
+
+  private __rozieListenersRenderer = inject(Renderer2);
+
+  private __rozieListenersDisposers_1: Array<() => void> = [];
+
+  private __rozieListenersDestroyRegistered_1 = false;
+
+  private __rozieListenersEffect_1 = effect(() => {
+    const el = this.rozieListenersTarget_1()?.nativeElement;
+    if (!el) return;
+    for (const off of this.__rozieListenersDisposers_1) off();
+    this.__rozieListenersDisposers_1 = [];
+    const obj: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      if (typeof v !== 'function') continue;
+      const norm = k.startsWith('on') ? k.slice(2).toLowerCase() : k;
+      const dispose = this.__rozieListenersRenderer.listen(el, norm, v as EventListener);
+      this.__rozieListenersDisposers_1.push(dispose);
+    }
+    if (!this.__rozieListenersDestroyRegistered_1) {
+      this.__rozieListenersDestroyRegistered_1 = true;
+      this.__rozieDestroyRef.onDestroy(() => {
+        for (const off of this.__rozieListenersDisposers_1) off();
+        this.__rozieListenersDisposers_1 = [];
+      });
+    }
+  });
 }
 
 export default Counter;

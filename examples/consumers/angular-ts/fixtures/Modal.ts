@@ -1,5 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, effect, inject, input, model, output, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { NG_VALUE_ACCESSOR } from '@angular/forms';
+import { RozieSlot } from '@rozie/runtime-angular';
 
 interface HeaderCtx {
   $implicit: { close: any };
@@ -16,6 +18,26 @@ interface FooterCtx {
   close: any;
 }
 
+function __rozieDisplay(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') {
+    try {
+      return JSON.stringify(v, null, 2);
+    } catch {
+      // Circular structure or a non-serialisable value (BigInt nested in an
+      // object). Degrade to a non-throwing form so the wrap never crashes the
+      // render — that is the entire point of "safe" interpolation (SPEC-1).
+      return String(v);
+    }
+  }
+  return String(v);
+}
+
+function __rozieAttr(v: unknown): string | null {
+  return v == null ? null : __rozieDisplay(v);
+}
+
 @Component({
   selector: 'rozie-modal',
   standalone: true,
@@ -24,26 +46,26 @@ interface FooterCtx {
 
     @if (open()) {
     <div class="modal-backdrop" #backdropEl (click)="_guardedHandler0($event)">
-      <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [aria-label]="title() || undefined" tabindex="-1">
-        @if (title() || (headerTpl ?? templates()?.['header'])) {
+      <div #dialogEl class="modal-dialog" role="dialog" aria-modal="true" [attr.aria-label]="rozieAttr(title() || undefined)" tabindex="-1">
+        @if (title() || (headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {
     <header>
-          @if ((headerTpl ?? templates()?.['header'])) {
-    <ng-container *ngTemplateOutlet="(headerTpl ?? templates()?.['header']); context: { $implicit: { close: _close }, close: _close }" />
+          @if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {
+    <ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header']); context: { $implicit: { close: _close }, close: _close }" />
     } @else {
 
             <h2>{{ title() }}</h2>
           
     }
-          <button class="close-btn" aria-label="Close" (click)="_close($event)">×</button>
+          <button class="close-btn" aria-label="Close" (click)="_close()">×</button>
         </header>
     }<div class="modal-body">
-          <ng-container *ngTemplateOutlet="(defaultTpl ?? templates()?.['defaultSlot']); context: { $implicit: { close: _close }, close: _close }" />
+          <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: { $implicit: { close: _close }, close: _close }" />
         </div>
 
-        @if ((footerTpl ?? templates()?.['footer'])) {
+        @if ((footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])) {
     <footer>
-          @if ((footerTpl ?? templates()?.['footer'])) {
-    <ng-container *ngTemplateOutlet="(footerTpl ?? templates()?.['footer']); context: { $implicit: { close: _close }, close: _close }" />
+          @if ((footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])) {
+    <ng-container *ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer']); context: { $implicit: { close: _close }, close: _close }" />
     }
         </footer>
     }</div>
@@ -51,6 +73,7 @@ interface FooterCtx {
     }
   `,
   styles: [`
+    :host(rozie-modal) { display: contents; }
     .modal-backdrop {
       position: fixed; inset: 0;
       background: rgba(0, 0, 0, 0.4);
@@ -78,22 +101,16 @@ interface FooterCtx {
     --rozie-modal-z: 2000;
     }
   `],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => Modal),
+      multi: true,
+    },
+  ],
+  host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Modal {
-  constructor() {
-      const renderer = inject(Renderer2);
-
-      effect((onCleanup) => {
-        if (!(this.open() && this.closeOnEscape())) return;
-        const handler = (e: KeyboardEvent) => {
-          if (e.key !== 'Escape') return;
-          this._close();
-        };
-        const unlisten = renderer.listen('document', 'keydown', handler);
-        onCleanup(unlisten);
-      });
-  }
-
   open = model<boolean>(false);
   closeOnEscape = input<boolean>(true);
   closeOnBackdrop = input<boolean>(true);
@@ -106,7 +123,37 @@ export class Modal {
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
+  __rozieFills = contentChildren(RozieSlot, { descendants: true });
+  __rozieFillMap = computed(() => {
+    const map = Object.create(null) as Record<string, TemplateRef<unknown>>;
+    for (const f of this.__rozieFills()) {
+      const k = f.rozieSlot();
+      if (k == null) continue;
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      map[k === '' ? 'defaultSlot' : k] = f.templateRef;
+    }
+    return map;
+  });
   private __rozieDestroyRef = inject(DestroyRef);
+  private __rozieWatchInitial_0 = true;
+
+  constructor() {
+      const renderer = inject(Renderer2);
+
+      effect((onCleanup) => {
+        if (!(this.open() && this.closeOnEscape())) return;
+        const handler = ($event: KeyboardEvent) => {
+          if ($event.key !== 'Escape') return;
+          this._close();
+        };
+        const unlisten = renderer.listen('document', 'keydown', handler);
+        onCleanup(unlisten);
+      });
+
+    effect(() => { const __watchVal = (() => this.open())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
+      if (isOpen) this.lockScroll();else this.unlockScroll();
+    })(__watchVal); }); });
+  }
 
   ngAfterViewInit() {
     this.lockScroll();
@@ -115,12 +162,12 @@ export class Modal {
   }
 
   _close = () => {
-    this.open.set(false);
+    this.open.set(false), this.__rozieCvaOnChange(false);
     this.close.emit();
   };
   savedBodyOverflow = '';
   lockScroll = () => {
-    if (!this.lockBodyScroll()) return;
+    if (!this.lockBodyScroll() || !this.open()) return;
     this.savedBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
   };
@@ -129,6 +176,26 @@ export class Modal {
     document.body.style.overflow = this.savedBodyOverflow;
   };
 
+  private __rozieCvaOnChange: (v: boolean) => void = () => {};
+  private __rozieCvaOnTouchedFn: () => void = () => {};
+  protected __rozieCvaDisabled = signal(false);
+
+  writeValue(v: boolean | null): void {
+    this.open.set(v ?? false);
+  }
+  registerOnChange(fn: (v: boolean) => void): void {
+    this.__rozieCvaOnChange = fn;
+  }
+  registerOnTouched(fn: () => void): void {
+    this.__rozieCvaOnTouchedFn = fn;
+  }
+  setDisabledState(isDisabled: boolean): void {
+    this.__rozieCvaDisabled.set(isDisabled);
+  }
+  __rozieCvaOnTouched(): void {
+    this.__rozieCvaOnTouchedFn();
+  }
+
   static ngTemplateContextGuard(
     _dir: Modal,
     _ctx: unknown,
@@ -136,10 +203,14 @@ export class Modal {
     return true;
   }
 
-  private _guardedHandler0 = (e: any) => {
-    if (e.target !== e.currentTarget) return;
+  private _guardedHandler0 = ($event: any) => {
+    if ($event.target !== $event.currentTarget) return;
     this.closeOnBackdrop() && this._close();
   };
+
+  rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
+
+  rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
 }
 
 export default Modal;

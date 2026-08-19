@@ -1,5 +1,8 @@
 <script lang="ts">
+import { rozieAttr } from '@rozie/runtime-svelte';
+
 import type { Snippet } from 'svelte';
+import { onMount, untrack } from 'svelte';
 
 interface Props {
   open?: boolean;
@@ -12,6 +15,7 @@ interface Props {
   footer?: Snippet<[{ close: any }]>;
   snippets?: Record<string, any>;
   onclose?: (...args: unknown[]) => void;
+  [key: string]: unknown;
 }
 
 let {
@@ -25,6 +29,7 @@ let {
   footer: __footerProp,
   snippets,
   onclose,
+  ...__rozieAttrs
 }: Props = $props();
 
 const header = $derived(__headerProp ?? snippets?.header);
@@ -38,14 +43,11 @@ const close = () => {
   open = false;
   onclose?.();
 };
-
-// Body-scroll-lock state lives outside reactive data because it tracks DOM
-// rather than UI; managed entirely via lifecycle and listeners.
 // Body-scroll-lock state lives outside reactive data because it tracks DOM
 // rather than UI; managed entirely via lifecycle and listeners.
 let savedBodyOverflow = '';
 const lockScroll = () => {
-  if (!lockBodyScroll) return;
+  if (!lockBodyScroll || !open) return;
   savedBodyOverflow = document.body.style.overflow;
   document.body.style.overflow = 'hidden';
 };
@@ -54,20 +56,28 @@ const unlockScroll = () => {
   document.body.style.overflow = savedBodyOverflow;
 };
 
-// Colocated lifecycle pair — runs in source order alongside other hooks.
+// $watch re-fires on every `open` toggle — the cross-target primitive for
+// reacting to a prop change. The $onMount/$onUnmount pair anchors the
+// unmount-time restore; $onMount runs exactly once on every target (a
+// guarded no-op here) and must not be relied on to re-fire.
 
-$effect(() => {
+onMount(() => {
   lockScroll();
   return () => unlockScroll();
 });
-$effect(() => {
+onMount(() => {
   dialogEl?.focus();
 });
 
+let __rozieWatchInitial_0 = true;
+$effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
+  if (isOpen) lockScroll();else unlockScroll();
+})(__watchVal); }); });
+
 $effect(() => {
   if (!(open && closeOnEscape)) return;
-  const handler = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape') return;
+  const handler = ($event: KeyboardEvent) => {
+    if ($event.key !== 'Escape') return;
     close();
   };
   document.addEventListener('keydown', handler);
@@ -75,46 +85,33 @@ $effect(() => {
 });
 </script>
 
-
-{#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={(e) => { if (e.target !== e.currentTarget) return; closeOnBackdrop && close(); }}>
-  <div bind:this={dialogEl} class="modal-dialog" role="dialog" aria-modal="true" aria-label={title || undefined} tabindex="-1">
-    {#if title || header}<header>
-      {#if header}{@render header({ close })}{:else}
-        <h2>{title}</h2>
-      {/if}
-      <button class="close-btn" aria-label="Close" onclick={close}>×</button>
-    </header>{/if}<div class="modal-body">
-      {@render children?.({ close })}
-    </div>
-
-    {#if footer}<footer>
-      {#if footer}{@render footer({ close })}{/if}
-    </footer>{/if}</div>
-</div>{/if}
+{#if open}<div class="modal-backdrop" bind:this={backdropEl} onclick={($event) => { if ($event.target !== $event.currentTarget) return; closeOnBackdrop && close(); }} data-rozie-s-fc45feb2><div bind:this={dialogEl} class="modal-dialog" role="dialog" aria-modal="true" aria-label={rozieAttr(title || undefined)} tabindex="-1" data-rozie-s-fc45feb2>{#if title || header}<header data-rozie-s-fc45feb2>{#if header}{@render header({ close })}{:else}<h2 data-rozie-s-fc45feb2>{title}</h2>{/if}<button class="close-btn" aria-label="Close" onclick={close} data-rozie-s-fc45feb2>×</button></header>{/if}<div class="modal-body" data-rozie-s-fc45feb2>{@render children?.({ close })}</div>{#if footer}<footer data-rozie-s-fc45feb2>{#if footer}{@render footer({ close })}{/if}</footer>{/if}</div></div>{/if}
 
 <style>
-.modal-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex; align-items: center; justify-content: center;
-  z-index: var(--rozie-modal-z, 2000);
+:global {
+  .modal-backdrop[data-rozie-s-fc45feb2] {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: var(--rozie-modal-z, 2000);
+  }
+  .modal-dialog[data-rozie-s-fc45feb2] {
+    background: white;
+    border-radius: 8px;
+    min-width: 20rem;
+    max-width: min(90vw, 40rem);
+    max-height: 90vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    outline: none;
+  }
+  header[data-rozie-s-fc45feb2], footer[data-rozie-s-fc45feb2] { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  header[data-rozie-s-fc45feb2] { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+  header[data-rozie-s-fc45feb2] h2[data-rozie-s-fc45feb2] { flex: 1; margin: 0; font-size: 1.1rem; }
+  footer[data-rozie-s-fc45feb2] { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
+  .modal-body[data-rozie-s-fc45feb2] { padding: 1rem; overflow: auto; }
+  .close-btn[data-rozie-s-fc45feb2] { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }
 }
-.modal-dialog {
-  background: white;
-  border-radius: 8px;
-  min-width: 20rem;
-  max-width: min(90vw, 40rem);
-  max-height: 90vh;
-  display: flex; flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  outline: none;
-}
-header, footer { padding: 1rem; display: flex; align-items: center; gap: 0.5rem; }
-header { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
-header h2 { flex: 1; margin: 0; font-size: 1.1rem; }
-footer { border-top: 1px solid rgba(0, 0, 0, 0.08); justify-content: flex-end; }
-.modal-body { padding: 1rem; overflow: auto; }
-.close-btn { background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1; }
 
 :global(:root) {
 --rozie-modal-z: 2000;

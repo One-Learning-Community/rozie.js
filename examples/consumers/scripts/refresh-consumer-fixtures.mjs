@@ -196,7 +196,7 @@ async function refreshTarget(target) {
   // `declare function Foo(...): JSX.Element; export default Foo;` — lives in
   // the sibling .d.ts. With both files present, TypeScript's bundler module
   // resolution prefers the .tsx and the consumer's `import type { FooProps }`
-  // fails. Drop the .tsx (and .module.css/.global.css runtime sidecars) so
+  // fails. Drop the .tsx (and every emitted CSS sidecar) so
   // module-resolution lands on the .d.ts — the load-bearing TYPES-02 artifact.
   // Vue/Svelte/Angular fixtures keep ALL emitted files because their typed
   // contract IS the .vue/.svelte/.ts source per D-84 (inline-typed targets).
@@ -216,7 +216,10 @@ function pruneReactRuntimeArtifacts(dir) {
       removed += pruneReactRuntimeArtifacts(full);
       continue;
     }
-    if (entry.endsWith('.tsx') || entry.endsWith('.module.css') || entry.endsWith('.global.css')) {
+    // `.css` covers the plain scoped-CSS sidecar as well as the
+    // `.module.css`/`.global.css` forms; plain `.css` was previously missed,
+    // leaving five unreferenced files behind on every run.
+    if (entry.endsWith('.tsx') || entry.endsWith('.css')) {
       rmSync(full);
       removed += 1;
     }

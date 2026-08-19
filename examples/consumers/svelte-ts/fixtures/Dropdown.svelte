@@ -1,4 +1,6 @@
 <script lang="ts">
+import { applyListeners } from '@rozie/runtime-svelte';
+
 const throttledLReposition = (() => {
   let lastCall = 0;
   return (...args: any[]) => {
@@ -10,6 +12,7 @@ const throttledLReposition = (() => {
 })();
 
 import type { Snippet } from 'svelte';
+import { onMount, untrack } from 'svelte';
 
 interface Props {
   open?: boolean;
@@ -18,6 +21,7 @@ interface Props {
   trigger?: Snippet<[{ open: any; toggle: any }]>;
   children?: Snippet<[{ close: any }]>;
   snippets?: Record<string, any>;
+  [key: string]: unknown;
 }
 
 let {
@@ -27,6 +31,7 @@ let {
   trigger: __triggerProp,
   children: __childrenProp,
   snippets,
+  ...__rozieAttrs
 }: Props = $props();
 
 const trigger = $derived(__triggerProp ?? snippets?.trigger);
@@ -35,16 +40,16 @@ const children = $derived(__childrenProp ?? snippets?.children);
 let triggerEl = $state<HTMLElement | undefined>(undefined);
 let panelEl = $state<HTMLElement | undefined>(undefined);
 
-const toggle = () => {
+export const toggle = () => {
   open = !open;
 };
-const close = () => {
+export const close = () => {
   open = false;
 };
 const reposition = () => {
   if (!panelEl || !triggerEl) return;
-  const rect = triggerEl.getBoundingClientRect();
-  Object.assign(panelEl.style, {
+  const rect = triggerEl!.getBoundingClientRect();
+  Object.assign(panelEl!.style, {
     top: `${rect.bottom}px`,
     left: `${rect.left}px`
   });
@@ -54,34 +59,45 @@ const reposition = () => {
 // element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch
 // is the primitive that re-runs the effect after panel mount.
 
-$effect(() => {
+onMount(() => {
   // Initial reposition only if the panel is open at mount time.
   if (open) reposition();
 });
-$effect(() => {
+onMount(() => {
   // Example of integrating a vanilla JS library — $refs gives direct DOM access.
   // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
 });
 
-$effect(() => { (() => open)(); (() => {
+let __rozieWatchInitial_0 = true;
+$effect(() => { (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
   if (open) reposition();
-})(); });
+})(); }); });
 
 $effect(() => {
   if (!(open && closeOnOutsideClick)) return;
-  const handler = (e: MouseEvent) => {
-    const target = e.target as Node;
+  const handler = ($event: MouseEvent) => {
+    const target = $event.target as Node;
     if (triggerEl?.contains(target) || panelEl?.contains(target)) return;
     close();
   };
-  document.addEventListener('click', handler);
-  return () => document.removeEventListener('click', handler);
+  let attached = false;
+  let cancelled = false;
+  const timer = setTimeout(() => {
+    if (cancelled) return;
+    document.addEventListener('click', handler);
+    attached = true;
+  }, 0);
+  return () => {
+    cancelled = true;
+    clearTimeout(timer);
+    if (attached) document.removeEventListener('click', handler);
+  };
 });
 
 $effect(() => {
   if (!(open && closeOnEscape)) return;
-  const handler = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape') return;
+  const handler = ($event: KeyboardEvent) => {
+    if ($event.key !== 'Escape') return;
     close();
   };
   document.addEventListener('keydown', handler);
@@ -95,26 +111,19 @@ $effect(() => {
 });
 </script>
 
-
-<div class="dropdown">
-  <div bind:this={triggerEl} onclick={toggle}>
-    {@render trigger?.({ open, toggle })}
-  </div>
-
-  {#if open}<div bind:this={panelEl} class="dropdown-panel" role="menu">
-    {@render children?.({ close })}
-  </div>{/if}</div>
-
+<div {...__rozieAttrs} class={["dropdown", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6d6bd882><div bind:this={triggerEl} onclick={toggle} data-rozie-s-6d6bd882>{@render trigger?.({ open, toggle })}</div>{#if open}<div bind:this={panelEl} class="dropdown-panel" role="menu" data-rozie-s-6d6bd882>{@render children?.({ close })}</div>{/if}</div>
 
 <style>
-.dropdown { position: relative; display: inline-block; }
-.dropdown-panel {
-  position: fixed;
-  z-index: var(--rozie-dropdown-z, 1000);
-  background: white;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+:global {
+  .dropdown[data-rozie-s-6d6bd882] { position: relative; display: inline-block; }
+  .dropdown-panel[data-rozie-s-6d6bd882] {
+    position: fixed;
+    z-index: var(--rozie-dropdown-z, 1000);
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
 }
 
 :global(:root) {
