@@ -12,6 +12,7 @@ import { createDefaultRegistry } from '../modifiers/registerBuiltins.js';
 import { buildManifest } from './buildManifest.js';
 import { parseManifest } from './readManifest.js';
 import { RozieErrorCode } from '../diagnostics/codes.js';
+import * as rozieCoreBarrel from '@rozie/core';
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -219,10 +220,18 @@ describe('parseManifest — malformed input never throws', () => {
 });
 
 describe('@rozie/core barrel exports the manifest surface', () => {
-  it('imports buildManifest, parseManifest, MANIFEST_SCHEMA_VERSION from @rozie/core', async () => {
-    const core = await import('@rozie/core');
-    expect(typeof core.buildManifest).toBe('function');
-    expect(typeof core.parseManifest).toBe('function');
-    expect(core.MANIFEST_SCHEMA_VERSION).toBe(1);
+  // STATIC import, not `await import('@rozie/core')` inside the test body.
+  // Loading the built barrel costs ~4.3s even on an idle machine — 85% of
+  // vitest's default 5000ms testTimeout — so as a dynamic in-test import this
+  // assertion blew its budget under any parallel load and failed
+  // intermittently in `turbo run test --force` while passing when run alone.
+  // Hoisting it moves that cost into the file's import phase, where it is not
+  // charged against a single test's timeout. The assertion is unchanged: it
+  // still proves the PUBLIC barrel (not a relative src path) exposes the
+  // manifest surface.
+  it('imports buildManifest, parseManifest, MANIFEST_SCHEMA_VERSION from @rozie/core', () => {
+    expect(typeof rozieCoreBarrel.buildManifest).toBe('function');
+    expect(typeof rozieCoreBarrel.parseManifest).toBe('function');
+    expect(rozieCoreBarrel.MANIFEST_SCHEMA_VERSION).toBe(1);
   });
 });
