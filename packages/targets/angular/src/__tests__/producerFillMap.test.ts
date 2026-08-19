@@ -19,7 +19,11 @@ import { parse } from '../../../../core/src/parse.js';
 import { lowerToIR } from '../../../../core/src/ir/lower.js';
 import { createDefaultRegistry } from '../../../../core/src/modifiers/registerBuiltins.js';
 import { emitAngular } from '../emitAngular.js';
-import { hasKeyedFillIntake } from '../emit/refineSlotTypes.js';
+import {
+  hasKeyedFillIntake,
+  eligibleSlotFieldNames,
+  buildEligibleSlotDecls,
+} from '../emit/refineSlotTypes.js';
 import type { IRComponent } from '../../../../core/src/ir/types.js';
 
 function lowerAngular(src: string, filename: string): IRComponent {
@@ -72,6 +76,71 @@ const DEFAULT_SLOT_ONLY_PRODUCER = `
 <rozie name="Def2">
 <template>
 <div><slot></slot></div>
+</template>
+</rozie>
+`;
+
+// Quick task 260818-okc (deferred-items.md item 6, candidate D) — a MIXED
+// producer: at least one @ContentChild-eligible slot (`header`, an
+// identifier name) AND at least one record-only slot (`cell-status`,
+// hyphenated — isRecordOnlySlotDecl true). The hyphenated name is what
+// makes hasRecordOnlySlot true (diagnostics are emitted at all); `header`
+// is what mints the eligible field the retimed counting guard reads.
+const MIXED_PRODUCER = `
+<rozie name="Mixed">
+<template>
+<div>
+  <slot name="header"></slot>
+  <slot name="cell-status"></slot>
+</div>
+</template>
+</rozie>
+`;
+
+// Mirrors tests/angular-runtime/fixtures/ProducerRecordPath.rozie exactly:
+// a `:name`-bound record-path slot (dynamicNameExpr set — record-only via
+// isRecordOnlySlotDecl's SECOND trigger, not via a hyphenated name) PLUS a
+// plain default `<slot>`. The default slot is NOT record-only (79-06
+// Assumption A1's '' sentinel is excluded from isRecordOnlySlotName
+// explicitly), so it mints an eligible `defaultTpl` field — this is the
+// real in-repo shape that changes, and its eligible field is the DEFAULT
+// slot's, not an identifier slot's, which a `header`-only fixture would miss.
+const RECORD_PATH_WITH_DEFAULT_PRODUCER = `
+<rozie name="RecordPathWithDefault">
+<props>
+{
+  slotKey: { type: String, default: 'alpha' },
+}
+</props>
+<template>
+<div>
+  <slot :name="slotKey()"></slot>
+  <slot></slot>
+</div>
+</template>
+</rozie>
+`;
+
+// Exercises all four eligibleSlotFieldNames/buildEligibleSlotDecls filter
+// shapes plus the default slot, for the drift fence (case 7 below):
+// identifier (`header`), duplicate identifier (`header` again), a
+// non-identifier record-only name (`cell-status`), a dynamic-name record-
+// only slot (`:name="slotKey()"`), and the default slot.
+const ALL_SLOT_SHAPES_PRODUCER = `
+<rozie name="AllShapes">
+<props>
+{
+  slotKey: { type: String, default: 'x' },
+}
+</props>
+<template>
+<div>
+  <slot name="header"></slot>
+  <slot name="header"></slot>
+  <slot name="cell-status"></slot>
+  <slot :name="slotKey()"></slot>
+  <slot></slot>
+</div>
 </template>
 </rozie>
 `;
@@ -308,5 +377,102 @@ describe('Angular producer — fill map spliced into the resolution chain (Task 
     expect(code).toContain(
       "*ngTemplateOutlet=\"(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])\"",
     );
+  });
+});
+
+// Quick task 260818-okc — closes deferred-items.md item 6 (the mixed-
+// producer false positive on the ngDevMode empty-fill-map warning),
+// RETIMED per candidate D: the check moves from the constructor effect()
+// (empirically falsified at 275c1d64 — the decorator ref is not yet
+// populated there) to a new ngAfterContentInit() lifecycle method, past the
+// point Angular populates @ContentChild refs (confirmed at retimedDiagnostics
+// .probe.test.ts, quick task 260818-okc Task 1). Written against the
+// POST-fix contract — RED at this commit; no emitter source is touched in
+// this task.
+describe('Angular producer — retimed mixed-producer empty-fill-map guard (260818-okc, deferred-items.md #6, candidate D)', () => {
+  it('MIXED_PRODUCER emits a ngAfterContentInit() lifecycle method carrying the dev-mode-guarded counting check', () => {
+    const code = compileAngular(MIXED_PRODUCER, 'Mixed.rozie');
+    const methodMatch = code.match(/ngAfterContentInit\(\) \{[\s\S]*?\n\}/);
+    expect(methodMatch).not.toBeNull();
+    const methodBody = methodMatch![0];
+    expect(methodBody).toContain(
+      'if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;',
+    );
+    expect(methodBody).toContain(
+      'const claimedByStaticRefs = [this.headerTpl].filter((t) => t != null).length;',
+    );
+    expect(methodBody).toContain(
+      'if (this.__rozieFills().length === 0 && this.__rozieProjectedTpls().length > claimedByStaticRefs) {',
+    );
+  });
+
+  it("MIXED_PRODUCER's effect body no longer contains the bare projected-versus-zero comparison, and still contains the duplicate-key branch with its ROZ750 text and component name", () => {
+    const code = compileAngular(MIXED_PRODUCER, 'Mixed.rozie');
+    const effectMatch = code.match(/effect\(\(\) => \{[\s\S]*?\n\}\);/);
+    expect(effectMatch).not.toBeNull();
+    const effectBody = effectMatch![0];
+    expect(effectBody).not.toContain('this.__rozieProjectedTpls().length > 0');
+    expect(effectBody).toContain('ROZ750');
+    expect(effectBody).toContain('Mixed');
+    expect(effectBody).toContain('duplicate keyed fill');
+  });
+
+  it("RECORD_PATH_WITH_DEFAULT_PRODUCER's counting local reads its default-slot field, not an identifier slot's", () => {
+    const code = compileAngular(RECORD_PATH_WITH_DEFAULT_PRODUCER, 'RecordPathWithDefault.rozie');
+    expect(code).toContain(
+      'const claimedByStaticRefs = [this.defaultTpl].filter((t) => t != null).length;',
+    );
+  });
+
+  it('REGRESSION FENCE — RECORD_ONLY_PRODUCER emits NO ngAfterContentInit lifecycle method and keeps the existing bare comparison inside the effect, verbatim', () => {
+    const code = compileAngular(RECORD_ONLY_PRODUCER, 'Cell.rozie');
+    expect(code).not.toContain('ngAfterContentInit');
+    expect(code).toContain(
+      'if (fills.length === 0 && this.__rozieProjectedTpls().length > 0) {',
+    );
+  });
+
+  it('IDENTIFIER_ONLY_PRODUCER and NO_SLOT_PRODUCER emit neither diagnostics nor the new lifecycle method — unchanged from today', () => {
+    const identifierCode = compileAngular(IDENTIFIER_ONLY_PRODUCER, 'X.rozie');
+    expect(identifierCode).not.toContain('__rozieProjectedTpls');
+    expect(identifierCode).not.toContain('__rozieSlotWarned');
+    expect(identifierCode).not.toContain('ngAfterContentInit');
+
+    const noSlotCode = compileAngular(NO_SLOT_PRODUCER, 'Plain.rozie');
+    expect(noSlotCode).not.toContain('__rozieProjectedTpls');
+    expect(noSlotCode).not.toContain('__rozieSlotWarned');
+    expect(noSlotCode).not.toContain('ngAfterContentInit');
+  });
+
+  it('every console. call in MIXED_PRODUCER\'s output is preceded, within its own enclosing emitted region, by the dev-mode guard, and no ambient global declaration is emitted — generalized across BOTH the effect and ngAfterContentInit regions', () => {
+    const code = compileAngular(MIXED_PRODUCER, 'Mixed.rozie');
+    const guardText = 'globalThis as { ngDevMode?: unknown }';
+    const guardIdxs = [...code.matchAll(/globalThis as \{ ngDevMode\?: unknown \}/g)].map(
+      (m) => m.index ?? -1,
+    );
+    void guardText;
+    // Two regions on a mixed producer: the effect() (dup-key only) and the
+    // new ngAfterContentInit() (the retimed empty-fill-map check).
+    expect(guardIdxs.length).toBe(2);
+    const consoleIdxs = [...code.matchAll(/console\./g)].map((m) => m.index ?? -1);
+    expect(consoleIdxs.length).toBeGreaterThan(0);
+    for (const cIdx of consoleIdxs) {
+      const precedingGuards = guardIdxs.filter((g) => g < cIdx);
+      expect(precedingGuards.length).toBeGreaterThan(0);
+    }
+    expect(code).not.toContain('declare global');
+  });
+
+  it("DRIFT FENCE — eligibleSlotFieldNames(slots) equals the field names buildEligibleSlotDecls(slots) actually produced, across identifier, duplicate identifier, non-identifier, dynamic-name, and default-slot shapes", () => {
+    const ir = lowerAngular(ALL_SLOT_SHAPES_PRODUCER, 'AllShapes.rozie');
+    const names = eligibleSlotFieldNames(ir.slots);
+    const decls = buildEligibleSlotDecls(ir.slots);
+    const declFieldNames = decls.map((d) => {
+      const m = d.fieldDecl.match(/\) (\w+)\?:/);
+      return m ? m[1] : null;
+    });
+    expect(names).toEqual(declFieldNames);
+    // Non-vacuity — the shape genuinely exercises more than one field.
+    expect(names.length).toBeGreaterThan(1);
   });
 });
