@@ -14,7 +14,22 @@ on:
 jobs:
   vue-matrix:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20 was too low and was silently eating this workflow. Three separate runs
+    # on 2026-08-19 were killed at 20m20s / 20m22s / 20m24s — always mid
+    # "Install Playwright Chromium", so BOTH the 3.4 and 3.5 legs were skipped
+    # and the workflow reported `cancelled`, which reads like an infra blip or a
+    # concurrency collision rather than a timeout. Successful runs had crept
+    # from ~11m to 17m23s as this job accumulated gates (strict-conformance,
+    # event-name contract, Vue-leaf) on top of the build + unit tests, and the
+    # Phase 80 backlog pushed it over.
+    #
+    # Note this job is also the odd one out structurally: every other matrix
+    # workflow fans its version legs out as parallel matrix jobs, while this one
+    # runs 3.4 and 3.5 sequentially inside a single job — which is why its wall
+    # clock is the longest while its timeout was the shortest (others are
+    # 25-30). Splitting it into a real matrix is the better long-term fix; this
+    # raises the ceiling to unblock verification without that refactor.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
 
