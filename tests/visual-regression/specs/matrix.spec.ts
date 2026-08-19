@@ -1405,7 +1405,42 @@ for (const example of EXAMPLES) {
     runner(`${example} · ${target}`, async ({ page }) => {
       await page.goto(`/?example=${example}&target=${target}`);
       const component = page.getByTestId('rozie-mount');
-      await expect(component).toBeVisible();
+      // MOUNT GATE — do NOT replace this with `toBeVisible()`.
+      //
+      // `expect(component).toBeVisible()` looks like a mount gate and is not
+      // one. `host/reset.css` pins the wrapper to `min-width: 1px;
+      // min-height: 1px` on purpose, so that cells which legitimately render
+      // nothing in their default state still have a screenshottable box. The
+      // side effect is that the STATIC empty `<div data-testid="rozie-mount">`
+      // in every `entry.<target>.html` is ALREADY "visible" at page load,
+      // before a single line of framework code runs — so the assertion passed
+      // instantly and NOTHING waited for the component to mount. The only real
+      // mount gate was `settleExample()`, which covers 41 of the examples; the
+      // ungated ones raced the screenshot matcher and, whenever the container
+      // was slow enough, captured the empty 1x1 wrapper instead of the
+      // component. That is the Docker "Expected an image WxH, received 1px by
+      // 1px" class (Phase 80 deferred item 5): 13 of 13 affected examples were
+      // ungated, 41 of 41 gated examples were unaffected.
+      //
+      // Reproduced deterministically by delaying the JS bundle 3s: with the
+      // delay `toBeVisible()` still PASSES while the box measures 1x1, and the
+      // matcher then emits the exact production signature.
+      //
+      // Gate instead on what the screenshot matcher itself measures — the
+      // wrapper having real layout. Safe for every cell: all 64 committed
+      // baselines have real content, none is 1x1 or has an axis <= 2px, so a
+      // ">1px in some axis" gate cannot block a legitimate cell. A component
+      // that genuinely never mounts now fails as a readable timeout here
+      // rather than as a confusing pixel-size mismatch downstream.
+      await expect
+        .poll(
+          async () => {
+            const box = await component.boundingBox();
+            return box ? Math.max(box.width, box.height) : 0;
+          },
+          { timeout: 15_000 },
+        )
+        .toBeGreaterThan(1);
       await settleExample(example, page);
       // Baseline keyed by example only (D-10) — all 6 targets diff against
       // the same Vue-generated `${example}.png`. The earlier ModalConsumer
