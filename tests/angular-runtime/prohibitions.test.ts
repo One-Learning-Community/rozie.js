@@ -64,6 +64,11 @@ function readExample(name: string): string {
  * and the "did the emitter actually change this fixture" backstop
  * (prohibition 5's machine-checkable half).
  */
+// NOTE: reading this commit requires real git history. CI must check out with
+// `fetch-depth: 0` — actions/checkout's default depth-1 shallow clone does not
+// contain this object, and every gate below then fails with
+// "Command failed: git show …" (134 of 144 tests, one root cause). The
+// angular-matrix workflow sets it explicitly; keep them in sync.
 const BASELINE_COMMIT = '2f9444f51c8cf0d6655cdb7c659c2d8059b19e09';
 
 /** `git show <commit>:<path>` — throws if the path did not exist at that commit. */
