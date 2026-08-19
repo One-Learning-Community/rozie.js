@@ -50,7 +50,7 @@ jobs:
       # don't clobber each other; restore-keys allow partial reuse across
       # commits via turbo's internal content-addressed cache.
       - name: Cache turbo build output
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.job }}-${{ github.sha }}
@@ -170,7 +170,7 @@ jobs:
       # Per-job turbo cache scope via github.job (= 'preact-compat'), so this
       # leg gets its own cache and never clobbers the react-matrix job.
       - name: Cache turbo build output
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.job }}-${{ github.sha }}
